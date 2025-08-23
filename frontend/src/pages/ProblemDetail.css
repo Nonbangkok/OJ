@@ -1,0 +1,212 @@
+/* New Layout Styles */
+.problem-detail-container {
+  display: flex;
+  height: calc(100vh - 60px); /* Full height minus navbar */
+}
+
+.left-nav {
+  width: 280px;
+  flex-shrink: 0;
+  background-color: var(--background-secondary);
+  border-right: 1px solid var(--border-color);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.problem-info h2 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+}
+
+.problem-info p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-family: "Inconsolata";
+}
+
+.problem-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.nav-btn {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  font-size: 1rem;
+  font-weight: 500;
+  text-align: left;
+  border-radius: 6px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.nav-btn:hover {
+  background-color: var(--background-hover);
+  color: var(--text-primary);
+}
+
+.nav-btn.active {
+  background-color: var(--primary-color-faded);
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.right-content {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 2rem;
+}
+
+/* Statement View Specific Styles */
+.statement-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.pdf-preview {
+  flex-grow: 1;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  width: 100%;
+  height: 100%;
+}
+
+.no-pdf-message {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  background-color: var(--background-primary);
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+}
+
+/* Header within content panels */
+.problem-header {
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1.5rem;
+  margin-bottom: 1.5rem;
+  flex-shrink: 0;
+}
+
+.problem-header h1 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.problem-author {
+  color: var(--text-secondary);
+  margin: 0.5rem 0 1rem 0;
+  font-size: 1rem;
+}
+
+.problem-meta {
+  display: flex;
+  gap: 1.5rem;
+  margin: 1rem 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.view-pdf-btn {
+  width: auto;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.view-pdf-btn:hover {
+  background-color: var(--background-tertiary);
+}
+
+/* Submission View Styles */
+.submit-view {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.submission-result-container {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.submission-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  color: var(--text-secondary);
+}
+.summary-item span {
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+.summary-item strong {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.test-cases-table {
+  /* Inherits from Table.css, but we can override if needed */
+  width: 100%;
+}
+
+.output-container {
+    margin-top: 1.5rem;
+}
+.output-container h4 {
+    margin-bottom: 0.5rem;
+    color: var(--text-secondary);
+}
+.output-container pre {
+    background-color: var(--background-primary);
+    padding: 1rem;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-family: "Inconsolata";
+    color: var(--text-primary);
+}
+
+
+/* Status colors */
+.status-accepted, .status-correct {
+  color: #48bb78; /* Green */
+  font-weight: bold;
+}
+
+.status-wrong,
+.status-time,
+.status-memory,
+.status-runtime,
+.status-compilation,
+.status-error {
+  color: #f56565; /* Red */
+  font-weight: bold;
+}
+
+.status-skipped {
+  color: #a0aec0; /* Gray */
+} 

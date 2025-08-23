@@ -1,0 +1,91 @@
+.sign-in-form-container {
+  background-color: var(--background-secondary);
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: var(--box-shadow);
+  border: 1px solid var(--border-color);
+  max-width: 500px;
+  margin: 2rem auto;
+}
+
+.form-container h2,
+.form-container h3 {
+  color: var(--text-primary);
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  box-sizing: border-box; /* Important for width: 100% to work correctly with padding */
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: var(--background-primary);
+  color: var(--text-primary);
+  font-family: var(--font-family-sans-serif);
+  font-size: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Fix for autofill background color */
+.form-group input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 30px var(--background-primary) inset !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+/* General Button Style */
+button, .button {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.85rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  background-color: var(--accent-primary);
+  color: #ffffff;
+  font-family: var(--font-family-sans-serif);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+}
+
+button:hover, .button:hover {
+  background-color: var(--accent-primary-hover);
+}
+
+button:disabled {
+  background-color: var(--background-tertiary);
+  color: var(--text-muted);
+  cursor: not-allowed;
+} 

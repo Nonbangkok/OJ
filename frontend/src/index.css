@@ -1,0 +1,82 @@
+/* Import Google Font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inconsolata:wght@200..900&display=swap');
+
+/* Define CSS variables for theming */
+:root {
+  --background-primary: #ffffff;
+  --background-secondary: #f8f9fa;
+  --background-tertiary: #e9ecef;
+  
+  --text-primary: #212529;
+  --text-secondary: #495057;
+  --text-muted: #6c757d;
+  
+  --border-color: #dee2e6;
+  
+  --accent-primary: #007bff;
+  --accent-primary-hover: #0056b3;
+  
+  --status-success: #28a745;
+  --status-danger: #dc3545;
+  --status-warning: #ffc107;
+  --status-info: #17a2b8;
+
+  --font-family-sans-serif: 'Inter', sans-serif;
+  --box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+}
+
+[data-theme='dark'] {
+  --background-primary: #121212;
+  --background-secondary: #1e1e1e;
+  --background-tertiary: #2a2a2a;
+
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --text-muted: #757575;
+
+  --border-color: #424242;
+
+  --accent-primary: #0d6efd;
+  --accent-primary-hover: #3d8bfd;
+  
+  --status-success: #198754;
+  --status-danger: #dc3545;
+  --status-warning: #ffc107;
+  --status-info: #0dcaf0;
+  
+  --box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.4);
+}
+
+/* Global styles reset and base */
+body {
+  margin: 0;
+  font-family: var(--font-family-sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--background-primary);
+  color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* General container class */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 2rem;
+}
+
+/* Global error message styling */
+.error-message {
+  color: var(--status-danger);
+  background-color: rgba(220, 53, 69, 0.1);
+  border: 1px solid rgba(220, 53, 69, 0.2);
+  padding: 1rem;
+  border-radius: 6px;
+  margin: 1rem 0;
+}

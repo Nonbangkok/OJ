@@ -1,0 +1,26 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "express-session": "^1.18.0",
+    "express-validator": "^7.1.0",
+    "multer": "^2.0.2",
+    "pg": "^8.16.3",
+    "unzipper": "^0.12.3",
+    "uuid": "^9.0.1",
+    "connect-pg-simple": "^9.0.1"
+  }
+}

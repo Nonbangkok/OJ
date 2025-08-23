@@ -1,0 +1,31 @@
+.admin-container {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 2rem;
+}
+
+.admin-container h1 {
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+}
+
+.admin-section {
+  margin-top: 2rem;
+  padding: 2rem;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: var(--box-shadow);
+}
+
+/* This is a general style that will apply to h2 inside the management components */
+.admin-section h2 {
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  color: var(--text-primary);
+  font-size: 1.75rem;
+} 

@@ -1,0 +1,99 @@
+.form-container {
+  width: 80%;
+  margin: 20px auto;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box; /* Important for padding and width */
+}
+
+.form-group textarea {
+  resize: vertical;
+  font-family: monospace;
+}
+
+button {
+  background-color: #4CAF50;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+.output-container {
+  margin-top: 20px;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #282c34;
+  color: #fff;
+  font-family: monospace;
+}
+
+.output-container h3 {
+  margin-top: 0;
+}
+
+.output-container pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+} 
+
+.submission-form-container {
+  background-color: var(--background-secondary);
+  padding: 2rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--box-shadow);
+}
+
+.submission-form-container textarea#code {
+  min-height: 300px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 0.95rem;
+  background-color: #282c34; /* Dark background */
+  color: #abb2bf; /* Light grey text */
+  border: 1px solid #3a3f4b; /* Slightly lighter border */
+  border-radius: 4px;
+  padding: 10px;
+  line-height: 1.5;
+  white-space: pre; /* Keep whitespace */
+  overflow-wrap: normal;
+  overflow-x: auto; /* Allow horizontal scrolling */
+}
+
+.submission-form-container textarea#code:focus {
+  outline: none;
+  border-color: #61afef; /* Highlight on focus */
+  box-shadow: 0 0 0 2px rgba(97, 175, 239, 0.2);
+}
+
+.submission-form-container h3 {
+  text-align: left;
+  margin-top: 0;
+} 
