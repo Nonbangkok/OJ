@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import SubmissionModal from './SubmissionModal';
 import '../components/Table.css';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
 const ProblemSubmissionsList = ({ problemId }) => {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,19 +13,20 @@ const ProblemSubmissionsList = ({ problemId }) => {
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [isStaffOrAdmin, setIsStaffOrAdmin] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
         // Fetch current user
-        const userRes = await axios.get(`${process.env.REACT_APP_API_URL}/me`, { withCredentials: true });
+        const userRes = await axios.get(`${API_URL}/me`, { withCredentials: true });
         if (userRes.data.isAuthenticated) {
           setCurrentUser(userRes.data.user);
         }
 
         // Fetch submissions for the specific problem, only for the current user
-        const subsRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/submissions`, {
+        const subsRes = await axios.get(`${API_URL}/api/submissions`, {
           withCredentials: true,
           params: { 
             problemId,
@@ -45,7 +48,7 @@ const ProblemSubmissionsList = ({ problemId }) => {
 
   const handleViewCode = async (submissionId) => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/submissions/${submissionId}`, {
+      const response = await axios.get(`${API_URL}/api/submissions/${submissionId}`, {
         withCredentials: true,
       });
       setSelectedSubmission(response.data);

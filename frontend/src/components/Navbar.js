@@ -4,9 +4,10 @@ import axios from 'axios';
 import './Navbar.css';
 import ThemeToggleButton from './ThemeToggleButton'; // Import the button
 
-const Navbar = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
+function Navbar() {
+  const [auth, setAuth] = useState({ isAuthenticated: false, user: null });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -15,11 +16,10 @@ const Navbar = () => {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/me`, { withCredentials: true });
-      setIsAuthenticated(response.data.isAuthenticated);
-      if (response.data.isAuthenticated) {
-        setUser(response.data.user);
-      }
+      const response = await axios.get(`${API_URL}/me`, {
+        withCredentials: true
+      });
+      setAuth({ isAuthenticated: response.data.isAuthenticated, user: response.data.user });
     } catch (error) {
       console.error('Error checking auth status:', error);
     }
@@ -27,9 +27,10 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     try {
-      await axios.post(`${process.env.REACT_APP_API_URL}/logout`, {}, { withCredentials: true });
-      setIsAuthenticated(false);
-      setUser(null);
+      await axios.post(`${API_URL}/logout`, {}, {
+        withCredentials: true
+      });
+      setAuth({ isAuthenticated: false, user: null });
       navigate('/');
     } catch (error) {
       console.error('Error logging out:', error);
@@ -44,14 +45,14 @@ const Navbar = () => {
           <li><Link to="/problems">Problems</Link></li>
           <li><Link to="/submissions">Submissions</Link></li>
           <li><Link to="/scoreboard">Scoreboard</Link></li>
-          {(user?.role === 'admin' || user?.role === 'staff') && (
+          {(auth.user?.role === 'admin' || auth.user?.role === 'staff') && (
             <li><Link to="/admin">Admin Panel</Link></li>
           )}
         </ul>
         <div className="nav-actions">
-          {isAuthenticated ? (
+          {auth.isAuthenticated ? (
             <>
-              <span className="username">Welcome, {user?.username}</span>
+              <span className="username">Welcome, {auth.user?.username}</span>
               <button onClick={handleLogout} className="logout-btn">Logout</button>
             </>
           ) : (

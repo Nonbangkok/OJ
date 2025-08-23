@@ -3,6 +3,8 @@ import axios from 'axios';
 import '../Form.css';
 import './ModalLayout.css';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
 const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser }) => {
   const [formData, setFormData] = useState({
     id: '',
@@ -23,7 +25,7 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
   useEffect(() => {
     const fetchAuthors = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/admin/authors`, { withCredentials: true });
+        const response = await axios.get(`${API_URL}/api/admin/authors`, { withCredentials: true });
         setAuthors(response.data);
       } catch (err) {
         console.error("Failed to fetch authors", err);

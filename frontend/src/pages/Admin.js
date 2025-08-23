@@ -4,6 +4,8 @@ import UserManagement from '../components/admin/UserManagement';
 import ProblemManagement from '../components/admin/ProblemManagement';
 import './Admin.css';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
 const Admin = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -11,7 +13,7 @@ const Admin = () => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/me`, { withCredentials: true });
+        const response = await axios.get(`${API_URL}/me`, { withCredentials: true });
         if (response.data.isAuthenticated) {
           setUser(response.data.user);
         }

@@ -3,7 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import '../components/Form.css'; // Use the new shared form styles
 
-const Register = () => {
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
+function Register() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,10 +34,10 @@ const Register = () => {
     }
 
     try {
-      const response = await axios.post(`${process.env.REACT_APP_API_URL}/register`, {
-        username,
-        email,
-        password,
+      const response = await axios.post(`${API_URL}/register`, {
+        username: username,
+        email: email,
+        password: password
       });
       setSuccess('Registration successful! Redirecting to login...');
       setTimeout(() => navigate('/login'), 2000);

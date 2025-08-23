@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import './Problems.css';
+import '../components/Table.css';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
 const Problems = () => {
   const [problems, setProblems] = useState([]);
@@ -11,7 +14,7 @@ const Problems = () => {
   useEffect(() => {
     const fetchProblems = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/problems-with-stats`, {
+        const response = await axios.get(`${API_URL}/api/problems-with-stats`, {
           withCredentials: true,
         });
         setProblems(response.data);

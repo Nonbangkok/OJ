@@ -3,7 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import '../components/Form.css'; // Use the new shared form styles
 
-const Login = () => {
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
+function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -14,8 +16,8 @@ const Login = () => {
     setError('');
 
     try {
-      const response = await axios.post(`${process.env.REACT_APP_API_URL}/login`, { username, password }, {
-        withCredentials: true,
+      const response = await axios.post(`${API_URL}/login`, { username, password }, {
+        withCredentials: true
       });
 
       // Assuming a successful login redirects to the home page

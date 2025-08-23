@@ -3,6 +3,8 @@ import axios from 'axios';
 import './Form.css'; // Use the new shared form styles
 import './CodeSubmissionForm.css'; // Keep for specific adjustments
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
 const CodeSubmissionForm = ({ problemId, onSubmissionResult }) => {
   const [language, setLanguage] = useState('cpp');
   const [code, setCode] = useState('');
@@ -21,7 +23,7 @@ const CodeSubmissionForm = ({ problemId, onSubmissionResult }) => {
     });
 
     try {
-      const response = await axios.post(`${process.env.REACT_APP_API_URL}/submit`, {
+      const response = await axios.post(`${API_URL}/submit`, {
         problemId,
         language,
         code,

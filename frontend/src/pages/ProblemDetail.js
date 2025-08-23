@@ -5,8 +5,9 @@ import './ProblemDetail.css';
 import CodeSubmissionForm from '../components/CodeSubmissionForm';
 import ProblemSubmissionsList from './ProblemSubmissionsList'; // Import the new component
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
-const ProblemDetail = () => {
+function ProblemDetail() {
   const { id } = useParams();
   const [problem, setProblem] = useState(null);
   const [pdfUrl, setPdfUrl] = useState('');
@@ -19,13 +20,13 @@ const ProblemDetail = () => {
   useEffect(() => {
     const fetchProblem = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/problems/${id}`, { withCredentials: true });
+        const response = await axios.get(`${API_URL}/api/problems/${id}`, { withCredentials: true });
         setProblem(response.data);
 
         // After fetching problem, if pdf path exists, fetch the pdf blob
         if (response.data.problem_pdf_path) {
           try {
-            const pdfResponse = await axios.get(`${process.env.REACT_APP_API_URL}${response.data.problem_pdf_path}`, {
+            const pdfResponse = await axios.get(`${API_URL}${response.data.problem_pdf_path}`, {
               withCredentials: true,
               responseType: 'blob',
             });
@@ -59,7 +60,7 @@ const ProblemDetail = () => {
     if (!problem || !problem.problem_pdf_path) return;
     setOpeningPdf(true);
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}${problem.problem_pdf_path}`, {
+      const response = await axios.get(`${API_URL}${problem.problem_pdf_path}`, {
         withCredentials: true,
         responseType: 'blob',
       });

@@ -3,6 +3,8 @@ import axios from 'axios';
 import '../Table.css'; // Use the new shared table styles
 import ProblemModal from './ProblemModal';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
 const ProblemManagement = ({ currentUser }) => {
   const [problems, setProblems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,7 +16,7 @@ const ProblemManagement = ({ currentUser }) => {
   const fetchProblems = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/problems`);
+      const response = await axios.get(`${API_URL}/api/problems`);
       setProblems(response.data);
     } catch (err) {
       setError('Failed to fetch problems.');
@@ -31,7 +33,7 @@ const ProblemManagement = ({ currentUser }) => {
   const handleDelete = async (problemId) => {
     if (window.confirm('Are you sure you want to delete this problem? All related test cases and submissions will also be deleted.')) {
       try {
-        await axios.delete(`${process.env.REACT_APP_API_URL}/api/admin/problems/${problemId}`, { withCredentials: true });
+        await axios.delete(`${API_URL}/api/admin/problems/${problemId}`, { withCredentials: true });
         fetchProblems();
       } catch (err) {
         setError('Failed to delete problem.');
@@ -42,7 +44,7 @@ const ProblemManagement = ({ currentUser }) => {
 
   const handleEdit = async (problem) => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/problems/${problem.id}`);
+      const response = await axios.get(`${API_URL}/api/problems/${problem.id}`);
       setEditingProblem(response.data);
       setIsModalOpen(true);
     } catch (err) {
@@ -65,9 +67,9 @@ const ProblemManagement = ({ currentUser }) => {
       let problemIdForUpload = problemData.id;
       
       if (isEditing) {
-        await axios.put(`${process.env.REACT_APP_API_URL}/api/admin/problems/${editingProblem.id}`, problemData, { withCredentials: true });
+        await axios.put(`${API_URL}/api/admin/problems/${editingProblem.id}`, problemData, { withCredentials: true });
       } else {
-        const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/admin/problems`, problemData, { withCredentials: true });
+        const response = await axios.post(`${API_URL}/api/admin/problems`, problemData, { withCredentials: true });
         problemIdForUpload = response.data.id;
       }
 
@@ -78,7 +80,7 @@ const ProblemManagement = ({ currentUser }) => {
 
         setUploadProgress({ status: 'uploading', message: 'Uploading files to server...' });
         
-        const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/admin/problems/${problemIdForUpload}/upload`, fileData, {
+        const response = await axios.post(`${API_URL}/api/admin/problems/${problemIdForUpload}/upload`, fileData, {
           withCredentials: true,
           headers: { 'Content-Type': 'multipart/form-data' },
         });
@@ -88,7 +90,7 @@ const ProblemManagement = ({ currentUser }) => {
         if (jobId) {
           const pollInterval = setInterval(async () => {
             try {
-              const progressRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/admin/upload-progress/${jobId}`, { withCredentials: true });
+              const progressRes = await axios.get(`${API_URL}/api/admin/upload-progress/${jobId}`, { withCredentials: true });
               const progressData = progressRes.data;
               setUploadProgress(progressData);
 

@@ -5,7 +5,9 @@ import '../components/Table.css'; // Use the new shared table styles
 import './Submissions.css'; // Import the new CSS file
 import SubmissionModal from './SubmissionModal'; // Import the modal
 
-const Submissions = () => {
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
+function Submissions() {
   const [submissions, setSubmissions] = useState([]);
   const [currentUser, setCurrentUser] = useState(null); // Add state for current user
   const [loading, setLoading] = useState(true);
@@ -20,7 +22,7 @@ const Submissions = () => {
       setLoading(true);
       try {
         // Fetch current user
-        const userRes = await axios.get(`${process.env.REACT_APP_API_URL}/me`, {
+        const userRes = await axios.get(`${API_URL}/me`, {
           withCredentials: true,
         });
         if (userRes.data.isAuthenticated) {
@@ -29,7 +31,7 @@ const Submissions = () => {
 
         // Fetch submissions
         const params = filter === 'mine' ? { filter: 'mine' } : {};
-        const subsRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/submissions`, {
+        const subsRes = await axios.get(`${API_URL}/api/submissions`, {
           withCredentials: true,
           params,
         });
@@ -48,7 +50,7 @@ const Submissions = () => {
 
   const handleViewCode = async (submissionId) => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/submissions/${submissionId}`, {
+      const response = await axios.get(`${API_URL}/api/submissions/${submissionId}`, {
         withCredentials: true,
       });
       setSelectedSubmission(response.data);

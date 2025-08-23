@@ -3,7 +3,9 @@ import axios from 'axios';
 import '../Table.css'; // Use the new shared table styles
 import EditUserModal from './EditUserModal';
 
-const UserManagement = () => {
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
+function UserManagement() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -11,10 +13,14 @@ const UserManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/admin/users`, { withCredentials: true });
+      setLoading(true);
+      const response = await axios.get(`${API_URL}/api/admin/users`, { withCredentials: true });
       setUsers(response.data);
     } catch (err) {
-      console.error('Error fetching users:', err);
+      setError('Failed to fetch users.');
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -22,25 +28,26 @@ const UserManagement = () => {
     fetchUsers();
   }, []);
 
-  const handleDeleteUser = async (userId) => {
+  const handleDelete = async (userId) => {
     if (window.confirm('Are you sure you want to delete this user and all their submissions?')) {
       try {
-        await axios.delete(`${process.env.REACT_APP_API_URL}/api/admin/users/${userId}`, { withCredentials: true });
-        fetchUsers();
+        await axios.delete(`${API_URL}/api/admin/users/${userId}`, { withCredentials: true });
+        setUsers(users.filter(user => user.id !== userId));
       } catch (err) {
-        console.error('Error deleting user:', err);
+        setError('Failed to delete user.');
+        console.error(err);
       }
     }
   };
 
-  const handleSubmitUserModal = async (userId, userData) => {
+  const handleSaveUser = async (userId, userData) => {
     try {
-      await axios.put(`${process.env.REACT_APP_API_URL}/api/admin/users/${userId}`, userData, { withCredentials: true });
-      fetchUsers();
-      setShowEditModal(false);
+      await axios.put(`${API_URL}/api/admin/users/${userId}`, userData, { withCredentials: true });
+      setEditingUser(null);
+      fetchUsers(); // Refresh the user list
     } catch (err) {
-      console.error('Error updating user:', err);
-      alert(`Error updating user: ${err.response?.data?.message || err.message}`);
+      setError('Failed to save user details.');
+      console.error(err);
     }
   };
 
@@ -74,7 +81,7 @@ const UserManagement = () => {
                       <button onClick={() => setEditingUser(user)} className="edit-btn">
                         Edit
                       </button>
-                      <button onClick={() => handleDeleteUser(user.id)} className="delete-btn">
+                      <button onClick={() => handleDelete(user.id)} className="delete-btn">
                         Delete
                       </button>
                     </>
@@ -89,7 +96,7 @@ const UserManagement = () => {
         <EditUserModal
           user={editingUser}
           onClose={() => setEditingUser(null)}
-          onSave={handleSubmitUserModal}
+          onSave={handleSaveUser}
         />
       )}
     </div>

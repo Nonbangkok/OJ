@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import '../components/Table.css'; // Use the new shared table styles
 
-const Scoreboard = () => {
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
+function Scoreboard() {
   const [scoreboard, setScoreboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -10,7 +12,9 @@ const Scoreboard = () => {
   useEffect(() => {
     const fetchScoreboard = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/scoreboard`, { withCredentials: true });
+        const response = await axios.get(`${API_URL}/api/scoreboard`, {
+          withCredentials: true,
+        });
         setScoreboard(response.data);
       } catch (err) {
         setError('Failed to fetch scoreboard. Please log in.');
