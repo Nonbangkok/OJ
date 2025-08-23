@@ -7,6 +7,7 @@ const dropTables = async () => {
   await db.query('DROP TABLE IF EXISTS submissions;');
   await db.query('DROP TABLE IF EXISTS problems CASCADE;');
   await db.query('DROP TABLE IF EXISTS users CASCADE;');
+  await db.query('DROP TABLE IF EXISTS user_sessions CASCADE;'); // Add this line
   console.log('Existing tables dropped.');
 }
 
