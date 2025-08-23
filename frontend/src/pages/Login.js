@@ -14,7 +14,7 @@ const Login = () => {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:3000/login', { username, password }, {
+      const response = await axios.post('https://oj-frontend-96or.onrender.com/login', { username, password }, {
         withCredentials: true
       });
 
