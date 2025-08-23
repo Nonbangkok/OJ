@@ -16,6 +16,7 @@ function Login() {
     setError('');
 
     try {
+      console.log(API_URL);
       const response = await axios.post(`${API_URL}/login`, { username, password }, {
         withCredentials: true
       });
