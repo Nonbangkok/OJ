@@ -15,9 +15,7 @@ const Navbar = () => {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await axios.get('http://localhost:3000/me', {
-        withCredentials: true
-      });
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/me`, { withCredentials: true });
       setIsAuthenticated(response.data.isAuthenticated);
       if (response.data.isAuthenticated) {
         setUser(response.data.user);
@@ -29,9 +27,7 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     try {
-      await axios.post('http://localhost:3000/logout', {}, {
-        withCredentials: true
-      });
+      await axios.post(`${process.env.REACT_APP_API_URL}/logout`, {}, { withCredentials: true });
       setIsAuthenticated(false);
       setUser(null);
       navigate('/');

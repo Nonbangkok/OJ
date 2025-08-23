@@ -32,10 +32,10 @@ const Register = () => {
     }
 
     try {
-      const response = await axios.post('http://localhost:3000/register', {
-        username: username,
-        email: email,
-        password: password
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/register`, {
+        username,
+        email,
+        password,
       });
       setSuccess('Registration successful! Redirecting to login...');
       setTimeout(() => navigate('/login'), 2000);

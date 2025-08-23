@@ -14,8 +14,8 @@ const Login = () => {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:3000/login', { username, password }, {
-        withCredentials: true
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/login`, { username, password }, {
+        withCredentials: true,
       });
 
       // Assuming a successful login redirects to the home page

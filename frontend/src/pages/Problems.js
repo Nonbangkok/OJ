@@ -11,7 +11,7 @@ const Problems = () => {
   useEffect(() => {
     const fetchProblems = async () => {
       try {
-        const response = await axios.get('http://localhost:3000/api/problems-with-stats', {
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/problems-with-stats`, {
           withCredentials: true,
         });
         setProblems(response.data);

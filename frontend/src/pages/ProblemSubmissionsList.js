@@ -17,13 +17,13 @@ const ProblemSubmissionsList = ({ problemId }) => {
       setLoading(true);
       try {
         // Fetch current user
-        const userRes = await axios.get('http://localhost:3000/me', { withCredentials: true });
+        const userRes = await axios.get(`${process.env.REACT_APP_API_URL}/me`, { withCredentials: true });
         if (userRes.data.isAuthenticated) {
           setCurrentUser(userRes.data.user);
         }
 
         // Fetch submissions for the specific problem, only for the current user
-        const subsRes = await axios.get('http://localhost:3000/api/submissions', {
+        const subsRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/submissions`, {
           withCredentials: true,
           params: { 
             problemId,
@@ -45,7 +45,7 @@ const ProblemSubmissionsList = ({ problemId }) => {
 
   const handleViewCode = async (submissionId) => {
     try {
-      const response = await axios.get(`http://localhost:3000/api/submissions/${submissionId}`, {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/submissions/${submissionId}`, {
         withCredentials: true,
       });
       setSelectedSubmission(response.data);

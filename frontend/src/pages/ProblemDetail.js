@@ -19,13 +19,13 @@ const ProblemDetail = () => {
   useEffect(() => {
     const fetchProblem = async () => {
       try {
-        const response = await axios.get(`http://localhost:3000/api/problems/${id}`, { withCredentials: true });
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/problems/${id}`, { withCredentials: true });
         setProblem(response.data);
 
         // After fetching problem, if pdf path exists, fetch the pdf blob
         if (response.data.problem_pdf_path) {
           try {
-            const pdfResponse = await axios.get(`http://localhost:3000${response.data.problem_pdf_path}`, {
+            const pdfResponse = await axios.get(`${process.env.REACT_APP_API_URL}${response.data.problem_pdf_path}`, {
               withCredentials: true,
               responseType: 'blob',
             });
@@ -59,7 +59,7 @@ const ProblemDetail = () => {
     if (!problem || !problem.problem_pdf_path) return;
     setOpeningPdf(true);
     try {
-      const response = await axios.get(`http://localhost:3000${problem.problem_pdf_path}`, {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}${problem.problem_pdf_path}`, {
         withCredentials: true,
         responseType: 'blob',
       });

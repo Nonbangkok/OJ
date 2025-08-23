@@ -10,9 +10,7 @@ const Scoreboard = () => {
   useEffect(() => {
     const fetchScoreboard = async () => {
       try {
-        const response = await axios.get('http://localhost:3000/api/scoreboard', {
-          withCredentials: true,
-        });
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/scoreboard`, { withCredentials: true });
         setScoreboard(response.data);
       } catch (err) {
         setError('Failed to fetch scoreboard. Please log in.');
