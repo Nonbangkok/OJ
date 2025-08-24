@@ -1,0 +1,52 @@
+services:
+  database:
+    image: postgres:16-alpine
+    container_name: oj_database
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - oj-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: oj_backend
+    depends_on:
+      - database
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
+      - PORT=3000
+      - SECRET_KEY=${SECRET_KEY}
+      - CORS_ORIGIN=http://localhost # For local development
+    networks:
+      - oj-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - REACT_APP_API_URL=${REACT_APP_API_URL}
+    container_name: oj_frontend
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - oj-network
+    restart: unless-stopped
+
+networks:
+  oj-network:
+    driver: bridge
+
+volumes:
+  db-data:
+    driver: local 
