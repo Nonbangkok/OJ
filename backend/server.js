@@ -364,7 +364,7 @@ app.post('/submit', requireAuth, (req, res) => {
       return res.status(500).json({ message: 'Error saving the code file.' });
     }
 
-    const compileCommand = `clang++ -std=c++20 ${filePath} -o ${outputPath}`;
+    const compileCommand = `g++ -std=c++20 ${filePath} -o ${outputPath}`;
     exec(compileCommand, async (error, stdout, stderr) => {
       // Delete the source .cpp file
       fs.unlink(filePath, (err) => { if (err) console.error("Error deleting .cpp file:", err); });
