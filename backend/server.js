@@ -13,6 +13,12 @@ const unzipper = require('unzipper');
 const { v4: uuidv4 } = require('uuid'); // Add uuid for job tracking
 const isMac = process.platform === 'darwin';
 
+// Ensure submissions directory exists on startup
+const submissionsDir = path.join(__dirname, 'submissions');
+if (!fs.existsSync(submissionsDir)) {
+  fs.mkdirSync(submissionsDir, { recursive: true });
+}
+
 // In-memory store for upload job progress
 const uploadJobs = {};
 
