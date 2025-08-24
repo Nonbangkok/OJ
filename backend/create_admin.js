@@ -1,3 +1,5 @@
+// This script is intended to be run via `docker-compose exec`.
+// Environment variables will be available from the container's environment.
 const readline = require('readline');
 const bcrypt = require('bcrypt');
 const db = require('./db');
