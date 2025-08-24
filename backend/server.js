@@ -1,5 +1,4 @@
 const express = require('express');
-const cors = require('cors');
 const fs = require('fs');
 const { exec } = require('child_process');
 const path = require('path');
@@ -11,7 +10,6 @@ const db = require('./db'); // This is your existing pg pool from db.js
 const multer = require('multer');
 const unzipper = require('unzipper');
 const { v4: uuidv4 } = require('uuid'); // Add uuid for job tracking
-const isMac = process.platform === 'darwin';
 
 // Use memory storage for multer to handle files as buffers
 const storage = multer.memoryStorage();
@@ -21,15 +19,10 @@ const upload = multer({ storage: storage });
 const uploadJobs = {};
 
 const app = express();
-app.set('trust proxy', 1); // Add this line to trust the reverse proxy
-const port = process.env.PORT || 3000;
+app.set('trust proxy', 1); // Trust the reverse proxy for secure cookies
+const port = process.env.PORT;
 
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
-  credentials: true
-}));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
 // PostgreSQL session store setup
 app.use(session({
@@ -37,7 +30,7 @@ app.use(session({
     pool: db.pool, // Use the existing pg pool from db.js
     tableName: 'user_sessions', // Name of the table to store sessions
   }),
-  secret: process.env.SECRET_KEY || 'supersecretkeyformemorydevelopmentonly', // Use environment variable
+  secret: process.env.SECRET_KEY, // Use environment variable
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -77,22 +70,15 @@ const requireStaffOrAdmin = (req, res, next) => {
 
 async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) {
   return new Promise((resolve) => {
-    // Command differs between macOS (BSD time) and Linux (GNU time)
-    const timeCommand = isMac 
-      ? `/usr/bin/time -l` 
-      : `/usr/bin/time -f "TIME_USED:%e MEM_USED:%M"`;
-      
-    // Use bash for more consistent behavior, especially with ulimit.
-    // The command now includes a timeout to kill the process if it hangs.
-    // const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${executablePath}`;
-    const command = isMac
-      ? `(ulimit -v ${memoryLimitMb * 1024}; ${timeCommand} ${executablePath})`
-      : `timeout ${timeLimitMs / 1000}s ${timeCommand} ${executablePath}`;
-
+    // The command for the Linux environment inside Docker
+    const timeCommand = `/usr/bin/time -f "TIME_USED:%e MEM_USED:%M"`;
+    
+    // Use timeout command which is reliable on Linux
+    const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${executablePath}`;
     const executionOptions = { 
-      timeout: timeLimitMs + 500, // Add a small buffer to the exec timeout
-      maxBuffer: 50 * 1024 * 1024, // 50MB buffer
-      shell: '/bin/bash' // Explicitly use bash
+      timeout: timeLimitMs + 500, // 
+      maxBuffer: 50 * 1024 * 1024, // 50MB
+      shell: '/bin/bash'
     };
 
     const child = exec(command, executionOptions, (error, stdout, stderr) => {
@@ -102,43 +88,26 @@ async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) 
       let programStderr = stderr;
 
       if (stderr) {
-        if (isMac) {
-          const timeMatch = stderr.match(/(\d+\.\d+)\s+user\s+(\d+\.\d+)\s+sys/);
-          const memMatch = stderr.match(/(\d+)\s+maximum resident set size/);
-          if (timeMatch) {
-            const userTime = parseFloat(timeMatch[1]);
-            const sysTime = parseFloat(timeMatch[2]);
-            timeMs = Math.round((userTime + sysTime) * 1000);
-          }
-          if (memMatch) {
-            memoryKb = Math.round(parseInt(memMatch[1], 10) / 1024); // Convert bytes to KB
-          }
-        } else { // Linux
-          const timeRegex = /TIME_USED:([0-9.]+)/;
-          const memRegex = /MEM_USED:(\d+)/;
-          const timeMatch = stderr.match(timeRegex);
-          const memMatch = stderr.match(memRegex);
-          if (timeMatch) timeMs = Math.round(parseFloat(timeMatch[1]) * 1000);
-          if (memMatch) memoryKb = parseInt(memMatch[1], 10);
-        }
+        const timeRegex = /TIME_USED:([0-9.]+)/;
+        const memRegex = /MEM_USED:(\d+)/;
+        const timeMatch = stderr.match(timeRegex);
+        const memMatch = stderr.match(memRegex);
+        if (timeMatch) timeMs = Math.round(parseFloat(timeMatch[1]) * 1000);
+        if (memMatch) memoryKb = parseInt(memMatch[1], 10);
+        
         // Clean stderr for reporting
-        programStderr = stderr.split('\n').slice(isMac ? 1 : 0).filter(line => !line.includes('MEM_USED') && !line.includes('maximum resident set size')).join('\n').trim();
+        programStderr = stderr.split('\n').filter(line => !line.includes('MEM_USED') && !line.includes('TIME_USED')).join('\n').trim();
       }
 
       if (error) {
-        // Did it time out? Check for timeout signal or high execution time.
-        if (error.signal === 'SIGTERM' || (error.code === 124 && stderr.includes('TIME_USED'))) { // 'timeout' command exits with 124
+        // Did it time out? 'timeout' command exits with 124
+        if (error.code === 124) { 
           return resolve({ status: 'Time Limit Exceeded', timeMs: timeLimitMs, memoryKb });
         }
         // Did it run out of memory? SIGSEGV is a common indicator.
         if (error.signal === 'SIGSEGV' || stderr.toLowerCase().includes('memory')) {
           return resolve({ status: 'Memory Limit Exceeded', timeMs, memoryKb: memoryLimitMb * 1024 });
         }
-        console.log(programStderr);
-        console.log(error);
-        console.log(timeMs);
-        console.log(memoryKb);
-        console.log(command);
         return resolve({ status: 'Runtime Error', output: programStderr, timeMs, memoryKb });
       }
       
