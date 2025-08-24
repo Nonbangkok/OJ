@@ -3,7 +3,7 @@ import axios from 'axios';
 import '../Form.css';
 import './ModalLayout.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+const API_URL = process.env.REACT_APP_API_URL;
 
 const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser }) => {
   const [formData, setFormData] = useState({

@@ -4,7 +4,7 @@ import UserManagement from '../components/admin/UserManagement';
 import ProblemManagement from '../components/admin/ProblemManagement';
 import './Admin.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+const API_URL = process.env.REACT_APP_API_URL;
 
 const Admin = () => {
   const [user, setUser] = useState(null);

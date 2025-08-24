@@ -5,7 +5,7 @@ import '../components/Table.css'; // Use the new shared table styles
 import './Submissions.css'; // Import the new CSS file
 import SubmissionModal from './SubmissionModal'; // Import the modal
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+const API_URL = process.env.REACT_APP_API_URL;
 
 function Submissions() {
   const [submissions, setSubmissions] = useState([]);

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import '../components/Table.css'; // Use the new shared table styles
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+const API_URL = process.env.REACT_APP_API_URL;
 
 function Scoreboard() {
   const [scoreboard, setScoreboard] = useState([]);

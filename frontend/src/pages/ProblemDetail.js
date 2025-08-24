@@ -5,7 +5,7 @@ import './ProblemDetail.css';
 import CodeSubmissionForm from '../components/CodeSubmissionForm';
 import ProblemSubmissionsList from './ProblemSubmissionsList';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+const API_URL = process.env.REACT_APP_API_URL;
 
 function ProblemDetail() {
   const { id } = useParams();

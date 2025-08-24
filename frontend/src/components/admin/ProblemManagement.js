@@ -3,7 +3,7 @@ import axios from 'axios';
 import '../Table.css'; // Use the new shared table styles
 import ProblemModal from './ProblemModal';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+const API_URL = process.env.REACT_APP_API_URL;
 
 const ProblemManagement = ({ currentUser }) => {
   const [problems, setProblems] = useState([]);
