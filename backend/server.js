@@ -87,8 +87,14 @@ async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) 
       ? `/usr/bin/time -l` 
       : `/usr/bin/time -f "TIME_USED:%e MEM_USED:%M"`;
       
-    const command = `(ulimit -v ${memoryLimitMb * 1024}; ${timeCommand} ${executablePath})`;
-    const executionOptions = { timeout: timeLimitMs, maxBuffer: 50 * 1024 * 1024 }; // 50MB buffer
+    // Use bash for more consistent behavior, especially with ulimit.
+    // The command now includes a timeout to kill the process if it hangs.
+    const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${executablePath}`;
+    const executionOptions = { 
+      timeout: timeLimitMs + 500, // Add a small buffer to the exec timeout
+      maxBuffer: 50 * 1024 * 1024, // 50MB buffer
+      shell: '/bin/bash' // Explicitly use bash
+    };
 
     const child = exec(command, executionOptions, (error, stdout, stderr) => {
       let timeMs = -1;
@@ -121,12 +127,12 @@ async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) 
       }
 
       if (error) {
-        // Did it time out?
-        if (timeMs >= timeLimitMs || error.killed && error.signal === 'SIGTERM') {
+        // Did it time out? Check for timeout signal or high execution time.
+        if (error.signal === 'SIGTERM' || (error.code === 124 && stderr.includes('TIME_USED'))) { // 'timeout' command exits with 124
           return resolve({ status: 'Time Limit Exceeded', timeMs: timeLimitMs, memoryKb });
         }
         // Did it run out of memory? SIGSEGV is a common indicator.
-        if (error.signal === 'SIGSEGV') {
+        if (error.signal === 'SIGSEGV' || stderr.toLowerCase().includes('memory')) {
           return resolve({ status: 'Memory Limit Exceeded', timeMs, memoryKb: memoryLimitMb * 1024 });
         }
         return resolve({ status: 'Runtime Error', output: programStderr, timeMs, memoryKb });
