@@ -1,8 +1,8 @@
 # Use an official Node.js runtime as a parent image. We'll use a recent Long-Term Support (LTS) version.
 FROM node:20-slim
 
-# Install g++ and other essential build tools
-RUN apt-get update && apt-get install -y build-essential
+# Install g++, build tools, and the 'time' utility
+RUN apt-get update && apt-get install -y build-essential time
 
 # Set the working directory inside the container
 WORKDIR /usr/src/app
