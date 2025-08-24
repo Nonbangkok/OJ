@@ -5,9 +5,10 @@ const dropTables = async () => {
   // Drop in reverse order of creation due to foreign key constraints
   // Using CASCADE to handle dependencies automatically
   await db.query('DROP TABLE IF EXISTS submissions;');
+  await db.query('DROP TABLE IF EXISTS testcases;'); // Add this
   await db.query('DROP TABLE IF EXISTS problems CASCADE;');
   await db.query('DROP TABLE IF EXISTS users CASCADE;');
-  await db.query('DROP TABLE IF EXISTS user_sessions CASCADE;'); // Add this line
+  await db.query('DROP TABLE IF EXISTS user_sessions CASCADE;');
   console.log('Existing tables dropped.');
 }
 
@@ -38,9 +39,20 @@ const createTables = async () => {
       id VARCHAR(50) PRIMARY KEY,
       title VARCHAR(255) NOT NULL,
       author VARCHAR(100),
-      problem_pdf_path VARCHAR(255),
+      problem_pdf BYTEA,
       time_limit_ms INT DEFAULT 2000,
       memory_limit_mb INT DEFAULT 256
+    );
+  `;
+
+  const testcasesTable = `
+    CREATE TABLE IF NOT EXISTS testcases (
+      id SERIAL PRIMARY KEY,
+      problem_id VARCHAR(50) REFERENCES problems(id) ON DELETE CASCADE,
+      case_number INT NOT NULL,
+      input_data TEXT NOT NULL,
+      output_data TEXT NOT NULL,
+      UNIQUE (problem_id, case_number)
     );
   `;
 
@@ -64,6 +76,7 @@ const createTables = async () => {
     await db.query(usersTable);
     await db.query(sessionTable);
     await db.query(problemsTable);
+    await db.query(testcasesTable); // Add this
     await db.query(submissionsTable);
     console.log('Tables created successfully!');
   } catch (err) {

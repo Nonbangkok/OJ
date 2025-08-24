@@ -3,41 +3,25 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import './ProblemDetail.css';
 import CodeSubmissionForm from '../components/CodeSubmissionForm';
-import ProblemSubmissionsList from './ProblemSubmissionsList'; // Import the new component
+import ProblemSubmissionsList from './ProblemSubmissionsList';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
 function ProblemDetail() {
   const { id } = useParams();
   const [problem, setProblem] = useState(null);
-  const [pdfUrl, setPdfUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [openingPdf, setOpeningPdf] = useState(false);
   const [submissionResult, setSubmissionResult] = useState(null);
-  const [activeView, setActiveView] = useState('statement'); // 'statement', 'submit', or 'submissions'
+  const [activeView, setActiveView] = useState('statement');
+
+  const pdfEndpointUrl = `${API_URL}/api/problems/${id}/pdf`;
 
   useEffect(() => {
     const fetchProblem = async () => {
       try {
         const response = await axios.get(`${API_URL}/api/problems/${id}`, { withCredentials: true });
         setProblem(response.data);
-
-        // After fetching problem, if pdf path exists, fetch the pdf blob
-        if (response.data.problem_pdf_path) {
-          try {
-            const pdfResponse = await axios.get(`${API_URL}${response.data.problem_pdf_path}`, {
-              withCredentials: true,
-              responseType: 'blob',
-            });
-            const file = new Blob([pdfResponse.data], { type: 'application/pdf' });
-            const fileURL = URL.createObjectURL(file);
-            setPdfUrl(fileURL);
-          } catch (pdfErr) {
-            console.error('Failed to fetch PDF:', pdfErr);
-            setError('Problem data loaded, but the PDF could not be displayed.');
-          }
-        }
       } catch (err) {
         setError(`Failed to fetch problem ${id}.`);
         console.error(err);
@@ -47,46 +31,21 @@ function ProblemDetail() {
     };
 
     fetchProblem();
-    
-    // Cleanup object URL on component unmount
-    return () => {
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl);
-      }
-    };
-  }, [id]); // Rerun when id changes, pdfUrl is not needed here
+  }, [id]);
 
-  const handlePdfView = async () => {
-    if (!problem || !problem.problem_pdf_path) return;
-    setOpeningPdf(true);
-    try {
-      const response = await axios.get(`${API_URL}${problem.problem_pdf_path}`, {
-        withCredentials: true,
-        responseType: 'blob',
-      });
-      
-      const file = new Blob([response.data], { type: 'application/pdf' });
-      const fileURL = URL.createObjectURL(file);
-      window.open(fileURL, '_blank');
-
-    } catch (err) {
-      console.error('Failed to open PDF:', err);
-      setError('Could not open the problem PDF. It may not exist or you may not have permission.');
-    } finally {
-      setOpeningPdf(false);
-    }
+  const handlePdfView = () => {
+    if (!problem || !problem.has_pdf) return;
+    window.open(pdfEndpointUrl, '_blank');
   };
 
   const handleSubmissionResult = (result) => {
     setSubmissionResult(result);
   };
 
-   // Helper to format status for CSS classes
   const getStatusClass = (status) => {
     if (!status) return '';
     return `status-${status.split(' ')[0].toLowerCase()}`;
   }
-
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div className="error-message">{error}</div>;
@@ -104,18 +63,17 @@ function ProblemDetail() {
                 <span>Time Limit: {problem.time_limit_ms} ms</span>
                 <span>Memory Limit: {problem.memory_limit_mb} MB</span>
               </div>
-              {problem.problem_pdf_path && (
+              {problem.has_pdf && (
                 <button 
                   onClick={handlePdfView}
-                  disabled={openingPdf}
                   className="view-pdf-btn"
                 >
-                  {openingPdf ? 'Opening...' : 'View Problem PDF in New Tab'}
+                  View Problem PDF in New Tab
                 </button>
               )}
             </div>
-            {pdfUrl ? (
-              <iframe src={pdfUrl} title={`${problem.title} PDF`} className="pdf-preview" />
+            {problem.has_pdf ? (
+              <iframe src={pdfEndpointUrl} title={`${problem.title} PDF`} className="pdf-preview" />
             ) : (
               <div className="no-pdf-message">No PDF available for preview.</div>
             )}

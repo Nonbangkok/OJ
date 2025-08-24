@@ -13,17 +13,12 @@ const unzipper = require('unzipper');
 const { v4: uuidv4 } = require('uuid'); // Add uuid for job tracking
 const isMac = process.platform === 'darwin';
 
-// Ensure submissions directory exists on startup
-const submissionsDir = path.join(__dirname, 'submissions');
-if (!fs.existsSync(submissionsDir)) {
-  fs.mkdirSync(submissionsDir, { recursive: true });
-}
+// Use memory storage for multer to handle files as buffers
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 // In-memory store for upload job progress
 const uploadJobs = {};
-
-// Setup for file uploads
-const upload = multer({ dest: 'uploads/' });
 
 const app = express();
 app.set('trust proxy', 1); // Add this line to trust the reverse proxy
@@ -89,7 +84,11 @@ async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) 
       
     // Use bash for more consistent behavior, especially with ulimit.
     // The command now includes a timeout to kill the process if it hangs.
-    const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${executablePath}`;
+    // const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${executablePath}`;
+    const command = isMac
+      ? `(ulimit -v ${memoryLimitMb * 1024}; ${timeCommand} ${executablePath})`
+      : `timeout ${timeLimitMs / 1000}s ${timeCommand} ${executablePath}`;
+
     const executionOptions = { 
       timeout: timeLimitMs + 500, // Add a small buffer to the exec timeout
       maxBuffer: 50 * 1024 * 1024, // 50MB buffer
@@ -159,38 +158,23 @@ async function judge(problemId, executablePath) {
     }
     const { time_limit_ms, memory_limit_mb } = problemRes.rows[0];
 
-    const testcasesDir = path.join(__dirname, 'problems', problemId, 'testcases');
-    const files = await fs.promises.readdir(testcasesDir);
-    
-    const inFileRegex = /(\d+)\.in$/;
-    const inFiles = files
-      .filter(f => inFileRegex.test(f))
-      .sort((a, b) => parseInt(a.match(inFileRegex)[1]) - parseInt(b.match(inFileRegex)[1]));
+    const testcasesRes = await db.query('SELECT case_number, input_data, output_data FROM testcases WHERE problem_id = $1 ORDER BY case_number ASC', [problemId]);
+    const testcases = testcasesRes.rows;
 
-    if (inFiles.length === 0) {
+    if (testcases.length === 0) {
       return { overallStatus: "System Error", score: 0, results: [{ testCase: 1, status: 'No test cases found' }] };
     }
 
     const results = [];
-    for (let i = 0; i < inFiles.length; i++) {
-      const inFile = inFiles[i];
-      const caseNumber = parseInt(inFile.match(inFileRegex)[1]);
-      const outFile = `${caseNumber}.out`;
+    for (const testcase of testcases) {
+      const { case_number, input_data, output_data } = testcase;
 
-      if (!files.includes(outFile)) {
-        results.push({ testCase: caseNumber, status: 'System Error: Missing output file' });
-        continue; // Skip to next test case
-      }
-
-      const input = await fs.promises.readFile(path.join(testcasesDir, inFile), 'utf8');
-      const expectedOutput = await fs.promises.readFile(path.join(testcasesDir, outFile), 'utf8');
-
-      const runResult = await runSingleCase(executablePath, input, time_limit_ms, memory_limit_mb);
+      const runResult = await runSingleCase(executablePath, input_data, time_limit_ms, memory_limit_mb);
       
       // Now, compare output
       if (runResult.status === 'Pending') {
         const formattedStdout = runResult.output.trim().replace(/\r\n/g, '\n');
-        const formattedExpectedOutput = expectedOutput.trim().replace(/\r\n/g, '\n');
+        const formattedExpectedOutput = output_data.trim().replace(/\r\n/g, '\n');
         if (formattedStdout === formattedExpectedOutput) {
           runResult.status = 'Accepted';
         } else {
@@ -199,7 +183,7 @@ async function judge(problemId, executablePath) {
       }
       
       results.push({
-        testCase: caseNumber,
+        testCase: case_number,
         status: runResult.status,
         timeMs: runResult.timeMs,
         memoryKb: runResult.memoryKb,
@@ -210,16 +194,15 @@ async function judge(problemId, executablePath) {
       if (runResult.status !== 'Accepted') {
         // To show all results, comment out the loop break.
         // For now, let's fill the rest with 'Skipped' to show the user there are more.
-        for (let j = i + 1; j < inFiles.length; j++) {
-            const skippedCaseNum = parseInt(inFiles[j].match(inFileRegex)[1]);
-            results.push({ testCase: skippedCaseNum, status: 'Skipped' });
+        for (let j = testcases.findIndex(t => t.case_number === case_number) + 1; j < testcases.length; j++) {
+            results.push({ testCase: testcases[j].case_number, status: 'Skipped' });
         }
         break; 
       }
     }
 
     const passedCases = results.filter(r => r.status === 'Accepted').length;
-    const totalCases = inFiles.length;
+    const totalCases = testcases.length;
     const score = totalCases > 0 ? Math.round((passedCases / totalCases) * 100) : 0;
     const firstFailed = results.find(r => r.status !== 'Accepted');
     const overallStatus = firstFailed ? firstFailed.status : 'Accepted';
@@ -355,7 +338,7 @@ app.get('/me', (req, res) => {
   }
 });
 
-app.post('/submit', requireAuth, (req, res) => {
+app.post('/submit', requireAuth, upload.none(), (req, res) => { // Use upload.none() if this route doesn't handle file uploads
   const { problemId, language, code } = req.body;
 
   if (language !== 'cpp') {
@@ -368,6 +351,12 @@ app.post('/submit', requireAuth, (req, res) => {
   const submissionId = Date.now();
   const filePath = path.join(__dirname, 'submissions', `${submissionId}.cpp`);
   const outputPath = path.join(__dirname, 'submissions', `${submissionId}.out`);
+
+  // We still need to write temporary files for compilation
+  const submissionsDir = path.join(__dirname, 'submissions');
+  if (!fs.existsSync(submissionsDir)) {
+    fs.mkdirSync(submissionsDir, { recursive: true });
+  }
 
   fs.writeFile(filePath, code, (err) => {
     if (err) {
@@ -476,7 +465,7 @@ app.get('/api/problems', async (req, res) => {
 app.get('/api/problems/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await db.query('SELECT * FROM problems WHERE id = $1', [id]);
+    const result = await db.query('SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf FROM problems WHERE id = $1', [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Problem not found' });
     }
@@ -487,16 +476,20 @@ app.get('/api/problems/:id', async (req, res) => {
   }
 });
 
-app.get('/api/problems/:id/pdf', requireAuth, (req, res) => {
+app.get('/api/problems/:id/pdf', requireAuth, async (req, res) => {
   const { id } = req.params;
-  const pdfPath = path.join(__dirname, 'problems', id, 'pdf', `${id}.pdf`);
-  
-  fs.access(pdfPath, fs.constants.F_OK, (err) => {
-    if (err) {
+  try {
+    const result = await db.query('SELECT problem_pdf FROM problems WHERE id = $1', [id]);
+    if (result.rows.length === 0 || !result.rows[0].problem_pdf) {
       return res.status(404).json({ message: 'Problem PDF not found.' });
     }
-    res.sendFile(pdfPath);
-  });
+    const pdfData = result.rows[0].problem_pdf;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.send(pdfData);
+  } catch (error) {
+    console.error(`Error fetching PDF for problem ${id}:`, error);
+    res.status(500).json({ message: 'Error fetching PDF' });
+  }
 });
 
 app.get('/api/submissions', requireAuth, async (req, res) => {
@@ -801,15 +794,11 @@ async function processUploads(jobId, id, problemPdfFile, testcasesZipFile) {
   try {
     const job = uploadJobs[jobId];
     
-    // Handle PDF upload (unchanged)
+    // Handle PDF upload
     if (problemPdfFile) {
       job.message = 'Processing PDF...';
-      const problemDir = path.join(__dirname, 'problems', id);
-      const newPdfDir = path.join(problemDir, 'pdf');
-      const newPdfPath = path.join(newPdfDir, `${id}.pdf`);
-      await fs.promises.mkdir(newPdfDir, { recursive: true });
-      await fs.promises.rename(problemPdfFile.path, newPdfPath);
-      await db.query('UPDATE problems SET problem_pdf_path = $1 WHERE id = $2', [`/api/problems/${id}/pdf`, id]);
+      const pdfBuffer = problemPdfFile.buffer;
+      await db.query('UPDATE problems SET problem_pdf = $1 WHERE id = $2', [pdfBuffer, id]);
     }
 
     // Handle Testcases ZIP upload with progress tracking
@@ -817,12 +806,10 @@ async function processUploads(jobId, id, problemPdfFile, testcasesZipFile) {
       job.status = 'processing';
       job.message = 'Analyzing ZIP file...';
       
-      const testcasesDir = path.join(__dirname, 'problems', id, 'testcases');
-      await fs.promises.rm(testcasesDir, { recursive: true, force: true });
-      await fs.promises.mkdir(testcasesDir, { recursive: true });
+      // Clear existing testcases for this problem
+      await db.query('DELETE FROM testcases WHERE problem_id = $1', [id]);
 
-      // Use unzipper.Open.file for more reliable directory parsing
-      const zip = await unzipper.Open.file(testcasesZipFile.path);
+      const zip = await unzipper.Open.buffer(testcasesZipFile.buffer);
       const testcaseFiles = {};
       const fileRegex = /^(?:input|output)?(\d+)\.(?:in|out|txt)$/i;
 
@@ -843,20 +830,15 @@ async function processUploads(jobId, id, problemPdfFile, testcasesZipFile) {
           }
 
           const lowerFileName = fileName.toLowerCase();
-          // Prioritize .in/.out extensions, then check for "input"/"output" in filename
-          if (lowerFileName.endsWith('.in')) {
+          if (lowerFileName.endsWith('.in') || lowerFileName.includes('input')) {
              testcaseFiles[number].in = file;
-          } else if (lowerFileName.endsWith('.out')) {
-             testcaseFiles[number].out = file;
-          } else if (lowerFileName.includes('input')) {
-             testcaseFiles[number].in = file;
-          } else if (lowerFileName.includes('output')) {
+          } else if (lowerFileName.endsWith('.out') || lowerFileName.includes('output')) {
              testcaseFiles[number].out = file;
           }
         }
       }
 
-      // Second pass: sort and write the collected entries
+      // Second pass: read content and insert into DB
       const sortedKeys = Object.keys(testcaseFiles).map(Number).sort((a, b) => a - b);
       const pairedCases = sortedKeys.filter(key => testcaseFiles[key].in && testcaseFiles[key].out);
       
@@ -864,33 +846,25 @@ async function processUploads(jobId, id, problemPdfFile, testcasesZipFile) {
       if (job.total === 0) {
           job.status = 'failed';
           job.message = 'No valid testcase pairs (.in/.out or input/output) found in the ZIP file.';
-          await fs.promises.unlink(testcasesZipFile.path);
-          return; // Exit the function
+          return;
       }
       
       let caseCounter = 1;
-      const writePromises = [];
-
       for (const key of pairedCases) {
         const pair = testcaseFiles[key];
         job.progress = caseCounter;
         job.message = `Processing testcase ${job.progress} of ${job.total}...`;
 
-        const inPath = path.join(testcasesDir, `${caseCounter}.in`);
-        const outPath = path.join(testcasesDir, `${caseCounter}.out`);
+        const inputData = await pair.in.buffer();
+        const outputData = await pair.out.buffer();
 
-        // Create write streams from the file entries
-        writePromises.push(new Promise((resolve, reject) => 
-          pair.in.stream().pipe(fs.createWriteStream(inPath)).on('finish', resolve).on('error', reject)
-        ));
-        writePromises.push(new Promise((resolve, reject) => 
-          pair.out.stream().pipe(fs.createWriteStream(outPath)).on('finish', resolve).on('error', reject)
-        ));
+        await db.query(
+          'INSERT INTO testcases (problem_id, case_number, input_data, output_data) VALUES ($1, $2, $3, $4)',
+          [id, caseCounter, inputData.toString('utf-8'), outputData.toString('utf-8')]
+        );
+
         caseCounter++;
       }
-      
-      await Promise.all(writePromises);
-      await fs.promises.unlink(testcasesZipFile.path);
     }
 
     job.status = 'completed';
@@ -902,9 +876,6 @@ async function processUploads(jobId, id, problemPdfFile, testcasesZipFile) {
       uploadJobs[jobId].status = 'failed';
       uploadJobs[jobId].message = 'An error occurred during processing.';
     }
-    // Cleanup failed uploads
-    if (problemPdfFile) await fs.promises.unlink(problemPdfFile.path).catch(e => console.error('Cleanup error:', e));
-    if (testcasesZipFile) await fs.promises.unlink(testcasesZipFile.path).catch(e => console.error('Cleanup error:', e));
   }
 }
 
