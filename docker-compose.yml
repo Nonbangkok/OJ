@@ -23,7 +23,6 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
       - PORT=3000
       - SECRET_KEY=${SECRET_KEY}
-      - CORS_ORIGIN=http://localhost # For local development
     networks:
       - oj-network
     restart: unless-stopped
