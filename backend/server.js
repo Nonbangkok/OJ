@@ -135,6 +135,11 @@ async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) 
         if (error.signal === 'SIGSEGV' || stderr.toLowerCase().includes('memory')) {
           return resolve({ status: 'Memory Limit Exceeded', timeMs, memoryKb: memoryLimitMb * 1024 });
         }
+        console.log(programStderr);
+        console.log(error);
+        console.log(timeMs);
+        console.log(memoryKb);
+        console.log(command);
         return resolve({ status: 'Runtime Error', output: programStderr, timeMs, memoryKb });
       }
       
