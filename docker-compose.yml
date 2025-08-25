@@ -36,8 +36,20 @@ services:
     container_name: oj_frontend
     depends_on:
       - backend
+    networks:
+      - oj-network
+    restart: unless-stopped
+
+  nginx-proxy:
+    image: nginx:1.25-alpine
+    container_name: oj_proxy
+    depends_on:
+      - frontend
     ports:
       - "80:80"
+      - "443:443" # For future SSL
+    volumes:
+      - ./nginx-proxy:/etc/nginx/conf.d
     networks:
       - oj-network
     restart: unless-stopped
