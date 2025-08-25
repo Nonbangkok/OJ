@@ -83,6 +83,9 @@ async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) 
       shell: '/bin/bash'
     };
 
+    let hasEpipError = false;
+    let epipErrorMessage = '';
+
     const child = exec(command, executionOptions, (error, stdout, stderr) => {
       let timeMs = -1;
       let memoryKb = -1;
@@ -101,6 +104,16 @@ async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) 
         programStderr = stderr.split('\n').filter(line => !line.includes('MEM_USED') && !line.includes('TIME_USED')).join('\n').trim();
       }
 
+      // If we had an EPIPE error, prioritize it over other errors
+      if (hasEpipError) {
+        return resolve({ 
+          status: 'Runtime Error', 
+          output: epipErrorMessage || 'Program crashed while receiving input (EPIPE)', 
+          timeMs, 
+          memoryKb 
+        });
+      }
+
       if (error) {
         // Did it time out? 'timeout' command exits with 124
         if (error.code === 124) { 
@@ -110,10 +123,43 @@ async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) 
         if (error.signal === 'SIGSEGV' || stderr.toLowerCase().includes('memory')) {
           return resolve({ status: 'Memory Limit Exceeded', timeMs, memoryKb: memoryLimitMb * 1024 });
         }
-        return resolve({ status: 'Runtime Error', output: programStderr, timeMs, memoryKb });
+        // For other errors, treat as Runtime Error
+        return resolve({ 
+          status: 'Runtime Error', 
+          output: programStderr || error.message || 'Program terminated unexpectedly', 
+          timeMs, 
+          memoryKb 
+        });
       }
       
       resolve({ status: 'Pending', output: programOutput, timeMs, memoryKb });
+    });
+
+    // Prevent EPIPE errors from crashing the main process.
+    // These can happen if the child process exits or crashes before stdin is fully written.
+    child.stdin.on('error', (err) => {
+      if (err.code === 'EPIPE') {
+        hasEpipError = true;
+        epipErrorMessage = `Program crashed while receiving input: ${err.message}`;
+        console.warn(`Caught EPIPE on stdin for executable ${executablePath}. Error: ${err.message}`);
+      }
+    });
+
+    // Also catch errors on the child process itself
+    child.on('error', (err) => {
+      console.warn(`Child process error for ${executablePath}:`, err);
+      if (!hasEpipError) {
+        hasEpipError = true;
+        epipErrorMessage = `Process error: ${err.message}`;
+      }
+    });
+
+    // Handle process exit with non-zero code
+    child.on('exit', (code, signal) => {
+      if (code !== 0 && signal !== null && !hasEpipError) {
+        hasEpipError = true;
+        epipErrorMessage = `Process exited with code ${code} and signal ${signal}`;
+      }
     });
 
     child.stdin.write(input);
