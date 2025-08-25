@@ -33,7 +33,7 @@
 }
 
 .problem-info {
-  flex-grow: 1;
+  flex-grow: 0.6;
 }
 
 .problem-title {
@@ -68,19 +68,20 @@
 }
 
 .problem-score-placeholder {
-  width: 250px; /* Match the width of the score details */
+  width: 300px; /* Match the width of the score details */
   min-height: 22px; /* Reserve space for the score bar */
+  flex-grow: 0.4;
 }
 
 .problem-score-details {
     display: flex;
     align-items: center;
     gap: 1rem;
-    width: 250px; /* Fixed width for alignment */
+    width: 400px; /* Fixed width for alignment */
 }
 
 .score-bar-container {
-    width: 100%;
+    width: 200px;
     height: 20px;
     background-color: var(--background-tertiary);
     border-radius: 6px;
