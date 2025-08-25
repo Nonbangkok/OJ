@@ -27,21 +27,25 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #4a5568;
-  padding-bottom: 1rem;
-  margin-bottom: 1rem;
+  position: relative; /* Add relative positioning */
 }
 
 .modal-header h2 {
   margin: 0;
+  flex-grow: 1; /* Allow h2 to take up available space */
 }
 
 .close-btn {
   background: none;
   border: none;
-  color: #e2e8f0;
-  font-size: 2.5rem;
+  font-size: 2rem;
   cursor: pointer;
+  color: var(--text-color);
+  padding: 0;
+  top: 10px;
+  right: 10px;
+  width: 50px;
+  height: 50px;
 }
 
 .modal-body {
@@ -58,9 +62,6 @@
 }
 
 .modal-footer {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid #4a5568;
   overflow-y: auto;
 }
 

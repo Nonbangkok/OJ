@@ -94,7 +94,7 @@ function Submissions() {
         </div>
       </div>
       <div className="table-container">
-        <table className="table">
+        <table className="submissions-table">
           <thead>
             <tr>
               <th>ID</th>
@@ -118,10 +118,14 @@ function Submissions() {
                 <td>{sub.score}</td>
                 <td>{sub.language}</td>
                 <td>
-                  {currentUser && (currentUser.username === sub.username || currentUser.role === 'admin' || currentUser.role === 'staff') && (
+                  {currentUser && (currentUser.username === sub.username || currentUser.role === 'admin' || currentUser.role === 'staff') ? (
                     <button onClick={() => handleViewCode(sub.id)} className="view-code-btn">
                       View Code
                     </button>
+                  ) : (
+                    <div className="view-code-btn" style={{ visibility: 'hidden' }} aria-hidden="true">
+                      View Code
+                    </div>
                   )}
                 </td>
               </tr>

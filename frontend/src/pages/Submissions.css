@@ -32,4 +32,23 @@
   background-color: var(--background-primary);
   color: var(--text-primary);
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.submissions-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  box-sizing: border-box;
+}
+
+.submissions-table td,
+.submissions-table th {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle; /* Ensure vertical alignment is consistent */
+}
+
+.view-code-btn {
+  padding: 8px 12px;
 } 
