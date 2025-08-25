@@ -51,4 +51,15 @@
 
 .view-code-btn {
   padding: 8px 12px;
-} 
+}
+
+a {
+  text-decoration: underline;
+  color: var(--text-primary);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+a:hover {
+  color: var(--text-secondary);
+}
