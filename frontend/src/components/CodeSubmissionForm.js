@@ -1,29 +1,26 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './Form.css'; // Use the new shared form styles
 import './CodeSubmissionForm.css'; // Keep for specific adjustments
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-const CodeSubmissionForm = ({ problemId, onSubmissionResult }) => {
+const CodeSubmissionForm = ({ problemId }) => {
   const [language, setLanguage] = useState('cpp');
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // Provide a structured initial state for the parent to render
-    onSubmissionResult({ 
-      overallStatus: 'Judging...', 
-      score: '–', 
-      maxTimeMs: '–', 
-      maxMemoryKb: '–',
-      results: [] 
-    });
+    setError('');
 
     try {
-      const response = await axios.post(`${API_URL}/submit`, {
+      // The backend now responds immediately with a submission ID
+      await axios.post(`${API_URL}/submit`, {
         problemId,
         language,
         code,
@@ -31,24 +28,16 @@ const CodeSubmissionForm = ({ problemId, onSubmissionResult }) => {
         withCredentials: true
       });
 
-      // The backend now returns the full, structured result. Pass it directly.
-      onSubmissionResult(response.data);
+      // On success, navigate to the submissions page
+      navigate('/submissions');
 
-    } catch (error) {
-      const errorData = error.response?.data || {};
-      // On error, create a result object that still fits the display structure
-      onSubmissionResult({
-        overallStatus: 'Submission Error',
-        score: 0,
-        results: [{ testCase: 1, status: errorData.message || 'An unexpected error occurred.' }],
-        output: errorData.output,
-        maxTimeMs: 0,
-        maxMemoryKb: 0,
-      });
-      console.error('Error submitting code:', error);
-    } finally {
-      setIsSubmitting(false);
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'An unexpected error occurred.';
+      setError(errorMsg);
+      console.error('Error submitting code:', err);
+      setIsSubmitting(false); // Re-enable the form on error
     }
+    // No finally block to reset isSubmitting, because we are navigating away
   };
 
   const handleTabKey = (e) => {
@@ -72,6 +61,7 @@ const CodeSubmissionForm = ({ problemId, onSubmissionResult }) => {
   return (
     <div className="submission-form-container">
       <h3>Submit Solution</h3>
+      {error && <p className="error-message" style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label htmlFor="language">Language:</label>

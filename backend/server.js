@@ -307,81 +307,104 @@ app.get('/me', (req, res) => {
   }
 });
 
-app.post('/submit', requireAuth, upload.none(), (req, res) => { // Use upload.none() if this route doesn't handle file uploads
+app.post('/submit', requireAuth, upload.none(), async (req, res) => {
   const { problemId, language, code } = req.body;
+  const { userId } = req.session;
 
   if (language !== 'cpp') {
     return res.status(400).json({ message: 'Only C++ is supported.' });
   }
-  if (!problemId) {
-    return res.status(400).json({ message: 'Problem ID is required.' });
+  if (!problemId || !code) {
+    return res.status(400).json({ message: 'Problem ID and code are required.' });
   }
 
-  const submissionId = Date.now();
-  const filePath = path.join(__dirname, 'submissions', `${submissionId}.cpp`);
-  const outputPath = path.join(__dirname, 'submissions', `${submissionId}.out`);
+  try {
+    const submissionRes = await db.query(
+      `INSERT INTO submissions (user_id, problem_id, code, language, overall_status, score)
+       VALUES ($1, $2, $3, $4, 'Pending', 0) RETURNING id`,
+      [userId, problemId, code, language]
+    );
+    const submissionId = submissionRes.rows[0].id;
 
-  // We still need to write temporary files for compilation
-  const submissionsDir = path.join(__dirname, 'submissions');
-  if (!fs.existsSync(submissionsDir)) {
-    fs.mkdirSync(submissionsDir, { recursive: true });
+    res.status(202).json({
+      message: 'Submission received and is being processed.',
+      submissionId: submissionId
+    });
+
+    // Fire-and-forget background processing
+    processSubmission(submissionId);
+
+  } catch (dbError) {
+    console.error("Error creating initial submission:", dbError);
+    res.status(500).json({ message: "Failed to queue submission." });
   }
+});
 
-  fs.writeFile(filePath, code, (err) => {
-    if (err) {
-      console.error('Error writing file:', err);
-      return res.status(500).json({ message: 'Error saving the code file.' });
+async function processSubmission(submissionId) {
+  let filePath = '';
+  let outputPath = '';
+
+  try {
+    const subRes = await db.query('SELECT * FROM submissions WHERE id = $1', [submissionId]);
+    if (subRes.rows.length === 0) {
+      console.error(`Submission ${submissionId} not found for processing.`);
+      return;
+    }
+    const { problem_id, code } = subRes.rows[0];
+
+    await db.query(`UPDATE submissions SET overall_status = 'Compiling' WHERE id = $1`, [submissionId]);
+
+    const uniqueId = `${submissionId}_${Date.now()}`;
+    filePath = path.join(__dirname, 'submissions', `${uniqueId}.cpp`);
+    outputPath = path.join(__dirname, 'submissions', `${uniqueId}.out`);
+    const submissionsDir = path.join(__dirname, 'submissions');
+
+    if (!fs.existsSync(submissionsDir)) {
+      fs.mkdirSync(submissionsDir, { recursive: true });
+    }
+    await fs.promises.writeFile(filePath, code);
+
+    // Use UndefinedBehaviorSanitizer to reliably catch signed integer overflow as a runtime error.
+    const compileCommand = `g++ -std=c++20 -fsanitize=signed-integer-overflow ${filePath} -o ${outputPath}`;
+    try {
+      await execPromise(compileCommand);
+    } catch (compileError) {
+      console.error(`Compilation error for submission ${submissionId}:`, compileError.stderr);
+      await db.query(
+        `UPDATE submissions SET overall_status = 'Compilation Error', results = $1 WHERE id = $2`,
+        [JSON.stringify([{ status: 'Compilation Error', output: compileError.stderr }]), submissionId]
+      );
+      return; 
+    } finally {
+      fs.unlink(filePath, (err) => { if (err) console.error(`Error deleting .cpp file for sub ${submissionId}:`, err); });
     }
 
-    const compileCommand = `g++ -std=c++20 ${filePath} -o ${outputPath}`;
-    exec(compileCommand, async (error, stdout, stderr) => {
-      // Delete the source .cpp file
-      fs.unlink(filePath, (err) => { if (err) console.error("Error deleting .cpp file:", err); });
+    await db.query(`UPDATE submissions SET overall_status = 'Running' WHERE id = $1`, [submissionId]);
+    await fs.promises.chmod(outputPath, 0o755);
+    const judgeResult = await judge(problem_id, outputPath);
 
-      if (error) {
-          console.error('Compilation error:', stderr);
-          // The frontend expects a full result object for consistent display
-          return res.status(200).json({
-              overallStatus: 'Compilation Error',
-              score: 0,
-              output: stderr,
-              results: [],
-              maxTimeMs: 0,
-              maxMemoryKb: 0,
-          });
-      }
+    const { results, score, overallStatus, maxTimeMs, maxMemoryKb } = judgeResult;
+    await db.query(
+      `UPDATE submissions
+       SET overall_status = $1, score = $2, results = $3, max_time_ms = $4, max_memory_kb = $5
+       WHERE id = $6`,
+      [overallStatus, score, JSON.stringify(results), maxTimeMs, maxMemoryKb, submissionId]
+    );
 
-      try {
-          // Set executable permissions, which is a common cause of runtime errors
-          await fs.promises.chmod(outputPath, 0o755);
-
-          // Run the judge
-          const judgeResult = await judge(problemId, outputPath);
-
-          // Save submission to database
-          try {
-              const { results, score, overallStatus, maxTimeMs, maxMemoryKb } = judgeResult;
-              await db.query(
-                  `INSERT INTO submissions (user_id, problem_id, code, language, overall_status, score, results, max_time_ms, max_memory_kb)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-                  [req.session.userId, problemId, code, language, overallStatus, score, JSON.stringify(results), maxTimeMs, maxMemoryKb]
-              );
-          } catch (dbError) {
-              console.error("Error saving submission to DB:", dbError);
-              // Don't fail the request, just log the error and continue
-          }
-
-          res.status(200).json(judgeResult);
-      } catch (judgeError) {
-          console.error("Judging system error:", judgeError);
-          res.status(500).json({ message: "Internal server error during judging." });
-      } finally {
-          // Clean up the executable file
-          fs.unlink(outputPath, (err) => { if (err) console.error("Error deleting .out file:", err); });
-      }
-    });
-  });
-});
+  } catch (error) {
+    console.error(`Critical error processing submission ${submissionId}:`, error);
+    try {
+      await db.query(
+        `UPDATE submissions SET overall_status = 'System Error' WHERE id = $1`,
+        [submissionId]
+      );
+    } catch (dbError) {
+      console.error(`Failed to update submission ${submissionId} to System Error status:`, dbError);
+    }
+  } finally {
+    fs.unlink(outputPath, (err) => { if (err) console.error(`Error deleting .out file for sub ${submissionId}:`, err); });
+  }
+}
 
 app.get('/api/problems-with-stats', requireAuth, async (req, res) => {
   const { userId } = req.session;

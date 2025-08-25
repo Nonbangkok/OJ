@@ -12,7 +12,6 @@ function ProblemDetail() {
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [submissionResult, setSubmissionResult] = useState(null);
   const [activeView, setActiveView] = useState('statement');
 
   const pdfEndpointUrl = `${API_URL}/api/problems/${id}/pdf`;
@@ -36,10 +35,6 @@ function ProblemDetail() {
   const handlePdfView = () => {
     if (!problem || !problem.has_pdf) return;
     window.open(pdfEndpointUrl, '_blank');
-  };
-
-  const handleSubmissionResult = (result) => {
-    setSubmissionResult(result);
   };
 
   const getStatusClass = (status) => {
@@ -82,61 +77,7 @@ function ProblemDetail() {
       case 'submit':
         return (
           <div className="submit-view">
-            <CodeSubmissionForm problemId={id} onSubmissionResult={handleSubmissionResult} />
-            
-            {submissionResult && (
-              <div className="submission-result-container">
-                <div className="submission-summary">
-                  <div className="summary-item">
-                    <span>Score</span>
-                    <strong>{submissionResult.score}/100</strong>
-                  </div>
-                  <div className="summary-item">
-                    <span>Status</span>
-                    <strong className={getStatusClass(submissionResult.overallStatus)}>
-                      {submissionResult.overallStatus}
-                    </strong>
-                  </div>
-                  <div className="summary-item">
-                    <span>Time</span>
-                    <strong>{submissionResult.maxTimeMs} ms</strong>
-                  </div>
-                  <div className="summary-item">
-                    <span>Memory</span>
-                    <strong>{submissionResult.maxMemoryKb} KB</strong>
-                  </div>
-                </div>
-
-                <h4>Test Cases:</h4>
-                <table className="test-cases-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Status</th>
-                      <th>Time (ms)</th>
-                      <th>Memory (KB)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {submissionResult.results?.map(res => (
-                      <tr key={res.testCase}>
-                        <td>{res.testCase}</td>
-                        <td className={getStatusClass(res.status)}>{res.status}</td>
-                        <td>{res.timeMs >= 0 ? res.timeMs : '-'}</td>
-                        <td>{res.memoryKb >= 0 ? res.memoryKb : '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                
-                {submissionResult.output && (
-                  <div className="output-container">
-                    <h4>Compiler/Runtime Output:</h4>
-                    <pre>{submissionResult.output}</pre>
-                  </div>
-                )}
-              </div>
-            )}
+            <CodeSubmissionForm problemId={id} />
           </div>
         );
       case 'submissions':

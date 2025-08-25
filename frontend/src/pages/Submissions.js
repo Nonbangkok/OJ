@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import '../components/Table.css'; // Use the new shared table styles
@@ -16,37 +16,51 @@ function Submissions() {
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  useEffect(() => {
-    // Combined fetch function
-    const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    // Only set loading on the very first fetch
+    if (submissions.length === 0) {
       setLoading(true);
-      try {
-        // Fetch current user
-        const userRes = await axios.get(`${API_URL}/me`, {
-          withCredentials: true,
-        });
-        if (userRes.data.isAuthenticated) {
-          setCurrentUser(userRes.data.user);
-        }
-
-        // Fetch submissions
-        const params = filter === 'mine' ? { filter: 'mine' } : {};
-        const subsRes = await axios.get(`${API_URL}/api/submissions`, {
-          withCredentials: true,
-          params,
-        });
-        setSubmissions(subsRes.data);
-        setError(''); // Clear previous errors
-      } catch (err) {
-        setError('Failed to fetch data. Please log in.');
-        console.error(err);
-      } finally {
-        setLoading(false);
+    }
+    try {
+      const userRes = await axios.get(`${API_URL}/me`, { withCredentials: true });
+      if (userRes.data.isAuthenticated) {
+        setCurrentUser(userRes.data.user);
       }
-    };
 
+      const params = filter === 'mine' ? { filter: 'mine' } : {};
+      const subsRes = await axios.get(`${API_URL}/api/submissions`, {
+        withCredentials: true,
+        params,
+      });
+      setSubmissions(subsRes.data);
+      setError('');
+    } catch (err) {
+      setError('Failed to fetch data. Please log in.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, submissions.length]);
+
+  useEffect(() => {
     fetchData();
-  }, [filter]); // Re-fetch when filter changes
+  }, [filter, fetchData]); // Initial fetch when filter changes
+
+  useEffect(() => {
+    // Check if there are any submissions being processed
+    const isProcessing = submissions.some(s => 
+      s.overall_status === 'Pending' || 
+      s.overall_status === 'Compiling' || 
+      s.overall_status === 'Running'
+    );
+
+    if (isProcessing) {
+      // If so, poll for updates every 2.5 seconds
+      const intervalId = setInterval(fetchData, 2500);
+      // Clean up the interval when the component unmounts or dependencies change
+      return () => clearInterval(intervalId);
+    }
+  }, [submissions, fetchData]); // Rerun this effect if submissions or fetchData change
 
   const handleViewCode = async (submissionId) => {
     try {
