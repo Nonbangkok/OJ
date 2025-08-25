@@ -22,8 +22,8 @@ function Login() {
 
       // Assuming a successful login redirects to the home page
       // If you need to handle specific success messages, you'd set them here
-      // For now, we'll just redirect
-      navigate('/');
+      // For now, we'll just redirect and refresh
+      window.location.href = '/';
     } catch (error) {
       if (error.response && error.response.data) {
         setError(error.response.data.message || 'Login failed');
