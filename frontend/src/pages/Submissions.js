@@ -97,7 +97,6 @@ function Submissions() {
         <table className="submissions-table">
           <thead>
             <tr>
-              <th>ID</th>
               <th>When</th>
               <th>User</th>
               <th>Problem</th>
@@ -110,7 +109,6 @@ function Submissions() {
           <tbody>
             {submissions.map(sub => (
               <tr key={sub.id}>
-                <td>{sub.id}</td>
                 <td>{new Date(sub.submitted_at).toLocaleString()}</td>
                 <td>{sub.username}</td>
                 <td><Link to={`/problems/${sub.problem_id}`}>{sub.problem_title}</Link></td>

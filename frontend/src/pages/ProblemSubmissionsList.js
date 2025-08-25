@@ -80,7 +80,6 @@ const ProblemSubmissionsList = ({ problemId }) => {
         <table className="table">
           <thead>
             <tr>
-              <th>ID</th>
               <th>When</th>
               <th>User</th>
               <th>Status</th>
@@ -92,7 +91,6 @@ const ProblemSubmissionsList = ({ problemId }) => {
           <tbody>
             {submissions.map(sub => (
               <tr key={sub.id}>
-                <td>{sub.id}</td>
                 <td>{new Date(sub.submitted_at).toLocaleString()}</td>
                 <td>{sub.username}</td>
                 <td className={getStatusClass(sub.overall_status)}>{sub.overall_status}</td>
