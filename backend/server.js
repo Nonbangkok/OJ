@@ -1,6 +1,8 @@
 const express = require('express');
 const fs = require('fs');
 const { exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
 const path = require('path');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
