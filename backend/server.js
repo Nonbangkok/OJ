@@ -11,14 +11,10 @@ const { body, validationResult } = require('express-validator');
 const db = require('./db'); // This is your existing pg pool from db.js
 const multer = require('multer');
 const unzipper = require('unzipper');
-const { v4: uuidv4 } = require('uuid'); // Add uuid for job tracking
 
 // Use memory storage for multer to handle files as buffers
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
-
-// In-memory store for upload job progress
-const uploadJobs = {};
 
 const app = express();
 app.set('trust proxy', 1); // Trust the reverse proxy for secure cookies
@@ -786,7 +782,7 @@ app.get('/api/admin/authors', requireAuth, requireStaffOrAdmin, async (req, res)
 app.post('/api/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, upload.fields([
   { name: 'problemPdf', maxCount: 1 },
   { name: 'testcasesZip', maxCount: 1 }
-]), (req, res) => { // NOTE: This is no longer an async function
+]), async (req, res) => {
   const { id } = req.params;
   const problemPdfFile = req.files['problemPdf'] ? req.files['problemPdf'][0] : null;
   const testcasesZipFile = req.files['testcasesZip'] ? req.files['testcasesZip'][0] : null;
@@ -795,57 +791,15 @@ app.post('/api/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, upl
     return res.status(400).json({ message: 'No files uploaded.' });
   }
 
-  const jobId = uuidv4();
-  uploadJobs[jobId] = { 
-    status: 'starting', 
-    progress: 0, 
-    total: 0, 
-    message: 'Upload process initiated...' 
-  };
-  
-  // Respond immediately to the client with the job ID
-  res.status(202).json({ message: 'File processing started.', jobId });
-
-  // Start the actual processing in the background (fire and forget)
-  processUploads(jobId, id, problemPdfFile, testcasesZipFile);
-});
-
-// New endpoint for polling upload progress
-app.get('/api/admin/upload-progress/:jobId', (req, res) => {
-  const { jobId } = req.params;
-  const job = uploadJobs[jobId];
-
-  if (!job) {
-    return res.status(404).json({ message: 'Job not found.' });
-  }
-
-  res.json(job);
-
-  // Clean up job from memory after it has been polled in a final state
-  if (job.status === 'completed' || job.status === 'failed') {
-    setTimeout(() => {
-      delete uploadJobs[jobId];
-    }, 60000); // Keep for 1 minute for the frontend to fetch the final status
-  }
-});
-
-// This new function will run in the background
-async function processUploads(jobId, id, problemPdfFile, testcasesZipFile) {
   try {
-    const job = uploadJobs[jobId];
-    
     // Handle PDF upload
     if (problemPdfFile) {
-      job.message = 'Processing PDF...';
       const pdfBuffer = problemPdfFile.buffer;
       await db.query('UPDATE problems SET problem_pdf = $1 WHERE id = $2', [pdfBuffer, id]);
     }
 
-    // Handle Testcases ZIP upload with progress tracking
+    // Handle Testcases ZIP upload
     if (testcasesZipFile) {
-      job.status = 'processing';
-      job.message = 'Analyzing ZIP file...';
-      
       // Clear existing testcases for this problem
       await db.query('DELETE FROM testcases WHERE problem_id = $1', [id]);
 
@@ -882,19 +836,13 @@ async function processUploads(jobId, id, problemPdfFile, testcasesZipFile) {
       const sortedKeys = Object.keys(testcaseFiles).map(Number).sort((a, b) => a - b);
       const pairedCases = sortedKeys.filter(key => testcaseFiles[key].in && testcaseFiles[key].out);
       
-      job.total = pairedCases.length;
-      if (job.total === 0) {
-          job.status = 'failed';
-          job.message = 'No valid testcase pairs (.in/.out or input/output) found in the ZIP file.';
-          return;
+      if (pairedCases.length === 0) {
+          return res.status(400).json({ message: 'No valid testcase pairs (.in/.out or input/output) found in the ZIP file.' });
       }
       
       let caseCounter = 1;
       for (const key of pairedCases) {
         const pair = testcaseFiles[key];
-        job.progress = caseCounter;
-        job.message = `Processing testcase ${job.progress} of ${job.total}...`;
-
         const inputData = await pair.in.buffer();
         const outputData = await pair.out.buffer();
 
@@ -907,17 +855,13 @@ async function processUploads(jobId, id, problemPdfFile, testcasesZipFile) {
       }
     }
 
-    job.status = 'completed';
-    job.message = 'All files processed successfully.';
+    res.status(200).json({ message: 'Files processed successfully.' });
 
   } catch (error) {
-    console.error(`Error processing job ${jobId}:`, error);
-    if (uploadJobs[jobId]) {
-      uploadJobs[jobId].status = 'failed';
-      uploadJobs[jobId].message = 'An error occurred during processing.';
-    }
+    console.error(`Error processing uploads for problem ${id}:`, error);
+    res.status(500).json({ message: 'An error occurred during file processing.' });
   }
-}
+});
 
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
