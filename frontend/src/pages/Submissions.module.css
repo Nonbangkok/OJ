@@ -34,24 +34,91 @@
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
+.table-container {
+  background-color: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--box-shadow);
+}
+
 .submissions-table {
   width: 100%;
   border-collapse: collapse;
-  border-spacing: 0;
-  box-sizing: border-box;
+  color: var(--text-secondary);
 }
 
-.submissions-table td,
+.submissions-table thead {
+  background-color: var(--background-tertiary);
+}
+
 .submissions-table th {
-  padding: 12px 15px;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.submissions-table th,
+.submissions-table td {
+  padding: 1rem 1.25rem;
   text-align: left;
   border-bottom: 1px solid var(--border-color);
-  vertical-align: middle; /* Ensure vertical alignment is consistent */
+  vertical-align: middle;
+}
+
+.submissions-table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.submissions-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.submissions-table tbody tr:hover {
+  background-color: var(--background-tertiary);
+}
+
+.submissions-table a {
+  color: var(--accent-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.submissions-table a:hover {
+  text-decoration: underline;
 }
 
 .view-code-btn {
+  /* This can be styled like other buttons if needed */
   padding: 8px 12px;
 }
+
+/* Status colors for test cases */
+.status-accepted {
+  color: #48bb78; /* Green */
+  font-weight: bold;
+}
+.status-wrong {
+  color: #f56565; /* Red */
+  font-weight: bold;
+}
+.status-time {
+  color: #f6ad55; /* Orange */
+}
+.status-compilation {
+  color: #a0aec0; /* Gray */
+}
+.status-runtime {
+  color: #ed8936; /* Orange */
+}
+.status-memory {
+  color: #ed64a6; /* Pink */
+}
+.status-pending, .status-compiling, .status-running {
+  color: #718096; /* Gray */
+} 
 
 a {
   text-decoration: underline;
