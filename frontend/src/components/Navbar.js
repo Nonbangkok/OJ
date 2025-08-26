@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import ThemeToggleButton from './ThemeToggleButton';
-import './Navbar.css';
+import styles from './Navbar.module.css';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -20,10 +20,10 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="navbar">
-      <div className="navbar-container">
-        <NavLink to="/" className="nav-brand">Online Judge</NavLink>
-        <ul className="nav-links">
+    <nav className={styles.navbar}>
+      <div className={styles['navbar-container']}>
+        <NavLink to="/" className={styles['nav-brand']}>Online Judge</NavLink>
+        <ul className={styles['nav-links']}>
           <li><NavLink to="/problems">Problems</NavLink></li>
           <li><NavLink to="/submissions">Submissions</NavLink></li>
           <li><NavLink to="/scoreboard">Scoreboard</NavLink></li>
@@ -31,18 +31,18 @@ const Navbar = () => {
             <li><NavLink to="/admin">Admin Panel</NavLink></li>
           )}
         </ul>
-        <div className="nav-actions">
+        <div className={styles['nav-actions']}>
           {user ? (
             <>
-              <span className="username">Welcome, {user?.username}</span>
-              <button onClick={handleLogout} className="logout-btn">Logout</button>
+              <span className={styles.username}>Welcome, {user?.username}</span>
+              <button onClick={handleLogout} className={styles['logout-btn']}>Logout</button>
             </>
           ) : (
             <>
-              <NavLink to="/login" className="nav-action-link">Login</NavLink>
+              <NavLink to="/login" className={styles['nav-action-link']}>Login</NavLink>
               {!user && (
                 <>
-                  {registrationEnabled && <NavLink to="/register" className="nav-action-link">Register</NavLink>}
+                  {registrationEnabled && <NavLink to="/register" className={styles['nav-action-link']}>Register</NavLink>}
                 </>
               )}
             </>

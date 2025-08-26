@@ -3,7 +3,7 @@ import axios from 'axios';
 import UserManagement from '../components/admin/UserManagement';
 import ProblemManagement from '../components/admin/ProblemManagement';
 import RegistrationSettings from '../components/admin/RegistrationSettings';
-import './Admin.css';
+import styles from './Admin.module.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -32,23 +32,23 @@ const Admin = () => {
   }
 
   return (
-    <div className="admin-container">
+    <div className={styles['admin-container']}>
       <h1>Admin Panel</h1>
       
       {user?.role === 'admin' && (
-        <div className="admin-section">
+        <div className={styles['admin-section']}>
           <UserManagement />
         </div>
       )}
 
       {(user?.role === 'admin' || user?.role === 'staff') && (
-        <div className="admin-section">
+        <div className={styles['admin-section']}>
           <ProblemManagement currentUser={user} />
         </div>
       )}
       
       {user?.role === 'admin' && (
-        <div className="admin-section">
+        <div className={styles['admin-section']}>
           <RegistrationSettings />
         </div>
       )}

@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import '../components/Form.css'; // Use the new shared form styles
+import styles from '../components/Form.module.css'; // Use the new shared form styles
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -33,11 +33,11 @@ function Login() {
   };
 
   return (
-    <div className="form-container">
+    <div className={styles['form-container']}>
       <h2>Login</h2>
       <form onSubmit={handleSubmit}>
-        {error && <p className="error-message">{error}</p>}
-        <div className="form-group">
+        {error && <p className={styles['error-message']}>{error}</p>}
+        <div className={styles['form-group']}>
           <label htmlFor="username">Username</label>
           <input
             type="text"
@@ -47,7 +47,7 @@ function Login() {
             required
           />
         </div>
-        <div className="form-group">
+        <div className={styles['form-group']}>
           <label htmlFor="password">Password</label>
           <input
             type="password"
@@ -60,7 +60,7 @@ function Login() {
         <button type="submit">Login</button>
       </form>
       {registrationEnabled && (
-        <p className="form-footer-link">
+        <p className={styles['form-footer-link']}>
           Don't have an account? <Link to="/register">Register here</Link>
         </p>
       )}

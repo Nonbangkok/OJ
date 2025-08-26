@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import '../Form.css';
-import './ModalLayout.css';
+import formStyles from '../Form.module.css';
+import modalStyles from './ModalLayout.module.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -79,13 +79,13 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
   };
 
   return (
-    <div className="modal-backdrop">
-      <div className="form-container">
+    <div className={modalStyles['modal-backdrop']}>
+      <div className={formStyles['form-container']}>
         <h2>{isEditing ? 'Edit Problem' : 'Create New Problem'}</h2>
         
         {/* Progress Bar Area */}
         {uploadProgress && (
-          <div className="upload-progress-container">
+          <div className={modalStyles['upload-progress-container']}>
             <p>{uploadProgress.message}</p>
             {(uploadProgress.status === 'processing' || uploadProgress.status === 'uploading') && uploadProgress.total > 0 && (
               <progress 
@@ -100,7 +100,7 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
         )}
 
         <fieldset disabled={isUploading}>
-          <div className="form-group">
+          <div className={formStyles['form-group']}>
             <label htmlFor="id">Problem ID</label>
             <input
               type="text"
@@ -111,7 +111,7 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
             />
           </div>
 
-          <div className="form-group">
+          <div className={formStyles['form-group']}>
             <label htmlFor="title">Title</label>
             <input
               type="text"
@@ -122,7 +122,7 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
             />
           </div>
 
-          <div className="form-group">
+          <div className={formStyles['form-group']}>
             <label htmlFor="author">Author</label>
             <select
               id="author"
@@ -139,7 +139,7 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
             </select>
           </div>
 
-          <div className="form-group">
+          <div className={formStyles['form-group']}>
             <label htmlFor="time_limit_ms">Time Limit (ms)</label>
             <input
               type="number"
@@ -150,7 +150,7 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
             />
           </div>
 
-          <div className="form-group">
+          <div className={formStyles['form-group']}>
             <label htmlFor="memory_limit_mb">Memory Limit (MB)</label>
             <input
               type="number"
@@ -161,7 +161,7 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
             />
           </div>
 
-          <div className="form-group">
+          <div className={formStyles['form-group']}>
             <label htmlFor="pdfFile">Problem PDF</label>
             <input
               type="file"
@@ -172,7 +172,7 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
             />
           </div>
 
-          <div className="form-group" style={{marginBottom: '0.25rem'}}>
+          <div className={formStyles['form-group']} style={{marginBottom: '0.25rem'}}>
             <label htmlFor="zipFile">Test Cases ZIP</label>
             <input
               type="file"
@@ -184,9 +184,9 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
           </div>
         </fieldset>
 
-        <div className="modal-actions">
-          <button onClick={onClose} className="button-cancel" disabled={isUploading}>Cancel</button>
-          <button onClick={handleSave} className="button-save" disabled={isUploading}>
+        <div className={modalStyles['modal-actions']}>
+          <button onClick={onClose} className={modalStyles['button-cancel']} disabled={isUploading}>Cancel</button>
+          <button onClick={handleSave} className={modalStyles['button-save']} disabled={isUploading}>
             {isUploading ? 'Processing...' : 'Save'}
           </button>
         </div>

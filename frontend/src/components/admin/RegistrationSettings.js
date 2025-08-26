@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import './RegistrationSettings.css';
+import styles from './RegistrationSettings.module.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -44,20 +44,20 @@ const RegistrationSettings = () => {
   if (isLoading) return <div>Loading settings...</div>;
 
   return (
-    <div className="settings-container">
+    <div className={styles['settings-container']}>
       <h3>Registration Settings</h3>
-      {error && <p className="error-message">{error}</p>}
-      {success && <p className="success-message">{success}</p>}
-      <div className="setting-item">
+      {error && <p className={styles['error-message']}>{error}</p>}
+      {success && <p className={styles['success-message']}>{success}</p>}
+      <div className={styles['setting-item']}>
         <label htmlFor="registration-toggle">Enable User Registration</label>
-        <div className="toggle-switch">
+        <div className={styles['toggle-switch']}>
           <input
             type="checkbox"
             id="registration-toggle"
             checked={isEnabled}
             onChange={handleToggle}
           />
-          <span className="slider round"></span>
+          <span className={`${styles.slider} ${styles.round}`}></span>
         </div>
       </div>
     </div>

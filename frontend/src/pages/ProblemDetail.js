@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import './ProblemDetail.css';
+import styles from './ProblemDetail.module.css';
 import CodeSubmissionForm from '../components/CodeSubmissionForm';
 import ProblemSubmissionsList from './ProblemSubmissionsList';
 
@@ -38,24 +38,24 @@ function ProblemDetail() {
   };
 
   if (loading) return <div>Loading...</div>;
-  if (error) return <div className="error-message">{error}</div>;
-  if (!problem) return <div className="error-message">Problem not found.</div>;
+  if (error) return <div className={styles['error-message']}>{error}</div>;
+  if (!problem) return <div className={styles['error-message']}>Problem not found.</div>;
 
   const renderContent = () => {
     switch (activeView) {
       case 'statement':
         return (
-          <div className="statement-view">
+          <div className={styles['statement-view']}>
             {problem.has_pdf ? (
-              <iframe src={pdfEndpointUrl} title={`${problem.title} PDF`} className="pdf-preview" />
+              <iframe src={pdfEndpointUrl} title={`${problem.title} PDF`} className={styles['pdf-preview']} />
             ) : (
-              <div className="no-pdf-message">No PDF available for preview.</div>
+              <div className={styles['no-pdf-message']}>No PDF available for preview.</div>
             )}
           </div>
         );
       case 'submit':
         return (
-          <div className="submit-view">
+          <div className={styles['submit-view']}>
             <CodeSubmissionForm problemId={id} />
           </div>
         );
@@ -67,14 +67,14 @@ function ProblemDetail() {
   };
 
   return (
-    <div className="problem-detail-container">
-        <div className="left-nav">
-            <div className="problem-info">
+    <div className={styles['problem-detail-container']}>
+        <div className={styles['left-nav']}>
+            <div className={styles['problem-info']}>
                 <h2>{problem.title}</h2>
-                <p className="problem-id">{problem.id}</p>
-                {problem.author && <p className="problem-author">Author: {problem.author}</p>}
+                <p className={styles['problem-id']}>{problem.id}</p>
+                {problem.author && <p className={styles['problem-author']}>Author: {problem.author}</p>}
                 
-                <div className="problem-meta">
+                <div className={styles['problem-meta']}>
                   <span>Time Limit: {problem.time_limit_ms} ms</span>
                   <span>Memory Limit: {problem.time_limit_mb} MB</span>
                 </div>
@@ -82,34 +82,34 @@ function ProblemDetail() {
                 {problem.has_pdf && (
                   <button 
                     onClick={handlePdfView}
-                    className="view-pdf-btn"
+                    className={styles['view-pdf-btn']}
                   >
                     View Problem PDF
                   </button>
                 )}
             </div>
-            <nav className="problem-nav">
+            <nav className={styles['problem-nav']}>
                 <button 
-                    className={`nav-btn ${activeView === 'statement' ? 'active' : ''}`}
+                    className={`${styles['nav-btn']} ${activeView === 'statement' ? styles.active : ''}`}
                     onClick={() => setActiveView('statement')}
                 >
                     Statement
                 </button>
                 <button 
-                    className={`nav-btn ${activeView === 'submit' ? 'active' : ''}`}
+                    className={`${styles['nav-btn']} ${activeView === 'submit' ? styles.active : ''}`}
                     onClick={() => setActiveView('submit')}
                 >
                     Submit
                 </button>
                 <button 
-                    className={`nav-btn ${activeView === 'submissions' ? 'active' : ''}`}
+                    className={`${styles['nav-btn']} ${activeView === 'submissions' ? styles.active : ''}`}
                     onClick={() => setActiveView('submissions')}
                 >
                     Submissions
                 </button>
             </nav>
         </div>
-        <div className="right-content">
+        <div className={styles['right-content']}>
             {renderContent()}
         </div>
     </div>

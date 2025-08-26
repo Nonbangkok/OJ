@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import '../components/Table.css'; // Use the new shared table styles
-import './Submissions.css'; // Import the new CSS file
+import styles from './Submissions.module.css'; // Import the new CSS file
 import SubmissionModal from './SubmissionModal'; // Import the modal
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -82,25 +82,26 @@ function Submissions() {
 
   const getStatusClass = (status) => {
     if (!status) return '';
-    return `status-${status.split(' ')[0].toLowerCase()}`;
+    const statusClass = `status-${status.split(' ')[0].toLowerCase()}`;
+    return styles[statusClass] || '';
   };
 
   if (loading) return <div>Loading submissions...</div>;
   if (error) return <div className="error-message">{error}</div>;
 
   return (
-    <div className="submissions-container">
-      <div className="submissions-header">
+    <div className={styles['submissions-container']}>
+      <div className={styles['submissions-header']}>
         <h1>Recent Submissions</h1>
-        <div className="filter-buttons">
+        <div className={styles['filter-buttons']}>
           <button 
-            className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
+            className={`${styles['filter-btn']} ${filter === 'all' ? styles.active : ''}`}
             onClick={() => setFilter('all')}
           >
             All Submissions
           </button>
           <button 
-            className={`filter-btn ${filter === 'mine' ? 'active' : ''}`}
+            className={`${styles['filter-btn']} ${filter === 'mine' ? styles.active : ''}`}
             onClick={() => setFilter('mine')}
           >
             My Submissions
@@ -131,11 +132,11 @@ function Submissions() {
                 <td>{sub.language}</td>
                 <td>
                   {currentUser && (currentUser.username === sub.username || currentUser.role === 'admin' || currentUser.role === 'staff') ? (
-                    <button onClick={() => handleViewCode(sub.id)} className="view-code-btn">
+                    <button onClick={() => handleViewCode(sub.id)} className={styles['view-code-btn']}>
                       View Code
                     </button>
                   ) : (
-                    <div className="view-code-btn" style={{ visibility: 'hidden' }} aria-hidden="true">
+                    <div className={styles['view-code-btn']} style={{ visibility: 'hidden' }} aria-hidden="true">
                       View Code
                     </div>
                   )}

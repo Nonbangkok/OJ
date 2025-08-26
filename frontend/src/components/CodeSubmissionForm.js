@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import './Form.css'; // Use the new shared form styles
-import './CodeSubmissionForm.css'; // Keep for specific adjustments
+import formStyles from './Form.module.css'; // Use the new shared form styles
+import styles from './CodeSubmissionForm.module.css'; // Keep for specific adjustments
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -59,11 +59,11 @@ const CodeSubmissionForm = ({ problemId }) => {
   };
 
   return (
-    <div className="submission-form-container">
+    <div className={styles['submission-form-container']}>
       <h3>Submit Solution</h3>
       {error && <p className="error-message" style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
       <form onSubmit={handleSubmit}>
-        <div className="form-group">
+        <div className={formStyles['form-group']}>
           <label htmlFor="language">Language:</label>
           <select
             id="language"
@@ -74,7 +74,7 @@ const CodeSubmissionForm = ({ problemId }) => {
             <option value="cpp">C++</option>
           </select>
         </div>
-        <div className="form-group">
+        <div className={formStyles['form-group']}>
           <label htmlFor="code">Your Code:</label>
           <textarea
             id="code"

@@ -3,7 +3,7 @@ import axios from 'axios';
 import ProblemModal from './ProblemModal';
 import ConfirmationModal from './ConfirmationModal';
 import '../Table.css';
-import './ModalLayout.css';
+import modalStyles from './ModalLayout.module.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -149,13 +149,13 @@ const ProblemManagement = ({ currentUser }) => {
   };
 
   if (loading) return <div>Loading problems...</div>;
-  if (error) return <div className="error-message">{error}</div>;
+  if (error) return <div className={modalStyles['error-message']}>{error}</div>;
 
   return (
-    <div className="management-container">
-      <div className="management-header">
+    <div className={modalStyles['management-container']}>
+      <div className={modalStyles['management-header']}>
         <h2>Problem Management</h2>
-        <button onClick={handleCreate} style={{marginBottom: '1.25rem'}} className="create-btn">Create New Problem</button>
+        <button onClick={handleCreate} style={{marginBottom: '1.25rem'}} className={modalStyles['create-btn']}>Create New Problem</button>
       </div>
       <div className="table-container">
         <table className="table">
@@ -171,9 +171,9 @@ const ProblemManagement = ({ currentUser }) => {
               <tr key={problem.id}>
                 <td>{problem.id}</td>
                 <td>{problem.title}</td>
-                <td className="actions">
-                  <button onClick={() => handleEdit(problem)} className="edit-btn">Edit</button>
-                  <button onClick={() => handleDeleteClick(problem.id)} className="delete-btn">Delete</button>
+                <td className={modalStyles.actions}>
+                  <button onClick={() => handleEdit(problem)} className={modalStyles['edit-btn']}>Edit</button>
+                  <button onClick={() => handleDeleteClick(problem.id)} className={modalStyles['delete-btn']}>Delete</button>
                 </td>
               </tr>
             ))}

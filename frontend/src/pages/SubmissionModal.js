@@ -1,5 +1,5 @@
 import React from 'react';
-import './SubmissionModal.css';
+import styles from './SubmissionModal.module.css';
 
 const SubmissionModal = ({ submission, onClose }) => {
   if (!submission) {
@@ -8,22 +8,23 @@ const SubmissionModal = ({ submission, onClose }) => {
 
   const getStatusClass = (status) => {
     if (!status) return '';
-    return `status-${status.split(' ')[0].toLowerCase()}`;
+    const statusClass = `status-${status.split(' ')[0].toLowerCase()}`;
+    return styles[statusClass] || '';
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
+    <div className={styles['modal-backdrop']} onClick={onClose}>
+      <div className={styles['modal-content']} onClick={e => e.stopPropagation()}>
+        <div className={styles['modal-header']}>
           <h2>Submission #{submission.id}</h2>
-          <button onClick={onClose} className="close-btn">&times;</button>
+          <button onClick={onClose} className={styles['close-btn']}>&times;</button>
         </div>
-        <div className="modal-body">
+        <div className={styles['modal-body']}>
           <pre><code>{submission.code}</code></pre>
         </div>
-        <div className="modal-footer">
+        <div className={styles['modal-footer']}>
           <h4>Test Cases:</h4>
-          <table className="modal-test-cases-table">
+          <table className={styles['modal-test-cases-table']}>
             <thead>
               <tr>
                 <th>#</th>

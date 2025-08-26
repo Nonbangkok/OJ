@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import './Problems.css';
+import styles from './Problems.module.css';
 import '../components/Table.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -77,24 +77,24 @@ const Problems = () => {
   if (error) return <div className="error-message">{error}</div>;
 
   return (
-    <div className="problems-page-container">
+    <div className={styles['problems-page-container']}>
       <h1>All Problems</h1>
-      <div className="problem-list">
+      <div className={styles['problem-list']}>
         {problems.map(problem => {
           const hasSubmitted = problem.submission_count > 0;
 
           return (
-            <div key={problem.id} className="problem-list-item">
-              <div className="problem-info">
-                <h3 className="problem-title">{problem.title}</h3>
-                <p className="problem-author">{problem.id}</p>
-                <div className="submission-status-placeholder">
+            <div key={problem.id} className={styles['problem-list-item']}>
+              <div className={styles['problem-info']}>
+                <h3 className={styles['problem-title']}>{problem.title}</h3>
+                <p className={styles['problem-author']}>{problem.id}</p>
+                <div className={styles['submission-status-placeholder']}>
                   {hasSubmitted && (
-                     <div className="submission-status">
-                        <span className="submission-time">
+                     <div className={styles['submission-status']}>
+                        <span className={styles['submission-time']}>
                             Submitted {formatTimeAgo(problem.latest_submission_at)} ({formatDateAbsolute(problem.latest_submission_at)})
                         </span>
-                        <span className="submission-tries">
+                        <span className={styles['submission-tries']}>
                             {problem.submission_count} {problem.submission_count > 1 ? 'tries' : 'try'}
                         </span>
                      </div>
@@ -102,25 +102,25 @@ const Problems = () => {
                 </div>
               </div>
 
-              <div className="problem-score-placeholder">
+              <div className={styles['problem-score-placeholder']}>
                 {hasSubmitted && (
-                  <div className="problem-score-details">
-                      <div className="score-bar-container">
+                  <div className={styles['problem-score-details']}>
+                      <div className={styles['score-bar-container']}>
                           <div 
-                            className={`score-bar ${problem.best_score === 100 ? 'full' : 'partial'}`} 
+                            className={`${styles['score-bar']} ${problem.best_score === 100 ? styles.full : styles.partial}`} 
                             style={{ width: `${problem.best_score || 0}%` }}
                           >
                               <span>{problem.best_score || 0}</span>
                           </div>
                       </div>
-                      <span className="score-text">
+                      <span className={styles['score-text']}>
                           {generateResultString(problem.latest_submission_status, problem.latest_submission_results)}
                       </span>
                   </div>
                 )}
               </div>
               
-              <Link to={`/problems/${problem.id}`} className={`problem-action-btn ${hasSubmitted ? 'edit' : 'new'}`}>
+              <Link to={`/problems/${problem.id}`} className={`${styles['problem-action-btn']} ${hasSubmitted ? styles.edit : styles.new}`}>
                 {hasSubmitted ? 'Edit' : 'New'}
               </Link>
             </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import '../Form.css';
-import './ModalLayout.css';
+import formStyles from '../Form.module.css';
+import modalStyles from './ModalLayout.module.css';
 
 
 const EditUserModal = ({ user, onClose, onSave }) => {
@@ -36,10 +36,10 @@ const EditUserModal = ({ user, onClose, onSave }) => {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="form-container">
+    <div className={modalStyles['modal-overlay']}>
+      <div className={formStyles['form-container']}>
         <h2>Edit User: {user.username}</h2>
-        <div className="form-group">
+        <div className={formStyles['form-group']}>
           <label htmlFor="username">Username</label>
           <input
             type="text"
@@ -49,7 +49,7 @@ const EditUserModal = ({ user, onClose, onSave }) => {
             onChange={handleChange}
           />
         </div>
-        <div className="form-group">
+        <div className={formStyles['form-group']}>
           <label htmlFor="role">Role</label>
           <select
             id="role"
@@ -61,9 +61,9 @@ const EditUserModal = ({ user, onClose, onSave }) => {
             <option value="staff">Staff</option>
           </select>
         </div>
-        <div className="modal-actions">
-          <button onClick={onClose} className="button-cancel">Cancel</button>
-          <button onClick={handleSave} className="button-save">Save</button>
+        <div className={modalStyles['modal-actions']}>
+          <button onClick={onClose} className={modalStyles['button-cancel']}>Cancel</button>
+          <button onClick={handleSave} className={modalStyles['button-save']}>Save</button>
         </div>
       </div>
     </div>

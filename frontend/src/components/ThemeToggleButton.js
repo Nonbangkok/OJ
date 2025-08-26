@@ -1,13 +1,13 @@
 import React from 'react';
 import { useTheme } from '../context/ThemeContext';
-import './ThemeToggleButton.css';
+import styles from './ThemeToggleButton.module.css';
 
 const ThemeToggleButton = () => {
   const { theme, toggleTheme } = useTheme();
 
   return (
     <button
-      className="theme-toggle-button"
+      className={styles['theme-toggle-button']}
       onClick={toggleTheme}
       aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
     >
