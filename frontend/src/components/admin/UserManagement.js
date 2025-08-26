@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import EditUserModal from './EditUserModal';
 import ConfirmationModal from './ConfirmationModal';
-import AddUserModal from './AddUserModal'; // Import the new modal
+import AddUserModal from './AddUserModal';
+import BatchUserCreation from './BatchUserCreation'; // Import the new component
 import styles from './Management.module.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -81,64 +82,67 @@ const UserManagement = () => {
   if (error) return <div className="error-message">{error}</div>;
 
   return (
-    <div className={styles['management-container']}>
-      <div className={styles['management-header']}>
-        <h2>User Management</h2>
-        <button onClick={() => setIsAddModalOpen(true)} className={styles['create-btn']}>
-          Create New User
-        </button>
-      </div>
-      <div className="table-container">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Username</th>
-              <th>Role</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map(user => (
-              <tr key={user.id}>
-                <td>{user.username}</td>
-                <td>{user.role}</td>
-                <td className={styles.actions}>
-                  {user.role !== 'admin' && (
-                    <>
-                      <button onClick={() => handleEdit(user)} className={styles['edit-btn']}>
-                        Edit
-                      </button>
-                      <button onClick={() => handleDeleteClick(user)} className={styles['delete-btn']}>
-                        Delete
-                      </button>
-                    </>
-                  )}
-                </td>
+    <>
+      <div className={styles['management-container']}>
+        <div className={styles['management-header']}>
+          <h2>User Management</h2>
+          <button onClick={() => setIsAddModalOpen(true)} className={styles['create-btn']}>
+            Create New User
+          </button>
+        </div>
+        <div className="table-container">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Role</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {editingUser && (
-        <EditUserModal
-          user={editingUser}
-          onClose={() => setEditingUser(null)}
-          onSave={handleSave}
+            </thead>
+            <tbody>
+              {users.map(user => (
+                <tr key={user.id}>
+                  <td>{user.username}</td>
+                  <td>{user.role}</td>
+                  <td className={styles.actions}>
+                    {user.role !== 'admin' && (
+                      <>
+                        <button onClick={() => handleEdit(user)} className={styles['edit-btn']}>
+                          Edit
+                        </button>
+                        <button onClick={() => handleDeleteClick(user)} className={styles['delete-btn']}>
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {editingUser && (
+          <EditUserModal
+            user={editingUser}
+            onClose={() => setEditingUser(null)}
+            onSave={handleSave}
+          />
+        )}
+        <ConfirmationModal
+          isOpen={!!deletingUser}
+          onClose={() => setDeletingUser(null)}
+          onConfirm={handleConfirmDelete}
+          title="Confirm Deletion"
+          message={`Are you sure you want to delete user "${deletingUser?.username}"? All related submissions will also be deleted.`}
         />
-      )}
-      <ConfirmationModal
-        isOpen={!!deletingUser}
-        onClose={() => setDeletingUser(null)}
-        onConfirm={handleConfirmDelete}
-        title="Confirm Deletion"
-        message={`Are you sure you want to delete user "${deletingUser?.username}"? All related submissions will also be deleted.`}
-      />
-      <AddUserModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onSave={handleAddNewUser}
-      />
-    </div>
+        <AddUserModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          onSave={handleAddNewUser}
+        />
+      </div>
+      <BatchUserCreation onUsersCreated={fetchUsers} />
+    </>
   );
 };
 

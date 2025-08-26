@@ -727,6 +727,57 @@ app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) =
   }
 });
 
+app.post('/api/admin/users/batch', requireAuth, requireAdmin, [
+  body('prefix').isLength({ min: 1 }).trim().escape(),
+  body('count').isInt({ min: 1, max: 100 }) // Limit to 100 users at a time for performance
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { prefix, count } = req.body;
+  const generatedUsers = [];
+  const saltRounds = 10;
+
+  const client = await db.pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    for (let i = 1; i <= count; i++) {
+      const username = `${prefix}-${i.toString().padStart(2, '0')}`;
+      const password = Math.random().toString(36).slice(-8); // Generate a random 8-char password
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+      const existingUser = await client.query('SELECT id FROM users WHERE username = $1', [username]);
+      if (existingUser.rows.length > 0) {
+        // This username already exists, we must abort the transaction.
+        // We could also choose to skip, but aborting is safer to avoid partial creations.
+        await client.query('ROLLBACK');
+        return res.status(409).json({ message: `Username '${username}' already exists. Aborting operation.` });
+      }
+
+      await client.query(
+        'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3)',
+        [username, hashedPassword, 'user']
+      );
+
+      generatedUsers.push({ username, password });
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ message: `${count} users created successfully.`, users: generatedUsers });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error during batch user creation:', error);
+    res.status(500).json({ message: 'An error occurred during batch user creation.' });
+  } finally {
+    client.release();
+  }
+});
+
 // Problem Management
 app.post('/api/admin/problems', requireAuth, requireStaffOrAdmin, [
     body('id').isLength({ min: 1 }).trim().escape(),
