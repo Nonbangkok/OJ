@@ -54,7 +54,6 @@ async function createAdmin() {
     console.log(`User "${username}" already exists. Their information will be updated.`);
   }
 
-  const email = await askQuestion(`Enter email for ${username}: `);
   const password = await askPassword(`Enter password for ${username}: `);
   
   if (password.length < 6) {
@@ -68,13 +67,12 @@ async function createAdmin() {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     await db.query(
-      `INSERT INTO users (username, email, password_hash, role)
-       VALUES ($1, $2, $3, 'admin')
+      `INSERT INTO users (username, password_hash, role)
+       VALUES ($1, $2, 'admin')
        ON CONFLICT (username) DO UPDATE SET
-         email = EXCLUDED.email,
          password_hash = EXCLUDED.password_hash,
          role = 'admin';`,
-      [username, email, hashedPassword]
+      [username, hashedPassword]
     );
 
     console.log(`Admin user '${username}' created/updated successfully.`);

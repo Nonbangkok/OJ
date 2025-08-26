@@ -39,7 +39,7 @@ function Login() {
       <form onSubmit={handleSubmit}>
         {error && <p className="error-message">{error}</p>}
         <div className="form-group">
-          <label htmlFor="username">Username or Email</label>
+          <label htmlFor="username">Username</label>
           <input
             type="text"
             id="username"

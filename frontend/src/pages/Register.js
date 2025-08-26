@@ -7,7 +7,6 @@ const API_URL = process.env.REACT_APP_API_URL;
 
 function Register() {
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -23,20 +22,14 @@ function Register() {
       return;
     }
 
-    if (!email.includes('@')) {
-      setError('Please enter a valid email address');
-      return;
-    }
-
     if (password.length < 6) {
       setError('Password must be at least 6 characters long');
       return;
     }
 
     try {
-      const response = await axios.post(`${API_URL}/register`, {
+      await axios.post(`${API_URL}/register`, {
         username: username,
-        email: email,
         password: password
       });
       setSuccess('Registration successful! Redirecting to login...');
@@ -65,16 +58,6 @@ function Register() {
             onChange={(e) => setUsername(e.target.value)}
             required
             minLength="3"
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="email">Email</label>
-          <input
-            type="email"
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
           />
         </div>
         <div className="form-group">
