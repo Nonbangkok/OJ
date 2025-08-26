@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import '../components/Form.css'; // Use the new shared form styles
+import { useSettings } from '../context/SettingsContext';
+import '../components/Form.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -11,6 +12,7 @@ function Register() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
+  const { registrationEnabled, isLoading } = useSettings();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,66 +20,77 @@ function Register() {
     setSuccess('');
 
     if (username.length < 3) {
-      setError('Username must be at least 3 characters long');
+      setError('Username must be at least 3 characters long.');
       return;
     }
-
     if (password.length < 6) {
-      setError('Password must be at least 6 characters long');
+      setError('Password must be at least 6 characters long.');
       return;
     }
 
     try {
       await axios.post(`${API_URL}/register`, {
-        username: username,
-        password: password
+        username,
+        password,
       });
-      setSuccess('Registration successful! Redirecting to login...');
-      setTimeout(() => navigate('/login'), 2000);
+      setSuccess('Registration successful! Please log in.');
+      navigate('/login');
     } catch (err) {
-      if (err.response && err.response.data) {
-        setError(err.response.data.message || 'Registration failed');
-      } else {
-        setError('An error occurred during registration');
-      }
+      setError(err.response?.data?.message || 'Registration failed. Username or email might already be in use.');
     }
   };
 
+  if (isLoading) {
+    return <div className="form-container"><h2>Loading...</h2></div>;
+  }
+
+  if (!registrationEnabled) {
+    return (
+      <div className="form-container">
+        <h2>Registration Disabled</h2>
+        <p>User registration is currently disabled. Please try again later.</p>
+        <p className="form-footer-link">
+          Already have an account? <Link to="/login">Login here</Link>
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="form-container">
-      <h2>Register</h2>
+      <h2>Register new page</h2>
       <form onSubmit={handleSubmit}>
-        {error && <p className="error-message">{error}</p>}
-        {success && <p className="success-message">{success}</p>}
         <div className="form-group">
-          <label htmlFor="username">Username</label>
+          <label htmlFor="username">Username:</label>
           <input
             type="text"
             id="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
-            minLength="3"
           />
         </div>
         <div className="form-group">
-          <label htmlFor="password">Password</label>
+          <label htmlFor="password">Password:</label>
           <input
             type="password"
             id="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            minLength="6"
           />
         </div>
-        <button type="submit">Register</button>
+        {error && <p className="error-message">{error}</p>}
+        {success && <p className="success-message">{success}</p>}
+        <button type="submit" className="form-button">
+          Register
+        </button>
       </form>
       <p className="form-footer-link">
         Already have an account? <Link to="/login">Login here</Link>
       </p>
     </div>
   );
-};
+}
 
 export default Register; 

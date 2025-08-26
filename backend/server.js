@@ -238,43 +238,74 @@ app.post('/register', [
   body('username').isLength({ min: 3 }).trim().escape(),
   body('password').isLength({ min: 6 })
 ], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
-  const { username, password } = req.body;
-
   try {
-    // Check if username already exists
-    const existingUser = await db.query(
-      'SELECT * FROM users WHERE username = $1',
-      [username]
+    // Check if registration is enabled
+    const regSettings = await db.query(
+      "SELECT setting_value FROM system_settings WHERE setting_key = 'registration_enabled'"
     );
-
-    if (existingUser.rows.length > 0) {
-      return res.status(400).json({ message: 'Username already exists' });
+    if (regSettings.rows.length === 0 || regSettings.rows[0].setting_value !== 'true') {
+      return res.status(403).json({ message: 'Registration is currently disabled.' });
     }
 
-    // Hash password
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
 
-    // Insert new user
-    const result = await db.query(
-      'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username',
-      [username, hashedPassword]
-    );
+    const { username, password } = req.body;
 
-    res.status(201).json({
-      message: 'User registered successfully',
-      user: result.rows[0]
-    });
+    try {
+      // Check if username already exists
+      const existingUser = await db.query(
+        'SELECT * FROM users WHERE username = $1',
+        [username]
+      );
+
+      if (existingUser.rows.length > 0) {
+        return res.status(400).json({ message: 'Username already exists' });
+      }
+
+      // Hash password
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+      // Insert new user
+      const result = await db.query(
+        'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username',
+        [username, hashedPassword]
+      );
+
+      res.status(201).json({
+        message: 'User registered successfully',
+        user: result.rows[0]
+      });
+    } catch (error) {
+      console.error('Registration error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(403).json({ message: 'Registration is currently disabled.' });
   }
 });
+
+// PUBLIC facing endpoint to check registration status
+app.get('/api/settings/registration', async (req, res) => {
+  try {
+    const result = await db.query(
+      "SELECT setting_value FROM system_settings WHERE setting_key = 'registration_enabled'"
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ enabled: false });
+    }
+    res.json({ enabled: result.rows[0].setting_value === 'true' });
+  } catch (error) {
+    // On error, default to disabled for security.
+    console.error('Error fetching public registration setting:', error);
+    res.json({ enabled: false });
+  }
+});
+
 
 app.post('/login', [
   body('username').trim().escape(),
@@ -870,6 +901,44 @@ app.post('/api/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, upl
   } catch (error) {
     console.error(`Error processing uploads for problem ${id}:`, error);
     res.status(500).json({ message: 'An error occurred during file processing.' });
+  }
+});
+
+// Admin API Endpoints for settings
+app.get('/api/admin/settings/registration', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await db.query(
+      "SELECT setting_value FROM system_settings WHERE setting_key = 'registration_enabled'"
+    );
+    if (result.rows.length === 0) {
+      // If the setting doesn't exist for some reason, default to true
+      return res.json({ enabled: true });
+    }
+    res.json({ enabled: result.rows[0].setting_value === 'true' });
+  } catch (error) {
+    console.error('Error fetching registration setting:', error);
+    res.status(500).json({ message: 'Error fetching settings' });
+  }
+});
+
+app.put('/api/admin/settings/registration', requireAuth, requireAdmin, [
+  body('enabled').isBoolean()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { enabled } = req.body;
+  try {
+    await db.query(
+      "UPDATE system_settings SET setting_value = $1 WHERE setting_key = 'registration_enabled'",
+      [enabled.toString()]
+    );
+    res.status(200).json({ message: 'Registration setting updated successfully.' });
+  } catch (error) {
+    console.error('Error updating registration setting:', error);
+    res.status(500).json({ message: 'Error updating setting' });
   }
 });
 

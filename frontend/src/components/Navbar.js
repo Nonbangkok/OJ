@@ -1,36 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import React from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
+import ThemeToggleButton from './ThemeToggleButton';
 import './Navbar.css';
-import ThemeToggleButton from './ThemeToggleButton'; // Import the button
 
-const API_URL = process.env.REACT_APP_API_URL;
-
-function Navbar() {
-  const [auth, setAuth] = useState({ isAuthenticated: false, user: null });
+const Navbar = () => {
+  const { user, logout } = useAuth();
+  const { registrationEnabled } = useSettings();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    checkAuthStatus();
-  }, []);
-
-  const checkAuthStatus = async () => {
+  const handleLogout = () => {
     try {
-      const response = await axios.get(`${API_URL}/me`, {
-        withCredentials: true
-      });
-      setAuth({ isAuthenticated: response.data.isAuthenticated, user: response.data.user });
-    } catch (error) {
-      console.error('Error checking auth status:', error);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await axios.post(`${API_URL}/logout`, {}, {
-        withCredentials: true
-      });
-      setAuth({ isAuthenticated: false, user: null });
+      logout();
       navigate('/');
     } catch (error) {
       console.error('Error logging out:', error);
@@ -40,25 +22,29 @@ function Navbar() {
   return (
     <nav className="navbar">
       <div className="navbar-container">
-        <Link to="/" className="nav-brand">Online Judge</Link>
+        <NavLink to="/" className="nav-brand">Online Judge</NavLink>
         <ul className="nav-links">
-          <li><Link to="/problems">Problems</Link></li>
-          <li><Link to="/submissions">Submissions</Link></li>
-          <li><Link to="/scoreboard">Scoreboard</Link></li>
-          {(auth.user?.role === 'admin' || auth.user?.role === 'staff') && (
-            <li><Link to="/admin">Admin Panel</Link></li>
+          <li><NavLink to="/problems">Problems</NavLink></li>
+          <li><NavLink to="/submissions">Submissions</NavLink></li>
+          <li><NavLink to="/scoreboard">Scoreboard</NavLink></li>
+          {(user?.role === 'admin' || user?.role === 'staff') && (
+            <li><NavLink to="/admin">Admin Panel</NavLink></li>
           )}
         </ul>
         <div className="nav-actions">
-          {auth.isAuthenticated ? (
+          {user ? (
             <>
-              <span className="username">Welcome, {auth.user?.username}</span>
+              <span className="username">Welcome, {user?.username}</span>
               <button onClick={handleLogout} className="logout-btn">Logout</button>
             </>
           ) : (
             <>
-              <Link to="/login" className="nav-action-link">Login</Link>
-              <Link to="/register" className="nav-action-link">Register</Link>
+              <NavLink to="/login" className="nav-action-link">Login</NavLink>
+              {!user && (
+                <>
+                  {registrationEnabled && <NavLink to="/register" className="nav-action-link">Register</NavLink>}
+                </>
+              )}
             </>
           )}
           <ThemeToggleButton />

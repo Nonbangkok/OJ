@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import '../components/Form.css'; // Use the new shared form styles
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -9,27 +11,24 @@ function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const { login } = useAuth();
+  const { registrationEnabled } = useSettings();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
     try {
-      const response = await axios.post(`${API_URL}/login`, { username, password }, {
+      const response = await axios.post(`${API_URL}/login`, {
+        username,
+        password
+      }, {
         withCredentials: true
       });
-
-      // Assuming a successful login redirects to the home page
-      // If you need to handle specific success messages, you'd set them here
-      // For now, we'll just redirect and refresh
-      window.location.href = '/';
-    } catch (error) {
-      if (error.response && error.response.data) {
-        setError(error.response.data.message || 'Login failed');
-      } else {
-        setError('An error occurred during login');
-      }
+      login(response.data.user); // Update auth context
+      navigate('/');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Login failed');
     }
   };
 
@@ -60,9 +59,11 @@ function Login() {
         </div>
         <button type="submit">Login</button>
       </form>
-      <p className="form-footer-link">
-        Don't have an account? <Link to="/register">Register here</Link>
-      </p>
+      {registrationEnabled && (
+        <p className="form-footer-link">
+          Don't have an account? <Link to="/register">Register here</Link>
+        </p>
+      )}
     </div>
   );
 };
