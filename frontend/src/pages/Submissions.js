@@ -90,8 +90,8 @@ function Submissions({ problemId, showTitle = true }) {
 
   const getStatusClass = (status) => {
     if (!status) return '';
-    const statusClass = `status-${status.split(' ')[0].toLowerCase()}`;
-    return styles[statusClass] || '';
+    // Return the class name string directly for the global stylesheet
+    return `status-${status.split(' ')[0].toLowerCase()}`;
   };
 
   if (loading) return <div>Loading submissions...</div>;
@@ -121,13 +121,13 @@ function Submissions({ problemId, showTitle = true }) {
           )}
         </div>
       )}
-      <div className={styles['table-container']}>
+      <div className="table-container">
         {submissions.length === 0 && !loading ? (
           <p style={{ padding: '1rem 1.25rem' }}>
             {problemId ? "You haven't made any submissions for this problem yet." : "No submissions found."}
           </p>
         ) : (
-          <table className={styles['submissions-table']}>
+          <table className="table">
             <thead>
               <tr>
                 <th>When</th>
