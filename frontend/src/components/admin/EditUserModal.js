@@ -47,8 +47,8 @@ const EditUserModal = ({ user, onClose, onSave }) => {
           </select>
         </div>
         <div className="modal-actions">
-          <button onClick={handleSave} className="save-btn">Save</button>
           <button onClick={onClose} className="cancel-btn">Cancel</button>
+          <button onClick={handleSave} className="save-btn">Save</button>
         </div>
       </div>
     </div>
