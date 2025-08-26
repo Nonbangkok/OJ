@@ -3,14 +3,12 @@
   padding: 1.5rem 2rem;
   border-radius: 8px;
   border: 1px solid var(--border-color);
-  margin-top: 2rem;
 }
 
 .settings-container h3 {
   margin-top: 0;
   margin-bottom: 1.5rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--border-color);
 }
 
 .setting-item {
