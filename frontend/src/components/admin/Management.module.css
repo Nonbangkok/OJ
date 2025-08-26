@@ -39,6 +39,7 @@
   composes: btn;
   background-color: #28a745;
   color: white;
+  max-width: 15rem;
 }
 .create-btn:hover {
   background-color: #218838;
