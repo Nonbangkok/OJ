@@ -31,6 +31,7 @@
   text-align: left;
   border-bottom: 1px solid var(--border-color);
   vertical-align: middle;
+  min-height: 25px;
 }
 
 .table tbody tr {
