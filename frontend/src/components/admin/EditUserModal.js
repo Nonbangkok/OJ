@@ -24,7 +24,7 @@ const EditUserModal = ({ user, onClose, onSave }) => {
 
   return (
     <div className="modal-backdrop">
-      <div className="modal-container form-container">
+      <div className="form-container">
         <h2>Edit User: {user.username}</h2>
         <div className="form-group">
           <label htmlFor="email">Email:</label>
