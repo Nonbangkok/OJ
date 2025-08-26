@@ -23,4 +23,5 @@
   margin-bottom: 1rem;
   color: var(--text-primary);
   font-size: 1.75rem;
+  min-width: 50rem;
 } 
