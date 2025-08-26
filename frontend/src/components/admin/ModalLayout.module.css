@@ -1,78 +1,62 @@
-.modal-overlay {
+.modal-overlay, .modal-backdrop {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 100%;
+  height: 100%;
   background-color: rgba(0, 0, 0, 0.6);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
 }
 
 .confirmation-modal-content {
   background-color: var(--background-secondary);
-  padding: 25px;
-  border-radius: 12px;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.25);
-  width: 90%;
-  max-width: 450px; /* Make it more compact */
-  border: 1px solid var(--border-color);
-  animation: slideIn 0.3s ease-out;
+  padding: 2rem;
+  border-radius: 8px;
+  text-align: center;
 }
 
-@keyframes slideIn {
-  from { transform: translateY(-30px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.confirmation-modal-content h2 {
-  margin-top: 0;
-  margin-bottom: 20px;
-  color: var(--text-color-primary);
-  font-size: 1.25rem;
-  padding-bottom: 10px;
-}
-.confirmation-modal-content p {
-  margin-bottom: 25px;
-  line-height: 1.6;
-  color: var(--text-color-secondary);
-}
 .modal-actions {
+  margin-top: 1.5rem;
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 1rem;
 }
-.modal-actions button {
-  padding: 10px 20px;
+
+.button-cancel, .button-save, .button-danger {
+  padding: 0.75rem 1.5rem;
   border: none;
   border-radius: 6px;
+  font-weight: bold;
   cursor: pointer;
-  font-weight: 600;
   transition: background-color 0.2s;
 }
+
 .button-cancel {
-  background-color: var(--background-color-tertiary);
-  color: var(--text-color-primary);
-  border: 1px solid var(--border-color);
+  background-color: var(--background-tertiary);
+  color: var(--text-primary);
 }
 .button-cancel:hover {
-  background-color: var(--border-color);
+  background-color: var(--button-secondary-hover-bg);
 }
+
+.button-save {
+  background-color: var(--button-primary-bg);
+  color: white;
+}
+.button-save:hover {
+  background-color: var(--button-primary-hover-bg);
+}
+
 .button-danger {
-  background-color: #e53e3e; /* Red for danger */
+  background-color: #e53e3e;
   color: white;
 }
 .button-danger:hover {
   background-color: #c53030;
-} 
+}
 
 fieldset {
   border-color: var(--border-color);
