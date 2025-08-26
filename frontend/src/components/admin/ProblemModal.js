@@ -80,7 +80,7 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
 
   return (
     <div className="modal-backdrop">
-      <div className="modal-container form-container">
+      <div className="form-container">
         <h2>{isEditing ? 'Edit Problem' : 'Create New Problem'}</h2>
         
         {/* Progress Bar Area */}
