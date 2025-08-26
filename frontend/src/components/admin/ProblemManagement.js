@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import '../Table.css'; // Use the new shared table styles
 import ProblemModal from './ProblemModal';
+import ConfirmationModal from './ConfirmationModal';
+import '../Table.css';
+import './ModalLayout.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -12,6 +14,9 @@ const ProblemManagement = ({ currentUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProblem, setEditingProblem] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(null); // State for upload progress
+
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [problemToDelete, setProblemToDelete] = useState(null);
 
   const fetchProblems = async () => {
     try {
@@ -30,14 +35,22 @@ const ProblemManagement = ({ currentUser }) => {
     fetchProblems();
   }, []);
 
-  const handleDelete = async (problemId) => {
-    if (window.confirm('Are you sure you want to delete this problem? All related test cases and submissions will also be deleted.')) {
+  const handleDeleteClick = (problemId) => {
+    setProblemToDelete(problemId);
+    setIsConfirmModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (problemToDelete) {
       try {
-        await axios.delete(`${API_URL}/api/admin/problems/${problemId}`, { withCredentials: true });
+        await axios.delete(`${API_URL}/api/admin/problems/${problemToDelete}`, { withCredentials: true });
         fetchProblems();
       } catch (err) {
         setError('Failed to delete problem.');
         console.error(err);
+      } finally {
+        setIsConfirmModalOpen(false);
+        setProblemToDelete(null);
       }
     }
   };
@@ -65,7 +78,7 @@ const ProblemManagement = ({ currentUser }) => {
 
     try {
       let problemIdForUpload = problemData.id;
-      
+
       if (isEditing) {
         await axios.put(`${API_URL}/api/admin/problems/${editingProblem.id}`, problemData, { withCredentials: true });
       } else {
@@ -79,7 +92,7 @@ const ProblemManagement = ({ currentUser }) => {
         if (zipFile) fileData.append('testcasesZip', zipFile);
 
         setUploadProgress({ status: 'uploading', message: 'Uploading files to server...' });
-        
+
         const response = await axios.post(`${API_URL}/api/admin/problems/${problemIdForUpload}/upload`, fileData, {
           withCredentials: true,
           headers: { 'Content-Type': 'multipart/form-data' },
@@ -130,6 +143,10 @@ const ProblemManagement = ({ currentUser }) => {
     }
   };
 
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setUploadProgress(null);
+  };
 
   if (loading) return <div>Loading problems...</div>;
   if (error) return <div className="error-message">{error}</div>;
@@ -138,7 +155,7 @@ const ProblemManagement = ({ currentUser }) => {
     <div className="management-container">
       <div className="management-header">
         <h2>Problem Management</h2>
-        <button onClick={handleCreate} className="create-btn">Create New Problem</button>
+        <button onClick={handleCreate} style={{marginBottom: '1.25rem'}} className="create-btn">Create New Problem</button>
       </div>
       <div className="table-container">
         <table className="table">
@@ -156,7 +173,7 @@ const ProblemManagement = ({ currentUser }) => {
                 <td>{problem.title}</td>
                 <td className="actions">
                   <button onClick={() => handleEdit(problem)} className="edit-btn">Edit</button>
-                  <button onClick={() => handleDelete(problem.id)} className="delete-btn">Delete</button>
+                  <button onClick={() => handleDeleteClick(problem.id)} className="delete-btn">Delete</button>
                 </td>
               </tr>
             ))}
@@ -166,15 +183,19 @@ const ProblemManagement = ({ currentUser }) => {
       {isModalOpen && (
         <ProblemModal
           problem={editingProblem}
-          onClose={() => {
-            setIsModalOpen(false);
-            setUploadProgress(null);
-          }}
+          onClose={handleCloseModal}
           onSave={handleSave}
           uploadProgress={uploadProgress} // Pass progress to modal
           currentUser={currentUser}
         />
       )}
+      <ConfirmationModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Confirm Deletion"
+        message={`Are you sure you want to delete problem "${problemToDelete}"? All related test cases and submissions will also be deleted.`}
+      />
     </div>
   );
 };
