@@ -4,13 +4,17 @@ import './ModalLayout.css';
 
 
 const EditUserModal = ({ user, onClose, onSave }) => {
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState('user');
+  const [formData, setFormData] = useState({
+    username: user?.username || '',
+    role: user?.role || 'user',
+  });
 
   useEffect(() => {
     if (user) {
-      setEmail(user.email);
-      setRole(user.role);
+      setFormData({
+        username: user.username,
+        role: user.role,
+      });
     }
   }, [user]);
 
@@ -18,16 +22,25 @@ const EditUserModal = ({ user, onClose, onSave }) => {
     return null;
   }
 
+  const handleChange = (e) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [id]: value,
+    }));
+  };
+
   const handleSave = () => {
-    onSave(user.id, { email, role });
+    onSave(user.id, formData);
+    onClose();
   };
 
   return (
-    <div className="modal-backdrop">
+    <div className="modal-overlay">
       <div className="form-container">
         <h2>Edit User: {user.username}</h2>
         <div className="form-group">
-          <label htmlFor="email">Email:</label>
+          <label htmlFor="username">Username</label>
           <input
             type="text"
             id="username"
