@@ -92,7 +92,6 @@ const UserManagement = () => {
         <table className="table">
           <thead>
             <tr>
-              <th>ID</th>
               <th>Username</th>
               <th>Role</th>
               <th>Actions</th>
@@ -101,7 +100,6 @@ const UserManagement = () => {
           <tbody>
             {users.map(user => (
               <tr key={user.id}>
-                <td>{user.id}</td>
                 <td>{user.username}</td>
                 <td>{user.role}</td>
                 <td className={styles.actions}>
