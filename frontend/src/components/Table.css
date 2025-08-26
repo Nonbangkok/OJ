@@ -17,25 +17,20 @@
   background-color: var(--background-tertiary);
 }
 
-.table th,
-.table td {
-  padding: 1rem 1.25rem;
-  text-align: left;
-  border-bottom: 1px solid var(--border-color);
-  vertical-align: middle; /* Align content vertically */
-}
-
-.table td {
-  min-height: 58px; /* Approximate height of a cell with buttons */
-  box-sizing: border-box;
-}
-
 .table th {
   color: var(--text-primary);
   font-weight: 600;
   font-size: 0.9rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.table th,
+.table td {
+  padding: 1rem 1.25rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
 }
 
 .table tbody tr {
@@ -60,28 +55,27 @@
   text-decoration: underline;
 }
 
-/* For action buttons in tables */
-.table .actions {
-  display: flex;
-  gap: 0.75rem;
+/* Status colors for table cells */
+.status-accepted {
+  color: #48bb78; /* Green */
+  font-weight: bold;
 }
-
-.table .actions button {
-  width: auto;
-  padding: 0.4rem 0.8rem;
-  font-size: 0.9rem;
+.status-wrong {
+  color: #f56565; /* Red */
+  font-weight: bold;
 }
-
-.table .actions .edit-btn {
-  background-color: var(--status-info);
+.status-time {
+  color: #f6ad55; /* Orange */
 }
-.table .actions .edit-btn:hover {
-  background-color: #138496;
+.status-compilation {
+  color: #a0aec0; /* Gray */
 }
-
-.table .actions .delete-btn {
-  background-color: var(--status-danger);
+.status-runtime {
+  color: #ed8936; /* Orange */
 }
-.table .actions .delete-btn:hover {
-  background-color: #c82333;
-} 
+.status-memory {
+  color: #ed64a6; /* Pink */
+}
+.status-pending, .status-compiling, .status-running {
+  color: #718096; /* Gray */
+}
