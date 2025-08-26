@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import styles from './ProblemDetail.module.css';
 import CodeSubmissionForm from '../components/CodeSubmissionForm';
-import ProblemSubmissionsList from './ProblemSubmissionsList';
+import Submissions from './Submissions';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -60,7 +60,7 @@ function ProblemDetail() {
           </div>
         );
       case 'submissions':
-        return <ProblemSubmissionsList problemId={id} />;
+        return <Submissions problemId={id} showTitle={false} />;
       default:
         return null;
     }
