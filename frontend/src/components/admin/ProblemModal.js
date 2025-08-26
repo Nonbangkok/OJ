@@ -185,8 +185,8 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
         </fieldset>
 
         <div className="modal-actions">
-          <button onClick={onClose} className="cancel-btn" disabled={isUploading}>Cancel</button>
-          <button onClick={handleSave} className="save-btn" disabled={isUploading}>
+          <button onClick={onClose} className="button-cancel" disabled={isUploading}>Cancel</button>
+          <button onClick={handleSave} className="button-save" disabled={isUploading}>
             {isUploading ? 'Processing...' : 'Save'}
           </button>
         </div>
