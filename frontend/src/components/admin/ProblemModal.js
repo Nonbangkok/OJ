@@ -172,7 +172,7 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
             />
           </div>
 
-          <div className="form-group">
+          <div className="form-group" style={{marginBottom: '0.25rem'}}>
             <label htmlFor="zipFile">Test Cases ZIP</label>
             <input
               type="file"
