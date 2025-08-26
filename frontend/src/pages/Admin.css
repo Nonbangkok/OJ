@@ -6,9 +6,6 @@
 
 .admin-container h1 {
   color: var(--text-primary);
-  margin-bottom: 2rem;
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 1rem;
 }
 
 .admin-section {
@@ -22,10 +19,8 @@
 
 /* This is a general style that will apply to h2 inside the management components */
 .admin-section h2 {
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 1rem;
   margin-top: 0;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   color: var(--text-primary);
   font-size: 1.75rem;
 } 
