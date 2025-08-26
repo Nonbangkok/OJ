@@ -33,6 +33,7 @@
 }
 
 .problem-info {
+  width: 400px;
   flex-grow: 0.6;
 }
 
@@ -134,6 +135,7 @@
 }
 
 .problem-action-btn {
+  width: 30px;
   padding: 0.6rem 1.5rem;
   border-radius: 6px;
   text-decoration: none;
