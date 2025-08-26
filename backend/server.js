@@ -670,6 +670,40 @@ app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+app.post('/api/admin/users', requireAuth, requireAdmin, [
+  body('username').isLength({ min: 3 }).trim().escape(),
+  body('password').isLength({ min: 6 }),
+  body('role').isIn(['user', 'staff'])
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { username, password, role } = req.body;
+
+  try {
+    const existingUser = await db.query('SELECT id FROM users WHERE username = $1', [username]);
+    if (existingUser.rows.length > 0) {
+      return res.status(409).json({ message: 'Username already exists.' });
+    }
+
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    const result = await db.query(
+      'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id, username, role',
+      [username, hashedPassword, role]
+    );
+
+    res.status(201).json(result.rows[0]);
+
+  } catch (error) {
+    console.error('Error creating user by admin:', error);
+    res.status(500).json({ message: 'Error creating user' });
+  }
+});
+
 app.put('/api/admin/users/:id', requireAuth, requireAdmin, [
   body('username').isLength({ min: 3 }).trim().escape(),
   body('role').isIn(['user', 'staff'])
