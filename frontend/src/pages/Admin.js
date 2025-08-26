@@ -46,9 +46,12 @@ const Admin = () => {
           <ProblemManagement currentUser={user} />
         </div>
       )}
-      <div className="admin-section">
-        <RegistrationSettings />
-      </div>
+      
+      {user?.role === 'admin' && (
+        <div className="admin-section">
+          <RegistrationSettings />
+        </div>
+      )}
     </div>
   );
 };
