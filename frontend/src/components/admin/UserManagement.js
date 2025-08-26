@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import '../Table.css'; // Use the new shared table styles
 import EditUserModal from './EditUserModal';
+import ConfirmationModal from './ConfirmationModal';
+import '../Table.css'; // Use the new shared table styles
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-function UserManagement() {
+const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [editingUser, setEditingUser] = useState(null);
+  const [editingUser, setEditingUser] = useState(null); // Controls the EditUserModal
+  const [deletingUser, setDeletingUser] = useState(null); // Controls the ConfirmationModal
 
   const fetchUsers = async () => {
     try {
@@ -28,19 +30,29 @@ function UserManagement() {
     fetchUsers();
   }, []);
 
-  const handleDelete = async (userId) => {
-    if (window.confirm('Are you sure you want to delete this user and all their submissions?')) {
+  const handleEdit = (user) => {
+    setEditingUser(user);
+  };
+  
+  const handleDeleteClick = (user) => {
+    setDeletingUser(user);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deletingUser) {
       try {
-        await axios.delete(`${API_URL}/api/admin/users/${userId}`, { withCredentials: true });
-        setUsers(users.filter(user => user.id !== userId));
+        await axios.delete(`${API_URL}/api/admin/users/${deletingUser.id}`, { withCredentials: true });
+        setUsers(users.filter(user => user.id !== deletingUser.id));
       } catch (err) {
         setError('Failed to delete user.');
         console.error(err);
+      } finally {
+        setDeletingUser(null);
       }
     }
   };
 
-  const handleSaveUser = async (userId, userData) => {
+  const handleSave = async (userId, userData) => {
     try {
       await axios.put(`${API_URL}/api/admin/users/${userId}`, userData, { withCredentials: true });
       setEditingUser(null);
@@ -78,10 +90,10 @@ function UserManagement() {
                 <td className="actions">
                   {user.role !== 'admin' && (
                     <>
-                      <button onClick={() => setEditingUser(user)} className="edit-btn">
+                      <button onClick={() => handleEdit(user)} className="edit-btn">
                         Edit
                       </button>
-                      <button onClick={() => handleDelete(user.id)} className="delete-btn">
+                      <button onClick={() => handleDeleteClick(user)} className="delete-btn">
                         Delete
                       </button>
                     </>
@@ -96,9 +108,16 @@ function UserManagement() {
         <EditUserModal
           user={editingUser}
           onClose={() => setEditingUser(null)}
-          onSave={handleSaveUser}
+          onSave={handleSave}
         />
       )}
+      <ConfirmationModal
+        isOpen={!!deletingUser}
+        onClose={() => setDeletingUser(null)}
+        onConfirm={handleConfirmDelete}
+        title="Confirm Deletion"
+        message={`Are you sure you want to delete user "${deletingUser?.username}"? All related submissions will also be deleted.`}
+      />
     </div>
   );
 };
