@@ -29,18 +29,20 @@ const EditUserModal = ({ user, onClose, onSave }) => {
         <div className="form-group">
           <label htmlFor="email">Email:</label>
           <input
-            type="email"
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="text"
+            id="username"
+            name="username"
+            value={formData.username}
+            onChange={handleChange}
           />
         </div>
         <div className="form-group">
-          <label htmlFor="role">Role:</label>
-          <select 
-            id="role" 
-            value={role} 
-            onChange={(e) => setRole(e.target.value)}
+          <label htmlFor="role">Role</label>
+          <select
+            id="role"
+            name="role"
+            value={formData.role}
+            onChange={handleChange}
           >
             <option value="user">User</option>
             <option value="staff">Staff</option>
