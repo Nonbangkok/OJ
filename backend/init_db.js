@@ -8,6 +8,7 @@ const dropTables = async () => {
   await db.query('DROP TABLE IF EXISTS problems CASCADE;');
   await db.query('DROP TABLE IF EXISTS users CASCADE;');
   await db.query('DROP TABLE IF EXISTS user_sessions CASCADE;');
+  await db.query('DROP TABLE IF EXISTS system_settings;');
   console.log('Existing tables dropped.');
 }
 
@@ -19,6 +20,13 @@ const createTables = async () => {
       password_hash VARCHAR(255) NOT NULL,
       role VARCHAR(10) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'staff', 'admin')),
       created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `;
+
+  const settingsTable = `
+    CREATE TABLE IF NOT EXISTS system_settings (
+      setting_key VARCHAR(50) PRIMARY KEY,
+      setting_value VARCHAR(255) NOT NULL
     );
   `;
 
@@ -72,10 +80,17 @@ const createTables = async () => {
 
   try {
     await db.query(usersTable);
+    await db.query(settingsTable);
     await db.query(sessionTable);
     await db.query(problemsTable);
     await db.query(testcasesTable); // Add this
     await db.query(submissionsTable);
+    // Set default setting for registration
+    await db.query(`
+      INSERT INTO system_settings (setting_key, setting_value)
+      VALUES ('registration_enabled', 'true')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
     console.log('Tables created successfully!');
   } catch (err) {
     console.error('Error creating tables:', err);
