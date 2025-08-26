@@ -35,14 +35,13 @@
   font-size: 0.9rem;
 }
 
-.btn:hover {
-  filter: brightness(90%);
-}
-
-/* Specific button styles */
 .create-btn {
   composes: btn;
-  background-color: var(--button-primary-bg);
+  background-color: #28a745;
+  color: white;
+}
+.create-btn:hover {
+  background-color: #218838;
 }
 
 .edit-btn {
@@ -50,7 +49,15 @@
   background-color: #17a2b8; /* A nice teal/info color */
 }
 
+.edit-btn:hover {
+  background-color: #138496;
+}
+
 .delete-btn {
   composes: btn;
   background-color: var(--status-danger);
 } 
+
+.delete-btn:hover {
+  background-color: #c82333;
+}
