@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import EditUserModal from './EditUserModal';
 import ConfirmationModal from './ConfirmationModal';
+import AddUserModal from './AddUserModal'; // Import the new modal
 import styles from './Management.module.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -12,6 +13,7 @@ const UserManagement = () => {
   const [error, setError] = useState('');
   const [editingUser, setEditingUser] = useState(null); // Controls the EditUserModal
   const [deletingUser, setDeletingUser] = useState(null); // Controls the ConfirmationModal
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false); // State for the new modal
 
   const fetchUsers = async () => {
     try {
@@ -63,12 +65,29 @@ const UserManagement = () => {
     }
   };
 
+  const handleAddNewUser = async (newUserData) => {
+    try {
+      await axios.post(`${API_URL}/api/admin/users`, newUserData, { withCredentials: true });
+      setIsAddModalOpen(false);
+      fetchUsers(); // Refresh the user list
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to create user.');
+      console.error(err);
+      // Note: We might want to display this error inside the modal in a future enhancement
+    }
+  };
+
   if (loading) return <div>Loading users...</div>;
   if (error) return <div className="error-message">{error}</div>;
 
   return (
     <div className={styles['management-container']}>
-      <h2>User Management</h2>
+      <div className={styles['management-header']}>
+        <h2>User Management</h2>
+        <button onClick={() => setIsAddModalOpen(true)} className={styles['create-btn']}>
+          Create New User
+        </button>
+      </div>
       <div className="table-container">
         <table className="table">
           <thead>
@@ -115,6 +134,11 @@ const UserManagement = () => {
         onConfirm={handleConfirmDelete}
         title="Confirm Deletion"
         message={`Are you sure you want to delete user "${deletingUser?.username}"? All related submissions will also be deleted.`}
+      />
+      <AddUserModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSave={handleAddNewUser}
       />
     </div>
   );
