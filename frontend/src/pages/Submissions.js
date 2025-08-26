@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import '../components/Table.css'; // Use the new shared table styles
 import styles from './Submissions.module.css'; // Import the new CSS file
 import SubmissionModal from './SubmissionModal'; // Import the modal
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-function Submissions() {
+function Submissions({ problemId, showTitle = true }) {
   const [submissions, setSubmissions] = useState([]);
   const [currentUser, setCurrentUser] = useState(null); // Add state for current user
   const [loading, setLoading] = useState(true);
@@ -27,7 +26,16 @@ function Submissions() {
         setCurrentUser(userRes.data.user);
       }
 
-      const params = filter === 'mine' ? { filter: 'mine' } : {};
+      const params = {};
+      if (problemId) {
+        // When on a problem detail page, always filter to the current user's submissions.
+        params.filter = 'mine';
+        params.problemId = problemId;
+      } else if (filter === 'mine') {
+        // On the main submissions page, respect the user's filter choice.
+        params.filter = 'mine';
+      }
+
       const subsRes = await axios.get(`${API_URL}/api/submissions`, {
         withCredentials: true,
         params,
@@ -40,7 +48,7 @@ function Submissions() {
     } finally {
       setLoading(false);
     }
-  }, [filter, submissions.length]);
+  }, [filter, submissions.length, problemId]);
 
   useEffect(() => {
     fetchData();
@@ -91,60 +99,71 @@ function Submissions() {
 
   return (
     <div className={styles['submissions-container']}>
-      <div className={styles['submissions-header']}>
-        <h1>Recent Submissions</h1>
-        <div className={styles['filter-buttons']}>
-          <button 
-            className={`${styles['filter-btn']} ${filter === 'all' ? styles.active : ''}`}
-            onClick={() => setFilter('all')}
-          >
-            All Submissions
-          </button>
-          <button 
-            className={`${styles['filter-btn']} ${filter === 'mine' ? styles.active : ''}`}
-            onClick={() => setFilter('mine')}
-          >
-            My Submissions
-          </button>
+      {showTitle && (
+        <div className={styles['submissions-header']}>
+          <h1>Recent Submissions</h1>
+          {/* Hide filter buttons when viewing submissions for a specific problem */}
+          {!problemId && (
+            <div className={styles['filter-buttons']}>
+              <button
+                className={`${styles['filter-btn']} ${filter === 'all' ? styles.active : ''}`}
+                onClick={() => setFilter('all')}
+              >
+                All Submissions
+              </button>
+              <button
+                className={`${styles['filter-btn']} ${filter === 'mine' ? styles.active : ''}`}
+                onClick={() => setFilter('mine')}
+              >
+                My Submissions
+              </button>
+            </div>
+          )}
         </div>
-      </div>
-      <div className="table-container">
-        <table className="submissions-table">
-          <thead>
-            <tr>
-              <th>When</th>
-              <th>User</th>
-              <th>Problem</th>
-              <th>Status</th>
-              <th>Score</th>
-              <th>Language</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {submissions.map(sub => (
-              <tr key={sub.id}>
-                <td>{new Date(sub.submitted_at).toLocaleString()}</td>
-                <td>{sub.username}</td>
-                <td><Link to={`/problems/${sub.problem_id}`}>{sub.problem_title}</Link></td>
-                <td className={getStatusClass(sub.overall_status)}>{sub.overall_status}</td>
-                <td>{sub.score}</td>
-                <td>{sub.language}</td>
-                <td>
-                  {currentUser && (currentUser.username === sub.username || currentUser.role === 'admin' || currentUser.role === 'staff') ? (
-                    <button onClick={() => handleViewCode(sub.id)} className={styles['view-code-btn']}>
-                      View Code
-                    </button>
-                  ) : (
-                    <div className={styles['view-code-btn']} style={{ visibility: 'hidden' }} aria-hidden="true">
-                      View Code
-                    </div>
-                  )}
-                </td>
+      )}
+      <div className={styles['table-container']}>
+        {submissions.length === 0 && !loading ? (
+          <p style={{ padding: '1rem 1.25rem' }}>
+            {problemId ? "You haven't made any submissions for this problem yet." : "No submissions found."}
+          </p>
+        ) : (
+          <table className={styles['submissions-table']}>
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>User</th>
+                {!problemId && <th>Problem</th>}
+                <th>Status</th>
+                <th>Score</th>
+                <th>Language</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {submissions.map(sub => (
+                <tr key={sub.id}>
+                  <td>{new Date(sub.submitted_at).toLocaleString()}</td>
+                  <td>{sub.username}</td>
+                  {!problemId && <td><Link to={`/problems/${sub.problem_id}`}>{sub.problem_title}</Link></td>}
+                  <td className={getStatusClass(sub.overall_status)}>{sub.overall_status}</td>
+                  <td>{sub.score}</td>
+                  <td>{sub.language}</td>
+                  <td>
+                    {currentUser && (currentUser.username === sub.username || currentUser.role === 'admin' || currentUser.role === 'staff') ? (
+                      <button onClick={() => handleViewCode(sub.id)} className={styles['view-code-btn']}>
+                        View Code
+                      </button>
+                    ) : (
+                      <div className={styles['view-code-btn']} style={{ visibility: 'hidden' }} aria-hidden="true">
+                        View Code
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
       {isModalOpen && <SubmissionModal submission={selectedSubmission} onClose={handleCloseModal} />}
     </div>
