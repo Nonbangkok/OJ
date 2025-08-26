@@ -49,8 +49,9 @@ const RegistrationSettings = () => {
       {error && <p className={styles['error-message']}>{error}</p>}
       {success && <p className={styles['success-message']}>{success}</p>}
       <div className={styles['setting-item']}>
-        <label htmlFor="registration-toggle">Enable User Registration</label>
-        <div className={styles['toggle-switch']}>
+        <div>Enable User Registration</div>
+        {/* Change the div to a label to make the entire switch clickable */}
+        <label className={styles['toggle-switch']}>
           <input
             type="checkbox"
             id="registration-toggle"
@@ -58,7 +59,7 @@ const RegistrationSettings = () => {
             onChange={handleToggle}
           />
           <span className={`${styles.slider} ${styles.round}`}></span>
-        </div>
+        </label>
       </div>
     </div>
   );
