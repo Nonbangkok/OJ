@@ -75,7 +75,6 @@ const UserManagement = () => {
             <tr>
               <th>ID</th>
               <th>Username</th>
-              <th>Email</th>
               <th>Role</th>
               <th>Actions</th>
             </tr>
@@ -85,7 +84,6 @@ const UserManagement = () => {
               <tr key={user.id}>
                 <td>{user.id}</td>
                 <td>{user.username}</td>
-                <td>{user.email}</td>
                 <td>{user.role}</td>
                 <td className="actions">
                   {user.role !== 'admin' && (
