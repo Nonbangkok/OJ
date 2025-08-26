@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import EditUserModal from './EditUserModal';
 import ConfirmationModal from './ConfirmationModal';
-import '../Table.css'; // Use the new shared table styles
+import styles from './Management.module.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -67,7 +67,7 @@ const UserManagement = () => {
   if (error) return <div className="error-message">{error}</div>;
 
   return (
-    <div className="management-container">
+    <div className={styles['management-container']}>
       <h2>User Management</h2>
       <div className="table-container">
         <table className="table">
@@ -85,13 +85,13 @@ const UserManagement = () => {
                 <td>{user.id}</td>
                 <td>{user.username}</td>
                 <td>{user.role}</td>
-                <td className="actions">
+                <td className={styles.actions}>
                   {user.role !== 'admin' && (
                     <>
-                      <button onClick={() => handleEdit(user)} className="edit-btn">
+                      <button onClick={() => handleEdit(user)} className={styles['edit-btn']}>
                         Edit
                       </button>
-                      <button onClick={() => handleDeleteClick(user)} className="delete-btn">
+                      <button onClick={() => handleDeleteClick(user)} className={styles['delete-btn']}>
                         Delete
                       </button>
                     </>

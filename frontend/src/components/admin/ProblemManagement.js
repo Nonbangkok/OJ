@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import ProblemModal from './ProblemModal';
 import ConfirmationModal from './ConfirmationModal';
-import '../Table.css';
-import modalStyles from './ModalLayout.module.css';
+import styles from './Management.module.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -149,13 +148,13 @@ const ProblemManagement = ({ currentUser }) => {
   };
 
   if (loading) return <div>Loading problems...</div>;
-  if (error) return <div className={modalStyles['error-message']}>{error}</div>;
+  if (error) return <div className='error-message'>{error}</div>;
 
   return (
-    <div className={modalStyles['management-container']}>
-      <div className={modalStyles['management-header']}>
+    <div className={styles['management-container']}>
+      <div className={styles['management-header']}>
         <h2>Problem Management</h2>
-        <button onClick={handleCreate} style={{marginBottom: '1.25rem'}} className={modalStyles['create-btn']}>Create New Problem</button>
+        <button onClick={handleCreate} className={styles['create-btn']}>Create New Problem</button>
       </div>
       <div className="table-container">
         <table className="table">
@@ -171,9 +170,9 @@ const ProblemManagement = ({ currentUser }) => {
               <tr key={problem.id}>
                 <td>{problem.id}</td>
                 <td>{problem.title}</td>
-                <td className={modalStyles.actions}>
-                  <button onClick={() => handleEdit(problem)} className={modalStyles['edit-btn']}>Edit</button>
-                  <button onClick={() => handleDeleteClick(problem.id)} className={modalStyles['delete-btn']}>Delete</button>
+                <td className={styles.actions}>
+                  <button onClick={() => handleEdit(problem)} className={styles['edit-btn']}>Edit</button>
+                  <button onClick={() => handleDeleteClick(problem.id)} className={styles['delete-btn']}>Delete</button>
                 </td>
               </tr>
             ))}
