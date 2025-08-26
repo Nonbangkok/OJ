@@ -1,11 +1,12 @@
-.sign-in-form-container {
-  background-color: var(--background-secondary);
+.form-container {
+  background-color: var(--background-primary);
   padding: 2rem;
   border-radius: 8px;
   box-shadow: var(--box-shadow);
   border: 1px solid var(--border-color);
   max-width: 500px;
   margin: 2rem auto;
+  width: 100%;
 }
 
 .form-container h2,
@@ -13,7 +14,7 @@
   color: var(--text-primary);
   text-align: center;
   margin-top: 0;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .form-group {
