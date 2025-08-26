@@ -40,10 +40,9 @@ const Navbar = () => {
           ) : (
             <>
               <NavLink to="/login" className={styles['nav-action-link']}>Login</NavLink>
-              {!user && (
-                <>
-                  {registrationEnabled && <NavLink to="/register" className={styles['nav-action-link']}>Register</NavLink>}
-                </>
+              {/* Conditionally render the Register link based on the setting */}
+              {registrationEnabled && (
+                <NavLink to="/register" className={styles['nav-action-link']}>Register</NavLink>
               )}
             </>
           )}

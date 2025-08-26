@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import styles from './RegistrationSettings.module.css';
+import { useSettings } from '../../context/SettingsContext';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -9,6 +10,7 @@ const RegistrationSettings = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const { refreshSettings } = useSettings(); // Get the refresh function
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -35,6 +37,7 @@ const RegistrationSettings = () => {
       );
       setIsEnabled(newStatus);
       setSuccess(`Registration has been ${newStatus ? 'enabled' : 'disabled'}.`);
+      await refreshSettings(); // Refresh settings globally
       setTimeout(() => setSuccess(''), 3000); // Clear message after 3 seconds
     } catch (err) {
       setError('Failed to update settings.');
