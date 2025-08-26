@@ -37,11 +37,6 @@ function ProblemDetail() {
     window.open(pdfEndpointUrl, '_blank');
   };
 
-  const getStatusClass = (status) => {
-    if (!status) return '';
-    return `status-${status.split(' ')[0].toLowerCase()}`;
-  }
-
   if (loading) return <div>Loading...</div>;
   if (error) return <div className="error-message">{error}</div>;
   if (!problem) return <div className="error-message">Problem not found.</div>;

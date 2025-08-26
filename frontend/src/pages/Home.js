@@ -1,10 +1,9 @@
 import React from 'react';
-import CodeSubmissionForm from '../components/CodeSubmissionForm';
 
 const Home = () => {
   return (
     <div>
-      {/* <CodeSubmissionForm /> */}
+      <h1>Home</h1>
     </div>
   );
 };

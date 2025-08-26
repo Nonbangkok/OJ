@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
 import SubmissionModal from './SubmissionModal';
 import '../components/Table.css';
 
@@ -13,7 +12,6 @@ const ProblemSubmissionsList = ({ problemId }) => {
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [isStaffOrAdmin, setIsStaffOrAdmin] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
