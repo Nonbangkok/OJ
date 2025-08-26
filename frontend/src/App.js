@@ -3,6 +3,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
 import './App.css';
+import './components/Table.css';
 
 // Components
 import Navbar from './components/Navbar';
