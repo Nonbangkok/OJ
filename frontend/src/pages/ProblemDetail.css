@@ -1,7 +1,7 @@
 /* New Layout Styles */
 .problem-detail-container {
   display: flex;
-  height: calc(100vh - 60px); /* Full height minus navbar */
+  height: calc(100vh - 100px);
 }
 
 .left-nav {
@@ -18,12 +18,46 @@
   margin: 0 0 0.5rem 0;
   color: var(--text-primary);
   font-size: 1.5rem;
+  line-height: 1.3;
 }
 
 .problem-info p {
   margin: 0;
   color: var(--text-secondary);
+}
+
+.problem-info .problem-id {
   font-family: "Inconsolata";
+  margin-bottom: 1rem;
+}
+
+.problem-info .problem-author {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.problem-info .problem-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.problem-info .view-pdf-btn {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  text-align: center;
+  margin-bottom: 1.5rem; /* Add space before the nav */
+}
+
+.problem-info .view-pdf-btn:hover {
+  background-color: var(--background-tertiary);
 }
 
 .problem-nav {
@@ -59,8 +93,8 @@
 
 .right-content {
   flex-grow: 1;
-  overflow-y: auto;
-  padding: 2rem;
+  overflow-y: hidden; /* Hide scrollbar of the container */
+  padding: 0; /* Remove padding to maximize space */
 }
 
 /* Statement View Specific Styles */
@@ -72,8 +106,7 @@
 
 .pdf-preview {
   flex-grow: 1;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border: none; /* Remove border */
   width: 100%;
   height: 100%;
 }
@@ -85,49 +118,12 @@
   justify-content: center;
   color: var(--text-secondary);
   background-color: var(--background-primary);
-  border: 1px dashed var(--border-color);
-  border-radius: 8px;
+  border-radius: 0;
 }
 
-/* Header within content panels */
+/* No longer need the header in the right panel */
 .problem-header {
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 1.5rem;
-  margin-bottom: 1.5rem;
-  flex-shrink: 0;
-}
-
-.problem-header h1 {
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.problem-author {
-  color: var(--text-secondary);
-  margin: 0.5rem 0 1rem 0;
-  font-size: 1rem;
-}
-
-.problem-meta {
-  display: flex;
-  gap: 1.5rem;
-  margin: 1rem 0;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-}
-
-.view-pdf-btn {
-  width: auto;
-  padding: 0.6rem 1.2rem;
-  font-size: 0.9rem;
-  margin-top: 0.5rem;
-  background-color: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-}
-
-.view-pdf-btn:hover {
-  background-color: var(--background-tertiary);
+ display: none;
 }
 
 /* Submission View Styles */

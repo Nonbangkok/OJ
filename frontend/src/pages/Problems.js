@@ -121,7 +121,7 @@ const Problems = () => {
               </div>
               
               <Link to={`/problems/${problem.id}`} className={`problem-action-btn ${hasSubmitted ? 'edit' : 'new'}`}>
-                {hasSubmitted ? 'View' : 'New'}
+                {hasSubmitted ? 'Edit' : 'New'}
               </Link>
             </div>
           );

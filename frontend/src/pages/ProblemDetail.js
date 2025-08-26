@@ -46,22 +46,6 @@ function ProblemDetail() {
       case 'statement':
         return (
           <div className="statement-view">
-            <div className="problem-header">
-              <h1>{problem.title}</h1>
-              {problem.author && <p className="problem-author">Author : {problem.author}</p>}
-              <div className="problem-meta">
-                <span>Time Limit: {problem.time_limit_ms} ms</span>
-                <span>Memory Limit: {problem.memory_limit_mb} MB</span>
-              </div>
-              {problem.has_pdf && (
-                <button 
-                  onClick={handlePdfView}
-                  className="view-pdf-btn"
-                >
-                  View Problem PDF in New Tab
-                </button>
-              )}
-            </div>
             {problem.has_pdf ? (
               <iframe src={pdfEndpointUrl} title={`${problem.title} PDF`} className="pdf-preview" />
             ) : (
@@ -87,7 +71,22 @@ function ProblemDetail() {
         <div className="left-nav">
             <div className="problem-info">
                 <h2>{problem.title}</h2>
-                <p>{problem.id}</p>
+                <p className="problem-id">{problem.id}</p>
+                {problem.author && <p className="problem-author">Author: {problem.author}</p>}
+                
+                <div className="problem-meta">
+                  <span>Time Limit: {problem.time_limit_ms} ms</span>
+                  <span>Memory Limit: {problem.time_limit_mb} MB</span>
+                </div>
+
+                {problem.has_pdf && (
+                  <button 
+                    onClick={handlePdfView}
+                    className="view-pdf-btn"
+                  >
+                    View Problem PDF
+                  </button>
+                )}
             </div>
             <nav className="problem-nav">
                 <button 
