@@ -25,37 +25,28 @@
   gap: 1rem;
 }
 
-.button-cancel, .button-save, .button-danger {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
 .button-cancel {
   background-color: var(--background-tertiary);
   color: var(--text-primary);
 }
 .button-cancel:hover {
-  background-color: var(--button-secondary-hover-bg);
+  background-color: var(--border-color);
 }
 
 .button-save {
-  background-color: var(--button-primary-bg);
+  background-color: #28a745;
   color: white;
 }
 .button-save:hover {
-  background-color: var(--button-primary-hover-bg);
+  background-color: #218838;
 }
 
 .button-danger {
-  background-color: #e53e3e;
+  background-color: #dc3545;
   color: white;
 }
 .button-danger:hover {
-  background-color: #c53030;
+  background-color: #c82333;
 }
 
 fieldset {
