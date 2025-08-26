@@ -75,4 +75,29 @@
   padding: 0.5rem;
   text-align: left;
   border-bottom: 1px solid #4a5568;
+}
+
+/* Status colors for test cases */
+.status-accepted {
+  color: #48bb78; /* Green */
+  font-weight: bold;
+}
+.status-wrong {
+  color: #f56565; /* Red */
+  font-weight: bold;
+}
+.status-time {
+  color: #f6ad55; /* Orange */
+}
+.status-compilation {
+  color: #a0aec0; /* Gray */
+}
+.status-runtime {
+  color: #ed8936; /* Orange */
+}
+.status-memory {
+  color: #ed64a6; /* Pink */
+}
+.status-pending, .status-compiling, .status-running {
+  color: #718096; /* Gray */
 } 
