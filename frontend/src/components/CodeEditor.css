@@ -1,0 +1,68 @@
+/* Import highlight.js theme */
+@import 'highlight.js/styles/atom-one-dark.css';
+
+/* Main wrapper for line numbers and editor */
+.editor-wrapper {
+  display: flex;
+  position: relative;
+  background-color: #282c34; /* Same as hljs background */
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  max-height: 60vh;
+  min-height: 40vh;
+  font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  color: white;
+  /* Set max height and allow internal scrolling */
+  overflow: hidden; /* Children will handle their own scrolling */
+}
+
+.editor-wrapper:focus-within {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+}
+
+/* Gutter for line numbers */
+.line-numbers-gutter {
+  background-color: #282c34; /* Slightly darker than editor */
+  color: #636d83; /* Muted color for line numbers */
+  padding: 1rem 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5; /* MUST match editor line height */
+  text-align: right;
+  user-select: none;
+  /* This element's scrollTop will be synced via JS */
+  overflow-y: hidden;
+}
+
+/* This will be the direct parent of the Editor component */
+.editor-container {
+  flex-grow: 1;
+  overflow: hidden; /* Hide this container's scrollbar */
+}
+
+/* Target the internals of react-simple-code-editor */
+.editor-container > div,
+.editor-container textarea,
+.editor-container pre {
+  height: 100% !important;
+  max-height: inherit !important;
+}
+
+.editor-container textarea,
+.editor-container pre {
+  padding: 1rem !important;
+  font-size: 1rem !important;
+  line-height: 1.5 !important;
+  outline: none !important;
+  caret-color: white !important;
+  background: none !important;
+  overflow-y: auto !important; /* The internal textarea is the one that scrolls */
+}
+
+/* Override highlight.js styles for better integration */
+.hljs {
+  background: none !important; /* The wrapper handles the background */
+  color: #abb2bf !important;
+} 
