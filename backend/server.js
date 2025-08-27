@@ -706,7 +706,7 @@ app.post('/api/admin/users', requireAuth, requireAdmin, [
 
 app.put('/api/admin/users/:id', requireAuth, requireAdmin, [
   body('username').isLength({ min: 3 }).trim().escape(),
-  body('role').isIn(['user', 'staff'])
+  body('role').isIn(['user', 'staff', 'admin']) // <-- Allow 'admin' role
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -716,7 +716,21 @@ app.put('/api/admin/users/:id', requireAuth, requireAdmin, [
   const { id } = req.params;
   const { username, role } = req.body;
 
+  // Prevent admin from editing their own account
+  if (req.session.userId == id) {
+    return res.status(403).json({ message: 'Admins cannot edit their own account.' });
+  }
+
   try {
+    // Fetch the user being edited to check their username
+    const userToEditRes = await db.query('SELECT username FROM users WHERE id = $1', [id]);
+    if (userToEditRes.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+    if (userToEditRes.rows[0].username === 'Nonbangkok') {
+      return res.status(403).json({ message: 'The "Nonbangkok" account cannot be edited.' });
+    }
+
     // Check if the new username is already taken by another user
     const existingUser = await db.query(
       'SELECT id FROM users WHERE username = $1 AND id != $2',
@@ -745,7 +759,23 @@ app.put('/api/admin/users/:id', requireAuth, requireAdmin, [
 
 app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
+
+  // Prevent admin from deleting their own account
+  if (req.session.userId == id) {
+    return res.status(403).json({ message: 'Admins cannot delete their own account.' });
+  }
+
   try {
+    // Fetch the user being deleted to check their username
+    const userToDeleteRes = await db.query('SELECT username FROM users WHERE id = $1', [id]);
+    if (userToDeleteRes.rows.length === 0) {
+      // User already doesn't exist, so we can consider the delete successful.
+      return res.status(200).json({ message: `User ${id} deleted successfully` });
+    }
+    if (userToDeleteRes.rows[0].username === 'Nonbangkok') {
+      return res.status(403).json({ message: 'The "Nonbangkok" account cannot be deleted.' });
+    }
+
     // We also need to handle submissions from this user.
     // For simplicity, we can just delete them. A better approach might be to anonymize them.
     await db.query('DELETE FROM submissions WHERE user_id = $1', [id]);

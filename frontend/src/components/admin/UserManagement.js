@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '../../context/AuthContext'; // Import useAuth
 import EditUserModal from './EditUserModal';
 import ConfirmationModal from './ConfirmationModal';
 import AddUserModal from './AddUserModal';
@@ -15,6 +16,7 @@ const UserManagement = () => {
   const [editingUser, setEditingUser] = useState(null); // Controls the EditUserModal
   const [deletingUser, setDeletingUser] = useState(null); // Controls the ConfirmationModal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false); // State for the new modal
+  const { user: currentUser } = useAuth(); // Get the currently logged-in user
 
   const fetchUsers = async () => {
     try {
@@ -105,7 +107,12 @@ const UserManagement = () => {
                   <td>{user.username}</td>
                   <td>{user.role}</td>
                   <td className={styles.actions}>
-                    {user.role !== 'admin' && (
+                    {/* Show buttons if:
+                        1. There is a logged-in user (currentUser exists)
+                        2. The user in the row is NOT the currently logged-in user
+                        3. The username is NOT "Nonbangkok"
+                    */}
+                    {currentUser && user.id !== currentUser.id && user.username !== 'Nonbangkok' && (
                       <>
                         <button onClick={() => handleEdit(user)} className={styles['edit-btn']}>
                           Edit
