@@ -103,7 +103,7 @@ function ProblemDetail() {
                 
                 <div className={styles['problem-meta']}>
                   <span>Time Limit: {problem.time_limit_ms} ms</span>
-                  <span>Memory Limit: {problem.time_limit_mb} MB</span>
+                  <span>Memory Limit: {problem.memory_limit_mb} MB</span>
                 </div>
 
                 {problem.has_pdf && (
