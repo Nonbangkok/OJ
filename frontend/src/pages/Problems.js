@@ -113,7 +113,7 @@ const Problems = () => {
                           </div>
                       </div>
                       <span className={styles['score-text']}>
-                          {generateResultString(problem.latest_submission_status, problem.latest_submission_results)}
+                          {generateResultString(problem.best_submission_status, problem.best_submission_results)}
                       </span>
                   </div>
                 )}

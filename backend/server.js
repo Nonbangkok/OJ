@@ -483,12 +483,27 @@ app.get('/api/problems-with-stats', requireAuth, async (req, res) => {
   const { userId } = req.session;
   try {
     const query = `
-      WITH UserProblemStats AS (
+      WITH RankedSubmissions AS (
+        SELECT
+          s.id,
+          s.user_id,
+          s.problem_id,
+          s.score,
+          s.overall_status,
+          s.results,
+          s.submitted_at,
+          -- Rank submissions by score (desc) and then by submission time (desc) to find the best
+          ROW_NUMBER() OVER(PARTITION BY s.user_id, s.problem_id ORDER BY s.score DESC, s.id DESC) as rn_best,
+          -- Rank submissions by time (desc) to find the latest
+          ROW_NUMBER() OVER(PARTITION BY s.user_id, s.problem_id ORDER BY s.id DESC) as rn_latest
+        FROM submissions s
+        WHERE s.user_id = $1
+      ),
+      UserProblemStats AS (
         SELECT
           problem_id,
           MAX(score) AS best_score,
-          COUNT(*) AS submission_count,
-          MAX(id) AS latest_submission_id
+          COUNT(*) AS submission_count
         FROM submissions
         WHERE user_id = $1
         GROUP BY problem_id
@@ -499,12 +514,16 @@ app.get('/api/problems-with-stats', requireAuth, async (req, res) => {
         p.author,
         ups.best_score,
         ups.submission_count,
-        s.submitted_at AS latest_submission_at,
-        s.overall_status AS latest_submission_status,
-        s.results AS latest_submission_results
+        -- Latest submission details
+        latest.submitted_at AS latest_submission_at,
+        latest.overall_status AS latest_submission_status,
+        -- Best submission details
+        best.overall_status AS best_submission_status,
+        best.results AS best_submission_results
       FROM problems p
       LEFT JOIN UserProblemStats ups ON p.id = ups.problem_id
-      LEFT JOIN submissions s ON ups.latest_submission_id = s.id
+      LEFT JOIN RankedSubmissions latest ON p.id = latest.problem_id AND latest.rn_latest = 1
+      LEFT JOIN RankedSubmissions best ON p.id = best.problem_id AND best.rn_best = 1
       ORDER BY p.id;
     `;
     const result = await db.query(query, [userId]);
