@@ -50,7 +50,7 @@ function ProblemDetail() {
       return 'Compilation Error';
     }
     if (!results || results.length === 0) {
-      return '[No results]';
+      return '';
     }
     const charMap = {
       'Accepted': 'P',
