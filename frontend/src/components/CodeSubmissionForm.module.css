@@ -50,4 +50,39 @@
 .submission-form-container h3 {
   text-align: left;
   margin-top: 0;
+  margin-bottom: 0; /* Remove bottom margin to align with buttons */
+}
+
+.formHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.languageButtons button {
+  background-color: var(--background-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.languageButtons button:not(:last-child) {
+  margin-right: 0.5rem;
+}
+
+.languageButtons button:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.languageButtons button.active {
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #ffffff;
+  font-weight: 600;
 } 

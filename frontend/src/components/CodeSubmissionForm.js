@@ -21,7 +21,7 @@ const API_URL = process.env.REACT_APP_API_URL;
 
 const CodeSubmissionForm = ({ problemId }) => {
   const [language, setLanguage] = useState('cpp');
-  const [code, setCode] = useState(`#include <iostream>\n\nint main() {\n    // Your code here\n    return 0;\n}`);
+  const [code, setCode] = useState(``);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -98,20 +98,21 @@ const CodeSubmissionForm = ({ problemId }) => {
 
   return (
     <div className={styles['submission-form-container']}>
-      <h3>Submit Solution</h3>
-      {error && <p className="error-message" style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
-      <form onSubmit={handleSubmit}>
-        <div className={formStyles['form-group']}>
-          <label htmlFor="language">Language:</label>
-          <select
-            id="language"
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
+      <div className={styles.formHeader}>
+        <h3>Submit Solution</h3>
+        <div className={styles.languageButtons}>
+          <button
+            className={language === 'cpp' ? styles.active : ''}
+            onClick={() => setLanguage('cpp')}
             disabled={isSubmitting}
           >
-            <option value="cpp">C++</option>
-          </select>
+            C++
+          </button>
         </div>
+      </div>
+
+      {error && <p className="error-message" style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
+      <form onSubmit={handleSubmit}>
         <div className={formStyles['form-group']}>
           <label htmlFor="code">Your Code:</label>
           <div className={editorStyles['editorWrapper']} ref={editorWrapperRef} onClick={handleWrapperClick}>
