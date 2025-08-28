@@ -19,8 +19,16 @@ function ProblemDetail() {
   useEffect(() => {
     const fetchProblem = async () => {
       try {
-        const response = await axios.get(`${API_URL}/api/problems/${id}`, { withCredentials: true });
-        setProblem(response.data);
+        const problemPromise = axios.get(`${API_URL}/api/problems/${id}`, { withCredentials: true });
+        const statsPromise = axios.get(`${API_URL}/api/problems-with-stats`, { withCredentials: true });
+
+        const [problemResponse, statsResponse] = await Promise.all([problemPromise, statsPromise]);
+        
+        const problemData = problemResponse.data;
+        const allProblemsWithStats = statsResponse.data;
+        const currentProblemStats = allProblemsWithStats.find(p => String(p.id) === id);
+
+        setProblem({ ...problemData, ...currentProblemStats });
       } catch (err) {
         setError(`Failed to fetch problem ${id}.`);
         console.error(err);
@@ -35,6 +43,25 @@ function ProblemDetail() {
   const handlePdfView = () => {
     if (!problem || !problem.has_pdf) return;
     window.open(pdfEndpointUrl, '_blank');
+  };
+
+  const generateResultString = (status, results) => {
+    if (status === 'Compilation Error') {
+      return 'Compilation Error';
+    }
+    if (!results || results.length === 0) {
+      return '[No results]';
+    }
+    const charMap = {
+      'Accepted': 'P',
+      'Wrong Answer': '-',
+      'Time Limit Exceeded': 'T',
+      'Runtime Error': 'R',
+      'Memory Limit Exceeded': 'M',
+      'Skipped': 'S',
+    };
+    const resultChars = results.map(r => charMap[r.status] || '?').join('');
+    return `[${resultChars}]`;
   };
 
   if (loading) return <div>Loading...</div>;
@@ -108,6 +135,24 @@ function ProblemDetail() {
                     Submissions
                 </button>
             </nav>
+            {problem && typeof problem.best_score !== 'undefined' && (
+              <div className={styles['score-container']}>
+                <div className={styles['score-bar-container']}>
+                  <div
+                    className={`${styles['score-bar']} ${
+                      problem.best_score === 100 ? styles.full : problem.best_score > 0 ? styles.partial : styles.zero
+                    }`}
+                    style={{ width: `${problem.best_score || 0}%` }}
+                  ></div>
+                </div>
+                <div className={styles['score-text-container']}>
+                  <span className={styles['score-text']}>Score: {problem.best_score || 0} / 100</span>
+                  <span className={styles['result-string']}>
+                    {generateResultString(problem.best_submission_status, problem.best_submission_results)}
+                  </span>
+                </div>
+              </div>
+            )}
         </div>
         <div className={styles['right-content']}>
             {renderContent()}
