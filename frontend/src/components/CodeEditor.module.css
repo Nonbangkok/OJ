@@ -1,30 +1,26 @@
-/* Import highlight.js theme */
-@import 'highlight.js/styles/atom-one-dark.css';
-
 /* Main wrapper for line numbers and editor */
-.editor-wrapper {
+.editorWrapper {
   display: flex;
   position: relative;
   background-color: #282c34; /* Same as hljs background */
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  max-height: 60vh;
-  min-height: 40vh;
   font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  color: white;
+  
   /* Set max height and allow internal scrolling */
+  max-height: 60vh;
   overflow: hidden; /* Children will handle their own scrolling */
 }
 
-.editor-wrapper:focus-within {
+.editorWrapper:focus-within {
   outline: none;
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
 }
 
 /* Gutter for line numbers */
-.line-numbers-gutter {
+.lineNumbersGutter {
   background-color: #282c34; /* Slightly darker than editor */
   color: #636d83; /* Muted color for line numbers */
   padding: 1rem 0.75rem;
@@ -37,22 +33,23 @@
 }
 
 /* This will be the direct parent of the Editor component */
-.editor-container {
+.editorContainer {
   flex-grow: 1;
   overflow: hidden; /* Hide this container's scrollbar */
 }
 
 /* Target the internals of react-simple-code-editor */
-.editor-container > div,
-.editor-container textarea,
-.editor-container pre {
+.editorContainer > div,
+.editorContainer textarea,
+.editorContainer pre {
   height: 100% !important;
   max-height: inherit !important;
 }
 
-.editor-container textarea,
-.editor-container pre {
+.editorContainer textarea,
+.editorContainer pre {
   padding: 1rem !important;
+  padding-left: 0.5rem !important;
   font-size: 1rem !important;
   line-height: 1.5 !important;
   outline: none !important;
@@ -62,7 +59,7 @@
 }
 
 /* Override highlight.js styles for better integration */
-.hljs {
+:global(.hljs) {
   background: none !important; /* The wrapper handles the background */
   color: #abb2bf !important;
 } 

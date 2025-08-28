@@ -6,7 +6,11 @@ import Editor from 'react-simple-code-editor';
 // Import highlight.js
 import hljs from 'highlight.js/lib/core';
 import cpp from 'highlight.js/lib/languages/cpp';
-import './CodeEditor.css';
+
+// Import highlight.js theme CSS globally
+import 'highlight.js/styles/atom-one-dark.css';
+
+import editorStyles from './CodeEditor.module.css'; // Import as a module
 import formStyles from './Form.module.css';
 import styles from './CodeSubmissionForm.module.css';
 
@@ -110,13 +114,13 @@ const CodeSubmissionForm = ({ problemId }) => {
         </div>
         <div className={formStyles['form-group']}>
           <label htmlFor="code">Your Code:</label>
-          <div className="editor-wrapper" ref={editorWrapperRef} onClick={handleWrapperClick}>
-            <div className="line-numbers-gutter" ref={lineNumbersRef}>
+          <div className={editorStyles['editorWrapper']} ref={editorWrapperRef} onClick={handleWrapperClick}>
+            <div className={editorStyles['lineNumbersGutter']} ref={lineNumbersRef}>
               {Array.from({ length: lineCount }).map((_, i) => (
                 <div key={i + 1}>{i + 1}</div>
               ))}
             </div>
-            <div className="editor-container">
+            <div className={editorStyles['editorContainer']}>
               <Editor
                 value={code}
                 onValueChange={code => setCode(code)}
