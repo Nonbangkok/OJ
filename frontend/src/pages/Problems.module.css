@@ -101,12 +101,12 @@
 
 /* Orange for scores < 100 */
 .score-bar.partial {
-  background-color: orange;
+  background-color: #FFC107;
 }
 
 /* Green for 100 */
 .score-bar.full {
-  background-color: green;
+  background-color: #48bb78;
 }
 
 .score-bar span {
