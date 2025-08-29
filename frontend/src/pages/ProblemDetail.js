@@ -23,7 +23,7 @@ function ProblemDetail() {
         const statsPromise = axios.get(`${API_URL}/api/problems-with-stats`, { withCredentials: true });
 
         const [problemResponse, statsResponse] = await Promise.all([problemPromise, statsPromise]);
-        
+
         const problemData = problemResponse.data;
         const allProblemsWithStats = statsResponse.data;
         const currentProblemStats = allProblemsWithStats.find(p => String(p.id) === id);
@@ -95,68 +95,71 @@ function ProblemDetail() {
 
   return (
     <div className={styles['problem-detail-container']}>
-        <div className={styles['left-nav']}>
-            <div className={styles['problem-info']}>
-                <h2>{problem.title}</h2>
-                <p className={styles['problem-id']}>{problem.id}</p>
-                {problem.author && <p className={styles['problem-author']}>Author: {problem.author}</p>}
-                
-                <div className={styles['problem-meta']}>
-                  <span>Time Limit: {problem.time_limit_ms} ms</span>
-                  <span>Memory Limit: {problem.memory_limit_mb} MB</span>
-                </div>
+      <div className={styles['left-nav']}>
+        <div className={styles['problem-info']}>
+          <h2>{problem.title}</h2>
+          <p className={styles['problem-id']}>{problem.id}</p>
+          {problem.author && <p className={styles['problem-author']}>Author: {problem.author}</p>}
 
-                {problem.has_pdf && (
-                  <button 
-                    onClick={handlePdfView}
-                    className={styles['view-pdf-btn']}
-                  >
-                    View Problem PDF
-                  </button>
-                )}
+          <div className={styles['problem-meta']}>
+            <span>Time Limit: {problem.time_limit_ms} ms</span>
+            <span>Memory Limit: {problem.memory_limit_mb} MB</span>
+          </div>
+
+          {problem.has_pdf && (
+            <button
+              onClick={handlePdfView}
+              className={styles['view-pdf-btn']}
+            >
+              View Problem PDF
+            </button>
+          )}
+        </div>
+        <nav className={styles['problem-nav']}>
+          <button
+            className={`${styles['nav-btn']} ${activeView === 'statement' ? styles.active : ''}`}
+            onClick={() => setActiveView('statement')}
+          >
+            Statement
+          </button>
+          <button
+            className={`${styles['nav-btn']} ${activeView === 'submit' ? styles.active : ''}`}
+            onClick={() => setActiveView('submit')}
+          >
+            Submit
+          </button>
+          <button
+            className={`${styles['nav-btn']} ${activeView === 'submissions' ? styles.active : ''}`}
+            onClick={() => setActiveView('submissions')}
+          >
+            My Submissions
+          </button>
+        </nav>
+        {problem && typeof problem.best_score !== 'undefined' && (
+          <div className={styles['score-container']}>
+            <div className={styles['score-bar-container']}>
+              <div
+                className={`${styles['score-bar']} ${problem.best_score === 100 ? styles.full : problem.best_score > 0 ? styles.partial : styles.zero
+                  }`}
+                style={{ width: `${problem.best_score || 0}%` }}
+              ></div>
             </div>
-            <nav className={styles['problem-nav']}>
-                <button 
-                    className={`${styles['nav-btn']} ${activeView === 'statement' ? styles.active : ''}`}
-                    onClick={() => setActiveView('statement')}
-                >
-                    Statement
-                </button>
-                <button 
-                    className={`${styles['nav-btn']} ${activeView === 'submit' ? styles.active : ''}`}
-                    onClick={() => setActiveView('submit')}
-                >
-                    Submit
-                </button>
-                <button 
-                    className={`${styles['nav-btn']} ${activeView === 'submissions' ? styles.active : ''}`}
-                    onClick={() => setActiveView('submissions')}
-                >
-                    My Submissions
-                </button>
-            </nav>
-            {problem && typeof problem.best_score !== 'undefined' && (
-              <div className={styles['score-container']}>
-                <div className={styles['score-bar-container']}>
-                  <div
-                    className={`${styles['score-bar']} ${
-                      problem.best_score === 100 ? styles.full : problem.best_score > 0 ? styles.partial : styles.zero
-                    }`}
-                    style={{ width: `${problem.best_score || 0}%` }}
-                  ></div>
-                </div>
-                <div className={styles['score-text-container']}>
-                  <span className={styles['score-text']}>Score: {problem.best_score || 0} / 100</span>
-                  <span className={styles['result-string']}>
-                    {generateResultString(problem.best_submission_status, problem.best_submission_results)}
-                  </span>
-                </div>
-              </div>
-            )}
-        </div>
-        <div className={styles['right-content']}>
-            {renderContent()}
-        </div>
+            <div className={styles['score-text-container']}>
+              <span className={styles['score-text']}>Score: {problem.best_score || 0} / 100</span>
+              <span className={styles['result-string']}>
+                {generateResultString(problem.best_submission_status, problem.best_submission_results)}
+              </span>
+              <span >Status:</span>
+              <span className={`${styles['status']} ${getStatusClass(problem.overall_status)}`}>
+                {submission.overall_status}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className={styles['right-content']}>
+        {renderContent()}
+      </div>
     </div>
   );
 };
