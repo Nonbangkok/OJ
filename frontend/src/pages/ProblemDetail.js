@@ -132,7 +132,7 @@ function ProblemDetail() {
                     className={`${styles['nav-btn']} ${activeView === 'submissions' ? styles.active : ''}`}
                     onClick={() => setActiveView('submissions')}
                 >
-                    Submissions
+                    My Submissions
                 </button>
             </nav>
             {problem && typeof problem.best_score !== 'undefined' && (
