@@ -622,7 +622,10 @@ app.get('/api/submissions/:id', requireAuth, async (req, res) => {
 
   try {
     const result = await db.query(
-      'SELECT * FROM submissions WHERE id = $1',
+      `SELECT s.*, u.username 
+       FROM submissions s
+       LEFT JOIN users u ON s.user_id = u.id
+       WHERE s.id = $1`,
       [id]
     );
 
