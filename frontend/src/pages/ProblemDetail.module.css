@@ -186,27 +186,6 @@
     color: var(--text-primary);
 }
 
-
-/* Status colors */
-.status-accepted, .status-correct {
-  color: #48bb78; /* Green */
-  font-weight: bold;
-}
-
-.status-wrong,
-.status-time,
-.status-memory,
-.status-runtime,
-.status-compilation,
-.status-error {
-  color: #f56565; /* Red */
-  font-weight: bold;
-}
-
-.status-skipped {
-  color: #a0aec0; /* Gray */
-}
-
 /* Score Bar Styles */
 .score-container {
   padding-top: 1rem;
@@ -261,4 +240,37 @@
     font-weight: 600;
     color: var(--text-secondary);
     text-align: center;
+} 
+
+/* styles for the new status text */
+.status-text {
+  font-weight: bold;
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 1rem;
+}
+
+/* Reusing status colors from the global Table.css concept */
+.status-accepted {
+  color: #48bb78; /* Green */
+}
+.status-wrong {
+  color: #f56565; /* Red */
+}
+.status-time {
+  color: #f6ad55; /* Orange */
+}
+.status-compilation {
+  color: #a0aec0; /* Gray */
+}
+.status-runtime {
+  color: #ed8936; /* Orange */
+}
+.status-memory {
+  color: #ed64a6; /* Pink */
+}
+.status-pending,
+.status-compiling,
+.status-running {
+  color: #718096; /* Gray */
 } 

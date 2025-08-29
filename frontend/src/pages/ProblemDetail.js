@@ -68,6 +68,11 @@ function ProblemDetail() {
   if (error) return <div className={styles['error-message']}>{error}</div>;
   if (!problem) return <div className={styles['error-message']}>Problem not found.</div>;
 
+  const getStatusClass = (status) => {
+    if (!status) return '';
+    return `status-${status.split(' ')[0].toLowerCase()}`;
+  };
+
   const renderContent = () => {
     switch (activeView) {
       case 'statement':
@@ -149,11 +154,12 @@ function ProblemDetail() {
               <span className={styles['result-string']}>
                 {generateResultString(problem.best_submission_status, problem.best_submission_results)}
               </span>
-              <span >Status:</span>
-              <span className={`${styles['status']} ${getStatusClass(problem.overall_status)}`}>
-                {submission.overall_status}
-              </span>
             </div>
+            {problem.best_submission_status && (
+              <div className={`${styles['status-text']} ${styles[getStatusClass(problem.best_submission_status)]}`}>
+                {problem.best_submission_status}
+              </div>
+            )}
           </div>
         )}
       </div>
