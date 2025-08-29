@@ -19,8 +19,8 @@ const ProblemManagement = ({ currentUser }) => {
 
   const fetchProblems = async () => {
     try {
-      setLoading(true);
-      const response = await axios.get(`${API_URL}/api/problems`);
+      // setLoading(true);
+      const response = await axios.get(`${API_URL}/api/admin/problems`, { withCredentials: true });
       setProblems(response.data);
     } catch (err) {
       setError('Failed to fetch problems.');
@@ -51,6 +51,66 @@ const ProblemManagement = ({ currentUser }) => {
         setIsConfirmModalOpen(false);
         setProblemToDelete(null);
       }
+    }
+  };
+
+  const handleToggleVisibility = async (problemId, currentVisibility) => {
+    try {
+      await axios.put(
+        `${API_URL}/api/admin/problems/${problemId}/visibility`,
+        { isVisible: !currentVisibility },
+        { withCredentials: true }
+      );
+      fetchProblems();
+    } catch (err) {
+      setError('Failed to update problem visibility.');
+      console.error(err);
+    }
+  };
+
+  const handleHideAll = async () => {
+    try {
+      setLoading(true);
+      const hidePromises = problems
+        .filter(problem => problem.is_visible)
+        .map(problem => 
+          axios.put(
+            `${API_URL}/api/admin/problems/${problem.id}/visibility`,
+            { isVisible: false },
+            { withCredentials: true }
+          )
+        );
+      
+      await Promise.all(hidePromises);
+      fetchProblems();
+    } catch (err) {
+      setError('Failed to hide all problems.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleShowAll = async () => {
+    try {
+      setLoading(true);
+      const showPromises = problems
+        .filter(problem => !problem.is_visible)
+        .map(problem => 
+          axios.put(
+            `${API_URL}/api/admin/problems/${problem.id}/visibility`,
+            { isVisible: true },
+            { withCredentials: true }
+          )
+        );
+      
+      await Promise.all(showPromises);
+      fetchProblems();
+    } catch (err) {
+      setError('Failed to show all problems.');
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -154,7 +214,27 @@ const ProblemManagement = ({ currentUser }) => {
     <div className={styles['management-container']}>
       <div className={styles['management-header']}>
         <h2>Problem Management</h2>
-        <button onClick={handleCreate} className={styles['create-btn']}>Create New Problem</button>
+        <div className={styles['header-actions']}>
+          <div className={styles['bulk-actions']}>
+            <button 
+              onClick={handleShowAll} 
+              className={styles['show-all-btn']}
+              disabled={loading || problems.every(p => p.is_visible)}
+              title="Show all hidden problems"
+            >
+              Show All
+            </button>
+            <button 
+              onClick={handleHideAll} 
+              className={styles['hide-all-btn']}
+              disabled={loading || problems.every(p => !p.is_visible)}
+              title="Hide all visible problems"
+            >
+              Hide All
+            </button>
+          </div>
+          <button onClick={handleCreate} className={styles['create-btn']}>Create New Problem</button>
+        </div>
       </div>
       <div className="table-container">
         <table className="table">
@@ -162,6 +242,7 @@ const ProblemManagement = ({ currentUser }) => {
             <tr>
               <th>ID</th>
               <th>Title</th>
+              <th>Visibility</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -170,6 +251,15 @@ const ProblemManagement = ({ currentUser }) => {
               <tr key={problem.id}>
                 <td>{problem.id}</td>
                 <td>{problem.title}</td>
+                <td>
+                  <button
+                    onClick={() => handleToggleVisibility(problem.id, problem.is_visible)}
+                    className={problem.is_visible ? styles['visible-btn'] : styles['hidden-btn']}
+                    title={problem.is_visible ? 'Click to hide' : 'Click to show'}
+                  >
+                    {problem.is_visible ? 'Visible' : 'Hidden'}
+                  </button>
+                </td>
                 <td className={styles.actions}>
                   <button onClick={() => handleEdit(problem)} className={styles['edit-btn']}>Edit</button>
                   <button onClick={() => handleDeleteClick(problem.id)} className={styles['delete-btn']}>Delete</button>

@@ -524,6 +524,7 @@ app.get('/api/problems-with-stats', requireAuth, async (req, res) => {
       LEFT JOIN UserProblemStats ups ON p.id = ups.problem_id
       LEFT JOIN RankedSubmissions latest ON p.id = latest.problem_id AND latest.rn_latest = 1
       LEFT JOIN RankedSubmissions best ON p.id = best.problem_id AND best.rn_best = 1
+      WHERE p.is_visible = true
       ORDER BY p.id;
     `;
     const result = await db.query(query, [userId]);
@@ -538,7 +539,7 @@ app.get('/api/problems-with-stats', requireAuth, async (req, res) => {
 // Problem API Endpoints
 app.get('/api/problems', async (req, res) => {
   try {
-    const result = await db.query('SELECT id, title, author FROM problems ORDER BY id');
+    const result = await db.query('SELECT id, title, author FROM problems WHERE is_visible = true ORDER BY id');
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching problems:', error);
@@ -549,11 +550,24 @@ app.get('/api/problems', async (req, res) => {
 app.get('/api/problems/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await db.query('SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf FROM problems WHERE id = $1', [id]);
+    const result = await db.query('SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible FROM problems WHERE id = $1', [id]);
+    
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Problem not found' });
     }
-    res.json(result.rows[0]);
+    
+    if (!result.rows[0].is_visible) {
+      return res.status(403).json({ 
+        message: 'Problem is hidden', 
+        detail: 'This problem has been hidden by administrators and is not accessible to regular users.',
+        problemId: id,
+        title: result.rows[0].title || 'Hidden Problem'
+      });
+    }
+    
+    // Remove is_visible from response for regular users
+    const { is_visible, ...problemData } = result.rows[0];
+    res.json(problemData);
   } catch (error) {
     console.error(`Error fetching problem ${id}:`, error);
     res.status(500).json({ message: 'Error fetching problem details' });
@@ -954,6 +968,45 @@ app.get('/api/admin/authors', requireAuth, requireStaffOrAdmin, async (req, res)
   } catch (error) {
     console.error('Error fetching authors:', error);
     res.status(500).json({ message: 'Error fetching authors' });
+  }
+});
+
+app.get('/api/admin/problems', requireAuth, requireStaffOrAdmin, async (req, res) => {
+  try {
+    const result = await db.query('SELECT id, title, author, is_visible FROM problems ORDER BY id');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching problems for admin:', error);
+    res.status(500).json({ message: 'Error fetching problems' });
+  }
+});
+
+app.put('/api/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin, [
+  body('isVisible').isBoolean()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { id } = req.params;
+  const { isVisible } = req.body;
+  
+  try {
+    const result = await db.query(
+      'UPDATE problems SET is_visible = $1 WHERE id = $2 RETURNING id, title, is_visible',
+      [isVisible, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Problem not found' });
+    }
+    res.json({ 
+      message: `Problem ${id} visibility updated successfully`, 
+      problem: result.rows[0] 
+    });
+  } catch (error) {
+    console.error(`Error updating visibility for problem ${id}:`, error);
+    res.status(500).json({ message: 'Error updating problem visibility' });
   }
 });
 

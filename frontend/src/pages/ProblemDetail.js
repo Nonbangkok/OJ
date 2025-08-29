@@ -12,6 +12,7 @@ function ProblemDetail() {
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [hiddenProblemInfo, setHiddenProblemInfo] = useState(null);
   const [activeView, setActiveView] = useState('statement');
 
   const pdfEndpointUrl = `${API_URL}/api/problems/${id}/pdf`;
@@ -30,7 +31,18 @@ function ProblemDetail() {
 
         setProblem({ ...problemData, ...currentProblemStats });
       } catch (err) {
-        setError(`Failed to fetch problem ${id}.`);
+        if (err.response?.status === 403 && err.response?.data?.message === 'Problem is hidden') {
+          // Handle hidden problem case
+          setHiddenProblemInfo({
+            problemId: err.response.data.problemId,
+            title: err.response.data.title,
+            detail: err.response.data.detail
+          });
+        } else if (err.response?.status === 404) {
+          setError(`Problem ${id} not found.`);
+        } else {
+          setError(`Failed to fetch problem ${id}.`);
+        }
         console.error(err);
       } finally {
         setLoading(false);
@@ -66,6 +78,24 @@ function ProblemDetail() {
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div className={styles['error-message']}>{error}</div>;
+  if (hiddenProblemInfo) {
+    return (
+      <div className={styles['problem-detail-container']}>
+        <div className={styles['hidden-problem-container']}>
+          <div className={styles['hidden-problem-header']}>
+            <h2>Problem is hidden by Admin</h2>
+            <div className={styles['hidden-problem-info']}>
+              <p><strong>Problem ID:</strong> {hiddenProblemInfo.problemId}</p>
+              <p><strong>Title:</strong> {hiddenProblemInfo.title}</p>
+            </div>
+          </div>
+          <div className={styles['hidden-problem-message']}>
+            <p>{hiddenProblemInfo.detail}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (!problem) return <div className={styles['error-message']}>Problem not found.</div>;
 
   const getStatusClass = (status) => {

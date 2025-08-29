@@ -12,6 +12,17 @@
   border-bottom: 1px solid var(--border-color);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.bulk-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .management-header h2 {
   margin: 0;
 }
@@ -61,4 +72,54 @@
 
 .delete-btn:hover {
   background-color: #c82333;
+}
+
+.visible-btn {
+  composes: btn;
+  background-color: #28a745; /* Green for visible */
+}
+
+.visible-btn:hover {
+  background-color: #218838;
+}
+
+.hidden-btn {
+  composes: btn;
+  background-color: #6c757d; /* Gray for hidden */
+}
+
+.hidden-btn:hover {
+  background-color: #545b62;
+}
+
+.show-all-btn {
+  composes: btn;
+  background-color: #28a745; /* Green for show all */
+  font-size: 0.85rem;
+}
+
+.show-all-btn:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.show-all-btn:disabled {
+  background-color: #adb5bd;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.hide-all-btn {
+  composes: btn;
+  background-color: #6c757d; /* Gray for hide all */
+  font-size: 0.85rem;
+}
+
+.hide-all-btn:hover:not(:disabled) {
+  background-color: #545b62;
+}
+
+.hide-all-btn:disabled {
+  background-color: #adb5bd;
+  cursor: not-allowed;
+  opacity: 0.6;
 }

@@ -2,6 +2,7 @@
 .problem-detail-container {
   display: flex;
   height: 88vh;
+  justify-content: center;
 }
 
 .left-nav {
@@ -273,4 +274,49 @@
 .status-compiling,
 .status-running {
   color: #718096; /* Gray */
+}
+
+/* Hidden Problem Styles */
+.hidden-problem-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 2rem;
+  text-align: center;
+}
+
+.hidden-problem-header h2 {
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+  font-size: 2rem;
+}
+
+.hidden-problem-info {
+  background-color: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  text-align: left;
+}
+
+.hidden-problem-info p {
+  margin: 0.5rem 0;
+  color: var(--text-secondary);
+}
+
+.hidden-problem-info strong {
+  color: var(--text-primary);
+}
+
+.hidden-problem-message {
+  max-width: 500px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.hidden-problem-message p {
+  margin: 1rem 0;
 } 

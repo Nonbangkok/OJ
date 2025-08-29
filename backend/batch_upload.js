@@ -129,8 +129,8 @@ async function batchUpload() {
         // 2. Upsert problem into database
         try {
           await db.query(`
-            INSERT INTO problems (id, title, author, time_limit_ms, memory_limit_mb)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO problems (id, title, author, time_limit_ms, memory_limit_mb, is_visible)
+            VALUES ($1, $2, $3, $4, $5, false)
             ON CONFLICT (id) DO UPDATE SET
               title = EXCLUDED.title,
               author = EXCLUDED.author,

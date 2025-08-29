@@ -47,7 +47,8 @@ const createTables = async () => {
       author VARCHAR(100),
       problem_pdf BYTEA,
       time_limit_ms INT DEFAULT 2000,
-      memory_limit_mb INT DEFAULT 256
+      memory_limit_mb INT DEFAULT 256,
+      is_visible BOOLEAN NOT NULL DEFAULT false
     );
   `;
 
