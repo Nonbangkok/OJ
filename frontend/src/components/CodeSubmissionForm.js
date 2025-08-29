@@ -29,6 +29,28 @@ const CodeSubmissionForm = ({ problemId }) => {
   const editorWrapperRef = useRef(null);
   const lineNumbersRef = useRef(null);
 
+  useEffect(() => {
+    try {
+      const cachedSubmission = JSON.parse(localStorage.getItem('oj-submission-cache') || '{}');
+      const problemCache = cachedSubmission[problemId];
+
+      if (problemCache && problemCache.code) {
+        const thirtyMinutes = 30 * 60 * 1000;
+        const timeDiff = new Date().getTime() - problemCache.timestamp;
+
+        if (timeDiff < thirtyMinutes) {
+          setCode(problemCache.code);
+        } else {
+          // Clear expired cache for this problem
+          delete cachedSubmission[problemId];
+          localStorage.setItem('oj-submission-cache', JSON.stringify(cachedSubmission));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to read from localStorage:", error);
+    }
+  }, [problemId]);
+
   // Sync scrolling between the editor's textarea, the <pre> block, and the line numbers gutter
   useEffect(() => {
     const editorEl = editorWrapperRef.current;
@@ -72,6 +94,18 @@ const CodeSubmissionForm = ({ problemId }) => {
       }, {
         withCredentials: true
       });
+      
+      try {
+        const submissionCache = JSON.parse(localStorage.getItem('oj-submission-cache') || '{}');
+        submissionCache[problemId] = {
+          code: code,
+          timestamp: new Date().getTime(),
+        };
+        localStorage.setItem('oj-submission-cache', JSON.stringify(submissionCache));
+      } catch (error) {
+        console.error("Failed to write to localStorage:", error);
+      }
+
       navigate('/submissions');
     } catch (err) {
       const errorMsg = err.response?.data?.message || 'An unexpected error occurred.';
