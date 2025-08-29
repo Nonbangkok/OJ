@@ -133,7 +133,7 @@ const CodeSubmissionForm = ({ problemId }) => {
   return (
     <div className={styles['submission-form-container']}>
       <div className={styles.formHeader}>
-        <h3>Submit Solution</h3>
+        <h2>Submit Solution</h2>
         <div className={styles.languageButtons}>
           <button
             className={language === 'cpp' ? styles.active : ''}
