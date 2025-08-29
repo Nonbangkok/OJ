@@ -9,7 +9,7 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   
   /* Set max height and allow internal scrolling */
-  max-height: 70vh;
+  max-height: 65vh;
   min-height: 50vh;
   overflow: hidden; /* Children will handle their own scrolling */
   color: white;
