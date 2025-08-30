@@ -25,7 +25,7 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
   useEffect(() => {
     const fetchAuthors = async () => {
       try {
-        const response = await axios.get(`${API_URL}/api/admin/authors`, { withCredentials: true });
+        const response = await axios.get(`${API_URL}/admin/authors`, { withCredentials: true });
         setAuthors(response.data);
       } catch (err) {
         console.error("Failed to fetch authors", err);

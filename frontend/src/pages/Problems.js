@@ -13,7 +13,7 @@ const Problems = () => {
   useEffect(() => {
     const fetchProblems = async () => {
       try {
-        const response = await axios.get(`${API_URL}/api/problems-with-stats`, {
+        const response = await axios.get(`${API_URL}/problems-with-stats`, {
           withCredentials: true,
         });
         setProblems(response.data);

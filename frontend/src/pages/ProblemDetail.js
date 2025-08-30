@@ -15,13 +15,13 @@ function ProblemDetail() {
   const [hiddenProblemInfo, setHiddenProblemInfo] = useState(null);
   const [activeView, setActiveView] = useState('statement');
 
-  const pdfEndpointUrl = `${API_URL}/api/problems/${id}/pdf`;
+      const pdfEndpointUrl = `${API_URL}/problems/${id}/pdf`;
 
   useEffect(() => {
     const fetchProblem = async () => {
       try {
-        const problemPromise = axios.get(`${API_URL}/api/problems/${id}`, { withCredentials: true });
-        const statsPromise = axios.get(`${API_URL}/api/problems-with-stats`, { withCredentials: true });
+        const problemPromise = axios.get(`${API_URL}/problems/${id}`, { withCredentials: true });
+        const statsPromise = axios.get(`${API_URL}/problems-with-stats`, { withCredentials: true });
 
         const [problemResponse, statsResponse] = await Promise.all([problemPromise, statsPromise]);
 

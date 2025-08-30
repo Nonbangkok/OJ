@@ -47,7 +47,7 @@ const BatchUserCreation = ({ onUsersCreated }) => {
 
     try {
       const response = await axios.post(
-        `${API_URL}/api/admin/users/batch`,
+        `${API_URL}/admin/users/batch`,
         { prefix, count: Number(count) },
         { withCredentials: true }
       );

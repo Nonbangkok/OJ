@@ -21,7 +21,7 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/admin/users`, { withCredentials: true });
+      const response = await axios.get(`${API_URL}/admin/users`, { withCredentials: true });
       setUsers(response.data);
     } catch (err) {
       setError('Failed to fetch users.');
@@ -46,7 +46,7 @@ const UserManagement = () => {
   const handleConfirmDelete = async () => {
     if (deletingUser) {
       try {
-        await axios.delete(`${API_URL}/api/admin/users/${deletingUser.id}`, { withCredentials: true });
+        await axios.delete(`${API_URL}/admin/users/${deletingUser.id}`, { withCredentials: true });
         setUsers(users.filter(user => user.id !== deletingUser.id));
       } catch (err) {
         setError('Failed to delete user.');
@@ -59,7 +59,7 @@ const UserManagement = () => {
 
   const handleSave = async (userId, userData) => {
     try {
-      await axios.put(`${API_URL}/api/admin/users/${userId}`, userData, { withCredentials: true });
+      await axios.put(`${API_URL}/admin/users/${userId}`, userData, { withCredentials: true });
       setEditingUser(null);
       fetchUsers(); // Refresh the user list
     } catch (err) {
@@ -70,7 +70,7 @@ const UserManagement = () => {
 
   const handleAddNewUser = async (newUserData) => {
     try {
-      await axios.post(`${API_URL}/api/admin/users`, newUserData, { withCredentials: true });
+      await axios.post(`${API_URL}/admin/users`, newUserData, { withCredentials: true });
       setIsAddModalOpen(false);
       fetchUsers(); // Refresh the user list
     } catch (err) {

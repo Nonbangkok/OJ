@@ -12,7 +12,7 @@ function Scoreboard() {
   useEffect(() => {
     const fetchScoreboard = async () => {
       try {
-        const response = await axios.get(`${API_URL}/api/scoreboard`, {
+        const response = await axios.get(`${API_URL}/scoreboard`, {
           withCredentials: true,
         });
         setScoreboard(response.data);

@@ -20,7 +20,7 @@ const ProblemManagement = ({ currentUser }) => {
   const fetchProblems = async () => {
     try {
       // setLoading(true);
-      const response = await axios.get(`${API_URL}/api/admin/problems`, { withCredentials: true });
+      const response = await axios.get(`${API_URL}/admin/problems`, { withCredentials: true });
       setProblems(response.data);
     } catch (err) {
       setError('Failed to fetch problems.');
@@ -42,7 +42,7 @@ const ProblemManagement = ({ currentUser }) => {
   const handleConfirmDelete = async () => {
     if (problemToDelete) {
       try {
-        await axios.delete(`${API_URL}/api/admin/problems/${problemToDelete}`, { withCredentials: true });
+        await axios.delete(`${API_URL}/admin/problems/${problemToDelete}`, { withCredentials: true });
         fetchProblems();
       } catch (err) {
         setError('Failed to delete problem.');
@@ -57,7 +57,7 @@ const ProblemManagement = ({ currentUser }) => {
   const handleToggleVisibility = async (problemId, currentVisibility) => {
     try {
       await axios.put(
-        `${API_URL}/api/admin/problems/${problemId}/visibility`,
+        `${API_URL}/admin/problems/${problemId}/visibility`,
         { isVisible: !currentVisibility },
         { withCredentials: true }
       );
@@ -75,7 +75,7 @@ const ProblemManagement = ({ currentUser }) => {
         .filter(problem => problem.is_visible)
         .map(problem => 
           axios.put(
-            `${API_URL}/api/admin/problems/${problem.id}/visibility`,
+            `${API_URL}/admin/problems/${problem.id}/visibility`,
             { isVisible: false },
             { withCredentials: true }
           )
@@ -98,7 +98,7 @@ const ProblemManagement = ({ currentUser }) => {
         .filter(problem => !problem.is_visible)
         .map(problem => 
           axios.put(
-            `${API_URL}/api/admin/problems/${problem.id}/visibility`,
+            `${API_URL}/admin/problems/${problem.id}/visibility`,
             { isVisible: true },
             { withCredentials: true }
           )
@@ -116,7 +116,7 @@ const ProblemManagement = ({ currentUser }) => {
 
   const handleEdit = async (problem) => {
     try {
-      const response = await axios.get(`${API_URL}/api/problems/${problem.id}`);
+      const response = await axios.get(`${API_URL}/problems/${problem.id}`);
       setEditingProblem(response.data);
       setIsModalOpen(true);
     } catch (err) {
@@ -139,9 +139,9 @@ const ProblemManagement = ({ currentUser }) => {
       let problemIdForUpload = problemData.id;
 
       if (isEditing) {
-        await axios.put(`${API_URL}/api/admin/problems/${editingProblem.id}`, problemData, { withCredentials: true });
+        await axios.put(`${API_URL}/admin/problems/${editingProblem.id}`, problemData, { withCredentials: true });
       } else {
-        const response = await axios.post(`${API_URL}/api/admin/problems`, problemData, { withCredentials: true });
+        const response = await axios.post(`${API_URL}/admin/problems`, problemData, { withCredentials: true });
         problemIdForUpload = response.data.id;
       }
 
@@ -152,7 +152,7 @@ const ProblemManagement = ({ currentUser }) => {
 
         setUploadProgress({ status: 'uploading', message: 'Uploading files to server...' });
 
-        const response = await axios.post(`${API_URL}/api/admin/problems/${problemIdForUpload}/upload`, fileData, {
+        const response = await axios.post(`${API_URL}/admin/problems/${problemIdForUpload}/upload`, fileData, {
           withCredentials: true,
           headers: { 'Content-Type': 'multipart/form-data' },
         });
@@ -162,7 +162,7 @@ const ProblemManagement = ({ currentUser }) => {
         if (jobId) {
           const pollInterval = setInterval(async () => {
             try {
-              const progressRes = await axios.get(`${API_URL}/api/admin/upload-progress/${jobId}`, { withCredentials: true });
+              const progressRes = await axios.get(`${API_URL}/admin/upload-progress/${jobId}`, { withCredentials: true });
               const progressData = progressRes.data;
               setUploadProgress(progressData);
 

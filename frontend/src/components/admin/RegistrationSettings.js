@@ -15,7 +15,7 @@ const RegistrationSettings = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await axios.get(`${API_URL}/api/admin/settings/registration`, { withCredentials: true });
+        const response = await axios.get(`${API_URL}/admin/settings/registration`, { withCredentials: true });
         setIsEnabled(response.data.enabled);
       } catch (err) {
         setError('Failed to fetch settings.');
@@ -31,7 +31,7 @@ const RegistrationSettings = () => {
     setSuccess('');
     const newStatus = !isEnabled;
     try {
-      await axios.put(`${API_URL}/api/admin/settings/registration`, 
+      await axios.put(`${API_URL}/admin/settings/registration`, 
         { enabled: newStatus }, 
         { withCredentials: true }
       );

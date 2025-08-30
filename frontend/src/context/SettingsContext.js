@@ -15,7 +15,7 @@ export const SettingsProvider = ({ children }) => {
 
   const fetchSettings = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/settings/registration`);
+              const response = await axios.get(`${API_URL}/settings/registration`);
       setSettings({
         registrationEnabled: response.data.enabled,
       });

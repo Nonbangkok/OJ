@@ -36,7 +36,7 @@ function Submissions({ problemId, showTitle = true }) {
         params.filter = 'mine';
       }
 
-      const subsRes = await axios.get(`${API_URL}/api/submissions`, {
+              const subsRes = await axios.get(`${API_URL}/submissions`, {
         withCredentials: true,
         params,
       });
@@ -72,7 +72,7 @@ function Submissions({ problemId, showTitle = true }) {
 
   const handleViewCode = async (submissionId) => {
     try {
-      const response = await axios.get(`${API_URL}/api/submissions/${submissionId}`, {
+              const response = await axios.get(`${API_URL}/submissions/${submissionId}`, {
         withCredentials: true,
       });
       setSelectedSubmission(response.data);
