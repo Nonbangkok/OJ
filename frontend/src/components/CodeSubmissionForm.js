@@ -19,7 +19,7 @@ hljs.registerLanguage('cpp', cpp);
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-const CodeSubmissionForm = ({ problemId }) => {
+const CodeSubmissionForm = ({ problemId, contestId }) => {
   const [language, setLanguage] = useState('cpp');
   const [code, setCode] = useState(``);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,11 +87,18 @@ const CodeSubmissionForm = ({ problemId }) => {
     setError('');
 
     try {
-      await axios.post(`${API_URL}/submit`, {
+      const submitData = {
         problemId,
         language,
         code,
-      }, {
+      };
+      
+      // Add contestId if this is a contest submission
+      if (contestId) {
+        submitData.contestId = contestId;
+      }
+      
+      await axios.post(`${API_URL}/submit`, submitData, {
         withCredentials: true
       });
       
@@ -106,7 +113,12 @@ const CodeSubmissionForm = ({ problemId }) => {
         console.error("Failed to write to localStorage:", error);
       }
 
-      navigate('/submissions');
+      // Navigate to appropriate submissions page
+      if (contestId) {
+        navigate(`/contests/${contestId}/submissions`);
+      } else {
+        navigate('/submissions');
+      }
     } catch (err) {
       const errorMsg = err.response?.data?.message || 'An unexpected error occurred.';
       setError(errorMsg);

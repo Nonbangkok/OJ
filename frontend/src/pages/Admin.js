@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import UserManagement from '../components/admin/UserManagement';
 import ProblemManagement from '../components/admin/ProblemManagement';
+import ContestManagement from '../components/admin/ContestManagement';
 import RegistrationSettings from '../components/admin/RegistrationSettings';
 import styles from './Admin.module.css';
 
@@ -44,6 +45,12 @@ const Admin = () => {
       {(user?.role === 'admin' || user?.role === 'staff') && (
         <div className={styles['admin-section']}>
           <ProblemManagement currentUser={user} />
+        </div>
+      )}
+
+      {(user?.role === 'admin' || user?.role === 'staff') && (
+        <div className={styles['admin-section']}>
+          <ContestManagement currentUser={user} />
         </div>
       )}
       

@@ -10,6 +10,11 @@ const bcrypt = require('bcrypt');
 const { body, validationResult } = require('express-validator');
 const db = require('./db'); // This is your existing pg pool from db.js
 const multer = require('multer');
+
+// Import Contest routes and scheduler
+const contestRoutes = require('./routes/contests');
+const contestScheduler = require('./services/contestScheduler');
+const { requireAuth, requireStaffOrAdmin } = require('./middleware/auth');
 const unzipper = require('unzipper');
 
 // Use memory storage for multer to handle files as buffers
@@ -32,21 +37,16 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Add this line
+    secure: false, // Set to false for development
+    sameSite: 'lax',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
 
-// Middleware to check if user is authenticated
-const requireAuth = (req, res, next) => {
-  if (req.session.userId) {
-    next();
-  } else {
-    res.status(401).json({ message: 'Authentication required' });
-  }
-};
+// Use Contest routes (after session middleware)
+app.use('/api/contests', contestRoutes);
+app.use('/api/admin/contests', contestRoutes);
 
 // Middleware to check if user is an admin
 const requireAdmin = (req, res, next) => {
@@ -54,15 +54,6 @@ const requireAdmin = (req, res, next) => {
     next();
   } else {
     res.status(403).json({ message: 'Admin access required' });
-  }
-};
-
-// Middleware to check if user is a staff member or an admin
-const requireStaffOrAdmin = (req, res, next) => {
-  if (req.session.role === 'admin' || req.session.role === 'staff') {
-    next();
-  } else {
-    res.status(403).json({ message: 'Staff or Admin access required' });
   }
 };
 
@@ -234,7 +225,7 @@ app.get('/', (req, res) => {
   res.send('Hello World!');
 });
 
-app.post('/register', [
+app.post('/api/register', [
   body('username').isLength({ min: 3 }).trim().escape(),
   body('password').isLength({ min: 6 })
 ], async (req, res) => {
@@ -307,7 +298,7 @@ app.get('/api/settings/registration', async (req, res) => {
 });
 
 
-app.post('/login', [
+app.post('/api/login', [
   body('username').trim().escape(),
   body('password').notEmpty()
 ], async (req, res) => {
@@ -356,7 +347,7 @@ app.post('/login', [
   }
 });
 
-app.post('/logout', (req, res) => {
+app.post('/api/logout', (req, res) => {
   req.session.destroy((err) => {
     if (err) {
       return res.status(500).json({ message: 'Error logging out' });
@@ -365,7 +356,7 @@ app.post('/logout', (req, res) => {
   });
 });
 
-app.get('/me', (req, res) => {
+app.get('/api/me', (req, res) => {
   if (req.session.userId) {
     res.json({
       isAuthenticated: true,
@@ -380,8 +371,8 @@ app.get('/me', (req, res) => {
   }
 });
 
-app.post('/submit', requireAuth, upload.none(), async (req, res) => {
-  const { problemId, language, code } = req.body;
+app.post('/api/submit', requireAuth, upload.none(), async (req, res) => {
+  const { problemId, language, code, contestId } = req.body;
   const { userId } = req.session;
 
   if (language !== 'cpp') {
@@ -392,20 +383,96 @@ app.post('/submit', requireAuth, upload.none(), async (req, res) => {
   }
 
   try {
-    const submissionRes = await db.query(
-      `INSERT INTO submissions (user_id, problem_id, code, language, overall_status, score)
-       VALUES ($1, $2, $3, $4, 'Pending', 0) RETURNING id`,
-      [userId, problemId, code, language]
-    );
-    const submissionId = submissionRes.rows[0].id;
+    // Check if this is a contest submission
+    if (contestId) {
+      // Validate contest exists and is running
+      const contestRes = await db.query(
+        'SELECT id, status, start_time, end_time FROM contests WHERE id = $1',
+        [contestId]
+      );
+      
+      if (contestRes.rows.length === 0) {
+        return res.status(404).json({ message: 'Contest not found.' });
+      }
+      
+      const contest = contestRes.rows[0];
+      if (contest.status !== 'running') {
+        return res.status(400).json({ 
+          message: `Contest is not running. Current status: ${contest.status}` 
+        });
+      }
+      
+      // Check if user is a participant
+      const participantRes = await db.query(
+        'SELECT 1 FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
+        [contestId, userId]
+      );
+      
+      if (participantRes.rows.length === 0) {
+        return res.status(403).json({ 
+          message: 'You must join the contest before submitting.' 
+        });
+      }
+      
+      // Check if problem belongs to this contest
+      const problemRes = await db.query(
+        'SELECT 1 FROM problems WHERE id = $1 AND contest_id = $2',
+        [problemId, contestId]
+      );
+      
+      if (problemRes.rows.length === 0) {
+        return res.status(400).json({ 
+          message: 'Problem does not belong to this contest.' 
+        });
+      }
+      
+      // Create contest submission
+      const submissionRes = await db.query(
+        `INSERT INTO contest_submissions (contest_id, user_id, problem_id, code, language, overall_status, score)
+         VALUES ($1, $2, $3, $4, $5, 'Pending', 0) RETURNING id`,
+        [contestId, userId, problemId, code, language]
+      );
+      const submissionId = submissionRes.rows[0].id;
 
-    res.status(202).json({
-      message: 'Submission received and is being processed.',
-      submissionId: submissionId
-    });
+      res.status(202).json({
+        message: 'Contest submission received and is being processed.',
+        submissionId: submissionId,
+        isContestSubmission: true
+      });
 
-    // Fire-and-forget background processing
-    processSubmission(submissionId);
+      // Fire-and-forget background processing for contest submission
+      processContestSubmission(submissionId);
+      
+    } else {
+      // Regular submission to main system
+      // Check if problem is available (not in any contest and visible)
+      const problemRes = await db.query(
+        'SELECT 1 FROM problems WHERE id = $1 AND is_visible = true AND contest_id IS NULL',
+        [problemId]
+      );
+      
+      if (problemRes.rows.length === 0) {
+        return res.status(400).json({ 
+          message: 'Problem is not available for submission.' 
+        });
+      }
+      
+      const submissionRes = await db.query(
+        `INSERT INTO submissions (user_id, problem_id, code, language, overall_status, score)
+         VALUES ($1, $2, $3, $4, 'Pending', 0) RETURNING id`,
+        [userId, problemId, code, language]
+      );
+      const submissionId = submissionRes.rows[0].id;
+
+      res.status(202).json({
+        message: 'Submission received and is being processed.',
+        submissionId: submissionId,
+        isContestSubmission: false
+      });
+
+      // Fire-and-forget background processing
+      processSubmission(submissionId);
+    }
 
   } catch (dbError) {
     console.error("Error creating initial submission:", dbError);
@@ -479,6 +546,73 @@ async function processSubmission(submissionId) {
   }
 }
 
+// Process contest submissions (similar to processSubmission but for contest_submissions table)
+async function processContestSubmission(submissionId) {
+  let filePath = '';
+  let outputPath = '';
+
+  try {
+    const subRes = await db.query('SELECT * FROM contest_submissions WHERE id = $1', [submissionId]);
+    if (subRes.rows.length === 0) {
+      console.error(`Contest submission ${submissionId} not found for processing.`);
+      return;
+    }
+    const { problem_id, code } = subRes.rows[0];
+
+    await db.query(`UPDATE contest_submissions SET overall_status = 'Compiling' WHERE id = $1`, [submissionId]);
+
+    const uniqueId = `contest_${submissionId}_${Date.now()}`;
+    filePath = path.join(__dirname, 'submissions', `${uniqueId}.cpp`);
+    outputPath = path.join(__dirname, 'submissions', `${uniqueId}.out`);
+    const submissionsDir = path.join(__dirname, 'submissions');
+
+    if (!fs.existsSync(submissionsDir)) {
+      fs.mkdirSync(submissionsDir, { recursive: true });
+    }
+    await fs.promises.writeFile(filePath, code);
+
+    // Use UndefinedBehaviorSanitizer to reliably catch signed integer overflow as a runtime error.
+    const compileCommand = `g++ -std=c++20 -fsanitize=signed-integer-overflow ${filePath} -o ${outputPath}`;
+    try {
+      await execPromise(compileCommand);
+    } catch (compileError) {
+      console.error(`Compilation error for contest submission ${submissionId}:`, compileError.stderr);
+      await db.query(
+        `UPDATE contest_submissions SET overall_status = 'Compilation Error', results = $1 WHERE id = $2`,
+        [JSON.stringify([{ status: 'Compilation Error', output: compileError.stderr }]), submissionId]
+      );
+      return; 
+    } finally {
+      fs.unlink(filePath, (err) => { if (err) console.error(`Error deleting .cpp file for contest sub ${submissionId}:`, err); });
+    }
+
+    await db.query(`UPDATE contest_submissions SET overall_status = 'Running' WHERE id = $1`, [submissionId]);
+    await fs.promises.chmod(outputPath, 0o755);
+    const judgeResult = await judge(problem_id, outputPath);
+
+    const { results, score, overallStatus, maxTimeMs, maxMemoryKb } = judgeResult;
+    await db.query(
+      `UPDATE contest_submissions
+       SET overall_status = $1, score = $2, results = $3, max_time_ms = $4, max_memory_kb = $5
+       WHERE id = $6`,
+      [overallStatus, score, JSON.stringify(results), maxTimeMs, maxMemoryKb, submissionId]
+    );
+
+  } catch (error) {
+    console.error(`Critical error processing contest submission ${submissionId}:`, error);
+    try {
+      await db.query(
+        `UPDATE contest_submissions SET overall_status = 'System Error' WHERE id = $1`,
+        [submissionId]
+      );
+    } catch (dbError) {
+      console.error(`Failed to update contest submission ${submissionId} to System Error status:`, dbError);
+    }
+  } finally {
+    fs.unlink(outputPath, (err) => { if (err) console.error(`Error deleting .out file for contest sub ${submissionId}:`, err); });
+  }
+}
+
 app.get('/api/problems-with-stats', requireAuth, async (req, res) => {
   const { userId } = req.session;
   try {
@@ -524,7 +658,7 @@ app.get('/api/problems-with-stats', requireAuth, async (req, res) => {
       LEFT JOIN UserProblemStats ups ON p.id = ups.problem_id
       LEFT JOIN RankedSubmissions latest ON p.id = latest.problem_id AND latest.rn_latest = 1
       LEFT JOIN RankedSubmissions best ON p.id = best.problem_id AND best.rn_best = 1
-      WHERE p.is_visible = true
+      WHERE p.is_visible = true AND p.contest_id IS NULL
       ORDER BY p.id;
     `;
     const result = await db.query(query, [userId]);
@@ -539,7 +673,9 @@ app.get('/api/problems-with-stats', requireAuth, async (req, res) => {
 // Problem API Endpoints
 app.get('/api/problems', async (req, res) => {
   try {
-    const result = await db.query('SELECT id, title, author FROM problems WHERE is_visible = true ORDER BY id');
+    const result = await db.query(
+      'SELECT id, title, author FROM problems WHERE is_visible = true AND contest_id IS NULL ORDER BY id'
+    );
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching problems:', error);
@@ -591,36 +727,52 @@ app.get('/api/problems/:id/pdf', requireAuth, async (req, res) => {
 });
 
 app.get('/api/submissions', requireAuth, async (req, res) => {
-  const { filter, problemId } = req.query; // Add problemId
+  const { filter, problemId, contestId } = req.query; // Add contestId
   const { userId } = req.session;
   
   try {
-    let query = `
-      SELECT 
-        s.id, u.username, s.problem_id, p.title AS problem_title,
-        s.overall_status, s.score, s.language, s.submitted_at
-      FROM submissions s
-      JOIN users u ON s.user_id = u.id
-      JOIN problems p ON s.problem_id = p.id
-    `;
-    const params = [];
-    const conditions = [];
+    let query, params = [], conditions = [];
+
+    if (contestId) {
+      // Fetch contest submissions
+      query = `
+        SELECT 
+          cs.id, u.username, cs.problem_id, p.title AS problem_title,
+          cs.overall_status, cs.score, cs.language, cs.submitted_at
+        FROM contest_submissions cs
+        JOIN users u ON cs.user_id = u.id
+        JOIN problems p ON cs.problem_id = p.id
+      `;
+      
+      params.push(contestId);
+      conditions.push(`cs.contest_id = $${params.length}`);
+    } else {
+      // Fetch regular submissions
+      query = `
+        SELECT 
+          s.id, u.username, s.problem_id, p.title AS problem_title,
+          s.overall_status, s.score, s.language, s.submitted_at
+        FROM submissions s
+        JOIN users u ON s.user_id = u.id
+        JOIN problems p ON s.problem_id = p.id
+      `;
+    }
 
     if (filter === 'mine') {
       params.push(userId);
-      conditions.push(`s.user_id = $${params.length}`);
+      conditions.push(`${contestId ? 'cs' : 's'}.user_id = $${params.length}`);
     }
 
     if (problemId) {
       params.push(problemId);
-      conditions.push(`s.problem_id = $${params.length}`);
+      conditions.push(`${contestId ? 'cs' : 's'}.problem_id = $${params.length}`);
     }
 
     if (conditions.length > 0) {
       query += ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    query += ` ORDER BY s.submitted_at DESC LIMIT 50;`;
+    query += ` ORDER BY ${contestId ? 'cs' : 's'}.submitted_at DESC LIMIT 50;`;
 
     const result = await db.query(query, params);
     res.json(result.rows);
@@ -632,16 +784,31 @@ app.get('/api/submissions', requireAuth, async (req, res) => {
 
 app.get('/api/submissions/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
+  const { contestId } = req.query; // Check if this is a contest submission request
   const { userId, role } = req.session;
 
   try {
-    const result = await db.query(
-      `SELECT s.*, u.username 
-       FROM submissions s
-       LEFT JOIN users u ON s.user_id = u.id
-       WHERE s.id = $1`,
-      [id]
-    );
+    let result;
+    
+    if (contestId) {
+      // Fetch contest submission
+      result = await db.query(
+        `SELECT cs.*, u.username 
+         FROM contest_submissions cs
+         LEFT JOIN users u ON cs.user_id = u.id
+         WHERE cs.id = $1 AND cs.contest_id = $2`,
+        [id, contestId]
+      );
+    } else {
+      // Fetch regular submission
+      result = await db.query(
+        `SELECT s.*, u.username 
+         FROM submissions s
+         LEFT JOIN users u ON s.user_id = u.id
+         WHERE s.id = $1`,
+        [id]
+      );
+    }
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Submission not found.' });
@@ -1132,6 +1299,35 @@ app.put('/api/admin/settings/registration', requireAuth, requireAdmin, [
   }
 });
 
+// Contest Scheduler endpoints for testing and monitoring
+app.get('/api/admin/scheduler/status', requireAuth, requireStaffOrAdmin, (req, res) => {
+  try {
+    const status = contestScheduler.getStatus();
+    res.json(status);
+  } catch (error) {
+    console.error('Error getting scheduler status:', error);
+    res.status(500).json({ message: 'Error getting scheduler status' });
+  }
+});
+
+app.post('/api/admin/scheduler/check', requireAuth, requireStaffOrAdmin, async (req, res) => {
+  try {
+    await contestScheduler.manualCheck();
+    res.json({ message: 'Manual contest check completed successfully' });
+  } catch (error) {
+    console.error('Error in manual scheduler check:', error);
+    res.status(500).json({ message: 'Error in manual contest check' });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
+  
+  // Start Contest Scheduler
+  try {
+    contestScheduler.start();
+    console.log('✅ Contest Scheduler initialized successfully');
+  } catch (error) {
+    console.error('❌ Failed to start Contest Scheduler:', error);
+  }
 }); 

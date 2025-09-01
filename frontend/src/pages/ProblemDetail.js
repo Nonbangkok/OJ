@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import styles from './ProblemDetail.module.css';
 import CodeSubmissionForm from '../components/CodeSubmissionForm';
@@ -8,28 +8,41 @@ import Submissions from './Submissions';
 const API_URL = process.env.REACT_APP_API_URL;
 
 function ProblemDetail() {
-  const { id } = useParams();
+  const { id, contestId, problemId } = useParams();
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [hiddenProblemInfo, setHiddenProblemInfo] = useState(null);
   const [activeView, setActiveView] = useState('statement');
+  const [contest, setContest] = useState(null);
 
-      const pdfEndpointUrl = `${API_URL}/problems/${id}/pdf`;
+  // Use problemId if available (from contest route), otherwise use id
+  const actualProblemId = problemId || id;
+  const pdfEndpointUrl = `${API_URL}/problems/${actualProblemId}/pdf`;
 
   useEffect(() => {
     const fetchProblem = async () => {
       try {
-        const problemPromise = axios.get(`${API_URL}/problems/${id}`, { withCredentials: true });
+        const problemPromise = axios.get(`${API_URL}/problems/${actualProblemId}`, { withCredentials: true });
         const statsPromise = axios.get(`${API_URL}/problems-with-stats`, { withCredentials: true });
 
         const [problemResponse, statsResponse] = await Promise.all([problemPromise, statsPromise]);
 
         const problemData = problemResponse.data;
         const allProblemsWithStats = statsResponse.data;
-        const currentProblemStats = allProblemsWithStats.find(p => String(p.id) === id);
+        const currentProblemStats = allProblemsWithStats.find(p => String(p.id) === actualProblemId);
 
         setProblem({ ...problemData, ...currentProblemStats });
+
+        // If this is a contest problem, fetch contest details
+        if (contestId) {
+          try {
+            const contestResponse = await axios.get(`${API_URL}/contests/${contestId}`, { withCredentials: true });
+            setContest(contestResponse.data);
+          } catch (contestErr) {
+            console.error('Error fetching contest details:', contestErr);
+          }
+        }
       } catch (err) {
         if (err.response?.status === 403 && err.response?.data?.message === 'Problem is hidden') {
           // Handle hidden problem case
@@ -39,9 +52,9 @@ function ProblemDetail() {
             detail: err.response.data.detail
           });
         } else if (err.response?.status === 404) {
-          setError(`Problem ${id} not found.`);
+          setError(`Problem ${actualProblemId} not found.`);
         } else {
-          setError(`Failed to fetch problem ${id}.`);
+          setError(`Failed to fetch problem ${actualProblemId}.`);
         }
         console.error(err);
       } finally {
@@ -50,7 +63,7 @@ function ProblemDetail() {
     };
 
     fetchProblem();
-  }, [id]);
+  }, [actualProblemId, contestId]);
 
   const handlePdfView = () => {
     if (!problem || !problem.has_pdf) return;
@@ -118,11 +131,11 @@ function ProblemDetail() {
       case 'submit':
         return (
           <div className={styles['submit-view']}>
-            <CodeSubmissionForm problemId={id} />
+            <CodeSubmissionForm problemId={actualProblemId} contestId={contestId} />
           </div>
         );
       case 'submissions':
-        return <Submissions problemId={id} showTitle={false} />;
+        return <Submissions problemId={actualProblemId} showTitle={false} />;
       default:
         return null;
     }
@@ -130,71 +143,92 @@ function ProblemDetail() {
 
   return (
     <div className={styles['problem-detail-container']}>
-      <div className={styles['left-nav']}>
-        <div className={styles['problem-info']}>
-          <h2>{problem.title}</h2>
-          <p className={styles['problem-id']}>{problem.id}</p>
-          {problem.author && <p className={styles['problem-author']}>Author: {problem.author}</p>}
-
-          <div className={styles['problem-meta']}>
-            <span>Time Limit: {problem.time_limit_ms} ms</span>
-            <span>Memory Limit: {problem.memory_limit_mb} MB</span>
+      {/* Contest Info Banner */}
+      {contest && (
+        <div className={styles.contestInfo}>
+          <h3>{contest.title}</h3>
+          <div className={styles.contestStatus}>
+            <span className={styles.status}>
+              {contest.status === 'running' ? 'Running' :
+               contest.status === 'scheduled' ? 'Scheduled' :
+               contest.status === 'finished' ? 'Finished' : contest.status}
+            </span>
           </div>
-
-          {problem.has_pdf && (
-            <button
-              onClick={handlePdfView}
-              className={styles['view-pdf-btn']}
-            >
-              View Problem PDF
-            </button>
-          )}
+          <div className={styles.contestActions}>
+            <Link to={`/contests/${contest.id}/scoreboard`} className={styles.scoreboardLink}>
+              View Rankings
+            </Link>
+          </div>
         </div>
-        <nav className={styles['problem-nav']}>
-          <button
-            className={`${styles['nav-btn']} ${activeView === 'statement' ? styles.active : ''}`}
-            onClick={() => setActiveView('statement')}
-          >
-            Statement
-          </button>
-          <button
-            className={`${styles['nav-btn']} ${activeView === 'submit' ? styles.active : ''}`}
-            onClick={() => setActiveView('submit')}
-          >
-            Submit
-          </button>
-          <button
-            className={`${styles['nav-btn']} ${activeView === 'submissions' ? styles.active : ''}`}
-            onClick={() => setActiveView('submissions')}
-          >
-            My Submissions
-          </button>
-        </nav>
-        {problem && typeof problem.best_score !== 'undefined' && (
-          <div className={styles['score-container']}>
-            <div className={styles['score-bar-container']}>
-              <div
-                className={`${styles['score-bar']} ${problem.best_score === 100 ? styles.full : problem.best_score > 0 ? styles.partial : styles.zero
-                  }`}
-                style={{ width: `${problem.best_score || 0}%` }}
-              ></div>
+      )}
+      
+      <div className={styles['content-wrapper']}>
+        <div className={styles['left-nav']}>
+          <div className={styles['problem-info']}>
+            <h2>{problem.title}</h2>
+            <p className={styles['problem-id']}>{problem.id}</p>
+            {problem.author && <p className={styles['problem-author']}>Author: {problem.author}</p>}
+
+            <div className={styles['problem-meta']}>
+              <span>Time Limit: {problem.time_limit_ms} ms</span>
+              <span>Memory Limit: {problem.memory_limit_mb} MB</span>
             </div>
-            <div className={styles['score-text-container']}>
-              <span className={styles['score-text']}>Score: {problem.best_score || 0} / 100</span>
-              <span className={styles['result-string']}>
-                {generateResultString(problem.best_submission_status, problem.best_submission_results)}
-              </span>
-            </div>
-            {problem.best_submission_status && (
-              <div className={`${styles['status-text']} ${styles[getStatusClass(problem.best_submission_status)]}`}>
-                {problem.best_submission_status}
-              </div>
+
+            {problem.has_pdf && (
+              <button
+                onClick={handlePdfView}
+                className={styles['view-pdf-btn']}
+              >
+                View Problem PDF
+              </button>
             )}
           </div>
-        )}
-      </div>
-      <div className={styles['right-content']}>
-        {renderContent()}
+          <nav className={styles['problem-nav']}>
+            <button
+              className={`${styles['nav-btn']} ${activeView === 'statement' ? styles.active : ''}`}
+              onClick={() => setActiveView('statement')}
+            >
+              Statement
+            </button>
+            <button
+              className={`${styles['nav-btn']} ${activeView === 'submit' ? styles.active : ''}`}
+              onClick={() => setActiveView('submit')}
+            >
+              Submit
+            </button>
+            <button
+              className={`${styles['nav-btn']} ${activeView === 'submissions' ? styles.active : ''}`}
+              onClick={() => setActiveView('submissions')}
+            >
+              My Submissions
+            </button>
+          </nav>
+          {problem && typeof problem.best_score !== 'undefined' && (
+            <div className={styles['score-container']}>
+              <div className={styles['score-bar-container']}>
+                <div
+                  className={`${styles['score-bar']} ${problem.best_score === 100 ? styles.full : problem.best_score > 0 ? styles.partial : styles.zero
+                    }`}
+                  style={{ width: `${problem.best_score || 0}%` }}
+                ></div>
+              </div>
+              <div className={styles['score-text-container']}>
+                <span className={styles['score-text']}>Score: {problem.best_score || 0} / 100</span>
+                <span className={styles['result-string']}>
+                  {generateResultString(problem.best_submission_status, problem.best_submission_results)}
+                </span>
+              </div>
+              {problem.best_submission_status && (
+                <div className={`${styles['status-text']} ${styles[getStatusClass(problem.best_submission_status)]}`}>
+                  {problem.best_submission_status}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <div className={styles['right-content']}>
+          {renderContent()}
+        </div>
       </div>
     </div>
   );

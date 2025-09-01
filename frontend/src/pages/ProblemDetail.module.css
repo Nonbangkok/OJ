@@ -1,8 +1,96 @@
+/* Contest Banner Styles */
+.contest-banner {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.contest-info h3 {
+  margin: 0 0 10px 0;
+  color: var(--text-primary);
+  font-size: 1.3rem;
+}
+
+.contest-info p {
+  margin: 0 0 15px 0;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.contest-status {
+  margin-bottom: 15px;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.status-badge.running {
+  background: #e8f5e8;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+}
+
+.status-badge.scheduled {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.status-badge.finished {
+  background: #f8f9fa;
+  color: #6c757d;
+  border: 1px solid #dee2e6;
+}
+
+.contest-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.back-to-contest,
+.view-scoreboard {
+  padding: 8px 16px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.back-to-contest {
+  background: var(--background-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.back-to-contest:hover {
+  background: var(--background-hover);
+}
+
+.view-scoreboard {
+  background: var(--primary-color);
+  color: white;
+}
+
+.view-scoreboard:hover {
+  background: var(--primary-dark);
+}
+
 /* New Layout Styles */
 .problem-detail-container {
   display: flex;
+  flex-direction: column;
   height: 88vh;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .left-nav {
@@ -11,6 +99,8 @@
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
+  background: var(--card-bg);
+  border-right: 1px solid var(--border-color);
 }
 
 .problem-info h2 {
@@ -90,6 +180,12 @@
   background-color: var(--primary-color-faded);
   color: var(--primary-color);
   font-weight: 600;
+}
+
+.content-wrapper {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
 }
 
 .right-content {

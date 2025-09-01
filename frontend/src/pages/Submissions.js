@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import styles from './Submissions.module.css'; // Import the new CSS file
 import SubmissionModal from './SubmissionModal'; // Import the modal
 
 const API_URL = process.env.REACT_APP_API_URL;
 
 function Submissions({ problemId, showTitle = true }) {
+  const { contestId } = useParams(); // Get contestId from URL if this is a contest page
   const [submissions, setSubmissions] = useState([]);
   const [currentUser, setCurrentUser] = useState(null); // Add state for current user
   const [loading, setLoading] = useState(true);
@@ -35,8 +36,13 @@ function Submissions({ problemId, showTitle = true }) {
         // On the main submissions page, respect the user's filter choice.
         params.filter = 'mine';
       }
+      
+      // Add contestId if this is a contest submissions page
+      if (contestId) {
+        params.contestId = contestId;
+      }
 
-              const subsRes = await axios.get(`${API_URL}/submissions`, {
+      const subsRes = await axios.get(`${API_URL}/submissions`, {
         withCredentials: true,
         params,
       });
@@ -48,7 +54,7 @@ function Submissions({ problemId, showTitle = true }) {
     } finally {
       setLoading(false);
     }
-  }, [filter, submissions.length, problemId]);
+  }, [problemId, filter, contestId]); // Add contestId to dependencies
 
   useEffect(() => {
     fetchData();
@@ -70,10 +76,16 @@ function Submissions({ problemId, showTitle = true }) {
     }
   }, [submissions, fetchData]); // Rerun this effect if submissions or fetchData change
 
-  const handleViewCode = async (submissionId) => {
+    const handleViewCode = async (submissionId) => {
     try {
-              const response = await axios.get(`${API_URL}/submissions/${submissionId}`, {
+      const params = {};
+      if (contestId) {
+        params.contestId = contestId;
+      }
+      
+      const response = await axios.get(`${API_URL}/submissions/${submissionId}`, {
         withCredentials: true,
+        params,
       });
       setSelectedSubmission(response.data);
       setIsModalOpen(true);

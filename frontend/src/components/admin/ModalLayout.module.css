@@ -55,3 +55,39 @@ fieldset {
   padding: 1rem;
   margin-bottom: 1rem;
 }
+
+/* Contest Modal Specific Styles */
+.contest-duration-display {
+  background: var(--bg-secondary);
+  padding: 12px 16px;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+
+.contest-form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.contest-form-cancel {
+  background-color: var(--background-tertiary);
+  color: var(--text-primary);
+  width: auto;
+  flex: 1;
+}
+
+.contest-form-submit {
+  flex: 1;
+  width: auto;
+}
+
+.contest-char-count {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  text-align: right;
+  display: block;
+  margin-top: 4px;
+}
