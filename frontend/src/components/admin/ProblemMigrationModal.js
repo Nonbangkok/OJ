@@ -86,7 +86,6 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
       
       setSelectedContest([]); // Clear selection after moving
       await fetchProblems(); // Refresh both lists
-      onSuccess(); // Notify parent to refresh contest list
     } catch (err) {
       console.error('Error moving problems to main:', err);
       setError(err.response?.data?.message || 'Failed to move problems to main');
@@ -132,9 +131,9 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
   if (loading) {
     return (
       <div className={modalStyles['modal-overlay']}>
-        <div className={formStyles['form-container']} style={{maxWidth: '1200px'}}>
+        <div className={`${formStyles['form-container']} ${modalStyles.migrationModalContainer}`}>
           <h2>📝 Manage Contest Problems</h2>
-          <div style={{textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary)', fontSize: '1.1rem'}}>
+          <div className={modalStyles.migrationModalLoadingText}>
             Loading problems...
           </div>
         </div>
@@ -145,12 +144,13 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
   return (
     <div className={modalStyles['modal-overlay']} onClick={onClose}>
       <div 
-        className={formStyles['form-container']} 
-        style={{maxWidth: '1200px', width: '95%'}}
+        className={`${formStyles['form-container']} ${modalStyles.migrationModalContainer}`}
         onClick={e => e.stopPropagation()}
       >
-        <h2>Manage Contest Problems</h2>
-        <p>Move problems between the main system and this contest</p>
+        <div className={modalStyles.migrationModalHeader}>
+          <h2>Manage Contest Problems</h2>
+          <p>Contest: <strong>{contest.title}</strong></p>
+        </div>
         
         {error && (
           <div className={formStyles['error-message']}>
@@ -159,221 +159,167 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
         )}
         
         {contest.status !== 'scheduled' && (
-          <div style={{background: '#fff3cd', color: '#856404', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', borderLeft: '4px solid #ffc107'}}>
+          <div className={modalStyles.migrationModalWarning}>
             Problems can only be modified for scheduled contests.
             This contest is currently {contest.status}.
           </div>
         )}
 
-        <div style={{display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '20px', minHeight: '500px'}}>
+        <div className={modalStyles.migrationModalGrid}>
           {/* Available Problems */}
-          <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', paddingBottom: '10px', borderBottom: '2px solid var(--border-color)'}}>
-              <h3>📚 Available Problems ({availableProblems.length})</h3>
+          <div className={modalStyles.migrationPanel}>
+            <div className={modalStyles.migrationPanelHeader}>
+              <h3>Available Problems ({availableProblems.length})</h3>
               {canMoveProblems && availableProblems.length > 0 && (
                 <button
                   onClick={handleSelectAllAvailable}
-                  style={{padding: '6px 12px', fontSize: '0.8rem', backgroundColor: 'var(--background-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '6px'}}
+                  className={modalStyles.migrationSelectAllButton}
                 >
                   {selectedAvailable.length === availableProblems.length ? 'Deselect All' : 'Select All'}
                 </button>
               )}
             </div>
             
-            <div style={{flex: 1, maxHeight: '400px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-secondary)'}}>
+            <div className={modalStyles.migrationProblemList}>
               {availableProblems.length === 0 ? (
-                <div style={{textAlign: 'center', padding: '40px 20px'}}>
-                  <div style={{fontSize: '2.5rem', marginBottom: '15px'}}>📝</div>
+                <div className={modalStyles.migrationEmptyList}>
                   <h3>No Available Problems</h3>
-                  <p>All problems are already assigned to this contest</p>
                 </div>
               ) : (
-                availableProblems.map(problem => (
-                  <div
-                    key={problem.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '12px 16px',
-                      borderBottom: '1px solid var(--border-color)',
-                      cursor: canMoveProblems ? 'pointer' : 'not-allowed',
-                      transition: 'background-color 0.2s ease',
-                      position: 'relative',
-                      background: selectedAvailable.includes(problem.id) ? '#e3f2fd' : 'transparent',
-                      borderColor: selectedAvailable.includes(problem.id) ? '#1976d2' : 'var(--border-color)',
-                      opacity: canMoveProblems ? 1 : 0.6
-                    }}
-                    onClick={() => canMoveProblems && handleSelectAvailable(problem.id)}
-                  >
-                    <div style={{flex: 1, minWidth: 0}}>
-                      <h4 style={{margin: '0 0 4px 0', color: 'var(--text-primary)', fontSize: '0.95rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                        {problem.title}
-                      </h4>
-                      <p style={{margin: '0 0 8px 0', color: 'var(--text-secondary)', fontSize: '0.8rem'}}>by {problem.author}</p>
-                      <div style={{display: 'flex', gap: '12px'}}>
-                        <span style={{color: 'var(--text-secondary)', fontSize: '0.75rem', background: 'var(--card-bg)', padding: '2px 6px', borderRadius: '4px'}}>
-                          ⏱️ {problem.time_limit_ms || 2000}ms
-                        </span>
-                        <span style={{color: 'var(--text-secondary)', fontSize: '0.75rem', background: 'var(--card-bg)', padding: '2px 6px', borderRadius: '4px'}}>
-                          💾 {problem.memory_limit_mb || 256}MB
-                        </span>
+                availableProblems.map(problem => {
+                  const itemClasses = [
+                    modalStyles.migrationProblemItem,
+                    canMoveProblems ? modalStyles.enabled : modalStyles.disabled,
+                    selectedAvailable.includes(problem.id) ? modalStyles.selected : ''
+                  ].join(' ');
+
+                  return (
+                    <div
+                      key={problem.id}
+                      className={itemClasses}
+                      onClick={() => canMoveProblems && handleSelectAvailable(problem.id)}
+                    >
+                      <div className={modalStyles.migrationProblemDetails}>
+                        <h4 className={modalStyles.migrationProblemTitle}>
+                          {problem.title}
+                        </h4>
+                        <p className={modalStyles.migrationProblemAuthor}>by {problem.author}</p>
                       </div>
+                      {canMoveProblems && (
+                        <div className={modalStyles.migrationProblemCheckboxContainer}>
+                          <input
+                            type="checkbox"
+                            checked={selectedAvailable.includes(problem.id)}
+                            onChange={() => handleSelectAvailable(problem.id)}
+                            onClick={e => e.stopPropagation()}
+                            className={modalStyles.migrationProblemCheckbox}
+                          />
+                        </div>
+                      )}
                     </div>
-                    {canMoveProblems && (
-                      <div style={{marginLeft: '12px'}}>
-                        <input
-                          type="checkbox"
-                          checked={selectedAvailable.includes(problem.id)}
-                          onChange={() => handleSelectAvailable(problem.id)}
-                          onClick={e => e.stopPropagation()}
-                          style={{width: '16px', height: '16px', cursor: 'pointer'}}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
 
           {/* Migration Controls */}
-          <div style={{display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '20px', padding: '20px', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)'}}>
-            <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
+          <div className={modalStyles.migrationControls}>
+            <div className={modalStyles.migrationControlsButtons}>
               <button
                 onClick={handleMoveToContest}
                 disabled={!canMoveProblems || selectedAvailable.length === 0 || migrationLoading}
-                style={{
-                  padding: '16px 20px',
-                  fontSize: '1.5rem',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '8px',
-                  minWidth: '120px',
-                  backgroundColor: 'var(--primary-color)',
-                  color: 'white',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
+                className={`${modalStyles.migrationControlButton} ${modalStyles.migrationControlToAdd}`}
                 title="Move selected problems to contest"
               >
-                {migrationLoading ? '🔄' : '➡️'}
-                <br />
-                <small style={{fontSize: '0.75rem', fontWeight: '500'}}>Add to Contest</small>
+                <small className={modalStyles.migrationControlButtonText}>Add to Contest</small>
               </button>
               
               <button
                 onClick={() => handleMoveToMain()}
                 disabled={!canMoveProblems || selectedContest.length === 0 || migrationLoading}
-                style={{
-                  padding: '16px 20px',
-                  fontSize: '1.5rem',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '8px',
-                  minWidth: '120px',
-                  backgroundColor: '#ffc107',
-                  color: '#212529',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
+                className={`${modalStyles.migrationControlButton} ${modalStyles.migrationControlToRemove}`}
                 title="Move selected problems back to main pool"
               >
-                {migrationLoading ? '🔄' : '⬅️'}
-                <br />
-                <small style={{fontSize: '0.75rem', fontWeight: '500'}}>Remove from Contest</small>
+                <small className={modalStyles.migrationControlButtonText}>Remove from Contest</small>
               </button>
             </div>
             
-            <div style={{textAlign: 'center'}}>
-              <div style={{color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '4px'}}>
-                📋 {selectedAvailable.length} selected from available
+            <div className={modalStyles.migrationSelectionCountContainer}>
+              <div className={modalStyles.migrationSelectionCountText}>
+                {selectedAvailable.length} selected from available
               </div>
-              <div style={{color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '4px'}}>
-                📋 {selectedContest.length} selected from contest
+              <div className={modalStyles.migrationSelectionCountText}>
+                {selectedContest.length} selected from contest
               </div>
             </div>
           </div>
 
           {/* Contest Problems */}
-          <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', paddingBottom: '10px', borderBottom: '2px solid var(--border-color)'}}>
+          <div className={modalStyles.migrationPanel}>
+            <div className={modalStyles.migrationPanelHeader}>
               <div>
                 <h3>Contest Problems ({contestProblems.length})</h3>
-                <p style={{margin: '0', color: 'var(--text-secondary)', fontSize: '0.85rem'}}>Problems currently assigned to this contest</p>
               </div>
               {canMoveProblems && contestProblems.length > 0 && (
                 <button
                   onClick={handleSelectAllContest}
-                  style={{padding: '6px 12px', fontSize: '0.8rem', backgroundColor: 'var(--background-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '6px'}}
+                  className={modalStyles.migrationSelectAllButton}
                 >
                   {selectedContest.length === contestProblems.length ? 'Deselect All' : 'Select All'}
                 </button>
               )}
             </div>
 
-            <div style={{flex: 1, maxHeight: '400px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-secondary)'}}>
+            <div className={modalStyles.migrationProblemList}>
               {contestProblems.length === 0 ? (
-                <div style={{textAlign: 'center', padding: '40px 20px'}}>
-                  <div style={{fontSize: '2.5rem', marginBottom: '15px'}}>🏆</div>
+                <div className={modalStyles.migrationEmptyList}>
                   <h3>No Contest Problems</h3>
                   <p>No problems have been assigned to this contest yet</p>
                 </div>
               ) : (
-                contestProblems.map((problem) => (
-                  <div
-                    key={problem.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '12px 16px',
-                      borderBottom: '1px solid var(--border-color)',
-                      transition: 'background-color 0.2s ease',
-                      position: 'relative',
-                      background: selectedContest.includes(problem.id) ? '#e3f2fd' : 'transparent',
-                      borderColor: selectedContest.includes(problem.id) ? '#1976d2' : 'var(--border-color)',
-                      cursor: canMoveProblems ? 'pointer' : 'not-allowed',
-                      opacity: canMoveProblems ? 1 : 0.6
-                    }}
-                    onClick={() => canMoveProblems && handleSelectContest(problem.id)}
-                  >
-                    <div style={{flex: 1, minWidth: 0}}>
-                      <h4 style={{margin: '0 0 4px 0', color: 'var(--text-primary)', fontSize: '0.95rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                        {problem.title}
-                      </h4>
-                      <p style={{margin: '0', color: 'var(--text-secondary)', fontSize: '0.8rem'}}>by {problem.author}</p>
-                    </div>
-                    {canMoveProblems && (
-                      <div style={{marginLeft: '12px'}}>
-                        <input
-                          type="checkbox"
-                          checked={selectedContest.includes(problem.id)}
-                          onChange={() => handleSelectContest(problem.id)}
-                          onClick={e => e.stopPropagation()}
-                          style={{width: '16px', height: '16px', cursor: 'pointer'}}
-                        />
+                contestProblems.map((problem) => {
+                  const itemClasses = [
+                    modalStyles.migrationProblemItem,
+                    canMoveProblems ? modalStyles.enabled : modalStyles.disabled,
+                    selectedContest.includes(problem.id) ? modalStyles.selected : ''
+                  ].join(' ');
+                  
+                  return (
+                    <div
+                      key={problem.id}
+                      className={itemClasses}
+                      onClick={() => canMoveProblems && handleSelectContest(problem.id)}
+                    >
+                      <div className={modalStyles.migrationProblemDetails}>
+                        <h4 className={modalStyles.migrationProblemTitle}>
+                          {problem.title}
+                        </h4>
+                        <p className={modalStyles.migrationProblemAuthor}>by {problem.author}</p>
                       </div>
-                    )}
-                  </div>
-                ))
+                      {canMoveProblems && (
+                        <div className={modalStyles.migrationProblemCheckboxContainer}>
+                          <input
+                            type="checkbox"
+                            checked={selectedContest.includes(problem.id)}
+                            onChange={() => handleSelectContest(problem.id)}
+                            onClick={e => e.stopPropagation()}
+                            className={modalStyles.migrationProblemCheckbox}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
         </div>
 
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '20px'}}>
-          <div>
-            <p style={{margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem'}}>
-              <strong>💡 Tip:</strong> Problems can only be moved for scheduled contests. 
-              Once a contest starts, the problem list is locked.
-            </p>
-          </div>
+        <div className={modalStyles.migrationFooter}>
           <button
             onClick={onClose}
-            style={{backgroundColor: 'var(--background-tertiary)', color: 'var(--text-primary)', width: 'auto', padding: '10px 20px', border: '1px solid var(--border-color)', borderRadius: '6px'}}
+            className={modalStyles.migrationCloseButton}
           >
             Close
           </button>
