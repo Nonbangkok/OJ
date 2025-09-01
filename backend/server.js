@@ -1299,27 +1299,6 @@ app.put('/api/admin/settings/registration', requireAuth, requireAdmin, [
   }
 });
 
-// Contest Scheduler endpoints for testing and monitoring
-app.get('/api/admin/scheduler/status', requireAuth, requireStaffOrAdmin, (req, res) => {
-  try {
-    const status = contestScheduler.getStatus();
-    res.json(status);
-  } catch (error) {
-    console.error('Error getting scheduler status:', error);
-    res.status(500).json({ message: 'Error getting scheduler status' });
-  }
-});
-
-app.post('/api/admin/scheduler/check', requireAuth, requireStaffOrAdmin, async (req, res) => {
-  try {
-    await contestScheduler.manualCheck();
-    res.json({ message: 'Manual contest check completed successfully' });
-  } catch (error) {
-    console.error('Error in manual scheduler check:', error);
-    res.status(500).json({ message: 'Error in manual contest check' });
-  }
-});
-
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
   

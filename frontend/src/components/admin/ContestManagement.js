@@ -22,12 +22,8 @@ function ContestManagement({ currentUser }) {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [contestToDelete, setContestToDelete] = useState(null);
   
-  // Scheduler status
-  const [schedulerStatus, setSchedulerStatus] = useState(null);
-
   useEffect(() => {
     fetchContests();
-    fetchSchedulerStatus();
   }, []);
 
   const fetchContests = async () => {
@@ -42,17 +38,6 @@ function ContestManagement({ currentUser }) {
       setError('Failed to load contests');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchSchedulerStatus = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/admin/scheduler/status`, {
-        withCredentials: true
-      });
-      setSchedulerStatus(response.data);
-    } catch (err) {
-      console.error('Error fetching scheduler status:', err);
     }
   };
 
@@ -85,19 +70,6 @@ function ContestManagement({ currentUser }) {
   const handleManageProblems = (contest) => {
     setMigrationContest(contest);
     setIsMigrationModalOpen(true);
-  };
-
-  const handleSchedulerCheck = async () => {
-    try {
-      await axios.post(`${API_URL}/admin/scheduler/check`, {}, {
-        withCredentials: true
-      });
-      fetchSchedulerStatus();
-      fetchContests(); // Refresh contests in case status changed
-    } catch (err) {
-      console.error('Error triggering scheduler check:', err);
-      setError('Failed to trigger scheduler check');
-    }
   };
 
   const getStatusBadge = (status) => {
@@ -150,25 +122,6 @@ function ContestManagement({ currentUser }) {
           </button>
         </div>
       </div>
-
-      {/* Scheduler Status */}
-      {schedulerStatus && (
-        <div className={styles.schedulerStatus}>
-          <h3>Contest Scheduler Status</h3>
-          <div className={styles.statusInfo}>
-            <strong>Running:</strong> {schedulerStatus.isRunning ? 'Yes' : 'No'}
-            {schedulerStatus.lastCheck && (
-              <span> | Last Check: {new Date(schedulerStatus.lastCheck).toLocaleString('en-US')}</span>
-            )}
-          </div>
-          <button 
-            onClick={handleSchedulerCheck}
-            className={styles.checkBtn}
-          >
-            Manual Check
-          </button>
-        </div>
-      )}
 
       {error && (
         <div className={styles.error}>
