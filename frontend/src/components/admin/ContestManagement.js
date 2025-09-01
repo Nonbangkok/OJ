@@ -109,13 +109,13 @@ function ContestManagement({ currentUser }) {
   }
 
   return (
-    <div className={styles.section}>
-      <div className={styles.sectionHeader}>
+    <div className={styles['management-container']}>
+      <div className={styles['management-header']}>
         <h2>Contest Management</h2>
-        <div className={styles.headerActions}>
+        <div className={styles['header-actions']}>
           <button 
             onClick={handleCreate}
-            className={`${styles.btn} ${styles.btnPrimary}`}
+            className={styles['create-btn']}
           >
             Create New Contest
           </button>
@@ -136,14 +136,14 @@ function ContestManagement({ currentUser }) {
           <p>Create your first contest to get started</p>
           <button 
             onClick={handleCreate}
-            className={`${styles.btn} ${styles.btnPrimary}`}
+            className={styles['create-btn']}
           >
             Create First Contest
           </button>
         </div>
       ) : (
-        <div className={styles.tableContainer}>
-          <table className={styles.table}>
+        <div className="table-container">
+          <table className="table">
             <thead>
               <tr>
                 <th>Title</th>
@@ -158,22 +158,6 @@ function ContestManagement({ currentUser }) {
               {contests.map(contest => (
                 <tr key={contest.id}>
                   <td>
-                    {/* <div className={styles.contestInfo}>
-                      <div className={styles.timeInfo}>
-                        <span className={styles.timeLabel}>Start:</span>
-                        <span className={styles.timeValue}>
-                          {new Date(contest.start_time).toLocaleString('en-US')}
-                        </span>
-                      </div>
-                      <div className={styles.stats}>
-                        <span className={styles.stat}>
-                          {contest.participant_count || 0}
-                        </span>
-                        <span className={styles.stat}>
-                          {contest.problem_count || 0}
-                        </span>
-                      </div>
-                    </div> */}
                     {contest.title}
                   </td>
                   
@@ -214,7 +198,7 @@ function ContestManagement({ currentUser }) {
                     <div className={styles.actionButtons}>
                       <button
                         onClick={() => handleEdit(contest)}
-                        className={`${styles.btn} ${styles.btnSmall} ${styles.btnSecondary}`}
+                        className={styles['edit-btn']}
                         title="Edit Contest"
                       >
                         Edit
@@ -222,7 +206,7 @@ function ContestManagement({ currentUser }) {
                       
                       <button
                         onClick={() => handleManageProblems(contest)}
-                        className={`${styles.btn} ${styles.btnSmall} ${styles.btnInfo}`}
+                        className={styles['problems-btn']}
                         title="Manage Problems"
                       >
                         Problems
@@ -233,7 +217,7 @@ function ContestManagement({ currentUser }) {
                           setContestToDelete(contest.id);
                           setIsConfirmModalOpen(true);
                         }}
-                        className={`${styles.btn} ${styles.btnSmall} ${styles.btnDanger}`}
+                        className={styles['delete-btn']}
                         title="Delete Contest"
                         disabled={contest.status === 'running'}
                       >
