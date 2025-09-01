@@ -197,7 +197,7 @@ function ContestScoreboard() {
               <span className={styles.infoLabel}>Problems</span>
               <span className={styles.infoValue}>{problems.length} problems</span>
             </div>
-            {lastUpdate && (
+            {lastUpdate && contest.status === 'running' && (
               <div className={styles.infoCard}>
                 <span className={styles.infoLabel}>Last Updated</span>
                 <span className={styles.infoValue}>{formatDateTime(lastUpdate)}</span>
@@ -307,39 +307,6 @@ function ContestScoreboard() {
           </div>
         </div>
       )}
-
-      {/* Footer */}
-      <div className={styles.footer}>
-        <div className={styles.legend}>
-          <h4>Legend:</h4>
-          <div className={styles.legendItems}>
-            <div className={styles.legendItem}>
-              <div className={`${styles.legendBox} ${styles.solved}`}></div>
-              <span>Solved (100 points)</span>
-            </div>
-            <div className={styles.legendItem}>
-              <div className={`${styles.legendBox} ${styles.partial}`}></div>
-              <span>Partial (1-99 points)</span>
-            </div>
-            <div className={styles.legendItem}>
-              <div className={`${styles.legendBox} ${styles.noAttempt}`}></div>
-              <span>No submission</span>
-            </div>
-          </div>
-        </div>
-        
-        {contest?.status === 'running' && (
-          <div className={styles.refreshInfo}>
-            <p>Rankings auto-update every 30 seconds</p>
-            <button 
-              onClick={fetchScoreboard}
-              className={styles.refreshBtn}
-            >
-              Refresh Now
-            </button>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
