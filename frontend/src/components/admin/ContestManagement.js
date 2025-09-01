@@ -112,7 +112,6 @@ function ContestManagement({ currentUser }) {
     <div className={styles.section}>
       <div className={styles.sectionHeader}>
         <h2>Contest Management</h2>
-        <p>Manage programming contests, participants, and problem assignments</p>
         <div className={styles.headerActions}>
           <button 
             onClick={handleCreate}
