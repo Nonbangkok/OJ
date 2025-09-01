@@ -139,7 +139,7 @@ function ContestSubmissions() {
 
       {/* Submissions Header */}
       <div className={styles['submissions-header']}>
-        <h2>Contest Submissions</h2>
+        <h1>Contest Submissions</h1>
         <div className={styles['filter-buttons']}>
           <button
             className={`${styles['filter-btn']} ${filter === 'all' ? styles.active : ''}`}
@@ -161,7 +161,6 @@ function ContestSubmissions() {
       {/* Submissions Table */}
       {submissions.length === 0 ? (
         <div className={styles['no-submissions']}>
-          <div className={styles['no-submissions-icon']}>📝</div>
           <h3>No submissions yet</h3>
           <p>No one has submitted solutions for this contest yet</p>
         </div>
@@ -196,7 +195,7 @@ function ContestSubmissions() {
                   </td>
                   <td>
                     <span className={styles['score']}>
-                      {submission.score !== undefined ? `${submission.score}/100` : 'N/A'}
+                      {submission.score !== undefined ? `${submission.score}` : 'N/A'}
                     </span>
                   </td>
                   <td>{submission.language}</td>

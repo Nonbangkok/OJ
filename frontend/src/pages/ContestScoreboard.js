@@ -76,28 +76,6 @@ function ContestScoreboard() {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const statusClasses = {
-      'scheduled': `${styles.badge} ${styles.scheduled}`,
-      'running': `${styles.badge} ${styles.running}`,
-      'finishing': `${styles.badge} ${styles.finishing}`,
-      'finished': `${styles.badge} ${styles.finished}`
-    };
-    
-    const statusText = {
-      'scheduled': 'Scheduled',
-      'running': 'Running',
-      'finishing': 'Finishing',
-      'finished': 'Finished'
-    };
-
-    return (
-      <span className={statusClasses[status] || styles.badge}>
-        {statusText[status] || status}
-      </span>
-    );
-  };
-
   const formatDateTime = (dateTime) => {
     return new Date(dateTime).toLocaleString('en-US', {
       hour: '2-digit',
@@ -132,15 +110,6 @@ function ContestScoreboard() {
     return null;
   };
 
-  const getRankIcon = (rank) => {
-    switch(rank) {
-      case 1: return '1st';
-      case 2: return '2nd';
-      case 3: return '3rd';
-      default: return `#${rank}`;
-    }
-  };
-
   if (loading) {
     return (
       <div className={styles.container}>
@@ -164,147 +133,77 @@ function ContestScoreboard() {
 
   return (
     <div className={styles.container}>
-      {/* Header */}
-      <div className={styles.header}>
-        <div className={styles.headerTop}>
-          <Link to="/contests" className={styles.backLink}>
-            ← All Contests
-          </Link>
-          <Link to={`/contests/${contestId}`} className={styles.contestLink}>
-            🏆 View Contest Details
-          </Link>
-        </div>
-        
-        <div className={styles.titleSection}>
-          <h1 className={styles.title}>Contest Rankings</h1>
-          {contest && getStatusBadge(contest.status)}
-        </div>
-        
-        {contest && (
-          <h2 className={styles.contestTitle}>{contest.title}</h2>
-        )}
-      </div>
-
-      {/* Contest Info */}
-      {contest && (
-        <div className={styles.contestInfo}>
-          <div className={styles.infoCards}>
-            <div className={styles.infoCard}>
-              <span className={styles.infoLabel}>Participants</span>
-              <span className={styles.infoValue}>{scoreboard.length} people</span>
-            </div>
-            <div className={styles.infoCard}>
-              <span className={styles.infoLabel}>Problems</span>
-              <span className={styles.infoValue}>{problems.length} problems</span>
-            </div>
-            {lastUpdate && contest.status === 'running' && (
-              <div className={styles.infoCard}>
-                <span className={styles.infoLabel}>Last Updated</span>
-                <span className={styles.infoValue}>{formatDateTime(lastUpdate)}</span>
-              </div>
-            )}
-          </div>
-          
-          {contest.status === 'running' && (
-            <div className={styles.liveIndicator}>
-              <span className={styles.liveIcon}>LIVE</span>
-              <span>Real-time Updates</span>
-            </div>
-          )}
+      <h1>Contest Scoreboard</h1>
+      {lastUpdate && (
+        <div className={styles.refreshInfo}>
+          <p>Last updated: {formatDateTime(lastUpdate)}</p>
         </div>
       )}
 
-      {/* Scoreboard */}
       {scoreboard.length === 0 ? (
         <div className={styles.noData}>
-          <div className={styles.noDataIcon}>📊</div>
           <h3>No ranking data yet</h3>
           <p>No participants have submitted solutions in this contest yet</p>
         </div>
       ) : (
-        <div className={styles.scoreboardContainer}>
-          <div className={styles.tableWrapper}>
-            <table className={styles.scoreboardTable}>
-              <thead>
-                <tr>
-                  <th className={styles.rankHeader}>Rank</th>
-                  <th className={styles.userHeader}>Participant</th>
-                  <th className={styles.scoreHeader}>Total Score</th>
-                  {problems.map((problem, index) => (
-                    <th key={problem.problem_id} className={styles.problemHeader}>
-                      <div className={styles.problemLetter}>
-                        {String.fromCharCode(65 + index)}
-                      </div>
-                      <div className={styles.problemTitle}>
-                        {problem.title}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {scoreboard.map((participant, index) => {
-                  const rank = index + 1;
-                  return (
-                    <tr key={participant.user_id} className={styles.participantRow}>
-                      <td className={styles.rankCell}>
-                        <span className={styles.rankValue}>
-                          {getRankIcon(rank)}
-                        </span>
-                      </td>
-                      
-                      <td className={styles.userCell}>
-                        <div className={styles.userInfo}>
-                          <span className={styles.username}>
-                            {participant.username}
-                          </span>
-                          {rank <= 3 && (
-                            <span className={styles.topRankBadge}>
-                              TOP {rank}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      
-                      <td className={styles.scoreCell}>
-                        <span className={styles.totalScore}>
-                          {participant.total_score}
-                        </span>
-                      </td>
-                      
-                      {problems.map((problem) => {
-                        const problemScore = getProblemScore(
-                          participant.detailed_scores, 
-                          problem.problem_id
-                        );
-                        
-                        return (
-                          <td key={problem.problem_id} className={styles.problemCell}>
-                            {problemScore ? (
-                              <div className={`${styles.problemScore} ${
-                                problemScore.solved ? styles.solved : styles.partial
-                              }`}>
-                                <span className={styles.score}>
-                                  {problemScore.score}
+        <div className="table-container">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Participant</th>
+                <th>Total Score</th>
+                {problems.map((problem, index) => (
+                  <th key={problem.problem_id}>
+                    <div style={{ fontSize: '0.8em', color: '#888' }}>{problem.problem_id}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {scoreboard.map((participant, index) => {
+                const rank = index + 1;
+                return (
+                  <tr key={participant.user_id} className={rank <= 3 ? `rank-${rank}` : ''}>
+                    <td>{rank}</td>
+                    <td>{participant.username}</td>
+                    <td>{participant.total_score}</td>
+                    {problems.map((problem) => {
+                      const problemScore = getProblemScore(
+                        participant.detailed_scores,
+                        problem.problem_id
+                      );
+
+                      return (
+                        <td key={problem.problem_id}>
+                          {problemScore ? (
+                            <div
+                              className={`${styles.problemScore} ${
+                                problemScore.solved
+                                  ? styles.solved
+                                  : problemScore.score > 0
+                                  ? styles.partial
+                                  : ''
+                              }`}
+                            >
+                              <span className={styles.score}>{problemScore.score}</span>
+                              {problemScore.attempts > 1 && (
+                                <span className={styles.attempts}>
+                                  ({problemScore.attempts})
                                 </span>
-                                {problemScore.attempts > 1 && (
-                                  <span className={styles.attempts}>
-                                    ({problemScore.attempts})
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <div className={styles.noAttempt}>-</div>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className={styles.noAttempt}>-</div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

@@ -22,8 +22,7 @@
   margin-bottom: 20px;
 }
 
-.backLink,
-.contestLink {
+.backLink {
   color: var(--primary-color);
   text-decoration: none;
   font-weight: 500;
@@ -32,144 +31,9 @@
   border-radius: 6px;
 }
 
-.backLink:hover,
-.contestLink:hover {
+.backLink:hover {
   color: var(--primary-dark);
   background: var(--bg-secondary);
-}
-
-/* Header */
-.header {
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  padding: 30px;
-  margin-bottom: 30px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.headerTop {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 25px;
-}
-
-.titleSection {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 15px;
-  flex-wrap: wrap;
-}
-
-.title {
-  color: var(--text-primary);
-  margin: 0;
-  font-size: 2rem;
-  font-weight: 700;
-  flex: 1;
-}
-
-.contestTitle {
-  color: var(--text-secondary);
-  margin: 0;
-  font-size: 1.3rem;
-  font-weight: 500;
-}
-
-.badge {
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.badge.scheduled {
-  background-color: #e3f2fd;
-  color: #1976d2;
-  border: 1px solid #bbdefb;
-}
-
-.badge.running {
-  background-color: #e8f5e8;
-  color: #2e7d32;
-  border: 1px solid #c8e6c9;
-  animation: pulse 2s infinite;
-}
-
-.badge.finishing {
-  background-color: #fff3e0;
-  color: #f57c00;
-  border: 1px solid #ffcc02;
-}
-
-.badge.finished {
-  background-color: #f3e5f5;
-  color: #7b1fa2;
-  border: 1px solid #ce93d8;
-}
-
-@keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.7; }
-  100% { opacity: 1; }
-}
-
-/* Contest Info */
-.contestInfo {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--bg-secondary);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 30px;
-  flex-wrap: wrap;
-  gap: 20px;
-}
-
-.infoCards {
-  display: flex;
-  gap: 30px;
-  flex-wrap: wrap;
-}
-
-.infoCard {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-}
-
-.infoLabel {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.infoValue {
-  color: var(--text-primary);
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.liveIndicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.liveIcon {
-  animation: blink 1.5s infinite;
-}
-
-@keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0.3; }
 }
 
 /* No Data */
@@ -193,181 +57,29 @@
   font-size: 1.5rem;
 }
 
-/* Scoreboard Table */
-.scoreboardContainer {
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  margin-bottom: 30px;
-}
-
-.tableWrapper {
-  overflow-x: auto;
-  max-width: 100%;
-}
-
-.scoreboardTable {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-
-/* Table Headers */
-.scoreboardTable thead {
-  background: var(--primary-color);
-  color: white;
-}
-
-.scoreboardTable th {
-  padding: 16px 12px;
-  text-align: center;
-  font-weight: 600;
-  font-size: 0.85rem;
-  white-space: nowrap;
-}
-
-.rankHeader {
-  width: 80px;
-  min-width: 80px;
-}
-
-.userHeader {
-  width: 200px;
-  min-width: 150px;
-  text-align: left !important;
-}
-
-.scoreHeader {
-  width: 100px;
-  min-width: 100px;
-}
-
-.problemHeader {
-  width: 120px;
-  min-width: 100px;
-  padding: 12px 8px;
-}
-
-.problemLetter {
-  font-size: 1.1rem;
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-
-.problemTitle {
-  font-size: 0.75rem;
-  opacity: 0.9;
-  font-weight: 400;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Table Body */
-.participantRow {
-  border-bottom: 1px solid var(--border-color);
-  transition: background-color 0.2s ease;
-}
-
-.participantRow:hover {
-  background: var(--bg-secondary);
-}
-
-.participantRow:nth-child(odd) {
-  background: rgba(0, 0, 0, 0.02);
-}
-
-.participantRow:nth-child(odd):hover {
-  background: var(--bg-secondary);
-}
-
-.scoreboardTable td {
-  padding: 16px 12px;
-  text-align: center;
-  vertical-align: middle;
-}
-
-/* Rank Cell */
-.rankCell {
-  font-weight: 600;
-  font-size: 1.1rem;
-  background: var(--bg-secondary);
-}
-
-.rankValue {
-  display: inline-block;
-  min-width: 40px;
-}
-
-/* User Cell */
-.userCell {
-  text-align: left !important;
-  font-weight: 500;
-}
-
-.userInfo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.username {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.topRankBadge {
-  background: linear-gradient(135deg, #FFD700, #FFA500);
-  color: #8B4513;
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* Score Cell */
-.scoreCell {
-  font-weight: 700;
-  font-size: 1.1rem;
-  background: var(--bg-secondary);
-}
-
-.totalScore {
-  color: var(--primary-color);
-}
-
-/* Problem Cells */
-.problemCell {
-  position: relative;
-  padding: 8px 4px;
-}
-
+/* Problem Cells Specific Styles */
 .problemScore {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 8px 4px;
+  padding: 8px 0px;
   border-radius: 6px;
-  min-height: 40px;
+  min-height: 30px;
   justify-content: center;
+  font-size: 0.9rem;
 }
 
 .problemScore.solved {
   background: #e8f5e8;
   color: #2e7d32;
-  border: 1px solid #80c783;
+  border: 1px solid #c8e6c9;
 }
 
 .problemScore.partial {
   background: #fff3e0;
   color: #f57c00;
-  border: 1px solid #ffcc02;
+  border: 1px solid #ffe0b2;
 }
 
 .score {
@@ -382,6 +94,17 @@
 }
 
 .noAttempt {
+  /* Make no-attempt cells have the same dimensions and layout as score cells */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0px;
+  border-radius: 6px;
+  min-height: 30px;
+  font-size: 0.9rem;
+
+  /* Original styles */
   color: var(--text-secondary);
   font-weight: 500;
   opacity: 0.6;
@@ -389,120 +112,11 @@
 
 .refreshInfo {
   text-align: right;
+  margin-bottom: 1rem;
 }
 
 .refreshInfo p {
   color: var(--text-secondary);
-  margin: 0 0 10px 0;
+  margin: 0;
   font-size: 0.9rem;
-}
-
-/* Responsive Design */
-@media (max-width: 1200px) {
-  .container {
-    padding: 15px;
-  }
-  
-  .scoreboardTable {
-    font-size: 0.8rem;
-  }
-  
-  .problemHeader {
-    width: 100px;
-    min-width: 80px;
-  }
-  
-  .userHeader {
-    min-width: 120px;
-  }
-}
-
-@media (max-width: 768px) {
-  .container {
-    padding: 10px;
-  }
-  
-  .header,
-  .scoreboardContainer {
-    padding: 20px;
-  }
-  
-  .title {
-    font-size: 1.6rem;
-  }
-  
-  .headerTop {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  
-  .titleSection {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  
-  .contestInfo {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .infoCards {
-    justify-content: space-around;
-  }
-  
-  .scoreboardTable {
-    font-size: 0.75rem;
-  }
-  
-  .scoreboardTable th,
-  .scoreboardTable td {
-    padding: 8px 4px;
-  }
-  
-  .problemHeader {
-    width: 80px;
-    min-width: 60px;
-    padding: 8px 4px;
-  }
-  
-  .problemTitle {
-    display: none;
-  }
-  
-  .userHeader {
-    min-width: 100px;
-  }
-  
-  .topRankBadge {
-    display: none;
-  }
-  
-  .refreshInfo {
-    text-align: center;
-  }
-}
-
-@media (max-width: 480px) {
-  .scoreboardTable {
-    font-size: 0.7rem;
-  }
-  
-  .problemLetter {
-    font-size: 0.9rem;
-  }
-  
-  .score {
-    font-size: 0.85rem;
-  }
-  
-  .attempts {
-    font-size: 0.6rem;
-  }
-  
-  .problemScore {
-    min-height: 30px;
-    padding: 4px 2px;
-  }
 } 
