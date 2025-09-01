@@ -1,0 +1,81 @@
+.contestNav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2rem;
+  height: 60px;
+  background-color: var(--primary-dark); /* A distinct color */
+  color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 999;
+}
+
+.navLeft, .navCenter, .navRight {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.contestBrand {
+  font-size: 1.2rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.navLink {
+  color: #e0e0e0;
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.navLink:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.activeLink {
+  composes: navLink;
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.exitButton {
+  background-color: #ffc107;
+  color: #212529;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s ease;
+}
+
+.exitButton:hover {
+  background-color: #ffca2c;
+}
+
+.username {
+  font-weight: 500;
+  color: #e0e0e0;
+}
+
+.logoutButton {
+  background: none;
+  border: 1px solid #ffc107;
+  color: #ffc107;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.logoutButton:hover {
+  background-color: #ffc107;
+  color: #212529;
+} 
