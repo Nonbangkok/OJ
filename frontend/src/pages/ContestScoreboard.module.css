@@ -361,7 +361,7 @@
 .problemScore.solved {
   background: #e8f5e8;
   color: #2e7d32;
-  border: 1px solid #c8e6c9;
+  border: 1px solid #80c783;
 }
 
 .problemScore.partial {
@@ -387,61 +387,6 @@
   opacity: 0.6;
 }
 
-/* Footer */
-.footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  padding: 25px;
-  gap: 30px;
-  flex-wrap: wrap;
-}
-
-.legend h4 {
-  color: var(--text-primary);
-  margin: 0 0 15px 0;
-  font-size: 1.1rem;
-}
-
-.legendItems {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-.legendItem {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-}
-
-.legendBox {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  border: 1px solid;
-}
-
-.legendBox.solved {
-  background: #e8f5e8;
-  border-color: #c8e6c9;
-}
-
-.legendBox.partial {
-  background: #fff3e0;
-  border-color: #ffcc02;
-}
-
-.legendBox.noAttempt {
-  background: var(--bg-secondary);
-  border-color: var(--border-color);
-}
-
 .refreshInfo {
   text-align: right;
 }
@@ -450,23 +395,6 @@
   color: var(--text-secondary);
   margin: 0 0 10px 0;
   font-size: 0.9rem;
-}
-
-.refreshBtn {
-  background: var(--primary-color);
-  color: white;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.refreshBtn:hover {
-  background: var(--primary-dark);
-  transform: translateY(-2px);
 }
 
 /* Responsive Design */
@@ -495,8 +423,7 @@
   }
   
   .header,
-  .scoreboardContainer,
-  .footer {
+  .scoreboardContainer {
     padding: 20px;
   }
   
@@ -550,15 +477,6 @@
   
   .topRankBadge {
     display: none;
-  }
-  
-  .footer {
-    flex-direction: column;
-    gap: 20px;
-  }
-  
-  .legendItems {
-    gap: 15px;
   }
   
   .refreshInfo {
