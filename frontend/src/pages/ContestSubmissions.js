@@ -135,34 +135,7 @@ function ContestSubmissions() {
 
   return (
     <div className={styles['submissions-container']}>
-      {/* Contest Header */}
-      {contest && (
-        <div className={styles['contest-header']}>
-          <div className={styles['header-top']}>
-            <Link to={`/contests/${contestId}`} className={styles['back-link']}>
-              ← Back to Contest
-            </Link>
-            <Link 
-              to={`/contests/${contestId}/scoreboard`}
-              className={styles['scoreboard-link']}
-            >
-              View Rankings
-            </Link>
-          </div>
-          
-          <div className={styles['contest-info']}>
-            <h1>📤 Submissions - {contest.title}</h1>
-            <div className={styles['contest-meta']}>
-              <span className={`${styles['status-badge']} ${styles[contest.status]}`}>
-                {contest.status === 'running' ? 'Running' :
-                contest.status === 'scheduled' ? 'Scheduled' :
-                contest.status === 'finished' ? 'Finished' : contest.status}
-              </span>
-              <span>Participants: {contest.participant_count || 0} people</span>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Submissions Header */}
       <div className={styles['submissions-header']}>
@@ -197,51 +170,36 @@ function ContestSubmissions() {
           <table className="table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Submitted By</th>
+                <th>#</th>
+                <th>When</th>
+                <th>User</th>
                 <th>Problem</th>
-                <th>Language</th>
                 <th>Status</th>
                 <th>Score</th>
-                <th>Submit Time</th>
+                <th>Language</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {submissions.map((submission) => (
                 <tr key={submission.id}>
-                  <td>#{submission.id}</td>
+                  <td>{submission.id}</td>
+                  <td>{formatDateTime(submission.submitted_at)}</td>
+                  <td>{submission.username}</td>
                   <td>
-                    <span className={styles['username']}>
-                      {submission.username}
-                    </span>
+                    <Link to={`/problems/${submission.problem_id}`} state={{ contestId: contestId }}>
+                      {submission.problem_title}
+                    </Link>
                   </td>
-                  <td>
-                    <div className={styles['problem-info']}>
-                      <span className={styles['problem-id']}>{submission.problem_id}</span>
-                      <span className={styles['problem-title']}>{submission.problem_title}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={styles['language-badge']}>
-                      {submission.language.toUpperCase()}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`status ${getStatusClass(submission.overall_status)}`}>
-                      {submission.overall_status}
-                    </span>
+                  <td className={getStatusClass(submission.overall_status)}>
+                    {submission.overall_status}
                   </td>
                   <td>
                     <span className={styles['score']}>
                       {submission.score !== undefined ? `${submission.score}/100` : 'N/A'}
                     </span>
                   </td>
-                  <td>
-                    <span className={styles['submit-time']}>
-                      {formatDateTime(submission.submitted_at)}
-                    </span>
-                  </td>
+                  <td>{submission.language}</td>
                   <td>
                     {canViewCode(submission) ? (
                       <button
@@ -249,13 +207,9 @@ function ContestSubmissions() {
                         className={styles['view-code-btn']}
                         title="View Code"
                       >
-                        👁️ Code
+                        View Code
                       </button>
-                    ) : (
-                      <span className={styles['no-access']}>
-                        🔒
-                      </span>
-                    )}
+                    ) : null}
                   </td>
                 </tr>
               ))}
@@ -272,20 +226,6 @@ function ContestSubmissions() {
         />
       )}
 
-      {/* Footer Info */}
-      <div className={styles['submissions-footer']}>
-        <div className={styles['info-text']}>
-          <p>
-            {filter === 'all' ? 
-              'Admin and Staff can view code for all submissions' : 
-              'You can only view code for your own submissions'
-            }
-          </p>
-          {contest?.status === 'running' && (
-            <p>Submissions auto-update every 2.5 seconds</p>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
