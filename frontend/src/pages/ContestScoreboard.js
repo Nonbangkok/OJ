@@ -147,15 +147,17 @@ function ContestScoreboard() {
         </div>
       ) : (
         <div className="table-container">
-          <table className="table">
+          <table className={`table ${styles.scoreboardTable}`}>
             <thead>
               <tr>
                 <th>Rank</th>
                 <th>Participant</th>
                 <th>Total Score</th>
-                {problems.map((problem, index) => (
+                {problems.map((problem) => (
                   <th key={problem.problem_id}>
-                    <div style={{ fontSize: '0.8em', color: '#888' }}>{problem.problem_id}</div>
+                    <div className={styles.problemHeader}>
+                      <div className={styles.problemId}>{problem.problem_id}</div>
+                    </div>
                   </th>
                 ))}
               </tr>
