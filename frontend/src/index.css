@@ -7,6 +7,7 @@
   --background-primary: #ffffff;
   --background-secondary: #f8f9fa;
   --background-tertiary: #e9ecef;
+  --navbar-slider-background: #e9ecef; /* Custom for light mode */
   
   --text-primary: #212529;
   --text-secondary: #495057;
@@ -30,6 +31,7 @@
   --background-primary: #121212;
   --background-secondary: #1e1e1e;
   --background-tertiary: #2a2a2a;
+  --navbar-slider-background: #424242; /* Custom for dark mode */
 
   --text-primary: #e0e0e0;
   --text-secondary: #a0a0a0;
