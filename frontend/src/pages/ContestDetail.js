@@ -147,15 +147,7 @@ function ContestDetail() {
     <div className={styles.container}>
       {/* Contest Header */}
       <div className={styles.contestHeader}>
-        <div className={styles.headerTop}>
-          <Link to="/contests" className={styles.backLink}>
-            ← All Contests
-          </Link>
-          <Link to={`/contests/${contestId}/scoreboard`} className={styles.scoreboardLink}>
-            View Rankings
-          </Link>
-        </div>
-        
+
         <div className={styles.titleSection}>
           <h1 className={styles.contestTitle}>{contest.title}</h1>
           {getStatusBadge(contest.status)}
@@ -177,7 +169,7 @@ function ContestDetail() {
           </div>
           
           <div className={styles.infoCard}>
-            <div className={styles.infoLabel}>🏁 End Time</div>
+            <div className={styles.infoLabel}>End Time</div>
             <div className={styles.infoValue}>{formatDateTime(contest.end_time)}</div>
           </div>
           
