@@ -30,20 +30,20 @@ function ContestNavbar() {
   const { contestId } = useParams();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [contestTitle, setContestTitle] = useState('Contest');
+  const [contest, setContest] = useState(null);
 
   useEffect(() => {
-    const fetchContestTitle = async () => {
+    const fetchContestDetails = async () => {
       try {
         const response = await axios.get(`${API_URL}/contests/${contestId}`, { withCredentials: true });
-        setContestTitle(response.data.title);
+        setContest(response.data);
       } catch (error) {
-        console.error("Failed to fetch contest title", error);
+        console.error("Failed to fetch contest details", error);
       }
     };
 
     if (contestId) {
-      fetchContestTitle();
+      fetchContestDetails();
     }
   }, [contestId]);
 
@@ -65,17 +65,21 @@ function ContestNavbar() {
             <ArrowLeftIcon />
           </button>
           <NavLink to={`/contests/${contestId}`} className={styles['nav-brand']}>
-            {contestTitle}
+            {contest?.title}
           </NavLink>
         </div>
         
         <ul className={styles['nav-links']}>
-          <li>
-            <NavLink to={`/contests/${contestId}/problems`}>Problems</NavLink>
-          </li>
-          <li>
-            <NavLink to={`/contests/${contestId}/submissions`}>Submissions</NavLink>
-          </li>
+          {contest && contest.status !== 'finished' && (
+            <>
+              <li>
+                <NavLink to={`/contests/${contestId}/problems`}>Problems</NavLink>
+              </li>
+              <li>
+                <NavLink to={`/contests/${contestId}/submissions`}>Submissions</NavLink>
+              </li>
+            </>
+          )}
           <li>
             <NavLink to={`/contests/${contestId}/scoreboard`}>Scoreboard</NavLink>
           </li>
