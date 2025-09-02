@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import { useAuth } from '../context/AuthContext';
 import styles from './ContestDetail.module.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
 function ContestDetail() {
   const { contestId } = useParams();
-  
-  const { user } = useAuth();
-  const navigate = useNavigate();
   
   const [contest, setContest] = useState(null);
   const [loading, setLoading] = useState(true);
