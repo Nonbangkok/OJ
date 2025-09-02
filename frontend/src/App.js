@@ -7,6 +7,7 @@ import './App.css';
 // Components
 import Navbar from './components/Navbar';
 import ContestLayout from './components/ContestLayout';
+import AdminLayout from './components/AdminLayout';
 
 // Pages
 import Home from './pages/Home';
@@ -24,6 +25,12 @@ import ContestSubmissions from './pages/ContestSubmissions';
 import ContestScoreboard from './pages/ContestScoreboard';
 import { SettingsProvider } from './context/SettingsContext';
 
+// Admin Pages
+import UserManagement from './components/admin/UserManagement';
+import ProblemManagement from './components/admin/ProblemManagement';
+import ContestManagement from './components/admin/ContestManagement';
+import RegistrationSettings from './components/admin/RegistrationSettings';
+
 // New layout for standard pages
 const MainLayout = () => (
   <main className="container">
@@ -39,10 +46,12 @@ const Layout = () => {
   // This ensures that we match URLs like `/contests/123` or `/contests/some-id/problems`
   // but explicitly NOT `/contests` or `/contests/`.
   const isContestPage = /^\/contests\/[^/]+/.test(location.pathname);
+  const isAdminPage = /^\/admin/.test(location.pathname);
+
 
   return (
     <div className="App">
-      {isContestPage ? null : <Navbar />}
+      {isContestPage || isAdminPage ? null : <Navbar />}
       {/* Remove the main container from here */}
       <Routes>
         {/* Standard routes wrapped in MainLayout */}
@@ -55,10 +64,18 @@ const Layout = () => {
           <Route path="/submissions" element={<Submissions />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/admin" element={<Admin />} />
           <Route path="/contests" element={<Contests />} />
         </Route>
         
+        {/* Admin routes with their own layout */}
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<Admin />} />
+          <Route path="users" element={<UserManagement />} />
+          <Route path="problems" element={<ProblemManagement />} />
+          <Route path="contests" element={<ContestManagement />} />
+          <Route path="settings" element={<RegistrationSettings />} />
+        </Route>
+
         {/* Contest routes with their own self-contained layout */}
         <Route path="/contests/:contestId" element={<ContestLayout />}>
           <Route index element={<ContestDetail />} />
