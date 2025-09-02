@@ -84,7 +84,7 @@ function ContestNavbar() {
         <div className={styles['nav-actions']}>
           {user && (
             <span className={styles.username}>
-              {user.username} ({user.role})
+              {user.username}
             </span>
           )}
           {/* The Exit Contest button has been moved to the left as an icon */}
