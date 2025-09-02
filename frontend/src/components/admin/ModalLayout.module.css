@@ -205,8 +205,7 @@ fieldset {
 }
 
 .migrationProblemItem.selected {
-  background: #e3f2fd;
-  border-color: #1976d2; /* This might need adjustment depending on how border is applied */
+  background: var(--migrationProblemItem-background);
 }
 
 .migrationProblemDetails {
@@ -232,12 +231,47 @@ fieldset {
 
 .migrationProblemCheckboxContainer {
   margin-left: 12px;
+  /* Add for custom checkbox alignment */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .migrationProblemCheckbox {
-  width: 16px;
-  height: 16px;
+  
+  /* Dimensions of the custom checkbox */
+  width: 20px;
+  height: 20px;
+  
+  /* Style of the custom checkbox (unchecked) */
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--background-primary);
   cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.migrationProblemCheckbox:hover {
+  border-color: var(--accent-primary);
+}
+
+.migrationProblemCheckbox:checked {
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+/* Create the checkmark using a pseudo-element */
+.migrationProblemCheckbox:checked::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 5px;
+  width: 6px;
+  height: 12px;
+  border: solid white;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
 }
 
 .migrationControls {
