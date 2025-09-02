@@ -169,7 +169,6 @@ function ContestSubmissions() {
           <table className="table">
             <thead>
               <tr>
-                <th>#</th>
                 <th>When</th>
                 <th>User</th>
                 <th>Problem</th>
@@ -182,7 +181,6 @@ function ContestSubmissions() {
             <tbody>
               {submissions.map((submission) => (
                 <tr key={submission.id}>
-                  <td>{submission.id}</td>
                   <td>{formatDateTime(submission.submitted_at)}</td>
                   <td>{submission.username}</td>
                   <td>
