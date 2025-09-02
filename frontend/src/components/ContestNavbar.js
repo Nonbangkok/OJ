@@ -3,8 +3,28 @@ import { NavLink, useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import styles from './ContestNavbar.module.css';
 import { useAuth } from '../context/AuthContext';
+import ThemeToggleButton from './ThemeToggleButton';
 
 const API_URL = process.env.REACT_APP_API_URL;
+
+// A simple, self-contained SVG icon component for the back arrow
+const ArrowLeftIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <line x1="19" y1="12" x2="5" y2="12"></line>
+    <polyline points="12 19 5 12 12 5"></polyline>
+  </svg>
+);
 
 function ContestNavbar() {
   const { contestId } = useParams();
@@ -15,13 +35,10 @@ function ContestNavbar() {
   useEffect(() => {
     const fetchContestTitle = async () => {
       try {
-        // We only need the title, so a lightweight API endpoint would be ideal,
-        // but for now, we can use the main contest detail endpoint.
         const response = await axios.get(`${API_URL}/contests/${contestId}`, { withCredentials: true });
         setContestTitle(response.data.title);
       } catch (error) {
         console.error("Failed to fetch contest title", error);
-        // Keep default title on error
       }
     };
 
@@ -31,37 +48,53 @@ function ContestNavbar() {
   }, [contestId]);
 
   const handleExit = () => {
-    navigate('/contests'); // Navigate back to the main contests list
+    navigate('/contests');
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
   };
 
   return (
-    <nav className={styles.contestNav}>
-      <div className={styles.navLeft}>
-        <span className={styles.contestBrand}>
-          {contestTitle}
-        </span>
-      </div>
-      <div className={styles.navCenter}>
-        <NavLink to={`/contests/${contestId}/problems`} className={({ isActive }) => isActive ? styles.activeLink : styles.navLink}>
-          Problems
-        </NavLink>
-        <NavLink to={`/contests/${contestId}/submissions`} className={({ isActive }) => isActive ? styles.activeLink : styles.navLink}>
-          Submissions
-        </NavLink>
-        <NavLink to={`/contests/${contestId}/scoreboard`} className={({ isActive }) => isActive ? styles.activeLink : styles.navLink}>
-          Scoreboard
-        </NavLink>
-      </div>
-      <div className={styles.navRight}>
-        <button onClick={handleExit} className={styles.exitButton}>
-          Exit Contest
-        </button>
-        {user && (
-          <>
-            <span className={styles.username}>{user.username} ({user.role})</span>
-            <button onClick={logout} className={styles.logoutButton}>Logout</button>
-          </>
-        )}
+    <nav className={styles.navbar}>
+      <div className={styles.effectHolder}></div>
+      <div className={styles['navbar-container']}>
+        <div className={styles['nav-left']}>
+          <button onClick={handleExit} className={styles['back-btn']} title="Exit Contest">
+            <ArrowLeftIcon />
+          </button>
+          <NavLink to={`/contests/${contestId}`} className={styles['nav-brand']}>
+            {contestTitle}
+          </NavLink>
+        </div>
+        
+        <ul className={styles['nav-links']}>
+          <li>
+            <NavLink to={`/contests/${contestId}/problems`}>Problems</NavLink>
+          </li>
+          <li>
+            <NavLink to={`/contests/${contestId}/submissions`}>Submissions</NavLink>
+          </li>
+          <li>
+            <NavLink to={`/contests/${contestId}/scoreboard`}>Scoreboard</NavLink>
+          </li>
+        </ul>
+        
+        <div className={styles['nav-actions']}>
+          {user && (
+            <span className={styles.username}>
+              {user.username} ({user.role})
+            </span>
+          )}
+          {/* The Exit Contest button has been moved to the left as an icon */}
+          {user && (
+            <button onClick={handleLogout} className={styles['logout-btn']}>
+              Logout
+            </button>
+          )}
+          <ThemeToggleButton />
+        </div>
       </div>
     </nav>
   );
