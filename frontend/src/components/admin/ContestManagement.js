@@ -95,7 +95,7 @@ function ContestManagement({ currentUser }) {
   };
 
   const formatDateTime = (dateTime) => {
-    return new Date(dateTime).toLocaleString('th-TH', {
+    return new Date(dateTime).toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
