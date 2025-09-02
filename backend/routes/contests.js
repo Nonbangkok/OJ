@@ -562,24 +562,63 @@ router.get('/:id/problems', requireAuth, async (req, res) => {
       return res.json([]); // Return empty array for scheduled contests
     }
     
-    // Get problems in this contest
+    // Base query with CTEs to get user's submission stats for this contest
+    const baseQuery = `
+      WITH RankedSubmissions AS (
+        SELECT
+          cs.id, cs.user_id, cs.problem_id, cs.score, cs.overall_status,
+          cs.results, cs.submitted_at,
+          ROW_NUMBER() OVER(PARTITION BY cs.user_id, cs.problem_id ORDER BY cs.score DESC, cs.id DESC) as rn_best,
+          ROW_NUMBER() OVER(PARTITION BY cs.user_id, cs.problem_id ORDER BY cs.id DESC) as rn_latest
+        FROM contest_submissions cs
+        WHERE cs.user_id = $1 AND cs.contest_id = $2
+      ),
+      UserProblemStats AS (
+        SELECT
+          problem_id,
+          MAX(score) AS best_score,
+          COUNT(*) AS submission_count
+        FROM contest_submissions
+        WHERE user_id = $1 AND contest_id = $2
+        GROUP BY problem_id
+      )
+    `;
+    
     let problemsResult;
     if (contest.status === 'finished') {
-      // For finished contests, get problems from contest_problems snapshot
-      problemsResult = await db.query(`
-        SELECT problem_id as id, title, author, time_limit_ms, memory_limit_mb
-        FROM contest_problems 
-        WHERE contest_id = $1
-        ORDER BY problem_id
-      `, [id]);
+      // For finished contests, get problems from contest_problems snapshot and join with stats
+      problemsResult = await db.query(baseQuery + `
+        SELECT
+          cp.problem_id as id, cp.title, cp.author,
+          ups.best_score, ups.submission_count,
+          latest.submitted_at AS latest_submission_at,
+          latest.overall_status AS latest_submission_status,
+          best.overall_status AS best_submission_status,
+          best.results AS best_submission_results
+        FROM contest_problems cp
+        LEFT JOIN UserProblemStats ups ON cp.problem_id = ups.problem_id
+        LEFT JOIN RankedSubmissions latest ON cp.problem_id = latest.problem_id AND latest.rn_latest = 1
+        LEFT JOIN RankedSubmissions best ON cp.problem_id = best.problem_id AND best.rn_best = 1
+        WHERE cp.contest_id = $2
+        ORDER BY cp.problem_id
+      `, [userId, id]);
     } else {
-      // For running/finishing contests, get problems from problems table
-      problemsResult = await db.query(`
-        SELECT id, title, author, time_limit_ms, memory_limit_mb
-        FROM problems 
-        WHERE contest_id = $1
-        ORDER BY id
-      `, [id]);
+      // For running/finishing contests, get problems from problems table and join with stats
+      problemsResult = await db.query(baseQuery + `
+        SELECT
+          p.id, p.title, p.author, p.time_limit_ms, p.memory_limit_mb,
+          ups.best_score, ups.submission_count,
+          latest.submitted_at AS latest_submission_at,
+          latest.overall_status AS latest_submission_status,
+          best.overall_status AS best_submission_status,
+          best.results AS best_submission_results
+        FROM problems p
+        LEFT JOIN UserProblemStats ups ON p.id = ups.problem_id
+        LEFT JOIN RankedSubmissions latest ON p.id = latest.problem_id AND latest.rn_latest = 1
+        LEFT JOIN RankedSubmissions best ON p.id = best.problem_id AND best.rn_best = 1
+        WHERE p.contest_id = $2
+        ORDER BY p.id
+      `, [userId, id]);
     }
     
     res.json(problemsResult.rows);
@@ -588,5 +627,112 @@ router.get('/:id/problems', requireAuth, async (req, res) => {
     res.status(500).json({ message: 'Error fetching contest problems' });
   }
 });
+
+// GET /api/contests/:id/problems/:problemId - Get a single contest problem
+router.get('/:id/problems/:problemId', requireAuth, async (req, res) => {
+  const { id: contestId, problemId } = req.params;
+  const { userId } = req.session;
+
+  try {
+    // 1. Check contest status and user participation
+    const contestRes = await db.query('SELECT status FROM contests WHERE id = $1', [contestId]);
+    if (contestRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Contest not found.' });
+    }
+    const contestStatus = contestRes.rows[0].status;
+
+    if (!['running', 'finishing', 'finished'].includes(contestStatus)) {
+      return res.status(403).json({ message: 'Contest is not active.' });
+    }
+
+    const participantRes = await db.query(
+      'SELECT 1 FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
+      [contestId, userId]
+    );
+    if (participantRes.rows.length === 0) {
+      return res.status(403).json({ message: 'You are not a participant in this contest.' });
+    }
+
+    // 2. Fetch problem details based on contest status
+    let problemRes;
+    if (contestStatus === 'finished') {
+      // For finished contests, get data from the snapshot
+      problemRes = await db.query(
+        'SELECT problem_id as id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf FROM contest_problems WHERE contest_id = $1 AND problem_id = $2',
+        [contestId, problemId]
+      );
+    } else {
+      // For running contests, get data from the main problems table
+      problemRes = await db.query(
+        'SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf FROM problems WHERE id = $1 AND contest_id = $2',
+        [problemId, contestId]
+      );
+    }
+
+    if (problemRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Problem not found in this contest.' });
+    }
+
+    res.json(problemRes.rows[0]);
+
+  } catch (error) {
+    console.error(`Error fetching contest problem ${problemId} for contest ${contestId}:`, error);
+    res.status(500).json({ message: 'Error fetching problem details.' });
+  }
+});
+
+// GET /api/contests/:id/problems/:problemId/pdf - Get a single contest problem's PDF
+router.get('/:id/problems/:problemId/pdf', requireAuth, async (req, res) => {
+  const { id: contestId, problemId } = req.params;
+  const { userId } = req.session;
+
+  try {
+    // 1. Check contest status and user participation (similar to getting problem details)
+    const contestRes = await db.query('SELECT status FROM contests WHERE id = $1', [contestId]);
+    if (contestRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Contest not found.' });
+    }
+    const contestStatus = contestRes.rows[0].status;
+
+    if (!['running', 'finishing', 'finished'].includes(contestStatus)) {
+      return res.status(403).json({ message: 'Contest is not active.' });
+    }
+
+    const participantRes = await db.query(
+      'SELECT 1 FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
+      [contestId, userId]
+    );
+    if (participantRes.rows.length === 0) {
+      return res.status(403).json({ message: 'You are not a participant in this contest.' });
+    }
+
+    // 2. Fetch the PDF data based on contest status
+    let pdfRes;
+    if (contestStatus === 'finished') {
+      pdfRes = await db.query(
+        'SELECT problem_pdf FROM contest_problems WHERE contest_id = $1 AND problem_id = $2',
+        [contestId, problemId]
+      );
+    } else {
+      pdfRes = await db.query(
+        'SELECT problem_pdf FROM problems WHERE id = $1 AND contest_id = $2',
+        [problemId, contestId]
+      );
+    }
+    
+    if (pdfRes.rows.length === 0 || !pdfRes.rows[0].problem_pdf) {
+      return res.status(404).json({ message: 'Problem PDF not found.' });
+    }
+    
+    const pdfData = pdfRes.rows[0].problem_pdf;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.send(pdfData);
+
+  } catch (error) {
+    console.error(`Error fetching PDF for contest problem ${problemId}:`, error);
+    res.status(500).json({ message: 'Error fetching PDF.' });
+  }
+});
+
 
 module.exports = router; 
