@@ -117,19 +117,20 @@
 }
 
 /* Buttons */
-.logout-btn { /* Combined styles */
-  padding: 0.5rem 1rem;
+.logout-btn {
+  background-color: transparent;
   border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background-color: var(--background-primary);
   color: var(--text-primary);
-  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  font-weight: 500;
+  font-family: var(--font-family-sans-serif);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .logout-btn:hover {
-  background-color: var(--background-tertiary);
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
+  background-color: var(--status-danger);
+  border-color: var(--status-danger);
+  color: #fff;
 } 
