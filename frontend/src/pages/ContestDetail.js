@@ -94,11 +94,14 @@ function ContestDetail() {
     const diff = end - now;
     
     if (diff <= 0) return 'Finished';
-    
-    const hours = Math.floor(diff / (1000 * 60 * 60));
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (hours > 0) {
+
+    if (days > 0) {
+      return `${days}d ${hours}h ${minutes}m remaining`;
+    } else if (hours > 0) {
       return `${hours}h ${minutes}m remaining`;
     } else {
       return `${minutes}m remaining`;
