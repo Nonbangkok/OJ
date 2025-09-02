@@ -68,6 +68,7 @@
   }
   
   .nav-links {
+    position: relative; /* Needed for slider positioning */
     display: flex;
     align-items: center;
     list-style: none;
@@ -79,6 +80,11 @@
     left: 50%;
     transform: translateX(-50%);
   }
+
+  .nav-links li {
+    position: relative;
+    z-index: 2;
+  }
   
   .nav-links a {
     color: var(--text-secondary);
@@ -89,6 +95,18 @@
   
   .nav-links a:hover {
     color: var(--text-primary);
+  }
+
+  .slider {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 32px;
+    background-color: var(--navbar-slider-background);
+    border-radius: 6px;
+    z-index: 1;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   }
   
   .nav-actions {

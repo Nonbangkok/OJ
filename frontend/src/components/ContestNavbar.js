@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { NavLink, useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { NavLink, useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import styles from './ContestNavbar.module.css';
 import { useAuth } from '../context/AuthContext';
@@ -29,8 +29,11 @@ const ArrowLeftIcon = () => (
 function ContestNavbar() {
   const { contestId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
   const [contest, setContest] = useState(null);
+  const navRef = useRef(null);
+  const [sliderStyle, setSliderStyle] = useState({ opacity: 0 });
 
   useEffect(() => {
     const fetchContestDetails = async () => {
@@ -56,6 +59,40 @@ function ContestNavbar() {
     navigate('/');
   };
 
+  const handleMouseEnter = (e) => {
+    const li = e.currentTarget;
+    setSliderStyle({
+      width: li.offsetWidth + 20,
+      left: li.offsetLeft - 10,
+      opacity: 1,
+    });
+  };
+
+  const resetSlider = () => {
+    try {
+      const activeLink = navRef.current?.querySelector('a.active');
+      if (activeLink && activeLink.parentElement) {
+        const activeLi = activeLink.parentElement;
+        setSliderStyle({
+          width: activeLi.offsetWidth + 20,
+          left: activeLi.offsetLeft - 10,
+          opacity: 1,
+        });
+      } else {
+        setSliderStyle({ ...sliderStyle, opacity: 0 });
+      }
+    } catch (e) {
+      setSliderStyle({ opacity: 0 });
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      resetSlider();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [location.pathname, user, contest]); // Re-calculate on path, user or contest change
+
   return (
     <nav className={styles.navbar}>
       <div className={styles.effectHolder}></div>
@@ -69,18 +106,19 @@ function ContestNavbar() {
           </NavLink>
         </div>
         
-        <ul className={styles['nav-links']}>
+        <ul ref={navRef} className={styles['nav-links']} onMouseLeave={resetSlider}>
+          <div className={styles.slider} style={sliderStyle} />
           {contest && contest.status !== 'finished' && (
             <>
-              <li>
+              <li onMouseEnter={handleMouseEnter}>
                 <NavLink to={`/contests/${contestId}/problems`}>Problems</NavLink>
               </li>
-              <li>
+              <li onMouseEnter={handleMouseEnter}>
                 <NavLink to={`/contests/${contestId}/submissions`}>Submissions</NavLink>
               </li>
             </>
           )}
-          <li>
+          <li onMouseEnter={handleMouseEnter}>
             <NavLink to={`/contests/${contestId}/scoreboard`}>Scoreboard</NavLink>
           </li>
         </ul>

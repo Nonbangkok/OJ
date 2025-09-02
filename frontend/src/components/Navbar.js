@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import ThemeToggleButton from './ThemeToggleButton';
@@ -9,6 +9,9 @@ const Navbar = () => {
   const { user, logout } = useAuth();
   const { registrationEnabled } = useSettings();
   const navigate = useNavigate();
+  const location = useLocation();
+  const navRef = useRef(null);
+  const [sliderStyle, setSliderStyle] = useState({ opacity: 0 });
 
   const handleLogout = () => {
     try {
@@ -19,20 +22,57 @@ const Navbar = () => {
     }
   };
 
+  const handleMouseEnter = (e) => {
+    const li = e.currentTarget;
+    setSliderStyle({
+      width: li.offsetWidth + 20,
+      left: li.offsetLeft - 10,
+      opacity: 1,
+    });
+  };
+
+  const resetSlider = () => {
+    try {
+      const activeLink = navRef.current?.querySelector('a.active');
+      if (activeLink && activeLink.parentElement) {
+        const activeLi = activeLink.parentElement;
+        setSliderStyle({
+          width: activeLi.offsetWidth + 20,
+          left: activeLi.offsetLeft - 10,
+          opacity: 1,
+        });
+      } else {
+        setSliderStyle({ ...sliderStyle, opacity: 0 });
+      }
+    } catch (e) {
+      // Catch potential errors if navRef.current is not available
+      setSliderStyle({ opacity: 0 });
+    }
+  };
+
+  useEffect(() => {
+    // Delay to ensure DOM is ready for measurement, especially on initial load
+    const timer = setTimeout(() => {
+      resetSlider();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [location.pathname, user]); // Re-calculate on path or user change
+
   return (
     <nav className={styles.navbar}>
       <div className={styles['navbar-container']}>
         <NavLink to="/" className={styles['nav-brand']}>Online Judge</NavLink>
-        <ul className={styles['nav-links']}>
-          <li><NavLink to="/problems">Problems</NavLink></li>
-          <li><NavLink to="/submissions">Submissions</NavLink></li>
-          <li><NavLink to="/scoreboard">Scoreboard</NavLink></li>
-          <li><NavLink to="/contests">Contests</NavLink></li>
+        <ul ref={navRef} className={styles['nav-links']} onMouseLeave={resetSlider}>
+          <div className={styles.slider} style={sliderStyle} />
+          <li onMouseEnter={handleMouseEnter}><NavLink to="/problems">Problems</NavLink></li>
+          <li onMouseEnter={handleMouseEnter}><NavLink to="/submissions">Submissions</NavLink></li>
+          <li onMouseEnter={handleMouseEnter}><NavLink to="/scoreboard">Scoreboard</NavLink></li>
+          <li onMouseEnter={handleMouseEnter}><NavLink to="/contests">Contests</NavLink></li>
           {user?.role === 'admin' && (
-            <li><NavLink to="/admin">Admin Panel</NavLink></li>
+            <li onMouseEnter={handleMouseEnter}><NavLink to="/admin">Admin Panel</NavLink></li>
           )}
           {user?.role === 'staff' && (
-            <li><NavLink to="/admin">Staff Panel</NavLink></li>
+            <li onMouseEnter={handleMouseEnter}><NavLink to="/admin">Staff Panel</NavLink></li>
           )}
         </ul>
         <div className={styles['nav-actions']}>
