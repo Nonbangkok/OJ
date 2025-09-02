@@ -1,81 +1,135 @@
-.contestNav {
+.navbar {
+  background-color: var(--background-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.75rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: var(--box-shadow);
+}
+
+.navbar-container {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin: 0 auto;
   padding: 0 2rem;
-  height: 60px;
-  background-color: var(--primary-dark); /* A distinct color */
-  color: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  width: 100%;
-  position: sticky;
-  top: 0;
-  z-index: 999;
+  max-height: 2.5rem;
+  position: relative; /* Added to position nav-links relative to this container */
 }
 
-.navLeft, .navCenter, .navRight {
+/* New Nav Left styles */
+.nav-left {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 0.75rem; /* Adjust gap between button and title */
+  min-width: 0; /* Important: Allows the container to shrink and the title to truncate */
 }
 
-.contestBrand {
-  font-size: 1.2rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.navLink {
-  color: #e0e0e0;
-  text-decoration: none;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-weight: 500;
+.back-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border-radius: 50%;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.navLink:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: white;
+.back-btn:hover {
+  background-color: var(--background-tertiary);
+  color: var(--text-primary);
 }
 
-.activeLink {
-  composes: navLink;
-  background-color: var(--primary-color);
-  color: white;
+.back-btn svg {
+  width: 22px;
+  height: 22px;
 }
 
-.exitButton {
-  background-color: #ffc107;
-  color: #212529;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: background-color 0.2s ease;
+
+/* Nav Brand (Contest Title) */
+.nav-brand {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+
+  /* Properties for handling long text */
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.exitButton:hover {
-  background-color: #ffca2c;
+.nav-brand:hover {
+  color: var(--text-primary);
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 1.5rem;
+  /* Center the nav-links and fix their position */
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.nav-links a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.nav-links a:hover {
+  color: var(--text-primary);
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .username {
+  color: var(--text-secondary);
   font-weight: 500;
-  color: #e0e0e0;
 }
 
-.logoutButton {
-  background: none;
-  border: 1px solid #ffc107;
-  color: #ffc107;
-  padding: 8px 16px;
+.nav-action-link {
+  color: var(--text-primary);
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
   border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
-.logoutButton:hover {
-  background-color: #ffc107;
-  color: #212529;
+.nav-action-link:hover {
+  background-color: var(--background-tertiary);
+}
+
+/* Buttons */
+.logout-btn { /* Combined styles */
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--background-primary);
+  color: var(--text-primary);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.logout-btn:hover {
+  background-color: var(--background-tertiary);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
 } 
