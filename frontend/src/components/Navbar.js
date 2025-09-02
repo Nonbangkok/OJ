@@ -28,8 +28,11 @@ const Navbar = () => {
           <li><NavLink to="/contests">Contests</NavLink></li>
           <li><NavLink to="/submissions">Submissions</NavLink></li>
           <li><NavLink to="/scoreboard">Scoreboard</NavLink></li>
-          {(user?.role === 'admin' || user?.role === 'staff') && (
+          {user?.role === 'admin' && (
             <li><NavLink to="/admin">Admin Panel</NavLink></li>
+          )}
+          {user?.role === 'staff' && (
+            <li><NavLink to="/admin">Staff Panel</NavLink></li>
           )}
         </ul>
         <div className={styles['nav-actions']}>
