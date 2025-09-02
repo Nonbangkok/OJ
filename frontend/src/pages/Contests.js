@@ -115,8 +115,7 @@ function Contests() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1>Programming Contests</h1>
-        <p>Join programming contests and compete with other participants</p>
+        <h1>Contests</h1>
       </div>
 
       {error && (
