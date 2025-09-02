@@ -8,7 +8,7 @@ import Submissions from './Submissions';
 const API_URL = process.env.REACT_APP_API_URL;
 
 function ProblemDetail() {
-  const { id, contestId, problemId } = useParams();
+  const { contestId, problemId } = useParams();
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -16,45 +16,45 @@ function ProblemDetail() {
   const [activeView, setActiveView] = useState('statement');
   const [contest, setContest] = useState(null);
 
-  // Use problemId if available (from contest route), otherwise use id
-  const actualProblemId = problemId || id;
-  const pdfEndpointUrl = `${API_URL}/problems/${actualProblemId}/pdf`;
-
   useEffect(() => {
     const fetchProblem = async () => {
       try {
-        const problemPromise = axios.get(`${API_URL}/problems/${actualProblemId}`, { withCredentials: true });
-        const statsPromise = axios.get(`${API_URL}/problems-with-stats`, { withCredentials: true });
-
-        const [problemResponse, statsResponse] = await Promise.all([problemPromise, statsPromise]);
-
-        const problemData = problemResponse.data;
-        const allProblemsWithStats = statsResponse.data;
-        const currentProblemStats = allProblemsWithStats.find(p => String(p.id) === actualProblemId);
-
-        setProblem({ ...problemData, ...currentProblemStats });
-
-        // If this is a contest problem, fetch contest details
+        let url;
+        // Determine the correct API endpoint based on the context (contest or main)
         if (contestId) {
-          try {
-            const contestResponse = await axios.get(`${API_URL}/contests/${contestId}`, { withCredentials: true });
-            setContest(contestResponse.data);
-          } catch (contestErr) {
-            console.error('Error fetching contest details:', contestErr);
-          }
+          url = `${API_URL}/contests/${contestId}/problems/${problemId}`;
+        } else {
+          url = `${API_URL}/problems/${problemId}`;
         }
+        
+        const problemResponse = await axios.get(url, { withCredentials: true });
+        const problemData = problemResponse.data;
+
+        // For non-contest problems, we still fetch all stats to show the user's best score.
+        // For contest problems, the stats are already joined in the backend.
+        if (!contestId) {
+          const statsResponse = await axios.get(`${API_URL}/problems-with-stats`, { withCredentials: true });
+          const allProblemsWithStats = statsResponse.data;
+          const currentProblemStats = allProblemsWithStats.find(p => String(p.id) === problemId);
+          setProblem({ ...problemData, ...currentProblemStats });
+        } else {
+          setProblem(problemData);
+          // Also fetch contest details for the banner
+          const contestResponse = await axios.get(`${API_URL}/contests/${contestId}`, { withCredentials: true });
+          setContest(contestResponse.data);
+        }
+        
       } catch (err) {
         if (err.response?.status === 403 && err.response?.data?.message === 'Problem is hidden') {
-          // Handle hidden problem case
           setHiddenProblemInfo({
             problemId: err.response.data.problemId,
             title: err.response.data.title,
             detail: err.response.data.detail
           });
         } else if (err.response?.status === 404) {
-          setError(`Problem ${actualProblemId} not found.`);
+          setError(`Problem ${problemId} not found.`);
         } else {
-          setError(`Failed to fetch problem ${actualProblemId}.`);
+          setError(err.response?.data?.message || `Failed to fetch problem ${problemId}.`);
         }
         console.error(err);
       } finally {
@@ -62,12 +62,18 @@ function ProblemDetail() {
       }
     };
 
-    fetchProblem();
-  }, [actualProblemId, contestId]);
+    if (problemId) {
+      fetchProblem();
+    }
+  }, [problemId, contestId]);
 
   const handlePdfView = () => {
     if (!problem || !problem.has_pdf) return;
-    window.open(pdfEndpointUrl, '_blank');
+    // For contest PDFs, the backend now checks authorization, so we can link directly.
+    const pdfUrl = contestId 
+      ? `${API_URL}/contests/${contestId}/problems/${problemId}/pdf`
+      : `${API_URL}/problems/${problemId}/pdf`;
+    window.open(pdfUrl, '_blank');
   };
 
   const generateResultString = (status, results) => {
@@ -122,7 +128,11 @@ function ProblemDetail() {
         return (
           <div className={styles['statement-view']}>
             {problem.has_pdf ? (
-              <iframe src={pdfEndpointUrl} title={`${problem.title} PDF`} className={styles['pdf-preview']} />
+              <iframe 
+                src={contestId ? `/api/contests/${contestId}/problems/${problemId}/pdf` : `/api/problems/${problemId}/pdf`}
+                title={`${problem.title} PDF`} 
+                className={styles['pdf-preview']} 
+              />
             ) : (
               <div className={styles['no-pdf-message']}>No PDF available for preview.</div>
             )}
@@ -131,11 +141,12 @@ function ProblemDetail() {
       case 'submit':
         return (
           <div className={styles['submit-view']}>
-            <CodeSubmissionForm problemId={actualProblemId} contestId={contestId} />
+            <CodeSubmissionForm problemId={problemId} contestId={contestId} />
           </div>
         );
       case 'submissions':
-        return <Submissions problemId={actualProblemId} showTitle={false} />;
+        // Pass contestId to submissions component if it exists
+        return <Submissions problemId={problemId} contestId={contestId} showTitle={false} />;
       default:
         return null;
     }
@@ -143,25 +154,6 @@ function ProblemDetail() {
 
   return (
     <div className={styles['problem-detail-container']}>
-      {/* Contest Info Banner */}
-      {contest && (
-        <div className={styles.contestInfo}>
-          <h3>{contest.title}</h3>
-          <div className={styles.contestStatus}>
-            <span className={styles.status}>
-              {contest.status === 'running' ? 'Running' :
-               contest.status === 'scheduled' ? 'Scheduled' :
-               contest.status === 'finished' ? 'Finished' : contest.status}
-            </span>
-          </div>
-          <div className={styles.contestActions}>
-            <Link to={`/contests/${contest.id}/scoreboard`} className={styles.scoreboardLink}>
-              View Rankings
-            </Link>
-          </div>
-        </div>
-      )}
-      
       <div className={styles['content-wrapper']}>
         <div className={styles['left-nav']}>
           <div className={styles['problem-info']}>
