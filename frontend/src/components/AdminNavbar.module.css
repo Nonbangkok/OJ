@@ -1,0 +1,136 @@
+.navbar {
+    background-color: var(--background-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.75rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: var(--box-shadow);
+  }
+  
+  .navbar-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0 auto;
+    padding: 0 2rem;
+    max-height: 2.5rem;
+    position: relative; /* Added to position nav-links relative to this container */
+  }
+  
+  /* New Nav Left styles */
+  .nav-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem; /* Adjust gap between button and title */
+    min-width: 0; /* Important: Allows the container to shrink and the title to truncate */
+  }
+  
+  .back-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    border-radius: 50%;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+  
+  .back-btn:hover {
+    background-color: var(--background-tertiary);
+    color: var(--text-primary);
+  }
+  
+  .back-btn svg {
+    width: 22px;
+    height: 22px;
+  }
+  
+  
+  /* Nav Brand (Contest Title) */
+  .nav-brand {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: color 0.2s ease;
+  
+    /* Properties for handling long text */
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  
+  .nav-brand:hover {
+    color: var(--text-primary);
+  }
+  
+  .nav-links {
+    display: flex;
+    align-items: center;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    gap: 1.5rem;
+    /* Center the nav-links and fix their position */
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  
+  .nav-links a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+  }
+  
+  .nav-links a:hover {
+    color: var(--text-primary);
+  }
+  
+  .nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .username {
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  
+  .nav-action-link {
+    color: var(--text-primary);
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+  
+  .nav-action-link:hover {
+    background-color: var(--background-tertiary);
+  }
+  
+  /* Buttons */
+  .logout-btn {
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    font-family: var(--font-family-sans-serif);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+  
+  .logout-btn:hover {
+    background-color: var(--status-danger);
+    border-color: var(--status-danger);
+    color: #fff;
+  } 
