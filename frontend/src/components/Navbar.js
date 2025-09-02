@@ -38,7 +38,7 @@ const Navbar = () => {
         <div className={styles['nav-actions']}>
           {user ? (
             <>
-              <span className={styles.username}>Welcome, {user?.username}</span>
+              <span className={styles.username}>{user?.username}</span>
               <button onClick={handleLogout} className={styles['logout-btn']}>Logout</button>
             </>
           ) : (
