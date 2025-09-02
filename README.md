@@ -132,7 +132,7 @@ Each problem directory must contain:
 
     *   **Option A: Zip Archive**
         -   A single `.zip` file containing all test case files.
-        -   Input and output files must be paired by number. [[memory:7207157]]
+        -   Input and output files must be paired by number.
         -   Supported naming conventions include: `input1.in`/`output1.out`, `1.in`/`1.out`, `input1.txt`/`output1.txt`, etc. The script intelligently pairs them based on the numbers in the filenames.
 
     *   **Option B: `input`/`output` Subdirectories**
