@@ -134,7 +134,7 @@ function ContestScoreboard() {
   return (
     <div className={styles.container}>
       <h1>Contest Scoreboard</h1>
-      {lastUpdate && (
+      {lastUpdate && contest?.status !== 'finished' && (
         <div className={styles.refreshInfo}>
           <p>Last updated: {formatDateTime(lastUpdate)}</p>
         </div>
