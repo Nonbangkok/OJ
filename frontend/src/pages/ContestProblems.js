@@ -139,7 +139,7 @@ const ContestProblems = () => {
                 )}
               </div>
               
-              <Link to={`/problems/${problem.id}`} className={`${styles['problem-action-btn']} ${hasSubmitted ? styles.edit : styles.new}`}>
+              <Link to={`/contests/${contestId}/problems/${problem.id}`} className={`${styles['problem-action-btn']} ${hasSubmitted ? styles.edit : styles.new}`}>
                 {hasSubmitted ? 'Edit' : 'New'}
               </Link>
             </div>
