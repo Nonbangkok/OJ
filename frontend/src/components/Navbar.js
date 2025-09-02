@@ -25,9 +25,9 @@ const Navbar = () => {
         <NavLink to="/" className={styles['nav-brand']}>Online Judge</NavLink>
         <ul className={styles['nav-links']}>
           <li><NavLink to="/problems">Problems</NavLink></li>
-          <li><NavLink to="/contests">Contests</NavLink></li>
           <li><NavLink to="/submissions">Submissions</NavLink></li>
           <li><NavLink to="/scoreboard">Scoreboard</NavLink></li>
+          <li><NavLink to="/contests">Contests</NavLink></li>
           {user?.role === 'admin' && (
             <li><NavLink to="/admin">Admin Panel</NavLink></li>
           )}
