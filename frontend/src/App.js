@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, Outlet } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import './App.css';
@@ -24,6 +24,13 @@ import ContestSubmissions from './pages/ContestSubmissions';
 import ContestScoreboard from './pages/ContestScoreboard';
 import { SettingsProvider } from './context/SettingsContext';
 
+// New layout for standard pages
+const MainLayout = () => (
+  <main className="container">
+    <Outlet />
+  </main>
+);
+
 // This component will contain the logic for switching navbars
 const Layout = () => {
   const location = useLocation();
@@ -36,27 +43,31 @@ const Layout = () => {
   return (
     <div className="App">
       {isContestPage ? null : <Navbar />}
-      <main className="container">
-        <Routes>
+      {/* Remove the main container from here */}
+      <Routes>
+        {/* Standard routes wrapped in MainLayout */}
+        <Route element={<MainLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/problems" element={<Problems />} />
-          <Route path="/problems/:id" element={<ProblemDetail />} />
+          {/* Note: ProblemDetail is used by both layouts, so we keep it duplicated for now */}
+          <Route path="/problems/:problemId" element={<ProblemDetail />} />
           <Route path="/scoreboard" element={<Scoreboard />} />
           <Route path="/submissions" element={<Submissions />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/contests" element={<Contests />} />
-          
-          {/* Contest routes with ContestLayout */}
-          <Route path="/contests/:contestId" element={<ContestLayout />}>
-            <Route index element={<ContestDetail />} />
-            <Route path="problems" element={<ContestProblems />} />
-            <Route path="submissions" element={<ContestSubmissions />} />
-            <Route path="scoreboard" element={<ContestScoreboard />} />
-          </Route>
-        </Routes>
-      </main>
+        </Route>
+        
+        {/* Contest routes with their own self-contained layout */}
+        <Route path="/contests/:contestId" element={<ContestLayout />}>
+          <Route index element={<ContestDetail />} />
+          <Route path="problems" element={<ContestProblems />} />
+          <Route path="problems/:problemId" element={<ProblemDetail />} />
+          <Route path="submissions" element={<ContestSubmissions />} />
+          <Route path="scoreboard" element={<ContestScoreboard />} />
+        </Route>
+      </Routes>
     </div>
   );
 };
