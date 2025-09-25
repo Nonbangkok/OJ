@@ -3,7 +3,6 @@ import axios from 'axios';
 import ProblemModal from './ProblemModal';
 import ConfirmationModal from './ConfirmationModal';
 import styles from './Management.module.css';
-import ProblemMigrationModal from './ProblemMigrationModal';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -307,12 +306,14 @@ const ProblemManagement = ({ currentUser }) => {
       </div>
        {/* Batch Upload Feedback UI */}
        {batchUploadFeedback.visible && (
-        <div 
-          className={`${styles.feedbackBox} ${styles[batchUploadFeedback.type]}`}
-          onClick={() => setBatchUploadFeedback({ ...batchUploadFeedback, visible: false })} // Click to dismiss
-        >
+        <div className={`${styles.feedbackBox} ${styles[batchUploadFeedback.type]}`}>
           <p>{batchUploadFeedback.message}</p>
-          <button className={styles.closeButton}>&times;</button>
+          <button 
+            className={styles.closeButton}
+            onClick={() => setBatchUploadFeedback({ ...batchUploadFeedback, visible: false })}
+          >
+            &times;
+          </button>
         </div>
       )}
       <div className="table-container">

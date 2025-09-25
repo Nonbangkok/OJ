@@ -256,19 +256,21 @@
 
 /* Feedback Box for Batch Upload */
 .feedbackBox {
-  padding: 15px 20px;
+  padding: 15px 50px 15px 20px;
   margin-bottom: 1.5rem;
   border-radius: 8px;
   border-left-width: 5px;
   border-left-style: solid;
   position: relative;
-  cursor: pointer;
   transition: opacity 0.3s ease;
+  display: flex;
+  align-items: center;
 }
 
 .feedbackBox p {
   margin: 0;
-  padding-right: 25px; /* Space for the close button */
+  flex: 1;
+  padding-right: 10px;
 }
 
 .feedbackBox.info {
@@ -296,13 +298,21 @@
   transform: translateY(-50%);
   background: none;
   border: none;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   line-height: 1;
   color: inherit;
   cursor: pointer;
   opacity: 0.7;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
 }
 
 .closeButton:hover {
   opacity: 1;
+  background-color: rgba(0, 0, 0, 0.1);
 }
