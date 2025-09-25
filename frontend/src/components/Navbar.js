@@ -61,7 +61,7 @@ const Navbar = () => {
   return (
     <nav className={styles.navbar}>
       <div className={styles['navbar-container']}>
-        <NavLink to="/" className={styles['nav-brand']}>Online Judge</NavLink>
+        <NavLink to="/" className={styles['nav-brand']}>WOI Grader</NavLink>
         <ul ref={navRef} className={styles['nav-links']} onMouseLeave={resetSlider}>
           <div className={styles.slider} style={sliderStyle} />
           <li onMouseEnter={handleMouseEnter}><NavLink to="/problems">Problems</NavLink></li>
