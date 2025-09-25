@@ -1,6 +1,6 @@
-# OJ (Online Judge) System
+# Grader System
 
-This is a simple Online Judge system with a React frontend and a Node.js (Express) backend, fully containerized with Docker for easy setup and deployment.
+This is a grader system with a React frontend and a Node.js (Express) backend, fully containerized with Docker for easy setup and deployment.
 
 ## Features
 

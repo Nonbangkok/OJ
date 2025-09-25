@@ -106,6 +106,31 @@ async function processTestcasesFromInputOutputDirs(problemId, inputDir, outputDi
   return processPairedFiles(problemId, testcaseFiles, (filePath) => fsPromises.readFile(filePath), log);
 }
 
+async function processTestcasesFromFlatDir(problemId, dirPath, log) {
+  const testcaseFiles = {};
+  const fileRegex = /^(?:input|output)?(\d+)\.(?:in|out|txt)$/i;
+
+  const allFiles = await fsPromises.readdir(dirPath);
+
+  for (const fileName of allFiles) {
+    const isJunk = fileName.startsWith('._') || fileName === '.DS_Store';
+    if (isJunk) continue;
+
+    const match = fileName.match(fileRegex);
+    if (match) {
+      const number = parseInt(match[1], 10);
+      if (!testcaseFiles[number]) testcaseFiles[number] = {};
+      const lowerFileName = fileName.toLowerCase();
+      if (lowerFileName.endsWith('.in') || lowerFileName.includes('input')) {
+        testcaseFiles[number].in = path.join(dirPath, fileName);
+      } else if (lowerFileName.endsWith('.out') || lowerFileName.includes('output')) {
+        testcaseFiles[number].out = path.join(dirPath, fileName);
+      }
+    }
+  }
+  return processPairedFiles(problemId, testcaseFiles, (filePath) => fsPromises.readFile(filePath), log);
+}
+
 async function streamToBuffer(stream) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -220,6 +245,8 @@ async function processProblemDirectory(problemPath) {
 
         for (const dirName of subdirectories) {
             const testcaseRootPath = path.join(problemPath, dirName);
+
+            // --- Attempt 1: Look for input/output sub-subdirectories ---
             const inputPath = path.join(testcaseRootPath, 'input');
             const outputPath = path.join(testcaseRootPath, 'output');
 
@@ -229,11 +256,31 @@ async function processProblemDirectory(problemPath) {
 
                 if (inputStats.isDirectory() && outputStats.isDirectory()) {
                     const processedCount = await processTestcasesFromInputOutputDirs(problemId, inputPath, outputPath, log);
-                    log.push(`Processed ${processedCount} test cases from '${dirName}/' directory.`);
-                    testcasesFound = true;
-                    break; 
+                    if (processedCount > 0) {
+                        log.push(`Processed ${processedCount} test cases from '${dirName}/input-output' subdirectories.`);
+                        testcasesFound = true;
+                    }
                 }
-            } catch (e) { /* This directory doesn't have the input/output structure, continue */ }
+            } catch (e) {
+                // This structure doesn't exist, so we will try the next method below.
+            }
+
+            // --- Attempt 2: If not found above, look for flat files in the directory itself ---
+            if (!testcasesFound) {
+                try {
+                    const processedCount = await processTestcasesFromFlatDir(problemId, testcaseRootPath, log);
+                    if (processedCount > 0) {
+                        log.push(`Processed ${processedCount} flat test cases from '${dirName}/' directory.`);
+                        testcasesFound = true;
+                    }
+                } catch (flatDirError) {
+                    // This directory also doesn't contain valid flat testcases, log nothing and continue.
+                }
+            }
+
+            if (testcasesFound) {
+                break; // Found and processed, stop searching in other directories
+            }
         }
     }
     
