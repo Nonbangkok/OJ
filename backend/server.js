@@ -16,10 +16,27 @@ const contestRoutes = require('./routes/contests');
 const contestScheduler = require('./services/contestScheduler');
 const { requireAuth, requireStaffOrAdmin } = require('./middleware/auth');
 const unzipper = require('unzipper');
+const { processBatchUpload } = require('./services/batchUploadService'); // Import the new service
 
-// Use memory storage for multer to handle files as buffers
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+// Multer configuration for single file uploads (in memory)
+const memoryUpload = multer({ storage: multer.memoryStorage() });
+
+// Multer configuration for batch uploads (to disk)
+const diskStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    // We'll use a temporary directory provided by the OS
+    const uploadPath = path.join('/tmp', 'oj_uploads');
+    fs.mkdirSync(uploadPath, { recursive: true }); // Ensure the dir exists
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    // Create a unique filename to avoid conflicts
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const diskUpload = multer({ storage: diskStorage });
+
 
 const app = express();
 app.set('trust proxy', 1); // Trust the reverse proxy for secure cookies
@@ -371,7 +388,7 @@ app.get('/api/me', (req, res) => {
   }
 });
 
-app.post('/api/submit', requireAuth, upload.none(), async (req, res) => {
+app.post('/api/submit', requireAuth, memoryUpload.none(), async (req, res) => {
   const { problemId, language, code, contestId } = req.body;
   const { userId } = req.session;
 
@@ -1177,7 +1194,25 @@ app.put('/api/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin, 
   }
 });
 
-app.post('/api/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, upload.fields([
+// NEW: Batch Upload Endpoint
+app.post('/api/admin/problems/batch-upload', requireAuth, requireAdmin, diskUpload.single('problemsZip'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No zip file uploaded.' });
+  }
+
+  try {
+    const results = await processBatchUpload(req.file.path);
+    res.status(200).json({
+      message: 'Batch upload process finished.',
+      ...results
+    });
+  } catch (error) {
+    console.error('Error in batch upload endpoint:', error);
+    res.status(500).json({ message: 'A critical error occurred during batch upload.', errors: [{ message: error.message }] });
+  }
+});
+
+app.post('/api/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, memoryUpload.fields([
   { name: 'problemPdf', maxCount: 1 },
   { name: 'testcasesZip', maxCount: 1 }
 ]), async (req, res) => {

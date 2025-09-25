@@ -3,6 +3,7 @@ import axios from 'axios';
 import ProblemModal from './ProblemModal';
 import ConfirmationModal from './ConfirmationModal';
 import styles from './Management.module.css';
+import ProblemMigrationModal from './ProblemMigrationModal';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -13,6 +14,12 @@ const ProblemManagement = ({ currentUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProblem, setEditingProblem] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(null); // State for upload progress
+
+  // New state for batch upload feedback
+  const [batchUploadFeedback, setBatchUploadFeedback] = useState({ visible: false, message: '', type: 'info' });
+
+  // Ref for the hidden file input
+  const batchUploadInputRef = React.useRef(null);
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [problemToDelete, setProblemToDelete] = useState(null);
@@ -130,6 +137,58 @@ const ProblemManagement = ({ currentUser }) => {
     setIsModalOpen(true);
   };
 
+  const handleTriggerBatchUpload = () => {
+    // Reset feedback before triggering
+    setBatchUploadFeedback({ visible: false, message: '', type: 'info' });
+    // Trigger the hidden file input
+    batchUploadInputRef.current.click();
+  };
+
+  const handleBatchUploadFileChange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) {
+      return;
+    }
+
+    setLoading(true); // Use main loading state to disable buttons
+    setBatchUploadFeedback({ visible: true, message: 'Uploading and processing zip file...', type: 'info' });
+
+
+    const formData = new FormData();
+    formData.append('problemsZip', file);
+
+    try {
+      const response = await axios.post(`${API_URL}/admin/problems/batch-upload`, formData, {
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      const { added = [], skipped = [], errors = [] } = response.data;
+      let feedbackMessage = `Batch upload complete. Added: ${added.length}. Skipped: ${skipped.length}.`;
+      if (errors.length > 0) {
+        const errorDetails = errors.map(e => `${e.directory}: ${e.message}`).join('; ');
+        feedbackMessage += ` Errors: ${errors.length} (${errorDetails})`;
+        setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'error' });
+      } else {
+        setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'success' });
+      }
+
+      fetchProblems(); // Refresh the list
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'Failed to batch upload problems.';
+      setBatchUploadFeedback({ visible: true, message: errorMsg, type: 'error' });
+      console.error(err);
+    } finally {
+      setLoading(false);
+      // Reset the file input so the same file can be selected again
+      if (batchUploadInputRef.current) {
+        batchUploadInputRef.current.value = '';
+      }
+    }
+  };
+
   const handleSave = async ({ problemData, pdfFile, zipFile }) => {
     const isEditing = !!editingProblem;
     // Reset progress on new save
@@ -233,9 +292,29 @@ const ProblemManagement = ({ currentUser }) => {
               Hide All
             </button>
           </div>
+          <input
+            type="file"
+            ref={batchUploadInputRef}
+            onChange={handleBatchUploadFileChange}
+            style={{ display: 'none' }}
+            accept=".zip"
+          />
+          <button onClick={handleTriggerBatchUpload} className={styles['create-btn']} style={{ marginRight: '10px' }}>
+            Batch Upload
+          </button>
           <button onClick={handleCreate} className={styles['create-btn']}>Create New Problem</button>
         </div>
       </div>
+       {/* Batch Upload Feedback UI */}
+       {batchUploadFeedback.visible && (
+        <div 
+          className={`${styles.feedbackBox} ${styles[batchUploadFeedback.type]}`}
+          onClick={() => setBatchUploadFeedback({ ...batchUploadFeedback, visible: false })} // Click to dismiss
+        >
+          <p>{batchUploadFeedback.message}</p>
+          <button className={styles.closeButton}>&times;</button>
+        </div>
+      )}
       <div className="table-container">
         <table className="table">
           <thead>
