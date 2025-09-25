@@ -68,47 +68,73 @@ Your OJ system is now fully set up and ready to use!
 
 ### Batch Uploading Problems
 
-The system includes a script to automatically import multiple problems from the `backend/problem_source` directory into the database.
+The system allows administrators to upload problems in bulk via the Admin Panel. By clicking the **Batch Upload** button on the Problem Management page, you can upload a single `.zip` file containing one or more problems.
 
-**To run the batch upload:**
-```bash
-docker-compose exec backend node batch_upload.js
+The uploaded `.zip` file can have two primary structures:
+
+1.  **Single Problem ZIP**: The root of the ZIP file contains the files for one problem directly (`config.json`, a PDF, and test cases).
+2.  **Multiple Problems ZIP**: The root of the ZIP file contains multiple directories, where each directory represents a single problem.
+
+### ZIP File Structure Examples
+
+#### Structure 1: Single Problem ZIP
+
+The ZIP file contains all necessary files for a single problem at its root level.
+
+```
+MooDeng.zip
+├── config.json
+├── MooDeng.pdf
+└── testcases/
+    ├── input/
+    │   ├── 1.in
+    │   └── 2.in
+    └── output/
+        ├── 1.out
+        └── 2.out
 ```
 
-### Directory Structure
+#### Structure 2: Multiple Problems ZIP
 
-Each problem must have its own directory inside `backend/problem_source`. For example:
+The ZIP file contains multiple problem directories. The system will iterate through each directory and process it as a separate problem, demonstrating the various ways test cases can be structured.
 
 ```
-backend/
-└── problem_source/
-    ├── MyFirstProblem/
-    │   ├── config.json
-    │   ├── MyFirstProblem.pdf
-    │   └── testcases.zip
-    ├── MySecondProblem/
-    │   ├── config.json
-    │   ├── MySecondProblem.pdf
-    │   └── testcases/
-    │       ├── input/
-    │       │   ├── 1.in
-    │       │   └── 2.in
-    │       └── output/
-    │           ├── 1.out
-    │           └── 2.out
-    └── MyThirdProblem/
-        ├── config.json
-        ├── MyThirdProblem.pdf
-        └── testcases/
-            ├── input/
-            │   ├── input1.txt
-            │   └── input2.txt
-            └── output/
-                ├── output2.txt
-                └── output2.txt
+ProblemSet.zip
+├── MyFirstProblem/  (Using a ZIP for test cases)
+│   ├── config.json
+│   ├── MyFirstProblem.pdf
+│   └── testcases.zip
+│       ├── input/
+│       │   ├── input01.in
+│       │   └── input02.in
+│       └── output/
+│           ├── output01.out
+│           └── output02.out
+│
+├── MySecondProblem/ (Using a folder with input/output subdirectories)
+│   ├── config.json
+│   ├── MySecondProblem.pdf
+│   └── testcases/
+│       ├── input/
+│       │   ├── 1.in
+│       │   └── 2.in
+│       └── output/
+│           ├── 1.out
+│           └── 2.out
+│
+└── MyThirdProblem/  (Using a folder with a flat file structure)
+    ├── config.json
+    ├── MyThirdProblem.pdf
+    └── data/
+        ├── input_01.txt
+        ├── output_01.txt
+        ├── input_02.txt
+        └── output_02.txt
 ```
 
-Each problem directory must contain:
+### Problem Directory Contents
+
+Each problem directory (either at the root of a multi-problem ZIP or the content of a single-problem ZIP) must contain:
 
 1.  **`config.json`**: A JSON file with problem metadata.
     ```json
@@ -130,16 +156,36 @@ Each problem directory must contain:
 
 3.  **Test Cases**: Test cases can be provided in one of two formats:
 
-    *   **Option A: Zip Archive**
-        -   A single `.zip` file containing all test case files.
-        -   Input and output files must be paired by number.
-        -   Supported naming conventions include: `input1.in`/`output1.out`, `1.in`/`1.out`, `input1.txt`/`output1.txt`, etc. The script intelligently pairs them based on the numbers in the filenames.
+    *   **Option A: Zip Archive (`testcases.zip`)**
+        -   A single `.zip` file containing all test case files for that specific problem.
+        -   This `testcases.zip` file itself can have two internal structures:
+            1.  **Flat Structure**: Input and output files are at the root of the zip. They must be paired by number. Supported naming conventions include: `input1.in`/`output1.out`, `1.in`/`1.out`, `input1.txt`/`output1.txt`, etc.
+                ```
+                Internal structure of MyFirstProblem/testcases.zip
+                ├── 1.in
+                ├── 1.out
+                ├── input2.txt
+                └── output2.txt
+                ```
+            2.  **Directory Structure**: The zip contains `input/` and `output/` subdirectories. All input files go into the `input/` folder, and all corresponding output files go into the `output/` folder. Files are paired by sorting them alphabetically/numerically.
+                ```
+                Another example of a testcases.zip internal structure
+                ├── input/
+                │   ├── case1.txt
+                │   └── case2.txt
+                └── output/
+                    ├── case1.txt
+                    └── case2.txt
+                ```
 
     *   **Option B: `input`/`output` Subdirectories**
-        -   A subdirectory (e.g., `testcases/`, `data/`) that contains two folders: `input/` and `output/`.
-        -   All input files go into the `input/` folder.
-        -   All corresponding output files go into the `output/` folder.
+        -   Instead of a zip, you can provide a subdirectory (e.g., `testcases/`, `data/`) that contains two folders: `input/` and `output/`.
+        -   All input files go into the `input/` folder, and all corresponding output files go into the `output/` folder.
         -   Files are paired by sorting them alphabetically/numerically. For example, the first file in `input/` is matched with the first file in `output/`. It's recommended to use names like `01.in`, `02.in`, etc., to ensure correct ordering.
+
+    *   **Option C: Flat Directory Structure**
+        -   As an alternative to `input/output` subdirectories, you can place all test case files directly inside a single subdirectory (e.g., `testcases/`, `data/`).
+        -   The system will pair files based on the numbers in their filenames (e.g., `input1.txt` is paired with `output1.txt`, `case_02.in` with `case_02.out`).
 
 **Note**: The script will clear any existing test cases for a problem before inserting the new ones.
 
