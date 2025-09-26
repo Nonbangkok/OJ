@@ -2,7 +2,13 @@
 FROM node:20-slim
 
 # Install g++, build tools, and the 'time' utility
-RUN apt-get update && apt-get install -y build-essential time
+# Add PostgreSQL 16 repository and install postgresql-client-16
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list' \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg \
+    && apt-get update \
+    && apt-get install -y build-essential time postgresql-client-16
 
 # Set the working directory inside the container
 WORKDIR /usr/src/app
