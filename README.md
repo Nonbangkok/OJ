@@ -9,7 +9,7 @@ This is a grader system with a React frontend and a Node.js (Express) backend, f
 - Code submission (C++ only) with judging in an isolated environment
 - Real-time judging of submissions
 - Scoreboard
-- Admin panel for user and problem management
+- Admin panel for user, problem, and database management
 
 ## Prerequisites
 
@@ -49,12 +49,14 @@ That's it! You do not need to install Node.js, npm, or PostgreSQL on your host m
 ## First-Time Setup (Database Initialization)
 
 After running the application for the first time, you need to initialize the database and create an admin user.
+**Important:** The database tables are NOT created automatically when the containers start. You must run the initialization script manually.
 
 1.  **Create the database tables:**
     -   Run this command in your terminal:
         ```bash
         docker-compose exec backend node init_db.js
         ```
+    -   This command will create all necessary database tables.
 
 2.  **Create an admin user:**
     -   Run this command and follow the interactive prompts to set up your admin account:
@@ -63,6 +65,32 @@ After running the application for the first time, you need to initialize the dat
         ```
 
 Your OJ system is now fully set up and ready to use!
+
+## Database Management (Admin Only)
+
+The system provides administration tools for exporting and importing the entire database, useful for backups or emergency recovery. These features are accessible via the Admin Panel under "Settings".
+
+### Export Database
+
+Administrators can export the current state of the database to a `.sql` dump file.
+
+1.  Navigate to the Admin Panel.
+2.  Go to the "Settings" section.
+3.  Click the "Export Database" button.
+4.  The browser will download an `oj_backup_*.sql` file containing your entire database.
+
+### Import Database
+
+Administrators can import a database dump file (`.sql`, `.dump`, or `.tar`) to restore the database to a previous state.
+
+**WARNING:** Importing a database will **PERMANENTLY DELETE ALL EXISTING DATA** in the database and replace it with the contents of the uploaded file. Proceed with extreme caution and ensure you have a backup of your current database if needed.
+
+1.  Navigate to the Admin Panel.
+2.  Go to the "Settings" section.
+3.  In the "Import Database" section, click "Choose File" and select your database dump file.
+4.  Click the "Upload & Import" button.
+5.  Confirm the action when prompted. The import process will begin.
+6.  After a successful import, you may need to refresh your browser or re-login.
 
 ## Managing Problems
 
