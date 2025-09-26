@@ -1338,6 +1338,127 @@ app.put('/admin/settings/registration', requireAuth, requireAdmin, [
   }
 });
 
+// Admin API Endpoints for Database Management
+app.post('/admin/database/export', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const dbName = process.env.PGDATABASE;
+    const dbUser = process.env.PGUSER;
+    const dbHost = process.env.PGHOST;
+    const dbPort = process.env.PGPORT;
+
+    // Use a temporary file to store the dump
+    const dumpFilePath = path.join('/tmp', `db_backup_${Date.now()}.sql`);
+
+    // Command to run pg_dump. Using plain SQL format.
+    // Ensure that pg_dump is available in the Docker container where backend runs.
+    const pgDumpCommand = `PGPASSWORD=${process.env.PGPASSWORD} pg_dump -h ${dbHost} -p ${dbPort} -U ${dbUser} -d ${dbName} -F p -f ${dumpFilePath}`;
+    
+    console.log(`Executing pg_dump command: ${pgDumpCommand}`);
+    await execPromise(pgDumpCommand);
+
+    // Send the file as a download
+    res.download(dumpFilePath, `oj_backup_${Date.now()}.sql`, (err) => {
+      if (err) {
+        console.error('Error sending file:', err);
+        // If an error occurs during download, and headers might have been sent,
+        // we can't send another response. This is a fallback.
+        if (!res.headersSent) {
+          res.status(500).json({ message: 'Error downloading backup file.' });
+        }
+      }
+      // Clean up the temporary dump file
+      fs.unlink(dumpFilePath, (unlinkErr) => {
+        if (unlinkErr) console.error('Error deleting temp dump file:', unlinkErr);
+      });
+    });
+
+  } catch (error) {
+    console.error('Error during database export:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Failed to export database.', error: error.message });
+    }
+  }
+});
+
+app.post('/admin/database/import', requireAuth, requireAdmin, diskUpload.single('databaseDump'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No database dump file uploaded.' });
+  }
+
+  try {
+    const dbName = process.env.PGDATABASE;
+    const dbUser = process.env.PGUSER;
+    const dbHost = process.env.PGHOST;
+    const dbPort = process.env.PGPORT;
+    const dumpFilePath = req.file.path; // Path to the uploaded file
+
+    // Determine if it's a plain SQL file or a custom/tar dump
+    const fileExtension = path.extname(req.file.originalname).toLowerCase();
+    let importCommand = '';
+
+    // NOTE: For a real production system, you might want to stop the backend
+    // and/or frontend services before importing to prevent data corruption
+    // and restart them afterwards. This would typically be handled by a
+    // more sophisticated deployment/orchestration system or a manual process.
+    // For this context, we're assuming a development/test environment where
+    // a brief inconsistency is acceptable or handled externally.
+
+    if (fileExtension === '.sql') {
+      // For plain SQL files, use psql
+      // -f reads from file, -1 for single transaction
+      importCommand = `PGPASSWORD=${process.env.PGPASSWORD} psql -h ${dbHost} -p ${dbPort} -U ${dbUser} -d ${dbName} -f ${dumpFilePath} -v ON_ERROR_STOP=1`;
+    } else if (fileExtension === '.dump' || fileExtension === '.tar') {
+      // For custom/tar format dumps, use pg_restore
+      importCommand = `PGPASSWORD=${process.env.PGPASSWORD} pg_restore -h ${dbHost} -p ${dbPort} -U ${dbUser} -d ${dbName} -v ${dumpFilePath}`;
+    } else {
+      fs.unlink(dumpFilePath, (unlinkErr) => { // Clean up temp file
+        if (unlinkErr) console.error('Error deleting unsupported dump file:', unlinkErr);
+      });
+      return res.status(400).json({ message: 'Unsupported file type. Only .sql, .dump, or .tar files are allowed.' });
+    }
+
+    // IMPORTANT: Drop all existing tables before importing to ensure a clean state.
+    // This is a destructive operation and should be used with extreme caution.
+    console.log('Dropping existing tables before import...');
+
+    // Drop Contest tables first
+    await db.query('DROP TABLE IF EXISTS contest_scoreboards CASCADE;');
+    await db.query('DROP TABLE IF EXISTS contest_problems CASCADE;');
+    await db.query('DROP TABLE IF EXISTS contest_submissions CASCADE;');
+    await db.query('DROP TABLE IF EXISTS contest_participants CASCADE;');
+    await db.query('DROP TABLE IF EXISTS contests CASCADE;');
+    
+    // Drop main tables
+    await db.query('DROP TABLE IF EXISTS submissions CASCADE;');
+    await db.query('DROP TABLE IF EXISTS testcases CASCADE;');
+    await db.query('DROP TABLE IF EXISTS problems CASCADE;');
+    await db.query('DROP TABLE IF EXISTS users CASCADE;');
+    await db.query('DROP TABLE IF EXISTS user_sessions CASCADE;');
+    await db.query('DROP TABLE IF EXISTS system_settings CASCADE;');
+
+    console.log(`Executing database import command: ${importCommand}`);
+    await execPromise(importCommand);
+
+    // After import, re-initialize the database (e.g., create default settings, etc.)
+    // This is important if the dump file does not contain all system_settings or default data.
+    // However, for a full dump, this might not be strictly necessary if the dump contains everything.
+    // For simplicity, we'll assume the dump is comprehensive.
+
+    res.status(200).json({ message: 'Database imported successfully.' });
+
+  } catch (error) {
+    console.error('Error during database import:', error);
+    res.status(500).json({ message: 'Failed to import database.', error: error.message });
+  } finally {
+    // Clean up the temporary dump file in all cases
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlink(req.file.path, (unlinkErr) => {
+        if (unlinkErr) console.error('Error deleting temporary dump file:', unlinkErr);
+      });
+    }
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
   
