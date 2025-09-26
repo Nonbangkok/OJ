@@ -62,8 +62,8 @@ app.use(session({
 }));
 
 // Use Contest routes (after session middleware)
-app.use('/api/contests', contestRoutes);
-app.use('/api/admin/contests', contestRoutes);
+app.use('/contests', contestRoutes);
+app.use('/admin/contests', contestRoutes);
 
 // Middleware to check if user is an admin
 const requireAdmin = (req, res, next) => {
@@ -242,7 +242,7 @@ app.get('/', (req, res) => {
   res.send('Hello World!');
 });
 
-app.post('/api/register', [
+app.post('/register', [
   body('username').isLength({ min: 3 }).trim().escape(),
   body('password').isLength({ min: 6 })
 ], async (req, res) => {
@@ -297,7 +297,7 @@ app.post('/api/register', [
 });
 
 // PUBLIC facing endpoint to check registration status
-app.get('/api/settings/registration', async (req, res) => {
+app.get('/settings/registration', async (req, res) => {
   try {
     const result = await db.query(
       "SELECT setting_value FROM system_settings WHERE setting_key = 'registration_enabled'"
@@ -315,7 +315,7 @@ app.get('/api/settings/registration', async (req, res) => {
 });
 
 
-app.post('/api/login', [
+app.post('/login', [
   body('username').trim().escape(),
   body('password').notEmpty()
 ], async (req, res) => {
@@ -364,7 +364,7 @@ app.post('/api/login', [
   }
 });
 
-app.post('/api/logout', (req, res) => {
+app.post('/logout', (req, res) => {
   req.session.destroy((err) => {
     if (err) {
       return res.status(500).json({ message: 'Error logging out' });
@@ -373,7 +373,7 @@ app.post('/api/logout', (req, res) => {
   });
 });
 
-app.get('/api/me', (req, res) => {
+app.get('/me', (req, res) => {
   if (req.session.userId) {
     res.json({
       isAuthenticated: true,
@@ -388,7 +388,7 @@ app.get('/api/me', (req, res) => {
   }
 });
 
-app.post('/api/submit', requireAuth, memoryUpload.none(), async (req, res) => {
+app.post('/submit', requireAuth, memoryUpload.none(), async (req, res) => {
   const { problemId, language, code, contestId } = req.body;
   const { userId } = req.session;
 
@@ -630,7 +630,7 @@ async function processContestSubmission(submissionId) {
   }
 }
 
-app.get('/api/problems-with-stats', requireAuth, async (req, res) => {
+app.get('/problems-with-stats', requireAuth, async (req, res) => {
   const { userId } = req.session;
   try {
     const query = `
@@ -688,7 +688,7 @@ app.get('/api/problems-with-stats', requireAuth, async (req, res) => {
 
 
 // Problem API Endpoints
-app.get('/api/problems', async (req, res) => {
+app.get('/problems', async (req, res) => {
   try {
     const result = await db.query(
       'SELECT id, title, author FROM problems WHERE is_visible = true AND contest_id IS NULL ORDER BY id'
@@ -700,7 +700,7 @@ app.get('/api/problems', async (req, res) => {
   }
 });
 
-app.get('/api/problems/:id', async (req, res) => {
+app.get('/problems/:id', async (req, res) => {
   const { id } = req.params;
   try {
     const result = await db.query('SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible FROM problems WHERE id = $1', [id]);
@@ -727,7 +727,7 @@ app.get('/api/problems/:id', async (req, res) => {
   }
 });
 
-app.get('/api/problems/:id/pdf', requireAuth, async (req, res) => {
+app.get('/problems/:id/pdf', requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const result = await db.query('SELECT problem_pdf FROM problems WHERE id = $1', [id]);
@@ -743,7 +743,7 @@ app.get('/api/problems/:id/pdf', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/submissions', requireAuth, async (req, res) => {
+app.get('/submissions', requireAuth, async (req, res) => {
   const { filter, problemId, contestId } = req.query; // Add contestId
   const { userId } = req.session;
   
@@ -799,7 +799,7 @@ app.get('/api/submissions', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/submissions/:id', requireAuth, async (req, res) => {
+app.get('/submissions/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
   const { contestId } = req.query; // Check if this is a contest submission request
   const { userId, role } = req.session;
@@ -848,7 +848,7 @@ app.get('/api/submissions/:id', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/scoreboard', requireAuth, async (req, res) => {
+app.get('/scoreboard', requireAuth, async (req, res) => {
   try {
     const result = await db.query(`
       WITH UserBestScores AS (
@@ -880,7 +880,7 @@ app.get('/api/scoreboard', requireAuth, async (req, res) => {
 
 // Admin API Endpoints
 // User Management
-app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
+app.get('/admin/users', requireAuth, requireAdmin, async (req, res) => {
   try {
     const result = await db.query('SELECT id, username, role, created_at FROM users ORDER BY id');
     res.json(result.rows);
@@ -890,7 +890,7 @@ app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/api/admin/users', requireAuth, requireAdmin, [
+app.post('/admin/users', requireAuth, requireAdmin, [
   body('username').isLength({ min: 3 }).trim().escape(),
   body('password').isLength({ min: 6 }),
   body('role').isIn(['user', 'staff'])
@@ -924,7 +924,7 @@ app.post('/api/admin/users', requireAuth, requireAdmin, [
   }
 });
 
-app.put('/api/admin/users/:id', requireAuth, requireAdmin, [
+app.put('/admin/users/:id', requireAuth, requireAdmin, [
   body('username').isLength({ min: 3 }).trim().escape(),
   body('role').isIn(['user', 'staff', 'admin']) // <-- Allow 'admin' role
 ], async (req, res) => {
@@ -977,7 +977,7 @@ app.put('/api/admin/users/:id', requireAuth, requireAdmin, [
   }
 });
 
-app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
+app.delete('/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
 
   // Prevent admin from deleting their own account
@@ -1011,7 +1011,7 @@ app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) =
   }
 });
 
-app.post('/api/admin/users/batch', requireAuth, requireAdmin, [
+app.post('/admin/users/batch', requireAuth, requireAdmin, [
   body('prefix').isLength({ min: 1 }).trim().escape(),
   body('count').isInt({ min: 1, max: 100 }) // Limit to 100 users at a time for performance
 ], async (req, res) => {
@@ -1067,7 +1067,7 @@ app.post('/api/admin/users/batch', requireAuth, requireAdmin, [
 });
 
 // Problem Management
-app.post('/api/admin/problems', requireAuth, requireStaffOrAdmin, [
+app.post('/admin/problems', requireAuth, requireStaffOrAdmin, [
     body('id').isLength({ min: 1 }).trim().escape(),
     body('title').isLength({ min: 1 }).trim(),
     body('author').isLength({ min: 1 }).trim(),
@@ -1091,7 +1091,7 @@ app.post('/api/admin/problems', requireAuth, requireStaffOrAdmin, [
     }
 });
 
-app.put('/api/admin/problems/:id', requireAuth, requireStaffOrAdmin, [
+app.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin, [
     body('id').isLength({ min: 1 }).trim().escape(), // New ID
     body('title').optional({ checkFalsy: true }).isLength({ min: 1 }).trim(),
     body('author').optional({ checkFalsy: true }).isLength({ min: 1 }).trim(),
@@ -1130,7 +1130,7 @@ app.put('/api/admin/problems/:id', requireAuth, requireStaffOrAdmin, [
     }
 });
 
-app.delete('/api/admin/problems/:id', requireAuth, requireStaffOrAdmin, async (req, res) => {
+app.delete('/admin/problems/:id', requireAuth, requireStaffOrAdmin, async (req, res) => {
     const { id } = req.params;
     try {
         // We also need to delete submissions for this problem
@@ -1147,7 +1147,7 @@ app.delete('/api/admin/problems/:id', requireAuth, requireStaffOrAdmin, async (r
     }
 });
 
-app.get('/api/admin/authors', requireAuth, requireStaffOrAdmin, async (req, res) => {
+app.get('/admin/authors', requireAuth, requireStaffOrAdmin, async (req, res) => {
   try {
     const result = await db.query(
       "SELECT id, username FROM users WHERE role = 'admin' OR role = 'staff' ORDER BY username"
@@ -1159,7 +1159,7 @@ app.get('/api/admin/authors', requireAuth, requireStaffOrAdmin, async (req, res)
   }
 });
 
-app.get('/api/admin/problems', requireAuth, requireStaffOrAdmin, async (req, res) => {
+app.get('/admin/problems', requireAuth, requireStaffOrAdmin, async (req, res) => {
   try {
     const result = await db.query('SELECT id, title, author, is_visible FROM problems ORDER BY id');
     res.json(result.rows);
@@ -1169,7 +1169,7 @@ app.get('/api/admin/problems', requireAuth, requireStaffOrAdmin, async (req, res
   }
 });
 
-app.put('/api/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin, [
+app.put('/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin, [
   body('isVisible').isBoolean()
 ], async (req, res) => {
   const errors = validationResult(req);
@@ -1199,7 +1199,7 @@ app.put('/api/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin, 
 });
 
 // NEW: Batch Upload Endpoint
-app.post('/api/admin/problems/batch-upload', requireAuth, requireAdmin, diskUpload.single('problemsZip'), async (req, res) => {
+app.post('/admin/problems/batch-upload', requireAuth, requireAdmin, diskUpload.single('problemsZip'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No zip file uploaded.' });
   }
@@ -1216,7 +1216,7 @@ app.post('/api/admin/problems/batch-upload', requireAuth, requireAdmin, diskUplo
   }
 });
 
-app.post('/api/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, memoryUpload.fields([
+app.post('/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, memoryUpload.fields([
   { name: 'problemPdf', maxCount: 1 },
   { name: 'testcasesZip', maxCount: 1 }
 ]), async (req, res) => {
@@ -1301,7 +1301,7 @@ app.post('/api/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, mem
 });
 
 // Admin API Endpoints for settings
-app.get('/api/admin/settings/registration', requireAuth, requireAdmin, async (req, res) => {
+app.get('/admin/settings/registration', requireAuth, requireAdmin, async (req, res) => {
   try {
     const result = await db.query(
       "SELECT setting_value FROM system_settings WHERE setting_key = 'registration_enabled'"
@@ -1317,7 +1317,7 @@ app.get('/api/admin/settings/registration', requireAuth, requireAdmin, async (re
   }
 });
 
-app.put('/api/admin/settings/registration', requireAuth, requireAdmin, [
+app.put('/admin/settings/registration', requireAuth, requireAdmin, [
   body('enabled').isBoolean()
 ], async (req, res) => {
   const errors = validationResult(req);
