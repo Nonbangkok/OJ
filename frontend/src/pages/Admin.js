@@ -3,7 +3,6 @@ import axios from 'axios';
 import UserManagement from '../components/admin/UserManagement';
 import ProblemManagement from '../components/admin/ProblemManagement';
 import ContestManagement from '../components/admin/ContestManagement';
-import RegistrationSettings from '../components/admin/RegistrationSettings';
 import styles from './Admin.module.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -56,7 +55,6 @@ const Admin = () => {
       
       {user?.role === 'admin' && (
         <div className={styles['admin-section']}>
-          <RegistrationSettings />
         </div>
       )}
     </div>
