@@ -23,6 +23,11 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
       - PORT=3000
       - SECRET_KEY=${SECRET_KEY}
+      - PGHOST=database
+      - PGPORT=5432
+      - PGUSER=${POSTGRES_USER}
+      - PGDATABASE=${POSTGRES_DB}
+      - PGPASSWORD=${POSTGRES_PASSWORD}
     networks:
       - oj-network
     restart: unless-stopped
