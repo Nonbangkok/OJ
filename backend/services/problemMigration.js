@@ -54,7 +54,7 @@ const moveProblemsToContest = async (contestId, problemIds) => {
     
     // Move problems to contest
     const updateResult = await client.query(
-      'UPDATE problems SET contest_id = $1 WHERE id = ANY($2) RETURNING id, title',
+      'UPDATE problems SET contest_id = $1, is_visible = FALSE WHERE id = ANY($2) RETURNING id, title',
       [contestId, problemIds]
     );
     
@@ -98,7 +98,7 @@ const moveProblemsBackToMain = async (contestId, problemIds = null) => {
     }
     
     // Build query dynamically
-    let queryText = 'UPDATE problems SET contest_id = NULL WHERE contest_id = $1';
+    let queryText = 'UPDATE problems SET contest_id = NULL, is_visible = TRUE WHERE contest_id = $1';
     const queryParams = [contestId];
 
     if (problemIds && problemIds.length > 0) {
