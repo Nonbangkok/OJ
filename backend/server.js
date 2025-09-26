@@ -18,6 +18,8 @@ const { requireAuth, requireStaffOrAdmin } = require('./middleware/auth');
 const unzipper = require('unzipper');
 const { processBatchUpload } = require('./services/batchUploadService'); // Import the new service
 
+const progressMap = new Map(); // Store SSE response objects by a unique upload ID
+
 // Multer configuration for single file uploads (in memory)
 const memoryUpload = multer({ storage: multer.memoryStorage() });
 
@@ -1198,22 +1200,64 @@ app.put('/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin, [
   }
 });
 
-// NEW: Batch Upload Endpoint
 app.post('/admin/problems/batch-upload', requireAuth, requireAdmin, diskUpload.single('problemsZip'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No zip file uploaded.' });
   }
 
+  // Generate a unique progress ID for this upload
+  const progressId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
   try {
-    const results = await processBatchUpload(req.file.path);
-    res.status(200).json({
-      message: 'Batch upload process finished.',
-      ...results
+    res.status(202).json({
+      message: 'Batch upload initiated. Connect to progress endpoint to monitor.',
+      progressId: progressId
     });
+
+    const batchResults = await processBatchUpload(req.file.path, (progressData) => {
+      const clientRes = progressMap.get(progressId);
+      if (clientRes && !clientRes.finished) {
+        clientRes.write(`event: progress\ndata: ${JSON.stringify(progressData)}\n\n`);
+      }
+    });
+
+    const clientRes = progressMap.get(progressId);
+    if (clientRes && !clientRes.finished) {
+      clientRes.write(`event: complete\ndata: ${JSON.stringify({ status: 'complete', message: 'Batch upload process finished.', ...batchResults })}\n\n`);
+      clientRes.end();
+    }
+    progressMap.delete(progressId); // Clean up after completion
+
   } catch (error) {
     console.error('Error in batch upload endpoint:', error);
-    res.status(500).json({ message: 'A critical error occurred during batch upload.', errors: [{ message: error.message }] });
+    const clientRes = progressMap.get(progressId);
+    if (clientRes && !clientRes.finished) {
+      clientRes.write(`event: error\ndata: ${JSON.stringify({ status: 'error', message: error.message || 'A critical error occurred during batch upload.' })}\n\n`);
+      clientRes.end();
+    }
+    progressMap.delete(progressId);
   }
+});
+
+app.get('/admin/problems/batch-upload-progress/:progressId', requireAuth, requireAdmin, (req, res) => {
+  const { progressId } = req.params;
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*' 
+  });
+
+  progressMap.set(progressId, res);
+
+  res.write(`event: initial\ndata: ${JSON.stringify({ message: 'Connected to batch upload progress stream.', progressId: progressId })}\n\n`);
+
+  req.on('close', () => {
+    if (progressMap.get(progressId) === res) {
+      progressMap.delete(progressId);
+    }
+  });
 });
 
 app.post('/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, memoryUpload.fields([

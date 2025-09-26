@@ -295,7 +295,7 @@ async function processProblemDirectory(problemPath) {
 // == Main exported function for the API == //
 // ================================================================= //
 
-async function processBatchUpload(zipFilePath) {
+async function processBatchUpload(zipFilePath, onProgress) {
   const results = { added: [], skipped: [], errors: [] };
   const tempDir = path.join(os.tmpdir(), `oj_batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   
@@ -331,6 +331,9 @@ async function processBatchUpload(zipFilePath) {
         }
       }
     }
+    
+    let processedCount = 0;
+    const totalProblems = problemPathsToProcess.length;
 
     for (const problemPath of problemPathsToProcess) {
       try {
@@ -342,6 +345,16 @@ async function processBatchUpload(zipFilePath) {
         }
       } catch (error) {
         results.errors.push({ directory: path.basename(problemPath), message: error.message });
+      } finally {
+        processedCount++;
+        if (onProgress && typeof onProgress === 'function') {
+          onProgress({ 
+            processed: processedCount, 
+            total: totalProblems, 
+            status: 'processing', 
+            currentProblem: path.basename(problemPath) 
+          });
+        }
       }
     }
   } catch (error) {

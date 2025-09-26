@@ -256,7 +256,7 @@
 
 /* Feedback Box for Batch Upload */
 .feedbackBox {
-  padding: 15px 50px 15px 20px;
+  padding: 15px 20px;
   margin-bottom: 1.5rem;
   border-radius: 8px;
   border-left-width: 5px;
@@ -265,12 +265,20 @@
   transition: opacity 0.3s ease;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+}
+
+.feedbackContent {
+  flex-grow: 1;
+  padding-right: 30px; /* Space for close button */
 }
 
 .feedbackBox p {
-  margin: 0;
-  flex: 1;
-  padding-right: 10px;
+  margin: 0 0 12px 0;
+}
+
+.feedbackBox p:last-child {
+  margin-bottom: 0;
 }
 
 .feedbackBox.info {
@@ -292,27 +300,79 @@
 }
 
 .closeButton {
-  position: absolute;
-  top: 50%;
-  right: 15px;
-  transform: translateY(-50%);
+  top: 8px;
+  right: 8px;
   background: none;
   border: none;
-  font-size: 1.2rem;
+  font-size: 1.5rem;
   line-height: 1;
   color: inherit;
   cursor: pointer;
-  opacity: 0.7;
-  width: 24px;
-  height: 24px;
+  opacity: 0.6;
+  transition: all 0.2s ease;
+  padding: 2px 6px;
+  width: auto;
+  height: auto;
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: all 0.2s ease;
+  justify-content: flex-end;
 }
 
 .closeButton:hover {
   opacity: 1;
+  transform: scale(1.1);
+}
+
+.progressWrapper {
+  width: 100%;
+}
+
+.progressInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+
+.progressFile {
+  color: black;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 10px;
+}
+
+.progressCounters {
+  font-weight: 600;
+  color: black;
+}
+
+
+/* Progress Bar for Batch Upload */
+.progressBarContainer {
+  width: 100%;
   background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  height: 24px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progressBarFill {
+  height: 100%;
+  background-color: var(--primary-color);
+  width: 0%; /* Will be updated by React state */
+  border-radius: 8px;
+  transition: width 0.3s ease-in-out;
+}
+
+.progressPercentage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: black;
+  font-size: 0.8rem;
+  font-weight: 600;
 }

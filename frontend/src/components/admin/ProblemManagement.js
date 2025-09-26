@@ -16,6 +16,7 @@ const ProblemManagement = ({ currentUser }) => {
 
   // New state for batch upload feedback
   const [batchUploadFeedback, setBatchUploadFeedback] = useState({ visible: false, message: '', type: 'info' });
+  const [batchUploadProgress, setBatchUploadProgress] = useState({ visible: false, processed: 0, total: 0, message: '', status: '' });
 
   // Ref for the hidden file input
   const batchUploadInputRef = React.useRef(null);
@@ -150,8 +151,8 @@ const ProblemManagement = ({ currentUser }) => {
     }
 
     setLoading(true); // Use main loading state to disable buttons
-    setBatchUploadFeedback({ visible: true, message: 'Uploading and processing zip file...', type: 'info' });
-
+    setBatchUploadFeedback({ visible: true, message: 'Initiating batch upload...', type: 'info' });
+    setBatchUploadProgress({ visible: true, processed: 0, total: 0, message: 'Starting upload...', status: 'pending' });
 
     const formData = new FormData();
     formData.append('problemsZip', file);
@@ -164,6 +165,63 @@ const ProblemManagement = ({ currentUser }) => {
         },
       });
       
+      const { progressId } = response.data;
+      if (progressId) {
+        // Initial feedback for file uploaded, progress listener will update more details
+        setBatchUploadFeedback({ visible: true, message: 'File uploaded. Waiting for processing to start...', type: 'info' });
+        const eventSource = new EventSource(`${API_URL}/admin/problems/batch-upload-progress/${progressId}`);
+
+        // eventSource.onmessage is now handled by specific event listeners
+        // eventSource.onmessage = (event) => {
+        //   const data = JSON.parse(event.data);
+        //   setBatchUploadProgress(data);
+        // };
+
+        eventSource.addEventListener('progress', (event) => {
+          const data = JSON.parse(event.data);
+          if (data && typeof data.processed === 'number' && typeof data.total === 'number') {
+            setBatchUploadProgress({ ...data, visible: true, status: 'in_progress' });
+            setBatchUploadFeedback({ visible: true, message: 'Batch processing problems...', type: 'info' });
+          } else {
+            console.warn('Received malformed progress data (progress event):', data);
+            setBatchUploadFeedback({ visible: true, message: 'Received malformed progress update.', type: 'info' });
+          }
+        });
+
+        eventSource.addEventListener('complete', (event) => {
+          const data = JSON.parse(event.data);
+          setBatchUploadProgress({ ...data, visible: false, status: 'completed' });
+          
+          let successMessage = 'Batch upload process finished.';
+          if (data.added && data.skipped) {
+            successMessage = `Batch upload complete. Added ${data.added.length} problems, skipped ${data.skipped.length} problems.`;
+          } else if (data.message) {
+            successMessage = data.message; // Fallback to generic message from backend
+          }
+          setBatchUploadFeedback({ visible: true, message: successMessage, type: 'success' });
+          
+          eventSource.close();
+          fetchProblems(); // Refresh the list after completion
+          setLoading(false);
+        });
+
+        eventSource.addEventListener('error', (event) => {
+          let errorMsg = 'An unknown error occurred during processing.';
+          if (event.data) {
+            try {
+              const data = JSON.parse(event.data);
+              errorMsg = data.message || errorMsg;
+            } catch (e) {
+              errorMsg = event.data;
+            }
+          }
+          setBatchUploadProgress({ visible: false, processed: 0, total: 0, message: errorMsg, status: 'error' });
+          setBatchUploadFeedback({ visible: true, message: errorMsg, type: 'error' });
+          eventSource.close();
+          setLoading(false);
+        });
+      } else {
+        // Fallback if no progressId is returned (shouldn't happen with current backend)
       const { added = [], skipped = [], errors = [] } = response.data;
       let feedbackMessage = `Batch upload complete. Added: ${added.length}. Skipped: ${skipped.length}.`;
       if (errors.length > 0) {
@@ -173,14 +231,15 @@ const ProblemManagement = ({ currentUser }) => {
       } else {
         setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'success' });
       }
-
       fetchProblems(); // Refresh the list
+        setLoading(false);
+      }
     } catch (err) {
       const errorMsg = err.response?.data?.message || 'Failed to batch upload problems.';
       setBatchUploadFeedback({ visible: true, message: errorMsg, type: 'error' });
-      console.error(err);
-    } finally {
+      setBatchUploadProgress({ visible: false, processed: 0, total: 0, message: errorMsg, status: 'error' });
       setLoading(false);
+    } finally {
       // Reset the file input so the same file can be selected again
       if (batchUploadInputRef.current) {
         batchUploadInputRef.current.value = '';
@@ -265,7 +324,7 @@ const ProblemManagement = ({ currentUser }) => {
     setUploadProgress(null);
   };
 
-  if (loading) return <div>Loading problems...</div>;
+  if (loading && !batchUploadProgress.visible) return <div>Loading problems...</div>;
   if (error) return <div className='error-message'>{error}</div>;
 
   return (
@@ -304,11 +363,34 @@ const ProblemManagement = ({ currentUser }) => {
           <button onClick={handleCreate} className={styles['create-btn']}>Create New Problem</button>
         </div>
       </div>
-       {/* Batch Upload Feedback UI */}
-       {batchUploadFeedback.visible && (
+      {/* Batch Upload Feedback UI */}
+      {batchUploadFeedback.visible && (
         <div className={`${styles.feedbackBox} ${styles[batchUploadFeedback.type]}`}>
-          <p>{batchUploadFeedback.message}</p>
-          <button 
+          <div className={styles.feedbackContent}>
+            <p>{batchUploadFeedback.message}</p>
+            {batchUploadProgress.visible && batchUploadProgress.total > 0 && batchUploadProgress.status === 'in_progress' && (
+              <div className={styles.progressWrapper}>
+                <div className={styles.progressInfo}>
+                  <span className={styles.progressFile}>
+                    Processing: {batchUploadProgress.currentProblem || '...'}
+                  </span>
+                  <span className={styles.progressCounters}>
+                    {batchUploadProgress.processed}/{batchUploadProgress.total}
+                  </span>
+                </div>
+                <div className={styles.progressBarContainer}>
+                  <div
+                    className={styles.progressBarFill}
+                    style={{ width: `${(batchUploadProgress.processed / batchUploadProgress.total) * 100}%` }}
+                  />
+                  <span className={styles.progressPercentage}>
+                    {Math.round((batchUploadProgress.processed / batchUploadProgress.total) * 100)}%
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          <button
             className={styles.closeButton}
             onClick={() => setBatchUploadFeedback({ ...batchUploadFeedback, visible: false })}
           >
