@@ -1,0 +1,217 @@
+.settings-container {
+  background-color: var(--background-secondary);
+  padding: 1.5rem 2rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.settings-container h3 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.setting-item label {
+  font-weight: 500;
+  color: var(--text-color-primary);
+}
+
+/* The switch - the box around the slider */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+}
+
+/* Hide default HTML checkbox */
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* The slider */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: var(--accent-primary);
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px var(--accent-primary);
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(22px);
+  -ms-transform: translateX(22px);
+  transform: translateX(22px);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+.settings-container h2 {
+  margin-bottom: 2rem;
+  color: var(--text-color-primary);
+  text-align: center;
+}
+
+.section-card {
+  background-color: var(--background-darker);
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 2rem;
+}
+
+.section-card h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px dashed var(--border-color-light);
+}
+
+.setting-item:last-child {
+  border-bottom: none;
+}
+
+.setting-item > div {
+  flex-grow: 1;
+  color: var(--text-color-primary);
+}
+
+.action-button {
+  background-color: var(--accent-primary);
+  color: white;
+  border: none;
+  padding: 0.6rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-size: 0.9rem;
+  margin-left: 1rem;
+}
+
+.action-button:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+}
+
+.action-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.import-button {
+  background-color: var(--button-danger-bg);
+}
+
+.import-button:hover:not(:disabled) {
+  background-color: var(--button-danger-hover);
+}
+
+.file-input {
+  flex-grow: 1;
+  margin-left: 1rem;
+  margin-right: 1rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background-color: var(--input-bg);
+  color: var(--text-color-primary);
+}
+
+.file-input::file-selector-button {
+  background-color: var(--background-light);
+  color: var(--text-color-primary);
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 0.8rem;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-right: 0.8rem;
+}
+
+.file-input::file-selector-button:hover {
+  background-color: var(--background-hover);
+}
+
+.warning-message {
+  color: var(--text-warning);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0;
+  text-align: center;
+}
+
+.error-message {
+  color: var(--text-error);
+  background-color: var(--background-error);
+  padding: 0.75rem;
+  border-radius: 5px;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.success-message {
+  color: var(--text-success);
+  background-color: var(--background-success);
+  padding: 0.75rem;
+  border-radius: 5px;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+/* Ensure padding is consistent */
+.settings-container {
+  padding: 2rem;
+}
+
+/* Adjust h3 for the new h2 */
+.settings-container h3 {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+} 
