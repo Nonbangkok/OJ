@@ -78,7 +78,7 @@ const ProblemManagement = ({ currentUser }) => {
     try {
       setLoading(true);
       const hidePromises = problems
-        .filter(problem => problem.is_visible)
+        .filter(problem => problem.is_visible && !problem.contest_id)
         .map(problem => 
           axios.put(
             `${API_URL}/admin/problems/${problem.id}/visibility`,
@@ -101,7 +101,7 @@ const ProblemManagement = ({ currentUser }) => {
     try {
       setLoading(true);
       const showPromises = problems
-        .filter(problem => !problem.is_visible)
+        .filter(problem => !problem.is_visible && !problem.contest_id)
         .map(problem => 
           axios.put(
             `${API_URL}/admin/problems/${problem.id}/visibility`,
@@ -332,13 +332,19 @@ const ProblemManagement = ({ currentUser }) => {
                 <td>{problem.id}</td>
                 <td>{problem.title}</td>
                 <td>
-                  <button
-                    onClick={() => handleToggleVisibility(problem.id, problem.is_visible)}
-                    className={problem.is_visible ? styles['visible-btn'] : styles['hidden-btn']}
-                    title={problem.is_visible ? 'Click to hide' : 'Click to show'}
-                  >
-                    {problem.is_visible ? 'Visible' : 'Hidden'}
-                  </button>
+                  {problem.contest_id && (problem.contest_status === 'scheduled' || problem.contest_status === 'running') ? (
+                    <span className={`${styles['contest-status-badge']} ${styles[problem.contest_status === 'scheduled' ? 'scheduled' : 'running']}`}>
+                      {problem.contest_status === 'scheduled' ? 'In Scheduled Contest' : 'In Running Contest'}
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleToggleVisibility(problem.id, problem.is_visible)}
+                      className={problem.is_visible ? styles['visible-btn'] : styles['hidden-btn']}
+                      title={problem.is_visible ? 'Click to hide' : 'Click to show'}
+                    >
+                      {problem.is_visible ? 'Visible' : 'Hidden'}
+                    </button>
+                  )}
                 </td>
                 <td className={styles.actions}>
                   <button onClick={() => handleEdit(problem)} className={styles['edit-btn']}>Edit</button>

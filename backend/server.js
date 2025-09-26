@@ -1161,7 +1161,7 @@ app.get('/admin/authors', requireAuth, requireStaffOrAdmin, async (req, res) => 
 
 app.get('/admin/problems', requireAuth, requireStaffOrAdmin, async (req, res) => {
   try {
-    const result = await db.query('SELECT id, title, author, is_visible FROM problems ORDER BY id');
+    const result = await db.query('SELECT p.id, p.title, p.author, p.is_visible, p.contest_id, c.status AS contest_status FROM problems p LEFT JOIN contests c ON p.contest_id = c.id ORDER BY p.id');
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching problems for admin:', error);
