@@ -29,7 +29,6 @@ import { SettingsProvider } from './context/SettingsContext';
 import UserManagement from './components/admin/UserManagement';
 import ProblemManagement from './components/admin/ProblemManagement';
 import ContestManagement from './components/admin/ContestManagement';
-import RegistrationSettings from './components/admin/RegistrationSettings';
 
 // New layout for standard pages
 const MainLayout = () => (
@@ -73,7 +72,6 @@ const Layout = () => {
           <Route path="users" element={<UserManagement />} />
           <Route path="problems" element={<ProblemManagement />} />
           <Route path="contests" element={<ContestManagement />} />
-          <Route path="settings" element={<RegistrationSettings />} />
         </Route>
 
         {/* Contest routes with their own self-contained layout */}
