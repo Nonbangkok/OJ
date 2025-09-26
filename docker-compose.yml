@@ -50,6 +50,8 @@ services:
       - "443:443" # For future SSL
     volumes:
       - ./nginx-proxy:/etc/nginx/conf.d
+      - /etc/letsencrypt:/etc/letsencrypt
+      - /var/lib/letsencrypt:/var/lib/letsencrypt
     networks:
       - oj-network
     restart: unless-stopped
