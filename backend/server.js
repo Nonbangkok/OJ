@@ -711,18 +711,21 @@ app.get('/problems/:id', async (req, res) => {
       return res.status(404).json({ message: 'Problem not found' });
     }
     
-    if (!result.rows[0].is_visible) {
-      return res.status(403).json({ 
-        message: 'Problem is hidden', 
+    // Allow admin/staff to view hidden problems, otherwise apply visibility check
+    const isStaffOrAdmin = req.session.role === 'admin' || req.session.role === 'staff';
+
+    if (!result.rows[0].is_visible && !isStaffOrAdmin) {
+      return res.status(403).json({
+        message: 'Problem is hidden',
         detail: 'This problem has been hidden by administrators and is not accessible to regular users.',
         problemId: id,
         title: result.rows[0].title || 'Hidden Problem'
       });
     }
     
-    // Remove is_visible from response for regular users
+    // Remove is_visible from response for regular users (admin/staff still see it)
     const { is_visible, ...problemData } = result.rows[0];
-    res.json(problemData);
+    res.json(isStaffOrAdmin ? result.rows[0] : problemData);
   } catch (error) {
     console.error(`Error fetching problem ${id}:`, error);
     res.status(500).json({ message: 'Error fetching problem details' });
