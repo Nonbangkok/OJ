@@ -18,6 +18,9 @@
   
   --accent-primary: #007bff;
   --accent-primary-hover: #0056b3;
+
+  --button-danger-bg: #dc3545; /* Red color for danger buttons */
+  --button-danger-hover: #c82333; /* Darker red on hover */
   
   --status-success: #28a745;
   --status-danger: #dc3545;
@@ -43,6 +46,9 @@
 
   --accent-primary: #0d6efd;
   --accent-primary-hover: #3d8bfd;
+
+  --button-danger-bg: #dc3545; /* Ensure consistent danger color in dark mode */
+  --button-danger-hover: #ef455a; /* Slightly brighter for dark mode hover */
   
   --status-success: #198754;
   --status-danger: #dc3545;
