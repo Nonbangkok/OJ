@@ -184,7 +184,7 @@ function ContestSubmissions() {
                   <td>{formatDateTime(submission.submitted_at)}</td>
                   <td>{submission.username}</td>
                   <td>
-                    <Link to={`/problems/${submission.problem_id}`} state={{ contestId: contestId }}>
+                    <Link to={`/contests/${contestId}/problems/${submission.problem_id}`}>
                       {submission.problem_title}
                     </Link>
                   </td>
