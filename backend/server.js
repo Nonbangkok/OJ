@@ -1031,7 +1031,11 @@ app.post('/api/admin/users/batch', requireAuth, requireAdmin, [
 
     for (let i = 1; i <= count; i++) {
       const username = `${prefix}-${i.toString().padStart(2, '0')}`;
-      const password = Math.random().toString(36).slice(-8); // Generate a random 8-char password
+      const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}|;:,.<>?';
+      let password = '';
+      for (let j = 0; j < 16; j++) {
+        password += charset.charAt(Math.floor(Math.random() * charset.length));
+      }
       const hashedPassword = await bcrypt.hash(password, saltRounds);
 
       const existingUser = await client.query('SELECT id FROM users WHERE username = $1', [username]);
