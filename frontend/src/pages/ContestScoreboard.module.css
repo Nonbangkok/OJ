@@ -87,12 +87,6 @@
   font-size: 1rem;
 }
 
-.attempts {
-  font-size: 0.7rem;
-  opacity: 0.8;
-  font-weight: 500;
-}
-
 .noAttempt {
   /* Make no-attempt cells have the same dimensions and layout as score cells */
   display: flex;

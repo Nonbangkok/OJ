@@ -256,8 +256,7 @@ router.get('/:id/scoreboard', requireAuth, async (req, res) => {
             SELECT
               cs.user_id,
               cs.problem_id,
-              MAX(cs.score) AS best_score,
-              COUNT(*) AS attempts
+              MAX(cs.score) AS best_score
             FROM contest_submissions cs
             WHERE cs.contest_id = $1
             GROUP BY cs.user_id, cs.problem_id
@@ -267,8 +266,7 @@ router.get('/:id/scoreboard', requireAuth, async (req, res) => {
               ubs.user_id,
               SUM(ubs.best_score) AS total_score,
               jsonb_object_agg(ubs.problem_id, jsonb_build_object(
-                'score', ubs.best_score,
-                'attempts', ubs.attempts
+                'score', ubs.best_score
               )) AS detailed_scores
             FROM UserBestScores ubs
             GROUP BY ubs.user_id

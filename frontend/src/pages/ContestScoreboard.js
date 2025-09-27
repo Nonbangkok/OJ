@@ -189,11 +189,6 @@ function ContestScoreboard() {
                               }`}
                             >
                               <span className={styles.score}>{problemScore.score}</span>
-                              {problemScore.attempts > 1 && (
-                                <span className={styles.attempts}>
-                                  ({problemScore.attempts})
-                                </span>
-                              )}
                             </div>
                           ) : (
                             <div className={styles.noAttempt}>-</div>
