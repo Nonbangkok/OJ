@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import styles from './Submissions.module.css';
@@ -10,6 +10,7 @@ const API_URL = process.env.REACT_APP_API_URL;
 function ContestSubmissions() {
   const { contestId } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   const [contest, setContest] = useState(null);
   const [submissions, setSubmissions] = useState([]);
@@ -21,17 +22,51 @@ function ContestSubmissions() {
 
   const fetchContestData = useCallback(async () => {
     try {
+      setLoading(true);
       const response = await axios.get(`${API_URL}/contests/${contestId}`, {
         withCredentials: true
       });
-      setContest(response.data);
+      const fetchedContest = response.data;
+      setContest(fetchedContest);
+
+      // Redirect logic if contest is finished
+      if (fetchedContest.status === 'finished') {
+        let redirectPath = '';
+
+        if (fetchedContest.is_participant) {
+          redirectPath = `/contests/${contestId}/scoreboard`;
+        } else {
+          redirectPath = '/contests';
+        }
+        navigate(redirectPath);
+        return; // Stop further execution
+      }
     } catch (err) {
       console.error('Error fetching contest data:', err);
+      if (err.response?.status === 403) {
+        // If user is not participant and contest is finished (or becomes finished), redirect to /contests
+        try {
+          const contestStatusCheck = await axios.get(`${API_URL}/contests/${contestId}`, { withCredentials: true });
+          if (contestStatusCheck.data.status === 'finished') {
+            navigate('/contests');
+            return;
+          }
+        } catch (innerErr) {
+          console.error('Failed to re-check contest status for 403 redirect:', innerErr);
+        }
+        setError('Failed to fetch contest submissions. You may not have access to this contest.');
+      } else if (err.response?.status === 404) {
+        setError('Contest not found.');
+      } else {
+        setError('Error fetching contest data.');
+      }
+    } finally {
+      setLoading(false);
     }
-  }, [contestId]);
+  }, [contestId, user, navigate]); // Added user and navigate to dependencies
 
   const fetchSubmissions = useCallback(async () => {
-    if (submissions.length === 0) {
+    if (submissions.length === 0) { 
       setLoading(true);
     }
     
@@ -57,15 +92,19 @@ function ContestSubmissions() {
     } finally {
       setLoading(false);
     }
-  }, [contestId, filter, submissions.length]);
+  }, [contestId, filter, submissions.length]); // Removed redirectMessage from dependencies
 
   useEffect(() => {
     fetchContestData();
-  }, [fetchContestData]);
+    const intervalId = setInterval(() => {
+      fetchContestData();
+    }, 15000); // Poll every 15 seconds
+    return () => clearInterval(intervalId);
+  }, [fetchContestData]); // fetchContestData is a useCallback, so it's stable. If not, it would cause infinite loop.
 
   useEffect(() => {
     fetchSubmissions();
-  }, [fetchSubmissions]);
+  }, [fetchSubmissions]); // Removed redirectMessage from dependencies
 
   // Auto-refresh for processing submissions
   useEffect(() => {
@@ -77,7 +116,7 @@ function ContestSubmissions() {
       const intervalId = setInterval(fetchSubmissions, 2500);
       return () => clearInterval(intervalId);
     }
-  }, [submissions, fetchSubmissions]);
+  }, [submissions, fetchSubmissions]); // Removed redirectMessage from dependencies
 
   const handleViewCode = async (submissionId) => {
     try {
@@ -135,7 +174,6 @@ function ContestSubmissions() {
 
   return (
     <div className={styles['submissions-container']}>
-
 
       {/* Submissions Header */}
       <div className={styles['submissions-header']}>

@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import styles from './ContestDetail.module.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
 function ContestDetail() {
   const { contestId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   
   const [contest, setContest] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -15,7 +18,13 @@ function ContestDetail() {
 
   useEffect(() => {
     fetchContestData();
-  }, [contestId]);
+
+    const intervalId = setInterval(() => {
+      fetchContestData();
+    }, 15000); // Poll every 15 seconds
+
+    return () => clearInterval(intervalId);
+  }, [contestId, user]); // Add user to dependency array to re-fetch if login status changes
 
   const fetchContestData = async () => {
     try {
@@ -25,11 +34,29 @@ function ContestDetail() {
         withCredentials: true
       });
       
-      setContest(contestResponse.data);
+      const fetchedContest = contestResponse.data;
+      setContest(fetchedContest);
+
+      // Redirect logic
+      if (fetchedContest.status === 'finished') {
+        let redirectPath = '';
+
+        if (fetchedContest.is_participant) {
+          redirectPath = `/contests/${contestId}/scoreboard`;
+        } else {
+          redirectPath = '/contests';
+        }
+        navigate(redirectPath);
+      }
+
     } catch (err) {
       console.error('Error fetching contest data:', err);
       if (err.response?.status === 403) {
         setError('You need to join this contest to view its details.');
+        // If user is not participant and contest is finished, redirect to /contests
+        if (contest?.status === 'finished') { // Use optional chaining to prevent error if contest is null
+          navigate('/contests');
+        }
       } else if (err.response?.status === 404) {
         setError('Contest not found.');
       } else {

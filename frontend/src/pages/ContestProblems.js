@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import styles from './Problems.module.css'; // Re-use the same styles
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -10,37 +11,75 @@ const ContestProblems = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { contestId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
-    const fetchProblems = async () => {
-      // This check is redundant now because of the one outside,
-      // but it's good practice to keep it.
+    const fetchContestAndProblemData = async () => {
       if (!contestId) {
         setLoading(false);
         setError('Contest ID is missing, cannot fetch problems.');
         return;
       }
       try {
-        const response = await axios.get(`${API_URL}/contests/${contestId}/problems`, {
+        // First, fetch contest details to check status and participation
+        const contestResponse = await axios.get(`${API_URL}/contests/${contestId}`, {
+          withCredentials: true
+        });
+        const fetchedContest = contestResponse.data;
+
+        // Redirect logic if contest is finished
+        if (fetchedContest.status === 'finished') {
+          let redirectPath = '';
+
+          if (fetchedContest.is_participant) {
+            redirectPath = `/contests/${contestId}/scoreboard`;
+          } else {
+            redirectPath = '/contests';
+          }
+          navigate(redirectPath);
+          return; // Stop further execution in this effect
+        }
+
+        // If contest is not finished, fetch problems
+        const problemsResponse = await axios.get(`${API_URL}/contests/${contestId}/problems`, {
           withCredentials: true,
         });
-        setProblems(response.data);
+        setProblems(problemsResponse.data);
       } catch (err) {
-        setError('Failed to fetch contest problems. You may not have access to this contest.');
-        console.error(err);
+        console.error('Error fetching contest data or problems:', err);
+        if (err.response?.status === 403) {
+          setError('Failed to fetch contest problems. You may not have access to this contest.');
+          // If user is not participant and contest is finished (or becomes finished), redirect to /contests
+          // This handles cases where user navigates directly to problems page of a finished contest they didn't join
+          if (err.response?.data?.message === 'You must join this contest to view problems' || err.response?.data?.message === 'Contest is not active.') {
+             // Attempt to get current contest status again to be sure it's finished
+            try {
+              const contestStatusCheck = await axios.get(`${API_URL}/contests/${contestId}`, { withCredentials: true });
+              if (contestStatusCheck.data.status === 'finished') {
+                 navigate('/contests');
+                 return;
+              }
+            } catch (innerErr) {
+              console.error('Failed to re-check contest status for 403 redirect:', innerErr);
+            }
+          }
+        } else {
+          setError('Failed to fetch contest problems.');
+        }
       } finally {
         setLoading(false);
       }
     };
     
-    // We check for contestId here before initiating the fetch.
-    if (contestId) {
-      fetchProblems();
-    } else {
-      setLoading(false);
-      setError('Contest ID not found in URL.');
-    }
-  }, [contestId]);
+    fetchContestAndProblemData(); // Initial fetch
+
+    const intervalId = setInterval(() => {
+      fetchContestAndProblemData();
+    }, 15000); // Poll every 15 seconds
+
+    return () => clearInterval(intervalId);
+  }, [contestId, user, navigate]);
 
   const formatTimeAgo = (dateString) => {
     if (!dateString) return '';
