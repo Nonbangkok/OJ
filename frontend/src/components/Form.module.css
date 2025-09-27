@@ -62,6 +62,10 @@
   min-height: 120px;
 }
 
+.form-time h2{
+  color: black;
+}
+
 /* General Button Style */
 button, .button {
   display: inline-block;

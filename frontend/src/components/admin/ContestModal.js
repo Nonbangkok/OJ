@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import formStyles from '../Form.module.css';
 import modalStyles from './ModalLayout.module.css';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -9,33 +11,19 @@ function ContestModal({ contest, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    start_time: '',
-    end_time: ''
+    start_time: null,
+    end_time: null
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (contest) {
-      // Convert UTC timestamps to local datetime-local format
-      const startTime = new Date(contest.start_time);
-      const endTime = new Date(contest.end_time);
-      
-      // Format for datetime-local input (YYYY-MM-DDTHH:MM)
-      const formatForInput = (date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        return `${year}-${month}-${day}T${hours}:${minutes}`;
-      };
-
       setFormData({
         title: contest.title || '',
         description: contest.description || '',
-        start_time: formatForInput(startTime),
-        end_time: formatForInput(endTime)
+        start_time: new Date(contest.start_time),
+        end_time: new Date(contest.end_time)
       });
     } else {
       // Default to tomorrow for new contests
@@ -46,20 +34,11 @@ function ContestModal({ contest, onClose, onSuccess }) {
       const dayAfter = new Date(tomorrow);
       dayAfter.setHours(16, 0, 0, 0); // 4:00 PM same day
       
-      const formatForInput = (date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        return `${year}-${month}-${day}T${hours}:${minutes}`;
-      };
-
       setFormData({
         title: '',
         description: '',
-        start_time: formatForInput(tomorrow),
-        end_time: formatForInput(dayAfter)
+        start_time: tomorrow,
+        end_time: dayAfter
       });
     }
   }, [contest]);
@@ -78,8 +57,8 @@ function ContestModal({ contest, onClose, onSuccess }) {
       return;
     }
     
-    const startTime = new Date(formData.start_time);
-    const endTime = new Date(formData.end_time);
+    const startTime = formData.start_time;
+    const endTime = formData.end_time;
     
     if (startTime >= endTime) {
       setError('End time must be after start time');
@@ -92,19 +71,11 @@ function ContestModal({ contest, onClose, onSuccess }) {
       return;
     }
     
-    // // Minimum contest duration (30 minutes)
-    // const durationMs = endTime - startTime;
-    // const minDurationMs = 30 * 60 * 1000; // 30 minutes
-    // if (durationMs < minDurationMs) {
-    //   setError('Contest must be at least 30 minutes long');
-    //   return;
-    // }
-
     try {
       setLoading(true);
       setError('');
       
-      // Convert local datetime to UTC for backend
+      // Convert Date objects to ISO strings for backend
       const contestData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
@@ -141,11 +112,18 @@ function ContestModal({ contest, onClose, onSuccess }) {
     }));
   };
 
+  const handleDateChange = (date, name) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: date
+    }));
+  };
+
   const getDurationText = () => {
     if (formData.start_time && formData.end_time) {
-      const startTime = new Date(formData.start_time);
-      const endTime = new Date(formData.end_time);
-      const durationMs = endTime - startTime;
+      const startTime = formData.start_time;
+      const endTime = formData.end_time;
+      const durationMs = endTime.getTime() - startTime.getTime();
       
       if (durationMs > 0) {
         const hours = Math.floor(durationMs / (1000 * 60 * 60));
@@ -212,31 +190,39 @@ function ContestModal({ contest, onClose, onSuccess }) {
           {/* Start Time */}
           <div className={formStyles['form-group']}>
             <label htmlFor="start_time">
-              Start Time *
+              Start Time :
             </label>
-            <input
-              type="datetime-local"
-              id="start_time"
-              name="start_time"
-              value={formData.start_time}
-              onChange={handleChange}
-              required
-            />
+            <div className={formStyles['form-time']}>
+              <DatePicker
+                selected={formData.start_time}
+                onChange={(date) => handleDateChange(date, 'start_time')}
+                showTimeSelect
+                dateFormat="MMM dd, yyyy, h:mm aa"
+                timeFormat="HH:mm"
+                timeIntervals={30}
+                minDate={new Date()}
+                required
+              />
+            </div>
           </div>
 
           {/* End Time */}
           <div className={formStyles['form-group']}>
             <label htmlFor="end_time">
-              End Time *
+              End Time :
             </label>
-            <input
-              type="datetime-local"
-              id="end_time"
-              name="end_time"
-              value={formData.end_time}
-              onChange={handleChange}
+            <div className={formStyles['form-time']}>
+            <DatePicker
+              selected={formData.end_time}
+              onChange={(date) => handleDateChange(date, 'end_time')}
+              showTimeSelect
+              dateFormat="MMM dd, yyyy, h:mm aa"
+              timeFormat="HH:mm"
+              timeIntervals={30}
+              minDate={formData.start_time || new Date()}
               required
             />
+            </div>
           </div>
 
           {/* Duration Display */}
