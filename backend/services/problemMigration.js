@@ -168,7 +168,8 @@ const migrateSubmissionsAfterContest = async (contestId) => {
         SELECT
           cs.user_id,
           cs.problem_id,
-          MAX(cs.score) AS best_score
+          MAX(cs.score) AS best_score,
+          MAX(cs.submitted_at) AS latest_score_time
         FROM contest_submissions cs
         WHERE cs.contest_id = $1
         GROUP BY cs.user_id, cs.problem_id
@@ -177,12 +178,13 @@ const migrateSubmissionsAfterContest = async (contestId) => {
         SELECT
           ubs.user_id,
           SUM(ubs.best_score) AS total_score,
-          jsonb_object_agg(ubs.problem_id, ubs.best_score) AS detailed_scores
+          jsonb_object_agg(ubs.problem_id, ubs.best_score) AS detailed_scores,
+          MAX(ubs.latest_score_time) AS last_score_improvement_time
         FROM UserBestScores ubs
         GROUP BY ubs.user_id
       )
-      INSERT INTO contest_scoreboards (contest_id, user_id, total_score, detailed_scores)
-      SELECT $1, uts.user_id, uts.total_score, uts.detailed_scores
+      INSERT INTO contest_scoreboards (contest_id, user_id, total_score, detailed_scores, last_score_improvement_time)
+      SELECT $1, uts.user_id, uts.total_score, uts.detailed_scores, uts.last_score_improvement_time
       FROM UserTotalScores uts
       JOIN contest_participants cp ON cp.user_id = uts.user_id AND cp.contest_id = $1
       RETURNING *

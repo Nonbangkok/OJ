@@ -861,7 +861,8 @@ app.get('/scoreboard', requireAuth, async (req, res) => {
         SELECT
           user_id,
           problem_id,
-          MAX(score) AS best_score
+          MAX(score) AS best_score,
+          MAX(submitted_at) AS latest_score_time
         FROM submissions
         GROUP BY user_id, problem_id
       )
@@ -869,11 +870,12 @@ app.get('/scoreboard', requireAuth, async (req, res) => {
       SELECT
         u.username,
         SUM(ubs.best_score) AS total_score,
-        COUNT(CASE WHEN ubs.best_score = 100 THEN 1 END) AS problems_solved
+        COUNT(CASE WHEN ubs.best_score = 100 THEN 1 END) AS problems_solved,
+        MAX(ubs.latest_score_time) AS last_score_improvement_time
       FROM UserBestScores ubs
       JOIN users u ON ubs.user_id = u.id
       GROUP BY u.username
-      ORDER BY total_score DESC, problems_solved DESC;
+      ORDER BY total_score DESC, last_score_improvement_time ASC;
     `);
     res.json(result.rows);
   } catch (error) {

@@ -133,6 +133,7 @@ const createTables = async () => {
       user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       total_score INTEGER NOT NULL,
       detailed_scores JSONB,
+      last_score_improvement_time TIMESTAMPTZ,
       PRIMARY KEY (contest_id, user_id)
     );
   `;
@@ -192,6 +193,7 @@ const createTables = async () => {
       await db.query('CREATE INDEX IF NOT EXISTS idx_contests_status ON contests(status);');
       await db.query('CREATE INDEX IF NOT EXISTS idx_contests_time ON contests(start_time, end_time);');
       await db.query('CREATE INDEX IF NOT EXISTS idx_contest_problems_contest ON contest_problems(contest_id);');
+      await db.query('CREATE INDEX IF NOT EXISTS idx_contest_scoreboards_score_time ON contest_scoreboards(total_score DESC, last_score_improvement_time ASC);');
       console.log('Database indexes created successfully!');
     } catch (indexErr) {
       console.log('Error creating indexes:', indexErr.message);

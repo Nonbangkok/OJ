@@ -234,7 +234,7 @@ router.get('/:id/scoreboard', requireAuth, async (req, res) => {
           FROM contest_scoreboards cs
           JOIN users u ON cs.user_id = u.id
           WHERE cs.contest_id = $1
-          ORDER BY cs.total_score DESC
+          ORDER BY cs.total_score DESC, cs.last_score_improvement_time ASC
         `, [id]),
         db.query(`
           SELECT problem_id, title
@@ -256,7 +256,8 @@ router.get('/:id/scoreboard', requireAuth, async (req, res) => {
             SELECT
               cs.user_id,
               cs.problem_id,
-              MAX(cs.score) AS best_score
+              MAX(cs.score) AS best_score,
+              MAX(cs.submitted_at) AS latest_score_time
             FROM contest_submissions cs
             WHERE cs.contest_id = $1
             GROUP BY cs.user_id, cs.problem_id
@@ -267,7 +268,8 @@ router.get('/:id/scoreboard', requireAuth, async (req, res) => {
               SUM(ubs.best_score) AS total_score,
               jsonb_object_agg(ubs.problem_id, jsonb_build_object(
                 'score', ubs.best_score
-              )) AS detailed_scores
+              )) AS detailed_scores,
+              MAX(ubs.latest_score_time) AS last_score_improvement_time
             FROM UserBestScores ubs
             GROUP BY ubs.user_id
           ),
@@ -276,7 +278,8 @@ router.get('/:id/scoreboard', requireAuth, async (req, res) => {
               cp.user_id,
               u.username,
               COALESCE(uts.total_score, 0) AS total_score,
-              COALESCE(uts.detailed_scores, '{}'::jsonb) AS detailed_scores
+              COALESCE(uts.detailed_scores, '{}'::jsonb) AS detailed_scores,
+              COALESCE(uts.last_score_improvement_time, cp.joined_at) AS last_score_improvement_time
             FROM contest_participants cp
             JOIN users u ON cp.user_id = u.id
             LEFT JOIN UserTotalScores uts ON uts.user_id = cp.user_id
@@ -284,7 +287,7 @@ router.get('/:id/scoreboard', requireAuth, async (req, res) => {
           )
           SELECT *
           FROM AllParticipants
-          ORDER BY total_score DESC, username ASC
+          ORDER BY total_score DESC, last_score_improvement_time ASC
         `, [id]),
         db.query(`
           SELECT id as problem_id, title
