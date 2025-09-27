@@ -1,5 +1,7 @@
 # Grader System
 
+![Grader Logo](frontend/public/logo512.png)
+
 The Grader System is a comprehensive online judge platform designed to facilitate competitive programming and programming education. It features a modern, responsive React frontend, a robust Node.js (Express) backend, and a PostgreSQL database, all orchestrated with Docker for seamless setup, deployment, and scalability. This system allows users to register, solve programming problems by submitting C++ code, and receive real-time feedback on their submissions. Administrators have powerful tools to manage users, problems, contests, and the database, making it a versatile platform for various programming challenges.
 
 **Target Audience:** This system is ideal for students, educators, and anyone interested in developing their programming skills through competitive programming or structured practice.
@@ -282,7 +284,7 @@ Each problem directory (either at the root of a multi-problem ZIP or the content
 
         ```
         Internal structure of problem testcases , Option C :
-        └── testcases/
+        └── data/
             ├── input1.txt
             ├── output1.txt
             ├── case_02.in
