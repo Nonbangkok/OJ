@@ -33,8 +33,8 @@ const moveProblemsToContest = async (contestId, problemIds) => {
     }
     
     const contest = contestResult.rows[0];
-    if (contest.status !== 'scheduled') {
-      throw new Error('Can only move problems to scheduled contests');
+    if (contest.status !== 'scheduled' && contest.status !== 'running') {
+      throw new Error('Can only move problems to scheduled or running contests');
     }
     
     // Check if all problems exist and are in main system (contest_id IS NULL)

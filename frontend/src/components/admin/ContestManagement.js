@@ -208,7 +208,7 @@ function ContestManagement({ currentUser }) {
                         onClick={() => handleManageProblems(contest)}
                         className={styles['problems-btn']}
                         title="Manage Problems"
-                        disabled={contest.status === 'running' || contest.status === 'finished'}
+                        disabled={contest.status === 'finished'}
                       >
                         Problems
                       </button>

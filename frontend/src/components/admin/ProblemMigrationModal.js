@@ -126,7 +126,7 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
     }
   };
 
-  const canMoveProblems = contest.status === 'scheduled';
+  const canMoveProblems = contest.status === 'scheduled' || contest.status === 'running';
 
   if (loading) {
     return (
@@ -158,9 +158,9 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
           </div>
         )}
         
-        {contest.status !== 'scheduled' && (
+        {contest.status !== 'scheduled' && contest.status !== 'running' && (
           <div className={modalStyles.migrationModalWarning}>
-            Problems can only be modified for scheduled contests.
+            Problems can only be modified for scheduled or running contests.
             This contest is currently {contest.status}.
           </div>
         )}

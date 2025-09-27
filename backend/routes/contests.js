@@ -505,9 +505,9 @@ router.delete('/:id/problems/:problemId', requireAuth, requireStaffOrAdmin, asyn
     }
 
     const contest = contestResult.rows[0];
-    if (contest.status !== 'scheduled') {
-      return res.status(400).json({ 
-        message: 'Can only move problems from scheduled contests' 
+    if (contest.status !== 'scheduled' && contest.status !== 'running') {
+      return res.status(400).json({
+        message: 'Can only move problems from scheduled or running contests'
       });
     }
 
