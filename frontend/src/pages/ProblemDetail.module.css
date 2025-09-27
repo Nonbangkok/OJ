@@ -148,6 +148,7 @@
 }
 
 .problem-nav {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -156,7 +157,13 @@
   padding-top: 1rem;
 }
 
+.problem-nav button {
+  position: relative;
+  z-index: 2;
+}
+
 .nav-btn {
+  position: relative;
   width: 100%;
   padding: 0.8rem 1rem;
   font-size: 1rem;
@@ -176,9 +183,20 @@
 }
 
 .nav-btn.active {
-  background-color: var(--primary-color-faded);
+  background-color: transparent;
   color: var(--primary-color);
   font-weight: 600;
+}
+
+.slider {
+  position: absolute;
+  transform: translateY(-50%);
+  width: 100%;
+  background-color: var(--navbar-slider-background);
+  border-radius: 6px;
+  z-index: 1;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .content-wrapper {

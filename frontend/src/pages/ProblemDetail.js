@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import styles from './ProblemDetail.module.css';
@@ -15,6 +15,8 @@ function ProblemDetail() {
   const [hiddenProblemInfo, setHiddenProblemInfo] = useState(null);
   const [activeView, setActiveView] = useState('statement');
   const [contest, setContest] = useState(null);
+  const navRef = useRef(null);
+  const [sliderStyle, setSliderStyle] = useState({ opacity: 0 });
 
   useEffect(() => {
     const fetchProblem = async () => {
@@ -66,6 +68,40 @@ function ProblemDetail() {
       fetchProblem();
     }
   }, [problemId, contestId]);
+
+  const handleMouseEnter = (e) => {
+    const btn = e.currentTarget;
+    setSliderStyle({
+      height: btn.offsetHeight + 5,
+      top: btn.offsetTop + 22,
+      opacity: 1,
+    });
+  };
+
+  const resetSlider = () => {
+    try {
+      const activeBtn = navRef.current?.querySelector(`.${styles.active}`);
+      if (activeBtn) {
+        setSliderStyle({
+          height: activeBtn.offsetHeight + 5,
+          top: activeBtn.offsetTop + 22,
+          opacity: 1,
+        });
+      } else {
+        setSliderStyle({ ...sliderStyle, opacity: 0 });
+      }
+    } catch (e) {
+      setSliderStyle({ opacity: 0 });
+    }
+  };
+
+  useEffect(() => {
+    // Delay to ensure DOM is ready for measurement
+    const timer = setTimeout(() => {
+      resetSlider();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [activeView, problem]); // Recalculate on view or problem change
 
   const handlePdfView = () => {
     if (!problem || !problem.has_pdf) return;
@@ -175,22 +211,26 @@ function ProblemDetail() {
               </button>
             )}
           </div>
-          <nav className={styles['problem-nav']}>
+          <nav ref={navRef} className={styles['problem-nav']} onMouseLeave={resetSlider}>
+            <div className={styles.slider} style={sliderStyle} />
             <button
               className={`${styles['nav-btn']} ${activeView === 'statement' ? styles.active : ''}`}
               onClick={() => setActiveView('statement')}
+              onMouseEnter={handleMouseEnter}
             >
               Statement
             </button>
             <button
               className={`${styles['nav-btn']} ${activeView === 'submit' ? styles.active : ''}`}
               onClick={() => setActiveView('submit')}
+              onMouseEnter={handleMouseEnter}
             >
               Submit
             </button>
             <button
               className={`${styles['nav-btn']} ${activeView === 'submissions' ? styles.active : ''}`}
               onClick={() => setActiveView('submissions')}
+              onMouseEnter={handleMouseEnter}
             >
               My Submissions
             </button>
