@@ -4,27 +4,11 @@ import axios from 'axios';
 import styles from './ContestNavbar.module.css';
 import { useAuth } from '../context/AuthContext';
 import ThemeToggleButton from './ThemeToggleButton';
+import { useTheme } from '../context/ThemeContext'; // Import useTheme
+import logo from '../assets/logo512.png'; // Import default logo
+import darkmodeLogo from '../assets/logo512_darkmode.png'; // Import dark mode logo
 
 const API_URL = process.env.REACT_APP_API_URL;
-
-// A simple, self-contained SVG icon component for the back arrow
-const ArrowLeftIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <line x1="19" y1="12" x2="5" y2="12"></line>
-    <polyline points="12 19 5 12 12 5"></polyline>
-  </svg>
-);
 
 function ContestNavbar() {
   const { contestId } = useParams();
@@ -33,6 +17,8 @@ function ContestNavbar() {
   const { user, logout } = useAuth();
   const [contest, setContest] = useState(null);
   const navRef = useRef(null);
+  const { theme } = useTheme(); // Get current theme
+  const currentLogo = theme === 'dark' ? darkmodeLogo : logo; // Choose logo based on theme
   const [sliderStyle, setSliderStyle] = useState({ opacity: 0 });
 
   useEffect(() => {
@@ -49,10 +35,6 @@ function ContestNavbar() {
       fetchContestDetails();
     }
   }, [contestId]);
-
-  const handleExit = () => {
-    navigate('/contests');
-  };
 
   const handleLogout = () => {
     logout();
@@ -98,9 +80,9 @@ function ContestNavbar() {
       <div className={styles.effectHolder}></div>
       <div className={styles['navbar-container']}>
         <div className={styles['nav-left']}>
-          <button onClick={handleExit} className={styles['back-btn']} title="Exit Contest">
-            <ArrowLeftIcon />
-          </button>
+          <NavLink to="/contests" className={styles['back-btn']}>
+            <img src={currentLogo} alt="Grader Logo" className={styles['nav-logo']} />
+          </NavLink>
           <NavLink to={`/contests/${contestId}`} className={styles['nav-brand']}>
             {contest?.title}
           </NavLink>

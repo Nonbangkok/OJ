@@ -4,6 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import ThemeToggleButton from './ThemeToggleButton';
 import styles from './Navbar.module.css';
+import { useTheme } from '../context/ThemeContext'; // Import useTheme
+import logo from '../assets/logo512.png'; // Import default logo
+import darkmodeLogo from '../assets/logo512_darkmode.png'; // Import dark mode logo
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -11,6 +14,8 @@ const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const navRef = useRef(null);
+  const { theme } = useTheme(); // Get current theme
+  const currentLogo = theme === 'dark' ? darkmodeLogo : logo; // Choose logo based on theme
   const [sliderStyle, setSliderStyle] = useState({ opacity: 0 });
 
   const handleLogout = () => {
@@ -61,7 +66,10 @@ const Navbar = () => {
   return (
     <nav className={styles.navbar}>
       <div className={styles['navbar-container']}>
-        <NavLink to="/" className={styles['nav-brand']}>WOI Grader</NavLink>
+        <NavLink to="/" className={styles['nav-brand']}>
+          <img src={currentLogo} alt="WOI Grader Logo" className={styles['nav-logo']} />
+          WOI Grader
+        </NavLink>
         <ul ref={navRef} className={styles['nav-links']} onMouseLeave={resetSlider}>
           <div className={styles.slider} style={sliderStyle} />
           <li onMouseEnter={handleMouseEnter}><NavLink to="/problems">Problems</NavLink></li>

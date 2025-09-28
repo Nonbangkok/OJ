@@ -3,31 +3,17 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ThemeToggleButton from './ThemeToggleButton';
 import styles from './AdminNavbar.module.css';
-
-// Copied from ContestNavbar.js
-const ArrowLeftIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <line x1="19" y1="12" x2="5" y2="12"></line>
-    <polyline points="12 19 5 12 12 5"></polyline>
-  </svg>
-);
+import { useTheme } from '../context/ThemeContext'; // Import useTheme
+import logo from '../assets/logo512.png'; // Import default logo
+import darkmodeLogo from '../assets/logo512_darkmode.png'; // Import dark mode logo
 
 const AdminNavbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const navRef = useRef(null);
+  const { theme } = useTheme(); // Get current theme
+  const currentLogo = theme === 'dark' ? darkmodeLogo : logo; // Choose logo based on theme
   const [sliderStyle, setSliderStyle] = useState({ opacity: 0 });
 
   const handleLogout = () => {
@@ -37,10 +23,6 @@ const AdminNavbar = () => {
     } catch (error) {
       console.error('Error logging out:', error);
     }
-  };
-
-  const handleExit = () => {
-    navigate('/');
   };
 
   const handleMouseEnter = (e) => {
@@ -81,9 +63,9 @@ const AdminNavbar = () => {
     <nav className={styles.navbar}>
       <div className={styles['navbar-container']}>
         <div className={styles['nav-left']}>
-          <button onClick={handleExit} className={styles['back-btn']} title="Exit Admin Panel">
-            <ArrowLeftIcon />
-          </button>
+          <NavLink to="/" className={styles['back-btn']}>
+            <img src={currentLogo} alt="Grader Logo" className={styles['nav-logo']} />
+          </NavLink>
           <NavLink to="/admin" className={styles['nav-brand']}>
             {user?.role === 'admin' ? 'Admin Panel' : 'Staff Panel'}
           </NavLink>

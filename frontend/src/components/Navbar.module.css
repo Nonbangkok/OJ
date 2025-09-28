@@ -18,10 +18,17 @@
 }
 
 .nav-brand {
+  display: flex;
+  align-items: center;
   font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
+  font-weight: bold;
+  color: var(--text-color);
   text-decoration: none;
+}
+
+.nav-logo {
+  height: 40px; /* Adjust height as needed */
+  margin-right: 10px; /* Space between logo and text */
 }
 
 .nav-links {

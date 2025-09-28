@@ -22,7 +22,6 @@
 .nav-left {
   display: flex;
   align-items: center;
-  gap: 0.75rem; /* Adjust gap between button and title */
   min-width: 0; /* Important: Allows the container to shrink and the title to truncate */
 }
 
@@ -30,18 +29,11 @@
   background: none;
   border: none;
   cursor: pointer;
-  padding: 0.5rem;
+  padding: 0.5rem 0 0.5rem 0;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
-  border-radius: 50%;
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-.back-btn:hover {
-  background-color: var(--background-tertiary);
-  color: var(--text-primary);
 }
 
 .back-btn svg {
@@ -49,18 +41,19 @@
   height: 22px;
 }
 
-
 /* Nav Brand (Contest Title) */
 .nav-brand {
+  display: flex;
+  align-items: center;
   font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
+  font-weight: bold;
+  color: var(--text-color);
   text-decoration: none;
-  transition: color 0.2s ease;
+}
 
-  /* Properties for handling long text */
-  white-space: nowrap;
-  text-overflow: ellipsis;
+.nav-logo {
+  height: 40px; /* Adjust height as needed */
+  margin-right: 10px; /* Space between logo and text */
 }
 
 .nav-brand:hover {
