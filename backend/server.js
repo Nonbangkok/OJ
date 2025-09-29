@@ -46,7 +46,7 @@ app.set('trust proxy', 1); // Trust the reverse proxy for secure cookies
 const port = process.env.PORT;
 
 // CORS configuration
-const allowedOrigins = ['https://woi-grader.com', 'http://www.woi-grader.com', 'https://www.woi-grader.com', 'http://localhost', 'http://grader-chan.com'];
+const allowedOrigins = ['https://woi-grader.com', 'https://www.woi-grader.com', 'http://localhost', 'http://grader-chan.com'];
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
