@@ -10,7 +10,6 @@ const bcrypt = require('bcrypt');
 const { body, validationResult } = require('express-validator');
 const db = require('./db'); // This is your existing pg pool from db.js
 const multer = require('multer');
-const cors = require('cors');
 
 // Import Contest routes and scheduler
 const contestRoutes = require('./routes/contests');
