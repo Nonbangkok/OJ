@@ -47,9 +47,18 @@ const port = process.env.PORT;
 
 app.use(express.json());
 // ปรับ CORS middleware ให้รองรับทั้ง www และ non-www domain โดยใช้ฟังก์ชันตรวจสอบ origin แบบ dynamic
+// กำหนด Access-Control-Allow-Credentials ให้เป็น true โดยใช้ options ของ CORS middleware
 app.use(cors({
-  origin: ["https://www.woi-grader.com", "https://woi-grader.com"],
-  credentials: true
+  origin: function(origin, callback) {
+    // อนุญาตทั้ง www และ non-www domain
+    const allowedOrigins = ["https://www.woi-grader.com", "https://woi-grader.com"];
+    if (!origin) return callback(null, true); // สำหรับ non-browser client หรือ curl
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true // ตรงนี้จะ set Access-Control-Allow-Credentials: true
 }));
 
 // PostgreSQL session store setup
