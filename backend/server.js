@@ -45,34 +45,8 @@ const app = express();
 app.set('trust proxy', 1); // Trust the reverse proxy for secure cookies
 const port = process.env.PORT;
 
-// CORS configuration
-const allowedOrigins = [
-  'https://www.woi-grader.com',
-  'https://www.woi-grader.com/api/me',
-  'http://localhost:3000', // For development
-  'http://localhost:3001'  // For development
-];
-
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, postman, etc.)
-    console.log(origin);
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log('Blocked CORS request from origin:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  optionsSuccessStatus: 200 // For legacy browser support
-};
-
-app.use(cors(corsOptions));
+// CORS is now handled by nginx-proxy to prevent duplicate headers
+// Backend will not send CORS headers - nginx will handle all CORS logic
 
 app.use(express.json());
 
