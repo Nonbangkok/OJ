@@ -45,8 +45,44 @@ const app = express();
 app.set('trust proxy', 1); // Trust the reverse proxy for secure cookies
 const port = process.env.PORT;
 
-// CORS is now handled by nginx-proxy to prevent duplicate headers
-// Backend will not send CORS headers - nginx will handle all CORS logic
+// // CORS configuration
+// const allowedOrigins = ['https://www.woi-grader.com'];
+// const corsOptions = {
+//   origin: function (origin, callback) {
+//     console.log(origin);
+//     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+//       callback(null, true);
+//     } else {
+//       callback(new Error('Not allowed by CORS'));
+//     }
+//   },
+//   credentials: true,
+// };
+// app.use(cors(corsOptions));
+// CORS configuration for production
+const allowedOrigins = [
+  'https://www.woi-grader.com',
+  'https://woi-grader.com',
+  'http://localhost:3000',
+  'http://localhost:3001'
+];
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked for origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+app.use(cors(corsOptions));
 
 app.use(express.json());
 
