@@ -10,6 +10,7 @@ const bcrypt = require('bcrypt');
 const { body, validationResult } = require('express-validator');
 const db = require('./db'); // This is your existing pg pool from db.js
 const multer = require('multer');
+const cors = require('cors');
 
 // Import Contest routes and scheduler
 const contestRoutes = require('./routes/contests');
@@ -45,6 +46,7 @@ app.set('trust proxy', 1); // Trust the reverse proxy for secure cookies
 const port = process.env.PORT;
 
 app.use(express.json());
+app.use(cors({ origin: "https://www.woi-grader.com", credentials: true }));
 
 // PostgreSQL session store setup
 app.use(session({
