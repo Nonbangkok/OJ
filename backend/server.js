@@ -10,6 +10,7 @@ const bcrypt = require('bcrypt');
 const { body, validationResult } = require('express-validator');
 const db = require('./db'); // This is your existing pg pool from db.js
 const multer = require('multer');
+const cors = require('cors');
 
 // Import Contest routes and scheduler
 const contestRoutes = require('./routes/contests');
@@ -43,6 +44,20 @@ const diskUpload = multer({ storage: diskStorage });
 const app = express();
 app.set('trust proxy', 1); // Trust the reverse proxy for secure cookies
 const port = process.env.PORT;
+
+// CORS configuration
+const allowedOrigins = ['https://woi-grader.com', 'https://www.woi-grader.com', 'http://localhost', 'http://grader-chan.com'];
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+};
+app.use(cors(corsOptions));
 
 app.use(express.json());
 
