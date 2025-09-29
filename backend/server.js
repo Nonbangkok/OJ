@@ -47,7 +47,10 @@ const port = process.env.PORT;
 
 app.use(express.json());
 
-app.use(cors({ origin: "*"}));
+app.use(cors({
+  origin: ["https://www.woi-grader.com", "https://woi-grader.com"],
+  credentials: true
+}));
 
 // PostgreSQL session store setup
 app.use(session({
