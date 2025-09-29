@@ -48,18 +48,7 @@ const port = process.env.PORT;
 app.use(express.json());
 // ปรับ CORS middleware ให้รองรับทั้ง www และ non-www domain โดยใช้ฟังก์ชันตรวจสอบ origin แบบ dynamic
 app.use(cors({
-  origin: function (origin, callback) {
-    // อนุญาตทั้ง www และ non-www หรือ origin ที่ไม่มี (เช่น curl หรือ server-side)
-    if (
-      !origin ||
-      origin === "https://www.woi-grader.com" ||
-      origin === "https://woi-grader.com"
-    ) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
+  origin: ["https://www.woi-grader.com", "https://woi-grader.com"],
   credentials: true
 }));
 
