@@ -49,10 +49,11 @@ const port = process.env.PORT;
 const allowedOrigins = ['https://woi-grader.com', 'https://www.woi-grader.com', 'http://localhost'];
 const corsOptions = {
   origin: function (origin, callback) {
+    console.log(origin);
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(null, true);
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
