@@ -48,7 +48,7 @@ const port = process.env.PORT;
 // CORS configuration
 const allowedOrigins = [
   'https://www.woi-grader.com',
-  'https://woi-grader.com',
+  'https://www.woi-grader.com/api/me',
   'http://localhost:3000', // For development
   'http://localhost:3001'  // For development
 ];
@@ -56,6 +56,7 @@ const allowedOrigins = [
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, postman, etc.)
+    console.log(origin);
     if (!origin) return callback(null, true);
     
     if (allowedOrigins.includes(origin)) {
