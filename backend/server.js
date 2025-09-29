@@ -45,20 +45,21 @@ const app = express();
 app.set('trust proxy', 1); // Trust the reverse proxy for secure cookies
 const port = process.env.PORT;
 
-// CORS configuration
-const allowedOrigins = ['https://woi-grader.com', 'https://www.woi-grader.com', 'http://localhost'];
-const corsOptions = {
-  origin: function (origin, callback) {
-    console.log(origin);
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-};
-app.use(cors(corsOptions));
+// // CORS configuration
+// const allowedOrigins = ['https://www.woi-grader.com'];
+// const corsOptions = {
+//   origin: function (origin, callback) {
+//     console.log(origin);
+//     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+//       callback(null, true);
+//     } else {
+//       callback(new Error('Not allowed by CORS'));
+//     }
+//   },
+//   credentials: true,
+// };
+// app.use(cors(corsOptions));
+app.use(cors({ origin: "*"}));
 
 app.use(express.json());
 
