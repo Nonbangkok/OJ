@@ -703,8 +703,9 @@ router.get('/:id/problems/:problemId/pdf', requireAuth_pdf, async (req, res) => 
       'SELECT 1 FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
       [contestId, userId]
     );
+    console.log(participantRes.rows);
     if (participantRes.rows.length === 0) {
-      return res.status(403).json({ message: 'You are not a participant in this contest.' });
+      return res.status(403).json({ message: '--You are not a participant in this contest.--' });
     }
 
     // 2. Fetch the PDF data based on contest status
