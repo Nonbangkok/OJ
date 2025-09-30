@@ -15,7 +15,7 @@ const cors = require('cors'); // Import the cors middleware
 // Import Contest routes and scheduler
 const contestRoutes = require('./routes/contests');
 const contestScheduler = require('./services/contestScheduler');
-const { requireAuth, requireAuth_pdf, requireStaffOrAdmin } = require('./middleware/auth');
+const { requireAuth, requireStaffOrAdmin } = require('./middleware/auth');
 const unzipper = require('unzipper');
 const { processBatchUpload } = require('./services/batchUploadService'); // Import the new service
 
@@ -741,7 +741,7 @@ app.get('/problems/:id', async (req, res) => {
   }
 });
 
-app.get('/problems/:id/pdf', requireAuth_pdf, async (req, res) => {
+app.get('/problems/:id/pdf', requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const result = await db.query('SELECT problem_pdf FROM problems WHERE id = $1', [id]);

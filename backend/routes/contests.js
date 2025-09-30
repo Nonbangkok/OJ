@@ -2,7 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const db = require('../db');
 const problemMigration = require('../services/problemMigration');
-const { requireAuth, requireAuth_pdf, requireStaffOrAdmin } = require('../middleware/auth');
+const { requireAuth, requireStaffOrAdmin } = require('../middleware/auth');
 const router = express.Router();
 
 // ==========================================
@@ -651,7 +651,7 @@ router.get('/:id/problems/:problemId', requireAuth, async (req, res) => {
       [contestId, userId]
     );
     if (participantRes.rows.length === 0) {
-      return res.status(403).json({ message: '-You are not a participant in this contest.-' });
+      return res.status(403).json({ message: 'You are not a participant in this contest.' });
     }
 
     // 2. Fetch problem details based on contest status
@@ -683,14 +683,9 @@ router.get('/:id/problems/:problemId', requireAuth, async (req, res) => {
 });
 
 // GET /api/contests/:id/problems/:problemId/pdf - Get a single contest problem's PDF
-router.get('/:id/problems/:problemId/pdf', requireAuth_pdf, async (req, res) => {
+router.get('/:id/problems/:problemId/pdf', requireAuth, async (req, res) => {
   const { id: contestId, problemId } = req.params;
   const { userId } = req.session;
-  console.log("0--------------------------------0");
-  console.log(req.params);
-  console.log(req.session);
-  console.log(req.session.userId);
-  console.log("0--------------------------------0");
 
   try {
     // 1. Check contest status and user participation (similar to getting problem details)
@@ -708,9 +703,8 @@ router.get('/:id/problems/:problemId/pdf', requireAuth_pdf, async (req, res) => 
       'SELECT 1 FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
       [contestId, userId]
     );
-
     if (participantRes.rows.length === 0) {
-      return res.status(403).json({ message: '--You are not a participant in this contest.--' });
+      return res.status(403).json({ message: 'You are not a participant in this contest.' });
     }
 
     // 2. Fetch the PDF data based on contest status
