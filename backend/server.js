@@ -741,7 +741,8 @@ app.get('/problems/:id', async (req, res) => {
   }
 });
 
-app.get('/problems/:id/pdf', requireAuth_pdf, async (req, res) => {
+// app.get('/problems/:id/pdf', requireAuth_pdf, async (req, res) => {
+app.get('/problems/:id/pdf', requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const result = await db.query('SELECT problem_pdf FROM problems WHERE id = $1', [id]);
