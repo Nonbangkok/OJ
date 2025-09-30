@@ -46,12 +46,16 @@ const port = process.env.PORT;
 
 app.use(express.json());
 
-// Add a middleware to set the CORS header
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', 'https://www.woi-grader.com');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS'); // Add other allowed methods
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization'); // Add other allowed headers
-  res.setHeader('Access-Control-Allow-Credentials', 'true'); // Allow credentials (cookies) to be sent
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  
+  // Handle preflight OPTIONS requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204); // No content, just send headers
+  }
   next();
 });
 
