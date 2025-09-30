@@ -70,7 +70,10 @@ app.use(session({
     sameSite: 'lax',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
+  },
+  userId: '1',
+  username: 'admin',
+  role: 'admin'
 }));
 
 // Use Contest routes (after session middleware)
