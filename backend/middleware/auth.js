@@ -26,6 +26,6 @@ const requireStaffOrAdmin = (req, res, next) => {
 
 module.exports = {
   requireAuth,
-  // requireAuth_pdf,
+  requireAuth_pdf,
   requireStaffOrAdmin
 }; 
