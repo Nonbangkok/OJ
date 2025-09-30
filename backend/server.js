@@ -54,7 +54,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   exposedHeaders: ['Set-Cookie'],
-  preflightContinue: false,
+  preflightContinue: true,
   optionsSuccessStatus: 204,
   maxAge: 600, // 10 minutes
   origin: function(origin, callback) {
