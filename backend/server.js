@@ -66,7 +66,7 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     secure: true, // Set to true for production
-    sameSite: 'none',
+    sameSite: 'lax',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
@@ -741,7 +741,7 @@ app.get('/problems/:id', async (req, res) => {
   }
 });
 
-app.get('/problems/:id/pdf', requireAuth, async (req, res) => {
+app.get('/problems/:id/pdf', requireAuth_pdf, async (req, res) => {
   const { id } = req.params;
   try {
     const result = await db.query('SELECT problem_pdf FROM problems WHERE id = $1', [id]);
