@@ -686,6 +686,11 @@ router.get('/:id/problems/:problemId', requireAuth, async (req, res) => {
 router.get('/:id/problems/:problemId/pdf', requireAuth_pdf, async (req, res) => {
   const { id: contestId, problemId } = req.params;
   const { userId } = req.session;
+  console.log("0--------------------------------0");
+  console.log(req.params);
+  console.log(req.session);
+  console.log(req.session.userId);
+  console.log("0--------------------------------0");
 
   try {
     // 1. Check contest status and user participation (similar to getting problem details)
@@ -703,7 +708,7 @@ router.get('/:id/problems/:problemId/pdf', requireAuth_pdf, async (req, res) => 
       'SELECT 1 FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
       [contestId, userId]
     );
-    console.log(participantRes.rows);
+
     if (participantRes.rows.length === 0) {
       return res.status(403).json({ message: '--You are not a participant in this contest.--' });
     }
