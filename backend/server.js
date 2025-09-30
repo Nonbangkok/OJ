@@ -10,6 +10,7 @@ const bcrypt = require('bcrypt');
 const { body, validationResult } = require('express-validator');
 const db = require('./db'); // This is your existing pg pool from db.js
 const multer = require('multer');
+const cors = require('cors'); // Import the cors middleware
 
 // Import Contest routes and scheduler
 const contestRoutes = require('./routes/contests');
@@ -46,18 +47,13 @@ const port = process.env.PORT;
 
 app.use(express.json());
 
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', 'https://www.woi-grader.com');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  
-  // Handle preflight OPTIONS requests
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(204); // No content, just send headers
-  }
-  next();
-});
+// Configure CORS using the cors middleware
+app.use(cors({
+  origin: 'https://www.woi-grader.com',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 
 // PostgreSQL session store setup
 app.use(session({
