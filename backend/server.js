@@ -48,24 +48,13 @@ const port = process.env.PORT;
 app.use(express.json());
 
 // Configure CORS using the cors middleware
-// app.use(cors({
-//   origin: 'https://www.woi-grader.com',
-//   credentials: true,
-//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-//   allowedHeaders: ['Content-Type', 'Authorization'],
-//   exposedHeaders: ['Set-Cookie'],
-//   preflightContinue: false,
-//   optionsSuccessStatus: 204,
-//   maxAge: 600, // 10 minutes
-//   origin: 'https://www.woi-grader.com',
-//   origin: function(origin, callback) {
-//     if (origin === 'https://www.woi-grader.com') {
-//       callback(null, true);
-//     } else {
-//       callback(new Error('Not allowed by CORS'));
-//     }
-//   }
-// }));
+app.use(cors({
+  origin: 'https://www.woi-grader.com',
+  // credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Set-Cookie'],
+}));
 
 // PostgreSQL session store setup
 app.use(session({
