@@ -2,7 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const db = require('../db');
 const problemMigration = require('../services/problemMigration');
-const { requireAuth, requireStaffOrAdmin } = require('../middleware/auth');
+const { requireAuth, requireAuth_pdf, requireStaffOrAdmin } = require('../middleware/auth');
 const router = express.Router();
 
 // ==========================================
