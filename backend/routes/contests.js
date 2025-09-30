@@ -683,7 +683,7 @@ router.get('/:id/problems/:problemId', requireAuth, async (req, res) => {
 });
 
 // GET /api/contests/:id/problems/:problemId/pdf - Get a single contest problem's PDF
-router.get('/:id/problems/:problemId/pdf', requireAuth, async (req, res) => {
+router.get('/:id/problems/:problemId/pdf', requireAuth_pdf, async (req, res) => {
   const { id: contestId, problemId } = req.params;
   const { userId } = req.session;
 
