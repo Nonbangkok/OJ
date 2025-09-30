@@ -630,7 +630,7 @@ router.get('/:id/problems', requireAuth, async (req, res) => {
 });
 
 // GET /api/contests/:id/problems/:problemId - Get a single contest problem
-router.get('/:id/problems/:problemId', requireAuth_pdf, async (req, res) => {
+router.get('/:id/problems/:problemId', requireAuth, async (req, res) => {
   const { id: contestId, problemId } = req.params;
   const { userId } = req.session;
 
@@ -651,7 +651,7 @@ router.get('/:id/problems/:problemId', requireAuth_pdf, async (req, res) => {
       [contestId, userId]
     );
     if (participantRes.rows.length === 0) {
-      return res.status(403).json({ message: 'You are not a participant in this contest.' });
+      return res.status(403).json({ message: '-You are not a participant in this contest.-' });
     }
 
     // 2. Fetch problem details based on contest status
