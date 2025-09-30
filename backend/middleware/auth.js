@@ -1,6 +1,9 @@
 // Middleware to check if user is authenticated
 const requireAuth = (req, res, next) => {
+  console.log("--------------------------------");
   console.log(req.session);
+  console.log(req.session.userId);
+  console.log("--------------------------------");
   if (req.session.userId) {
     next();
   } else {
