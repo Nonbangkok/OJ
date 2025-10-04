@@ -67,7 +67,7 @@ async function processTestcasesFromZip(problemId, zipPath, log) {
             const lowerFileName = fileName.toLowerCase();
             if (lowerFileName.endsWith('.in') || lowerFileName.includes('input')) {
                 testcaseFiles[number].in = file;
-            } else if (lowerFileName.endsWith('.out') || lowerFileName.includes('output')) {
+            } else if (lowerFileName.endsWith('.out') || lowerFileName.endsWith('.sol') || lowerFileName.includes('output')) {
                 testcaseFiles[number].out = file;
             }
         }
@@ -123,7 +123,7 @@ async function processTestcasesFromFlatDir(problemId, dirPath, log) {
       const lowerFileName = fileName.toLowerCase();
       if (lowerFileName.endsWith('.in') || lowerFileName.includes('input')) {
         testcaseFiles[number].in = path.join(dirPath, fileName);
-      } else if (lowerFileName.endsWith('.out') || lowerFileName.includes('output')) {
+      } else if (lowerFileName.endsWith('.out') || lowerFileName.endsWith('.sol') || lowerFileName.includes('output')) {
         testcaseFiles[number].out = path.join(dirPath, fileName);
       }
     }

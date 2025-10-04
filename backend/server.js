@@ -1322,7 +1322,7 @@ app.post('/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, memoryU
           const lowerFileName = fileName.toLowerCase();
           if (lowerFileName.endsWith('.in') || lowerFileName.includes('input')) {
              testcaseFiles[number].in = file;
-          } else if (lowerFileName.endsWith('.out') || lowerFileName.includes('output')) {
+          } else if (lowerFileName.endsWith('.out') || lowerFileName.endsWith('.sol') || lowerFileName.includes('output')) {
              testcaseFiles[number].out = file;
           }
         }
