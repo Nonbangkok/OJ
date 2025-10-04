@@ -1215,7 +1215,7 @@ app.put('/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin, [
   }
 });
 
-app.post('/admin/problems/batch-upload', requireAuth, requireAdmin, diskUpload.single('problemsZip'), async (req, res) => {
+app.post('/admin/problems/batch-upload', requireAuth, requireStaffOrAdmin, diskUpload.single('problemsZip'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No zip file uploaded.' });
   }
@@ -1254,7 +1254,7 @@ app.post('/admin/problems/batch-upload', requireAuth, requireAdmin, diskUpload.s
   }
 });
 
-app.get('/admin/problems/batch-upload-progress/:progressId', requireAuth, requireAdmin, (req, res) => {
+app.get('/admin/problems/batch-upload-progress/:progressId', requireAuth, requireStaffOrAdmin, (req, res) => {
   const { progressId } = req.params;
 
   res.writeHead(200, {
