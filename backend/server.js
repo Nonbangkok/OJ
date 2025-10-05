@@ -759,9 +759,10 @@ app.get('/problems/:id/pdf', requireAuth, async (req, res) => {
 });
 
 app.get('/submissions', requireAuth, async (req, res) => {
-  const { filter, problemId, contestId } = req.query; // Add contestId
-  const { userId } = req.session;
-  
+  const { filter, problemId, contestId } = req.query;
+  const { userId, role } = req.session;
+  const isStaffOrAdmin = role === 'admin' || role === 'staff';
+
   try {
     let query, params = [], conditions = [];
 
@@ -798,6 +799,23 @@ app.get('/submissions', requireAuth, async (req, res) => {
     if (problemId) {
       params.push(problemId);
       conditions.push(`${contestId ? 'cs' : 's'}.problem_id = $${params.length}`);
+    }
+
+    // Admin/Staff filters
+    if (isStaffOrAdmin) {
+      const { filterProblemId, filterUserId } = req.query;
+      if (filterProblemId) {
+        params.push(filterProblemId);
+        conditions.push(`${contestId ? 'cs' : 's'}.problem_id = $${params.length}`);
+      }
+      if (filterUserId) {
+        const userRes = await db.query('SELECT id FROM users WHERE username = $1', [filterUserId]);
+        if (userRes.rows.length === 0) {
+          return res.status(404).json({ message: 'User not found for filtering.' });
+        }
+        params.push(userRes.rows[0].id);
+        conditions.push(`${contestId ? 'cs' : 's'}.user_id = $${params.length}`);
+      }
     }
 
     if (conditions.length > 0) {

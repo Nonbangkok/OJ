@@ -15,6 +15,8 @@ function Submissions({ problemId, showTitle = true }) {
   const [filter, setFilter] = useState('all'); // 'all' or 'mine'
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filterProblemId, setFilterProblemId] = useState(''); // New state for problemId filter
+  const [filterUserId, setFilterUserId] = useState(''); // New state for userId filter
 
   const fetchData = useCallback(async () => {
     // Only set loading on the very first fetch
@@ -42,6 +44,16 @@ function Submissions({ problemId, showTitle = true }) {
         params.contestId = contestId;
       }
 
+      // Add admin/staff filters
+      if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'staff') && !problemId) {
+        if (filterProblemId) {
+          params.filterProblemId = filterProblemId;
+        }
+        if (filterUserId) {
+          params.filterUserId = filterUserId;
+        }
+      }
+
       const subsRes = await axios.get(`${API_URL}/submissions`, {
         withCredentials: true,
         params,
@@ -54,7 +66,7 @@ function Submissions({ problemId, showTitle = true }) {
     } finally {
       setLoading(false);
     }
-  }, [problemId, filter, contestId]); // Add contestId to dependencies
+  }, [problemId, filter, contestId, currentUser, filterProblemId, filterUserId]); // Add new dependencies
 
   useEffect(() => {
     fetchData();
@@ -129,6 +141,31 @@ function Submissions({ problemId, showTitle = true }) {
               >
                 My Submissions
               </button>
+              {/* Admin/Staff Filters */}
+              {currentUser && (currentUser.role === 'admin' || currentUser.role === 'staff') && (
+                <>
+                  <input
+                    type="text"
+                    placeholder="Filter by Problem ID"
+                    value={filterProblemId}
+                    onChange={(e) => setFilterProblemId(e.target.value)}
+                    className={styles['filter-input']}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Filter by Username"
+                    value={filterUserId}
+                    onChange={(e) => setFilterUserId(e.target.value)}
+                    className={styles['filter-input']}
+                  />
+                  <button
+                    className={styles['filter-btn']}
+                    onClick={fetchData} // Trigger refetch with current filters
+                  >
+                    Apply Filters
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
