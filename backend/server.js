@@ -65,7 +65,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    domain: '.woi-grader.com',
+    domain: 'woi-grader.com',
     secure: true, // Set to true for production
     sameSite: 'lax',
     httpOnly: true,
