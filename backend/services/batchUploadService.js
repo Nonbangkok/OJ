@@ -53,7 +53,7 @@ async function processTestcasesFromZip(problemId, zipPath, log) {
     // --- Fallback to original logic for flat zip files ---
     log.push('Detected flat file structure inside zip.');
     const testcaseFiles = {};
-    const fileRegex = /^(?:input|output)?(\d+)\.(?:in|out|txt)$/i;
+    const fileRegex = /^(?:input|output)?(\d+)\.(?:in|out|txt|sol)$/i;
 
     for (const file of zip.files) {
         const fileName = path.basename(file.path);
@@ -108,7 +108,7 @@ async function processTestcasesFromInputOutputDirs(problemId, inputDir, outputDi
 
 async function processTestcasesFromFlatDir(problemId, dirPath, log) {
   const testcaseFiles = {};
-  const fileRegex = /^(?:input|output)?(\d+)\.(?:in|out|txt)$/i;
+  const fileRegex = /^(?:input|output)?(\d+)\.(?:in|out|txt|sol)$/i;
 
   const allFiles = await fsPromises.readdir(dirPath);
 

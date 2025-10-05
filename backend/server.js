@@ -1301,7 +1301,7 @@ app.post('/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, memoryU
 
       const zip = await unzipper.Open.buffer(testcasesZipFile.buffer);
       const testcaseFiles = {};
-      const fileRegex = /^(?:input|output)?(\d+)\.(?:in|out|txt)$/i;
+      const fileRegex = /^(?:input|output)?(\d+)\.(?:in|out|txt|sol)$/i;
 
       // First pass: Iterate through all files in the zip to find pairs
       for (const file of zip.files) {
