@@ -20,9 +20,9 @@ function Submissions({ problemId, showTitle = true }) {
 
   const fetchData = useCallback(async () => {
     // Only set loading on the very first fetch
-    if (submissions.length === 0) {
-      setLoading(true);
-    }
+    // if (submissions.length === 0) {
+    //   setLoading(true);
+    // }
     try {
       const userRes = await axios.get(`${API_URL}/me`, { withCredentials: true });
       if (userRes.data.isAuthenticated) {
