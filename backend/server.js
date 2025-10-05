@@ -50,7 +50,7 @@ app.use(express.json());
 // Configure CORS using the cors middleware
 app.use(cors({
   origin: 'https://www.woi-grader.com',
-  // credentials: true,
+  credentials: false,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
@@ -65,7 +65,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    domain: 'woi-grader.com',
+    domain: '.woi-grader.com',
     secure: true, // Set to true for production
     sameSite: 'lax',
     httpOnly: true,
