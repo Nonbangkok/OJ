@@ -17,6 +17,8 @@ function Submissions({ problemId, showTitle = true }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterProblemId, setFilterProblemId] = useState(''); // New state for problemId filter
   const [filterUserId, setFilterUserId] = useState(''); // New state for userId filter
+  const [problemSuggestions, setProblemSuggestions] = useState([]);
+  const [userSuggestions, setUserSuggestions] = useState([]);
 
   const fetchData = useCallback(async () => {
     // Only set loading on the very first fetch
@@ -68,6 +70,34 @@ function Submissions({ problemId, showTitle = true }) {
     }
   }, [problemId, filter, contestId, currentUser, filterProblemId, filterUserId]); // Add new dependencies
 
+  const fetchProblemSuggestions = useCallback(async (searchText) => {
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'staff')) return;
+    try {
+      const response = await axios.get(`${API_URL}/admin/problems/list`, {
+        withCredentials: true,
+        params: { search: searchText }
+      });
+      setProblemSuggestions(response.data);
+    } catch (err) {
+      console.error('Error fetching problem suggestions:', err);
+      setProblemSuggestions([]);
+    }
+  }, [currentUser]);
+
+  const fetchUserSuggestions = useCallback(async (searchText) => {
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'staff')) return;
+    try {
+      const response = await axios.get(`${API_URL}/admin/users/list`, {
+        withCredentials: true,
+        params: { search: searchText }
+      });
+      setUserSuggestions(response.data);
+    } catch (err) {
+      console.error('Error fetching user suggestions:', err);
+      setUserSuggestions([]);
+    }
+  }, [currentUser]);
+
   useEffect(() => {
     fetchData();
   }, [filter, fetchData]); // Initial fetch when filter changes
@@ -87,6 +117,46 @@ function Submissions({ problemId, showTitle = true }) {
       return () => clearInterval(intervalId);
     }
   }, [submissions, fetchData]); // Rerun this effect if submissions or fetchData change
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (filterProblemId) {
+        fetchProblemSuggestions(filterProblemId);
+      } else {
+        setProblemSuggestions([]); // Clear suggestions if input is empty
+      }
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [filterProblemId, fetchProblemSuggestions]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (filterUserId) {
+        fetchUserSuggestions(filterUserId);
+      } else {
+        setUserSuggestions([]); // Clear suggestions if input is empty
+      }
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [filterUserId, fetchUserSuggestions]);
+
+  const handleProblemIdChange = (e) => {
+    setFilterProblemId(e.target.value);
+  };
+
+  const handleUserIdChange = (e) => {
+    setFilterUserId(e.target.value);
+  };
+
+  const handleProblemSelect = (problemId) => {
+    setFilterProblemId(problemId);
+    setProblemSuggestions([]); // Clear suggestions after selection
+  };
+
+  const handleUserSelect = (username) => {
+    setFilterUserId(username);
+    setUserSuggestions([]); // Clear suggestions after selection
+  };
 
     const handleViewCode = async (submissionId) => {
     try {
@@ -148,16 +218,34 @@ function Submissions({ problemId, showTitle = true }) {
                     type="text"
                     placeholder="Filter by Problem ID"
                     value={filterProblemId}
-                    onChange={(e) => setFilterProblemId(e.target.value)}
+                    onChange={handleProblemIdChange}
                     className={styles['filter-input']}
                   />
+                  {problemSuggestions.length > 0 && (
+                    <ul className={styles['suggestions-list']}>
+                      {problemSuggestions.map(problem => (
+                        <li key={problem.id} onClick={() => handleProblemSelect(problem.id)}>
+                          {problem.id} - {problem.title}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <input
                     type="text"
                     placeholder="Filter by Username"
                     value={filterUserId}
-                    onChange={(e) => setFilterUserId(e.target.value)}
+                    onChange={handleUserIdChange}
                     className={styles['filter-input']}
                   />
+                  {userSuggestions.length > 0 && (
+                    <ul className={styles['suggestions-list']}>
+                      {userSuggestions.map(user => (
+                        <li key={user.id} onClick={() => handleUserSelect(user.username)}>
+                          {user.username}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <button
                     className={styles['filter-btn']}
                     onClick={fetchData} // Trigger refetch with current filters

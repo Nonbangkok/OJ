@@ -1536,6 +1536,48 @@ app.post('/admin/database/import', requireAuth, requireAdmin, diskUpload.single(
   }
 });
 
+app.get('/admin/problems/list', requireAuth, requireStaffOrAdmin, async (req, res) => {
+  try {
+    const { search } = req.query;
+    let query = 'SELECT id, title FROM problems';
+    const params = [];
+
+    if (search) {
+      params.push(`%${search}%`);
+      query += ' WHERE id ILIKE $1 OR title ILIKE $1';
+    }
+
+    query += ' ORDER BY id ASC LIMIT 10'; // Limit to 10 suggestions
+
+    const result = await db.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching problem list:', error);
+    res.status(500).json({ message: 'Error fetching problem list' });
+  }
+});
+
+app.get('/admin/users/list', requireAuth, requireStaffOrAdmin, async (req, res) => {
+  try {
+    const { search } = req.query;
+    let query = 'SELECT id, username FROM users WHERE role != \'admin\''; // Exclude admin from list
+    const params = [];
+
+    if (search) {
+      params.push(`%${search}%`);
+      query += ' AND username ILIKE $1';
+    }
+
+    query += ' ORDER BY username ASC LIMIT 10'; // Limit to 10 suggestions
+
+    const result = await db.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching user list:', error);
+    res.status(500).json({ message: 'Error fetching user list' });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
   
