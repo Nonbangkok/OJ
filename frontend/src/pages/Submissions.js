@@ -15,8 +15,6 @@ function Submissions({ problemId, showTitle = true }) {
   const [filter, setFilter] = useState('all'); // 'all' or 'mine'
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [filterProblemId, setFilterProblemId] = useState('');
-  const [filterUserId, setFilterUserId] = useState('');
 
   const fetchData = useCallback(async () => {
     // Only set loading on the very first fetch
@@ -43,16 +41,6 @@ function Submissions({ problemId, showTitle = true }) {
       if (contestId) {
         params.contestId = contestId;
       }
-      
-      // Add filters for staff/admin users
-      if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'staff')) {
-        if (filterProblemId) {
-          params.filterProblemId = filterProblemId;
-        }
-        if (filterUserId) {
-          params.filterUserId = filterUserId;
-        }
-      }
 
       const subsRes = await axios.get(`${API_URL}/submissions`, {
         withCredentials: true,
@@ -66,7 +54,7 @@ function Submissions({ problemId, showTitle = true }) {
     } finally {
       setLoading(false);
     }
-  }, [problemId, filter, contestId, currentUser, filterProblemId, filterUserId]);
+  }, [problemId, filter, contestId]); // Add contestId to dependencies
 
   useEffect(() => {
     fetchData();
@@ -127,36 +115,6 @@ function Submissions({ problemId, showTitle = true }) {
         <div className={styles['submissions-header']}>
           <h1>Recent Submissions</h1>
           {/* Hide filter buttons when viewing submissions for a specific problem */}
-          {!problemId && (currentUser && (currentUser.role === 'admin' || currentUser.role === 'staff')) && (
-            <div className={styles['admin-filters']}>
-              <input
-                type="text"
-                placeholder="Filter by Problem ID"
-                value={filterProblemId}
-                onChange={(e) => setFilterProblemId(e.target.value)}
-                className={styles['filter-input']}
-              />
-              <input
-                type="text"
-                placeholder="Filter by User ID"
-                value={filterUserId}
-                onChange={(e) => setFilterUserId(e.target.value)}
-                className={styles['filter-input']}
-              />
-              <button
-                className={styles['filter-btn']}
-                onClick={() => fetchData()}
-              >
-                Apply Filters
-              </button>
-              <button
-                className={styles['filter-btn']}
-                onClick={() => { setFilterProblemId(''); setFilterUserId(''); fetchData(); }}
-              >
-                Clear Filters
-              </button>
-            </div>
-          )}
           {!problemId && (
             <div className={styles['filter-buttons']}>
               <button

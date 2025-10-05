@@ -760,12 +760,10 @@ app.get('/problems/:id/pdf', requireAuth, async (req, res) => {
 
 app.get('/submissions', requireAuth, async (req, res) => {
   const { filter, problemId, contestId } = req.query; // Add contestId
-  const { userId, role } = req.session; // Get role from session
-  const isStaffOrAdmin = role === 'admin' || role === 'staff';
-
+  const { userId } = req.session;
+  
   try {
     let query, params = [], conditions = [];
-    let baseTableAlias = ''; // To dynamically refer to submission table alias
 
     if (contestId) {
       // Fetch contest submissions
@@ -780,7 +778,6 @@ app.get('/submissions', requireAuth, async (req, res) => {
       
       params.push(contestId);
       conditions.push(`cs.contest_id = $${params.length}`);
-      baseTableAlias = 'cs';
     } else {
       // Fetch regular submissions
       query = `
@@ -791,37 +788,23 @@ app.get('/submissions', requireAuth, async (req, res) => {
         JOIN users u ON s.user_id = u.id
         JOIN problems p ON s.problem_id = p.id
       `;
-      baseTableAlias = 's';
     }
 
     if (filter === 'mine') {
       params.push(userId);
-      conditions.push(`${baseTableAlias}.user_id = $${params.length}`);
+      conditions.push(`${contestId ? 'cs' : 's'}.user_id = $${params.length}`);
     }
 
     if (problemId) {
       params.push(problemId);
-      conditions.push(`${baseTableAlias}.problem_id = $${params.length}`);
-    }
-    
-    // Admin/Staff filters
-    if (isStaffOrAdmin) {
-      const { filterProblemId, filterUserId } = req.query;
-      if (filterProblemId) {
-        params.push(filterProblemId);
-        conditions.push(`${baseTableAlias}.problem_id = $${params.length}`);
-      }
-      if (filterUserId) {
-        params.push(filterUserId);
-        conditions.push(`${baseTableAlias}.user_id = $${params.length}`);
-      }
+      conditions.push(`${contestId ? 'cs' : 's'}.problem_id = $${params.length}`);
     }
 
     if (conditions.length > 0) {
       query += ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    query += ` ORDER BY ${baseTableAlias}.submitted_at DESC LIMIT 50;`;
+    query += ` ORDER BY ${contestId ? 'cs' : 's'}.submitted_at DESC LIMIT 50;`;
 
     const result = await db.query(query, params);
     res.json(result.rows);
