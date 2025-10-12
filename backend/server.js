@@ -1,6 +1,6 @@
 const express = require('express');
 const fs = require('fs');
-const { exec, spawn } = require('child_process');
+const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
 const path = require('path');
@@ -88,102 +88,93 @@ const requireAdmin = (req, res, next) => {
 
 async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) {
   return new Promise((resolve) => {
-    const timeoutSeconds = timeLimitMs / 1000;
-    const timeFormat = "%e MEM_USED:%M"; // Format string for /usr/bin/time
+    // The command for the Linux environment inside Docker
+    const timeCommand = `/usr/bin/time -f "TIME_USED:%e MEM_USED:%M"`;
+    
+    // Use timeout command which is reliable on Linux
+    const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${executablePath}`;
+    const executionOptions = { 
+      timeout: timeLimitMs + 500, // 
+      maxBuffer: 50 * 1024 * 1024, // 50MB
+      shell: '/bin/bash'
+    };
 
-    // Arguments for the 'timeout' command
-    const commandArgs = [
-      `${timeoutSeconds}s`,
-      '/usr/bin/time',
-      '-f',
-      timeFormat,
-      executablePath
-    ];
-
-    let stdoutBuffer = '';
-    let stderrBuffer = '';
     let hasEpipError = false;
     let epipErrorMessage = '';
-    let childProcessExited = false; // To track if child process has already exited
 
-    const child = spawn('timeout', commandArgs, {
-      timeout: timeLimitMs + 500, // Timeout for the spawn call itself
-      shell: false, // Explicitly set to false for security
-      stdio: ['pipe', 'pipe', 'pipe'] // Ensure stdin, stdout, stderr are pipes
-    });
-
-    child.stdout.on('data', (data) => {
-      stdoutBuffer += data.toString();
-    });
-
-    child.stderr.on('data', (data) => {
-      stderrBuffer += data.toString();
-    });
-
-    child.on('error', (err) => {
-      console.warn(`Child process error for ${executablePath}:`, err);
-      if (!hasEpipError && !childProcessExited) { // Only set if not already set by EPIPE or exit
-        hasEpipError = true;
-        epipErrorMessage = `Process error: ${err.message}`;
-      }
-    });
-
-    child.on('close', (code, signal) => {
-      childProcessExited = true;
+    const child = exec(command, executionOptions, (error, stdout, stderr) => {
       let timeMs = -1;
       let memoryKb = -1;
-      let programOutput = stdoutBuffer;
-      let programStderr = stderrBuffer;
+      let programOutput = stdout;
+      let programStderr = stderr;
 
-      // Extract time and memory from stderr (from /usr/bin/time)
-      if (stderrBuffer) {
+      if (stderr) {
         const timeRegex = /TIME_USED:([0-9.]+)/;
         const memRegex = /MEM_USED:(\d+)/;
-        const timeMatch = stderrBuffer.match(timeRegex);
-        const memMatch = stderrBuffer.match(memRegex);
+        const timeMatch = stderr.match(timeRegex);
+        const memMatch = stderr.match(memRegex);
         if (timeMatch) timeMs = Math.round(parseFloat(timeMatch[1]) * 1000);
         if (memMatch) memoryKb = parseInt(memMatch[1], 10);
         
-        // Clean stderr for reporting (remove time/mem info)
-        programStderr = stderrBuffer.split('\n').filter(line => !line.includes('MEM_USED') && !line.includes('TIME_USED')).join('\n').trim();
+        // Clean stderr for reporting
+        programStderr = stderr.split('\n').filter(line => !line.includes('MEM_USED') && !line.includes('TIME_USED')).join('\n').trim();
       }
 
+      // If we had an EPIPE error, prioritize it over other errors
       if (hasEpipError) {
-        return resolve({
-          status: 'Runtime Error',
-          output: epipErrorMessage || 'Program crashed while receiving input (EPIPE)',
-          timeMs,
-          memoryKb
+        return resolve({ 
+          status: 'Runtime Error', 
+          output: epipErrorMessage || 'Program crashed while receiving input (EPIPE)', 
+          timeMs, 
+          memoryKb 
         });
       }
 
-      if (code !== 0) { // Non-zero exit code indicates an issue
-        if (code === 124) { // 'timeout' command exits with 124 on timeout
+      if (error) {
+        // Did it time out? 'timeout' command exits with 124
+        if (error.code === 124) { 
           return resolve({ status: 'Time Limit Exceeded', timeMs: timeLimitMs, memoryKb });
         }
-        if (signal === 'SIGSEGV' || programStderr.toLowerCase().includes('memory')) {
+        // Did it run out of memory? SIGSEGV is a common indicator.
+        if (error.signal === 'SIGSEGV' || stderr.toLowerCase().includes('memory')) {
           return resolve({ status: 'Memory Limit Exceeded', timeMs, memoryKb: memoryLimitMb * 1024 });
         }
-        // For other non-zero exit codes, treat as Runtime Error
-        return resolve({
-          status: 'Runtime Error',
-          output: programStderr || `Process exited with code ${code}`,
-          timeMs,
-          memoryKb
+        // For other errors, treat as Runtime Error
+        return resolve({ 
+          status: 'Runtime Error', 
+          output: programStderr || error.message || 'Program terminated unexpectedly', 
+          timeMs, 
+          memoryKb 
         });
       }
       
       resolve({ status: 'Pending', output: programOutput, timeMs, memoryKb });
     });
 
-    // Handle EPIPE on stdin
+    // Prevent EPIPE errors from crashing the main process.
+    // These can happen if the child process exits or crashes before stdin is fully written.
     child.stdin.on('error', (err) => {
       if (err.code === 'EPIPE') {
         hasEpipError = true;
         epipErrorMessage = `Program crashed while receiving input: ${err.message}`;
         console.warn(`Caught EPIPE on stdin for executable ${executablePath}. Error: ${err.message}`);
-      } else {
-        console.error(`Stdin error for ${executablePath}:`, err);
+      }
+    });
+
+    // Also catch errors on the child process itself
+    child.on('error', (err) => {
+      console.warn(`Child process error for ${executablePath}:`, err);
+      if (!hasEpipError) {
+        hasEpipError = true;
+        epipErrorMessage = `Process error: ${err.message}`;
+      }
+    });
+
+    // Handle process exit with non-zero code
+    child.on('exit', (code, signal) => {
+      if (code !== 0 && signal !== null && !hasEpipError) {
+        hasEpipError = true;
+        epipErrorMessage = `Process exited with code ${code} and signal ${signal}`;
       }
     });
 
@@ -542,39 +533,15 @@ async function processSubmission(submissionId) {
     }
     await fs.promises.writeFile(filePath, code);
 
-    // Use spawn for g++ compilation for better security
-    const compileArgs = [
-      '-std=c++20',
-      '-fsanitize=signed-integer-overflow',
-      filePath,
-      '-o',
-      outputPath
-    ];
+    // Use UndefinedBehaviorSanitizer to reliably catch signed integer overflow as a runtime error.
+    const compileCommand = `g++ -std=c++20 -fsanitize=signed-integer-overflow ${filePath} -o ${outputPath}`;
     try {
-      const compileProcess = spawn('g++', compileArgs, { shell: false });
-      let compileStderr = '';
-      compileProcess.stderr.on('data', (data) => {
-        compileStderr += data.toString();
-      });
-
-      await new Promise((resolve, reject) => {
-        compileProcess.on('close', (code) => {
-          if (code !== 0) {
-            reject(new Error(compileStderr || `g++ exited with code ${code}`));
-          } else {
-            resolve();
-          }
-        });
-        compileProcess.on('error', (err) => {
-          reject(new Error(`Failed to start g++ process: ${err.message}`));
-        });
-      });
-
+      await execPromise(compileCommand);
     } catch (compileError) {
-      console.error(`Compilation error for submission ${submissionId}:`, compileError.message);
+      console.error(`Compilation error for submission ${submissionId}:`, compileError.stderr);
       await db.query(
         `UPDATE submissions SET overall_status = 'Compilation Error', results = $1 WHERE id = $2`,
-        [JSON.stringify([{ status: 'Compilation Error', output: compileError.message }]), submissionId]
+        [JSON.stringify([{ status: 'Compilation Error', output: compileError.stderr }]), submissionId]
       );
       return; 
     } finally {
@@ -633,39 +600,15 @@ async function processContestSubmission(submissionId) {
     }
     await fs.promises.writeFile(filePath, code);
 
-    // Use spawn for g++ compilation for better security
-    const compileArgs = [
-      '-std=c++20',
-      '-fsanitize=signed-integer-overflow',
-      filePath,
-      '-o',
-      outputPath
-    ];
+    // Use UndefinedBehaviorSanitizer to reliably catch signed integer overflow as a runtime error.
+    const compileCommand = `g++ -std=c++20 -fsanitize=signed-integer-overflow ${filePath} -o ${outputPath}`;
     try {
-      const compileProcess = spawn('g++', compileArgs, { shell: false });
-      let compileStderr = '';
-      compileProcess.stderr.on('data', (data) => {
-        compileStderr += data.toString();
-      });
-
-      await new Promise((resolve, reject) => {
-        compileProcess.on('close', (code) => {
-          if (code !== 0) {
-            reject(new Error(compileStderr || `g++ exited with code ${code}`));
-          } else {
-            resolve();
-          }
-        });
-        compileProcess.on('error', (err) => {
-          reject(new Error(`Failed to start g++ process: ${err.message}`));
-        });
-      });
-
+      await execPromise(compileCommand);
     } catch (compileError) {
-      console.error(`Compilation error for contest submission ${submissionId}:`, compileError.message);
+      console.error(`Compilation error for contest submission ${submissionId}:`, compileError.stderr);
       await db.query(
         `UPDATE contest_submissions SET overall_status = 'Compilation Error', results = $1 WHERE id = $2`,
-        [JSON.stringify([{ status: 'Compilation Error', output: compileError.message }]), submissionId]
+        [JSON.stringify([{ status: 'Compilation Error', output: compileError.stderr }]), submissionId]
       );
       return; 
     } finally {
