@@ -13,6 +13,7 @@ const ProblemManagement = ({ currentUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProblem, setEditingProblem] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(null); // State for upload progress
+  const [selectedProblems, setSelectedProblems] = useState([]); // New state for selected problems
 
   // New state for batch upload feedback
   const [batchUploadFeedback, setBatchUploadFeedback] = useState({ visible: false, message: '', type: 'info' });
@@ -80,14 +81,14 @@ const ProblemManagement = ({ currentUser }) => {
       setLoading(true);
       const hidePromises = problems
         .filter(problem => problem.is_visible && !problem.contest_id)
-        .map(problem => 
+        .map(problem =>
           axios.put(
             `${API_URL}/admin/problems/${problem.id}/visibility`,
             { isVisible: false },
             { withCredentials: true }
           )
         );
-      
+
       await Promise.all(hidePromises);
       fetchProblems();
     } catch (err) {
@@ -103,14 +104,14 @@ const ProblemManagement = ({ currentUser }) => {
       setLoading(true);
       const showPromises = problems
         .filter(problem => !problem.is_visible && !problem.contest_id)
-        .map(problem => 
+        .map(problem =>
           axios.put(
             `${API_URL}/admin/problems/${problem.id}/visibility`,
             { isVisible: true },
             { withCredentials: true }
           )
         );
-      
+
       await Promise.all(showPromises);
       fetchProblems();
     } catch (err) {
@@ -135,6 +136,76 @@ const ProblemManagement = ({ currentUser }) => {
   const handleCreate = () => {
     setEditingProblem(null);
     setIsModalOpen(true);
+  };
+
+  const handleToggleSelectProblem = (problemId) => {
+    setSelectedProblems(prev =>
+      prev.includes(problemId)
+        ? prev.filter(id => id !== problemId)
+        : [...prev, problemId]
+    );
+  };
+
+  const handleSelectAll = (event) => {
+    if (event.target.checked) {
+      // Only select problems that are not currently in a running or scheduled contest
+      const allSelectableProblemIds = problems
+        .filter(p => !(p.contest_id && (p.contest_status === 'scheduled' || p.contest_status === 'running')))
+        .map(p => p.id);
+      setSelectedProblems(allSelectableProblemIds);
+    } else {
+      setSelectedProblems([]);
+    }
+  };
+
+  const handleExportSelected = async () => {
+    if (selectedProblems.length === 0) {
+      setBatchUploadFeedback({ visible: true, message: 'Please select at least one problem to export.', type: 'warning' });
+      return;
+    }
+
+    // setLoading(true); // Disable buttons during export
+    setBatchUploadFeedback({ visible: true, message: 'Initiating problem export...', type: 'info' });
+
+    try {
+      const response = await axios.post(
+        `${API_URL}/admin/problems/export`,
+        { problemIds: selectedProblems },
+        { withCredentials: true, responseType: 'blob' } // Important for downloading files
+      );
+
+      // Create a Blob from the response data
+      const blob = new Blob([response.data], { type: response.headers['content-type'] });
+      const downloadUrl = window.URL.createObjectURL(blob);
+
+      // Extract filename from Content-Disposition header
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `problems_export_${Date.now()}.zip`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      // Create a link element and trigger the download
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+
+      setBatchUploadFeedback({ visible: true, message: `${selectedProblems.length} problems exported successfully!`, type: 'success' });
+      setSelectedProblems([]); // Clear selection after export
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'Failed to export problems.';
+      setBatchUploadFeedback({ visible: true, message: errorMsg, type: 'error' });
+      console.error('Error exporting problems:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleTriggerBatchUpload = () => {
@@ -164,7 +235,7 @@ const ProblemManagement = ({ currentUser }) => {
           'Content-Type': 'multipart/form-data',
         },
       });
-      
+
       const { progressId } = response.data;
       if (progressId) {
         // Initial feedback for file uploaded, progress listener will update more details
@@ -191,7 +262,7 @@ const ProblemManagement = ({ currentUser }) => {
         eventSource.addEventListener('complete', (event) => {
           const data = JSON.parse(event.data);
           setBatchUploadProgress({ ...data, visible: false, status: 'completed' });
-          
+
           let successMessage = 'Batch upload process finished.';
           if (data.added && data.skipped) {
             successMessage = `Batch upload complete. Added ${data.added.length} problems, skipped ${data.skipped.length} problems.`;
@@ -199,7 +270,7 @@ const ProblemManagement = ({ currentUser }) => {
             successMessage = data.message; // Fallback to generic message from backend
           }
           setBatchUploadFeedback({ visible: true, message: successMessage, type: 'success' });
-          
+
           eventSource.close();
           fetchProblems(); // Refresh the list after completion
           setLoading(false);
@@ -222,16 +293,16 @@ const ProblemManagement = ({ currentUser }) => {
         });
       } else {
         // Fallback if no progressId is returned (shouldn't happen with current backend)
-      const { added = [], skipped = [], errors = [] } = response.data;
-      let feedbackMessage = `Batch upload complete. Added: ${added.length}. Skipped: ${skipped.length}.`;
-      if (errors.length > 0) {
-        const errorDetails = errors.map(e => `${e.directory}: ${e.message}`).join('; ');
-        feedbackMessage += ` Errors: ${errors.length} (${errorDetails})`;
-        setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'error' });
-      } else {
-        setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'success' });
-      }
-      fetchProblems(); // Refresh the list
+        const { added = [], skipped = [], errors = [] } = response.data;
+        let feedbackMessage = `Batch upload complete. Added: ${added.length}. Skipped: ${skipped.length}.`;
+        if (errors.length > 0) {
+          const errorDetails = errors.map(e => `${e.directory}: ${e.message}`).join('; ');
+          feedbackMessage += ` Errors: ${errors.length} (${errorDetails})`;
+          setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'error' });
+        } else {
+          setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'success' });
+        }
+        fetchProblems(); // Refresh the list
         setLoading(false);
       }
     } catch (err) {
@@ -300,10 +371,10 @@ const ProblemManagement = ({ currentUser }) => {
             }
           }, 1500);
         } else {
-           // If no job ID, it means no zip file, so we are done
-           setIsModalOpen(false);
-           fetchProblems();
-           setUploadProgress(null);
+          // If no job ID, it means no zip file, so we are done
+          setIsModalOpen(false);
+          fetchProblems();
+          setUploadProgress(null);
         }
       } else {
         // No files to upload, just close modal and refresh
@@ -333,16 +404,16 @@ const ProblemManagement = ({ currentUser }) => {
         <h2>Problem Management</h2>
         <div className={styles['header-actions']}>
           <div className={styles['bulk-actions']}>
-            <button 
-              onClick={handleShowAll} 
+            <button
+              onClick={handleShowAll}
               className={styles['show-all-btn']}
               disabled={loading || problems.every(p => p.is_visible)}
               title="Show all hidden problems"
             >
               Show All
             </button>
-            <button 
-              onClick={handleHideAll} 
+            <button
+              onClick={handleHideAll}
               className={styles['hide-all-btn']}
               disabled={loading || problems.every(p => !p.is_visible)}
               title="Hide all visible problems"
@@ -357,6 +428,15 @@ const ProblemManagement = ({ currentUser }) => {
             style={{ display: 'none' }}
             accept=".zip"
           />
+          <button
+            onClick={handleExportSelected}
+            className={styles['create-btn']}
+            style={{ marginRight: '10px' }}
+            disabled={loading || selectedProblems.length === 0}
+            title={selectedProblems.length === 0 ? 'Select problems to export' : 'Export selected problems'}
+          >
+            Export Selected
+          </button>
           <button onClick={handleTriggerBatchUpload} className={styles['create-btn']} style={{ marginRight: '10px' }}>
             Batch Upload
           </button>
@@ -402,6 +482,15 @@ const ProblemManagement = ({ currentUser }) => {
         <table className="table">
           <thead>
             <tr>
+              <th>
+                <input
+                  type="checkbox"
+                  onChange={handleSelectAll}
+                  checked={selectedProblems.length > 0 && selectedProblems.length === problems.filter(p => !(p.contest_id && (p.contest_status === 'scheduled' || p.contest_status === 'running'))).length}
+                  disabled={loading || problems.filter(p => !(p.contest_id && (p.contest_status === 'scheduled' || p.contest_status === 'running'))).length === 0}
+                  title="Select all selectable problems"
+                />
+              </th>
               <th>ID</th>
               <th>Title</th>
               <th>Visibility</th>
@@ -411,6 +500,15 @@ const ProblemManagement = ({ currentUser }) => {
           <tbody>
             {problems.map(problem => (
               <tr key={problem.id}>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={selectedProblems.includes(problem.id)}
+                    onChange={() => handleToggleSelectProblem(problem.id)}
+                    disabled={problem.contest_id && (problem.contest_status === 'scheduled' || problem.contest_status === 'running')}
+                    title={problem.contest_id && (problem.contest_status === 'scheduled' || problem.contest_status === 'running') ? 'Cannot export problems in active contests' : 'Select problem for export'}
+                  />
+                </td>
                 <td>{problem.id}</td>
                 <td>{problem.title}</td>
                 <td>
