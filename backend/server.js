@@ -17,9 +17,16 @@ const contestRoutes = require('./routes/contests');
 const contestScheduler = require('./services/contestScheduler');
 const { requireAuth, requireStaffOrAdmin } = require('./middleware/auth');
 const unzipper = require('unzipper');
+const archiver = require('archiver'); // Import archiver
 const { processBatchUpload } = require('./services/batchUploadService'); // Import the new service
 
 const progressMap = new Map(); // Store SSE response objects by a unique upload ID
+
+// Directory for temporary problem exports
+const problemExportTempDir = path.join(__dirname, 'temp_problem_exports');
+if (!fs.existsSync(problemExportTempDir)) {
+  fs.mkdirSync(problemExportTempDir, { recursive: true });
+}
 
 // Multer configuration for single file uploads (in memory)
 const memoryUpload = multer({ storage: multer.memoryStorage() });
@@ -1545,5 +1552,112 @@ app.listen(port, () => {
     console.log('✅ Contest Scheduler initialized successfully');
   } catch (error) {
     console.error('❌ Failed to start Contest Scheduler:', error);
+  }
+}); 
+
+// Admin API Endpoints for Problem Export
+app.post('/admin/problems/export', requireAuth, requireStaffOrAdmin, async (req, res) => {
+  const { problemIds } = req.body; // Expects an array of problem IDs to export
+
+  if (!problemIds || !Array.isArray(problemIds) || problemIds.length === 0) {
+    return res.status(400).json({ message: 'No problem IDs provided for export.' });
+  }
+
+  const archive = archiver('zip', {
+    zlib: { level: 9 } // Sets the compression level.
+  });
+
+  const timestamp = Date.now();
+  const outputFileName = `problems_export_${timestamp}.zip`;
+  const outputPath = path.join(problemExportTempDir, outputFileName);
+  const output = fs.createWriteStream(outputPath);
+
+  output.on('close', () => {
+    console.log(`Exported ${archive.pointer()} total bytes to ${outputFileName}`);
+    res.download(outputPath, outputFileName, (err) => {
+      if (err) {
+        console.error('Error sending file:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ message: 'Error downloading problem export file.' });
+        }
+      }
+      // Clean up the temporary zip file
+      fs.unlink(outputPath, (unlinkErr) => {
+        if (unlinkErr) console.error('Error deleting temp problem export file:', unlinkErr);
+      });
+    });
+  });
+
+  archive.on('error', (err) => {
+    console.error('Archive error:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Error creating problem export zip.', error: err.message });
+    }
+    // Clean up if an error occurs before sending
+    fs.unlink(outputPath, (unlinkErr) => {
+      if (unlinkErr) console.error('Error deleting partially created zip file:', unlinkErr);
+    });
+  });
+
+  archive.pipe(output);
+
+  try {
+    for (const problemId of problemIds) {
+      const problemRes = await db.query(
+        'SELECT id, title, author, time_limit_ms, memory_limit_mb, problem_pdf FROM problems WHERE id = $1',
+        [problemId]
+      );
+
+      if (problemRes.rows.length === 0) {
+        console.warn(`Problem ${problemId} not found, skipping export.`);
+        continue;
+      }
+
+      const problem = problemRes.rows[0];
+      const problemFolderName = `${problem.id}`; // Use problem ID as folder name
+
+      // 1. Add config.json
+      const config = {
+        id: problem.id,
+        title: problem.title,
+        author: problem.author,
+        time_limit_ms: problem.time_limit_ms,
+        memory_limit_mb: problem.memory_limit_mb,
+      };
+      archive.append(JSON.stringify(config, null, 2), { name: `${problemFolderName}/config.json` });
+
+      // 2. Add problem PDF (if exists)
+      if (problem.problem_pdf) {
+        archive.append(problem.problem_pdf, { name: `${problemFolderName}/${problem.id}.pdf` });
+      }
+
+      // 3. Add test cases (input/output)
+      const testcasesRes = await db.query(
+        'SELECT case_number, input_data, output_data FROM testcases WHERE problem_id = $1 ORDER BY case_number ASC',
+        [problemId]
+      );
+
+      if (testcasesRes.rows.length > 0) {
+        for (const testcase of testcasesRes.rows) {
+          const caseNumberPadded = testcase.case_number.toString().padStart(2, '0'); // e.g., 01, 02
+          archive.append(testcase.input_data, { name: `${problemFolderName}/testcases/input/input${caseNumberPadded}.txt` });
+          archive.append(testcase.output_data, { name: `${problemFolderName}/testcases/output/output${caseNumberPadded}.txt` });
+        }
+      }
+    }
+
+    archive.finalize();
+
+  } catch (error) {
+    console.error('Error during problem export:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Failed to export problems.', error: error.message });
+    }
+    // Ensure the archive is finalized even on error to trigger 'close' or 'error' events
+    archive.abort(); 
+    // Clean up if an error occurs before sending
+    fs.unlink(outputPath, (unlinkErr) => {
+      if (unlinkErr) console.error('Error deleting partially created zip file:', unlinkErr);
+    });
   }
 }); 
