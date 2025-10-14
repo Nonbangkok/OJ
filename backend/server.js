@@ -22,12 +22,6 @@ const { processBatchUpload } = require('./services/batchUploadService'); // Impo
 
 const progressMap = new Map(); // Store SSE response objects by a unique upload ID
 
-// Directory for temporary problem exports
-const problemExportTempDir = path.join(__dirname, 'temp_problem_exports');
-if (!fs.existsSync(problemExportTempDir)) {
-  fs.mkdirSync(problemExportTempDir, { recursive: true });
-}
-
 // Multer configuration for single file uploads (in memory)
 const memoryUpload = multer({ storage: multer.memoryStorage() });
 
@@ -1569,37 +1563,21 @@ app.post('/admin/problems/export', requireAuth, requireStaffOrAdmin, async (req,
 
   const timestamp = Date.now();
   const outputFileName = `problems_export_${timestamp}.zip`;
-  const outputPath = path.join(problemExportTempDir, outputFileName);
-  const output = fs.createWriteStream(outputPath);
 
-  output.on('close', () => {
-    console.log(`Exported ${archive.pointer()} total bytes to ${outputFileName}`);
-    res.download(outputPath, outputFileName, (err) => {
-      if (err) {
-        console.error('Error sending file:', err);
-        if (!res.headersSent) {
-          res.status(500).json({ message: 'Error downloading problem export file.' });
-        }
-      }
-      // Clean up the temporary zip file
-      fs.unlink(outputPath, (unlinkErr) => {
-        if (unlinkErr) console.error('Error deleting temp problem export file:', unlinkErr);
-      });
-    });
-  });
+  // Set headers for file download
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="${outputFileName}"`);
+
+  // Pipe the archive directly to the response
+  archive.pipe(res);
 
   archive.on('error', (err) => {
-    console.error('Archive error:', err);
+    console.error('Archive error during streaming export:', err);
     if (!res.headersSent) {
       res.status(500).json({ message: 'Error creating problem export zip.', error: err.message });
     }
-    // Clean up if an error occurs before sending
-    fs.unlink(outputPath, (unlinkErr) => {
-      if (unlinkErr) console.error('Error deleting partially created zip file:', unlinkErr);
-    });
+    res.end(); // End the response even if headers were sent
   });
-
-  archive.pipe(output);
 
   try {
     for (const problemId of problemIds) {
@@ -1653,11 +1631,7 @@ app.post('/admin/problems/export', requireAuth, requireStaffOrAdmin, async (req,
     if (!res.headersSent) {
       res.status(500).json({ message: 'Failed to export problems.', error: error.message });
     }
-    // Ensure the archive is finalized even on error to trigger 'close' or 'error' events
     archive.abort(); 
-    // Clean up if an error occurs before sending
-    fs.unlink(outputPath, (unlinkErr) => {
-      if (unlinkErr) console.error('Error deleting partially created zip file:', unlinkErr);
-    });
+    res.end(); // Ensure response is ended on error
   }
-}); 
+});
