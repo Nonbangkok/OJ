@@ -81,14 +81,14 @@ const ProblemManagement = ({ currentUser }) => {
       setLoading(true);
       const hidePromises = problems
         .filter(problem => problem.is_visible && !problem.contest_id)
-        .map(problem => 
+        .map(problem =>
           axios.put(
             `${API_URL}/admin/problems/${problem.id}/visibility`,
             { isVisible: false },
             { withCredentials: true }
           )
         );
-      
+
       await Promise.all(hidePromises);
       fetchProblems();
     } catch (err) {
@@ -104,14 +104,14 @@ const ProblemManagement = ({ currentUser }) => {
       setLoading(true);
       const showPromises = problems
         .filter(problem => !problem.is_visible && !problem.contest_id)
-        .map(problem => 
+        .map(problem =>
           axios.put(
             `${API_URL}/admin/problems/${problem.id}/visibility`,
             { isVisible: true },
             { withCredentials: true }
           )
         );
-      
+
       await Promise.all(showPromises);
       fetchProblems();
     } catch (err) {
@@ -235,7 +235,7 @@ const ProblemManagement = ({ currentUser }) => {
           'Content-Type': 'multipart/form-data',
         },
       });
-      
+
       const { progressId } = response.data;
       if (progressId) {
         // Initial feedback for file uploaded, progress listener will update more details
@@ -262,7 +262,7 @@ const ProblemManagement = ({ currentUser }) => {
         eventSource.addEventListener('complete', (event) => {
           const data = JSON.parse(event.data);
           setBatchUploadProgress({ ...data, visible: false, status: 'completed' });
-          
+
           let successMessage = 'Batch upload process finished.';
           if (data.added && data.skipped) {
             successMessage = `Batch upload complete. Added ${data.added.length} problems, skipped ${data.skipped.length} problems.`;
@@ -270,7 +270,7 @@ const ProblemManagement = ({ currentUser }) => {
             successMessage = data.message; // Fallback to generic message from backend
           }
           setBatchUploadFeedback({ visible: true, message: successMessage, type: 'success' });
-          
+
           eventSource.close();
           fetchProblems(); // Refresh the list after completion
           setLoading(false);
@@ -293,16 +293,16 @@ const ProblemManagement = ({ currentUser }) => {
         });
       } else {
         // Fallback if no progressId is returned (shouldn't happen with current backend)
-      const { added = [], skipped = [], errors = [] } = response.data;
-      let feedbackMessage = `Batch upload complete. Added: ${added.length}. Skipped: ${skipped.length}.`;
-      if (errors.length > 0) {
-        const errorDetails = errors.map(e => `${e.directory}: ${e.message}`).join('; ');
-        feedbackMessage += ` Errors: ${errors.length} (${errorDetails})`;
-        setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'error' });
-      } else {
-        setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'success' });
-      }
-      fetchProblems(); // Refresh the list
+        const { added = [], skipped = [], errors = [] } = response.data;
+        let feedbackMessage = `Batch upload complete. Added: ${added.length}. Skipped: ${skipped.length}.`;
+        if (errors.length > 0) {
+          const errorDetails = errors.map(e => `${e.directory}: ${e.message}`).join('; ');
+          feedbackMessage += ` Errors: ${errors.length} (${errorDetails})`;
+          setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'error' });
+        } else {
+          setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'success' });
+        }
+        fetchProblems(); // Refresh the list
         setLoading(false);
       }
     } catch (err) {
@@ -371,10 +371,10 @@ const ProblemManagement = ({ currentUser }) => {
             }
           }, 1500);
         } else {
-           // If no job ID, it means no zip file, so we are done
-           setIsModalOpen(false);
-           fetchProblems();
-           setUploadProgress(null);
+          // If no job ID, it means no zip file, so we are done
+          setIsModalOpen(false);
+          fetchProblems();
+          setUploadProgress(null);
         }
       } else {
         // No files to upload, just close modal and refresh
@@ -404,16 +404,16 @@ const ProblemManagement = ({ currentUser }) => {
         <h2>Problem Management</h2>
         <div className={styles['header-actions']}>
           <div className={styles['bulk-actions']}>
-            <button 
-              onClick={handleShowAll} 
+            <button
+              onClick={handleShowAll}
               className={styles['show-all-btn']}
               disabled={loading || problems.every(p => p.is_visible)}
               title="Show all hidden problems"
             >
               Show All
             </button>
-            <button 
-              onClick={handleHideAll} 
+            <button
+              onClick={handleHideAll}
               className={styles['hide-all-btn']}
               disabled={loading || problems.every(p => !p.is_visible)}
               title="Hide all visible problems"
@@ -428,10 +428,10 @@ const ProblemManagement = ({ currentUser }) => {
             style={{ display: 'none' }}
             accept=".zip"
           />
-          <button 
-            onClick={handleExportSelected} 
-            className={styles['create-btn']} 
-            style={{ marginRight: '10px' }} 
+          <button
+            onClick={handleExportSelected}
+            className={styles['create-btn']}
+            style={{ marginRight: '10px' }}
             disabled={loading || selectedProblems.length === 0}
             title={selectedProblems.length === 0 ? 'Select problems to export' : 'Export selected problems'}
           >
@@ -483,7 +483,7 @@ const ProblemManagement = ({ currentUser }) => {
           <thead>
             <tr>
               <th>
-                <input 
+                <input
                   type="checkbox"
                   onChange={handleSelectAll}
                   checked={selectedProblems.length > 0 && selectedProblems.length === problems.filter(p => !(p.contest_id && (p.contest_status === 'scheduled' || p.contest_status === 'running'))).length}
