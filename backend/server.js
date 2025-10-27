@@ -1155,6 +1155,12 @@ app.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin, [
             [newId, title, author, time_limit_ms, memory_limit_mb, oldId]
         );
         
+        // Update problem_id in contest_problems and contest_submissions if problem ID changed
+        if (oldId !== newId) {
+            await db.query('UPDATE contest_problems SET problem_id = $1 WHERE problem_id = $2', [newId, oldId]);
+            await db.query('UPDATE contest_submissions SET problem_id = $1 WHERE problem_id = $2', [newId, oldId]);
+        }
+
         if (result.rows.length === 0) {
             return res.status(404).json({ message: 'Problem not found' });
         }
