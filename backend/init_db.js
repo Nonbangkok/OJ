@@ -64,7 +64,7 @@ const createTables = async () => {
   const testcasesTable = `
     CREATE TABLE IF NOT EXISTS testcases (
       id SERIAL PRIMARY KEY,
-      problem_id VARCHAR(50) REFERENCES problems(id) ON DELETE CASCADE,
+      problem_id VARCHAR(50) REFERENCES problems(id) ON DELETE CASCADE ON UPDATE CASCADE,
       case_number INT NOT NULL,
       input_data TEXT NOT NULL,
       output_data TEXT NOT NULL,
