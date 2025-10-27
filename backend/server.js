@@ -1177,6 +1177,9 @@ app.delete('/admin/problems/:id', requireAuth, requireStaffOrAdmin, async (req, 
     try {
         // We also need to delete submissions for this problem
         await db.query('DELETE FROM submissions WHERE problem_id = $1', [id]);
+        await db.query('DELETE FROM testcases WHERE problem_id = $1', [id]);
+        await db.query('DELETE FROM contest_problems WHERE problem_id = $1', [id]);
+        await db.query('DELETE FROM contest_submissions WHERE problem_id = $1', [id]);
         const result = await db.query('DELETE FROM problems WHERE id = $1 RETURNING id', [id]);
         
         if (result.rowCount === 0) {
