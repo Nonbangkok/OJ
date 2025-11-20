@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { Link, useParams } from 'react-router-dom';
 import styles from './Submissions.module.css'; // Import the new CSS file
@@ -15,19 +15,69 @@ function Submissions({ problemId, showTitle = true }) {
   const [filter, setFilter] = useState('all'); // 'all' or 'mine'
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [filterProblemId, setFilterProblemId] = useState(''); // New state for problemId filter
-  const [filterUserId, setFilterUserId] = useState(''); // New state for userId filter
+
+  // Input states
+  const [filterProblemId, setFilterProblemId] = useState('');
+  const [filterUserId, setFilterUserId] = useState('');
+
+  // Applied filter states (for manual trigger)
+  const [appliedFilterProblemId, setAppliedFilterProblemId] = useState('');
+  const [appliedFilterUserId, setAppliedFilterUserId] = useState('');
+
+  // Autocomplete states
+  const [problemSuggestions, setProblemSuggestions] = useState([]);
+  const [userSuggestions, setUserSuggestions] = useState([]);
+  const [showProblemSuggestions, setShowProblemSuggestions] = useState(false);
+  const [showUserSuggestions, setShowUserSuggestions] = useState(false);
+
+  const [visibleCount, setVisibleCount] = useState(10);
+
+  // Refs for click outside detection and request tracking
+  const problemInputRef = useRef(null);
+  const userInputRef = useRef(null);
+  const lastRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (problemInputRef.current && !problemInputRef.current.contains(event.target)) {
+        setShowProblemSuggestions(false);
+      }
+      if (userInputRef.current && !userInputRef.current.contains(event.target)) {
+        setShowUserSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Fetch user once on mount
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const userRes = await axios.get(`${API_URL}/me`, { withCredentials: true });
+        if (userRes.data.isAuthenticated) {
+          setCurrentUser(userRes.data.user);
+        }
+      } catch (err) {
+        console.error("Error fetching user:", err);
+      }
+    };
+    fetchUser();
+  }, []);
 
   const fetchData = useCallback(async () => {
+    const currentRequestId = Date.now();
+    lastRequestIdRef.current = currentRequestId;
+
     // Only set loading on the very first fetch
     // if (submissions.length === 0) {
     //   setLoading(true);
     // }
     try {
-      const userRes = await axios.get(`${API_URL}/me`, { withCredentials: true });
-      if (userRes.data.isAuthenticated) {
-        setCurrentUser(userRes.data.user);
-      }
+      // Removed /me call from here to avoid infinite loop
 
       const params = {};
       if (problemId) {
@@ -38,7 +88,7 @@ function Submissions({ problemId, showTitle = true }) {
         // On the main submissions page, respect the user's filter choice.
         params.filter = 'mine';
       }
-      
+
       // Add contestId if this is a contest submissions page
       if (contestId) {
         params.contestId = contestId;
@@ -46,11 +96,11 @@ function Submissions({ problemId, showTitle = true }) {
 
       // Add admin/staff filters
       if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'staff') && !problemId) {
-        if (filterProblemId) {
-          params.filterProblemId = filterProblemId;
+        if (appliedFilterProblemId) {
+          params.filterProblemId = appliedFilterProblemId;
         }
-        if (filterUserId) {
-          params.filterUserId = filterUserId;
+        if (appliedFilterUserId) {
+          params.filterUserId = appliedFilterUserId;
         }
       }
 
@@ -58,15 +108,26 @@ function Submissions({ problemId, showTitle = true }) {
         withCredentials: true,
         params,
       });
-      setSubmissions(subsRes.data);
-      setError('');
+
+      // Check if request is still valid before updating state
+      if (currentRequestId === lastRequestIdRef.current) {
+        setSubmissions(subsRes.data);
+        setError('');
+      }
     } catch (err) {
-      setError('Failed to fetch data. Please log in.');
-      console.error(err);
+      if (currentRequestId === lastRequestIdRef.current) {
+        // If it's a 404 from filtering, it might just mean no user found, but ideally backend should handle this.
+        // For now, let's just clear submissions if it's a filter error to be safe, or show error.
+        // But better to fix backend.
+        setError('Failed to fetch data. Please log in.');
+        console.error(err);
+      }
     } finally {
-      setLoading(false);
+      if (currentRequestId === lastRequestIdRef.current) {
+        setLoading(false);
+      }
     }
-  }, [problemId, filter, contestId, currentUser, filterProblemId, filterUserId]); // Add new dependencies
+  }, [problemId, filter, contestId, currentUser, appliedFilterProblemId, appliedFilterUserId]);
 
   useEffect(() => {
     fetchData();
@@ -74,9 +135,9 @@ function Submissions({ problemId, showTitle = true }) {
 
   useEffect(() => {
     // Check if there are any submissions being processed
-    const isProcessing = submissions.some(s => 
-      s.overall_status === 'Pending' || 
-      s.overall_status === 'Compiling' || 
+    const isProcessing = submissions.some(s =>
+      s.overall_status === 'Pending' ||
+      s.overall_status === 'Compiling' ||
       s.overall_status === 'Running'
     );
 
@@ -88,13 +149,13 @@ function Submissions({ problemId, showTitle = true }) {
     }
   }, [submissions, fetchData]); // Rerun this effect if submissions or fetchData change
 
-    const handleViewCode = async (submissionId) => {
+  const handleViewCode = async (submissionId) => {
     try {
       const params = {};
       if (contestId) {
         params.contestId = contestId;
       }
-      
+
       const response = await axios.get(`${API_URL}/submissions/${submissionId}`, {
         withCredentials: true,
         params,
@@ -110,6 +171,59 @@ function Submissions({ problemId, showTitle = true }) {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedSubmission(null);
+  };
+
+  const handleApplyFilters = () => {
+    setSubmissions([]); // Clear current submissions
+    setLoading(true);   // Show loading state
+    setAppliedFilterProblemId(filterProblemId);
+    setAppliedFilterUserId(filterUserId);
+    // fetchData will be triggered by the useEffect dependency change
+  };
+
+  // Autocomplete Handlers
+  const handleProblemChange = async (e) => {
+    const value = e.target.value;
+    setFilterProblemId(value);
+    if (value.length > 0) {
+      try {
+        const res = await axios.get(`${API_URL}/api/search/problems?q=${value}`, { withCredentials: true });
+        setProblemSuggestions(res.data);
+        setShowProblemSuggestions(true);
+      } catch (err) {
+        console.error("Error fetching problem suggestions:", err);
+      }
+    } else {
+      setProblemSuggestions([]);
+      setShowProblemSuggestions(false);
+    }
+  };
+
+  const handleUserChange = async (e) => {
+    const value = e.target.value;
+    setFilterUserId(value);
+    if (value.length > 0) {
+      try {
+        const res = await axios.get(`${API_URL}/api/search/users?q=${value}`, { withCredentials: true });
+        setUserSuggestions(res.data);
+        setShowUserSuggestions(true);
+      } catch (err) {
+        console.error("Error fetching user suggestions:", err);
+      }
+    } else {
+      setUserSuggestions([]);
+      setShowUserSuggestions(false);
+    }
+  };
+
+  const selectProblem = (problemId) => {
+    setFilterProblemId(problemId);
+    setShowProblemSuggestions(false);
+  };
+
+  const selectUser = (username) => {
+    setFilterUserId(username);
+    setShowUserSuggestions(false);
   };
 
   const getStatusClass = (status) => {
@@ -144,23 +258,49 @@ function Submissions({ problemId, showTitle = true }) {
               {/* Admin/Staff Filters */}
               {currentUser && (currentUser.role === 'admin' || currentUser.role === 'staff') && (
                 <>
-                  <input
-                    type="text"
-                    placeholder="Filter by Problem ID"
-                    value={filterProblemId}
-                    onChange={(e) => setFilterProblemId(e.target.value)}
-                    className={styles['filter-input']}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Filter by Username"
-                    value={filterUserId}
-                    onChange={(e) => setFilterUserId(e.target.value)}
-                    className={styles['filter-input']}
-                  />
+                  <div style={{ position: 'relative', alignContent: 'center' }} ref={problemInputRef}>
+                    <input
+                      type="text"
+                      placeholder="Filter by Problem ID"
+                      value={filterProblemId}
+                      onChange={handleProblemChange}
+                      onFocus={() => filterProblemId && setShowProblemSuggestions(true)}
+                      className={styles['filter-input']}
+                    />
+                    {showProblemSuggestions && problemSuggestions.length > 0 && (
+                      <ul className={styles['suggestions-list']}>
+                        {problemSuggestions.map(p => (
+                          <li key={p.id} onClick={() => selectProblem(p.id)}>
+                            {p.id} - {p.title}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div style={{ position: 'relative', alignContent: 'center' }} ref={userInputRef}>
+                    <input
+                      type="text"
+                      placeholder="Filter by Username"
+                      value={filterUserId}
+                      onChange={handleUserChange}
+                      onFocus={() => filterUserId && setShowUserSuggestions(true)}
+                      className={styles['filter-input']}
+                    />
+                    {showUserSuggestions && userSuggestions.length > 0 && (
+                      <ul className={styles['suggestions-list']}>
+                        {userSuggestions.map(u => (
+                          <li key={u.username} onClick={() => selectUser(u.username)}>
+                            {u.username}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
                   <button
                     className={styles['filter-btn']}
-                    onClick={fetchData} // Trigger refetch with current filters
+                    onClick={handleApplyFilters} // Trigger refetch with current filters
                   >
                     Apply Filters
                   </button>
@@ -189,7 +329,7 @@ function Submissions({ problemId, showTitle = true }) {
               </tr>
             </thead>
             <tbody>
-              {submissions.map(sub => (
+              {submissions.slice(0, visibleCount).map(sub => (
                 <tr key={sub.id}>
                   <td>{new Date(sub.submitted_at).toLocaleString()}</td>
                   <td>{sub.username}</td>
@@ -214,6 +354,16 @@ function Submissions({ problemId, showTitle = true }) {
           </table>
         )}
       </div>
+      {visibleCount < submissions.length && (
+        <div className={styles['show-more-container']}>
+          <button
+            className={styles['show-more-btn']}
+            onClick={() => setVisibleCount(prev => prev + 10)}
+          >
+            Show More
+          </button>
+        </div>
+      )}
       {isModalOpen && <SubmissionModal submission={selectedSubmission} onClose={handleCloseModal} />}
     </div>
   );
