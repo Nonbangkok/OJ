@@ -832,6 +832,39 @@ app.get('/submissions', requireAuth, async (req, res) => {
   }
 });
 
+// Autocomplete/Search Endpoints
+app.get('/api/search/problems', requireAuth, async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.json([]);
+
+  try {
+    const result = await db.query(
+      'SELECT id, title FROM problems WHERE id ILIKE $1 OR title ILIKE $1 LIMIT 10',
+      [`%${q}%`]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error searching problems:', error);
+    res.status(500).json({ message: 'Error searching problems' });
+  }
+});
+
+app.get('/api/search/users', requireAuth, async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.json([]);
+
+  try {
+    const result = await db.query(
+      'SELECT username FROM users WHERE username ILIKE $1 LIMIT 10',
+      [`%${q}%`]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error searching users:', error);
+    res.status(500).json({ message: 'Error searching users' });
+  }
+});
+
 app.get('/submissions/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
   const { contestId } = req.query; // Check if this is a contest submission request
