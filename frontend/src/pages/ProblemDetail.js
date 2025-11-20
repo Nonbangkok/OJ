@@ -28,7 +28,7 @@ function ProblemDetail() {
         } else {
           url = `${API_URL}/problems/${problemId}`;
         }
-        
+
         const problemResponse = await axios.get(url, { withCredentials: true });
         const problemData = problemResponse.data;
 
@@ -45,7 +45,7 @@ function ProblemDetail() {
           const contestResponse = await axios.get(`${API_URL}/contests/${contestId}`, { withCredentials: true });
           setContest(contestResponse.data);
         }
-        
+
       } catch (err) {
         if (err.response?.status === 403 && err.response?.data?.message === 'Problem is hidden') {
           setHiddenProblemInfo({
@@ -106,7 +106,7 @@ function ProblemDetail() {
   const handlePdfView = () => {
     if (!problem || !problem.has_pdf) return;
     // For contest PDFs, the backend now checks authorization, so we can link directly.
-    const pdfUrl = contestId 
+    const pdfUrl = contestId
       ? `${API_URL}/contests/${contestId}/problems/${problemId}/pdf`
       : `${API_URL}/problems/${problemId}/pdf`;
     window.open(pdfUrl, '_blank');
@@ -164,10 +164,10 @@ function ProblemDetail() {
         return (
           <div className={styles['statement-view']}>
             {problem.has_pdf ? (
-              <iframe 
+              <iframe
                 src={contestId ? `/api/contests/${contestId}/problems/${problemId}/pdf` : `/api/problems/${problemId}/pdf`}
-                title={`${problem.title} PDF`} 
-                className={styles['pdf-preview']} 
+                title={`${problem.title} PDF`}
+                className={styles['pdf-preview']}
               />
             ) : (
               <div className={styles['no-pdf-message']}>No PDF available for preview.</div>
