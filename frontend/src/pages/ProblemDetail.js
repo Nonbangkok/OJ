@@ -182,7 +182,11 @@ function ProblemDetail() {
         );
       case 'submissions':
         // Pass contestId to submissions component if it exists
-        return <Submissions problemId={problemId} contestId={contestId} showTitle={false} />;
+        return (
+          <div className={styles['submissions-wrapper']}>
+            <Submissions problemId={problemId} contestId={contestId} showTitle={false} />
+          </div>
+        );
       default:
         return null;
     }
