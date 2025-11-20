@@ -91,10 +91,10 @@ async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) 
   return new Promise((resolve) => {
     // The command for the Linux environment inside Docker
     const timeCommand = `/usr/bin/time -f "TIME_USED:%e MEM_USED:%M"`;
-    
+
     // Use timeout command which is reliable on Linux
     const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${executablePath}`;
-    const executionOptions = { 
+    const executionOptions = {
       timeout: timeLimitMs + 500, // 
       maxBuffer: 50 * 1024 * 1024, // 50MB
       shell: '/bin/bash'
@@ -116,24 +116,24 @@ async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) 
         const memMatch = stderr.match(memRegex);
         if (timeMatch) timeMs = Math.round(parseFloat(timeMatch[1]) * 1000);
         if (memMatch) memoryKb = parseInt(memMatch[1], 10);
-        
+
         // Clean stderr for reporting
         programStderr = stderr.split('\n').filter(line => !line.includes('MEM_USED') && !line.includes('TIME_USED')).join('\n').trim();
       }
 
       // If we had an EPIPE error, prioritize it over other errors
       if (hasEpipError) {
-        return resolve({ 
-          status: 'Runtime Error', 
-          output: epipErrorMessage || 'Program crashed while receiving input (EPIPE)', 
-          timeMs, 
-          memoryKb 
+        return resolve({
+          status: 'Runtime Error',
+          output: epipErrorMessage || 'Program crashed while receiving input (EPIPE)',
+          timeMs,
+          memoryKb
         });
       }
 
       if (error) {
         // Did it time out? 'timeout' command exits with 124
-        if (error.code === 124) { 
+        if (error.code === 124) {
           return resolve({ status: 'Time Limit Exceeded', timeMs: timeLimitMs, memoryKb });
         }
         // Did it run out of memory? SIGSEGV is a common indicator.
@@ -141,14 +141,14 @@ async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) 
           return resolve({ status: 'Memory Limit Exceeded', timeMs, memoryKb: memoryLimitMb * 1024 });
         }
         // For other errors, treat as Runtime Error
-        return resolve({ 
-          status: 'Runtime Error', 
-          output: programStderr || error.message || 'Program terminated unexpectedly', 
-          timeMs, 
-          memoryKb 
+        return resolve({
+          status: 'Runtime Error',
+          output: programStderr || error.message || 'Program terminated unexpectedly',
+          timeMs,
+          memoryKb
         });
       }
-      
+
       resolve({ status: 'Pending', output: programOutput, timeMs, memoryKb });
     });
 
@@ -204,7 +204,7 @@ async function judge(problemId, executablePath) {
       const { case_number, input_data, output_data } = testcase;
 
       const runResult = await runSingleCase(executablePath, input_data, time_limit_ms, memory_limit_mb);
-      
+
       // Now, compare output
       if (runResult.status === 'Pending') {
         const formattedStdout = runResult.output.trim().replace(/\r\n/g, '\n');
@@ -215,7 +215,7 @@ async function judge(problemId, executablePath) {
           runResult.status = 'Wrong Answer';
         }
       }
-      
+
       results.push({
         testCase: case_number,
         status: runResult.status,
@@ -223,15 +223,15 @@ async function judge(problemId, executablePath) {
         memoryKb: runResult.memoryKb,
         output: runResult.status !== 'Accepted' && runResult.status !== 'Wrong Answer' ? runResult.output : undefined,
       });
-      
+
       // Stop on first non-Accepted result for immediate feedback
       if (runResult.status !== 'Accepted') {
         // To show all results, comment out the loop break.
         // For now, let's fill the rest with 'Skipped' to show the user there are more.
         for (let j = testcases.findIndex(t => t.case_number === case_number) + 1; j < testcases.length; j++) {
-            results.push({ testCase: testcases[j].case_number, status: 'Skipped' });
+          results.push({ testCase: testcases[j].case_number, status: 'Skipped' });
         }
-        break; 
+        break;
       }
     }
 
@@ -420,42 +420,42 @@ app.post('/submit', requireAuth, memoryUpload.none(), async (req, res) => {
         'SELECT id, status, start_time, end_time FROM contests WHERE id = $1',
         [contestId]
       );
-      
+
       if (contestRes.rows.length === 0) {
         return res.status(404).json({ message: 'Contest not found.' });
       }
-      
+
       const contest = contestRes.rows[0];
       if (contest.status !== 'running') {
-        return res.status(400).json({ 
-          message: `Contest is not running. Current status: ${contest.status}` 
+        return res.status(400).json({
+          message: `Contest is not running. Current status: ${contest.status}`
         });
       }
-      
+
       // Check if user is a participant
       const participantRes = await db.query(
         'SELECT 1 FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
         [contestId, userId]
       );
-      
+
       if (participantRes.rows.length === 0) {
-        return res.status(403).json({ 
-          message: 'You must join the contest before submitting.' 
+        return res.status(403).json({
+          message: 'You must join the contest before submitting.'
         });
       }
-      
+
       // Check if problem belongs to this contest
       const problemRes = await db.query(
         'SELECT 1 FROM problems WHERE id = $1 AND contest_id = $2',
         [problemId, contestId]
       );
-      
+
       if (problemRes.rows.length === 0) {
-        return res.status(400).json({ 
-          message: 'Problem does not belong to this contest.' 
+        return res.status(400).json({
+          message: 'Problem does not belong to this contest.'
         });
       }
-      
+
       // Create contest submission
       const submissionRes = await db.query(
         `INSERT INTO contest_submissions (contest_id, user_id, problem_id, code, language, overall_status, score)
@@ -472,7 +472,7 @@ app.post('/submit', requireAuth, memoryUpload.none(), async (req, res) => {
 
       // Fire-and-forget background processing for contest submission
       processContestSubmission(submissionId);
-      
+
     } else {
       // Regular submission to main system
       // Check if problem is available (not in any contest and visible)
@@ -480,13 +480,13 @@ app.post('/submit', requireAuth, memoryUpload.none(), async (req, res) => {
         'SELECT 1 FROM problems WHERE id = $1 AND is_visible = true AND contest_id IS NULL',
         [problemId]
       );
-      
+
       if (problemRes.rows.length === 0) {
-        return res.status(400).json({ 
-          message: 'Problem is not available for submission.' 
+        return res.status(400).json({
+          message: 'Problem is not available for submission.'
         });
       }
-      
+
       const submissionRes = await db.query(
         `INSERT INTO submissions (user_id, problem_id, code, language, overall_status, score)
          VALUES ($1, $2, $3, $4, 'Pending', 0) RETURNING id`,
@@ -544,7 +544,7 @@ async function processSubmission(submissionId) {
         `UPDATE submissions SET overall_status = 'Compilation Error', results = $1 WHERE id = $2`,
         [JSON.stringify([{ status: 'Compilation Error', output: compileError.stderr }]), submissionId]
       );
-      return; 
+      return;
     } finally {
       fs.unlink(filePath, (err) => { if (err) console.error(`Error deleting .cpp file for sub ${submissionId}:`, err); });
     }
@@ -611,7 +611,7 @@ async function processContestSubmission(submissionId) {
         `UPDATE contest_submissions SET overall_status = 'Compilation Error', results = $1 WHERE id = $2`,
         [JSON.stringify([{ status: 'Compilation Error', output: compileError.stderr }]), submissionId]
       );
-      return; 
+      return;
     } finally {
       fs.unlink(filePath, (err) => { if (err) console.error(`Error deleting .cpp file for contest sub ${submissionId}:`, err); });
     }
@@ -717,11 +717,11 @@ app.get('/problems/:id', async (req, res) => {
   const { id } = req.params;
   try {
     const result = await db.query('SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible FROM problems WHERE id = $1', [id]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Problem not found' });
     }
-    
+
     // Allow admin/staff to view hidden problems, otherwise apply visibility check
     const isStaffOrAdmin = req.session.role === 'admin' || req.session.role === 'staff';
 
@@ -733,7 +733,7 @@ app.get('/problems/:id', async (req, res) => {
         title: result.rows[0].title || 'Hidden Problem'
       });
     }
-    
+
     // Remove is_visible from response for regular users (admin/staff still see it)
     const { is_visible, ...problemData } = result.rows[0];
     res.json(isStaffOrAdmin ? result.rows[0] : problemData);
@@ -777,7 +777,7 @@ app.get('/submissions', requireAuth, async (req, res) => {
         JOIN users u ON cs.user_id = u.id
         JOIN problems p ON cs.problem_id = p.id
       `;
-      
+
       params.push(contestId);
       conditions.push(`cs.contest_id = $${params.length}`);
     } else {
@@ -840,7 +840,7 @@ app.get('/submissions/:id', requireAuth, async (req, res) => {
 
   try {
     let result;
-    
+
     if (contestId) {
       // Fetch contest submission
       result = await db.query(
@@ -1007,7 +1007,7 @@ app.put('/admin/users/:id', requireAuth, requireAdmin, [
   } catch (error) {
     console.error(`Error updating user ${id}:`, error);
     if (error.code === '23505') { // unique_violation
-        return res.status(409).json({ message: 'Username is already taken.' });
+      return res.status(409).json({ message: 'Username is already taken.' });
     }
     res.status(500).json({ message: 'Error updating user' });
   }
@@ -1036,7 +1036,7 @@ app.delete('/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
     // For simplicity, we can just delete them. A better approach might be to anonymize them.
     await db.query('DELETE FROM submissions WHERE user_id = $1', [id]);
     const result = await db.query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
-    
+
     if (result.rowCount === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -1104,92 +1104,92 @@ app.post('/admin/users/batch', requireAuth, requireAdmin, [
 
 // Problem Management
 app.post('/admin/problems', requireAuth, requireStaffOrAdmin, [
-    body('id').isLength({ min: 1 }).trim().escape(),
-    body('title').isLength({ min: 1 }).trim(),
-    body('author').isLength({ min: 1 }).trim(),
-    body('time_limit_ms').isInt({ min: 100 }),
-    body('memory_limit_mb').isInt({ min: 10 })
+  body('id').isLength({ min: 1 }).trim().escape(),
+  body('title').isLength({ min: 1 }).trim(),
+  body('author').isLength({ min: 1 }).trim(),
+  body('time_limit_ms').isInt({ min: 100 }),
+  body('memory_limit_mb').isInt({ min: 10 })
 ], async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-    }
-    const { id, title, author, time_limit_ms, memory_limit_mb } = req.body;
-    try {
-        const result = await db.query(
-            'INSERT INTO problems (id, title, author, time_limit_ms, memory_limit_mb) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [id, title, author, time_limit_ms, memory_limit_mb]
-        );
-        res.status(201).json(result.rows[0]);
-    } catch (error) {
-        console.error('Error creating problem:', error);
-        res.status(500).json({ message: 'Error creating problem' });
-    }
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  const { id, title, author, time_limit_ms, memory_limit_mb } = req.body;
+  try {
+    const result = await db.query(
+      'INSERT INTO problems (id, title, author, time_limit_ms, memory_limit_mb) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [id, title, author, time_limit_ms, memory_limit_mb]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating problem:', error);
+    res.status(500).json({ message: 'Error creating problem' });
+  }
 });
 
 app.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin, [
-    body('id').isLength({ min: 1 }).trim().escape(), // New ID
-    body('title').optional({ checkFalsy: true }).isLength({ min: 1 }).trim(),
-    body('author').optional({ checkFalsy: true }).isLength({ min: 1 }).trim(),
-    body('time_limit_ms').optional().isInt({ min: 100 }),
-    body('memory_limit_mb').optional().isInt({ min: 10 })
+  body('id').isLength({ min: 1 }).trim().escape(), // New ID
+  body('title').optional({ checkFalsy: true }).isLength({ min: 1 }).trim(),
+  body('author').optional({ checkFalsy: true }).isLength({ min: 1 }).trim(),
+  body('time_limit_ms').optional().isInt({ min: 100 }),
+  body('memory_limit_mb').optional().isInt({ min: 10 })
 ], async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-    }
-    const oldId = req.params.id;
-    const { id: newId, title, author, time_limit_ms, memory_limit_mb } = req.body;
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  const oldId = req.params.id;
+  const { id: newId, title, author, time_limit_ms, memory_limit_mb } = req.body;
 
-    try {
-        // If the ID is being changed, check if the new ID already exists
-        if (oldId !== newId) {
-            const existingProblem = await db.query('SELECT id FROM problems WHERE id = $1', [newId]);
-            if (existingProblem.rows.length > 0) {
-                return res.status(409).json({ message: `Problem ID '${newId}' already exists.` });
-            }
-        }
-        
-        const result = await db.query(
-            'UPDATE problems SET id = $1, title = $2, author = $3, time_limit_ms = $4, memory_limit_mb = $5 WHERE id = $6 RETURNING *',
-            [newId, title, author, time_limit_ms, memory_limit_mb, oldId]
-        );
-        
-        // Update problem_id in contest_problems and contest_submissions if problem ID changed
-        if (oldId !== newId) {
-            await db.query('UPDATE contest_problems SET problem_id = $1 WHERE problem_id = $2', [newId, oldId]);
-            await db.query('UPDATE contest_submissions SET problem_id = $1 WHERE problem_id = $2', [newId, oldId]);
-        }
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: 'Problem not found' });
-        }
-        
-        res.json(result.rows[0]);
-    } catch (error) {
-        console.error(`Error updating problem ${oldId}:`, error);
-        res.status(500).json({ message: 'Error updating problem' });
+  try {
+    // If the ID is being changed, check if the new ID already exists
+    if (oldId !== newId) {
+      const existingProblem = await db.query('SELECT id FROM problems WHERE id = $1', [newId]);
+      if (existingProblem.rows.length > 0) {
+        return res.status(409).json({ message: `Problem ID '${newId}' already exists.` });
+      }
     }
+
+    const result = await db.query(
+      'UPDATE problems SET id = $1, title = $2, author = $3, time_limit_ms = $4, memory_limit_mb = $5 WHERE id = $6 RETURNING *',
+      [newId, title, author, time_limit_ms, memory_limit_mb, oldId]
+    );
+
+    // Update problem_id in contest_problems and contest_submissions if problem ID changed
+    if (oldId !== newId) {
+      await db.query('UPDATE contest_problems SET problem_id = $1 WHERE problem_id = $2', [newId, oldId]);
+      await db.query('UPDATE contest_submissions SET problem_id = $1 WHERE problem_id = $2', [newId, oldId]);
+    }
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Problem not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(`Error updating problem ${oldId}:`, error);
+    res.status(500).json({ message: 'Error updating problem' });
+  }
 });
 
 app.delete('/admin/problems/:id', requireAuth, requireStaffOrAdmin, async (req, res) => {
-    const { id } = req.params;
-    try {
-        // We also need to delete submissions for this problem
-        await db.query('DELETE FROM submissions WHERE problem_id = $1', [id]);
-        await db.query('DELETE FROM testcases WHERE problem_id = $1', [id]);
-        await db.query('DELETE FROM contest_problems WHERE problem_id = $1', [id]);
-        await db.query('DELETE FROM contest_submissions WHERE problem_id = $1', [id]);
-        const result = await db.query('DELETE FROM problems WHERE id = $1 RETURNING id', [id]);
-        
-        if (result.rowCount === 0) {
-            return res.status(404).json({ message: 'Problem not found' });
-        }
-        res.status(200).json({ message: `Problem ${id} deleted successfully` });
-    } catch (error) {
-        console.error(`Error deleting problem ${id}:`, error);
-        res.status(500).json({ message: 'Error deleting problem' });
+  const { id } = req.params;
+  try {
+    // We also need to delete submissions for this problem
+    await db.query('DELETE FROM submissions WHERE problem_id = $1', [id]);
+    await db.query('DELETE FROM testcases WHERE problem_id = $1', [id]);
+    await db.query('DELETE FROM contest_problems WHERE problem_id = $1', [id]);
+    await db.query('DELETE FROM contest_submissions WHERE problem_id = $1', [id]);
+    const result = await db.query('DELETE FROM problems WHERE id = $1 RETURNING id', [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'Problem not found' });
     }
+    res.status(200).json({ message: `Problem ${id} deleted successfully` });
+  } catch (error) {
+    console.error(`Error deleting problem ${id}:`, error);
+    res.status(500).json({ message: 'Error deleting problem' });
+  }
 });
 
 app.get('/admin/authors', requireAuth, requireStaffOrAdmin, async (req, res) => {
@@ -1224,7 +1224,7 @@ app.put('/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin, [
 
   const { id } = req.params;
   const { isVisible } = req.body;
-  
+
   try {
     const result = await db.query(
       'UPDATE problems SET is_visible = $1 WHERE id = $2 RETURNING id, title, is_visible',
@@ -1233,9 +1233,9 @@ app.put('/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin, [
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Problem not found' });
     }
-    res.json({ 
-      message: `Problem ${id} visibility updated successfully`, 
-      problem: result.rows[0] 
+    res.json({
+      message: `Problem ${id} visibility updated successfully`,
+      problem: result.rows[0]
     });
   } catch (error) {
     console.error(`Error updating visibility for problem ${id}:`, error);
@@ -1289,7 +1289,7 @@ app.get('/admin/problems/batch-upload-progress/:progressId', requireAuth, requir
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*' 
+    'Access-Control-Allow-Origin': '*'
   });
 
   progressMap.set(progressId, res);
@@ -1349,9 +1349,9 @@ app.post('/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, memoryU
 
           const lowerFileName = fileName.toLowerCase();
           if (lowerFileName.endsWith('.in') || lowerFileName.includes('input')) {
-             testcaseFiles[number].in = file;
+            testcaseFiles[number].in = file;
           } else if (lowerFileName.endsWith('.out') || lowerFileName.endsWith('.sol') || lowerFileName.includes('output')) {
-             testcaseFiles[number].out = file;
+            testcaseFiles[number].out = file;
           }
         }
       }
@@ -1359,11 +1359,11 @@ app.post('/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, memoryU
       // Second pass: read content and insert into DB
       const sortedKeys = Object.keys(testcaseFiles).map(Number).sort((a, b) => a - b);
       const pairedCases = sortedKeys.filter(key => testcaseFiles[key].in && testcaseFiles[key].out);
-      
+
       if (pairedCases.length === 0) {
-          return res.status(400).json({ message: 'No valid testcase pairs (.in/.out or input/output) found in the ZIP file.' });
+        return res.status(400).json({ message: 'No valid testcase pairs (.in/.out or input/output) found in the ZIP file.' });
       }
-      
+
       let caseCounter = 1;
       for (const key of pairedCases) {
         const pair = testcaseFiles[key];
@@ -1439,7 +1439,7 @@ app.post('/admin/database/export', requireAuth, requireAdmin, async (req, res) =
     // Command to run pg_dump. Using plain SQL format.
     // Ensure that pg_dump is available in the Docker container where backend runs.
     const pgDumpCommand = `PGPASSWORD=${process.env.PGPASSWORD} pg_dump -h ${dbHost} -p ${dbPort} -U ${dbUser} -d ${dbName} -F p -f ${dumpFilePath}`;
-    
+
     console.log(`Executing pg_dump command: ${pgDumpCommand}`);
     await execPromise(pgDumpCommand);
 
@@ -1514,7 +1514,7 @@ app.post('/admin/database/import', requireAuth, requireAdmin, diskUpload.single(
     await db.query('DROP TABLE IF EXISTS contest_submissions CASCADE;');
     await db.query('DROP TABLE IF EXISTS contest_participants CASCADE;');
     await db.query('DROP TABLE IF EXISTS contests CASCADE;');
-    
+
     // Drop main tables
     await db.query('DROP TABLE IF EXISTS submissions CASCADE;');
     await db.query('DROP TABLE IF EXISTS testcases CASCADE;');
@@ -1548,7 +1548,7 @@ app.post('/admin/database/import', requireAuth, requireAdmin, diskUpload.single(
 
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
-  
+
   // Start Contest Scheduler
   try {
     contestScheduler.start();
@@ -1556,7 +1556,7 @@ app.listen(port, () => {
   } catch (error) {
     console.error('❌ Failed to start Contest Scheduler:', error);
   }
-}); 
+});
 
 // Admin API Endpoints for Problem Export
 app.post('/admin/problems/export', requireAuth, requireStaffOrAdmin, async (req, res) => {
@@ -1640,7 +1640,7 @@ app.post('/admin/problems/export', requireAuth, requireStaffOrAdmin, async (req,
     if (!res.headersSent) {
       res.status(500).json({ message: 'Failed to export problems.', error: error.message });
     }
-    archive.abort(); 
+    archive.abort();
     res.end(); // Ensure response is ended on error
   }
 });
