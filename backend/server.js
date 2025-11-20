@@ -802,20 +802,19 @@ app.get('/submissions', requireAuth, async (req, res) => {
       conditions.push(`${contestId ? 'cs' : 's'}.problem_id = $${params.length}`);
     }
 
-    // Admin/Staff filters
     if (isStaffOrAdmin) {
       const { filterProblemId, filterUserId } = req.query;
+
       if (filterProblemId) {
-        params.push(filterProblemId);
-        conditions.push(`${contestId ? 'cs' : 's'}.problem_id = $${params.length}`);
+        // Flexible matching for "auto-correct" feel, or exact match if selected from autocomplete
+        // Using ILIKE for case-insensitive partial match if they typed it manually
+        params.push(`%${filterProblemId}%`);
+        conditions.push(`${contestId ? 'cs' : 's'}.problem_id IN (SELECT id FROM problems WHERE id ILIKE $${params.length})`);
       }
+
       if (filterUserId) {
-        const userRes = await db.query('SELECT id FROM users WHERE username = $1', [filterUserId]);
-        if (userRes.rows.length === 0) {
-          return res.status(404).json({ message: 'User not found for filtering.' });
-        }
-        params.push(userRes.rows[0].id);
-        conditions.push(`${contestId ? 'cs' : 's'}.user_id = $${params.length}`);
+        params.push(`%${filterUserId}%`);
+        conditions.push(`${contestId ? 'cs' : 's'}.user_id IN (SELECT id FROM users WHERE username ILIKE $${params.length})`);
       }
     }
 
@@ -823,7 +822,7 @@ app.get('/submissions', requireAuth, async (req, res) => {
       query += ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    query += ` ORDER BY ${contestId ? 'cs' : 's'}.submitted_at DESC LIMIT 50;`;
+    query += ` ORDER BY ${contestId ? 'cs' : 's'}.submitted_at DESC LIMIT 200;`;
 
     const result = await db.query(query, params);
     res.json(result.rows);
