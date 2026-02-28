@@ -101,12 +101,12 @@
 
 /* Orange for scores < 100 */
 .score-bar.partial {
-  background-color: #FFC107;
+  background-color: var(--status-warning-bg);
 }
 
 /* Green for 100 */
 .score-bar.full {
-  background-color: #48bb78;
+  background-color: var(--status-success-bg);
 }
 
 .score-bar span {
@@ -148,9 +148,10 @@
 
 .problem-action-btn.new,
 .problem-action-btn.edit {
-  background-color: green;
+  background-color: var(--status-success-bg);
 }
+
 .problem-action-btn.new:hover,
 .problem-action-btn.edit:hover {
-  background-color: darkgreen;
+  background-color: var(--accent-primary-hover);
 } 

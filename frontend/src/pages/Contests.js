@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import styles from './Contests.module.css';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import contestService from '../services/contestService';
 
 function Contests() {
   const [contests, setContests] = useState([]);
@@ -19,10 +17,8 @@ function Contests() {
   const fetchContests = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/contests`, {
-        withCredentials: true
-      });
-      setContests(response.data);
+      const data = await contestService.getAll();
+      setContests(data);
     } catch (err) {
       console.error('Error fetching contests:', err);
       setError('Failed to load contests');
@@ -33,9 +29,7 @@ function Contests() {
 
   const handleJoinContest = async (contestId) => {
     try {
-      await axios.post(`${API_URL}/contests/${contestId}/join`, {}, {
-        withCredentials: true
-      });
+      await contestService.join(contestId);
       setError('');
       // Refresh contests to update join status
       fetchContests();
@@ -52,7 +46,7 @@ function Contests() {
       'finishing': `${styles.badge} ${styles.finishing}`,
       'finished': `${styles.badge} ${styles.finished}`
     };
-    
+
     const statusText = {
       'scheduled': 'Scheduled',
       'running': 'Running',
@@ -79,10 +73,10 @@ function Contests() {
 
   const isContestJoinable = (contest) => {
     if (!user) return false;
-    
+
     const now = new Date();
     const endTime = new Date(contest.end_time);
-    
+
     // Can join until contest ends
     return now < endTime;
   };
@@ -138,11 +132,11 @@ function Contests() {
                 <h3 className={styles.contestTitle}>{contest.title}</h3>
                 {getStatusBadge(contest.status)}
               </div>
-              
+
               {contest.description && (
                 <p className={styles.contestDescription}>{contest.description}</p>
               )}
-              
+
               <div className={styles.contestTiming}>
                 <div className={styles.timeInfo}>
                   <span className={styles.timeLabel}>Start:</span>
@@ -162,7 +156,7 @@ function Contests() {
               <div className={styles.contestActions}>
                 {/* Join Contest Button */}
                 {isContestJoinable(contest) && !contest.is_participant && (
-                  <button 
+                  <button
                     className={`${styles.actionBtn} ${styles.joinBtn}`}
                     onClick={() => handleJoinContest(contest.id)}
                   >
@@ -179,7 +173,7 @@ function Contests() {
 
                 {/* Enter Contest (Running) */}
                 {isContestViewable(contest, contest.is_participant) && (
-                  <Link 
+                  <Link
                     to={`/contests/${contest.id}`}
                     className={`${styles.actionBtn} ${styles.enterBtn}`}
                   >
@@ -189,7 +183,7 @@ function Contests() {
 
                 {/* View Scoreboard */}
                 {contest.status === 'finished' && (
-                  <Link 
+                  <Link
                     to={`/contests/${contest.id}/scoreboard`}
                     className={`${styles.actionBtn} ${styles.scoreboardBtn}`}
                   >
@@ -199,7 +193,7 @@ function Contests() {
 
                 {/* Login Required */}
                 {!user && isContestJoinable(contest) && (
-                  <Link 
+                  <Link
                     to="/login"
                     className={`${styles.actionBtn} ${styles.loginBtn}`}
                   >

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
-import '../components/Table.css'; // Use the new shared table styles
+import '../components/common/Table.css'; // Use the new shared table styles
 
 const API_URL = process.env.REACT_APP_API_URL;
 

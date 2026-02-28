@@ -1,13 +1,12 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Outlet } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import './App.css';
 
 // Components
-import Navbar from './components/Navbar';
-import ContestLayout from './components/ContestLayout';
-import AdminLayout from './components/AdminLayout';
+import Navbar from './components/common/Navbar';
+import ContestLayout from './layouts/contest/ContestLayout';
+import AdminLayout from './layouts/admin/AdminLayout';
 
 // Pages
 import Home from './pages/Home';
@@ -26,10 +25,10 @@ import ContestScoreboard from './pages/ContestScoreboard';
 import { SettingsProvider } from './context/SettingsContext';
 
 // Admin Pages
-import UserManagement from './components/admin/UserManagement';
-import ProblemManagement from './components/admin/ProblemManagement';
-import ContestManagement from './components/admin/ContestManagement';
-import Settings from './components/admin/Settings';
+import UserManagement from './features/admin/components/UserManagement';
+import ProblemManagement from './features/admin/components/ProblemManagement';
+import ContestManagement from './features/admin/components/ContestManagement';
+import Settings from './features/admin/components/Settings';
 
 // New layout for standard pages
 const MainLayout = () => (

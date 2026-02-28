@@ -1,7 +1,5 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import { createContext, useState, useEffect, useContext } from 'react';
+import authService from '../services/authService';
 
 const AuthContext = createContext();
 
@@ -14,9 +12,9 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkLoggedIn = async () => {
       try {
-        const response = await axios.get(`${API_URL}/me`, { withCredentials: true });
-        if (response.data.isAuthenticated) {
-          setUser(response.data.user);
+        const data = await authService.checkLogin();
+        if (data.isAuthenticated) {
+          setUser(data.user);
         } else {
           setUser(null);
         }
@@ -26,7 +24,6 @@ export const AuthProvider = ({ children }) => {
         setIsLoading(false);
       }
     };
-
     checkLoggedIn();
   }, []);
 
@@ -36,7 +33,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await axios.post(`${API_URL}/logout`, {}, { withCredentials: true });
+      await authService.logout();
     } catch (error) {
       console.error('Logout failed', error);
     } finally {

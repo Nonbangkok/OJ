@@ -1,0 +1,191 @@
+import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Editor from 'react-simple-code-editor';
+
+// Import highlight.js
+import hljs from 'highlight.js/lib/core';
+import cpp from 'highlight.js/lib/languages/cpp';
+
+// Import highlight.js theme CSS globally
+import 'highlight.js/styles/atom-one-dark.css';
+
+import editorStyles from '../../../components/common/CodeEditor.module.css';
+import formStyles from '../../../components/common/Form.module.css';
+import styles from './CodeSubmissionForm.module.css';
+import submissionService from '../../../services/submissionService';
+
+// Register C++ language after all imports
+hljs.registerLanguage('cpp', cpp);
+
+const CodeSubmissionForm = ({ problemId, contestId }) => {
+  const [language, setLanguage] = useState('cpp');
+  const [code, setCode] = useState(``);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  const editorWrapperRef = useRef(null);
+  const lineNumbersRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      const cachedSubmission = JSON.parse(localStorage.getItem('oj-submission-cache') || '{}');
+      const problemCache = cachedSubmission[problemId];
+
+      if (problemCache && problemCache.code) {
+        const thirtyMinutes = 30 * 60 * 1000;
+        const timeDiff = new Date().getTime() - problemCache.timestamp;
+
+        if (timeDiff < thirtyMinutes) {
+          setCode(problemCache.code);
+        } else {
+          // Clear expired cache for this problem
+          delete cachedSubmission[problemId];
+          localStorage.setItem('oj-submission-cache', JSON.stringify(cachedSubmission));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to read from localStorage:", error);
+    }
+  }, [problemId]);
+
+  // Sync scrolling between the editor's textarea, the <pre> block, and the line numbers gutter
+  useEffect(() => {
+    const editorEl = editorWrapperRef.current;
+    if (!editorEl) return;
+
+    const textarea = editorEl.querySelector('textarea');
+    const pre = editorEl.querySelector('pre'); // Find the <pre> block for highlighted code
+
+    if (!textarea || !pre) return;
+
+    const syncScroll = () => {
+      const scrollTop = textarea.scrollTop;
+      const scrollLeft = textarea.scrollLeft;
+
+      if (lineNumbersRef.current) {
+        lineNumbersRef.current.scrollTop = scrollTop;
+      }
+
+      // Sync the <pre> block's scroll position to match the textarea
+      pre.scrollTop = scrollTop;
+      pre.scrollLeft = scrollLeft;
+    };
+
+    textarea.addEventListener('scroll', syncScroll);
+
+    return () => {
+      textarea.removeEventListener('scroll', syncScroll);
+    };
+  }, []); // Run only once to attach the listener
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      const submitData = {
+        problemId,
+        language,
+        code,
+      };
+
+      // Add contestId if this is a contest submission
+      if (contestId) {
+        submitData.contestId = contestId;
+      }
+
+      await submissionService.submit(submitData);
+
+      try {
+        const submissionCache = JSON.parse(localStorage.getItem('oj-submission-cache') || '{}');
+        submissionCache[problemId] = {
+          code: code,
+          timestamp: new Date().getTime(),
+        };
+        localStorage.setItem('oj-submission-cache', JSON.stringify(submissionCache));
+      } catch (error) {
+        console.error("Failed to write to localStorage:", error);
+      }
+
+      // Navigate to appropriate submissions page
+      if (contestId) {
+        navigate(`/contests/${contestId}/submissions`);
+      } else {
+        navigate('/submissions');
+      }
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'An unexpected error occurred.';
+      setError(errorMsg);
+      console.error('Error submitting code:', err);
+      setIsSubmitting(false);
+    }
+  };
+
+  const highlightCode = (code) => {
+    try {
+      return hljs.highlight(code, { language: 'cpp' }).value;
+    } catch (e) {
+      console.warn('Highlighting error:', e);
+      return code;
+    }
+  };
+
+  const lineCount = code.split('\n').length;
+
+  const handleWrapperClick = () => {
+    editorWrapperRef.current?.querySelector('textarea')?.focus();
+  };
+
+  return (
+    <div className={styles['submission-form-container']}>
+      <div className={styles.formHeader}>
+        <h2>Submit Solution</h2>
+        <div className={styles.languageButtons}>
+          <button
+            className={language === 'cpp' ? styles.active : ''}
+            onClick={() => setLanguage('cpp')}
+            disabled={isSubmitting}
+          >
+            C++
+          </button>
+        </div>
+      </div>
+
+      {error && <p className="error-message" style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
+      <form onSubmit={handleSubmit}>
+        <div className={formStyles['form-group']}>
+          <label htmlFor="code">Your Code:</label>
+          <div className={editorStyles['editorWrapper']} ref={editorWrapperRef} onClick={handleWrapperClick}>
+            <div className={editorStyles['lineNumbersGutter']} ref={lineNumbersRef}>
+              {Array.from({ length: lineCount }).map((_, i) => (
+                <div key={i + 1}>{i + 1}</div>
+              ))}
+            </div>
+            <div className={editorStyles['editorContainer']}>
+              <Editor
+                value={code}
+                onValueChange={code => setCode(code)}
+                highlight={highlightCode}
+                padding={16}
+                textareaId="code"
+                disabled={isSubmitting}
+                style={{
+                  fontFamily: '"Fira code", "Fira Mono", monospace',
+                  fontSize: 16,
+                  lineHeight: 1.5, // Ensure line height matches CSS
+                }}
+              />
+            </div>
+          </div>
+        </div>
+        <button type="submit" disabled={isSubmitting} className={formStyles['submit-button']}>
+          {isSubmitting ? 'Submitting...' : 'Submit'}
+        </button>
+      </form>
+    </div>
+  );
+};
+
+export default CodeSubmissionForm; 
