@@ -161,11 +161,8 @@ const ProblemManagement = ({ currentUser }) => {
 
   const handleSelectAll = (event) => {
     if (event.target.checked) {
-      // Only select problems that are not currently in a running or scheduled contest
-      const allSelectableProblemIds = problems
-        .filter(p => !(p.contest_id && (p.contest_status === 'scheduled' || p.contest_status === 'running')))
-        .map(p => p.id);
-      setSelectedProblems(allSelectableProblemIds);
+      const allProblemIds = problems.map(p => p.id);
+      setSelectedProblems(allProblemIds);
     } else {
       setSelectedProblems([]);
     }
