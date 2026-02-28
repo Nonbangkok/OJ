@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
-import formStyles from '../Form.module.css';
+import formStyles from '../../../components/common/Form.module.css';
 import modalStyles from './ModalLayout.module.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -21,7 +21,7 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
   const fetchProblems = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch available problems and contest problems in parallel
       const [availableRes, contestRes] = await Promise.all([
         axios.get(`${API_URL}/contests/available-problems`, {
@@ -31,7 +31,7 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
           withCredentials: true
         })
       ]);
-      
+
       setAvailableProblems(availableRes.data);
       setContestProblems(contestRes.data);
     } catch (err) {
@@ -44,18 +44,18 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
 
   const handleMoveToContest = async () => {
     if (selectedAvailable.length === 0) return;
-    
+
     try {
       setMigrationLoading(true);
       setError('');
-      
+
       await axios.post(`${API_URL}/admin/contests/${contest.id}/problems`, {
         problemIds: selectedAvailable,
         action: 'move_to_contest'
       }, {
         withCredentials: true
       });
-      
+
       setSelectedAvailable([]);
       await fetchProblems(); // Refresh both lists
     } catch (err) {
@@ -76,14 +76,14 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
     try {
       setMigrationLoading(true);
       setError('');
-      
+
       await axios.post(`${API_URL}/admin/contests/${contest.id}/problems`, {
         problemIds: problemIdsToRemove,
         action: 'move_to_main'
       }, {
         withCredentials: true
       });
-      
+
       setSelectedContest([]); // Clear selection after moving
       await fetchProblems(); // Refresh both lists
     } catch (err) {
@@ -95,7 +95,7 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
   };
 
   const handleSelectAvailable = (problemId) => {
-    setSelectedAvailable(prev => 
+    setSelectedAvailable(prev =>
       prev.includes(problemId)
         ? prev.filter(id => id !== problemId)
         : [...prev, problemId]
@@ -103,7 +103,7 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
   };
 
   const handleSelectContest = (problemId) => {
-    setSelectedContest(prev => 
+    setSelectedContest(prev =>
       prev.includes(problemId)
         ? prev.filter(id => id !== problemId)
         : [...prev, problemId]
@@ -143,7 +143,7 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
 
   return (
     <div className={modalStyles['modal-overlay']} onClick={onClose}>
-      <div 
+      <div
         className={`${formStyles['form-container']} ${modalStyles.migrationModalContainer}`}
         onClick={e => e.stopPropagation()}
       >
@@ -151,13 +151,13 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
           <h2>Manage Contest Problems</h2>
           <p>Contest: <strong>{contest.title}</strong></p>
         </div>
-        
+
         {error && (
           <div className={formStyles['error-message']}>
             <h3>Error: {error}</h3>
           </div>
         )}
-        
+
         {contest.status !== 'scheduled' && contest.status !== 'running' && (
           <div className={modalStyles.migrationModalWarning}>
             Problems can only be modified for scheduled or running contests.
@@ -179,7 +179,7 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
                 </button>
               )}
             </div>
-            
+
             <div className={modalStyles.migrationProblemList}>
               {availableProblems.length === 0 ? (
                 <div className={modalStyles.migrationEmptyList}>
@@ -234,7 +234,7 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
               >
                 <small className={modalStyles.migrationControlButtonText}>Add to Contest</small>
               </button>
-              
+
               <button
                 onClick={() => handleMoveToMain()}
                 disabled={!canMoveProblems || selectedContest.length === 0 || migrationLoading}
@@ -244,7 +244,7 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
                 <small className={modalStyles.migrationControlButtonText}>Remove from Contest</small>
               </button>
             </div>
-            
+
             <div className={modalStyles.migrationSelectionCountContainer}>
               <div className={modalStyles.migrationSelectionCountText}>
                 {selectedAvailable.length} selected from available
@@ -284,7 +284,7 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
                     canMoveProblems ? modalStyles.enabled : modalStyles.disabled,
                     selectedContest.includes(problem.id) ? modalStyles.selected : ''
                   ].join(' ');
-                  
+
                   return (
                     <div
                       key={problem.id}

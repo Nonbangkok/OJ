@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Editor from 'react-simple-code-editor';
 import hljs from 'highlight.js/lib/core';
 import cpp from 'highlight.js/lib/languages/cpp';
@@ -7,8 +7,8 @@ import cpp from 'highlight.js/lib/languages/cpp';
 import 'highlight.js/styles/atom-one-dark.css';
 
 import styles from './SubmissionModal.module.css';
-import editorStyles from '../components/CodeEditor.module.css';
-import '../components/Table.css';
+import editorStyles from '../../../components/common/CodeEditor.module.css';
+import '../../../components/common/Table.css';
 
 // Register C++ language
 hljs.registerLanguage('cpp', cpp);

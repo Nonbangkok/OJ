@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import styles from './Submissions.module.css';
-import SubmissionModal from './SubmissionModal';
+import SubmissionModal from '../features/problems/components/SubmissionModal';
 
 const API_URL = process.env.REACT_APP_API_URL;
 

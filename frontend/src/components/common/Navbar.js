@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import ThemeToggleButton from './ThemeToggleButton';
 import styles from './Navbar.module.css';
-import { useTheme } from '../context/ThemeContext'; // Import useTheme
-import logo from '../assets/logo512.png'; // Import default logo
-import darkmodeLogo from '../assets/logo512_darkmode.png'; // Import dark mode logo
+import { useTheme } from '../../context/ThemeContext';
+import logo from '../../assets/logo512.png';
+import darkmodeLogo from '../../assets/logo512_darkmode.png';
 
 const Navbar = () => {
   const { user, logout } = useAuth();

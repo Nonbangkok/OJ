@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
-import formStyles from '../Form.module.css';
+import formStyles from '../../../components/common/Form.module.css';
 import modalStyles from './ModalLayout.module.css';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -30,10 +30,10 @@ function ContestModal({ contest, onClose, onSuccess }) {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(10, 0, 0, 0); // 10:00 AM
-      
+
       const dayAfter = new Date(tomorrow);
       dayAfter.setHours(16, 0, 0, 0); // 4:00 PM same day
-      
+
       setFormData({
         title: '',
         description: '',
@@ -45,36 +45,36 @@ function ContestModal({ contest, onClose, onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validation
     if (!formData.title.trim()) {
       setError('Contest title is required');
       return;
     }
-    
+
     if (!formData.start_time || !formData.end_time) {
       setError('Start time and end time are required');
       return;
     }
-    
+
     const startTime = formData.start_time;
     const endTime = formData.end_time;
-    
+
     if (startTime >= endTime) {
       setError('End time must be after start time');
       return;
     }
-    
+
     // Check if start time is in the past for new contests
     if (!contest && startTime <= new Date()) {
       setError('Start time must be in the future');
       return;
     }
-    
+
     try {
       setLoading(true);
       setError('');
-      
+
       // Convert Date objects to ISO strings for backend
       const contestData = {
         title: formData.title.trim(),
@@ -94,7 +94,7 @@ function ContestModal({ contest, onClose, onSuccess }) {
           withCredentials: true
         });
       }
-      
+
       onSuccess();
     } catch (err) {
       console.error('Error saving contest:', err);
@@ -124,11 +124,11 @@ function ContestModal({ contest, onClose, onSuccess }) {
       const startTime = formData.start_time;
       const endTime = formData.end_time;
       const durationMs = endTime.getTime() - startTime.getTime();
-      
+
       if (durationMs > 0) {
         const hours = Math.floor(durationMs / (1000 * 60 * 60));
         const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
-        
+
         if (hours > 0) {
           return `Duration: ${hours} hour${hours > 1 ? 's' : ''} ${minutes > 0 ? `${minutes} minute${minutes > 1 ? 's' : ''}` : ''}`;
         } else if (minutes > 0) {
@@ -212,16 +212,16 @@ function ContestModal({ contest, onClose, onSuccess }) {
               End Time :
             </label>
             <div className={formStyles['form-time']}>
-            <DatePicker
-              selected={formData.end_time}
-              onChange={(date) => handleDateChange(date, 'end_time')}
-              showTimeSelect
-              dateFormat="MMM dd, yyyy, h:mm aa"
-              timeFormat="HH:mm"
-              timeIntervals={30}
-              minDate={formData.start_time || new Date()}
-              required
-            />
+              <DatePicker
+                selected={formData.end_time}
+                onChange={(date) => handleDateChange(date, 'end_time')}
+                showTimeSelect
+                dateFormat="MMM dd, yyyy, h:mm aa"
+                timeFormat="HH:mm"
+                timeIntervals={30}
+                minDate={formData.start_time || new Date()}
+                required
+              />
             </div>
           </div>
 

@@ -1,11 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import styles from '../components/Form.module.css'; // Use the new shared form styles
-
-const API_URL = process.env.REACT_APP_API_URL;
+import styles from '../components/common/Form.module.css';
+import authService from '../services/authService';
 
 function Login() {
   const [username, setUsername] = useState('');
@@ -19,13 +17,8 @@ function Login() {
     e.preventDefault();
     setError('');
     try {
-      const response = await axios.post(`${API_URL}/login`, {
-        username,
-        password
-      }, {
-        withCredentials: true
-      });
-      login(response.data.user); // Update auth context
+      const data = await authService.login(username, password);
+      login(data.user);
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');

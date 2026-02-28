@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
-import UserManagement from '../components/admin/UserManagement';
-import ProblemManagement from '../components/admin/ProblemManagement';
-import ContestManagement from '../components/admin/ContestManagement';
-import Settings from '../components/admin/Settings';
+import UserManagement from '../features/admin/components/UserManagement';
+import ProblemManagement from '../features/admin/components/ProblemManagement';
+import ContestManagement from '../features/admin/components/ContestManagement';
+import Settings from '../features/admin/components/Settings';
 import styles from './Admin.module.css';
 
 const API_URL = process.env.REACT_APP_API_URL;

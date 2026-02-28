@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import formStyles from '../Form.module.css';
+import { useState, useEffect } from 'react';
+import formStyles from '../../../components/common/Form.module.css';
 import modalStyles from './ModalLayout.module.css';
 
 

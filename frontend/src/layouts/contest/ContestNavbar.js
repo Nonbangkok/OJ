@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import styles from './ContestNavbar.module.css';
-import { useAuth } from '../context/AuthContext';
-import ThemeToggleButton from './ThemeToggleButton';
-import { useTheme } from '../context/ThemeContext'; // Import useTheme
-import logo from '../assets/logo512.png'; // Import default logo
-import darkmodeLogo from '../assets/logo512_darkmode.png'; // Import dark mode logo
+import { useAuth } from '../../context/AuthContext';
+import ThemeToggleButton from '../../components/common/ThemeToggleButton';
+import { useTheme } from '../../context/ThemeContext';
+import logo from '../../assets/logo512.png';
+import darkmodeLogo from '../../assets/logo512_darkmode.png';
 
 const API_URL = process.env.REACT_APP_API_URL;
 

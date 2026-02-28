@@ -33,15 +33,15 @@
 }
 
 .status-badge.running {
-  background: #e8f5e8;
-  color: #2e7d32;
-  border: 1px solid #c8e6c9;
+  background: var(--background-tertiary);
+  color: var(--status-success-bg);
+  border: 1px solid var(--border-color);
 }
 
 .status-badge.scheduled {
-  background: #fff3cd;
-  color: #856404;
-  border: 1px solid #ffeaa7;
+  background: var(--background-tertiary);
+  color: var(--status-warning-bg);
+  border: 1px solid var(--border-color);
 }
 
 .status-badge.finished {
@@ -346,13 +346,11 @@
 }
 
 .score-bar.full {
-  background-color: #48bb78;
-  /* Green from existing styles */
+  background-color: var(--status-success-bg);
 }
 
 .score-bar.partial {
-  background-color: #FFC107;
-  /* Yellow */
+  background-color: var(--status-warning-bg);
 }
 
 .score-bar.zero {
@@ -391,40 +389,33 @@
 
 /* Reusing status colors from the global Table.css concept */
 .status-accepted {
-  color: #48bb78;
-  /* Green */
+  color: var(--status-success-bg);
 }
 
 .status-wrong {
-  color: #f56565;
-  /* Red */
+  color: var(--status-error-bg);
 }
 
 .status-time {
-  color: #f6ad55;
-  /* Orange */
+  color: var(--status-warning-bg);
 }
 
 .status-compilation {
-  color: #a0aec0;
-  /* Gray */
+  color: var(--text-muted);
 }
 
 .status-runtime {
-  color: #ed8936;
-  /* Orange */
+  color: var(--status-warning-bg);
 }
 
 .status-memory {
-  color: #ed64a6;
-  /* Pink */
+  color: var(--status-error-bg);
 }
 
 .status-pending,
 .status-compiling,
 .status-running {
-  color: #718096;
-  /* Gray */
+  color: var(--text-muted);
 }
 
 /* Hidden Problem Styles */

@@ -1,99 +1,25 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import axios from 'axios';
+import { useEffect } from 'react';
 import styles from './ProblemDetail.module.css';
-import CodeSubmissionForm from '../components/CodeSubmissionForm';
+import CodeSubmissionForm from '../features/problems/components/CodeSubmissionForm';
 import Submissions from './Submissions';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import problemService from '../services/problemService';
+import { useProblemDetail } from '../hooks/useProblemDetail';
 
 function ProblemDetail() {
-  const { contestId, problemId } = useParams();
-  const [problem, setProblem] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [hiddenProblemInfo, setHiddenProblemInfo] = useState(null);
-  const [activeView, setActiveView] = useState('statement');
-  const [contest, setContest] = useState(null);
-  const navRef = useRef(null);
-  const [sliderStyle, setSliderStyle] = useState({ opacity: 0 });
-
-  useEffect(() => {
-    const fetchProblem = async () => {
-      try {
-        let url;
-        // Determine the correct API endpoint based on the context (contest or main)
-        if (contestId) {
-          url = `${API_URL}/contests/${contestId}/problems/${problemId}`;
-        } else {
-          url = `${API_URL}/problems/${problemId}`;
-        }
-
-        const problemResponse = await axios.get(url, { withCredentials: true });
-        const problemData = problemResponse.data;
-
-        // For non-contest problems, we still fetch all stats to show the user's best score.
-        // For contest problems, the stats are already joined in the backend.
-        if (!contestId) {
-          const statsResponse = await axios.get(`${API_URL}/problems-with-stats`, { withCredentials: true });
-          const allProblemsWithStats = statsResponse.data;
-          const currentProblemStats = allProblemsWithStats.find(p => String(p.id) === problemId);
-          setProblem({ ...problemData, ...currentProblemStats });
-        } else {
-          setProblem(problemData);
-          // Also fetch contest details for the banner
-          const contestResponse = await axios.get(`${API_URL}/contests/${contestId}`, { withCredentials: true });
-          setContest(contestResponse.data);
-        }
-
-      } catch (err) {
-        if (err.response?.status === 403 && err.response?.data?.message === 'Problem is hidden') {
-          setHiddenProblemInfo({
-            problemId: err.response.data.problemId,
-            title: err.response.data.title,
-            detail: err.response.data.detail
-          });
-        } else if (err.response?.status === 404) {
-          setError(`Problem ${problemId} not found.`);
-        } else {
-          setError(err.response?.data?.message || `Failed to fetch problem ${problemId}.`);
-        }
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (problemId) {
-      fetchProblem();
-    }
-  }, [problemId, contestId]);
-
-  const handleMouseEnter = (e) => {
-    const btn = e.currentTarget;
-    setSliderStyle({
-      height: btn.offsetHeight + 5,
-      top: btn.offsetTop + 22,
-      opacity: 1,
-    });
-  };
-
-  const resetSlider = () => {
-    try {
-      const activeBtn = navRef.current?.querySelector(`.${styles.active}`);
-      if (activeBtn) {
-        setSliderStyle({
-          height: activeBtn.offsetHeight + 5,
-          top: activeBtn.offsetTop + 22,
-          opacity: 1,
-        });
-      } else {
-        setSliderStyle({ ...sliderStyle, opacity: 0 });
-      }
-    } catch (e) {
-      setSliderStyle({ opacity: 0 });
-    }
-  };
+  const {
+    problemId,
+    contestId,
+    problem,
+    loading,
+    error,
+    hiddenProblemInfo,
+    activeView,
+    setActiveView,
+    navRef,
+    sliderStyle,
+    handleMouseEnter,
+    resetSlider
+  } = useProblemDetail();
 
   useEffect(() => {
     // Delay to ensure DOM is ready for measurement
@@ -105,10 +31,7 @@ function ProblemDetail() {
 
   const handlePdfView = () => {
     if (!problem || !problem.has_pdf) return;
-    // For contest PDFs, the backend now checks authorization, so we can link directly.
-    const pdfUrl = contestId
-      ? `${API_URL}/contests/${contestId}/problems/${problemId}/pdf`
-      : `${API_URL}/problems/${problemId}/pdf`;
+    const pdfUrl = problemService.getPdfUrl(problemId, contestId);
     window.open(pdfUrl, '_blank');
   };
 

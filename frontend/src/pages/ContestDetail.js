@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import styles from './ContestDetail.module.css';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import contestService from '../services/contestService';
 
 function ContestDetail() {
   const { contestId } = useParams();
@@ -30,11 +28,7 @@ function ContestDetail() {
     try {
       setLoading(true);
       
-      const contestResponse = await axios.get(`${API_URL}/contests/${contestId}`, {
-        withCredentials: true
-      });
-      
-      const fetchedContest = contestResponse.data;
+      const fetchedContest = await contestService.getById(contestId);
       setContest(fetchedContest);
 
       // Redirect logic
@@ -70,9 +64,7 @@ function ContestDetail() {
   const handleJoinContest = async () => {
     setJoining(true);
     try {
-      await axios.post(`${API_URL}/contests/${contestId}/join`, {}, {
-        withCredentials: true
-      });
+      await contestService.join(contestId);
       // Refresh contest data
       fetchContestData();
     } catch (err) {

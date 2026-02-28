@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import formStyles from '../Form.module.css';
+import formStyles from '../../../components/common/Form.module.css';
 import modalStyles from './ModalLayout.module.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -54,8 +54,8 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
       });
     }
     // Clear file inputs on open
-    if(pdfRef.current) pdfRef.current.value = null;
-    if(zipRef.current) zipRef.current.value = null;
+    if (pdfRef.current) pdfRef.current.value = null;
+    if (zipRef.current) zipRef.current.value = null;
     setPdfFile(null);
     setZipFile(null);
   }, [problem, currentUser]);
@@ -82,15 +82,15 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
     <div className={modalStyles['modal-backdrop']}>
       <div className={formStyles['form-container']}>
         <h2>{isEditing ? 'Edit Problem' : 'Create New Problem'}</h2>
-        
+
         {/* Progress Bar Area */}
         {uploadProgress && (
           <div className={modalStyles['upload-progress-container']}>
             <p>{uploadProgress.message}</p>
             {(uploadProgress.status === 'processing' || uploadProgress.status === 'uploading') && uploadProgress.total > 0 && (
-              <progress 
-                value={uploadProgress.progress} 
-                max={uploadProgress.total} 
+              <progress
+                value={uploadProgress.progress}
+                max={uploadProgress.total}
                 style={{ width: '100%', height: '20px' }}
               />
             )}
@@ -172,7 +172,7 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
             />
           </div>
 
-          <div className={formStyles['form-group']} style={{marginBottom: '0.25rem'}}>
+          <div className={formStyles['form-group']} style={{ marginBottom: '0.25rem' }}>
             <label htmlFor="zipFile">Test Cases ZIP</label>
             <input
               type="file"

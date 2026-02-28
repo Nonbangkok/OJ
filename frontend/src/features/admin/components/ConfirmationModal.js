@@ -1,4 +1,3 @@
-import React from 'react';
 import styles from './ModalLayout.module.css';
 
 const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => {

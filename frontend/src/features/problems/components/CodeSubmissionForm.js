@@ -1,6 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import Editor from 'react-simple-code-editor';
 
 // Import highlight.js
@@ -10,14 +9,13 @@ import cpp from 'highlight.js/lib/languages/cpp';
 // Import highlight.js theme CSS globally
 import 'highlight.js/styles/atom-one-dark.css';
 
-import editorStyles from './CodeEditor.module.css'; // Import as a module
-import formStyles from './Form.module.css';
+import editorStyles from '../../../components/common/CodeEditor.module.css';
+import formStyles from '../../../components/common/Form.module.css';
 import styles from './CodeSubmissionForm.module.css';
+import submissionService from '../../../services/submissionService';
 
 // Register C++ language after all imports
 hljs.registerLanguage('cpp', cpp);
-
-const API_URL = process.env.REACT_APP_API_URL;
 
 const CodeSubmissionForm = ({ problemId, contestId }) => {
   const [language, setLanguage] = useState('cpp');
@@ -68,7 +66,7 @@ const CodeSubmissionForm = ({ problemId, contestId }) => {
       if (lineNumbersRef.current) {
         lineNumbersRef.current.scrollTop = scrollTop;
       }
-      
+
       // Sync the <pre> block's scroll position to match the textarea
       pre.scrollTop = scrollTop;
       pre.scrollLeft = scrollLeft;
@@ -92,16 +90,14 @@ const CodeSubmissionForm = ({ problemId, contestId }) => {
         language,
         code,
       };
-      
+
       // Add contestId if this is a contest submission
       if (contestId) {
         submitData.contestId = contestId;
       }
-      
-      await axios.post(`${API_URL}/submit`, submitData, {
-        withCredentials: true
-      });
-      
+
+      await submissionService.submit(submitData);
+
       try {
         const submissionCache = JSON.parse(localStorage.getItem('oj-submission-cache') || '{}');
         submissionCache[problemId] = {

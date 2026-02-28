@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useAuth } from '../../context/AuthContext'; // Import useAuth
+import { useAuth } from '../../../context/AuthContext'; // Import useAuth
 import EditUserModal from './EditUserModal';
 import ConfirmationModal from './ConfirmationModal';
 import AddUserModal from './AddUserModal';
@@ -38,7 +38,7 @@ const UserManagement = () => {
   const handleEdit = (user) => {
     setEditingUser(user);
   };
-  
+
   const handleDeleteClick = (user) => {
     setDeletingUser(user);
   };

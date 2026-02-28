@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import ProblemModal from './ProblemModal';
 import ConfirmationModal from './ConfirmationModal';
@@ -20,7 +20,7 @@ const ProblemManagement = ({ currentUser }) => {
   const [batchUploadProgress, setBatchUploadProgress] = useState({ visible: false, processed: 0, total: 0, message: '', status: '' });
 
   // Ref for the hidden file input
-  const batchUploadInputRef = React.useRef(null);
+  const batchUploadInputRef = useRef(null);
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [problemToDelete, setProblemToDelete] = useState(null);

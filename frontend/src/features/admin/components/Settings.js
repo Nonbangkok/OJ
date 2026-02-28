@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import styles from './Settings.module.css'; // Updated CSS import
-import { useSettings } from '../../context/SettingsContext';
+import { useSettings } from '../../../context/SettingsContext';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -39,8 +39,8 @@ const Settings = () => { // Renamed component
     setRegistrationSuccess('');
     const newStatus = !isRegistrationEnabled;
     try {
-      await axios.put(`${API_URL}/admin/settings/registration`, 
-        { enabled: newStatus }, 
+      await axios.put(`${API_URL}/admin/settings/registration`,
+        { enabled: newStatus },
         { withCredentials: true }
       );
       setIsRegistrationEnabled(newStatus);
@@ -166,8 +166,8 @@ const Settings = () => { // Renamed component
         {/* Export Section */}
         <div className={styles['setting-item']}>
           <div>Export Current Database</div>
-          <button 
-            onClick={handleExportDatabase} 
+          <button
+            onClick={handleExportDatabase}
             disabled={isExporting}
             className={styles['action-button']}
           >
@@ -178,15 +178,15 @@ const Settings = () => { // Renamed component
         {/* Import Section */}
         <div className={styles['setting-item']}>
           <div>Import Database</div>
-          <input 
-            type="file" 
-            onChange={handleFileChange} 
-            accept=".sql,.dump,.tar" 
+          <input
+            type="file"
+            onChange={handleFileChange}
+            accept=".sql,.dump,.tar"
             className={styles['file-input']}
           />
           {databaseFile && <p>Selected file: {databaseFile.name}</p>}
-          <button 
-            onClick={handleImportDatabase} 
+          <button
+            onClick={handleImportDatabase}
             disabled={isImporting || !databaseFile}
             className={`${styles['action-button']} ${styles['import-button']}`}
           >

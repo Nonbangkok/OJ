@@ -1,31 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Link } from 'react-router-dom';
 import styles from './Problems.module.css';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import { useProblems } from '../hooks/useProblems';
 
 const Problems = () => {
-  const [problems, setProblems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    const fetchProblems = async () => {
-      try {
-        const response = await axios.get(`${API_URL}/problems-with-stats`, {
-          withCredentials: true,
-        });
-        setProblems(response.data);
-      } catch (err) {
-        setError('Failed to fetch problems. Please log in.');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProblems();
-  }, []);
+  const { problems, loading, error } = useProblems();
 
   const formatTimeAgo = (dateString) => {
     if (!dateString) return '';
@@ -45,7 +23,7 @@ const Problems = () => {
     if (interval > 1) return `${Math.floor(interval)} minutes ago`;
     return `${Math.floor(seconds)} seconds ago`;
   };
-  
+
   const formatDateAbsolute = (dateString) => {
     if (!dateString) return '';
     const d = new Date(dateString);
@@ -89,14 +67,14 @@ const Problems = () => {
                 <p className={styles['problem-author']}>{problem.id}</p>
                 <div className={styles['submission-status-placeholder']}>
                   {hasSubmitted && (
-                     <div className={styles['submission-status']}>
-                        <span className={styles['submission-time']}>
-                            Submitted {formatTimeAgo(problem.latest_submission_at)} ({formatDateAbsolute(problem.latest_submission_at)})
-                        </span>
-                        <span className={styles['submission-tries']}>
-                            {problem.submission_count} {problem.submission_count > 1 ? 'tries' : 'try'}
-                        </span>
-                     </div>
+                    <div className={styles['submission-status']}>
+                      <span className={styles['submission-time']}>
+                        Submitted {formatTimeAgo(problem.latest_submission_at)} ({formatDateAbsolute(problem.latest_submission_at)})
+                      </span>
+                      <span className={styles['submission-tries']}>
+                        {problem.submission_count} {problem.submission_count > 1 ? 'tries' : 'try'}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -104,21 +82,21 @@ const Problems = () => {
               <div className={styles['problem-score-placeholder']}>
                 {hasSubmitted && (
                   <div className={styles['problem-score-details']}>
-                      <div className={styles['score-bar-container']}>
-                          <div 
-                            className={`${styles['score-bar']} ${problem.best_score === 100 ? styles.full : styles.partial}`} 
-                            style={{ width: `${problem.best_score || 0}%` }}
-                          >
-                              <span>{problem.best_score || 0}</span>
-                          </div>
+                    <div className={styles['score-bar-container']}>
+                      <div
+                        className={`${styles['score-bar']} ${problem.best_score === 100 ? styles.full : styles.partial}`}
+                        style={{ width: `${problem.best_score || 0}%` }}
+                      >
+                        <span>{problem.best_score || 0}</span>
                       </div>
-                      <span className={styles['score-text']}>
-                          {generateResultString(problem.best_submission_status, problem.best_submission_results)}
-                      </span>
+                    </div>
+                    <span className={styles['score-text']}>
+                      {generateResultString(problem.best_submission_status, problem.best_submission_results)}
+                    </span>
                   </div>
                 )}
               </div>
-              
+
               <Link to={`/problems/${problem.id}`} className={`${styles['problem-action-btn']} ${hasSubmitted ? styles.edit : styles.new}`}>
                 {hasSubmitted ? 'Edit' : 'New'}
               </Link>

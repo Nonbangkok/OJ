@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import formStyles from '../Form.module.css';
+import { useState } from 'react';
+import formStyles from '../../../components/common/Form.module.css';
 import modalStyles from './ModalLayout.module.css';
 
 const AddUserModal = ({ isOpen, onClose, onSave }) => {
