@@ -1,16 +1,16 @@
-const db = require('./db');
+const db = require('../db');
 
 const dropTables = async () => {
   // Drop in reverse order of creation due to foreign key constraints
   // Using CASCADE to handle dependencies automatically
-  
+
   // Drop Contest tables first
   await db.query('DROP TABLE IF EXISTS contest_scoreboards CASCADE;');
   await db.query('DROP TABLE IF EXISTS contest_problems CASCADE;');
   await db.query('DROP TABLE IF EXISTS contest_submissions CASCADE;');
   await db.query('DROP TABLE IF EXISTS contest_participants CASCADE;');
   await db.query('DROP TABLE IF EXISTS contests CASCADE;');
-  
+
   // Drop main tables
   await db.query('DROP TABLE IF EXISTS submissions CASCADE;');
   await db.query('DROP TABLE IF EXISTS testcases CASCADE;');
@@ -158,14 +158,14 @@ const createTables = async () => {
     await db.query(problemsTable);
     await db.query(testcasesTable);
     await db.query(submissionsTable);
-    
+
     // Create Contest tables
     await db.query(contestsTable);
     await db.query(contestParticipantsTable);
     await db.query(contestSubmissionsTable);
     await db.query(contestScoreboardsTable);
     await db.query(contestProblemsTable);
-    
+
     // Set default setting for registration
     await db.query(`
       INSERT INTO system_settings (setting_key, setting_value)
@@ -173,7 +173,7 @@ const createTables = async () => {
       ON CONFLICT (setting_key) DO NOTHING;
     `);
     console.log('Tables created successfully!');
-    
+
     // Add contest_id column to problems table AFTER all tables are created
     try {
       await db.query(`
@@ -184,7 +184,7 @@ const createTables = async () => {
     } catch (alterErr) {
       console.log('Contest_id column already exists or error:', alterErr.message);
     }
-    
+
     // Create indexes for better performance
     try {
       await db.query('CREATE INDEX IF NOT EXISTS idx_problems_contest_id ON problems(contest_id);');

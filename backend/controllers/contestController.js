@@ -5,17 +5,13 @@ const problemMigration = require('../services/problemMigration');
 const { requireAuth, requireStaffOrAdmin } = require('../middleware/auth');
 const router = express.Router();
 
-// ==========================================
-// USER-FACING CONTEST ENDPOINTS
-// ==========================================
-
-// GET /api/contests - List all contests
+// List all contests
 router.get('/', async (req, res) => {
   const { userId } = req.session;
-  
+
   try {
     let result;
-    
+
     if (userId) {
       // If user is logged in, include participation status
       result = await db.query(`
@@ -78,7 +74,7 @@ router.get('/', async (req, res) => {
         ORDER BY c.start_time DESC
       `);
     }
-    
+
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching contests:', error);
@@ -86,7 +82,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/contests/available-problems - Get problems available for contest (Admin)
+// Get problems available for contest (Admin)
 router.get('/available-problems', requireAuth, requireStaffOrAdmin, async (req, res) => {
   try {
     const problems = await problemMigration.getAvailableProblemsForContest();
@@ -97,11 +93,11 @@ router.get('/available-problems', requireAuth, requireStaffOrAdmin, async (req, 
   }
 });
 
-// GET /api/contests/:id - Get contest details
+// Get contest details
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   const { userId } = req.session;
-  
+
   try {
     const contestResult = await db.query(`
       SELECT 
@@ -121,7 +117,7 @@ router.get('/:id', async (req, res) => {
     }
 
     const contest = contestResult.rows[0];
-    
+
     // Check if current user is a participant
     let isParticipant = false;
     if (userId) {
@@ -131,7 +127,7 @@ router.get('/:id', async (req, res) => {
       `, [id, userId]);
       isParticipant = participantResult.rows.length > 0;
     }
-    
+
     // Get problems in this contest (only if contest has started)
     let problems = [];
     if (contest.status === 'running' || contest.status === 'finished') {
@@ -163,7 +159,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/contests/:id/join - Join a contest
+// Join a contest
 router.post('/:id/join', requireAuth, async (req, res) => {
   const { id } = req.params;
   const { userId } = req.session;
@@ -180,14 +176,14 @@ router.post('/:id/join', requireAuth, async (req, res) => {
     }
 
     const contest = contestResult.rows[0];
-    
+
     // Check if contest is still open for registration (can join until end time)
     const now = new Date();
     const endTime = new Date(contest.end_time);
-    
+
     if (now >= endTime) {
-      return res.status(400).json({ 
-        message: 'Cannot join contest that has already ended' 
+      return res.status(400).json({
+        message: 'Cannot join contest that has already ended'
       });
     }
 
@@ -211,10 +207,10 @@ router.post('/:id/join', requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/contests/:id/scoreboard - Get contest scoreboard
+// Get contest scoreboard
 router.get('/:id/scoreboard', requireAuth, async (req, res) => {
   const { id } = req.params;
-  
+
   try {
     // Check if contest exists
     const contestResult = await db.query('SELECT * FROM contests WHERE id = $1', [id]);
@@ -243,7 +239,7 @@ router.get('/:id/scoreboard', requireAuth, async (req, res) => {
           ORDER BY problem_id
         `, [id])
       ]);
-      
+
       res.json({
         scoreboard: scoreboardResult.rows,
         problems: problemsResult.rows
@@ -296,7 +292,7 @@ router.get('/:id/scoreboard', requireAuth, async (req, res) => {
           ORDER BY id
         `, [id])
       ]);
-      
+
       res.json({
         scoreboard: scoreboardResult.rows,
         problems: problemsResult.rows
@@ -322,7 +318,7 @@ router.get('/:id/scoreboard', requireAuth, async (req, res) => {
           ORDER BY id
         `, [id])
       ]);
-      
+
       res.json({
         scoreboard: participantsResult.rows,
         problems: problemsResult.rows
@@ -334,11 +330,7 @@ router.get('/:id/scoreboard', requireAuth, async (req, res) => {
   }
 });
 
-// ==========================================
-// ADMIN CONTEST ENDPOINTS
-// ==========================================
-
-// POST /api/contests - Create new contest (Admin only)
+// Create new contest (Admin only)
 router.post('/', requireAuth, requireStaffOrAdmin, [
   body('title').isLength({ min: 1 }).trim(),
   body('description').optional().trim(),
@@ -355,8 +347,8 @@ router.post('/', requireAuth, requireStaffOrAdmin, [
 
   // Validate that end time is after start time
   if (new Date(endTime) <= new Date(startTime)) {
-    return res.status(400).json({ 
-      message: 'End time must be after start time' 
+    return res.status(400).json({
+      message: 'End time must be after start time'
     });
   }
 
@@ -374,7 +366,7 @@ router.post('/', requireAuth, requireStaffOrAdmin, [
   }
 });
 
-// PUT /api/contests/:id - Update contest (Admin only)
+// Update contest (Admin only)
 router.put('/:id', requireAuth, requireStaffOrAdmin, [
   body('title').isLength({ min: 1 }).trim(),
   body('description').optional().trim(),
@@ -391,8 +383,8 @@ router.put('/:id', requireAuth, requireStaffOrAdmin, [
 
   // Validate that end time is after start time
   if (new Date(endTime) <= new Date(startTime)) {
-    return res.status(400).json({ 
-      message: 'End time must be after start time' 
+    return res.status(400).json({
+      message: 'End time must be after start time'
     });
   }
 
@@ -415,7 +407,7 @@ router.put('/:id', requireAuth, requireStaffOrAdmin, [
   }
 });
 
-// DELETE /api/contests/:id - Delete contest (Admin only)
+// Delete contest (Admin only)
 router.delete('/:id', requireAuth, requireStaffOrAdmin, async (req, res) => {
   const { id } = req.params;
 
@@ -428,8 +420,8 @@ router.delete('/:id', requireAuth, requireStaffOrAdmin, async (req, res) => {
 
     const contest = contestResult.rows[0];
     if (contest.status === 'running') {
-      return res.status(400).json({ 
-        message: 'Cannot delete a running contest' 
+      return res.status(400).json({
+        message: 'Cannot delete a running contest'
       });
     }
 
@@ -440,7 +432,7 @@ router.delete('/:id', requireAuth, requireStaffOrAdmin, async (req, res) => {
     );
 
     const result = await db.query('DELETE FROM contests WHERE id = $1 RETURNING id', [id]);
-    
+
     res.json({ message: `Contest ${id} deleted successfully` });
   } catch (error) {
     console.error(`Error deleting contest ${id}:`, error);
@@ -448,14 +440,10 @@ router.delete('/:id', requireAuth, requireStaffOrAdmin, async (req, res) => {
   }
 });
 
-// ==========================================
-// PROBLEM MIGRATION ENDPOINTS (Admin only)
-// ==========================================
-
-// GET /api/admin/contests/:id/problems - Get problems in contest (Admin)
+// Get problems in contest (Admin)
 router.get('/:id/admin-problems', requireAuth, requireStaffOrAdmin, async (req, res) => {
   const { id } = req.params;
-  
+
   try {
     const problems = await problemMigration.getProblemsInContest(id);
     res.json(problems);
@@ -466,7 +454,7 @@ router.get('/:id/admin-problems', requireAuth, requireStaffOrAdmin, async (req, 
 });
 
 
-// POST /api/contests/:id/problems - Move problems to/from contest (Admin)
+// Move problems to/from contest (Admin)
 router.post('/:id/problems', requireAuth, requireStaffOrAdmin, [
   body('problemIds').isArray({ min: 1 }).withMessage('Must provide at least one problem ID'),
   body('problemIds.*').isString().trim().escape(),
@@ -494,7 +482,7 @@ router.post('/:id/problems', requireAuth, requireStaffOrAdmin, [
   }
 });
 
-// DELETE /api/contests/:id/problems/:problemId - Move problem back to main system
+// Move problem back to main system
 router.delete('/:id/problems/:problemId', requireAuth, requireStaffOrAdmin, async (req, res) => {
   const { id, problemId } = req.params;
 
@@ -519,12 +507,12 @@ router.delete('/:id/problems/:problemId', requireAuth, requireStaffOrAdmin, asyn
     );
 
     if (updateResult.rows.length === 0) {
-      return res.status(404).json({ 
-        message: 'Problem not found in this contest' 
+      return res.status(404).json({
+        message: 'Problem not found in this contest'
       });
     }
 
-    res.json({ 
+    res.json({
       message: `Successfully moved problem ${problemId} back to main system`,
       problem: updateResult.rows[0]
     });
@@ -534,11 +522,11 @@ router.delete('/:id/problems/:problemId', requireAuth, requireStaffOrAdmin, asyn
   }
 });
 
-// GET /api/contests/:id/problems - Get contest problems for participants (User endpoint)
+// Get contest problems for participants (User endpoint)
 router.get('/:id/problems', requireAuth, async (req, res) => {
   const { id } = req.params;
   const { userId } = req.session;
-  
+
   try {
     // Check if contest exists
     const contestResult = await db.query('SELECT * FROM contests WHERE id = $1', [id]);
@@ -547,22 +535,22 @@ router.get('/:id/problems', requireAuth, async (req, res) => {
     }
 
     const contest = contestResult.rows[0];
-    
+
     // Check if user is a participant
     const participantResult = await db.query(
       'SELECT 1 FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
       [id, userId]
     );
-    
+
     if (participantResult.rows.length === 0) {
       return res.status(403).json({ message: 'You must join this contest to view problems' });
     }
-    
+
     // Only show problems if contest is running, finishing, or finished
     if (!['running', 'finishing', 'finished'].includes(contest.status)) {
       return res.json([]); // Return empty array for scheduled contests
     }
-    
+
     // Base query with CTEs to get user's submission stats for this contest
     const baseQuery = `
       WITH RankedSubmissions AS (
@@ -584,7 +572,7 @@ router.get('/:id/problems', requireAuth, async (req, res) => {
         GROUP BY problem_id
       )
     `;
-    
+
     let problemsResult;
     if (contest.status === 'finished') {
       // For finished contests, get problems from contest_problems snapshot and join with stats
@@ -621,7 +609,7 @@ router.get('/:id/problems', requireAuth, async (req, res) => {
         ORDER BY p.id
       `, [userId, id]);
     }
-    
+
     res.json(problemsResult.rows);
   } catch (error) {
     console.error(`Error fetching contest problems for user ${userId}:`, error);
@@ -629,7 +617,7 @@ router.get('/:id/problems', requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/contests/:id/problems/:problemId - Get a single contest problem
+// Get a single contest problem
 router.get('/:id/problems/:problemId', requireAuth, async (req, res) => {
   const { id: contestId, problemId } = req.params;
   const { userId } = req.session;
@@ -682,7 +670,7 @@ router.get('/:id/problems/:problemId', requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/contests/:id/problems/:problemId/pdf - Get a single contest problem's PDF
+// Get a single contest problem's PDF
 router.get('/:id/problems/:problemId/pdf', requireAuth, async (req, res) => {
   const { id: contestId, problemId } = req.params;
   const { userId } = req.session;
@@ -720,11 +708,11 @@ router.get('/:id/problems/:problemId/pdf', requireAuth, async (req, res) => {
         [problemId, contestId]
       );
     }
-    
+
     if (pdfRes.rows.length === 0 || !pdfRes.rows[0].problem_pdf) {
       return res.status(404).json({ message: 'Problem PDF not found.' });
     }
-    
+
     const pdfData = pdfRes.rows[0].problem_pdf;
     res.setHeader('Content-Type', 'application/pdf');
     res.send(pdfData);
@@ -734,6 +722,5 @@ router.get('/:id/problems/:problemId/pdf', requireAuth, async (req, res) => {
     res.status(500).json({ message: 'Error fetching PDF.' });
   }
 });
-
 
 module.exports = router; 

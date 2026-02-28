@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { pool } = require('./db');
+const { pool } = require('../db');
 
 const clearSubmissions = async () => {
   console.log('Attempting to clear all submissions...');
@@ -14,4 +14,4 @@ const clearSubmissions = async () => {
   }
 };
 
-clearSubmissions(); 
+clearSubmissions();

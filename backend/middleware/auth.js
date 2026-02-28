@@ -16,7 +16,17 @@ const requireStaffOrAdmin = (req, res, next) => {
   }
 };
 
+// Middleware to check if user is an admin
+const requireAdmin = (req, res, next) => {
+  if (req.session.role === 'admin') {
+    next();
+  } else {
+    res.status(403).json({ message: 'Admin access required' });
+  }
+};
+
 module.exports = {
   requireAuth,
-  requireStaffOrAdmin
-}; 
+  requireStaffOrAdmin,
+  requireAdmin
+};

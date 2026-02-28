@@ -2,7 +2,7 @@
 // Environment variables will be available from the container's environment.
 const readline = require('readline');
 const bcrypt = require('bcrypt');
-const db = require('./db');
+const db = require('../db');
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -55,7 +55,7 @@ async function createAdmin() {
   }
 
   const password = await askPassword(`Enter password for ${username}: `);
-  
+
   if (password.length < 6) {
     console.error('Password must be at least 6 characters long.');
     rl.close();
