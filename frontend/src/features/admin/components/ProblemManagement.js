@@ -25,6 +25,9 @@ const ProblemManagement = ({ currentUser }) => {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [problemToDelete, setProblemToDelete] = useState(null);
 
+  // New state for bulk action confirmation
+  const [bulkConfirm, setBulkConfirm] = useState({ isOpen: false, type: null });
+
   const fetchProblems = async () => {
     try {
       // setLoading(true);
@@ -76,7 +79,11 @@ const ProblemManagement = ({ currentUser }) => {
     }
   };
 
-  const handleHideAll = async () => {
+  const handleHideAll = () => {
+    setBulkConfirm({ isOpen: true, type: 'hide' });
+  };
+
+  const executeHideAll = async () => {
     try {
       setLoading(true);
       const hidePromises = problems
@@ -96,10 +103,15 @@ const ProblemManagement = ({ currentUser }) => {
       console.error(err);
     } finally {
       setLoading(false);
+      setBulkConfirm({ isOpen: false, type: null });
     }
   };
 
-  const handleShowAll = async () => {
+  const handleShowAll = () => {
+    setBulkConfirm({ isOpen: true, type: 'show' });
+  };
+
+  const executeShowAll = async () => {
     try {
       setLoading(true);
       const showPromises = problems
@@ -119,6 +131,7 @@ const ProblemManagement = ({ currentUser }) => {
       console.error(err);
     } finally {
       setLoading(false);
+      setBulkConfirm({ isOpen: false, type: null });
     }
   };
 
@@ -148,11 +161,8 @@ const ProblemManagement = ({ currentUser }) => {
 
   const handleSelectAll = (event) => {
     if (event.target.checked) {
-      // Only select problems that are not currently in a running or scheduled contest
-      const allSelectableProblemIds = problems
-        .filter(p => !(p.contest_id && (p.contest_status === 'scheduled' || p.contest_status === 'running')))
-        .map(p => p.id);
-      setSelectedProblems(allSelectableProblemIds);
+      const allProblemIds = problems.map(p => p.id);
+      setSelectedProblems(allProblemIds);
     } else {
       setSelectedProblems([]);
     }
@@ -486,9 +496,9 @@ const ProblemManagement = ({ currentUser }) => {
                 <input
                   type="checkbox"
                   onChange={handleSelectAll}
-                  checked={selectedProblems.length > 0 && selectedProblems.length === problems.filter(p => !(p.contest_id && (p.contest_status === 'scheduled' || p.contest_status === 'running'))).length}
-                  disabled={loading || problems.filter(p => !(p.contest_id && (p.contest_status === 'scheduled' || p.contest_status === 'running'))).length === 0}
-                  title="Select all selectable problems"
+                  checked={selectedProblems.length > 0 && selectedProblems.length === problems.length}
+                  disabled={loading || problems.length === 0}
+                  title="Select all problems"
                 />
               </th>
               <th>ID</th>
@@ -505,8 +515,7 @@ const ProblemManagement = ({ currentUser }) => {
                     type="checkbox"
                     checked={selectedProblems.includes(problem.id)}
                     onChange={() => handleToggleSelectProblem(problem.id)}
-                    disabled={problem.contest_id && (problem.contest_status === 'scheduled' || problem.contest_status === 'running')}
-                    title={problem.contest_id && (problem.contest_status === 'scheduled' || problem.contest_status === 'running') ? 'Cannot export problems in active contests' : 'Select problem for export'}
+                    title="Select problem for export"
                   />
                 </td>
                 <td>{problem.id}</td>
@@ -550,6 +559,15 @@ const ProblemManagement = ({ currentUser }) => {
         onConfirm={handleConfirmDelete}
         title="Confirm Deletion"
         message={`Are you sure you want to delete problem "${problemToDelete}"? All related test cases and submissions will also be deleted.`}
+      />
+      <ConfirmationModal
+        isOpen={bulkConfirm.isOpen}
+        onClose={() => setBulkConfirm({ isOpen: false, type: null })}
+        onConfirm={bulkConfirm.type === 'show' ? executeShowAll : executeHideAll}
+        title={bulkConfirm.type === 'show' ? "Confirm Show All" : "Confirm Hide All"}
+        message={bulkConfirm.type === 'show'
+          ? "Are you sure you want to make all problems visible to users? (Excluding those in contests)"
+          : "Are you sure you want to hide all problems from users? (Excluding those in contests)"}
       />
     </div>
   );
