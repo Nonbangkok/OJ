@@ -3,12 +3,13 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import styles from './ContestDetail.module.css';
 import contestService from '../services/contestService';
+import { formatDateTime, getRemainingTime } from '../utils/formatters';
 
 function ContestDetail() {
   const { contestId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const [contest, setContest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,7 +28,7 @@ function ContestDetail() {
   const fetchContestData = async () => {
     try {
       setLoading(true);
-      
+
       const fetchedContest = await contestService.getById(contestId);
       setContest(fetchedContest);
 
@@ -82,7 +83,7 @@ function ContestDetail() {
       'finishing': `${styles.badge} ${styles.finishing}`,
       'finished': `${styles.badge} ${styles.finished}`
     };
-    
+
     const statusText = {
       'scheduled': 'Scheduled',
       'running': 'Running',
@@ -97,35 +98,7 @@ function ContestDetail() {
     );
   };
 
-  const formatDateTime = (dateTime) => {
-    return new Date(dateTime).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
 
-  const getRemainingTime = (endTime) => {
-    const now = new Date();
-    const end = new Date(endTime);
-    const diff = end - now;
-    
-    if (diff <= 0) return 'Finished';
-
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-    if (days > 0) {
-      return `${days}d ${hours}h ${minutes}m remaining`;
-    } else if (hours > 0) {
-      return `${hours}h ${minutes}m remaining`;
-    } else {
-      return `${minutes}m remaining`;
-    }
-  };
 
   if (loading) {
     return (
@@ -170,7 +143,7 @@ function ContestDetail() {
           <h1 className={styles.contestTitle}>{contest.title}</h1>
           {getStatusBadge(contest.status)}
         </div>
-        
+
         {contest.description && (
           <p className={styles.contestDescription}>{contest.description}</p>
         )}
@@ -185,12 +158,12 @@ function ContestDetail() {
               {formatDateTime(contest.start_time)}
             </div>
           </div>
-          
+
           <div className={styles.infoCard}>
             <div className={styles.infoLabel}>End Time</div>
             <div className={styles.infoValue}>{formatDateTime(contest.end_time)}</div>
           </div>
-          
+
           {contest.status === 'running' && (
             <div className={styles.infoCard}>
               <div className={styles.infoLabel}>Time Remaining</div>
@@ -199,7 +172,7 @@ function ContestDetail() {
               </div>
             </div>
           )}
-          
+
           <div className={styles.infoCard}>
             <div className={styles.infoLabel}>Participants</div>
             <div className={styles.infoValue}>

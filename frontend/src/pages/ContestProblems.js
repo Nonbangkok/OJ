@@ -1,138 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Link, useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import styles from './Problems.module.css'; // Re-use the same styles
-
-const API_URL = process.env.REACT_APP_API_URL;
+import { Link, useParams } from 'react-router-dom';
+import styles from './Problems.module.css';
+import { formatTimeAgo, formatDateAbsolute, generateResultString } from '../utils/formatters';
+import { useContestGuard } from '../hooks/useContestGuard';
+import { useProblems } from '../hooks/useProblems';
 
 const ContestProblems = () => {
-  const [problems, setProblems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const { contestId } = useParams();
-  const navigate = useNavigate();
-  const { user } = useAuth();
 
-  useEffect(() => {
-    const fetchContestAndProblemData = async () => {
-      if (!contestId) {
-        setLoading(false);
-        setError('Contest ID is missing, cannot fetch problems.');
-        return;
-      }
-      try {
-        // First, fetch contest details to check status and participation
-        const contestResponse = await axios.get(`${API_URL}/contests/${contestId}`, {
-          withCredentials: true
-        });
-        const fetchedContest = contestResponse.data;
+  // Contest access guard — handles redirect logic and polling
+  const { isAccessible, loading: guardLoading, error: guardError } = useContestGuard(contestId);
 
-        // Redirect logic if contest is finished
-        if (fetchedContest.status === 'finished') {
-          let redirectPath = '';
+  // Fetch contest problems using the shared hook
+  const { problems, loading: problemsLoading, error: problemsError } = useProblems(
+    isAccessible ? contestId : null
+  );
 
-          if (fetchedContest.is_participant) {
-            redirectPath = `/contests/${contestId}/scoreboard`;
-          } else {
-            redirectPath = '/contests';
-          }
-          navigate(redirectPath);
-          return; // Stop further execution in this effect
-        }
-
-        // If contest is not finished, fetch problems
-        const problemsResponse = await axios.get(`${API_URL}/contests/${contestId}/problems`, {
-          withCredentials: true,
-        });
-        setProblems(problemsResponse.data);
-      } catch (err) {
-        console.error('Error fetching contest data or problems:', err);
-        if (err.response?.status === 403) {
-          setError('Failed to fetch contest problems. You may not have access to this contest.');
-          // If user is not participant and contest is finished (or becomes finished), redirect to /contests
-          // This handles cases where user navigates directly to problems page of a finished contest they didn't join
-          if (err.response?.data?.message === 'You must join this contest to view problems' || err.response?.data?.message === 'Contest is not active.') {
-             // Attempt to get current contest status again to be sure it's finished
-            try {
-              const contestStatusCheck = await axios.get(`${API_URL}/contests/${contestId}`, { withCredentials: true });
-              if (contestStatusCheck.data.status === 'finished') {
-                 navigate('/contests');
-                 return;
-              }
-            } catch (innerErr) {
-              console.error('Failed to re-check contest status for 403 redirect:', innerErr);
-            }
-          }
-        } else {
-          setError('Failed to fetch contest problems.');
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchContestAndProblemData(); // Initial fetch
-
-    const intervalId = setInterval(() => {
-      fetchContestAndProblemData();
-    }, 15000); // Poll every 15 seconds
-
-    return () => clearInterval(intervalId);
-  }, [contestId, user, navigate]);
-
-  const formatTimeAgo = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now - date) / 1000);
-
-    let interval = seconds / 31536000;
-    if (interval > 1) return `${Math.floor(interval)} years ago`;
-    interval = seconds / 2592000;
-    if (interval > 1) return `${Math.floor(interval)} months ago`;
-    interval = seconds / 86400;
-    if (interval > 1) return `${Math.floor(interval)} days ago`;
-    interval = seconds / 3600;
-    if (interval > 1) return `${Math.floor(interval)} hours ago`;
-    interval = seconds / 60;
-    if (interval > 1) return `${Math.floor(interval)} minutes ago`;
-    return `${Math.floor(seconds)} seconds ago`;
-  };
-  
-  const formatDateAbsolute = (dateString) => {
-    if (!dateString) return '';
-    const d = new Date(dateString);
-    const pad = (num) => num.toString().padStart(2, '0');
-    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${(d.getFullYear() + 543) % 100} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  };
-
-  const generateResultString = (status, results) => {
-    if (status === 'Compilation Error') {
-      return 'Compilation Error';
-    }
-    if (!results || results.length === 0) {
-      return '';
-    }
-    const charMap = {
-      'Accepted': 'P',
-      'Wrong Answer': '-',
-      'Time Limit Exceeded': 'T',
-      'Runtime Error': 'R',
-      'Memory Limit Exceeded': 'M',
-      'Skipped': 'S',
-    };
-    const resultChars = results.map(r => charMap[r.status] || '?').join('');
-    return `[${resultChars}]`;
-  };
-
-  // Add a specific check for undefined contestId early on.
   if (!contestId) {
     return <div className="error-message">Error: No Contest ID specified in the URL.</div>;
   }
 
-  if (loading) return <div>Loading problems...</div>;
-  if (error) return <div className="error-message">{error}</div>;
+  if (guardLoading || problemsLoading) return <div>Loading problems...</div>;
+  if (guardError) return <div className="error-message">{guardError}</div>;
+  if (problemsError) return <div className="error-message">{problemsError}</div>;
 
   return (
     <div className={styles['problems-page-container']}>
@@ -148,14 +37,14 @@ const ContestProblems = () => {
                 <p className={styles['problem-author']}>{problem.id}</p>
                 <div className={styles['submission-status-placeholder']}>
                   {hasSubmitted && (
-                     <div className={styles['submission-status']}>
-                        <span className={styles['submission-time']}>
-                            Submitted {formatTimeAgo(problem.latest_submission_at)} ({formatDateAbsolute(problem.latest_submission_at)})
-                        </span>
-                        <span className={styles['submission-tries']}>
-                            {problem.submission_count} {problem.submission_count > 1 ? 'tries' : 'try'}
-                        </span>
-                     </div>
+                    <div className={styles['submission-status']}>
+                      <span className={styles['submission-time']}>
+                        Submitted {formatTimeAgo(problem.latest_submission_at)} ({formatDateAbsolute(problem.latest_submission_at)})
+                      </span>
+                      <span className={styles['submission-tries']}>
+                        {problem.submission_count} {problem.submission_count > 1 ? 'tries' : 'try'}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -163,21 +52,21 @@ const ContestProblems = () => {
               <div className={styles['problem-score-placeholder']}>
                 {hasSubmitted && (
                   <div className={styles['problem-score-details']}>
-                      <div className={styles['score-bar-container']}>
-                          <div 
-                            className={`${styles['score-bar']} ${problem.best_score === 100 ? styles.full : styles.partial}`} 
-                            style={{ width: `${problem.best_score || 0}%` }}
-                          >
-                              <span>{problem.best_score || 0}</span>
-                          </div>
+                    <div className={styles['score-bar-container']}>
+                      <div
+                        className={`${styles['score-bar']} ${problem.best_score === 100 ? styles.full : styles.partial}`}
+                        style={{ width: `${problem.best_score || 0}%` }}
+                      >
+                        <span>{problem.best_score || 0}</span>
                       </div>
-                      <span className={styles['score-text']}>
-                          {generateResultString(problem.best_submission_status, problem.best_submission_results)}
-                      </span>
+                    </div>
+                    <span className={styles['score-text']}>
+                      {generateResultString(problem.best_submission_status, problem.best_submission_results)}
+                    </span>
                   </div>
                 )}
               </div>
-              
+
               <Link to={`/contests/${contestId}/problems/${problem.id}`} className={`${styles['problem-action-btn']} ${hasSubmitted ? styles.edit : styles.new}`}>
                 {hasSubmitted ? 'Edit' : 'New'}
               </Link>
@@ -189,4 +78,4 @@ const ContestProblems = () => {
   );
 };
 
-export default ContestProblems; 
+export default ContestProblems;

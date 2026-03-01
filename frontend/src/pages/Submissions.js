@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import styles from './Submissions.module.css';
 import SubmissionModal from '../features/problems/components/SubmissionModal';
 import { useSubmissions } from '../hooks/useSubmissions';
+import { getStatusClass } from '../utils/formatters';
 
 function Submissions({ problemId, showTitle = true }) {
   const { contestId } = useParams();
@@ -53,10 +54,7 @@ function Submissions({ problemId, showTitle = true }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [setShowProblemSuggestions, setShowUserSuggestions]);
 
-  const getStatusClass = (status) => {
-    if (!status) return '';
-    return `status-${status.split(' ')[0].toLowerCase()}`;
-  };
+
 
   if (loading) return <div>Loading submissions...</div>;
   if (error) return <div className="error-message">{error}</div>;

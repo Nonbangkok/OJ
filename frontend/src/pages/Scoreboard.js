@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import '../components/common/Table.css'; // Use the new shared table styles
-
-const API_URL = process.env.REACT_APP_API_URL;
 
 function Scoreboard() {
   const [scoreboard, setScoreboard] = useState([]);
@@ -12,9 +10,7 @@ function Scoreboard() {
   useEffect(() => {
     const fetchScoreboard = async () => {
       try {
-        const response = await axios.get(`${API_URL}/scoreboard`, {
-          withCredentials: true,
-        });
+        const response = await api.get('/scoreboard');
         setScoreboard(response.data);
       } catch (err) {
         setError('Failed to fetch scoreboard. Please log in.');

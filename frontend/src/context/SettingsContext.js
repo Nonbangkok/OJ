@@ -1,7 +1,5 @@
 import { createContext, useState, useEffect, useContext } from 'react';
-import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import api from '../services/api';
 
 const SettingsContext = createContext();
 
@@ -15,7 +13,7 @@ export const SettingsProvider = ({ children }) => {
 
   const fetchSettings = async () => {
     try {
-              const response = await axios.get(`${API_URL}/settings/registration`);
+      const response = await api.get('/settings/registration');
       setSettings({
         registrationEnabled: response.data.enabled,
       });

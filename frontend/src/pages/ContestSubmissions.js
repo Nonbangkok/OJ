@@ -1,17 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import styles from './Submissions.module.css';
 import SubmissionModal from '../features/problems/components/SubmissionModal';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import { getStatusClass, canViewCode, formatDateTime } from '../utils/formatters';
 
 function ContestSubmissions() {
   const { contestId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+
   const [contest, setContest] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,9 +22,7 @@ function ContestSubmissions() {
   const fetchContestData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/contests/${contestId}`, {
-        withCredentials: true
-      });
+      const response = await api.get(`/contests/${contestId}`);
       const fetchedContest = response.data;
       setContest(fetchedContest);
 
@@ -46,7 +43,7 @@ function ContestSubmissions() {
       if (err.response?.status === 403) {
         // If user is not participant and contest is finished (or becomes finished), redirect to /contests
         try {
-          const contestStatusCheck = await axios.get(`${API_URL}/contests/${contestId}`, { withCredentials: true });
+          const contestStatusCheck = await api.get(`/contests/${contestId}`);
           if (contestStatusCheck.data.status === 'finished') {
             navigate('/contests');
             return;
@@ -66,24 +63,23 @@ function ContestSubmissions() {
   }, [contestId, user, navigate]); // Added user and navigate to dependencies
 
   const fetchSubmissions = useCallback(async () => {
-    if (submissions.length === 0) { 
+    if (submissions.length === 0) {
       setLoading(true);
     }
-    
+
     try {
       const params = {
         contestId: contestId
       };
-      
+
       if (filter === 'mine') {
         params.filter = 'mine';
       }
 
-      const response = await axios.get(`${API_URL}/submissions`, {
-        withCredentials: true,
+      const response = await api.get('/submissions', {
         params,
       });
-      
+
       setSubmissions(response.data);
       setError('');
     } catch (err) {
@@ -108,7 +104,7 @@ function ContestSubmissions() {
 
   // Auto-refresh for processing submissions
   useEffect(() => {
-    const isProcessing = submissions.some(sub => 
+    const isProcessing = submissions.some(sub =>
       ['Pending', 'Compiling', 'Running'].includes(sub.overall_status)
     );
 
@@ -120,8 +116,7 @@ function ContestSubmissions() {
 
   const handleViewCode = async (submissionId) => {
     try {
-      const response = await axios.get(`${API_URL}/submissions/${submissionId}`, {
-        withCredentials: true,
+      const response = await api.get(`/submissions/${submissionId}`, {
         params: { contestId }
       });
       setSelectedSubmission(response.data);
@@ -137,32 +132,7 @@ function ContestSubmissions() {
     setSelectedSubmission(null);
   };
 
-  const getStatusClass = (status) => {
-    if (!status) return '';
-    return `status-${status.split(' ')[0].toLowerCase()}`;
-  };
 
-  const canViewCode = (submission) => {
-    if (!user) return false;
-    
-    // Admin and staff can view all submissions
-    if (user.role === 'admin' || user.role === 'staff') {
-      return true;
-    }
-    
-    // Regular users can only view their own submissions
-    return submission.username === user.username;
-  };
-
-  const formatDateTime = (dateTime) => {
-    return new Date(dateTime).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
 
   if (loading) {
     return (
@@ -236,7 +206,7 @@ function ContestSubmissions() {
                   </td>
                   <td>{submission.language}</td>
                   <td>
-                    {canViewCode(submission) ? (
+                    {canViewCode(submission, user) ? (
                       <button
                         onClick={() => handleViewCode(submission.id)}
                         className={styles['view-code-btn']}
@@ -255,9 +225,9 @@ function ContestSubmissions() {
 
       {/* Submission Modal */}
       {isModalOpen && selectedSubmission && (
-        <SubmissionModal 
-          submission={selectedSubmission} 
-          onClose={handleCloseModal} 
+        <SubmissionModal
+          submission={selectedSubmission}
+          onClose={handleCloseModal}
         />
       )}
 
