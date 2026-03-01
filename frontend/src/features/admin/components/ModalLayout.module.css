@@ -11,6 +11,14 @@
   z-index: 1000;
 }
 
+.modal-overlay h2,
+.modal-overlay h3 {
+  color: var(--text-primary);
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
 .confirmation-modal-content {
   background-color: var(--background-secondary);
   padding: 2rem;
