@@ -11,6 +11,7 @@ const ProblemDetail = () => {
     problemId,
     contestId,
     problem,
+    contest,
     loading,
     error,
     hiddenProblemInfo,
