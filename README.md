@@ -122,6 +122,49 @@ After successfully running the Docker containers for the first time, you need to
 
 Your Grader System is now fully set up and ready for use!
 
+## Testing
+
+The project includes automated tests for both the backend and frontend. You can run the full test suite or run tests for each part separately.
+
+### Run All Tests
+
+From the project root, execute the unified test script to run both backend and frontend tests:
+
+```bash
+./tests/run_tests.sh
+```
+
+*   This script runs backend tests first, then frontend tests. It exits with status code 0 if all tests pass, or 1 if any test fails.
+*   **Note:** Ensure Docker containers (including the database) are running before executing this script, as backend tests may require a database connection.
+
+### Run Backend Tests Only
+
+From the project root:
+
+```bash
+cd backend
+npm test
+```
+
+*   Backend tests use **Jest** and **Supertest** to test API endpoints, controllers, and middleware (e.g., authentication, submissions, problems, contests, admin).
+*   Backend tests are located in `backend/tests/`.
+
+### Run Frontend Tests Only
+
+From the project root:
+
+```bash
+cd frontend
+npm test
+```
+
+*   Frontend tests use **Jest** and **React Testing Library** (`@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`) to test pages, hooks, services, and components.
+*   By default, `npm test` runs in **watch mode** (re-runs on file changes). To run once and exit (e.g., in CI), use:
+    ```bash
+    CI=true npm test
+    ```
+*   Frontend tests are located in `frontend/src/tests/`.
+
 ## Database Management (Admin Only)
 
 The system provides administration tools for exporting and importing the entire database, useful for backups or emergency recovery. These features are accessible via the Admin Panel under "Settings".
