@@ -6,8 +6,6 @@ import { formatTimeAgo, formatDateAbsolute, generateResultString } from '../util
 const Problems = () => {
   const { problems, loading, error } = useProblems();
 
-
-
   if (loading) return <div>Loading problems...</div>;
   if (error) return <div className="error-message">{error}</div>;
 

@@ -5,7 +5,7 @@ import styles from './Contests.module.css';
 import contestService from '../services/contestService';
 import { formatDateTime } from '../utils/formatters';
 
-function Contests() {
+const Contests = () => {
   const [contests, setContests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

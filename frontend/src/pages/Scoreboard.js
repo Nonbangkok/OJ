@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 import '../components/common/Table.css'; // Use the new shared table styles
 
-function Scoreboard() {
+const Scoreboard = () => {
   const [scoreboard, setScoreboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

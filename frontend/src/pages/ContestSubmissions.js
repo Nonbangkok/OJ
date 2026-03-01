@@ -6,7 +6,7 @@ import { getStatusClass, canViewCode, formatDateTime } from '../utils/formatters
 import { useContestGuard } from '../hooks/useContestGuard';
 import { useSubmissions } from '../hooks/useSubmissions';
 
-function ContestSubmissions() {
+const ContestSubmissions = () => {
   const { contestId } = useParams();
   const { user } = useAuth();
 
