@@ -5,7 +5,7 @@ import { useSettings } from '../context/SettingsContext';
 import styles from '../components/common/Form.module.css';
 import authService from '../services/authService';
 
-function Login() {
+const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');

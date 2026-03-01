@@ -40,7 +40,7 @@ const MainLayout = () => (
 // This component will contain the logic for switching navbars
 const Layout = () => {
   const location = useLocation();
-  
+
   // Use a regular expression for a more robust check.
   // This ensures that we match URLs like `/contests/123` or `/contests/some-id/problems`
   // but explicitly NOT `/contests` or `/contests/`.
@@ -65,7 +65,7 @@ const Layout = () => {
           <Route path="/register" element={<Register />} />
           <Route path="/contests" element={<Contests />} />
         </Route>
-        
+
         {/* Admin routes with their own layout */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Admin />} />
@@ -88,7 +88,7 @@ const Layout = () => {
   );
 };
 
-function App() {
+const App = () => {
   return (
     <ThemeProvider>
       <AuthProvider>

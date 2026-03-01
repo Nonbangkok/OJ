@@ -1,10 +1,11 @@
-/* General Table Styling */
+/* Structural Table Styling */
 .table-container {
   background-color: var(--background-secondary);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   overflow: hidden; /* This is important for the border-radius to work on the table */
   box-shadow: var(--box-shadow);
+  margin-bottom: 2rem;
 }
 
 .table {
@@ -54,29 +55,4 @@
 
 .table a:hover {
   text-decoration: underline;
-}
-
-/* Status colors for table cells */
-.status-accepted {
-  color: #48bb78; /* Green */
-  font-weight: bold;
-}
-.status-wrong {
-  color: #f56565; /* Red */
-  font-weight: bold;
-}
-.status-time {
-  color: #f6ad55; /* Orange */
-}
-.status-compilation {
-  color: #a0aec0; /* Gray */
-}
-.status-runtime {
-  color: #ed8936; /* Orange */
-}
-.status-memory {
-  color: #ed64a6; /* Pink */
-}
-.status-pending, .status-compiling, .status-running {
-  color: #718096; /* Gray */
 }

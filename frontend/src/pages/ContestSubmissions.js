@@ -1,6 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import styles from './Submissions.module.css';
+import tableStyles from '../components/common/Table.module.css';
 import SubmissionModal from '../features/problems/components/SubmissionModal';
 import { getStatusClass, canViewCode, formatDateTime } from '../utils/formatters';
 import { useContestGuard } from '../hooks/useContestGuard';
@@ -68,8 +69,8 @@ const ContestSubmissions = () => {
           <p>No one has submitted solutions for this contest yet</p>
         </div>
       ) : (
-        <div className="table-container">
-          <table className="table">
+        <div className={tableStyles['table-container']}>
+          <table className={tableStyles.table}>
             <thead>
               <tr>
                 <th>When</th>

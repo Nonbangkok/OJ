@@ -5,7 +5,7 @@ import styles from './ContestDetail.module.css';
 import contestService from '../services/contestService';
 import { formatDateTime, getRemainingTime } from '../utils/formatters';
 
-function ContestDetail() {
+const ContestDetail = () => {
   const { contestId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();

@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../../services/api';
 import styles from './Settings.module.css'; // Updated CSS import
 import { useSettings } from '../../../context/SettingsContext';
-
-const API_URL = process.env.REACT_APP_API_URL;
 
 const Settings = () => { // Renamed component
   // Existing state for Registration Settings
@@ -23,7 +21,7 @@ const Settings = () => { // Renamed component
   useEffect(() => {
     const fetchRegistrationSettings = async () => {
       try {
-        const response = await axios.get(`${API_URL}/admin/settings/registration`, { withCredentials: true });
+        const response = await api.get('/admin/settings/registration');
         setIsRegistrationEnabled(response.data.enabled);
       } catch (err) {
         setRegistrationError('Failed to fetch registration settings.');
@@ -39,9 +37,8 @@ const Settings = () => { // Renamed component
     setRegistrationSuccess('');
     const newStatus = !isRegistrationEnabled;
     try {
-      await axios.put(`${API_URL}/admin/settings/registration`,
-        { enabled: newStatus },
-        { withCredentials: true }
+      await api.put('/admin/settings/registration',
+        { enabled: newStatus }
       );
       setIsRegistrationEnabled(newStatus);
       setRegistrationSuccess(`Registration has been ${newStatus ? 'enabled' : 'disabled'}.`);
@@ -57,8 +54,7 @@ const Settings = () => { // Renamed component
     setDatabaseError('');
     setDatabaseSuccess('');
     try {
-      const response = await axios.post(`${API_URL}/admin/database/export`, {}, {
-        withCredentials: true,
+      const response = await api.post('/admin/database/export', {}, {
         responseType: 'blob', // Important for downloading files
       });
 
@@ -114,8 +110,7 @@ const Settings = () => { // Renamed component
     formData.append('databaseDump', databaseFile);
 
     try {
-      await axios.post(`${API_URL}/admin/database/import`, formData, {
-        withCredentials: true,
+      await api.post('/admin/database/import', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

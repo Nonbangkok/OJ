@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../../../services/api';
 import styles from './Management.module.css';
 import formStyles from '../../../components/common/Form.module.css';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import tableStyles from '../../../components/common/Table.module.css';
 
 const BatchUserCreation = ({ onUsersCreated }) => {
   const [prefix, setPrefix] = useState('');
@@ -46,10 +45,9 @@ const BatchUserCreation = ({ onUsersCreated }) => {
     }
 
     try {
-      const response = await axios.post(
-        `${API_URL}/admin/users/batch`,
-        { prefix, count: Number(count) },
-        { withCredentials: true }
+      const response = await api.post(
+        '/admin/users/batch',
+        { prefix, count: Number(count) }
       );
       setCreatedUsers(response.data.users);
       // We do NOT call onUsersCreated() here to prevent the results table from disappearing.
@@ -106,8 +104,8 @@ const BatchUserCreation = ({ onUsersCreated }) => {
             </button>
           </div>
           <p>Please save these passwords. They will not be shown again.</p>
-          <div className="table-container">
-            <table className="table">
+          <div className={tableStyles['table-container']}>
+            <table className={tableStyles.table}>
               <thead>
                 <tr>
                   <th>Username</th>

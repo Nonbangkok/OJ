@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../services/api';
 import styles from './ContestScoreboard.module.css';
+import tableStyles from '../components/common/Table.module.css';
 
-function ContestScoreboard() {
+const ContestScoreboard = () => {
   const { contestId } = useParams();
 
   const [contest, setContest] = useState(null);
@@ -138,8 +139,8 @@ function ContestScoreboard() {
           <p>No participants have submitted solutions in this contest yet</p>
         </div>
       ) : (
-        <div className="table-container">
-          <table className={`table ${styles.scoreboardTable}`}>
+        <div className={tableStyles['table-container']}>
+          <table className={`${tableStyles.table} ${styles.scoreboardTable}`}>
             <thead>
               <tr>
                 <th>Rank</th>
@@ -173,10 +174,10 @@ function ContestScoreboard() {
                           {problemScore ? (
                             <div
                               className={`${styles.problemScore} ${problemScore.solved
-                                  ? styles.solved
-                                  : problemScore.score > 0
-                                    ? styles.partial
-                                    : ''
+                                ? styles.solved
+                                : problemScore.score > 0
+                                  ? styles.partial
+                                  : ''
                                 }`}
                             >
                               <span className={styles.score}>{problemScore.score}</span>

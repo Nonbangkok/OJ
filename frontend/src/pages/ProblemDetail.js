@@ -6,7 +6,7 @@ import problemService from '../services/problemService';
 import { useProblemDetail } from '../hooks/useProblemDetail';
 import { generateResultString, getStatusClass } from '../utils/formatters';
 
-function ProblemDetail() {
+const ProblemDetail = () => {
   const {
     problemId,
     contestId,

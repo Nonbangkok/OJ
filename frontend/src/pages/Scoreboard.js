@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import '../components/common/Table.css'; // Use the new shared table styles
+import tableStyles from '../components/common/Table.module.css';
 
 const Scoreboard = () => {
   const [scoreboard, setScoreboard] = useState([]);
@@ -28,8 +28,8 @@ const Scoreboard = () => {
   return (
     <div className="scoreboard-container">
       <h1>Scoreboard</h1>
-      <div className="table-container">
-        <table className="table">
+      <div className={tableStyles['table-container']}>
+        <table className={tableStyles.table}>
           <thead>
             <tr>
               <th>Rank</th>

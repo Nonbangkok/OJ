@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext'; // Import useAuth
 import EditUserModal from './EditUserModal';
 import ConfirmationModal from './ConfirmationModal';
 import AddUserModal from './AddUserModal';
 import BatchUserCreation from './BatchUserCreation'; // Import the new component
 import styles from './Management.module.css';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import tableStyles from '../../../components/common/Table.module.css';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -21,7 +20,7 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/admin/users`, { withCredentials: true });
+      const response = await api.get('/admin/users');
       setUsers(response.data);
     } catch (err) {
       setError('Failed to fetch users.');
@@ -46,7 +45,7 @@ const UserManagement = () => {
   const handleConfirmDelete = async () => {
     if (deletingUser) {
       try {
-        await axios.delete(`${API_URL}/admin/users/${deletingUser.id}`, { withCredentials: true });
+        await api.delete(`/admin/users/${deletingUser.id}`);
         setUsers(users.filter(user => user.id !== deletingUser.id));
       } catch (err) {
         setError('Failed to delete user.');
@@ -59,7 +58,7 @@ const UserManagement = () => {
 
   const handleSave = async (userId, userData) => {
     try {
-      await axios.put(`${API_URL}/admin/users/${userId}`, userData, { withCredentials: true });
+      await api.put(`/admin/users/${userId}`, userData);
       setEditingUser(null);
       fetchUsers(); // Refresh the user list
     } catch (err) {
@@ -70,7 +69,7 @@ const UserManagement = () => {
 
   const handleAddNewUser = async (newUserData) => {
     try {
-      await axios.post(`${API_URL}/admin/users`, newUserData, { withCredentials: true });
+      await api.post('/admin/users', newUserData);
       setIsAddModalOpen(false);
       fetchUsers(); // Refresh the user list
     } catch (err) {
@@ -92,8 +91,8 @@ const UserManagement = () => {
             Create New User
           </button>
         </div>
-        <div className="table-container">
-          <table className="table">
+        <div className={tableStyles['table-container']}>
+          <table className={tableStyles.table}>
             <thead>
               <tr>
                 <th>Username</th>

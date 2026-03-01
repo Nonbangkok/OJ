@@ -4,7 +4,7 @@ import api from '../services/api';
 import { useSettings } from '../context/SettingsContext';
 import styles from '../components/common/Form.module.css';
 
-function Register() {
+const Register = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
