@@ -53,59 +53,6 @@ function Submissions({ problemId, showTitle = true }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [setShowProblemSuggestions, setShowUserSuggestions]);
 
-  const handleApplyFilters = () => {
-    setSubmissions([]); // Clear current submissions
-    setLoading(true);   // Show loading state
-    setAppliedFilterProblemId(filterProblemId);
-    setAppliedFilterUserId(filterUserId);
-    // fetchData will be triggered by the useEffect dependency change
-  };
-
-  // Autocomplete Handlers
-  const handleProblemChange = async (e) => {
-    const value = e.target.value;
-    setFilterProblemId(value);
-    if (value.length > 0) {
-      try {
-        const res = await axios.get(`${API_URL}/api/search/problems?q=${value}`, { withCredentials: true });
-        setProblemSuggestions(res.data);
-        setShowProblemSuggestions(true);
-      } catch (err) {
-        console.error("Error fetching problem suggestions:", err);
-      }
-    } else {
-      setProblemSuggestions([]);
-      setShowProblemSuggestions(false);
-    }
-  };
-
-  const handleUserChange = async (e) => {
-    const value = e.target.value;
-    setFilterUserId(value);
-    if (value.length > 0) {
-      try {
-        const res = await axios.get(`${API_URL}/api/search/users?q=${value}`, { withCredentials: true });
-        setUserSuggestions(res.data);
-        setShowUserSuggestions(true);
-      } catch (err) {
-        console.error("Error fetching user suggestions:", err);
-      }
-    } else {
-      setUserSuggestions([]);
-      setShowUserSuggestions(false);
-    }
-  };
-
-  const selectProblem = (problemId) => {
-    setFilterProblemId(problemId);
-    setShowProblemSuggestions(false);
-  };
-
-  const selectUser = (username) => {
-    setFilterUserId(username);
-    setShowUserSuggestions(false);
-  };
-
   const getStatusClass = (status) => {
     if (!status) return '';
     return `status-${status.split(' ')[0].toLowerCase()}`;
@@ -229,6 +176,7 @@ function Submissions({ problemId, showTitle = true }) {
           </table>
         )}
       </div>
+
       {visibleCount < submissions.length && (
         <div className={styles['show-more-container']}>
           <button
