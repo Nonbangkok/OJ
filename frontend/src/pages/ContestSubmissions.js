@@ -1,146 +1,41 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import styles from './Submissions.module.css';
 import SubmissionModal from '../features/problems/components/SubmissionModal';
 import { getStatusClass, canViewCode, formatDateTime } from '../utils/formatters';
+import { useContestGuard } from '../hooks/useContestGuard';
+import { useSubmissions } from '../hooks/useSubmissions';
 
 function ContestSubmissions() {
   const { contestId } = useParams();
   const { user } = useAuth();
-  const navigate = useNavigate();
 
-  const [contest, setContest] = useState(null);
-  const [submissions, setSubmissions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [filter, setFilter] = useState('all'); // 'all' or 'mine'
-  const [selectedSubmission, setSelectedSubmission] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Contest access guard — handles redirect logic and polling
+  const { isAccessible, loading: guardLoading, error: guardError } = useContestGuard(contestId);
 
-  const fetchContestData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await api.get(`/contests/${contestId}`);
-      const fetchedContest = response.data;
-      setContest(fetchedContest);
+  // Fetch submissions using the shared hook, passing contestId
+  const {
+    submissions,
+    loading: submissionsLoading,
+    error: submissionsError,
+    filter,
+    setFilter,
+    selectedSubmission,
+    isModalOpen,
+    handleViewCode,
+    handleCloseModal
+  } = useSubmissions(null, isAccessible ? contestId : null);
 
-      // Redirect logic if contest is finished
-      if (fetchedContest.status === 'finished') {
-        let redirectPath = '';
-
-        if (fetchedContest.is_participant) {
-          redirectPath = `/contests/${contestId}/scoreboard`;
-        } else {
-          redirectPath = '/contests';
-        }
-        navigate(redirectPath);
-        return; // Stop further execution
-      }
-    } catch (err) {
-      console.error('Error fetching contest data:', err);
-      if (err.response?.status === 403) {
-        // If user is not participant and contest is finished (or becomes finished), redirect to /contests
-        try {
-          const contestStatusCheck = await api.get(`/contests/${contestId}`);
-          if (contestStatusCheck.data.status === 'finished') {
-            navigate('/contests');
-            return;
-          }
-        } catch (innerErr) {
-          console.error('Failed to re-check contest status for 403 redirect:', innerErr);
-        }
-        setError('Failed to fetch contest submissions. You may not have access to this contest.');
-      } else if (err.response?.status === 404) {
-        setError('Contest not found.');
-      } else {
-        setError('Error fetching contest data.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [contestId, user, navigate]); // Added user and navigate to dependencies
-
-  const fetchSubmissions = useCallback(async () => {
-    if (submissions.length === 0) {
-      setLoading(true);
-    }
-
-    try {
-      const params = {
-        contestId: contestId
-      };
-
-      if (filter === 'mine') {
-        params.filter = 'mine';
-      }
-
-      const response = await api.get('/submissions', {
-        params,
-      });
-
-      setSubmissions(response.data);
-      setError('');
-    } catch (err) {
-      setError('Failed to fetch contest submissions. Please make sure you have access to this contest.');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [contestId, filter, submissions.length]); // Removed redirectMessage from dependencies
-
-  useEffect(() => {
-    fetchContestData();
-    const intervalId = setInterval(() => {
-      fetchContestData();
-    }, 15000); // Poll every 15 seconds
-    return () => clearInterval(intervalId);
-  }, [fetchContestData]); // fetchContestData is a useCallback, so it's stable. If not, it would cause infinite loop.
-
-  useEffect(() => {
-    fetchSubmissions();
-  }, [fetchSubmissions]); // Removed redirectMessage from dependencies
-
-  // Auto-refresh for processing submissions
-  useEffect(() => {
-    const isProcessing = submissions.some(sub =>
-      ['Pending', 'Compiling', 'Running'].includes(sub.overall_status)
-    );
-
-    if (isProcessing) {
-      const intervalId = setInterval(fetchSubmissions, 2500);
-      return () => clearInterval(intervalId);
-    }
-  }, [submissions, fetchSubmissions]); // Removed redirectMessage from dependencies
-
-  const handleViewCode = async (submissionId) => {
-    try {
-      const response = await api.get(`/submissions/${submissionId}`, {
-        params: { contestId }
-      });
-      setSelectedSubmission(response.data);
-      setIsModalOpen(true);
-    } catch (err) {
-      setError(`Failed to fetch submission #${submissionId}.`);
-      console.error(err);
-    }
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedSubmission(null);
-  };
-
-
-
-  if (loading) {
+  if (guardLoading || submissionsLoading) {
     return (
       <div className={styles['submissions-container']}>
         <div>Loading contest submissions...</div>
       </div>
     );
   }
+
+  // Combine errors if any
+  const error = guardError || submissionsError;
 
   return (
     <div className={styles['submissions-container']}>
@@ -235,4 +130,4 @@ function ContestSubmissions() {
   );
 }
 
-export default ContestSubmissions; 
+export default ContestSubmissions;
