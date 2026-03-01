@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import styles from './ContestScoreboard.module.css';
+import tableStyles from '../components/common/Table.module.css';
 
-const API_URL = process.env.REACT_APP_API_URL;
-
-function ContestScoreboard() {
+const ContestScoreboard = () => {
   const { contestId } = useParams();
-  
+
   const [contest, setContest] = useState(null);
   const [scoreboard, setScoreboard] = useState([]);
   const [problems, setProblems] = useState([]);
@@ -17,13 +16,13 @@ function ContestScoreboard() {
 
   useEffect(() => {
     fetchContestData();
-    
+
     // Auto-refresh for running contests
     let interval;
     if (contest?.status === 'running') {
       interval = setInterval(fetchScoreboard, 30000); // Refresh every 30 seconds
     }
-    
+
     return () => {
       if (interval) clearInterval(interval);
     };
@@ -32,17 +31,13 @@ function ContestScoreboard() {
   const fetchContestData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch contest details and scoreboard in parallel
       const [contestResponse, scoreboardDataResponse] = await Promise.all([
-        axios.get(`${API_URL}/contests/${contestId}`, {
-          withCredentials: true
-        }),
-        axios.get(`${API_URL}/contests/${contestId}/scoreboard`, {
-          withCredentials: true
-        })
+        api.get(`/contests/${contestId}`),
+        api.get(`/contests/${contestId}/scoreboard`)
       ]);
-      
+
       setContest(contestResponse.data);
       setScoreboard(scoreboardDataResponse.data.scoreboard);
       setProblems(scoreboardDataResponse.data.problems || []);
@@ -64,10 +59,8 @@ function ContestScoreboard() {
 
   const fetchScoreboard = async () => {
     try {
-      const response = await axios.get(`${API_URL}/contests/${contestId}/scoreboard`, {
-        withCredentials: true
-      });
-      
+      const response = await api.get(`/contests/${contestId}/scoreboard`);
+
       // The response will always have scoreboard and problems, but we only need to update the scoreboard on refresh.
       setScoreboard(response.data.scoreboard);
       setLastUpdate(new Date());
@@ -86,10 +79,10 @@ function ContestScoreboard() {
 
   const getProblemScore = (userScores, problemId) => {
     if (!userScores || typeof userScores !== 'object') return null;
-    
+
     const problemScore = userScores[problemId];
     if (!problemScore) return null;
-    
+
     // Handle both old format (just number) and new format (object)
     if (typeof problemScore === 'number') {
       return {
@@ -98,7 +91,7 @@ function ContestScoreboard() {
         solved: problemScore === 100
       };
     }
-    
+
     if (typeof problemScore === 'object') {
       return {
         score: problemScore.score || 0,
@@ -106,7 +99,7 @@ function ContestScoreboard() {
         solved: (problemScore.score || 0) === 100
       };
     }
-    
+
     return null;
   };
 
@@ -146,8 +139,8 @@ function ContestScoreboard() {
           <p>No participants have submitted solutions in this contest yet</p>
         </div>
       ) : (
-        <div className="table-container">
-          <table className={`table ${styles.scoreboardTable}`}>
+        <div className={tableStyles['table-container']}>
+          <table className={`${tableStyles.table} ${styles.scoreboardTable}`}>
             <thead>
               <tr>
                 <th>Rank</th>
@@ -180,13 +173,12 @@ function ContestScoreboard() {
                         <td key={problem.problem_id}>
                           {problemScore ? (
                             <div
-                              className={`${styles.problemScore} ${
-                                problemScore.solved
-                                  ? styles.solved
-                                  : problemScore.score > 0
+                              className={`${styles.problemScore} ${problemScore.solved
+                                ? styles.solved
+                                : problemScore.score > 0
                                   ? styles.partial
                                   : ''
-                              }`}
+                                }`}
                             >
                               <span className={styles.score}>{problemScore.score}</span>
                             </div>

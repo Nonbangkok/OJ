@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import UserManagement from '../features/admin/components/UserManagement';
 import ProblemManagement from '../features/admin/components/ProblemManagement';
 import ContestManagement from '../features/admin/components/ContestManagement';
 import Settings from '../features/admin/components/Settings';
 import styles from './Admin.module.css';
-
-const API_URL = process.env.REACT_APP_API_URL;
 
 const Admin = () => {
   const [user, setUser] = useState(null);
@@ -15,7 +13,7 @@ const Admin = () => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await axios.get(`${API_URL}/me`, { withCredentials: true });
+        const response = await api.get('/me');
         if (response.data.isAuthenticated) {
           setUser(response.data.user);
         }
@@ -35,7 +33,7 @@ const Admin = () => {
   return (
     <div className={styles['admin-container']}>
       <h1>Admin Panel</h1>
-      
+
       {user?.role === 'admin' && (
         <div className={styles['admin-section']}>
           <UserManagement />
@@ -53,7 +51,7 @@ const Admin = () => {
           <ContestManagement currentUser={user} />
         </div>
       )}
-      
+
       {user?.role === 'admin' && (
         <div className={styles['admin-section']}>
           <Settings />

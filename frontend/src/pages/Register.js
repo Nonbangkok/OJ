@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import { useSettings } from '../context/SettingsContext';
 import styles from '../components/common/Form.module.css';
 
-const API_URL = process.env.REACT_APP_API_URL;
-
-function Register() {
+const Register = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -29,7 +27,7 @@ function Register() {
     }
 
     try {
-      await axios.post(`${API_URL}/register`, {
+      await api.post('/register', {
         username,
         password,
       });
@@ -61,7 +59,7 @@ function Register() {
       <h2>Register</h2>
       <form onSubmit={handleSubmit}>
         <div className={styles['form-group']}>
-          <label htmlFor="username">Username:</label>
+          <label htmlFor="username">Username</label>
           <input
             type="text"
             id="username"
@@ -71,7 +69,7 @@ function Register() {
           />
         </div>
         <div className={styles['form-group']}>
-          <label htmlFor="password">Password:</label>
+          <label htmlFor="password">Password</label>
           <input
             type="password"
             id="password"

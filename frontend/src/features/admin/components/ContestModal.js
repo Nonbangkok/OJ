@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../../services/api';
 import formStyles from '../../../components/common/Form.module.css';
 import modalStyles from './ModalLayout.module.css';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
-const API_URL = process.env.REACT_APP_API_URL;
-
-function ContestModal({ contest, onClose, onSuccess }) {
+const ContestModal = ({ contest, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -85,14 +83,10 @@ function ContestModal({ contest, onClose, onSuccess }) {
 
       if (contest) {
         // Update existing contest
-        await axios.put(`${API_URL}/admin/contests/${contest.id}`, contestData, {
-          withCredentials: true
-        });
+        await api.put(`/admin/contests/${contest.id}`, contestData);
       } else {
         // Create new contest
-        await axios.post(`${API_URL}/admin/contests`, contestData, {
-          withCredentials: true
-        });
+        await api.post('/admin/contests', contestData);
       }
 
       onSuccess();

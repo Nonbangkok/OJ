@@ -3,8 +3,10 @@ import { Link, useParams } from 'react-router-dom';
 import styles from './Submissions.module.css';
 import SubmissionModal from '../features/problems/components/SubmissionModal';
 import { useSubmissions } from '../hooks/useSubmissions';
+import { getStatusClass } from '../utils/formatters';
+import tableStyles from '../components/common/Table.module.css';
 
-function Submissions({ problemId, showTitle = true }) {
+const Submissions = ({ problemId, showTitle = true }) => {
   const { contestId } = useParams();
 
   // Logic is now completely in the Hook
@@ -53,10 +55,7 @@ function Submissions({ problemId, showTitle = true }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [setShowProblemSuggestions, setShowUserSuggestions]);
 
-  const getStatusClass = (status) => {
-    if (!status) return '';
-    return `status-${status.split(' ')[0].toLowerCase()}`;
-  };
+
 
   if (loading) return <div>Loading submissions...</div>;
   if (error) return <div className="error-message">{error}</div>;
@@ -134,13 +133,13 @@ function Submissions({ problemId, showTitle = true }) {
         </div>
       )}
 
-      <div className="table-container">
+      <div className={tableStyles['table-container']}>
         {submissions.length === 0 ? (
           <p style={{ padding: '1rem 1.25rem' }}>
             {problemId ? "You haven't made any submissions for this problem yet." : "No submissions found."}
           </p>
         ) : (
-          <table className="table">
+          <table className={tableStyles.table}>
             <thead>
               <tr>
                 <th>When</th>

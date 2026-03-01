@@ -5,14 +5,19 @@ const authService = {
     const response = await api.get('/me');
     return response.data;
   },
-  
+
   login: async (username, password) => {
     const response = await api.post('/login', { username, password });
     return response.data;
   },
-  
+
   logout: async () => {
     await api.post('/logout');
+  },
+
+  register: async (username, password) => {
+    const response = await api.post('/register', { username, password });
+    return response.data;
   },
 };
 

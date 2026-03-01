@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { NavLink, useParams, useNavigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../services/api';
 import styles from './ContestNavbar.module.css';
 import { useAuth } from '../../context/AuthContext';
 import ThemeToggleButton from '../../components/common/ThemeToggleButton';
@@ -8,9 +8,7 @@ import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/logo512.png';
 import darkmodeLogo from '../../assets/logo512_darkmode.png';
 
-const API_URL = process.env.REACT_APP_API_URL;
-
-function ContestNavbar() {
+const ContestNavbar = () => {
   const { contestId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -24,7 +22,7 @@ function ContestNavbar() {
   useEffect(() => {
     const fetchContestDetails = async () => {
       try {
-        const response = await axios.get(`${API_URL}/contests/${contestId}`, { withCredentials: true });
+        const response = await api.get(`/contests/${contestId}`);
         setContest(response.data);
       } catch (error) {
         console.error("Failed to fetch contest details", error);
@@ -87,7 +85,7 @@ function ContestNavbar() {
             {contest?.title}
           </NavLink>
         </div>
-        
+
         <ul ref={navRef} className={styles['nav-links']} onMouseLeave={resetSlider}>
           <div className={styles.slider} style={sliderStyle} />
           {contest && contest.status !== 'finished' && (
@@ -104,7 +102,7 @@ function ContestNavbar() {
             <NavLink to={`/contests/${contestId}/scoreboard`}>Scoreboard</NavLink>
           </li>
         </ul>
-        
+
         <div className={styles['nav-actions']}>
           {user && (
             <span className={styles.username}>

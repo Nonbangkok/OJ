@@ -4,12 +4,14 @@ import CodeSubmissionForm from '../features/problems/components/CodeSubmissionFo
 import Submissions from './Submissions';
 import problemService from '../services/problemService';
 import { useProblemDetail } from '../hooks/useProblemDetail';
+import { generateResultString, getStatusClass } from '../utils/formatters';
 
-function ProblemDetail() {
+const ProblemDetail = () => {
   const {
     problemId,
     contestId,
     problem,
+    contest,
     loading,
     error,
     hiddenProblemInfo,
@@ -35,24 +37,7 @@ function ProblemDetail() {
     window.open(pdfUrl, '_blank');
   };
 
-  const generateResultString = (status, results) => {
-    if (status === 'Compilation Error') {
-      return 'Compilation Error';
-    }
-    if (!results || results.length === 0) {
-      return '';
-    }
-    const charMap = {
-      'Accepted': 'P',
-      'Wrong Answer': '-',
-      'Time Limit Exceeded': 'T',
-      'Runtime Error': 'R',
-      'Memory Limit Exceeded': 'M',
-      'Skipped': 'S',
-    };
-    const resultChars = results.map(r => charMap[r.status] || '?').join('');
-    return `[${resultChars}]`;
-  };
+
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div className={styles['error-message']}>{error}</div>;
@@ -76,10 +61,7 @@ function ProblemDetail() {
   }
   if (!problem) return <div className={styles['error-message']}>Problem not found.</div>;
 
-  const getStatusClass = (status) => {
-    if (!status) return '';
-    return `status-${status.split(' ')[0].toLowerCase()}`;
-  };
+
 
   const renderContent = () => {
     switch (activeView) {

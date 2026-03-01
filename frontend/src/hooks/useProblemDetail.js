@@ -82,6 +82,7 @@ export const useProblemDetail = () => {
         problemId,
         contestId,
         problem,
+        contest,
         loading,
         error,
         hiddenProblemInfo,

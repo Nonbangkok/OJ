@@ -8,7 +8,7 @@ import 'highlight.js/styles/atom-one-dark.css';
 
 import styles from './SubmissionModal.module.css';
 import editorStyles from '../../../components/common/CodeEditor.module.css';
-import '../../../components/common/Table.css';
+import tableStyles from '../../../components/common/Table.module.css';
 
 // Register C++ language
 hljs.registerLanguage('cpp', cpp);
@@ -27,17 +27,17 @@ const SubmissionModal = ({ submission, onClose }) => {
       setLineCount(submission.code.split('\n').length);
     }
   }, [submission]);
-  
+
   // Sync scrolling between line numbers and code
   useEffect(() => {
     if (!submission) return;
 
     const editorEl = editorWrapperRef.current;
     if (!editorEl) return;
-    
+
     const textarea = editorEl.querySelector('textarea');
     const lineNumbers = lineNumbersRef.current;
-    
+
     if (!textarea || !lineNumbers) return;
 
     // Check for scrollbar presence
@@ -49,7 +49,7 @@ const SubmissionModal = ({ submission, onClose }) => {
     // Check initially and on any resize of the textarea
     const resizeObserver = new ResizeObserver(checkScrollbar);
     resizeObserver.observe(textarea);
-    
+
     // Initial check after a short delay to allow DOM to render
     const timeoutId = setTimeout(checkScrollbar, 50);
 
@@ -57,13 +57,13 @@ const SubmissionModal = ({ submission, onClose }) => {
       lineNumbers.scrollTop = textarea.scrollTop;
       const pre = editorEl.querySelector('pre');
       if (pre) {
-          pre.scrollTop = textarea.scrollTop;
-          pre.scrollLeft = textarea.scrollLeft;
+        pre.scrollTop = textarea.scrollTop;
+        pre.scrollLeft = textarea.scrollLeft;
       }
     };
 
     textarea.addEventListener('scroll', syncScroll);
-    
+
     return () => {
       clearTimeout(timeoutId);
       resizeObserver.disconnect();
@@ -124,8 +124,8 @@ const SubmissionModal = ({ submission, onClose }) => {
     }
 
     return (
-      <div className="table-container">
-        <table className="table">
+      <div className={tableStyles['table-container']}>
+        <table className={tableStyles.table}>
           <thead>
             <tr>
               <th>#</th>
@@ -208,7 +208,7 @@ const SubmissionModal = ({ submission, onClose }) => {
                 <div className={editorStyles['editorContainer']}>
                   <Editor
                     value={code}
-                    onValueChange={() => {}}
+                    onValueChange={() => { }}
                     highlight={highlightCode}
                     padding={16}
                     textareaId="code"

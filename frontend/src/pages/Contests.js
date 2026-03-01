@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import styles from './Contests.module.css';
 import contestService from '../services/contestService';
+import { formatDateTime } from '../utils/formatters';
 
-function Contests() {
+const Contests = () => {
   const [contests, setContests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -61,15 +62,7 @@ function Contests() {
     );
   };
 
-  const formatDateTime = (dateTime) => {
-    return new Date(dateTime).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+
 
   const isContestJoinable = (contest) => {
     if (!user) return false;

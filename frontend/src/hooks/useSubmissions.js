@@ -1,25 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import submissionService from '../services/submissionService';
 import authService from '../services/authService';
+import { useAutocomplete } from './useAutocomplete';
 
 export const useSubmissions = (problemId, contestId) => {
     const [submissions, setSubmissions] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [filter, setFilter] = useState('all'); // 'all' or 'mine'
+    const [filter, setFilter] = useState('all');
     const [selectedSubmission, setSelectedSubmission] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // Input states (Autocomplete)
-    const [filterProblemId, setFilterProblemId] = useState('');
-    const [filterUserId, setFilterUserId] = useState('');
-    const [appliedFilters, setAppliedFilters] = useState({ problemId: '', userId: '' });
-    const [problemSuggestions, setProblemSuggestions] = useState([]);
-    const [userSuggestions, setUserSuggestions] = useState([]);
-    const [showProblemSuggestions, setShowProblemSuggestions] = useState(false);
-    const [showUserSuggestions, setShowUserSuggestions] = useState(false);
+    // Autocomplete hooks (replaces ~60 lines of manual state management)
+    const problemAutocomplete = useAutocomplete(submissionService.searchProblems);
+    const userAutocomplete = useAutocomplete(submissionService.searchUsers);
 
+    const [appliedFilters, setAppliedFilters] = useState({ problemId: '', userId: '' });
     const lastRequestIdRef = useRef(0);
 
     // 1. Initial User Fetch
@@ -95,7 +92,10 @@ export const useSubmissions = (problemId, contestId) => {
     const handleApplyFilters = () => {
         setSubmissions([]);
         setLoading(true);
-        setAppliedFilters({ problemId: filterProblemId, userId: filterUserId });
+        setAppliedFilters({
+            problemId: problemAutocomplete.query,
+            userId: userAutocomplete.query,
+        });
     };
 
     const handleViewCode = async (submissionId) => {
@@ -113,45 +113,6 @@ export const useSubmissions = (problemId, contestId) => {
         setSelectedSubmission(null);
     };
 
-    // Autocomplete helpers
-    const handleProblemChange = async (e) => {
-        const value = e.target.value;
-        setFilterProblemId(value);
-        if (value.length > 0) {
-            try {
-                const data = await submissionService.searchProblems(value);
-                setProblemSuggestions(data);
-                setShowProblemSuggestions(true);
-            } catch (err) { console.error(err); }
-        } else {
-            setShowProblemSuggestions(false);
-        }
-    };
-
-    const handleUserChange = async (e) => {
-        const value = e.target.value;
-        setFilterUserId(value);
-        if (value.length > 0) {
-            try {
-                const data = await submissionService.searchUsers(value);
-                setUserSuggestions(data);
-                setShowUserSuggestions(true);
-            } catch (err) { console.error(err); }
-        } else {
-            setShowUserSuggestions(false);
-        }
-    };
-
-    const selectProblem = (id) => {
-        setFilterProblemId(id);
-        setShowProblemSuggestions(false);
-    };
-
-    const selectUser = (username) => {
-        setFilterUserId(username);
-        setShowUserSuggestions(false);
-    };
-
     return {
         submissions,
         currentUser,
@@ -161,23 +122,26 @@ export const useSubmissions = (problemId, contestId) => {
         setFilter,
         selectedSubmission,
         isModalOpen,
-        filterProblemId,
-        setFilterProblemId,
-        filterUserId,
-        setFilterUserId,
-        problemSuggestions,
-        userSuggestions,
-        showProblemSuggestions,
-        setShowProblemSuggestions,
-        showUserSuggestions,
-        setShowUserSuggestions,
+
+        // Autocomplete — expose with backward-compatible names
+        filterProblemId: problemAutocomplete.query,
+        setFilterProblemId: problemAutocomplete.setQuery,
+        filterUserId: userAutocomplete.query,
+        setFilterUserId: userAutocomplete.setQuery,
+        problemSuggestions: problemAutocomplete.suggestions,
+        userSuggestions: userAutocomplete.suggestions,
+        showProblemSuggestions: problemAutocomplete.showSuggestions,
+        setShowProblemSuggestions: problemAutocomplete.setShowSuggestions,
+        showUserSuggestions: userAutocomplete.showSuggestions,
+        setShowUserSuggestions: userAutocomplete.setShowSuggestions,
+        handleProblemChange: problemAutocomplete.handleChange,
+        handleUserChange: userAutocomplete.handleChange,
+        selectProblem: problemAutocomplete.select,
+        selectUser: userAutocomplete.select,
+
         handleApplyFilters,
         handleViewCode,
         handleCloseModal,
-        handleProblemChange,
-        handleUserChange,
-        selectProblem,
-        selectUser,
         refresh: fetchData
     };
 };

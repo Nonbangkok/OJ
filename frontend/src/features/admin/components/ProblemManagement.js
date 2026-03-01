@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import api from '../../../services/api';
 import ProblemModal from './ProblemModal';
 import ConfirmationModal from './ConfirmationModal';
 import styles from './Management.module.css';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import tableStyles from '../../../components/common/Table.module.css';
 
 const ProblemManagement = ({ currentUser }) => {
   const [problems, setProblems] = useState([]);
@@ -31,7 +30,7 @@ const ProblemManagement = ({ currentUser }) => {
   const fetchProblems = async () => {
     try {
       // setLoading(true);
-      const response = await axios.get(`${API_URL}/admin/problems`, { withCredentials: true });
+      const response = await api.get('/admin/problems');
       setProblems(response.data);
     } catch (err) {
       setError('Failed to fetch problems.');
@@ -53,7 +52,7 @@ const ProblemManagement = ({ currentUser }) => {
   const handleConfirmDelete = async () => {
     if (problemToDelete) {
       try {
-        await axios.delete(`${API_URL}/admin/problems/${problemToDelete}`, { withCredentials: true });
+        await api.delete(`/admin/problems/${problemToDelete}`);
         fetchProblems();
       } catch (err) {
         setError('Failed to delete problem.');
@@ -67,10 +66,9 @@ const ProblemManagement = ({ currentUser }) => {
 
   const handleToggleVisibility = async (problemId, currentVisibility) => {
     try {
-      await axios.put(
-        `${API_URL}/admin/problems/${problemId}/visibility`,
-        { isVisible: !currentVisibility },
-        { withCredentials: true }
+      await api.put(
+        `/admin/problems/${problemId}/visibility`,
+        { isVisible: !currentVisibility }
       );
       fetchProblems();
     } catch (err) {
@@ -89,10 +87,9 @@ const ProblemManagement = ({ currentUser }) => {
       const hidePromises = problems
         .filter(problem => problem.is_visible && !problem.contest_id)
         .map(problem =>
-          axios.put(
-            `${API_URL}/admin/problems/${problem.id}/visibility`,
-            { isVisible: false },
-            { withCredentials: true }
+          api.put(
+            `/admin/problems/${problem.id}/visibility`,
+            { isVisible: false }
           )
         );
 
@@ -117,10 +114,9 @@ const ProblemManagement = ({ currentUser }) => {
       const showPromises = problems
         .filter(problem => !problem.is_visible && !problem.contest_id)
         .map(problem =>
-          axios.put(
-            `${API_URL}/admin/problems/${problem.id}/visibility`,
-            { isVisible: true },
-            { withCredentials: true }
+          api.put(
+            `/admin/problems/${problem.id}/visibility`,
+            { isVisible: true }
           )
         );
 
@@ -137,7 +133,7 @@ const ProblemManagement = ({ currentUser }) => {
 
   const handleEdit = async (problem) => {
     try {
-      const response = await axios.get(`${API_URL}/problems/${problem.id}`);
+      const response = await api.get(`/problems/${problem.id}`);
       setEditingProblem(response.data);
       setIsModalOpen(true);
     } catch (err) {
@@ -178,10 +174,10 @@ const ProblemManagement = ({ currentUser }) => {
     setBatchUploadFeedback({ visible: true, message: 'Initiating problem export...', type: 'info' });
 
     try {
-      const response = await axios.post(
-        `${API_URL}/admin/problems/export`,
+      const response = await api.post(
+        '/admin/problems/export',
         { problemIds: selectedProblems },
-        { withCredentials: true, responseType: 'blob' } // Important for downloading files
+        { responseType: 'blob' } // Important for downloading files
       );
 
       // Create a Blob from the response data
@@ -239,8 +235,7 @@ const ProblemManagement = ({ currentUser }) => {
     formData.append('problemsZip', file);
 
     try {
-      const response = await axios.post(`${API_URL}/admin/problems/batch-upload`, formData, {
-        withCredentials: true,
+      const response = await api.post('/admin/problems/batch-upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -250,7 +245,7 @@ const ProblemManagement = ({ currentUser }) => {
       if (progressId) {
         // Initial feedback for file uploaded, progress listener will update more details
         setBatchUploadFeedback({ visible: true, message: 'File uploaded. Waiting for processing to start...', type: 'info' });
-        const eventSource = new EventSource(`${API_URL}/admin/problems/batch-upload-progress/${progressId}`);
+        const eventSource = new EventSource(`${api.defaults.baseURL}/admin/problems/batch-upload-progress/${progressId}`, { withCredentials: true });
 
         // eventSource.onmessage is now handled by specific event listeners
         // eventSource.onmessage = (event) => {
@@ -337,9 +332,9 @@ const ProblemManagement = ({ currentUser }) => {
       let problemIdForUpload = problemData.id;
 
       if (isEditing) {
-        await axios.put(`${API_URL}/admin/problems/${editingProblem.id}`, problemData, { withCredentials: true });
+        await api.put(`/admin/problems/${editingProblem.id}`, problemData);
       } else {
-        const response = await axios.post(`${API_URL}/admin/problems`, problemData, { withCredentials: true });
+        const response = await api.post('/admin/problems', problemData);
         problemIdForUpload = response.data.id;
       }
 
@@ -350,8 +345,7 @@ const ProblemManagement = ({ currentUser }) => {
 
         setUploadProgress({ status: 'uploading', message: 'Uploading files to server...' });
 
-        const response = await axios.post(`${API_URL}/admin/problems/${problemIdForUpload}/upload`, fileData, {
-          withCredentials: true,
+        const response = await api.post(`/admin/problems/${problemIdForUpload}/upload`, fileData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
 
@@ -360,7 +354,7 @@ const ProblemManagement = ({ currentUser }) => {
         if (jobId) {
           const pollInterval = setInterval(async () => {
             try {
-              const progressRes = await axios.get(`${API_URL}/admin/upload-progress/${jobId}`, { withCredentials: true });
+              const progressRes = await api.get(`/admin/upload-progress/${jobId}`);
               const progressData = progressRes.data;
               setUploadProgress(progressData);
 
@@ -488,8 +482,8 @@ const ProblemManagement = ({ currentUser }) => {
           </button>
         </div>
       )}
-      <div className="table-container">
-        <table className="table">
+      <div className={tableStyles['table-container']}>
+        <table className={tableStyles.table}>
           <thead>
             <tr>
               <th>

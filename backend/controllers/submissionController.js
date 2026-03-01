@@ -188,7 +188,7 @@ router.get('/submissions', requireAuth, async (req, res) => {
 });
 
 // Autocomplete/Search Endpoints
-router.get('/api/search/problems', requireAuth, async (req, res) => {
+router.get('/search/problems', requireAuth, async (req, res) => {
   const { q } = req.query;
   if (!q) return res.json([]);
 
@@ -204,7 +204,7 @@ router.get('/api/search/problems', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/api/search/users', requireAuth, async (req, res) => {
+router.get('/search/users', requireAuth, async (req, res) => {
   const { q } = req.query;
   if (!q) return res.json([]);
 

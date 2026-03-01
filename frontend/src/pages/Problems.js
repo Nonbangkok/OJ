@@ -1,54 +1,10 @@
 import { Link } from 'react-router-dom';
 import styles from './Problems.module.css';
 import { useProblems } from '../hooks/useProblems';
+import { formatTimeAgo, formatDateAbsolute, generateResultString } from '../utils/formatters';
 
 const Problems = () => {
   const { problems, loading, error } = useProblems();
-
-  const formatTimeAgo = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now - date) / 1000);
-
-    let interval = seconds / 31536000;
-    if (interval > 1) return `${Math.floor(interval)} years ago`;
-    interval = seconds / 2592000;
-    if (interval > 1) return `${Math.floor(interval)} months ago`;
-    interval = seconds / 86400;
-    if (interval > 1) return `${Math.floor(interval)} days ago`;
-    interval = seconds / 3600;
-    if (interval > 1) return `${Math.floor(interval)} hours ago`;
-    interval = seconds / 60;
-    if (interval > 1) return `${Math.floor(interval)} minutes ago`;
-    return `${Math.floor(seconds)} seconds ago`;
-  };
-
-  const formatDateAbsolute = (dateString) => {
-    if (!dateString) return '';
-    const d = new Date(dateString);
-    const pad = (num) => num.toString().padStart(2, '0');
-    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${(d.getFullYear() + 543) % 100} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  };
-
-  const generateResultString = (status, results) => {
-    if (status === 'Compilation Error') {
-      return 'Compilation Error';
-    }
-    if (!results || results.length === 0) {
-      return '';
-    }
-    const charMap = {
-      'Accepted': 'P',
-      'Wrong Answer': '-',
-      'Time Limit Exceeded': 'T',
-      'Runtime Error': 'R',
-      'Memory Limit Exceeded': 'M',
-      'Skipped': 'S',
-    };
-    const resultChars = results.map(r => charMap[r.status] || '?').join('');
-    return `[${resultChars}]`;
-  };
 
   if (loading) return <div>Loading problems...</div>;
   if (error) return <div className="error-message">{error}</div>;

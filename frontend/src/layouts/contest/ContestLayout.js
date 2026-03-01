@@ -1,7 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import ContestNavbar from './ContestNavbar';
 
-function ContestLayout() {
+const ContestLayout = () => {
   return (
     <>
       <ContestNavbar />

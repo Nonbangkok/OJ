@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../../services/api';
 import formStyles from '../../../components/common/Form.module.css';
 import modalStyles from './ModalLayout.module.css';
 
-const API_URL = process.env.REACT_APP_API_URL;
-
-function ProblemMigrationModal({ contest, onClose, onSuccess }) {
+const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
   const [availableProblems, setAvailableProblems] = useState([]);
   const [contestProblems, setContestProblems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,12 +22,8 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
 
       // Fetch available problems and contest problems in parallel
       const [availableRes, contestRes] = await Promise.all([
-        axios.get(`${API_URL}/contests/available-problems`, {
-          withCredentials: true
-        }),
-        axios.get(`${API_URL}/admin/contests/${contest.id}/admin-problems`, {
-          withCredentials: true
-        })
+        api.get('/contests/available-problems'),
+        api.get(`/admin/contests/${contest.id}/admin-problems`)
       ]);
 
       setAvailableProblems(availableRes.data);
@@ -49,11 +43,9 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
       setMigrationLoading(true);
       setError('');
 
-      await axios.post(`${API_URL}/admin/contests/${contest.id}/problems`, {
+      await api.post(`/admin/contests/${contest.id}/problems`, {
         problemIds: selectedAvailable,
         action: 'move_to_contest'
-      }, {
-        withCredentials: true
       });
 
       setSelectedAvailable([]);
@@ -77,11 +69,9 @@ function ProblemMigrationModal({ contest, onClose, onSuccess }) {
       setMigrationLoading(true);
       setError('');
 
-      await axios.post(`${API_URL}/admin/contests/${contest.id}/problems`, {
+      await api.post(`/admin/contests/${contest.id}/problems`, {
         problemIds: problemIdsToRemove,
         action: 'move_to_main'
-      }, {
-        withCredentials: true
       });
 
       setSelectedContest([]); // Clear selection after moving

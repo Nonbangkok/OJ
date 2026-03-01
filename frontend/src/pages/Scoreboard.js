@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-import '../components/common/Table.css'; // Use the new shared table styles
+import api from '../services/api';
+import tableStyles from '../components/common/Table.module.css';
 
-const API_URL = process.env.REACT_APP_API_URL;
-
-function Scoreboard() {
+const Scoreboard = () => {
   const [scoreboard, setScoreboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -12,9 +10,7 @@ function Scoreboard() {
   useEffect(() => {
     const fetchScoreboard = async () => {
       try {
-        const response = await axios.get(`${API_URL}/scoreboard`, {
-          withCredentials: true,
-        });
+        const response = await api.get('/scoreboard');
         setScoreboard(response.data);
       } catch (err) {
         setError('Failed to fetch scoreboard. Please log in.');
@@ -32,8 +28,8 @@ function Scoreboard() {
   return (
     <div className="scoreboard-container">
       <h1>Scoreboard</h1>
-      <div className="table-container">
-        <table className="table">
+      <div className={tableStyles['table-container']}>
+        <table className={tableStyles.table}>
           <thead>
             <tr>
               <th>Rank</th>

@@ -104,3 +104,28 @@ code {
   border-radius: 6px;
   margin: 1rem 0;
 }
+
+/* Status colors for table cells and other UI elements */
+.status-accepted {
+  color: #48bb78 !important; /* Green */
+  font-weight: bold;
+}
+.status-wrong {
+  color: #f56565 !important; /* Red */
+  font-weight: bold;
+}
+.status-time {
+  color: #f6ad55 !important; /* Orange */
+}
+.status-compilation {
+  color: #a0aec0 !important; /* Gray */
+}
+.status-runtime {
+  color: #ed8936 !important; /* Orange */
+}
+.status-memory {
+  color: #ed64a6 !important; /* Pink */
+}
+.status-pending, .status-compiling, .status-running {
+  color: #718096 !important; /* Gray */
+}

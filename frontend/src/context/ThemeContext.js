@@ -2,6 +2,8 @@ import { createContext, useState, useEffect, useContext } from 'react';
 
 const ThemeContext = createContext();
 
+export const useTheme = () => useContext(ThemeContext);
+
 export const ThemeProvider = ({ children }) => {
   // Initialize state from localStorage or default to 'light'
   const [theme, setTheme] = useState(() => {
@@ -27,6 +29,4 @@ export const ThemeProvider = ({ children }) => {
       {children}
     </ThemeContext.Provider>
   );
-};
-
-export const useTheme = () => useContext(ThemeContext); 
+}; 

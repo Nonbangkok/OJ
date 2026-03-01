@@ -18,12 +18,12 @@ const submissionService = {
   },
 
   searchProblems: async (query) => {
-    const response = await api.get(`/api/search/problems?q=${query}`);
+    const response = await api.get(`/search/problems?q=${query}`);
     return response.data;
   },
 
   searchUsers: async (query) => {
-    const response = await api.get(`/api/search/users?q=${query}`);
+    const response = await api.get(`/search/users?q=${query}`);
     return response.data;
   }
 };

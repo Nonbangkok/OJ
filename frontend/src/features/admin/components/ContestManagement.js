@@ -1,27 +1,26 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../../services/api';
 import ContestModal from './ContestModal';
 import ProblemMigrationModal from './ProblemMigrationModal';
 import ConfirmationModal from './ConfirmationModal';
 import styles from './Management.module.css';
+import tableStyles from '../../../components/common/Table.module.css';
 
-const API_URL = process.env.REACT_APP_API_URL;
-
-function ContestManagement({ currentUser }) {
+const ContestManagement = ({ currentUser }) => {
   const [contests, setContests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingContest, setEditingContest] = useState(null);
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [migrationContest, setMigrationContest] = useState(null);
-  
+
   // Confirmation modal
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [contestToDelete, setContestToDelete] = useState(null);
-  
+
   useEffect(() => {
     fetchContests();
   }, []);
@@ -29,9 +28,7 @@ function ContestManagement({ currentUser }) {
   const fetchContests = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/admin/contests`, {
-        withCredentials: true
-      });
+      const response = await api.get('/admin/contests');
       setContests(response.data);
     } catch (err) {
       console.error('Error fetching contests:', err);
@@ -44,9 +41,7 @@ function ContestManagement({ currentUser }) {
   const handleDelete = async () => {
     if (contestToDelete) {
       try {
-        await axios.delete(`${API_URL}/admin/contests/${contestToDelete}`, {
-          withCredentials: true
-        });
+        await api.delete(`/admin/contests/${contestToDelete}`);
         fetchContests();
         setIsConfirmModalOpen(false);
         setContestToDelete(null);
@@ -79,7 +74,7 @@ function ContestManagement({ currentUser }) {
       'finishing': `${styles.badge} ${styles.finishing}`,
       'finished': `${styles.badge} ${styles.finished}`
     };
-    
+
     const statusText = {
       'scheduled': 'Scheduled',
       'running': 'Running',
@@ -113,7 +108,7 @@ function ContestManagement({ currentUser }) {
       <div className={styles['management-header']}>
         <h2>Contest Management</h2>
         <div className={styles['header-actions']}>
-          <button 
+          <button
             onClick={handleCreate}
             className={styles['create-btn']}
           >
@@ -134,7 +129,7 @@ function ContestManagement({ currentUser }) {
           <div className={styles.emptyIcon}>🏆</div>
           <h3>No contests yet</h3>
           <p>Create your first contest to get started</p>
-          <button 
+          <button
             onClick={handleCreate}
             className={styles['create-btn']}
           >
@@ -142,8 +137,8 @@ function ContestManagement({ currentUser }) {
           </button>
         </div>
       ) : (
-        <div className="table-container">
-          <table className="table">
+        <div className={tableStyles['table-container']}>
+          <table className={tableStyles.table}>
             <thead>
               <tr>
                 <th>Title</th>
@@ -160,11 +155,11 @@ function ContestManagement({ currentUser }) {
                   <td>
                     {contest.title}
                   </td>
-                  
+
                   <td>
                     {getStatusBadge(contest.status)}
                   </td>
-                  
+
                   <td>
                     <div className={styles.timeInfo}>
                       <div className={styles.timeRow}>
@@ -181,19 +176,19 @@ function ContestManagement({ currentUser }) {
                       </div>
                     </div>
                   </td>
-                  
+
                   <td>
                     <span className={styles.statValue}>
                       {contest.participant_count || 0}
                     </span>
                   </td>
-                  
+
                   <td>
                     <span className={styles.statValue}>
                       {contest.problem_count || 0}
                     </span>
                   </td>
-                  
+
                   <td>
                     <div className={styles.actionButtons}>
                       <button
@@ -203,7 +198,7 @@ function ContestManagement({ currentUser }) {
                       >
                         Edit
                       </button>
-                      
+
                       <button
                         onClick={() => handleManageProblems(contest)}
                         className={styles['problems-btn']}
@@ -212,7 +207,7 @@ function ContestManagement({ currentUser }) {
                       >
                         Problems
                       </button>
-                      
+
                       <button
                         onClick={() => {
                           setContestToDelete(contest.id);
