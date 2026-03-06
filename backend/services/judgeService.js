@@ -3,8 +3,8 @@ const { exec } = require('child_process');
 
 async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) {
   return new Promise((resolve) => {
-    // The command for the Linux environment inside Docker
-    const timeCommand = `/usr/bin/time -f "TIME_USED:%e MEM_USED:%M"`;
+    // Using custom C wrapper for microsecond precision
+    const timeCommand = `./scripts/time_wrapper`;
 
     // Use timeout command which is reliable on Linux
     const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${executablePath}`;
@@ -24,11 +24,20 @@ async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) 
       let programStderr = stderr;
 
       if (stderr) {
-        const timeRegex = /TIME_USED:([0-9.]+)/;
+        const timeRegex = /TIME_USED:([0-9.+]+)/;
         const memRegex = /MEM_USED:(\d+)/;
         const timeMatch = stderr.match(timeRegex);
         const memMatch = stderr.match(memRegex);
-        if (timeMatch) timeMs = Math.round(parseFloat(timeMatch[1]) * 1000);
+
+        if (timeMatch) {
+          try {
+            const timeExpression = timeMatch[1];
+            const sumSeconds = timeExpression.split('+').reduce((acc, val) => acc + parseFloat(val || 0), 0);
+            timeMs = Number((sumSeconds * 1000).toFixed(3));
+          } catch (e) {
+            console.error("Error parsing CPU time:", e);
+          }
+        }
         if (memMatch) memoryKb = parseInt(memMatch[1], 10);
 
         // Clean stderr for reporting

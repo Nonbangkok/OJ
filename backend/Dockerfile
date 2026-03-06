@@ -22,6 +22,9 @@ RUN npm install
 # Copy the rest of your app's source code from the 'backend' directory
 COPY . .
 
+# Compile the high-precision time wrapper
+RUN gcc scripts/time_wrapper.c -o scripts/time_wrapper
+
 # Render will automatically set the PORT environment variable, so we just need to expose it.
 EXPOSE 3000
 
