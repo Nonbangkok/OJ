@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import Admin from '../../pages/Admin';
+import Admin from '../../pages/admin/Admin';
 import authService from '../../services/authService';
 
 jest.mock('../../services/authService');

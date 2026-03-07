@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import Problems from '../../pages/Problems';
+import Problems from '../../pages/problem/Problems';
 import problemService from '../../services/problemService';
 
 jest.mock('../../services/problemService');

@@ -9,19 +9,19 @@ import ContestLayout from './layouts/contest/ContestLayout';
 import AdminLayout from './layouts/admin/AdminLayout';
 
 // Pages
-import Home from './pages/Home';
-import Problems from './pages/Problems';
-import ProblemDetail from './pages/ProblemDetail';
-import Scoreboard from './pages/Scoreboard';
-import Submissions from './pages/Submissions';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Admin from './pages/Admin';
-import Contests from './pages/Contests';
-import ContestDetail from './pages/ContestDetail';
-import ContestProblems from './pages/ContestProblems';
-import ContestSubmissions from './pages/ContestSubmissions';
-import ContestScoreboard from './pages/ContestScoreboard';
+import Home from './pages/home/Home';
+import Problems from './pages/problem/Problems';
+import ProblemDetail from './pages/problem/ProblemDetail';
+import Scoreboard from './pages/scoreboard/Scoreboard';
+import Submissions from './pages/submission/Submissions';
+import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
+import Admin from './pages/admin/Admin';
+import Contests from './pages/contest/Contests';
+import ContestDetail from './pages/contest/ContestDetail';
+import ContestProblems from './pages/contest/ContestProblems';
+import ContestSubmissions from './pages/contest/ContestSubmissions';
+import ContestScoreboard from './pages/contest/ContestScoreboard';
 import { SettingsProvider } from './context/SettingsContext';
 
 // Admin Pages

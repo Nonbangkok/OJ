@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import Scoreboard from '../../pages/Scoreboard';
+import Scoreboard from '../../pages/scoreboard/Scoreboard';
 import scoreboardService from '../../services/scoreboardService';
 
 jest.mock('../../services/scoreboardService');

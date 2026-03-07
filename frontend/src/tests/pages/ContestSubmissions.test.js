@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import ContestSubmissions from '../../pages/ContestSubmissions';
+import ContestSubmissions from '../../pages/contest/ContestSubmissions';
 import contestService from '../../services/contestService';
 import submissionService from '../../services/submissionService';
 import authService from '../../services/authService';
