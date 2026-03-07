@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import api from '../services/api';
+import contestService from '../services/contestService';
 import styles from './ContestScoreboard.module.css';
 import tableStyles from '../components/common/Table.module.css';
 
@@ -33,14 +33,14 @@ const ContestScoreboard = () => {
       setLoading(true);
 
       // Fetch contest details and scoreboard in parallel
-      const [contestResponse, scoreboardDataResponse] = await Promise.all([
-        api.get(`/contests/${contestId}`),
-        api.get(`/contests/${contestId}/scoreboard`)
+      const [contestData, scoreboardData] = await Promise.all([
+        contestService.getById(contestId),
+        contestService.getScoreboard(contestId)
       ]);
 
-      setContest(contestResponse.data);
-      setScoreboard(scoreboardDataResponse.data.scoreboard);
-      setProblems(scoreboardDataResponse.data.problems || []);
+      setContest(contestData);
+      setScoreboard(scoreboardData.scoreboard);
+      setProblems(scoreboardData.problems || []);
       setLastUpdate(new Date());
 
     } catch (err) {
@@ -59,10 +59,10 @@ const ContestScoreboard = () => {
 
   const fetchScoreboard = async () => {
     try {
-      const response = await api.get(`/contests/${contestId}/scoreboard`);
+      const data = await contestService.getScoreboard(contestId);
 
       // The response will always have scoreboard and problems, but we only need to update the scoreboard on refresh.
-      setScoreboard(response.data.scoreboard);
+      setScoreboard(data.scoreboard);
       setLastUpdate(new Date());
     } catch (err) {
       console.error('Error refreshing scoreboard:', err);

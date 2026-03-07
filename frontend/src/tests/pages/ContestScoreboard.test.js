@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import ContestScoreboard from '../../pages/ContestScoreboard';
-import api from '../../services/api';
+import contestService from '../../services/contestService';
 
-jest.mock('../../services/api');
+jest.mock('../../services/contestService');
 jest.mock('react-router-dom', () => ({
     ...jest.requireActual('react-router-dom'),
     useParams: () => ({ contestId: 'contest-1' }),
@@ -15,7 +15,8 @@ describe('ContestScoreboard Page', () => {
     });
 
     it('displays loading state', () => {
-        api.get.mockReturnValue(new Promise(() => {}));
+        contestService.getById.mockReturnValue(new Promise(() => { }));
+        contestService.getScoreboard.mockReturnValue(new Promise(() => { }));
 
         render(
             <BrowserRouter>
@@ -32,9 +33,9 @@ describe('ContestScoreboard Page', () => {
             scoreboard: [{ user_id: 1, username: 'user1', total_score: 100, detailed_scores: {} }],
             problems: [{ problem_id: 'P1' }],
         };
-        api.get
-            .mockResolvedValueOnce({ data: mockContest })
-            .mockResolvedValueOnce({ data: mockScoreboardData });
+
+        contestService.getById.mockResolvedValueOnce(mockContest);
+        contestService.getScoreboard.mockResolvedValueOnce(mockScoreboardData);
 
         render(
             <BrowserRouter>
@@ -47,10 +48,14 @@ describe('ContestScoreboard Page', () => {
             expect(screen.getByText('user1')).toBeInTheDocument();
             expect(screen.getByText('100')).toBeInTheDocument();
         });
+
+        expect(contestService.getById).toHaveBeenCalledWith('contest-1');
+        expect(contestService.getScoreboard).toHaveBeenCalledWith('contest-1');
     });
 
     it('displays error when contest not found', async () => {
-        api.get.mockRejectedValueOnce({ response: { status: 404 } });
+        contestService.getById.mockRejectedValueOnce({ response: { status: 404 } });
+        contestService.getScoreboard.mockResolvedValueOnce({ scoreboard: [], problems: [] });
 
         render(
             <BrowserRouter>

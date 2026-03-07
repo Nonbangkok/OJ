@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { NavLink, useParams, useNavigate, useLocation } from 'react-router-dom';
-import api from '../../services/api';
+import contestService from '../../services/contestService';
 import styles from './ContestNavbar.module.css';
 import { useAuth } from '../../context/AuthContext';
 import ThemeToggleButton from '../../components/common/ThemeToggleButton';
@@ -22,8 +22,8 @@ const ContestNavbar = () => {
   useEffect(() => {
     const fetchContestDetails = async () => {
       try {
-        const response = await api.get(`/contests/${contestId}`);
-        setContest(response.data);
+        const data = await contestService.getById(contestId);
+        setContest(data);
       } catch (error) {
         console.error("Failed to fetch contest details", error);
       }

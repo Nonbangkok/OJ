@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import api from '../../../services/api';
+import adminService from '../../../services/adminService';
 import formStyles from '../../../components/common/Form.module.css';
 import modalStyles from './ModalLayout.module.css';
 
@@ -23,8 +23,8 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
   useEffect(() => {
     const fetchAuthors = async () => {
       try {
-        const response = await api.get('/admin/authors');
-        setAuthors(response.data);
+        const data = await adminService.getAuthors();
+        setAuthors(data);
       } catch (err) {
         console.error("Failed to fetch authors", err);
       }
