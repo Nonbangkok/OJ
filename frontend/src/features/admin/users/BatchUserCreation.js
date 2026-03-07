@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import adminService from '../../../services/adminService';
-import styles from './Management.module.css';
+import styles from '../shared/Management.module.css';
 import formStyles from '../../../components/styles/Form.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 

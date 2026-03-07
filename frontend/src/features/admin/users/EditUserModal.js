@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import formStyles from '../../../components/styles/Form.module.css';
-import modalStyles from './ModalLayout.module.css';
+import modalStyles from '../shared/ModalLayout.module.css';
 
 
 const EditUserModal = ({ user, onClose, onSave }) => {

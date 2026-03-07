@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import adminService from '../../../services/adminService';
 import { useAuth } from '../../../context/AuthContext'; // Import useAuth
 import EditUserModal from './EditUserModal';
-import ConfirmationModal from './ConfirmationModal';
+import ConfirmationModal from '../shared/ConfirmationModal';
 import AddUserModal from './AddUserModal';
 import BatchUserCreation from './BatchUserCreation'; // Import the new component
-import styles from './Management.module.css';
+import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 import { APP_CONSTANTS } from '../../../utils/constants';
 

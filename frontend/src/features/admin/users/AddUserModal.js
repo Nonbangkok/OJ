@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import formStyles from '../../../components/styles/Form.module.css';
-import modalStyles from './ModalLayout.module.css';
+import modalStyles from '../shared/ModalLayout.module.css';
 
 const AddUserModal = ({ isOpen, onClose, onSave }) => {
   const [username, setUsername] = useState('');

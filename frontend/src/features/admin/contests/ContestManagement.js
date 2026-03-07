@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import adminService from '../../../services/adminService';
 import ContestModal from './ContestModal';
-import ProblemMigrationModal from './ProblemMigrationModal';
-import ConfirmationModal from './ConfirmationModal';
-import styles from './Management.module.css';
+import ProblemMigrationModal from '../problems/ProblemMigrationModal';
+import ConfirmationModal from '../shared/ConfirmationModal';
+import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 
 const ContestManagement = ({ currentUser }) => {

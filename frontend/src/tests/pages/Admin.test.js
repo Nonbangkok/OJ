@@ -4,10 +4,10 @@ import Admin from '../../pages/admin/Admin';
 import authService from '../../services/authService';
 
 jest.mock('../../services/authService');
-jest.mock('../../features/admin/components/UserManagement', () => () => <div data-testid="user-management">UserManagement</div>);
-jest.mock('../../features/admin/components/ProblemManagement', () => () => <div data-testid="problem-management">ProblemManagement</div>);
-jest.mock('../../features/admin/components/ContestManagement', () => () => <div data-testid="contest-management">ContestManagement</div>);
-jest.mock('../../features/admin/components/Settings', () => () => <div data-testid="settings">Settings</div>);
+jest.mock('../../features/admin/users/UserManagement', () => () => <div data-testid="user-management">UserManagement</div>);
+jest.mock('../../features/admin/problems/ProblemManagement', () => () => <div data-testid="problem-management">ProblemManagement</div>);
+jest.mock('../../features/admin/contests/ContestManagement', () => () => <div data-testid="contest-management">ContestManagement</div>);
+jest.mock('../../features/admin/settings/Settings', () => () => <div data-testid="settings">Settings</div>);
 
 describe('Admin Page', () => {
     beforeEach(() => {

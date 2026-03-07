@@ -25,10 +25,10 @@ import ContestScoreboard from './pages/contest/ContestScoreboard';
 import { SettingsProvider } from './context/SettingsContext';
 
 // Admin Pages
-import UserManagement from './features/admin/components/UserManagement';
-import ProblemManagement from './features/admin/components/ProblemManagement';
-import ContestManagement from './features/admin/components/ContestManagement';
-import Settings from './features/admin/components/Settings';
+import UserManagement from './features/admin/users/UserManagement';
+import ProblemManagement from './features/admin/problems/ProblemManagement';
+import ContestManagement from './features/admin/contests/ContestManagement';
+import Settings from './features/admin/settings/Settings';
 
 // New layout for standard pages
 const MainLayout = () => (

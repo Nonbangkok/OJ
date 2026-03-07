@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import adminService from '../../../services/adminService';
 import ProblemModal from './ProblemModal';
-import ConfirmationModal from './ConfirmationModal';
-import styles from './Management.module.css';
+import ConfirmationModal from '../shared/ConfirmationModal';
+import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 
 const ProblemManagement = ({ currentUser }) => {

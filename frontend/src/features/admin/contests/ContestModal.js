@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import adminService from '../../../services/adminService';
 import formStyles from '../../../components/styles/Form.module.css';
-import modalStyles from './ModalLayout.module.css';
+import modalStyles from '../shared/ModalLayout.module.css';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
