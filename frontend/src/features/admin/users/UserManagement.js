@@ -106,22 +106,24 @@ const UserManagement = () => {
                 <tr key={user.id}>
                   <td>{user.username}</td>
                   <td>{user.role}</td>
-                  <td className={styles.actions}>
-                    {/* Show buttons if:
+                  <td>
+                    <div className={styles.actions}>
+                      {/* Show buttons if:
                         1. There is a logged-in user (currentUser exists)
                         2. The user in the row is NOT the currently logged-in user
                         3. The username is NOT "APP_CONSTANTS.SYSTEM_ADMIN_USERNAME"
                     */}
-                    {currentUser && user.id !== currentUser.id && user.username !== APP_CONSTANTS.SYSTEM_ADMIN_USERNAME && (
-                      <>
-                        <button onClick={() => handleEdit(user)} className={styles['edit-btn']}>
-                          Edit
-                        </button>
-                        <button onClick={() => handleDeleteClick(user)} className={styles['delete-btn']}>
-                          Delete
-                        </button>
-                      </>
-                    )}
+                      {currentUser && user.id !== currentUser.id && user.username !== APP_CONSTANTS.SYSTEM_ADMIN_USERNAME && (
+                        <>
+                          <button onClick={() => handleEdit(user)} className={styles['edit-btn']}>
+                            Edit
+                          </button>
+                          <button onClick={() => handleDeleteClick(user)} className={styles['delete-btn']}>
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

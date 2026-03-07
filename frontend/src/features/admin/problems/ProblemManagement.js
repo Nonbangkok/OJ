@@ -512,9 +512,11 @@ const ProblemManagement = ({ currentUser }) => {
                     </button>
                   )}
                 </td>
-                <td className={styles.actions}>
-                  <button onClick={() => handleEdit(problem)} className={styles['edit-btn']}>Edit</button>
-                  <button onClick={() => handleDeleteClick(problem.id)} className={styles['delete-btn']}>Delete</button>
+                <td>
+                  <div className={styles.actions}>
+                    <button onClick={() => handleEdit(problem)} className={styles['edit-btn']}>Edit</button>
+                    <button onClick={() => handleDeleteClick(problem.id)} className={styles['delete-btn']}>Delete</button>
+                  </div>
                 </td>
               </tr>
             ))}
