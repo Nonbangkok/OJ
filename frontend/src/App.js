@@ -4,7 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import './App.css';
 
 // Components
-import Navbar from './components/common/Navbar';
+import Navbar from './components/navbar/Navbar';
 import ContestLayout from './layouts/contest/ContestLayout';
 import AdminLayout from './layouts/admin/AdminLayout';
 

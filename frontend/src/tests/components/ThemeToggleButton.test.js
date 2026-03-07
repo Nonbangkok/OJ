@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import ThemeToggleButton from '../../components/common/ThemeToggleButton';
+import ThemeToggleButton from '../../components/shared/ThemeToggleButton';
 
 const mockToggleTheme = jest.fn();
 jest.mock('../../context/ThemeContext', () => ({

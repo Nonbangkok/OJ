@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
-import ThemeToggleButton from './ThemeToggleButton';
+import ThemeToggleButton from '../shared/ThemeToggleButton';
 import styles from './Navbar.module.css';
 import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/logo512.png';

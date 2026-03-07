@@ -6,7 +6,7 @@ import ConfirmationModal from './ConfirmationModal';
 import AddUserModal from './AddUserModal';
 import BatchUserCreation from './BatchUserCreation'; // Import the new component
 import styles from './Management.module.css';
-import tableStyles from '../../../components/common/Table.module.css';
+import tableStyles from '../../../components/styles/Table.module.css';
 import { APP_CONSTANTS } from '../../../utils/constants';
 
 const UserManagement = () => {

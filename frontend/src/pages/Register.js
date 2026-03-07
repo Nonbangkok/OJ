@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import authService from '../services/authService';
 import { useSettings } from '../context/SettingsContext';
-import styles from '../components/common/Form.module.css';
+import styles from '../components/styles/Form.module.css';
 
 const Register = () => {
   const [username, setUsername] = useState('');

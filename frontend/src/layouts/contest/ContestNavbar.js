@@ -3,7 +3,7 @@ import { NavLink, useParams, useNavigate, useLocation } from 'react-router-dom';
 import contestService from '../../services/contestService';
 import styles from './ContestNavbar.module.css';
 import { useAuth } from '../../context/AuthContext';
-import ThemeToggleButton from '../../components/common/ThemeToggleButton';
+import ThemeToggleButton from '../../components/shared/ThemeToggleButton';
 import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/logo512.png';
 import darkmodeLogo from '../../assets/logo512_darkmode.png';

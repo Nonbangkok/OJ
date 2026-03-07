@@ -7,8 +7,8 @@ import cpp from 'highlight.js/lib/languages/cpp';
 import 'highlight.js/styles/atom-one-dark.css';
 
 import styles from './SubmissionModal.module.css';
-import editorStyles from '../../../components/common/CodeEditor.module.css';
-import tableStyles from '../../../components/common/Table.module.css';
+import editorStyles from '../../../components/styles/CodeEditor.module.css';
+import tableStyles from '../../../components/styles/Table.module.css';
 
 // Register C++ language
 hljs.registerLanguage('cpp', cpp);

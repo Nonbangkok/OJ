@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import adminService from '../../../services/adminService';
-import formStyles from '../../../components/common/Form.module.css';
+import formStyles from '../../../components/styles/Form.module.css';
 import modalStyles from './ModalLayout.module.css';
 
 const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {

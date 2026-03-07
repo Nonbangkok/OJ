@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import scoreboardService from '../services/scoreboardService';
-import tableStyles from '../components/common/Table.module.css';
+import tableStyles from '../components/styles/Table.module.css';
 import styles from './Scoreboard.module.css';
 
 const Scoreboard = () => {

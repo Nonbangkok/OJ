@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import contestService from '../services/contestService';
 import styles from './ContestScoreboard.module.css';
-import tableStyles from '../components/common/Table.module.css';
+import tableStyles from '../components/styles/Table.module.css';
 
 const ContestScoreboard = () => {
   const { contestId } = useParams();

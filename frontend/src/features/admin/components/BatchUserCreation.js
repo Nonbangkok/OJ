@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import api from '../../../services/api';
 import styles from './Management.module.css';
-import formStyles from '../../../components/common/Form.module.css';
-import tableStyles from '../../../components/common/Table.module.css';
+import formStyles from '../../../components/styles/Form.module.css';
+import tableStyles from '../../../components/styles/Table.module.css';
 
 const BatchUserCreation = ({ onUsersCreated }) => {
   const [prefix, setPrefix] = useState('');

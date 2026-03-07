@@ -3,7 +3,7 @@ import adminService from '../../../services/adminService';
 import ProblemModal from './ProblemModal';
 import ConfirmationModal from './ConfirmationModal';
 import styles from './Management.module.css';
-import tableStyles from '../../../components/common/Table.module.css';
+import tableStyles from '../../../components/styles/Table.module.css';
 
 const ProblemManagement = ({ currentUser }) => {
   const [problems, setProblems] = useState([]);

@@ -9,8 +9,8 @@ import cpp from 'highlight.js/lib/languages/cpp';
 // Import highlight.js theme CSS globally
 import 'highlight.js/styles/atom-one-dark.css';
 
-import editorStyles from '../../../components/common/CodeEditor.module.css';
-import formStyles from '../../../components/common/Form.module.css';
+import editorStyles from '../../../components/styles/CodeEditor.module.css';
+import formStyles from '../../../components/styles/Form.module.css';
 import styles from './CodeSubmissionForm.module.css';
 import submissionService from '../../../services/submissionService';
 

@@ -4,7 +4,7 @@ import ContestModal from './ContestModal';
 import ProblemMigrationModal from './ProblemMigrationModal';
 import ConfirmationModal from './ConfirmationModal';
 import styles from './Management.module.css';
-import tableStyles from '../../../components/common/Table.module.css';
+import tableStyles from '../../../components/styles/Table.module.css';
 
 const ContestManagement = ({ currentUser }) => {
   const [contests, setContests] = useState([]);
