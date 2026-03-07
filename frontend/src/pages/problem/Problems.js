@@ -1,31 +1,17 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import styles from './Problems.module.css';
-import { formatTimeAgo, formatDateAbsolute, generateResultString } from '../utils/formatters';
-import { useContestGuard } from '../hooks/useContestGuard';
-import { useProblems } from '../hooks/useProblems';
+import { useProblems } from '../../hooks/useProblems';
+import { formatTimeAgo, formatDateAbsolute, generateResultString } from '../../utils/formatters';
 
-const ContestProblems = () => {
-  const { contestId } = useParams();
+const Problems = () => {
+  const { problems, loading, error } = useProblems();
 
-  // Contest access guard — handles redirect logic and polling
-  const { isAccessible, loading: guardLoading, error: guardError } = useContestGuard(contestId);
-
-  // Fetch contest problems using the shared hook
-  const { problems, loading: problemsLoading, error: problemsError } = useProblems(
-    isAccessible ? contestId : null
-  );
-
-  if (!contestId) {
-    return <div className="error-message">Error: No Contest ID specified in the URL.</div>;
-  }
-
-  if (guardLoading || problemsLoading) return <div>Loading problems...</div>;
-  if (guardError) return <div className="error-message">{guardError}</div>;
-  if (problemsError) return <div className="error-message">{problemsError}</div>;
+  if (loading) return <div>Loading problems...</div>;
+  if (error) return <div className="error-message">{error}</div>;
 
   return (
     <div className={styles['problems-page-container']}>
-      <h1>Contest Problems</h1>
+      <h1>All Problems</h1>
       <div className={styles['problem-list']}>
         {problems.map(problem => {
           const hasSubmitted = problem.submission_count > 0;
@@ -67,7 +53,7 @@ const ContestProblems = () => {
                 )}
               </div>
 
-              <Link to={`/contests/${contestId}/problems/${problem.id}`} className={`${styles['problem-action-btn']} ${hasSubmitted ? styles.edit : styles.new}`}>
+              <Link to={`/problems/${problem.id}`} className={`${styles['problem-action-btn']} ${hasSubmitted ? styles.edit : styles.new}`}>
                 {hasSubmitted ? 'Edit' : 'New'}
               </Link>
             </div>
@@ -78,4 +64,4 @@ const ContestProblems = () => {
   );
 };
 
-export default ContestProblems;
+export default Problems; 

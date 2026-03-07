@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import styles from './ProblemDetail.module.css';
-import CodeSubmissionForm from '../features/problems/components/CodeSubmissionForm';
-import Submissions from './Submissions';
-import problemService from '../services/problemService';
-import { useProblemDetail } from '../hooks/useProblemDetail';
-import { generateResultString, getStatusClass } from '../utils/formatters';
+import CodeSubmissionForm from '../../features/problems/components/CodeSubmissionForm';
+import Submissions from '../submission/Submissions';
+import problemService from '../../services/problemService';
+import { useProblemDetail } from '../../hooks/useProblemDetail';
+import { generateResultString, getStatusClass } from '../../utils/formatters';
 
 const ProblemDetail = () => {
   const {

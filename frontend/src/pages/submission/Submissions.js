@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import styles from '../components/styles/Submissions.module.css';
-import SubmissionModal from '../features/problems/components/SubmissionModal';
-import { useSubmissions } from '../hooks/useSubmissions';
-import { getStatusClass } from '../utils/formatters';
-import tableStyles from '../components/styles/Table.module.css';
+import styles from '../../components/styles/Submissions.module.css';
+import SubmissionModal from '../../features/problems/components/SubmissionModal';
+import { useSubmissions } from '../../hooks/useSubmissions';
+import { getStatusClass } from '../../utils/formatters';
+import tableStyles from '../../components/styles/Table.module.css';
 
 const Submissions = ({ problemId, showTitle = true }) => {
   const { contestId } = useParams();

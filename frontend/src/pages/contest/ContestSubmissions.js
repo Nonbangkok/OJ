@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import styles from '../components/styles/Submissions.module.css';
-import SubmissionModal from '../features/problems/components/SubmissionModal';
-import { useSubmissions } from '../hooks/useSubmissions';
-import { getStatusClass, canViewCode, formatDateTime } from '../utils/formatters';
-import tableStyles from '../components/styles/Table.module.css';
-import { useAuth } from '../context/AuthContext';
-import { useContestGuard } from '../hooks/useContestGuard';
+import styles from '../../components/styles/Submissions.module.css';
+import SubmissionModal from '../../features/problems/components/SubmissionModal';
+import { useSubmissions } from '../../hooks/useSubmissions';
+import { getStatusClass, canViewCode, formatDateTime } from '../../utils/formatters';
+import tableStyles from '../../components/styles/Table.module.css';
+import { useAuth } from '../../context/AuthContext';
+import { useContestGuard } from '../../hooks/useContestGuard';
 
 const ContestSubmissions = () => {
     const { contestId } = useParams();

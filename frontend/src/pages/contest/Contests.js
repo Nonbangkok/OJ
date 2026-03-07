@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import styles from './Contests.module.css';
-import contestService from '../services/contestService';
-import { formatDateTime } from '../utils/formatters';
+import contestService from '../../services/contestService';
+import { formatDateTime } from '../../utils/formatters';
 
 const Contests = () => {
   const [contests, setContests] = useState([]);

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import styles from './ContestDetail.module.css';
-import contestService from '../services/contestService';
-import { formatDateTime, getRemainingTime } from '../utils/formatters';
+import contestService from '../../services/contestService';
+import { formatDateTime, getRemainingTime } from '../../utils/formatters';
 
 const ContestDetail = () => {
   const { contestId } = useParams();

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useSettings } from '../context/SettingsContext';
-import styles from '../components/styles/Form.module.css';
-import authService from '../services/authService';
+import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
+import styles from '../../components/styles/Form.module.css';
+import authService from '../../services/authService';
 
 const Login = () => {
   const [username, setUsername] = useState('');
