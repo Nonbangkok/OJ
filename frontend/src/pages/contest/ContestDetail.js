@@ -77,8 +77,6 @@ const ContestDetail = () => {
     }
   };
 
-
-
   if (loading) {
     return (
       <div className={styles.container}>
