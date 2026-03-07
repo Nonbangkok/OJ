@@ -22,6 +22,10 @@ const adminService = {
         const response = await api.delete(`/admin/users/${userId}`);
         return response.data;
     },
+    createBatchUsers: async (batchData) => {
+        const response = await api.post('/admin/users/batch', batchData);
+        return response.data;
+    },
 
     // Problem Management
     getProblems: async () => {

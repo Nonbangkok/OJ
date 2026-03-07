@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import api from '../../../services/api';
+import adminService from '../../../services/adminService';
 import styles from './Management.module.css';
 import formStyles from '../../../components/styles/Form.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
@@ -45,11 +45,8 @@ const BatchUserCreation = ({ onUsersCreated }) => {
     }
 
     try {
-      const response = await api.post(
-        '/admin/users/batch',
-        { prefix, count: Number(count) }
-      );
-      setCreatedUsers(response.data.users);
+      const data = await adminService.createBatchUsers({ prefix, count: Number(count) });
+      setCreatedUsers(data.users);
       // We do NOT call onUsersCreated() here to prevent the results table from disappearing.
       // The admin can manually refresh the page to see the updated main user list.
     } catch (err) {
