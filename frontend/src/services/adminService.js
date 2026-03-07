@@ -14,6 +14,10 @@ const adminService = {
         const response = await api.put(`/admin/users/${userId}`, userData);
         return response.data;
     },
+    getAuthors: async () => {
+        const response = await api.get('/admin/authors');
+        return response.data;
+    },
     deleteUser: async (userId) => {
         const response = await api.delete(`/admin/users/${userId}`);
         return response.data;
