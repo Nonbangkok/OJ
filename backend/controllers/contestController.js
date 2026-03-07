@@ -6,7 +6,7 @@ const { requireAuth, requireStaffOrAdmin } = require('../middleware/auth');
 const router = express.Router();
 
 // List all contests
-router.get('/', async (req, res) => {
+router.get('/contests', async (req, res) => {
   const { userId } = req.session;
 
   try {
@@ -83,7 +83,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get problems available for contest (Admin)
-router.get('/available-problems', requireAuth, requireStaffOrAdmin, async (req, res) => {
+router.get('/admin/contests/available-problems', requireAuth, requireStaffOrAdmin, async (req, res) => {
   try {
     const problems = await problemMigration.getAvailableProblemsForContest();
     res.json(problems);
@@ -94,7 +94,7 @@ router.get('/available-problems', requireAuth, requireStaffOrAdmin, async (req, 
 });
 
 // Get contest details
-router.get('/:id', async (req, res) => {
+router.get('/contests/:id', async (req, res) => {
   const { id } = req.params;
   const { userId } = req.session;
 
@@ -160,7 +160,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Join a contest
-router.post('/:id/join', requireAuth, async (req, res) => {
+router.post('/contests/:id/join', requireAuth, async (req, res) => {
   const { id } = req.params;
   const { userId } = req.session;
 
@@ -208,7 +208,7 @@ router.post('/:id/join', requireAuth, async (req, res) => {
 });
 
 // Get contest scoreboard
-router.get('/:id/scoreboard', requireAuth, async (req, res) => {
+router.get('/contests/:id/scoreboard', requireAuth, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -331,7 +331,7 @@ router.get('/:id/scoreboard', requireAuth, async (req, res) => {
 });
 
 // Create new contest (Admin only)
-router.post('/', requireAuth, requireStaffOrAdmin, [
+router.post('/admin/contests', requireAuth, requireStaffOrAdmin, [
   body('title').isLength({ min: 1 }).trim(),
   body('description').optional().trim(),
   body('startTime').isISO8601().toDate(),
@@ -367,7 +367,7 @@ router.post('/', requireAuth, requireStaffOrAdmin, [
 });
 
 // Update contest (Admin only)
-router.put('/:id', requireAuth, requireStaffOrAdmin, [
+router.put('/admin/contests/:id', requireAuth, requireStaffOrAdmin, [
   body('title').isLength({ min: 1 }).trim(),
   body('description').optional().trim(),
   body('startTime').isISO8601().toDate(),
@@ -408,7 +408,7 @@ router.put('/:id', requireAuth, requireStaffOrAdmin, [
 });
 
 // Delete contest (Admin only)
-router.delete('/:id', requireAuth, requireStaffOrAdmin, async (req, res) => {
+router.delete('/admin/contests/:id', requireAuth, requireStaffOrAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -441,7 +441,7 @@ router.delete('/:id', requireAuth, requireStaffOrAdmin, async (req, res) => {
 });
 
 // Get problems in contest (Admin)
-router.get('/:id/admin-problems', requireAuth, requireStaffOrAdmin, async (req, res) => {
+router.get('/admin/contests/:id/admin-problems', requireAuth, requireStaffOrAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -455,7 +455,7 @@ router.get('/:id/admin-problems', requireAuth, requireStaffOrAdmin, async (req, 
 
 
 // Move problems to/from contest (Admin)
-router.post('/:id/problems', requireAuth, requireStaffOrAdmin, [
+router.post('/admin/contests/:id/problems', requireAuth, requireStaffOrAdmin, [
   body('problemIds').isArray({ min: 1 }).withMessage('Must provide at least one problem ID'),
   body('problemIds.*').isString().trim().escape(),
   body('action').isIn(['move_to_contest', 'move_to_main']).withMessage('Action must be move_to_contest or move_to_main')
@@ -483,7 +483,7 @@ router.post('/:id/problems', requireAuth, requireStaffOrAdmin, [
 });
 
 // Move problem back to main system
-router.delete('/:id/problems/:problemId', requireAuth, requireStaffOrAdmin, async (req, res) => {
+router.delete('/admin/contests/:id/problems/:problemId', requireAuth, requireStaffOrAdmin, async (req, res) => {
   const { id, problemId } = req.params;
 
   try {
@@ -523,7 +523,7 @@ router.delete('/:id/problems/:problemId', requireAuth, requireStaffOrAdmin, asyn
 });
 
 // Get contest problems for participants (User endpoint)
-router.get('/:id/problems', requireAuth, async (req, res) => {
+router.get('/contests/:id/problems', requireAuth, async (req, res) => {
   const { id } = req.params;
   const { userId } = req.session;
 
@@ -618,7 +618,7 @@ router.get('/:id/problems', requireAuth, async (req, res) => {
 });
 
 // Get a single contest problem
-router.get('/:id/problems/:problemId', requireAuth, async (req, res) => {
+router.get('/contests/:id/problems/:problemId', requireAuth, async (req, res) => {
   const { id: contestId, problemId } = req.params;
   const { userId } = req.session;
 
@@ -671,7 +671,7 @@ router.get('/:id/problems/:problemId', requireAuth, async (req, res) => {
 });
 
 // Get a single contest problem's PDF
-router.get('/:id/problems/:problemId/pdf', requireAuth, async (req, res) => {
+router.get('/contests/:id/problems/:problemId/pdf', requireAuth, async (req, res) => {
   const { id: contestId, problemId } = req.params;
   const { userId } = req.session;
 
