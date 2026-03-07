@@ -79,6 +79,7 @@ router.get('/problems', async (req, res) => {
   }
 });
 
+// Public details
 router.get('/problems/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -105,6 +106,23 @@ router.get('/problems/:id', async (req, res) => {
     res.json(isStaffOrAdmin ? result.rows[0] : problemData);
   } catch (error) {
     console.error(`Error fetching problem ${id}:`, error);
+    res.status(500).json({ message: 'Error fetching problem details' });
+  }
+});
+
+// Admin details - guaranteed to return everything
+router.get('/admin/problems/:id', requireAuth, requireStaffOrAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await db.query('SELECT id, title, author, time_limit_ms, memory_limit_mb, is_visible, (problem_pdf IS NOT NULL) as has_pdf FROM problems WHERE id = $1', [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Problem not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(`Error fetching admin problem ${id}:`, error);
     res.status(500).json({ message: 'Error fetching problem details' });
   }
 });
