@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Scoreboard from '../../pages/Scoreboard';
-import api from '../../services/api';
+import scoreboardService from '../../services/scoreboardService';
 
-jest.mock('../../services/api');
+jest.mock('../../services/scoreboardService');
 
 describe('Scoreboard Page', () => {
     beforeEach(() => {
@@ -11,27 +11,37 @@ describe('Scoreboard Page', () => {
     });
 
     it('renders loading state initially', () => {
-        api.get.mockReturnValue(new Promise(() => { }));
+        scoreboardService.getGlobal.mockReturnValue(new Promise(() => { }));
         render(<BrowserRouter><Scoreboard /></BrowserRouter>);
         expect(screen.getByText(/loading scoreboard/i)).toBeInTheDocument();
     });
 
-    it('displays scoreboard data on success', async () => {
+    it('displays scoreboard data with rank emojis on success', async () => {
         const mockScoreboard = [
-            { username: 'testuser', total_score: 100, problems_solved: 1 }
+            { username: 'topuser', total_score: 100, problems_solved: 5 },
+            { username: 'seconduser', total_score: 80, problems_solved: 4 },
+            { username: 'thirduser', total_score: 60, problems_solved: 3 },
+            { username: 'regularuser', total_score: 40, problems_solved: 2 }
         ];
-        api.get.mockResolvedValueOnce({ data: mockScoreboard });
+        scoreboardService.getGlobal.mockResolvedValueOnce(mockScoreboard);
 
         render(<BrowserRouter><Scoreboard /></BrowserRouter>);
 
         await waitFor(() => {
-            expect(screen.getByText('testuser')).toBeInTheDocument();
-            expect(screen.getByText('100')).toBeInTheDocument();
+            // Check for names
+            expect(screen.getByText(/topuser/)).toBeInTheDocument();
+            expect(screen.getByText(/seconduser/)).toBeInTheDocument();
+            expect(screen.getByText(/thirduser/)).toBeInTheDocument();
+
+            // Check for emojis (🥇, 🥈, 🥉)
+            expect(screen.getByText(/🥇 topuser/)).toBeInTheDocument();
+            expect(screen.getByText(/🥈 seconduser/)).toBeInTheDocument();
+            expect(screen.getByText(/🥉 thirduser/)).toBeInTheDocument();
         });
     });
 
     it('handles fetch error gracefully', async () => {
-        api.get.mockRejectedValueOnce(new Error('Fetch error'));
+        scoreboardService.getGlobal.mockRejectedValueOnce(new Error('Fetch error'));
 
         render(<BrowserRouter><Scoreboard /></BrowserRouter>);
 
