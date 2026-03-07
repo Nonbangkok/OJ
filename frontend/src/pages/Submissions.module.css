@@ -121,3 +121,8 @@ a:hover {
   background-color: var(--background-tertiary);
   transform: translateY(-1px);
 }
+
+.filter-input-wrapper {
+  position: relative;
+  align-content: center;
+}

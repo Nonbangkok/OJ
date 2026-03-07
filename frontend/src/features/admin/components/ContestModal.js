@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '../../../services/api';
+import adminService from '../../../services/adminService';
 import formStyles from '../../../components/common/Form.module.css';
 import modalStyles from './ModalLayout.module.css';
 import DatePicker from 'react-datepicker';
@@ -83,10 +83,10 @@ const ContestModal = ({ contest, onClose, onSuccess }) => {
 
       if (contest) {
         // Update existing contest
-        await api.put(`/admin/contests/${contest.id}`, contestData);
+        await adminService.updateContest(contest.id, contestData);
       } else {
         // Create new contest
-        await api.post('/admin/contests', contestData);
+        await adminService.createContest(contestData);
       }
 
       onSuccess();

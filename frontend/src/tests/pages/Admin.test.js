@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Admin from '../../pages/Admin';
-import api from '../../services/api';
+import authService from '../../services/authService';
 
-jest.mock('../../services/api');
+jest.mock('../../services/authService');
 jest.mock('../../features/admin/components/UserManagement', () => () => <div data-testid="user-management">UserManagement</div>);
 jest.mock('../../features/admin/components/ProblemManagement', () => () => <div data-testid="problem-management">ProblemManagement</div>);
 jest.mock('../../features/admin/components/ContestManagement', () => () => <div data-testid="contest-management">ContestManagement</div>);
@@ -15,7 +15,7 @@ describe('Admin Page', () => {
     });
 
     it('displays loading state initially', () => {
-        api.get.mockReturnValue(new Promise(() => {}));
+        authService.checkLogin.mockReturnValue(new Promise(() => { }));
 
         render(
             <BrowserRouter>
@@ -27,8 +27,8 @@ describe('Admin Page', () => {
     });
 
     it('displays admin panel and sections for admin user', async () => {
-        api.get.mockResolvedValueOnce({
-            data: { isAuthenticated: true, user: { username: 'admin', role: 'admin' } },
+        authService.checkLogin.mockResolvedValueOnce({
+            isAuthenticated: true, user: { username: 'admin', role: 'admin' }
         });
 
         render(
@@ -47,8 +47,8 @@ describe('Admin Page', () => {
     });
 
     it('displays only staff sections for staff user', async () => {
-        api.get.mockResolvedValueOnce({
-            data: { isAuthenticated: true, user: { username: 'staff', role: 'staff' } },
+        authService.checkLogin.mockResolvedValueOnce({
+            isAuthenticated: true, user: { username: 'staff', role: 'staff' }
         });
 
         render(
@@ -67,8 +67,8 @@ describe('Admin Page', () => {
     });
 
     it('displays nothing for regular user', async () => {
-        api.get.mockResolvedValueOnce({
-            data: { isAuthenticated: true, user: { username: 'user', role: 'user' } },
+        authService.checkLogin.mockResolvedValueOnce({
+            isAuthenticated: true, user: { username: 'user', role: 'user' }
         });
 
         render(

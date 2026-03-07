@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '../../../services/api';
+import adminService from '../../../services/adminService';
 import styles from './Settings.module.css'; // Updated CSS import
 import { useSettings } from '../../../context/SettingsContext';
 
@@ -21,8 +21,8 @@ const Settings = () => { // Renamed component
   useEffect(() => {
     const fetchRegistrationSettings = async () => {
       try {
-        const response = await api.get('/admin/settings/registration');
-        setIsRegistrationEnabled(response.data.enabled);
+        const data = await adminService.getRegistrationSettings();
+        setIsRegistrationEnabled(data.enabled);
       } catch (err) {
         setRegistrationError('Failed to fetch registration settings.');
       } finally {
@@ -37,9 +37,7 @@ const Settings = () => { // Renamed component
     setRegistrationSuccess('');
     const newStatus = !isRegistrationEnabled;
     try {
-      await api.put('/admin/settings/registration',
-        { enabled: newStatus }
-      );
+      await adminService.updateRegistrationSettings(newStatus);
       setIsRegistrationEnabled(newStatus);
       setRegistrationSuccess(`Registration has been ${newStatus ? 'enabled' : 'disabled'}.`);
       await refreshSettings();
@@ -54,9 +52,7 @@ const Settings = () => { // Renamed component
     setDatabaseError('');
     setDatabaseSuccess('');
     try {
-      const response = await api.post('/admin/database/export', {}, {
-        responseType: 'blob', // Important for downloading files
-      });
+      const response = await adminService.exportDatabase();
 
       // Create a blob from the response
       const blob = new Blob([response.data], { type: 'application/sql' });
@@ -110,11 +106,7 @@ const Settings = () => { // Renamed component
     formData.append('databaseDump', databaseFile);
 
     try {
-      await api.post('/admin/database/import', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      await adminService.importDatabase(formData);
       setDatabaseSuccess('Database imported successfully! You may need to refresh or re-login.');
       setDatabaseFile(null); // Clear selected file
       setTimeout(() => setDatabaseSuccess(''), 5000);

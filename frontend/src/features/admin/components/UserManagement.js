@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '../../../services/api';
+import adminService from '../../../services/adminService';
 import { useAuth } from '../../../context/AuthContext'; // Import useAuth
 import EditUserModal from './EditUserModal';
 import ConfirmationModal from './ConfirmationModal';
@@ -7,6 +7,7 @@ import AddUserModal from './AddUserModal';
 import BatchUserCreation from './BatchUserCreation'; // Import the new component
 import styles from './Management.module.css';
 import tableStyles from '../../../components/common/Table.module.css';
+import { APP_CONSTANTS } from '../../../utils/constants';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -20,8 +21,8 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/admin/users');
-      setUsers(response.data);
+      const data = await adminService.getUsers();
+      setUsers(data);
     } catch (err) {
       setError('Failed to fetch users.');
       console.error(err);
@@ -45,7 +46,7 @@ const UserManagement = () => {
   const handleConfirmDelete = async () => {
     if (deletingUser) {
       try {
-        await api.delete(`/admin/users/${deletingUser.id}`);
+        await adminService.deleteUser(deletingUser.id);
         setUsers(users.filter(user => user.id !== deletingUser.id));
       } catch (err) {
         setError('Failed to delete user.');
@@ -58,7 +59,7 @@ const UserManagement = () => {
 
   const handleSave = async (userId, userData) => {
     try {
-      await api.put(`/admin/users/${userId}`, userData);
+      await adminService.updateUser(userId, userData);
       setEditingUser(null);
       fetchUsers(); // Refresh the user list
     } catch (err) {
@@ -69,7 +70,7 @@ const UserManagement = () => {
 
   const handleAddNewUser = async (newUserData) => {
     try {
-      await api.post('/admin/users', newUserData);
+      await adminService.createUser(newUserData);
       setIsAddModalOpen(false);
       fetchUsers(); // Refresh the user list
     } catch (err) {
@@ -109,9 +110,9 @@ const UserManagement = () => {
                     {/* Show buttons if:
                         1. There is a logged-in user (currentUser exists)
                         2. The user in the row is NOT the currently logged-in user
-                        3. The username is NOT "Nonbangkok"
+                        3. The username is NOT "APP_CONSTANTS.SYSTEM_ADMIN_USERNAME"
                     */}
-                    {currentUser && user.id !== currentUser.id && user.username !== 'Nonbangkok' && (
+                    {currentUser && user.id !== currentUser.id && user.username !== APP_CONSTANTS.SYSTEM_ADMIN_USERNAME && (
                       <>
                         <button onClick={() => handleEdit(user)} className={styles['edit-btn']}>
                           Edit

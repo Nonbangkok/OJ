@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import api from '../services/api';
+import authService from '../services/authService';
 import { useSettings } from '../context/SettingsContext';
 import styles from '../components/common/Form.module.css';
 
@@ -27,10 +27,7 @@ const Register = () => {
     }
 
     try {
-      await api.post('/register', {
-        username,
-        password,
-      });
+      await authService.register(username, password);
       setSuccess('Registration successful! Please log in.');
       navigate('/login');
     } catch (err) {

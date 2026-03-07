@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '../../../services/api';
+import adminService from '../../../services/adminService';
 import ContestModal from './ContestModal';
 import ProblemMigrationModal from './ProblemMigrationModal';
 import ConfirmationModal from './ConfirmationModal';
@@ -28,8 +28,8 @@ const ContestManagement = ({ currentUser }) => {
   const fetchContests = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/admin/contests');
-      setContests(response.data);
+      const data = await adminService.getContests();
+      setContests(data);
     } catch (err) {
       console.error('Error fetching contests:', err);
       setError('Failed to load contests');
@@ -41,7 +41,7 @@ const ContestManagement = ({ currentUser }) => {
   const handleDelete = async () => {
     if (contestToDelete) {
       try {
-        await api.delete(`/admin/contests/${contestToDelete}`);
+        await adminService.deleteContest(contestToDelete);
         fetchContests();
         setIsConfirmModalOpen(false);
         setContestToDelete(null);

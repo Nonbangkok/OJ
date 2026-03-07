@@ -83,7 +83,7 @@ const Submissions = ({ problemId, showTitle = true }) => {
               {/* Admin/Staff Filters */}
               {currentUser && (currentUser.role === 'admin' || currentUser.role === 'staff') && (
                 <>
-                  <div style={{ position: 'relative', alignContent: 'center' }} ref={problemInputRef}>
+                  <div className={styles['filter-input-wrapper']} ref={problemInputRef}>
                     <input
                       type="text"
                       placeholder="Filter by Problem ID"
@@ -103,7 +103,7 @@ const Submissions = ({ problemId, showTitle = true }) => {
                     )}
                   </div>
 
-                  <div style={{ position: 'relative', alignContent: 'center' }} ref={userInputRef}>
+                  <div className={styles['filter-input-wrapper']} ref={userInputRef}>
                     <input
                       type="text"
                       placeholder="Filter by Username"

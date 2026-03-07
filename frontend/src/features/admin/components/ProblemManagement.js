@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import api from '../../../services/api';
+import adminService from '../../../services/adminService';
 import ProblemModal from './ProblemModal';
 import ConfirmationModal from './ConfirmationModal';
 import styles from './Management.module.css';
@@ -30,8 +30,8 @@ const ProblemManagement = ({ currentUser }) => {
   const fetchProblems = async () => {
     try {
       // setLoading(true);
-      const response = await api.get('/admin/problems');
-      setProblems(response.data);
+      const data = await adminService.getProblems();
+      setProblems(data);
     } catch (err) {
       setError('Failed to fetch problems.');
       console.error(err);
@@ -52,7 +52,7 @@ const ProblemManagement = ({ currentUser }) => {
   const handleConfirmDelete = async () => {
     if (problemToDelete) {
       try {
-        await api.delete(`/admin/problems/${problemToDelete}`);
+        await adminService.deleteProblem(problemToDelete);
         fetchProblems();
       } catch (err) {
         setError('Failed to delete problem.');
@@ -66,10 +66,7 @@ const ProblemManagement = ({ currentUser }) => {
 
   const handleToggleVisibility = async (problemId, currentVisibility) => {
     try {
-      await api.put(
-        `/admin/problems/${problemId}/visibility`,
-        { isVisible: !currentVisibility }
-      );
+      await adminService.updateProblemVisibility(problemId, !currentVisibility);
       fetchProblems();
     } catch (err) {
       setError('Failed to update problem visibility.');
@@ -87,10 +84,7 @@ const ProblemManagement = ({ currentUser }) => {
       const hidePromises = problems
         .filter(problem => problem.is_visible && !problem.contest_id)
         .map(problem =>
-          api.put(
-            `/admin/problems/${problem.id}/visibility`,
-            { isVisible: false }
-          )
+          adminService.updateProblemVisibility(problem.id, false)
         );
 
       await Promise.all(hidePromises);
@@ -114,10 +108,7 @@ const ProblemManagement = ({ currentUser }) => {
       const showPromises = problems
         .filter(problem => !problem.is_visible && !problem.contest_id)
         .map(problem =>
-          api.put(
-            `/admin/problems/${problem.id}/visibility`,
-            { isVisible: true }
-          )
+          adminService.updateProblemVisibility(problem.id, true)
         );
 
       await Promise.all(showPromises);
@@ -133,12 +124,15 @@ const ProblemManagement = ({ currentUser }) => {
 
   const handleEdit = async (problem) => {
     try {
-      const response = await api.get(`/problems/${problem.id}`);
-      setEditingProblem(response.data);
+      setLoading(true);
+      const data = await adminService.getProblemDetail(problem.id);
+      setEditingProblem(data);
       setIsModalOpen(true);
     } catch (err) {
       setError('Failed to fetch problem details.');
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -174,11 +168,7 @@ const ProblemManagement = ({ currentUser }) => {
     setBatchUploadFeedback({ visible: true, message: 'Initiating problem export...', type: 'info' });
 
     try {
-      const response = await api.post(
-        '/admin/problems/export',
-        { problemIds: selectedProblems },
-        { responseType: 'blob' } // Important for downloading files
-      );
+      const response = await adminService.exportProblems(selectedProblems);
 
       // Create a Blob from the response data
       const blob = new Blob([response.data], { type: response.headers['content-type'] });
@@ -235,17 +225,13 @@ const ProblemManagement = ({ currentUser }) => {
     formData.append('problemsZip', file);
 
     try {
-      const response = await api.post('/admin/problems/batch-upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await adminService.batchUploadProblems(formData);
 
       const { progressId } = response.data;
       if (progressId) {
         // Initial feedback for file uploaded, progress listener will update more details
         setBatchUploadFeedback({ visible: true, message: 'File uploaded. Waiting for processing to start...', type: 'info' });
-        const eventSource = new EventSource(`${api.defaults.baseURL}/admin/problems/batch-upload-progress/${progressId}`, { withCredentials: true });
+        const eventSource = adminService.getBatchUploadProgressEventSource(progressId);
 
         // eventSource.onmessage is now handled by specific event listeners
         // eventSource.onmessage = (event) => {
@@ -332,10 +318,10 @@ const ProblemManagement = ({ currentUser }) => {
       let problemIdForUpload = problemData.id;
 
       if (isEditing) {
-        await api.put(`/admin/problems/${editingProblem.id}`, problemData);
+        await adminService.updateProblem(editingProblem.id, problemData);
       } else {
-        const response = await api.post('/admin/problems', problemData);
-        problemIdForUpload = response.data.id;
+        const data = await adminService.createProblem(problemData);
+        problemIdForUpload = data.id;
       }
 
       if (pdfFile || zipFile) {
@@ -345,17 +331,14 @@ const ProblemManagement = ({ currentUser }) => {
 
         setUploadProgress({ status: 'uploading', message: 'Uploading files to server...' });
 
-        const response = await api.post(`/admin/problems/${problemIdForUpload}/upload`, fileData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        const data = await adminService.uploadFiles(problemIdForUpload, fileData);
 
         // Start polling for progress
-        const { jobId } = response.data;
+        const { jobId } = data;
         if (jobId) {
           const pollInterval = setInterval(async () => {
             try {
-              const progressRes = await api.get(`/admin/upload-progress/${jobId}`);
-              const progressData = progressRes.data;
+              const progressData = await adminService.getUploadProgress(jobId);
               setUploadProgress(progressData);
 
               if (progressData.status === 'completed' || progressData.status === 'failed') {

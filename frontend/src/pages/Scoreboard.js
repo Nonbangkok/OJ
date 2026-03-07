@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import api from '../services/api';
+import scoreboardService from '../services/scoreboardService';
 import tableStyles from '../components/common/Table.module.css';
+import styles from './Scoreboard.module.css';
 
 const Scoreboard = () => {
   const [scoreboard, setScoreboard] = useState([]);
@@ -10,8 +11,8 @@ const Scoreboard = () => {
   useEffect(() => {
     const fetchScoreboard = async () => {
       try {
-        const response = await api.get('/scoreboard');
-        setScoreboard(response.data);
+        const data = await scoreboardService.getGlobal();
+        setScoreboard(data);
       } catch (err) {
         setError('Failed to fetch scoreboard. Please log in.');
         console.error(err);
@@ -26,7 +27,7 @@ const Scoreboard = () => {
   if (error) return <div className="error-message">{error}</div>;
 
   return (
-    <div className="scoreboard-container">
+    <div className={styles['scoreboard-container']}>
       <h1>Scoreboard</h1>
       <div className={tableStyles['table-container']}>
         <table className={tableStyles.table}>
@@ -40,7 +41,7 @@ const Scoreboard = () => {
           </thead>
           <tbody>
             {scoreboard.map((user, index) => (
-              <tr key={user.username} className={index < 3 ? `rank-${index + 1}` : ''}>
+              <tr key={user.username} className={index < 3 ? styles[`rank-${index + 1}`] : ''}>
                 <td>{index + 1}</td>
                 <td>
                   {index === 0 && '🥇 '}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '../../../services/api';
+import adminService from '../../../services/adminService';
 import formStyles from '../../../components/common/Form.module.css';
 import modalStyles from './ModalLayout.module.css';
 
@@ -21,13 +21,13 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
       setLoading(true);
 
       // Fetch available problems and contest problems in parallel
-      const [availableRes, contestRes] = await Promise.all([
-        api.get('/contests/available-problems'),
-        api.get(`/admin/contests/${contest.id}/admin-problems`)
+      const [availableData, contestData] = await Promise.all([
+        adminService.getAvailableProblems(),
+        adminService.getContestProblemsAdmin(contest.id)
       ]);
 
-      setAvailableProblems(availableRes.data);
-      setContestProblems(contestRes.data);
+      setAvailableProblems(availableData);
+      setContestProblems(contestData);
     } catch (err) {
       console.error('Error fetching problems:', err);
       setError('Failed to load problems');
@@ -43,10 +43,7 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
       setMigrationLoading(true);
       setError('');
 
-      await api.post(`/admin/contests/${contest.id}/problems`, {
-        problemIds: selectedAvailable,
-        action: 'move_to_contest'
-      });
+      await adminService.migrateContestProblems(contest.id, selectedAvailable, 'move_to_contest');
 
       setSelectedAvailable([]);
       await fetchProblems(); // Refresh both lists
@@ -69,10 +66,7 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
       setMigrationLoading(true);
       setError('');
 
-      await api.post(`/admin/contests/${contest.id}/problems`, {
-        problemIds: problemIdsToRemove,
-        action: 'move_to_main'
-      });
+      await adminService.migrateContestProblems(contest.id, problemIdsToRemove, 'move_to_main');
 
       setSelectedContest([]); // Clear selection after moving
       await fetchProblems(); // Refresh both lists

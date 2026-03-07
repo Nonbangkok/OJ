@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '../services/api';
+import authService from '../services/authService';
 import UserManagement from '../features/admin/components/UserManagement';
 import ProblemManagement from '../features/admin/components/ProblemManagement';
 import ContestManagement from '../features/admin/components/ContestManagement';
@@ -13,9 +13,9 @@ const Admin = () => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await api.get('/me');
-        if (response.data.isAuthenticated) {
-          setUser(response.data.user);
+        const data = await authService.checkLogin();
+        if (data.isAuthenticated) {
+          setUser(data.user);
         }
       } catch (error) {
         console.error("Could not fetch user data for admin panel", error);
