@@ -1,29 +1,41 @@
-.contestGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 2rem;
-    margin-top: 2rem;
-}
-
 .noContests {
-    text-align: center;
-    padding: 4rem 2rem;
-    background-color: var(--color-bg-secondary);
-    border-radius: 12px;
-    border: 1px dashed var(--color-border);
-    margin-top: 2rem;
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--text-secondary);
 }
 
 .noContestsIcon {
-    font-size: 3rem;
-    margin-bottom: 1rem;
+  font-size: 4rem;
+  margin-bottom: 20px;
 }
 
 .noContests h3 {
-    margin-bottom: 0.5rem;
-    color: var(--color-text-primary);
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  font-size: 1.5rem;
 }
 
-.noContests p {
-    color: var(--color-text-secondary);
+.contestGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 30px;
+  margin-top: 20px;
 }
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .contestGrid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .contestCard {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .contestCard {
+    padding: 16px;
+  }
+} 

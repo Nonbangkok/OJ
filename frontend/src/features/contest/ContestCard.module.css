@@ -1,136 +1,195 @@
 .contestCard {
-    background-color: var(--color-bg-card, #ffffff);
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 24px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .contestCard:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  border-color: var(--primary-color);
 }
 
 .contestHeader {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 15px;
 }
 
 .contestTitle {
-    margin: 0;
-    font-size: 1.25rem;
-    color: var(--color-text-primary);
+  color: var(--text-primary);
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  flex: 1;
+  line-height: 1.3;
 }
 
 .contestDescription {
-    color: var(--color-text-secondary);
-    font-size: 0.95rem;
-    margin-bottom: 1.5rem;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+  color: var(--text-secondary);
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: fit-content;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
 }
 
 .contestTiming {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
-    padding: 0.75rem;
-    background-color: var(--color-bg-secondary);
-    border-radius: 8px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 16px 0;
+  margin: 16px 0;
 }
 
 .timeInfo {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.9rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.timeInfo:last-child {
+  margin-bottom: 0;
 }
 
 .timeLabel {
-    color: var(--color-text-secondary);
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 0.9rem;
 }
 
 .timeValue {
-    font-weight: 500;
-    color: var(--color-text-primary);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .contestStats {
-    display: flex;
-    gap: 1.5rem;
-    margin-bottom: 1.5rem;
-    font-size: 0.85rem;
-    color: var(--color-text-secondary);
+  display: flex;
+  justify-content: space-between;
+  margin: 16px 0;
+  gap: 15px;
+}
+
+.stat {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .contestActions {
-    margin-top: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
 }
 
 .actionBtn {
-    display: block;
-    width: 100%;
-    padding: 0.75rem;
-    text-align: center;
-    border-radius: 8px;
-    font-weight: 600;
-    text-decoration: none;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  text-decoration: none;
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-block;
 }
 
 .joinBtn {
-    background-color: #3182ce;
-    color: white;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: white;
 }
 
 .joinBtn:hover {
-    background-color: #2b6cb0;
+  background: linear-gradient(135deg, #45a049, #3d8b40);
+  transform: translateY(-2px);
 }
 
 .enterBtn {
-    background-color: #38a169;
-    color: white;
+  background: linear-gradient(135deg, #2196F3, #1976D2);
+  color: white;
 }
 
 .enterBtn:hover {
-    background-color: #2f855a;
+  background: linear-gradient(135deg, #1976D2, #1565C0);
+  transform: translateY(-2px);
 }
 
 .scoreboardBtn {
-    background-color: #718096;
-    color: white;
+  background: linear-gradient(135deg, #FF9800, #F57C00);
+  color: white;
 }
 
 .scoreboardBtn:hover {
-    background-color: #4a5568;
+  background: linear-gradient(135deg, #F57C00, #EF6C00);
+  transform: translateY(-2px);
 }
 
 .loginBtn {
-    background-color: #edf2f7;
-    color: #2d3748;
+  background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+  color: white;
 }
 
 .loginBtn:hover {
-    background-color: #e2e8f0;
+  background: linear-gradient(135deg, #7B1FA2, #6A1B9A);
+  transform: translateY(-2px);
 }
 
 .joinedStatus {
-    text-align: center;
-    color: #38a169;
-    font-weight: 600;
-    font-size: 0.9rem;
-    padding: 0.5rem;
+  background: #e8f5e8;
+  color: #2e7d32;
+  padding: 12px 20px;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: 1px solid #c8e6c9;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .contestHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .contestStats {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .timeInfo {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .contestTitle {
+    font-size: 1.2rem;
+  }
 }

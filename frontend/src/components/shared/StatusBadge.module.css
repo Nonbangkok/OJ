@@ -1,31 +1,32 @@
 .badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    text-transform: capitalize;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-.scheduled {
-    background-color: var(--color-bg-secondary);
-    color: var(--color-text-secondary);
-    border: 1px solid var(--color-border);
+.badge.scheduled {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  border: 1px solid #bbdefb;
 }
 
-.running {
-    background-color: #e6fffa;
-    color: #2c7a7b;
-    border: 1px solid #81e6d9;
+.badge.running {
+  background-color: #e8f5e8;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+  animation: pulse 2s infinite;
 }
 
-.finishing {
-    background-color: #fffaf0;
-    color: #9c4221;
-    border: 1px solid #fbd38d;
+.badge.finishing {
+  background-color: #fff3e0;
+  color: #f57c00;
+  border: 1px solid #ffcc02;
 }
 
-.finished {
-    background-color: #f7fafc;
-    color: #4a5568;
-    border: 1px solid #e2e8f0;
+.badge.finished {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+  border: 1px solid #ce93d8;
 }
