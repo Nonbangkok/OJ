@@ -46,9 +46,7 @@ app.use('/', authRoutes);
 app.use('/', adminRoutes);
 app.use('/', problemRoutes);
 app.use('/', submissionRoutes);
-
-app.use('/contests', contestRoutes);
-app.use('/admin/contests', contestRoutes);
+app.use('/', contestRoutes);
 
 app.get('/', (req, res) => {
   res.send('Grader System API is running!');

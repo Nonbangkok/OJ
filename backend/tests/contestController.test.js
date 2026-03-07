@@ -44,13 +44,13 @@ describe('Contest Controller', () => {
         jest.restoreAllMocks();
     });
 
-    describe('GET /', () => {
+    describe('GET /contests', () => {
         it('should return a list of contests based on visibility', async () => {
             db.query.mockResolvedValueOnce({
                 rows: [{ id: 1, title: 'Contest 1', is_visible: true }]
             });
 
-            const res = await request(app).get('/');
+            const res = await request(app).get('/contests');
 
             expect(res.status).toBe(200);
             expect(res.body.length).toBe(1);
@@ -74,7 +74,7 @@ describe('Contest Controller', () => {
                 rows: [{ id: 'P1', title: 'Problem 1' }]
             });
 
-            const res = await request(app).get('/1');
+            const res = await request(app).get('/contests/1');
 
             expect(res.status).toBe(200);
             expect(res.body.title).toBe('Contest 1');
@@ -85,12 +85,12 @@ describe('Contest Controller', () => {
             db.query.mockResolvedValueOnce({
                 rows: [] // Empty rows means not found
             });
-            const res = await request(app).get('/999');
+            const res = await request(app).get('/contests/999');
             expect(res.status).toBe(404);
         });
     });
 
-    describe('POST /', () => {
+    describe('POST /admin/contests', () => {
         it('should create a new contest and assign problems', async () => {
             const payload = {
                 title: 'New Contest',
@@ -106,7 +106,7 @@ describe('Contest Controller', () => {
                 .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Insert
                 .mockResolvedValue({ rowCount: 1 }); // For all subsequent problem checks/updates
 
-            const res = await request(app).post('/').send(payload);
+            const res = await request(app).post('/admin/contests').send(payload);
 
             expect(res.status).toBe(201);
             expect(res.body.id).toBe(1);

@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import Home from '../../pages/Home';
+import Home from '../../pages/home/Home';
 
 describe('Home Page', () => {
     it('renders welcome message initially', () => {

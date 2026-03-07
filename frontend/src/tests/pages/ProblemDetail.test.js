@@ -1,11 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import ProblemDetail from '../../pages/ProblemDetail';
+import ProblemDetail from '../../pages/problem/ProblemDetail';
 import problemService from '../../services/problemService';
-import contestService from '../../services/contestService';
 
 jest.mock('../../services/problemService');
-jest.mock('../../services/contestService');
 jest.mock('react-router-dom', () => ({
     ...jest.requireActual('react-router-dom'),
     useParams: () => ({ problemId: '1' })

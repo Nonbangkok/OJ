@@ -1,0 +1,16 @@
+.problems-page-container {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 2rem;
+}
+
+.problems-page-container h1 {
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+}
+
+.problem-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}

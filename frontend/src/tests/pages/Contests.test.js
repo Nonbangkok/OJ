@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import Contests from '../../pages/Contests';
+import Contests from '../../pages/contest/Contests';
 import contestService from '../../services/contestService';
 
 jest.mock('../../services/contestService');

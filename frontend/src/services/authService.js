@@ -19,6 +19,11 @@ const authService = {
     const response = await api.post('/register', { username, password });
     return response.data;
   },
+
+  getRegistrationSettings: async () => {
+    const response = await api.get('/settings/registration');
+    return response.data;
+  },
 };
 
 export default authService;

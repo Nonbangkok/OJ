@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect, useContext } from 'react';
-import api from '../services/api';
+import authService from '../services/authService';
 
 const SettingsContext = createContext();
 
@@ -13,9 +13,9 @@ export const SettingsProvider = ({ children }) => {
 
   const fetchSettings = async () => {
     try {
-      const response = await api.get('/settings/registration');
+      const data = await authService.getRegistrationSettings();
       setSettings({
-        registrationEnabled: response.data.enabled,
+        registrationEnabled: data.enabled,
       });
     } catch (error) {
       console.error('Failed to fetch system settings:', error);

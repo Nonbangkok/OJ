@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import ThemeToggleButton from '../../components/common/ThemeToggleButton';
+import ThemeToggleButton from '../../components/shared/ThemeToggleButton';
 import styles from './AdminNavbar.module.css';
 import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/logo512.png';
