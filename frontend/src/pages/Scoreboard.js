@@ -42,7 +42,12 @@ const Scoreboard = () => {
             {scoreboard.map((user, index) => (
               <tr key={user.username} className={index < 3 ? `rank-${index + 1}` : ''}>
                 <td>{index + 1}</td>
-                <td>{user.username}</td>
+                <td>
+                  {index === 0 && '🥇 '}
+                  {index === 1 && '🥈 '}
+                  {index === 2 && '🥉 '}
+                  {user.username}
+                </td>
                 <td>{user.problems_solved}</td>
                 <td>{user.total_score}</td>
               </tr>
