@@ -1,0 +1,12 @@
+.rank-1 {
+    background-color: rgba(255, 215, 0, 0.1);
+    font-weight: bold;
+}
+
+.rank-2 {
+    background-color: rgba(192, 192, 192, 0.1);
+}
+
+.rank-3 {
+    background-color: rgba(205, 127, 50, 0.1);
+}

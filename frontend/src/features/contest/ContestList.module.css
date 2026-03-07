@@ -1,0 +1,29 @@
+.contestGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.noContests {
+    text-align: center;
+    padding: 4rem 2rem;
+    background-color: var(--color-bg-secondary);
+    border-radius: 12px;
+    border: 1px dashed var(--color-border);
+    margin-top: 2rem;
+}
+
+.noContestsIcon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.noContests h3 {
+    margin-bottom: 0.5rem;
+    color: var(--color-text-primary);
+}
+
+.noContests p {
+    color: var(--color-text-secondary);
+}

@@ -1,0 +1,31 @@
+.badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.scheduled {
+    background-color: var(--color-bg-secondary);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+}
+
+.running {
+    background-color: #e6fffa;
+    color: #2c7a7b;
+    border: 1px solid #81e6d9;
+}
+
+.finishing {
+    background-color: #fffaf0;
+    color: #9c4221;
+    border: 1px solid #fbd38d;
+}
+
+.finished {
+    background-color: #f7fafc;
+    color: #4a5568;
+    border: 1px solid #e2e8f0;
+}

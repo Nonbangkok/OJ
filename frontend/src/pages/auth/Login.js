@@ -1,64 +1,41 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
-import styles from '../../components/styles/Form.module.css';
+import { useAuthForms } from '../../hooks/useAuthForms';
 import authService from '../../services/authService';
+import LoginForm from '../../features/auth/LoginForm';
 
 const Login = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const { login } = useAuth();
   const { registrationEnabled } = useSettings();
   const navigate = useNavigate();
+
+  const { formData, error, setError, handleChange, setLoading } = useAuthForms();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      const data = await authService.login(username, password);
+      setLoading(true);
+      const data = await authService.login(formData.username, formData.password);
       login(data.user);
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className={styles['form-container']}>
-      <h2>Login</h2>
-      <form onSubmit={handleSubmit}>
-        {error && <p className={styles['error-message']}>{error}</p>}
-        <div className={styles['form-group']}>
-          <label htmlFor="username">Username</label>
-          <input
-            type="text"
-            id="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-        </div>
-        <div className={styles['form-group']}>
-          <label htmlFor="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        <button type="submit">Login</button>
-      </form>
-      {registrationEnabled && (
-        <p className={styles['form-footer-link']}>
-          Don't have an account? <Link to="/register">Register here</Link>
-        </p>
-      )}
-    </div>
+    <LoginForm
+      formData={formData}
+      error={error}
+      onSubmit={handleSubmit}
+      onChange={handleChange}
+      registrationEnabled={registrationEnabled}
+    />
   );
 };
 
-export default Login; 
+export default Login;

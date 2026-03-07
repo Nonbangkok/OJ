@@ -1,91 +1,48 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import authService from '../../services/authService';
 import { useSettings } from '../../context/SettingsContext';
-import styles from '../../components/styles/Form.module.css';
+import { useAuthForms } from '../../hooks/useAuthForms';
+import RegisterForm from '../../features/auth/RegisterForm';
 
 const Register = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const navigate = useNavigate();
-  const { registrationEnabled, isLoading } = useSettings();
+  const { registrationEnabled, isLoading: isLoadingSettings } = useSettings();
+
+  const {
+    formData, error, setError, success, setSuccess,
+    handleChange, validate, setLoading
+  } = useAuthForms();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
 
-    if (username.length < 3) {
-      setError('Username must be at least 3 characters long.');
-      return;
-    }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long.');
-      return;
-    }
+    if (!validate()) return;
 
     try {
-      await authService.register(username, password);
+      setLoading(true);
+      await authService.register(formData.username, formData.password);
       setSuccess('Registration successful! Please log in.');
       navigate('/login');
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Username or email might already be in use.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (isLoading) {
-    return <div className={styles['form-container']}><h2>Loading...</h2></div>;
-  }
-
-  if (!registrationEnabled) {
-    return (
-      <div className={styles['form-container']}>
-        <h2>Registration Disabled</h2>
-        <p>User registration is currently disabled. Please try again later.</p>
-        <p className={styles['form-footer-link']}>
-          Already have an account? <Link to="/login">Login here</Link>
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className={styles['form-container']}>
-      <h2>Register</h2>
-      <form onSubmit={handleSubmit}>
-        <div className={styles['form-group']}>
-          <label htmlFor="username">Username</label>
-          <input
-            type="text"
-            id="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-        </div>
-        <div className={styles['form-group']}>
-          <label htmlFor="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        {error && <p className={styles['error-message']}>{error}</p>}
-        {success && <p className={styles['success-message']}>{success}</p>}
-        <button type="submit" className={styles['form-button']}>
-          Register
-        </button>
-      </form>
-      <p className={styles['form-footer-link']}>
-        Already have an account? <Link to="/login">Login here</Link>
-      </p>
-    </div>
+    <RegisterForm
+      formData={formData}
+      error={error}
+      success={success}
+      onSubmit={handleSubmit}
+      onChange={handleChange}
+      registrationEnabled={registrationEnabled}
+      isLoadingSettings={isLoadingSettings}
+    />
   );
 }
 
-export default Register; 
+export default Register;

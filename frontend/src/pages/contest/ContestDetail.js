@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import styles from './ContestDetail.module.css';
 import contestService from '../../services/contestService';
 import { formatDateTime, getRemainingTime } from '../../utils/formatters';
+import StatusBadge from '../../components/shared/StatusBadge';
 
 const ContestDetail = () => {
   const { contestId } = useParams();
@@ -76,28 +77,6 @@ const ContestDetail = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const statusClasses = {
-      'scheduled': `${styles.badge} ${styles.scheduled}`,
-      'running': `${styles.badge} ${styles.running}`,
-      'finishing': `${styles.badge} ${styles.finishing}`,
-      'finished': `${styles.badge} ${styles.finished}`
-    };
-
-    const statusText = {
-      'scheduled': 'Scheduled',
-      'running': 'Running',
-      'finishing': 'Finishing',
-      'finished': 'Finished'
-    };
-
-    return (
-      <span className={statusClasses[status] || styles.badge}>
-        {statusText[status] || status}
-      </span>
-    );
-  };
-
 
 
   if (loading) {
@@ -141,7 +120,7 @@ const ContestDetail = () => {
 
         <div className={styles.titleSection}>
           <h1 className={styles.contestTitle}>{contest.title}</h1>
-          {getStatusBadge(contest.status)}
+          <StatusBadge status={contest.status} />
         </div>
 
         {contest.description && (
