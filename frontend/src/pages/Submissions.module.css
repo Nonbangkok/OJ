@@ -9,6 +9,12 @@
   margin: 0;
 }
 
+.no-submissions {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 1rem;
+}
+
 .filter-buttons {
   display: flex;
   gap: 0.5rem;

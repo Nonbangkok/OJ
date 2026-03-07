@@ -135,9 +135,11 @@ const Submissions = ({ problemId, showTitle = true }) => {
 
       <div className={tableStyles['table-container']}>
         {submissions.length === 0 ? (
-          <p style={{ padding: '1rem 1.25rem' }}>
-            {problemId ? "You haven't made any submissions for this problem yet." : "No submissions found."}
-          </p>
+          <div className={styles['no-submissions']}>
+            <p>
+              {problemId ? "You haven't made any submissions for this problem yet." : "No submissions found."}
+            </p>
+          </div>
         ) : (
           <table className={tableStyles.table}>
             <thead>
