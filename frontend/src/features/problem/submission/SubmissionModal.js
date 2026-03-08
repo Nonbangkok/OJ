@@ -75,6 +75,10 @@ const SubmissionModal = ({ submission, onClose }) => {
               <span className={styles['detail-value']}>{formatDate(submission.submitted_at)}</span>
             </div>
             <div className={styles['detail-row']}>
+              <span className={styles['detail-label']}>Problem:</span>
+              <span className={styles['detail-value']}>{submission.problem_name}</span>
+            </div>
+            <div className={styles['detail-row']}>
               <span className={styles['detail-label']}>User:</span>
               <span className={styles['detail-value']}>{submission.username || 'Unknown'}</span>
             </div>
