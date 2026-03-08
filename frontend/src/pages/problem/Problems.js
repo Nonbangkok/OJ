@@ -1,6 +1,6 @@
 import styles from './Problems.module.css';
 import { useProblems } from '../../hooks/useProblems';
-import ProblemCard from '../../features/problems/ProblemCard';
+import ProblemCard from '../../features/problem/ProblemCard';
 
 const Problems = () => {
   const { problems, loading, error } = useProblems();

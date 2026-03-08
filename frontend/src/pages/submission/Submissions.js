@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import styles from '../../components/styles/Submissions.module.css';
-import SubmissionModal from '../../features/problems/submissions/SubmissionModal';
+import SubmissionModal from '../../features/problem/submission/SubmissionModal';
 import { useSubmissions } from '../../hooks/useSubmissions';
 import { getStatusClass } from '../../utils/formatters';
 import tableStyles from '../../components/styles/Table.module.css';

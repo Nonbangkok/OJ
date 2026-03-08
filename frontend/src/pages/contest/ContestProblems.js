@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom';
 import { useContestGuard } from '../../hooks/useContestGuard';
 import { useProblems } from '../../hooks/useProblems';
-import ProblemCard from '../../features/problems/ProblemCard';
+import ProblemCard from '../../features/problem/ProblemCard';
 import styles from '../problem/Problems.module.css';
 
 const ContestProblems = () => {

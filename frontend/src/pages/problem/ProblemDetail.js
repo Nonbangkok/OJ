@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import styles from './ProblemDetail.module.css';
-import CodeSubmissionForm from '../../features/problems/submissions/CodeSubmissionForm';
+import CodeSubmissionForm from '../../features/problem/submission/CodeSubmissionForm';
 import Submissions from '../submission/Submissions';
 import problemService from '../../services/problemService';
 import { useProblemDetail } from '../../hooks/useProblemDetail';
