@@ -1,39 +1,18 @@
-import { useState, useEffect } from 'react';
 import formStyles from '../../../components/styles/Form.module.css';
+import useEditUserModal from '../../../hooks/admin/useEditUserModal';
 import modalStyles from '../shared/ModalLayout.module.css';
 
 
 const EditUserModal = ({ user, onClose, onSave }) => {
-  const [formData, setFormData] = useState({
-    username: user?.username || '',
-    role: user?.role || 'user',
-  });
-
-  useEffect(() => {
-    if (user) {
-      setFormData({
-        username: user.username,
-        role: user.role,
-      });
-    }
-  }, [user]);
+  const {
+    formData,
+    handleChange,
+    handleSave,
+  } = useEditUserModal(user, onClose, onSave);
 
   if (!user) {
     return null;
   }
-
-  const handleChange = (e) => {
-    const { id, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [id]: value,
-    }));
-  };
-
-  const handleSave = () => {
-    onSave(user.id, formData);
-    onClose();
-  };
 
   return (
     <div className={modalStyles['modal-overlay']}>

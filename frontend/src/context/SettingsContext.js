@@ -1,7 +1,7 @@
 import { createContext, useState, useEffect, useContext } from 'react';
 import authService from '../services/authService';
 
-const SettingsContext = createContext();
+export const SettingsContext = createContext();
 
 export const useSettings = () => useContext(SettingsContext);
 

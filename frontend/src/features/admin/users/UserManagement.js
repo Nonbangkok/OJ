@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import adminService from '../../../services/adminService';
+import useUserManagement from '../../../hooks/admin/useUserManagement';
 import { useAuth } from '../../../context/AuthContext'; // Import useAuth
 import EditUserModal from './EditUserModal';
 import ConfirmationModal from '../shared/ConfirmationModal';
@@ -10,75 +9,25 @@ import tableStyles from '../../../components/styles/Table.module.css';
 import { APP_CONSTANTS } from '../../../utils/constants';
 
 const UserManagement = () => {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [editingUser, setEditingUser] = useState(null); // Controls the EditUserModal
-  const [deletingUser, setDeletingUser] = useState(null); // Controls the ConfirmationModal
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false); // State for the new modal
+  const {
+    users,
+    loading,
+    error,
+    editingUser,
+    setEditingUser,
+    deletingUser,
+    setDeletingUser,
+    isAddModalOpen,
+    setIsAddModalOpen,
+    fetchUsers,
+    handleEdit,
+    handleDeleteClick,
+    handleConfirmDelete,
+    handleSave,
+    handleAddNewUser
+  } = useUserManagement();
+
   const { user: currentUser } = useAuth(); // Get the currently logged-in user
-
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const data = await adminService.getUsers();
-      setUsers(data);
-    } catch (err) {
-      setError('Failed to fetch users.');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const handleEdit = (user) => {
-    setEditingUser(user);
-  };
-
-  const handleDeleteClick = (user) => {
-    setDeletingUser(user);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (deletingUser) {
-      try {
-        await adminService.deleteUser(deletingUser.id);
-        setUsers(users.filter(user => user.id !== deletingUser.id));
-      } catch (err) {
-        setError('Failed to delete user.');
-        console.error(err);
-      } finally {
-        setDeletingUser(null);
-      }
-    }
-  };
-
-  const handleSave = async (userId, userData) => {
-    try {
-      await adminService.updateUser(userId, userData);
-      setEditingUser(null);
-      fetchUsers(); // Refresh the user list
-    } catch (err) {
-      setError('Failed to save user details.');
-      console.error(err);
-    }
-  };
-
-  const handleAddNewUser = async (newUserData) => {
-    try {
-      await adminService.createUser(newUserData);
-      setIsAddModalOpen(false);
-      fetchUsers(); // Refresh the user list
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to create user.');
-      console.error(err);
-      // Note: We might want to display this error inside the modal in a future enhancement
-    }
-  };
 
   if (loading) return <div>Loading users...</div>;
   if (error) return <div className="error-message">{error}</div>;
