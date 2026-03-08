@@ -28,7 +28,6 @@ const ProblemManagement = ({ currentUser }) => {
     setProblemToDelete,
     bulkConfirm,
     setBulkConfirm,
-
     fetchProblems,
     handleDeleteClick,
     handleConfirmDelete,
