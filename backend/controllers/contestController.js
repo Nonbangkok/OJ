@@ -18,7 +18,7 @@ router.get('/contests', async (req, res) => {
         SELECT 
           c.id, c.title, c.description, c.start_time, c.end_time, c.status,
           c.created_at,
-          COUNT(cp.user_id) as participant_count,
+          COUNT(DISTINCT cp.user_id) as participant_count,
           CASE WHEN user_participation.user_id IS NOT NULL THEN true ELSE false END as is_participant,
           CASE 
             WHEN c.status = 'finished' THEN COALESCE(finished_problems.problem_count, 0)
@@ -51,7 +51,7 @@ router.get('/contests', async (req, res) => {
         SELECT 
           c.id, c.title, c.description, c.start_time, c.end_time, c.status,
           c.created_at,
-          COUNT(cp.user_id) as participant_count,
+          COUNT(DISTINCT cp.user_id) as participant_count,
           false as is_participant,
           CASE 
             WHEN c.status = 'finished' THEN COALESCE(finished_problems.problem_count, 0)
