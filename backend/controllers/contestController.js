@@ -82,6 +82,41 @@ router.get('/contests', async (req, res) => {
   }
 });
 
+// List all contests for admin
+router.get('/admin/contests', requireAuth, requireStaffOrAdmin, async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        c.id, c.title, c.description, c.start_time, c.end_time, c.status,
+        c.created_at,
+        COUNT(DISTINCT cp.user_id) as participant_count,
+        CASE 
+          WHEN c.status = 'finished' THEN COALESCE(finished_problems.problem_count, 0)
+          ELSE COALESCE(active_problems.problem_count, 0)
+        END as problem_count
+      FROM contests c
+      LEFT JOIN contest_participants cp ON c.id = cp.contest_id
+      LEFT JOIN (
+        SELECT contest_id, COUNT(*) as problem_count
+        FROM contest_problems
+        GROUP BY contest_id
+      ) finished_problems ON c.id = finished_problems.contest_id AND c.status = 'finished'
+      LEFT JOIN (
+        SELECT contest_id, COUNT(*) as problem_count
+        FROM problems
+        WHERE contest_id IS NOT NULL
+        GROUP BY contest_id
+      ) active_problems ON c.id = active_problems.contest_id AND c.status != 'finished'
+      GROUP BY c.id, c.title, c.description, c.start_time, c.end_time, c.status, c.created_at, finished_problems.problem_count, active_problems.problem_count
+      ORDER BY c.start_time DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching admin contests:', error);
+    res.status(500).json({ message: 'Error fetching contests' });
+  }
+});
+
 // Get problems available for contest (Admin)
 router.get('/admin/contests/available-problems', requireAuth, requireStaffOrAdmin, async (req, res) => {
   try {
