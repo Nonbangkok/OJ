@@ -65,7 +65,30 @@ const useSubmissionModal = (submission) => {
 
     const handleCopyCode = async () => {
         try {
-            await navigator.clipboard.writeText(code);
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                await navigator.clipboard.writeText(code);
+            } else {
+                // Fallback for non-secure contexts or older browsers
+                const textArea = document.createElement("textarea");
+                textArea.value = code;
+
+                // Ensure the textarea is not visible or affecting layout
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+
+                if (!successful) {
+                    throw new Error('Fallback copy failed');
+                }
+            }
+
             setCopySuccess(true);
             setTimeout(() => setCopySuccess(false), 2000);
         } catch (err) {
