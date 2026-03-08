@@ -112,4 +112,40 @@ describe('Contest Controller', () => {
             expect(res.body.id).toBe(1);
         });
     });
+
+    describe('GET /admin/contests', () => {
+        it('should return 200 and a list of contests for admin', async () => {
+            db.query.mockResolvedValueOnce({
+                rows: [
+                    {
+                        id: 1,
+                        title: 'Admin Contest',
+                        participant_count: '5',
+                        problem_count: '3',
+                        status: 'scheduled'
+                    },
+                    {
+                        id: 2,
+                        title: 'Staff Contest',
+                        participant_count: '14',
+                        problem_count: '7',
+                        status: 'running'
+                    }
+                ]
+            });
+
+            const res = await request(app).get('/admin/contests');
+
+            expect(res.status).toBe(200);
+            expect(res.body.length).toBe(2);
+            expect(res.body[0].title).toBe('Admin Contest');
+            expect(res.body[0].participant_count).toBe('5');
+            expect(res.body[0].problem_count).toBe('3');
+            expect(res.body[0].status).toBe('scheduled');
+            expect(res.body[1].title).toBe('Staff Contest');
+            expect(res.body[1].participant_count).toBe('14');
+            expect(res.body[1].problem_count).toBe('7');
+            expect(res.body[1].status).toBe('running');
+        });
+    });
 });
