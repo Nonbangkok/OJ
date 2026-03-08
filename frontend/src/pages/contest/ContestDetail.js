@@ -1,81 +1,17 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { Link } from 'react-router-dom';
 import styles from './ContestDetail.module.css';
-import contestService from '../../services/contestService';
 import { formatDateTime, getRemainingTime } from '../../utils/formatters';
 import StatusBadge from '../../components/shared/StatusBadge';
+import useContestDetail from '../../hooks/useContestDetail';
 
 const ContestDetail = () => {
-  const { contestId } = useParams();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-
-  const [contest, setContest] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [joining, setJoining] = useState(false);
-
-  useEffect(() => {
-    fetchContestData();
-
-    const intervalId = setInterval(() => {
-      fetchContestData();
-    }, 15000); // Poll every 15 seconds
-
-    return () => clearInterval(intervalId);
-  }, [contestId, user]); // Add user to dependency array to re-fetch if login status changes
-
-  const fetchContestData = async () => {
-    try {
-      setLoading(true);
-
-      const fetchedContest = await contestService.getById(contestId);
-      setContest(fetchedContest);
-
-      // Redirect logic
-      if (fetchedContest.status === 'finished') {
-        let redirectPath = '';
-
-        if (fetchedContest.is_participant) {
-          redirectPath = `/contests/${contestId}/scoreboard`;
-        } else {
-          redirectPath = '/contests';
-        }
-        navigate(redirectPath);
-      }
-
-    } catch (err) {
-      console.error('Error fetching contest data:', err);
-      if (err.response?.status === 403) {
-        setError('You need to join this contest to view its details.');
-        // If user is not participant and contest is finished, redirect to /contests
-        if (contest?.status === 'finished') { // Use optional chaining to prevent error if contest is null
-          navigate('/contests');
-        }
-      } else if (err.response?.status === 404) {
-        setError('Contest not found.');
-      } else {
-        setError('Failed to load contest data.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleJoinContest = async () => {
-    setJoining(true);
-    try {
-      await contestService.join(contestId);
-      // Refresh contest data
-      fetchContestData();
-    } catch (err) {
-      console.error('Error joining contest:', err);
-      alert(err.response?.data?.message || 'Failed to join contest');
-    } finally {
-      setJoining(false);
-    }
-  };
+  const {
+    contest,
+    loading,
+    error,
+    joining,
+    handleJoinContest
+  } = useContestDetail();
 
   if (loading) {
     return (
