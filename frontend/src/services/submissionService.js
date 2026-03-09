@@ -17,13 +17,17 @@ const submissionService = {
     return response.data;
   },
 
-  searchProblems: async (query) => {
-    const response = await api.get(`/search/problems?q=${query}`);
+  searchProblems: async (query, contestId = null) => {
+    let url = `/search/problems?q=${query}`;
+    if (contestId) url += `&contestId=${contestId}`;
+    const response = await api.get(url);
     return response.data;
   },
 
-  searchUsers: async (query) => {
-    const response = await api.get(`/search/users?q=${query}`);
+  searchUsers: async (query, contestId = null) => {
+    let url = `/search/users?q=${query}`;
+    if (contestId) url += `&contestId=${contestId}`;
+    const response = await api.get(url);
     return response.data;
   }
 };

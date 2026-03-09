@@ -12,9 +12,8 @@ export const useSubmissions = (problemId, contestId) => {
     const [selectedSubmission, setSelectedSubmission] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // Autocomplete hooks (replaces ~60 lines of manual state management)
-    const problemAutocomplete = useAutocomplete(submissionService.searchProblems);
-    const userAutocomplete = useAutocomplete(submissionService.searchUsers);
+    const problemAutocomplete = useAutocomplete(submissionService.searchProblems, { contestId });
+    const userAutocomplete = useAutocomplete(submissionService.searchUsers, { contestId });
 
     const [appliedFilters, setAppliedFilters] = useState({ problemId: '', userId: '' });
     const lastRequestIdRef = useRef(0);

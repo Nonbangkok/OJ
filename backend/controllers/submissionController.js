@@ -189,14 +189,40 @@ router.get('/submissions', requireAuth, async (req, res) => {
 
 // Autocomplete/Search Endpoints
 router.get('/search/problems', requireAuth, async (req, res) => {
-  const { q } = req.query;
+  const { q, contestId } = req.query;
   if (!q) return res.json([]);
 
   try {
-    const result = await db.query(
-      'SELECT id, title FROM problems WHERE id ILIKE $1 OR title ILIKE $1 LIMIT 10',
-      [`%${q}%`]
-    );
+    let result;
+    if (contestId) {
+      // Check if contest is finished or active to search correct table
+      const contestRes = await db.query('SELECT status FROM contests WHERE id = $1', [contestId]);
+      if (contestRes.rows.length === 0) return res.json([]);
+
+      const status = contestRes.rows[0].status;
+
+      if (status === 'finished') {
+        result = await db.query(
+          `SELECT problem_id as id, title FROM contest_problems 
+           WHERE contest_id = $1 AND (problem_id ILIKE $2 OR title ILIKE $2) 
+           LIMIT 10`,
+          [contestId, `%${q}%`]
+        );
+      } else {
+        result = await db.query(
+          `SELECT id, title FROM problems 
+           WHERE contest_id = $1 AND (id ILIKE $2 OR title ILIKE $2) 
+           LIMIT 10`,
+          [contestId, `%${q}%`]
+        );
+      }
+    } else {
+      // Global search
+      result = await db.query(
+        'SELECT id, title FROM problems WHERE id ILIKE $1 OR title ILIKE $1 LIMIT 10',
+        [`%${q}%`]
+      );
+    }
     res.json(result.rows);
   } catch (error) {
     console.error('Error searching problems:', error);
@@ -205,14 +231,25 @@ router.get('/search/problems', requireAuth, async (req, res) => {
 });
 
 router.get('/search/users', requireAuth, async (req, res) => {
-  const { q } = req.query;
+  const { q, contestId } = req.query;
   if (!q) return res.json([]);
 
   try {
-    const result = await db.query(
-      'SELECT username FROM users WHERE username ILIKE $1 LIMIT 10',
-      [`%${q}%`]
-    );
+    let result;
+    if (contestId) {
+      result = await db.query(
+        `SELECT u.username FROM users u
+         JOIN contest_participants cp ON u.id = cp.user_id
+         WHERE cp.contest_id = $1 AND u.username ILIKE $2
+         LIMIT 10`,
+        [contestId, `%${q}%`]
+      );
+    } else {
+      result = await db.query(
+        'SELECT username FROM users WHERE username ILIKE $1 LIMIT 10',
+        [`%${q}%`]
+      );
+    }
     res.json(result.rows);
   } catch (error) {
     console.error('Error searching users:', error);
