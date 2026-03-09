@@ -126,13 +126,6 @@ fieldset {
   width: 95%;
 }
 
-.migrationModalLoadingText {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--text-secondary);
-  font-size: 1.1rem;
-}
-
 .migrationModalWarning {
   background: #fff3cd;
   color: #856404;
