@@ -1,8 +1,8 @@
 import React from 'react';
 import styles from './LoadingPage.module.css';
 import { useTheme } from '../../context/ThemeContext';
-import logoLight from '../../../assets/logo512.png';
-import logoDark from '../../../assets/logo512_darkmode.png';
+import logoLight from '../../assets/logo512.png';
+import logoDark from '../../assets/logo512_darkmode.png';
 
 /**
  * LoadingPage component for full-screen loading state with animated logo.
