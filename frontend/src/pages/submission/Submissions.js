@@ -5,6 +5,7 @@ import SubmissionModal from '../../features/problem/submission/SubmissionModal';
 import { useSubmissions } from '../../hooks/useSubmissions';
 import { getStatusClass } from '../../utils/formatters';
 import tableStyles from '../../components/styles/Table.module.css';
+import LoadingPage from '../../components/shared/LoadingPage';
 
 const Submissions = ({ problemId, showTitle = true }) => {
   const { contestId } = useParams();
@@ -57,7 +58,7 @@ const Submissions = ({ problemId, showTitle = true }) => {
 
 
 
-  if (loading) return <div>Loading submissions...</div>;
+  if (loading) return <LoadingPage />;
   if (error) return <div className="error-message">{error}</div>;
 
   return (

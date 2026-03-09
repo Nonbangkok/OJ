@@ -3,6 +3,7 @@ import styles from './ContestDetail.module.css';
 import { formatDateTime, getRemainingTime } from '../../utils/formatters';
 import StatusBadge from '../../components/shared/StatusBadge';
 import useContestDetail from '../../hooks/useContestDetail';
+import LoadingPage from '../../components/shared/LoadingPage';
 
 const ContestDetail = () => {
   const {
@@ -13,13 +14,7 @@ const ContestDetail = () => {
     handleJoinContest
   } = useContestDetail();
 
-  if (loading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.loading}>Loading contest data...</div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingPage />;
 
   if (error) {
     return (

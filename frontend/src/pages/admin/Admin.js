@@ -4,13 +4,12 @@ import ProblemManagement from '../../features/admin/problems/ProblemManagement';
 import ContestManagement from '../../features/admin/contests/ContestManagement';
 import Settings from '../../features/admin/settings/Settings';
 import styles from './Admin.module.css';
+import LoadingPage from '../../components/shared/LoadingPage';
 
 const Admin = () => {
   const { user, loading } = useAdminPage();
 
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  if (loading) return <LoadingPage />;
 
   return (
     <div className={styles['admin-container']}>

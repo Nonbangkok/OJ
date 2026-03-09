@@ -2,10 +2,12 @@ import styles from './Problems.module.css';
 import { useProblems } from '../../hooks/useProblems';
 import ProblemCard from '../../features/problem/ProblemCard';
 
+import LoadingPage from '../../components/shared/LoadingPage';
+
 const Problems = () => {
   const { problems, loading, error } = useProblems();
 
-  if (loading) return <div>Loading problems...</div>;
+  if (loading) return <LoadingPage />;
   if (error) return <div className="error-message">{error}</div>;
 
   return (

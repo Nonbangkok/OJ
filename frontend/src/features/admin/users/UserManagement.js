@@ -7,6 +7,7 @@ import BatchUserCreation from './BatchUserCreation'; // Import the new component
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 import { APP_CONSTANTS } from '../../../utils/constants';
+import LoadingPage from '../../../components/shared/LoadingPage';
 
 const UserManagement = () => {
   const {
@@ -29,7 +30,7 @@ const UserManagement = () => {
 
   const { user: currentUser } = useAuth(); // Get the currently logged-in user
 
-  if (loading) return <div>Loading users...</div>;
+  if (loading) return <LoadingPage />;
   if (error) return <div className="error-message">{error}</div>;
 
   return (

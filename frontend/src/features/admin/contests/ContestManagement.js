@@ -4,6 +4,7 @@ import ProblemMigrationModal from '../problems/ProblemMigrationModal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
+import LoadingPage from '../../../components/shared/LoadingPage';
 
 const ContestManagement = ({ currentUser }) => {
   const {
@@ -32,7 +33,7 @@ const ContestManagement = ({ currentUser }) => {
   } = useContestManagement(styles);
 
   if (loading) {
-    return <div className={styles.loading}>Loading contests...</div>;
+    return <LoadingPage />;
   }
 
   return (

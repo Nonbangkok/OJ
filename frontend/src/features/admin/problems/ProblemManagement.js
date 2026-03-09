@@ -3,6 +3,7 @@ import ProblemModal from './ProblemModal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
+import LoadingPage from '../../../components/shared/LoadingPage';
 
 const ProblemManagement = ({ currentUser }) => {
   const {
@@ -47,7 +48,7 @@ const ProblemManagement = ({ currentUser }) => {
     handleCloseModal
   } = useProblemManagement();
 
-  if (loading && !batchUploadProgress.visible) return <div>Loading problems...</div>;
+  if (loading && !batchUploadProgress.visible) return <LoadingPage />;
   if (error) return <div className='error-message'>{error}</div>;
 
   return (

@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import useContestScoreboard from '../../hooks/useContestScoreboard';
 import styles from './ContestScoreboard.module.css';
 import tableStyles from '../../components/styles/Table.module.css';
+import LoadingPage from '../../components/shared/LoadingPage';
 
 const ContestScoreboard = () => {
   const { contestId } = useParams();
@@ -17,13 +18,7 @@ const ContestScoreboard = () => {
     getProblemScore
   } = useContestScoreboard(contestId);
 
-  if (loading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.loading}>Loading contest rankings...</div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingPage />;
 
   if (error) {
     return (

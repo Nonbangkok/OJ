@@ -1,6 +1,7 @@
 import useProblemMigrationModal from '../../../hooks/admin/useProblemMigrationModal';
 import formStyles from '../../../components/styles/Form.module.css';
 import modalStyles from '../shared/ModalLayout.module.css';
+import LoadingPage from '../../../components/shared/LoadingPage';
 
 const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
   const {
@@ -21,18 +22,7 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
 
   const canMoveProblems = contest.status === 'scheduled' || contest.status === 'running';
 
-  if (loading) {
-    return (
-      <div className={modalStyles['modal-overlay']}>
-        <div className={`${formStyles['form-container']} ${modalStyles.migrationModalContainer}`}>
-          <h2>📝 Manage Contest Problems</h2>
-          <div className={modalStyles.migrationModalLoadingText}>
-            Loading problems...
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingPage />;
 
   return (
     <div className={modalStyles['modal-overlay']} onClick={onClose}>

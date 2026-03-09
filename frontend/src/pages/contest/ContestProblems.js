@@ -3,6 +3,7 @@ import { useContestGuard } from '../../hooks/useContestGuard';
 import { useProblems } from '../../hooks/useProblems';
 import ProblemCard from '../../features/problem/ProblemCard';
 import styles from '../problem/Problems.module.css';
+import LoadingPage from '../../components/shared/LoadingPage';
 
 const ContestProblems = () => {
   const { contestId } = useParams();
@@ -19,7 +20,7 @@ const ContestProblems = () => {
     return <div className="error-message">Error: No Contest ID specified in the URL.</div>;
   }
 
-  if (guardLoading || problemsLoading) return <div>Loading problems...</div>;
+  if (guardLoading || problemsLoading) return <LoadingPage />;
   if (guardError) return <div className="error-message">{guardError}</div>;
   if (problemsError) return <div className="error-message">{problemsError}</div>;
 

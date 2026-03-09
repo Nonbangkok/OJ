@@ -6,6 +6,8 @@ import problemService from '../../services/problemService';
 import { useProblemDetail } from '../../hooks/useProblemDetail';
 import { generateResultString, getStatusClass } from '../../utils/formatters';
 
+import LoadingPage from '../../components/shared/LoadingPage';
+
 const ProblemDetail = () => {
   const {
     problemId,
@@ -39,7 +41,7 @@ const ProblemDetail = () => {
 
 
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <LoadingPage />;
   if (error) return <div className={styles['error-message']}>{error}</div>;
   if (hiddenProblemInfo) {
     return (

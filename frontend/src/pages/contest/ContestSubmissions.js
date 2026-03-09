@@ -7,6 +7,7 @@ import { getStatusClass, canViewCode, formatDateTime } from '../../utils/formatt
 import tableStyles from '../../components/styles/Table.module.css';
 import { useAuth } from '../../context/AuthContext';
 import { useContestGuard } from '../../hooks/useContestGuard';
+import LoadingPage from '../../components/shared/LoadingPage';
 
 const ContestSubmissions = () => {
     const { contestId } = useParams();
@@ -61,13 +62,7 @@ const ContestSubmissions = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [setShowProblemSuggestions, setShowUserSuggestions]);
 
-    if (guardLoading || submissionsLoading) {
-        return (
-            <div className={styles['submissions-container']}>
-                <div>Loading contest submissions...</div>
-            </div>
-        );
-    }
+    if (guardLoading || submissionsLoading) return <LoadingPage />;
 
     const error = guardError || submissionsError;
 
