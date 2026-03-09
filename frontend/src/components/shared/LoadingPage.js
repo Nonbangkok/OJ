@@ -1,4 +1,3 @@
-import React from 'react';
 import styles from './LoadingPage.module.css';
 import { useTheme } from '../../context/ThemeContext';
 import logoLight from '../../assets/logo512.png';
