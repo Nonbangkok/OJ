@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import hljs from 'highlight.js/lib/core';
+import { UI_TIMEOUTS } from '../config/constants';
 
 const useSubmissionModal = (submission) => {
     const [copySuccess, setCopySuccess] = useState(false);
@@ -39,7 +40,7 @@ const useSubmissionModal = (submission) => {
         resizeObserver.observe(textarea);
 
         // Initial check after a short delay to allow DOM to render
-        const timeoutId = setTimeout(checkScrollbar, 50);
+        const timeoutId = setTimeout(checkScrollbar, UI_TIMEOUTS.MODAL_CHECK);
 
         const syncScroll = () => {
             lineNumbers.scrollTop = textarea.scrollTop;
@@ -90,7 +91,7 @@ const useSubmissionModal = (submission) => {
             }
 
             setCopySuccess(true);
-            setTimeout(() => setCopySuccess(false), 2000);
+            setTimeout(() => setCopySuccess(false), UI_TIMEOUTS.COPY_CLIPBOARD);
         } catch (err) {
             console.error('Failed to copy code:', err);
         }

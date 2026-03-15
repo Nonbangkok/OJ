@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const db = require('../db');
 const problemMigration = require('../services/problemMigration');
 const { requireAuth, requireStaffOrAdmin } = require('../middleware/auth');
+const { CONTEST_STATUS, USER_ROLES } = require('../constants');
 const router = express.Router();
 
 // List all contests
@@ -21,7 +22,7 @@ router.get('/contests', async (req, res) => {
           COUNT(DISTINCT cp.user_id) as participant_count,
           CASE WHEN user_participation.user_id IS NOT NULL THEN true ELSE false END as is_participant,
           CASE 
-            WHEN c.status = 'finished' THEN COALESCE(finished_problems.problem_count, 0)
+            WHEN c.status = '${CONTEST_STATUS.FINISHED}' THEN COALESCE(finished_problems.problem_count, 0)
             ELSE COALESCE(active_problems.problem_count, 0)
           END as problem_count
         FROM contests c
@@ -35,13 +36,13 @@ router.get('/contests', async (req, res) => {
           SELECT contest_id, COUNT(*) as problem_count
           FROM contest_problems
           GROUP BY contest_id
-        ) finished_problems ON c.id = finished_problems.contest_id AND c.status = 'finished'
+        ) finished_problems ON c.id = finished_problems.contest_id AND c.status = '${CONTEST_STATUS.FINISHED}'
         LEFT JOIN (
           SELECT contest_id, COUNT(*) as problem_count
           FROM problems
           WHERE contest_id IS NOT NULL
           GROUP BY contest_id
-        ) active_problems ON c.id = active_problems.contest_id AND c.status != 'finished'
+        ) active_problems ON c.id = active_problems.contest_id AND c.status != '${CONTEST_STATUS.FINISHED}'
         GROUP BY c.id, c.title, c.description, c.start_time, c.end_time, c.status, c.created_at, user_participation.user_id, finished_problems.problem_count, active_problems.problem_count
         ORDER BY c.start_time DESC
       `, [userId]);
@@ -54,7 +55,7 @@ router.get('/contests', async (req, res) => {
           COUNT(DISTINCT cp.user_id) as participant_count,
           false as is_participant,
           CASE 
-            WHEN c.status = 'finished' THEN COALESCE(finished_problems.problem_count, 0)
+            WHEN c.status = '${CONTEST_STATUS.FINISHED}' THEN COALESCE(finished_problems.problem_count, 0)
             ELSE COALESCE(active_problems.problem_count, 0)
           END as problem_count
         FROM contests c
@@ -63,13 +64,13 @@ router.get('/contests', async (req, res) => {
           SELECT contest_id, COUNT(*) as problem_count
           FROM contest_problems
           GROUP BY contest_id
-        ) finished_problems ON c.id = finished_problems.contest_id AND c.status = 'finished'
+        ) finished_problems ON c.id = finished_problems.contest_id AND c.status = '${CONTEST_STATUS.FINISHED}'
         LEFT JOIN (
           SELECT contest_id, COUNT(*) as problem_count
           FROM problems
           WHERE contest_id IS NOT NULL
           GROUP BY contest_id
-        ) active_problems ON c.id = active_problems.contest_id AND c.status != 'finished'
+        ) active_problems ON c.id = active_problems.contest_id AND c.status != '${CONTEST_STATUS.FINISHED}'
         GROUP BY c.id, c.title, c.description, c.start_time, c.end_time, c.status, c.created_at, finished_problems.problem_count, active_problems.problem_count
         ORDER BY c.start_time DESC
       `);
@@ -91,7 +92,7 @@ router.get('/admin/contests', requireAuth, requireStaffOrAdmin, async (req, res)
         c.created_at,
         COUNT(DISTINCT cp.user_id) as participant_count,
         CASE 
-          WHEN c.status = 'finished' THEN COALESCE(finished_problems.problem_count, 0)
+          WHEN c.status = '${CONTEST_STATUS.FINISHED}' THEN COALESCE(finished_problems.problem_count, 0)
           ELSE COALESCE(active_problems.problem_count, 0)
         END as problem_count
       FROM contests c
@@ -100,13 +101,13 @@ router.get('/admin/contests', requireAuth, requireStaffOrAdmin, async (req, res)
         SELECT contest_id, COUNT(*) as problem_count
         FROM contest_problems
         GROUP BY contest_id
-      ) finished_problems ON c.id = finished_problems.contest_id AND c.status = 'finished'
+      ) finished_problems ON c.id = finished_problems.contest_id AND c.status = '${CONTEST_STATUS.FINISHED}'
       LEFT JOIN (
         SELECT contest_id, COUNT(*) as problem_count
         FROM problems
         WHERE contest_id IS NOT NULL
         GROUP BY contest_id
-      ) active_problems ON c.id = active_problems.contest_id AND c.status != 'finished'
+      ) active_problems ON c.id = active_problems.contest_id AND c.status != '${CONTEST_STATUS.FINISHED}'
       GROUP BY c.id, c.title, c.description, c.start_time, c.end_time, c.status, c.created_at, finished_problems.problem_count, active_problems.problem_count
       ORDER BY c.start_time DESC
     `);
@@ -165,8 +166,8 @@ router.get('/contests/:id', async (req, res) => {
 
     // Get problems in this contest (only if contest has started)
     let problems = [];
-    if (contest.status === 'running' || contest.status === 'finished') {
-      if (contest.status === 'finished') {
+    if (contest.status === CONTEST_STATUS.RUNNING || contest.status === CONTEST_STATUS.FINISHED) {
+      if (contest.status === CONTEST_STATUS.FINISHED) {
         // For finished contests, get problems from contest_problems snapshot
         const problemsResult = await db.query(`
           SELECT problem_id as id, title, author
@@ -255,7 +256,7 @@ router.get('/contests/:id/scoreboard', requireAuth, async (req, res) => {
 
     const contest = contestResult.rows[0];
 
-    if (contest.status === 'finished') {
+    if (contest.status === CONTEST_STATUS.FINISHED) {
       // Get final scoreboard from contest_scoreboards table with problems information
       const [scoreboardResult, problemsResult] = await Promise.all([
         db.query(`
@@ -279,7 +280,7 @@ router.get('/contests/:id/scoreboard', requireAuth, async (req, res) => {
         scoreboard: scoreboardResult.rows,
         problems: problemsResult.rows
       });
-    } else if (contest.status === 'running' || contest.status === 'finishing') {
+    } else if (contest.status === CONTEST_STATUS.RUNNING || contest.status === CONTEST_STATUS.FINISHING) {
       // Generate real-time scoreboard and fetch current problems
       const [scoreboardResult, problemsResult] = await Promise.all([
         db.query(`
@@ -454,7 +455,7 @@ router.delete('/admin/contests/:id', requireAuth, requireStaffOrAdmin, async (re
     }
 
     const contest = contestResult.rows[0];
-    if (contest.status === 'running') {
+    if (contest.status === CONTEST_STATUS.RUNNING) {
       return res.status(400).json({
         message: 'Cannot delete a running contest'
       });
@@ -529,7 +530,7 @@ router.delete('/admin/contests/:id/problems/:problemId', requireAuth, requireSta
     }
 
     const contest = contestResult.rows[0];
-    if (contest.status !== 'scheduled' && contest.status !== 'running') {
+    if (contest.status !== 'scheduled' && contest.status !== CONTEST_STATUS.RUNNING) {
       return res.status(400).json({
         message: 'Can only move problems from scheduled or running contests'
       });
@@ -582,7 +583,7 @@ router.get('/contests/:id/problems', requireAuth, async (req, res) => {
     }
 
     // Only show problems if contest is running, finishing, or finished
-    if (!['running', 'finishing', 'finished'].includes(contest.status)) {
+    if (![CONTEST_STATUS.RUNNING, CONTEST_STATUS.FINISHING, CONTEST_STATUS.FINISHED].includes(contest.status)) {
       return res.json([]); // Return empty array for scheduled contests
     }
 
@@ -609,7 +610,7 @@ router.get('/contests/:id/problems', requireAuth, async (req, res) => {
     `;
 
     let problemsResult;
-    if (contest.status === 'finished') {
+    if (contest.status === CONTEST_STATUS.FINISHED) {
       // For finished contests, get problems from contest_problems snapshot and join with stats
       problemsResult = await db.query(baseQuery + `
         SELECT
@@ -665,7 +666,7 @@ router.get('/contests/:id/problems/:problemId', requireAuth, async (req, res) =>
     }
     const contestStatus = contestRes.rows[0].status;
 
-    if (!['running', 'finishing', 'finished'].includes(contestStatus)) {
+    if (![CONTEST_STATUS.RUNNING, CONTEST_STATUS.FINISHING, CONTEST_STATUS.FINISHED].includes(contestStatus)) {
       return res.status(403).json({ message: 'Contest is not active.' });
     }
 
@@ -679,7 +680,7 @@ router.get('/contests/:id/problems/:problemId', requireAuth, async (req, res) =>
 
     // 2. Fetch problem details based on contest status
     let problemRes;
-    if (contestStatus === 'finished') {
+    if (contestStatus === CONTEST_STATUS.FINISHED) {
       // For finished contests, get data from the snapshot
       problemRes = await db.query(
         'SELECT problem_id as id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf FROM contest_problems WHERE contest_id = $1 AND problem_id = $2',
@@ -718,7 +719,7 @@ router.get('/contests/:id/problems/:problemId/pdf', requireAuth, async (req, res
     }
     const contestStatus = contestRes.rows[0].status;
 
-    if (!['running', 'finishing', 'finished'].includes(contestStatus)) {
+    if (![CONTEST_STATUS.RUNNING, CONTEST_STATUS.FINISHING, CONTEST_STATUS.FINISHED].includes(contestStatus)) {
       return res.status(403).json({ message: 'Contest is not active.' });
     }
 
@@ -732,7 +733,7 @@ router.get('/contests/:id/problems/:problemId/pdf', requireAuth, async (req, res
 
     // 2. Fetch the PDF data based on contest status
     let pdfRes;
-    if (contestStatus === 'finished') {
+    if (contestStatus === CONTEST_STATUS.FINISHED) {
       pdfRes = await db.query(
         'SELECT problem_pdf FROM contest_problems WHERE contest_id = $1 AND problem_id = $2',
         [contestId, problemId]

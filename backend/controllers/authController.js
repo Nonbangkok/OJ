@@ -3,10 +3,11 @@ const router = express.Router();
 const db = require('../db');
 const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcrypt');
+const { USER_VALIDATION, SECURITY_CONFIG } = require('../constants');
 
 router.post('/register', [
-  body('username').isLength({ min: 3 }).trim().escape(),
-  body('password').isLength({ min: 6 })
+  body('username').isLength({ min: USER_VALIDATION.MIN_USERNAME_LENGTH }).trim().escape(),
+  body('password').isLength({ min: USER_VALIDATION.MIN_PASSWORD_LENGTH })
 ], async (req, res) => {
   try {
     // Check if registration is enabled
@@ -37,7 +38,7 @@ router.post('/register', [
     }
 
     // Hash password
-    const saltRounds = 10;
+    const saltRounds = SECURITY_CONFIG.SALT_ROUNDS;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // Insert new user

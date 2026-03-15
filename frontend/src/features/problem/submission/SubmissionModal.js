@@ -5,6 +5,7 @@ import 'highlight.js/styles/atom-one-dark.css';
 import styles from './SubmissionModal.module.css';
 import editorStyles from '../../../components/styles/CodeEditor.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
+import { UI_CONFIG } from '../../../config/constants';
 
 const SubmissionModal = ({ submission, onClose }) => {
   const {
@@ -133,7 +134,7 @@ const SubmissionModal = ({ submission, onClose }) => {
                     disabled={true}
                     style={{
                       fontFamily: '"Fira code", "Fira Mono", monospace',
-                      fontSize: 16,
+                      fontSize: UI_CONFIG.DEFAULT_EDITOR_FONT_SIZE,
                       lineHeight: 1.5, // Ensure line height matches CSS
                     }}
                   />

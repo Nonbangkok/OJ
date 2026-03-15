@@ -8,6 +8,7 @@ const unzipper = require('unzipper');
 const path = require('path');
 const archiver = require('archiver');
 const { processBatchUpload } = require('../services/batchUploadService');
+const { PROBLEM_VALIDATION, USER_ROLES } = require('../constants');
 const progressMap = new Map();
 
 router.get('/problems-with-stats', requireAuth, async (req, res) => {
@@ -90,7 +91,7 @@ router.get('/problems/:id', async (req, res) => {
     }
 
     // Allow admin/staff to view hidden problems, otherwise apply visibility check
-    const isStaffOrAdmin = req.session.role === 'admin' || req.session.role === 'staff';
+    const isStaffOrAdmin = req.session.role === USER_ROLES.ADMIN || req.session.role === USER_ROLES.STAFF;
 
     if (!result.rows[0].is_visible && !isStaffOrAdmin) {
       return res.status(403).json({
@@ -145,10 +146,10 @@ router.get('/problems/:id/pdf', requireAuth, async (req, res) => {
 
 router.post('/admin/problems', requireAuth, requireStaffOrAdmin, [
   body('id').isLength({ min: 1 }).trim().escape(),
-  body('title').isLength({ min: 1 }).trim(),
-  body('author').isLength({ min: 1 }).trim(),
-  body('time_limit_ms').isInt({ min: 100 }),
-  body('memory_limit_mb').isInt({ min: 1 })
+  body('title').isLength({ min: PROBLEM_VALIDATION.MIN_TITLE_LENGTH }).trim(),
+  body('author').isLength({ min: PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH }).trim(),
+  body('time_limit_ms').isInt({ min: PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS }),
+  body('memory_limit_mb').isInt({ min: PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB })
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -169,10 +170,10 @@ router.post('/admin/problems', requireAuth, requireStaffOrAdmin, [
 
 router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin, [
   body('id').isLength({ min: 1 }).trim().escape(), // New ID
-  body('title').optional({ checkFalsy: true }).isLength({ min: 1 }).trim(),
-  body('author').optional({ checkFalsy: true }).isLength({ min: 1 }).trim(),
-  body('time_limit_ms').optional().isInt({ min: 100 }),
-  body('memory_limit_mb').optional().isInt({ min: 1 })
+  body('title').optional({ checkFalsy: true }).isLength({ min: PROBLEM_VALIDATION.MIN_TITLE_LENGTH }).trim(),
+  body('author').optional({ checkFalsy: true }).isLength({ min: PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH }).trim(),
+  body('time_limit_ms').optional().isInt({ min: PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS }),
+  body('memory_limit_mb').optional().isInt({ min: PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB })
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {

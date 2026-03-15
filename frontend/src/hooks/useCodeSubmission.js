@@ -24,10 +24,10 @@ const useCodeSubmission = (problemId, contestId) => {
             const problemCache = cachedSubmission[problemId];
 
             if (problemCache && problemCache.code) {
-                const thirtyMinutes = 30 * 60 * 1000;
+                const CACHE_TIMEOUT = 30 * 60 * 1000;
                 const timeDiff = new Date().getTime() - problemCache.timestamp;
 
-                if (timeDiff < thirtyMinutes) {
+                if (timeDiff < CACHE_TIMEOUT) {
                     setCode(problemCache.code);
                 } else {
                     // Clear expired cache for this problem

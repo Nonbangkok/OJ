@@ -5,6 +5,7 @@ import useCodeSubmission from '../../../hooks/useCodeSubmission';
 import editorStyles from '../../../components/styles/CodeEditor.module.css';
 import formStyles from '../../../components/styles/Form.module.css';
 import styles from './CodeSubmissionForm.module.css';
+import { UI_CONFIG } from '../../../config/constants';
 
 const CodeSubmissionForm = ({ problemId, contestId }) => {
   const {
@@ -57,7 +58,7 @@ const CodeSubmissionForm = ({ problemId, contestId }) => {
                 disabled={isSubmitting}
                 style={{
                   fontFamily: '"Fira code", "Fira Mono", monospace',
-                  fontSize: 16,
+                  fontSize: UI_CONFIG.DEFAULT_EDITOR_FONT_SIZE,
                   lineHeight: 1.5, // Ensure line height matches CSS
                 }}
               />

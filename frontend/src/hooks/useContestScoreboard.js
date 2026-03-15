@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import contestService from '../services/contestService';
+import { POLLING_INTERVALS } from '../config/constants';
 
 const useContestScoreboard = (contestId) => {
     const [contest, setContest] = useState(null);
@@ -17,7 +18,7 @@ const useContestScoreboard = (contestId) => {
         // Auto-refresh for running contests
         let interval;
         if (contest?.status === 'running') {
-            interval = setInterval(fetchScoreboard, 30000); // Refresh every 30 seconds
+            interval = setInterval(fetchScoreboard, POLLING_INTERVALS.SCOREBOARD); // Refresh every 30 seconds
         }
 
         return () => {

@@ -4,6 +4,7 @@ const db = require('../db');
 const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcrypt');
 const { requireAuth, requireAdmin, requireStaffOrAdmin } = require('../middleware/auth');
+const { USER_VALIDATION, USER_ROLES, SECURITY_CONFIG } = require('../constants');
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const execPromise = promisify(exec);
@@ -23,9 +24,9 @@ router.get('/admin/users', requireAuth, requireAdmin, async (req, res) => {
 });
 
 router.post('/admin/users', requireAuth, requireAdmin, [
-  body('username').isLength({ min: 3 }).trim().escape(),
-  body('password').isLength({ min: 6 }),
-  body('role').isIn(['user', 'staff'])
+  body('username').isLength({ min: USER_VALIDATION.MIN_USERNAME_LENGTH }).trim().escape(),
+  body('password').isLength({ min: USER_VALIDATION.MIN_PASSWORD_LENGTH }),
+  body('role').isIn([USER_ROLES.USER, USER_ROLES.STAFF])
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -40,7 +41,7 @@ router.post('/admin/users', requireAuth, requireAdmin, [
       return res.status(409).json({ message: 'Username already exists.' });
     }
 
-    const saltRounds = 10;
+    const saltRounds = SECURITY_CONFIG.SALT_ROUNDS;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     const result = await db.query(
@@ -57,8 +58,8 @@ router.post('/admin/users', requireAuth, requireAdmin, [
 });
 
 router.put('/admin/users/:id', requireAuth, requireAdmin, [
-  body('username').isLength({ min: 3 }).trim().escape(),
-  body('role').isIn(['user', 'staff', 'admin']) // <-- Allow 'admin' role
+  body('username').isLength({ min: USER_VALIDATION.MIN_USERNAME_LENGTH }).trim().escape(),
+  body('role').isIn([USER_ROLES.USER, USER_ROLES.STAFF, USER_ROLES.ADMIN]) // <-- Allow 'admin' role
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -145,7 +146,7 @@ router.delete('/admin/users/:id', requireAuth, requireAdmin, async (req, res) =>
 
 router.post('/admin/users/batch', requireAuth, requireAdmin, [
   body('prefix').isLength({ min: 1 }).trim().escape(),
-  body('count').isInt({ min: 1, max: 100 }) // Limit to 100 users at a time for performance
+  body('count').isInt({ min: 1, max: USER_VALIDATION.BATCH_MAX_COUNT }) // Limit to 100 users at a time for performance
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -165,7 +166,7 @@ router.post('/admin/users/batch', requireAuth, requireAdmin, [
       const username = `${prefix}-${i.toString().padStart(2, '0')}`;
       const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}|;:,.<>?';
       let password = '';
-      for (let j = 0; j < 16; j++) {
+      for (let j = 0; j < USER_VALIDATION.RANDOM_PASSWORD_LENGTH; j++) {
         password += charset.charAt(Math.floor(Math.random() * charset.length));
       }
       const hashedPassword = await bcrypt.hash(password, saltRounds);

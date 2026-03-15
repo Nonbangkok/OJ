@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import adminService from '../../services/adminService';
+import { POLLING_INTERVALS } from '../../config/constants';
 
 const useProblemManagement = () => {
     const [problems, setProblems] = useState([]);
@@ -334,7 +335,7 @@ const useProblemManagement = () => {
                             setUploadProgress({ status: 'failed', message: 'Could not retrieve processing status.' });
                             clearInterval(pollInterval);
                         }
-                    }, 1500);
+                    }, POLLING_INTERVALS.BATCH_PROCESS);
                 } else {
                     setIsModalOpen(false);
                     fetchProblems();

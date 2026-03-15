@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import contestService from '../services/contestService';
+import { POLLING_INTERVALS } from '../config/constants';
 
 /**
  * Hook that manages contest access checks and auto-redirects.
@@ -56,7 +57,7 @@ export const useContestGuard = (contestId) => {
 
     useEffect(() => {
         checkAccess();
-        const intervalId = setInterval(checkAccess, 15000);
+        const intervalId = setInterval(checkAccess, POLLING_INTERVALS.CONTEST_GUARD);
         return () => clearInterval(intervalId);
     }, [checkAccess]);
 

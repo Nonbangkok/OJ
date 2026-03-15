@@ -4,6 +4,7 @@ const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { memoryUpload } = require('../middleware/upload');
 const { processSubmission, processContestSubmission } = require('../services/submissionService');
+const { USER_ROLES, SUBMISSION_STATUS, CONTEST_STATUS } = require('../constants');
 
 router.post('/submit', requireAuth, memoryUpload.none(), async (req, res) => {
   const { problemId, language, code, contestId } = req.body;
@@ -30,7 +31,7 @@ router.post('/submit', requireAuth, memoryUpload.none(), async (req, res) => {
       }
 
       const contest = contestRes.rows[0];
-      if (contest.status !== 'running') {
+      if (contest.status !== CONTEST_STATUS.RUNNING) {
         return res.status(400).json({
           message: `Contest is not running. Current status: ${contest.status}`
         });
@@ -63,8 +64,8 @@ router.post('/submit', requireAuth, memoryUpload.none(), async (req, res) => {
       // Create contest submission
       const submissionRes = await db.query(
         `INSERT INTO contest_submissions (contest_id, user_id, problem_id, code, language, overall_status, score)
-         VALUES ($1, $2, $3, $4, $5, 'Pending', 0) RETURNING id`,
-        [contestId, userId, problemId, code, language]
+         VALUES ($1, $2, $3, $4, $5, $6, 0) RETURNING id`,
+        [contestId, userId, problemId, code, language, SUBMISSION_STATUS.PENDING]
       );
       const submissionId = submissionRes.rows[0].id;
 
@@ -93,8 +94,8 @@ router.post('/submit', requireAuth, memoryUpload.none(), async (req, res) => {
 
       const submissionRes = await db.query(
         `INSERT INTO submissions (user_id, problem_id, code, language, overall_status, score)
-         VALUES ($1, $2, $3, $4, 'Pending', 0) RETURNING id`,
-        [userId, problemId, code, language]
+         VALUES ($1, $2, $3, $4, $5, 0) RETURNING id`,
+        [userId, problemId, code, language, SUBMISSION_STATUS.PENDING]
       );
       const submissionId = submissionRes.rows[0].id;
 
@@ -117,7 +118,7 @@ router.post('/submit', requireAuth, memoryUpload.none(), async (req, res) => {
 router.get('/submissions', requireAuth, async (req, res) => {
   const { filter, problemId, contestId } = req.query;
   const { userId, role } = req.session;
-  const isStaffOrAdmin = role === 'admin' || role === 'staff';
+  const isStaffOrAdmin = role === USER_ROLES.ADMIN || role === USER_ROLES.STAFF;
 
   try {
     let query, params = [], conditions = [];
@@ -201,7 +202,7 @@ router.get('/search/problems', requireAuth, async (req, res) => {
 
       const status = contestRes.rows[0].status;
 
-      if (status === 'finished') {
+      if (status === CONTEST_STATUS.FINISHED) {
         result = await db.query(
           `SELECT problem_id as id, title FROM contest_problems 
            WHERE contest_id = $1 AND (problem_id ILIKE $2 OR title ILIKE $2) 
@@ -293,7 +294,7 @@ router.get('/submissions/:id', requireAuth, async (req, res) => {
 
     // Allow access if the user is an admin, a staff member, or the owner of the submission
     const isOwner = submission.user_id === userId;
-    const isStaffOrAdmin = role === 'admin' || role === 'staff';
+    const isStaffOrAdmin = role === USER_ROLES.ADMIN || role === USER_ROLES.STAFF;
 
     if (!isOwner && !isStaffOrAdmin) {
       return res.status(403).json({ message: 'You are not authorized to view this submission.' });
