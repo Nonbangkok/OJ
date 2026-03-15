@@ -17,13 +17,19 @@ jest.mock('../../utils/formatters', () => ({
     formatDateTime: jest.fn((date) => `Formatted: ${date}`)
 }));
 
+const now = new Date();
+const yesterday = new Date(now);
+yesterday.setDate(now.getDate() - 1);
+const tomorrow = new Date(now);
+tomorrow.setDate(now.getDate() + 1);
+
 const mockContest = {
     id: 1,
     title: 'Spring Contest',
     description: 'A fun contest',
     status: 'running',
-    start_time: '2026-03-01T10:00:00Z',
-    end_time: '2026-03-10T10:00:00Z',
+    start_time: yesterday.toISOString(),
+    end_time: tomorrow.toISOString(),
     participant_count: 50,
     problem_count: 5,
     is_participant: false
@@ -97,7 +103,9 @@ describe('ContestCard', () => {
     });
 
     it('shows View Results for finished contests', () => {
-        const finishedContest = { ...mockContest, status: 'finished', end_time: '2020-01-01T00:00:00Z' };
+        const pastDate = new Date(now);
+        pastDate.setDate(now.getDate() - 2);
+        const finishedContest = { ...mockContest, status: 'finished', end_time: pastDate.toISOString() };
 
         render(
             <BrowserRouter>
