@@ -1,19 +1,16 @@
 import api from '../../services/api';
+import problemService from '../../services/problemService';
 
-jest.mock('../../services/api');
-
-// Set env before loading problemService (getPdfUrl uses API_URL at module load)
-const originalEnv = process.env.REACT_APP_API_URL;
-process.env.REACT_APP_API_URL = 'http://localhost:5000/api';
-const problemService = require('../../services/problemService').default;
+jest.mock('../../services/api', () => ({
+    get: jest.fn(),
+    defaults: {
+        baseURL: 'http://localhost:5000/api'
+    }
+}));
 
 describe('Problem Service', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-    });
-
-    afterAll(() => {
-        process.env.REACT_APP_API_URL = originalEnv;
     });
 
     it('getAllWithStats fetches problems with stats', async () => {
