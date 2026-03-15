@@ -1,3 +1,5 @@
+import { USER_ROLES, SUBMISSION_STATUS } from './constants';
+
 /**
  * Shared utility functions for formatting dates, statuses, and results.
  * Extracted from duplicated code across multiple page components.
@@ -46,19 +48,19 @@ export const formatDateAbsolute = (dateString) => {
  * @returns {string} Result string (e.g., "[PP-TS]")
  */
 export const generateResultString = (status, results) => {
-    if (status === 'Compilation Error') {
-        return 'Compilation Error';
+    if (status === SUBMISSION_STATUS.COMPILATION_ERROR) {
+        return SUBMISSION_STATUS.COMPILATION_ERROR;
     }
     if (!results || results.length === 0) {
         return '';
     }
     const charMap = {
-        'Accepted': 'P',
-        'Wrong Answer': '-',
-        'Time Limit Exceeded': 'T',
-        'Runtime Error': 'R',
-        'Memory Limit Exceeded': 'M',
-        'Skipped': 'S',
+        [SUBMISSION_STATUS.ACCEPTED]: 'P',
+        [SUBMISSION_STATUS.WRONG_ANSWER]: '-',
+        [SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED]: 'T',
+        [SUBMISSION_STATUS.RUNTIME_ERROR]: 'R',
+        [SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED]: 'M',
+        [SUBMISSION_STATUS.SKIPPED]: 'S',
     };
     const resultChars = results.map(r => charMap[r.status] || '?').join('');
     return `[${resultChars}]`;
@@ -122,6 +124,6 @@ export const getRemainingTime = (endTime) => {
  */
 export const canViewCode = (submission, user) => {
     if (!user) return false;
-    if (user.role === 'admin' || user.role === 'staff') return true;
+    if (user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.STAFF) return true;
     return submission.username === user.username;
 };

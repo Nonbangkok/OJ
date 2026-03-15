@@ -6,6 +6,7 @@ import styles from './AdminNavbar.module.css';
 import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/logo512.png';
 import darkmodeLogo from '../../assets/logo512_darkmode.png';
+import { USER_ROLES } from '../../utils/constants';
 
 const AdminNavbar = () => {
   const { user, logout } = useAuth();
@@ -67,21 +68,21 @@ const AdminNavbar = () => {
             <img src={currentLogo} alt="Grader Logo" className={styles['nav-logo']} />
           </NavLink>
           <NavLink to="/admin" className={styles['nav-brand']}>
-            {user?.role === 'admin' ? 'Admin Panel' : 'Staff Panel'}
+            {user?.role === USER_ROLES.ADMIN ? 'Admin Panel' : 'Staff Panel'}
           </NavLink>
         </div>
         <ul ref={navRef} className={styles['nav-links']} onMouseLeave={resetSlider}>
           <div className={styles.slider} style={sliderStyle} />
-          {user?.role === 'admin' && (
+          {user?.role === USER_ROLES.ADMIN && (
             <li onMouseEnter={handleMouseEnter}><NavLink to="/admin/users">Users</NavLink></li>
           )}
-          {(user?.role === 'admin' || user?.role === 'staff') && (
+          {(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.STAFF) && (
             <>
               <li onMouseEnter={handleMouseEnter}><NavLink to="/admin/problems">Problems</NavLink></li>
               <li onMouseEnter={handleMouseEnter}><NavLink to="/admin/contests">Contests</NavLink></li>
             </>
           )}
-          {user?.role === 'admin' && (
+          {user?.role === USER_ROLES.ADMIN && (
             <li onMouseEnter={handleMouseEnter}><NavLink to="/admin/settings">Settings</NavLink></li>
           )}
         </ul>

@@ -8,6 +8,7 @@ import tableStyles from '../../components/styles/Table.module.css';
 import { useAuth } from '../../context/AuthContext';
 import { useContestGuard } from '../../hooks/useContestGuard';
 import LoadingPage from '../../components/shared/LoadingPage';
+import { USER_ROLES } from '../../utils/constants';
 
 const ContestSubmissions = () => {
     const { contestId } = useParams();
@@ -85,7 +86,7 @@ const ContestSubmissions = () => {
                     </button>
 
                     {/* Admin/Staff Filters */}
-                    {currentUser && (currentUser.role === 'admin' || currentUser.role === 'staff') && (
+                    {currentUser && (currentUser.role === USER_ROLES.ADMIN || currentUser.role === USER_ROLES.STAFF) && (
                         <>
                             <div className={styles['filter-input-wrapper']} ref={problemInputRef}>
                                 <input

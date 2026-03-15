@@ -6,6 +6,7 @@ import { useSubmissions } from '../../hooks/useSubmissions';
 import { getStatusClass } from '../../utils/formatters';
 import tableStyles from '../../components/styles/Table.module.css';
 import LoadingPage from '../../components/shared/LoadingPage';
+import { USER_ROLES } from '../../utils/constants';
 
 const Submissions = ({ problemId, showTitle = true }) => {
   const { contestId } = useParams();
@@ -82,7 +83,7 @@ const Submissions = ({ problemId, showTitle = true }) => {
               </button>
 
               {/* Admin/Staff Filters */}
-              {currentUser && (currentUser.role === 'admin' || currentUser.role === 'staff') && (
+              {currentUser && (currentUser.role === USER_ROLES.ADMIN || currentUser.role === USER_ROLES.STAFF) && (
                 <>
                   <div className={styles['filter-input-wrapper']} ref={problemInputRef}>
                     <input
@@ -166,7 +167,7 @@ const Submissions = ({ problemId, showTitle = true }) => {
                   <td>{sub.score}</td>
                   <td>{sub.language}</td>
                   <td>
-                    {currentUser && (currentUser.username === sub.username || currentUser.role === 'admin' || currentUser.role === 'staff') && (
+                    {currentUser && (currentUser.username === sub.username || currentUser.role === USER_ROLES.ADMIN || currentUser.role === USER_ROLES.STAFF) && (
                       <button onClick={() => handleViewCode(sub.id)} className={styles['view-code-btn']}>
                         View Code
                       </button>

@@ -5,6 +5,7 @@ import ContestManagement from '../../features/admin/contests/ContestManagement';
 import Settings from '../../features/admin/settings/Settings';
 import styles from './Admin.module.css';
 import LoadingPage from '../../components/shared/LoadingPage';
+import { USER_ROLES } from '../../utils/constants';
 
 const Admin = () => {
   const { user, loading } = useAdminPage();
@@ -15,25 +16,25 @@ const Admin = () => {
     <div className={styles['admin-container']}>
       <h1>Admin Panel</h1>
 
-      {user?.role === 'admin' && (
+      {user?.role === USER_ROLES.ADMIN && (
         <div className={styles['admin-section']}>
           <UserManagement />
         </div>
       )}
 
-      {(user?.role === 'admin' || user?.role === 'staff') && (
+      {(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.STAFF) && (
         <div className={styles['admin-section']}>
           <ProblemManagement currentUser={user} />
         </div>
       )}
 
-      {(user?.role === 'admin' || user?.role === 'staff') && (
+      {(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.STAFF) && (
         <div className={styles['admin-section']}>
           <ContestManagement currentUser={user} />
         </div>
       )}
 
-      {user?.role === 'admin' && (
+      {user?.role === USER_ROLES.ADMIN && (
         <div className={styles['admin-section']}>
           <Settings />
         </div>
