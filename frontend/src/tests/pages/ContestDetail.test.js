@@ -4,6 +4,14 @@ import ContestDetail from '../../pages/contest/ContestDetail';
 import contestService from '../../services/contestService';
 
 jest.mock('../../services/contestService');
+
+// Mock ThemeContext to prevent useTheme errors from LoadingPage
+jest.mock('../../context/ThemeContext', () => ({
+    useTheme: jest.fn(() => ({ theme: 'light' })),
+}));
+
+// Mock LoadingPage to control the loading text
+jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading Contest Data...</div>);
 jest.mock('react-router-dom', () => ({
     ...jest.requireActual('react-router-dom'),
     useParams: () => ({ contestId: '1' }),
@@ -22,7 +30,7 @@ describe('ContestDetail Page', () => {
     it('renders loading state initially', () => {
         contestService.getById.mockReturnValue(new Promise(() => { }));
         render(<BrowserRouter><ContestDetail /></BrowserRouter>);
-        expect(screen.getByText(/loading contest data/i)).toBeInTheDocument();
+        expect(screen.getByText(/loading contest data\.\.\.$/i)).toBeInTheDocument();
     });
 
     it('displays contest details successfully', async () => {

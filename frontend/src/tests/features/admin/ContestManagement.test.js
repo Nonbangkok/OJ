@@ -6,6 +6,14 @@ import { BrowserRouter } from 'react-router-dom';
 // Mock services
 jest.mock('../../../services/adminService');
 
+// Mock ThemeContext to prevent useTheme errors from child components
+jest.mock('../../../context/ThemeContext', () => ({
+    useTheme: jest.fn(() => ({ theme: 'light' })),
+}));
+
+// Mock LoadingPage to control what text appears during loading state
+jest.mock('../../../components/shared/LoadingPage', () => () => <div>Loading Contests...</div>);
+
 const mockContests = [
     {
         id: 1,
@@ -55,7 +63,7 @@ describe('ContestManagement Component', () => {
     it('renders loading state initially', () => {
         adminService.getContests.mockReturnValue(new Promise(() => { }));
         renderContestManagement();
-        expect(screen.getByText(/loading contests.../i)).toBeInTheDocument();
+        expect(screen.getByText(/loading contests\.\.\.$/i)).toBeInTheDocument();
     });
 
     it('renders contest list correctly', async () => {

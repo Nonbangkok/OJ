@@ -14,7 +14,9 @@ jest.mock('react-router-dom', () => ({
 // Mock the context hooks
 jest.mock('../context/AuthContext');
 jest.mock('../context/SettingsContext');
-jest.mock('../context/ThemeContext');
+jest.mock('../context/ThemeContext', () => ({
+    useTheme: jest.fn(),
+}));
 
 // Mock assets
 jest.mock('../assets/logo512.png', () => 'test-file-stub');

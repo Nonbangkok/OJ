@@ -6,6 +6,14 @@ import { BrowserRouter } from 'react-router-dom';
 // Mock services
 jest.mock('../../../services/adminService');
 
+// Mock ThemeContext to prevent useTheme errors from LoadingPage
+jest.mock('../../../context/ThemeContext', () => ({
+    useTheme: jest.fn(() => ({ theme: 'light' })),
+}));
+
+// Mock LoadingPage to control the loading text
+jest.mock('../../../components/shared/LoadingPage', () => () => <div>Loading Problems...</div>);
+
 // Mock URL and Blob for export tests
 window.URL.createObjectURL = jest.fn();
 window.URL.revokeObjectURL = jest.fn();
@@ -35,7 +43,7 @@ describe('ProblemManagement Component', () => {
     it('renders loading state initially', () => {
         adminService.getProblems.mockReturnValue(new Promise(() => { }));
         renderProblemManagement();
-        expect(screen.getByText(/loading problems.../i)).toBeInTheDocument();
+        expect(screen.getByText(/loading problems\.\.\.$/i)).toBeInTheDocument();
     });
 
     it('renders problem list correctly', async () => {

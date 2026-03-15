@@ -9,6 +9,14 @@ import { APP_CONSTANTS } from '../../../utils/constants';
 jest.mock('../../../services/adminService');
 jest.mock('../../../context/AuthContext');
 
+// Mock ThemeContext to prevent useTheme errors from LoadingPage
+jest.mock('../../../context/ThemeContext', () => ({
+    useTheme: jest.fn(() => ({ theme: 'light' })),
+}));
+
+// Mock LoadingPage to control the loading text
+jest.mock('../../../components/shared/LoadingPage', () => () => <div>Loading Users...</div>);
+
 const mockUsers = [
     { id: 1, username: 'Nonbangkok', role: 'admin' },
     { id: 2, username: 'user1', role: 'user' },
@@ -35,7 +43,7 @@ describe('UserManagement Component', () => {
     it('renders loading state initially', () => {
         adminService.getUsers.mockReturnValue(new Promise(() => { }));
         renderUserManagement();
-        expect(screen.getByText(/loading users.../i)).toBeInTheDocument();
+        expect(screen.getByText(/loading users\.\.\.$/i)).toBeInTheDocument();
     });
 
     it('renders user list and headers correctly', async () => {
