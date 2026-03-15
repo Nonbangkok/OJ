@@ -11,6 +11,7 @@ const db = require('../db');
 // ================================================================= //
 // == Helper functions directly adapted from batch_upload.js == //
 // ================================================================= //
+const { UPLOAD_STATUS, FILE_CONFIG } = require('../constants');
 
 async function processTestcasesFromZip(problemId, zipPath, log) {
   const zip = await unzipper.Open.file(zipPath);
@@ -200,7 +201,7 @@ async function processProblemDirectory(problemPath) {
     `, [problemId, title, author, time_limit_ms, memory_limit_mb]);
 
     if (insertResult.rowCount === 0) {
-        return { status: 'skipped', problemId };
+    return { status: UPLOAD_STATUS.SKIPPED, problemId };
     }
 
     // --- Problem was newly inserted, proceed with file uploads ---
@@ -288,12 +289,12 @@ async function processProblemDirectory(problemPath) {
         log.push('No .zip file or valid testcase directory found.');
     }
 
-    return { status: 'added', problemId, log };
 }
 
 // ================================================================= //
 // == Main exported function for the API == //
 // ================================================================= //
+  return { status: UPLOAD_STATUS.ADDED, problemId, log };
 
 async function processBatchUpload(zipFilePath, onProgress) {
   const results = { added: [], skipped: [], errors: [] };
@@ -338,9 +339,9 @@ async function processBatchUpload(zipFilePath, onProgress) {
     for (const problemPath of problemPathsToProcess) {
       try {
         const result = await processProblemDirectory(problemPath);
-        if (result.status === 'added') {
+        if (result.status === UPLOAD_STATUS.ADDED) {
           results.added.push(result.problemId);
-        } else if (result.status === 'skipped') {
+        } else if (result.status === UPLOAD_STATUS.SKIPPED) {
           results.skipped.push(result.problemId);
         }
       } catch (error) {
@@ -363,8 +364,8 @@ async function processBatchUpload(zipFilePath, onProgress) {
   } finally {
     const delay = ms => new Promise(res => setTimeout(res, ms));
     try {
-        await delay(200);
         await execPromise(`rm -rf ${tempDir}`);
+      await delay(FILE_CONFIG.CLEANUP_DELAY_MS);
     } catch (err) {
         console.warn(`[Robust Cleanup] Failed to remove temp directory ${tempDir}:`, err);
     }
