@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import submissionService from '../services/submissionService';
 import authService from '../services/authService';
 import { useAutocomplete } from './useAutocomplete';
+import { USER_ROLES, SUBMISSION_STATUS } from '../utils/constants';
+import { POLLING_INTERVALS } from '../config/constants';
 
 export const useSubmissions = (problemId, contestId) => {
     const [submissions, setSubmissions] = useState([]);
@@ -12,9 +14,8 @@ export const useSubmissions = (problemId, contestId) => {
     const [selectedSubmission, setSelectedSubmission] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // Autocomplete hooks (replaces ~60 lines of manual state management)
-    const problemAutocomplete = useAutocomplete(submissionService.searchProblems);
-    const userAutocomplete = useAutocomplete(submissionService.searchUsers);
+    const problemAutocomplete = useAutocomplete(submissionService.searchProblems, { contestId });
+    const userAutocomplete = useAutocomplete(submissionService.searchUsers, { contestId });
 
     const [appliedFilters, setAppliedFilters] = useState({ problemId: '', userId: '' });
     const lastRequestIdRef = useRef(0);
@@ -49,7 +50,7 @@ export const useSubmissions = (problemId, contestId) => {
             if (contestId) params.contestId = contestId;
 
             // Staff/Admin search filters
-            if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'staff') && !problemId) {
+            if (currentUser && (currentUser.role === USER_ROLES.ADMIN || currentUser.role === USER_ROLES.STAFF) && !problemId) {
                 if (appliedFilters.problemId) params.filterProblemId = appliedFilters.problemId;
                 if (appliedFilters.userId) params.filterUserId = appliedFilters.userId;
             }
@@ -79,11 +80,11 @@ export const useSubmissions = (problemId, contestId) => {
     // 3. Polling for Pending Submissions
     useEffect(() => {
         const isProcessing = submissions.some(s =>
-            ['Pending', 'Compiling', 'Running'].includes(s.overall_status)
+            [SUBMISSION_STATUS.PENDING, SUBMISSION_STATUS.COMPILING, SUBMISSION_STATUS.RUNNING].includes(s.overall_status)
         );
 
         if (isProcessing) {
-            const intervalId = setInterval(fetchData, 2500);
+            const intervalId = setInterval(fetchData, POLLING_INTERVALS.SUBMISSIONS);
             return () => clearInterval(intervalId);
         }
     }, [submissions, fetchData]);

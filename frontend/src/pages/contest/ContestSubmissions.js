@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import styles from '../../components/styles/Submissions.module.css';
-import SubmissionModal from '../../features/problems/submissions/SubmissionModal';
+import SubmissionModal from '../../features/problem/submission/SubmissionModal';
 import { useSubmissions } from '../../hooks/useSubmissions';
 import { getStatusClass, canViewCode, formatDateTime } from '../../utils/formatters';
 import tableStyles from '../../components/styles/Table.module.css';
 import { useAuth } from '../../context/AuthContext';
 import { useContestGuard } from '../../hooks/useContestGuard';
+import LoadingPage from '../../components/shared/LoadingPage';
+import { USER_ROLES } from '../../utils/constants';
 
 const ContestSubmissions = () => {
     const { contestId } = useParams();
@@ -61,13 +63,7 @@ const ContestSubmissions = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [setShowProblemSuggestions, setShowUserSuggestions]);
 
-    if (guardLoading || submissionsLoading) {
-        return (
-            <div className={styles['submissions-container']}>
-                <div>Loading contest submissions...</div>
-            </div>
-        );
-    }
+    if (guardLoading || submissionsLoading) return <LoadingPage />;
 
     const error = guardError || submissionsError;
 
@@ -90,7 +86,7 @@ const ContestSubmissions = () => {
                     </button>
 
                     {/* Admin/Staff Filters */}
-                    {currentUser && (currentUser.role === 'admin' || currentUser.role === 'staff') && (
+                    {currentUser && (currentUser.role === USER_ROLES.ADMIN || currentUser.role === USER_ROLES.STAFF) && (
                         <>
                             <div className={styles['filter-input-wrapper']} ref={problemInputRef}>
                                 <input

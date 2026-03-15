@@ -4,6 +4,14 @@ import ContestProblems from '../../pages/contest/ContestProblems';
 import contestService from '../../services/contestService';
 
 jest.mock('../../services/contestService');
+
+// Mock ThemeContext to prevent useTheme errors from LoadingPage
+jest.mock('../../context/ThemeContext', () => ({
+    useTheme: jest.fn(() => ({ theme: 'light' })),
+}));
+
+// Mock LoadingPage to control the loading text
+jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading Problems...</div>);
 jest.mock('react-router-dom', () => ({
     ...jest.requireActual('react-router-dom'),
     useParams: () => ({ contestId: 'contest-1' }),
@@ -18,7 +26,7 @@ describe('ContestProblems Page', () => {
     });
 
     it('displays loading state', () => {
-        contestService.getById.mockReturnValue(new Promise(() => {}));
+        contestService.getById.mockReturnValue(new Promise(() => { }));
 
         render(
             <BrowserRouter>
@@ -26,7 +34,7 @@ describe('ContestProblems Page', () => {
             </BrowserRouter>
         );
 
-        expect(screen.getByText(/loading problems/i)).toBeInTheDocument();
+        expect(screen.getByText(/loading problems\.\.\.$/i)).toBeInTheDocument();
     });
 
     it('displays contest problems on success', async () => {

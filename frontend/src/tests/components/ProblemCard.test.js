@@ -1,9 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import ProblemCard from '../../features/problems/ProblemCard';
+import ProblemCard from '../../features/problem/ProblemCard';
 
 // Mock CSS modules
-jest.mock('../../features/problems/ProblemCard.module.css', () => new Proxy({}, {
+jest.mock('../../features/problem/ProblemCard.module.css', () => new Proxy({}, {
     get: (target, prop) => prop
 }));
 

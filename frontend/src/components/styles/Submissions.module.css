@@ -64,6 +64,8 @@ a:hover {
   color: var(--text-primary);
   font-weight: 500;
   transition: all 0.2s ease;
+  height: 1.5rem;
+  font-size: 0.9rem;
 }
 
 .suggestions-list {

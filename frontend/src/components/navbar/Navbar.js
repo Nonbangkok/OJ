@@ -7,6 +7,7 @@ import styles from './Navbar.module.css';
 import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/logo512.png';
 import darkmodeLogo from '../../assets/logo512_darkmode.png';
+import { USER_ROLES } from '../../utils/constants';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -76,10 +77,10 @@ const Navbar = () => {
           <li onMouseEnter={handleMouseEnter}><NavLink to="/submissions">Submissions</NavLink></li>
           <li onMouseEnter={handleMouseEnter}><NavLink to="/scoreboard">Scoreboard</NavLink></li>
           <li onMouseEnter={handleMouseEnter}><NavLink to="/contests">Contests</NavLink></li>
-          {user?.role === 'admin' && (
+          {user?.role === USER_ROLES.ADMIN && (
             <li onMouseEnter={handleMouseEnter}><NavLink to="/admin">Admin Panel</NavLink></li>
           )}
-          {user?.role === 'staff' && (
+          {user?.role === USER_ROLES.STAFF && (
             <li onMouseEnter={handleMouseEnter}><NavLink to="/admin">Staff Panel</NavLink></li>
           )}
         </ul>

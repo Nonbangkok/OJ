@@ -4,6 +4,7 @@ const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { memoryUpload } = require('../middleware/upload');
 const { processSubmission, processContestSubmission } = require('../services/submissionService');
+const { USER_ROLES, SUBMISSION_STATUS, CONTEST_STATUS } = require('../constants');
 
 router.post('/submit', requireAuth, memoryUpload.none(), async (req, res) => {
   const { problemId, language, code, contestId } = req.body;
@@ -30,7 +31,7 @@ router.post('/submit', requireAuth, memoryUpload.none(), async (req, res) => {
       }
 
       const contest = contestRes.rows[0];
-      if (contest.status !== 'running') {
+      if (contest.status !== CONTEST_STATUS.RUNNING) {
         return res.status(400).json({
           message: `Contest is not running. Current status: ${contest.status}`
         });
@@ -63,8 +64,8 @@ router.post('/submit', requireAuth, memoryUpload.none(), async (req, res) => {
       // Create contest submission
       const submissionRes = await db.query(
         `INSERT INTO contest_submissions (contest_id, user_id, problem_id, code, language, overall_status, score)
-         VALUES ($1, $2, $3, $4, $5, 'Pending', 0) RETURNING id`,
-        [contestId, userId, problemId, code, language]
+         VALUES ($1, $2, $3, $4, $5, $6, 0) RETURNING id`,
+        [contestId, userId, problemId, code, language, SUBMISSION_STATUS.PENDING]
       );
       const submissionId = submissionRes.rows[0].id;
 
@@ -93,8 +94,8 @@ router.post('/submit', requireAuth, memoryUpload.none(), async (req, res) => {
 
       const submissionRes = await db.query(
         `INSERT INTO submissions (user_id, problem_id, code, language, overall_status, score)
-         VALUES ($1, $2, $3, $4, 'Pending', 0) RETURNING id`,
-        [userId, problemId, code, language]
+         VALUES ($1, $2, $3, $4, $5, 0) RETURNING id`,
+        [userId, problemId, code, language, SUBMISSION_STATUS.PENDING]
       );
       const submissionId = submissionRes.rows[0].id;
 
@@ -117,7 +118,7 @@ router.post('/submit', requireAuth, memoryUpload.none(), async (req, res) => {
 router.get('/submissions', requireAuth, async (req, res) => {
   const { filter, problemId, contestId } = req.query;
   const { userId, role } = req.session;
-  const isStaffOrAdmin = role === 'admin' || role === 'staff';
+  const isStaffOrAdmin = role === USER_ROLES.ADMIN || role === USER_ROLES.STAFF;
 
   try {
     let query, params = [], conditions = [];
@@ -189,14 +190,40 @@ router.get('/submissions', requireAuth, async (req, res) => {
 
 // Autocomplete/Search Endpoints
 router.get('/search/problems', requireAuth, async (req, res) => {
-  const { q } = req.query;
+  const { q, contestId } = req.query;
   if (!q) return res.json([]);
 
   try {
-    const result = await db.query(
-      'SELECT id, title FROM problems WHERE id ILIKE $1 OR title ILIKE $1 LIMIT 10',
-      [`%${q}%`]
-    );
+    let result;
+    if (contestId) {
+      // Check if contest is finished or active to search correct table
+      const contestRes = await db.query('SELECT status FROM contests WHERE id = $1', [contestId]);
+      if (contestRes.rows.length === 0) return res.json([]);
+
+      const status = contestRes.rows[0].status;
+
+      if (status === CONTEST_STATUS.FINISHED) {
+        result = await db.query(
+          `SELECT problem_id as id, title FROM contest_problems 
+           WHERE contest_id = $1 AND (problem_id ILIKE $2 OR title ILIKE $2) 
+           LIMIT 10`,
+          [contestId, `%${q}%`]
+        );
+      } else {
+        result = await db.query(
+          `SELECT id, title FROM problems 
+           WHERE contest_id = $1 AND (id ILIKE $2 OR title ILIKE $2) 
+           LIMIT 10`,
+          [contestId, `%${q}%`]
+        );
+      }
+    } else {
+      // Global search
+      result = await db.query(
+        'SELECT id, title FROM problems WHERE id ILIKE $1 OR title ILIKE $1 LIMIT 10',
+        [`%${q}%`]
+      );
+    }
     res.json(result.rows);
   } catch (error) {
     console.error('Error searching problems:', error);
@@ -205,14 +232,25 @@ router.get('/search/problems', requireAuth, async (req, res) => {
 });
 
 router.get('/search/users', requireAuth, async (req, res) => {
-  const { q } = req.query;
+  const { q, contestId } = req.query;
   if (!q) return res.json([]);
 
   try {
-    const result = await db.query(
-      'SELECT username FROM users WHERE username ILIKE $1 LIMIT 10',
-      [`%${q}%`]
-    );
+    let result;
+    if (contestId) {
+      result = await db.query(
+        `SELECT u.username FROM users u
+         JOIN contest_participants cp ON u.id = cp.user_id
+         WHERE cp.contest_id = $1 AND u.username ILIKE $2
+         LIMIT 10`,
+        [contestId, `%${q}%`]
+      );
+    } else {
+      result = await db.query(
+        'SELECT username FROM users WHERE username ILIKE $1 LIMIT 10',
+        [`%${q}%`]
+      );
+    }
     res.json(result.rows);
   } catch (error) {
     console.error('Error searching users:', error);
@@ -256,7 +294,7 @@ router.get('/submissions/:id', requireAuth, async (req, res) => {
 
     // Allow access if the user is an admin, a staff member, or the owner of the submission
     const isOwner = submission.user_id === userId;
-    const isStaffOrAdmin = role === 'admin' || role === 'staff';
+    const isStaffOrAdmin = role === USER_ROLES.ADMIN || role === USER_ROLES.STAFF;
 
     if (!isOwner && !isStaffOrAdmin) {
       return res.status(403).json({ message: 'You are not authorized to view this submission.' });

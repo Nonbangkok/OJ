@@ -211,9 +211,7 @@ const setupDatabase = async () => {
   } catch (err) {
     console.error('Error during database setup:', err);
   } finally {
-    // In a real app, you might not want to end the pool here
-    // but for a setup script, it's fine.
-    // Or just let the script exit.
+    db.pool.end();
   }
 };
 

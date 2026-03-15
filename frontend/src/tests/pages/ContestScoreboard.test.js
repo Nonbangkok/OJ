@@ -4,6 +4,14 @@ import ContestScoreboard from '../../pages/contest/ContestScoreboard';
 import contestService from '../../services/contestService';
 
 jest.mock('../../services/contestService');
+
+// Mock ThemeContext to prevent useTheme errors from LoadingPage
+jest.mock('../../context/ThemeContext', () => ({
+    useTheme: jest.fn(() => ({ theme: 'light' })),
+}));
+
+// Mock LoadingPage to control the loading text
+jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading Contest Rankings...</div>);
 jest.mock('react-router-dom', () => ({
     ...jest.requireActual('react-router-dom'),
     useParams: () => ({ contestId: 'contest-1' }),
@@ -24,7 +32,7 @@ describe('ContestScoreboard Page', () => {
             </BrowserRouter>
         );
 
-        expect(screen.getByText(/loading contest rankings/i)).toBeInTheDocument();
+        expect(screen.getByText(/loading contest rankings\.\.\.$/i)).toBeInTheDocument();
     });
 
     it('displays contest scoreboard on success', async () => {

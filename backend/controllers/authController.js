@@ -3,17 +3,20 @@ const router = express.Router();
 const db = require('../db');
 const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcrypt');
+const { USER_VALIDATION, SECURITY_CONFIG } = require('../constants');
 
 router.post('/register', [
-  body('username').isLength({ min: 3 }).trim().escape(),
-  body('password').isLength({ min: 6 })
+  body('username').isLength({ min: USER_VALIDATION.MIN_USERNAME_LENGTH }).trim().escape(),
+  body('password').isLength({ min: USER_VALIDATION.MIN_PASSWORD_LENGTH })
 ], async (req, res) => {
   try {
     // Check if registration is enabled
     const regSettings = await db.query(
       "SELECT setting_value FROM system_settings WHERE setting_key = 'registration_enabled'"
     );
-    if (regSettings.rows.length === 0 || regSettings.rows[0].setting_value !== 'true') {
+    const isRegistrationEnabled = regSettings.rows.length === 0 || regSettings.rows[0].setting_value === 'true';
+
+    if (!isRegistrationEnabled) {
       return res.status(403).json({ message: 'Registration is currently disabled.' });
     }
 
@@ -24,37 +27,33 @@ router.post('/register', [
 
     const { username, password } = req.body;
 
-    try {
-      // Check if username already exists
-      const existingUser = await db.query(
-        'SELECT * FROM users WHERE username = $1',
-        [username]
-      );
+    // Check if username already exists
+    const existingUser = await db.query(
+      'SELECT * FROM users WHERE username = $1',
+      [username]
+    );
 
-      if (existingUser.rows.length > 0) {
-        return res.status(400).json({ message: 'Username already exists' });
-      }
-
-      // Hash password
-      const saltRounds = 10;
-      const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-      // Insert new user
-      const result = await db.query(
-        'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username',
-        [username, hashedPassword]
-      );
-
-      res.status(201).json({
-        message: 'User registered successfully',
-        user: result.rows[0]
-      });
-    } catch (error) {
-      console.error('Registration error:', error);
-      res.status(500).json({ message: 'Internal server error' });
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ message: 'Username already exists' });
     }
+
+    // Hash password
+    const saltRounds = SECURITY_CONFIG.SALT_ROUNDS;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Insert new user
+    const result = await db.query(
+      'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username',
+      [username, hashedPassword]
+    );
+
+    res.status(201).json({
+      message: 'User registered successfully',
+      user: result.rows[0]
+    });
   } catch (error) {
-    res.status(403).json({ message: 'Registration is currently disabled.' });
+    console.error('Registration error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 });
 
@@ -66,7 +65,7 @@ router.get('/settings/registration', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.json({ enabled: false });
+      return res.json({ enabled: true });
     }
     res.json({ enabled: result.rows[0].setting_value === 'true' });
   } catch (error) {

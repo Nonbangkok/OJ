@@ -4,6 +4,14 @@ import Admin from '../../pages/admin/Admin';
 import authService from '../../services/authService';
 
 jest.mock('../../services/authService');
+
+// Mock ThemeContext to prevent useTheme errors from LoadingPage
+jest.mock('../../context/ThemeContext', () => ({
+    useTheme: jest.fn(() => ({ theme: 'light' })),
+}));
+
+// Mock LoadingPage to control the loading text
+jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading...</div>);
 jest.mock('../../features/admin/users/UserManagement', () => () => <div data-testid="user-management">UserManagement</div>);
 jest.mock('../../features/admin/problems/ProblemManagement', () => () => <div data-testid="problem-management">ProblemManagement</div>);
 jest.mock('../../features/admin/contests/ContestManagement', () => () => <div data-testid="contest-management">ContestManagement</div>);
@@ -23,7 +31,7 @@ describe('Admin Page', () => {
             </BrowserRouter>
         );
 
-        expect(screen.getByText(/loading/i)).toBeInTheDocument();
+        expect(screen.getByText(/loading\.\.\.$/i)).toBeInTheDocument();
     });
 
     it('displays admin panel and sections for admin user', async () => {

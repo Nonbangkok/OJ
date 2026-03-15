@@ -5,6 +5,14 @@ import scoreboardService from '../../services/scoreboardService';
 
 jest.mock('../../services/scoreboardService');
 
+// Mock ThemeContext to prevent useTheme errors from LoadingPage
+jest.mock('../../context/ThemeContext', () => ({
+    useTheme: jest.fn(() => ({ theme: 'light' })),
+}));
+
+// Mock LoadingPage to control the loading text
+jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading Scoreboard...</div>);
+
 describe('Scoreboard Page', () => {
     beforeEach(() => {
         jest.clearAllMocks();
@@ -13,7 +21,7 @@ describe('Scoreboard Page', () => {
     it('renders loading state initially', () => {
         scoreboardService.getGlobal.mockReturnValue(new Promise(() => { }));
         render(<BrowserRouter><Scoreboard /></BrowserRouter>);
-        expect(screen.getByText(/loading scoreboard/i)).toBeInTheDocument();
+        expect(screen.getByText(/loading scoreboard\.\.\.$/i)).toBeInTheDocument();
     });
 
     it('displays scoreboard data with rank emojis on success', async () => {

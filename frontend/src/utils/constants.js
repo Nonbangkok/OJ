@@ -6,6 +6,21 @@ export const APP_CONSTANTS = {
     SUBMISSION_CACHE_EXPIRY: 30 * 60 * 1000, // 30 minutes in milliseconds
 };
 
-export const API_ENDPOINTS = {
-    // Add major endpoints if needed for centralization
+export const USER_ROLES = {
+    USER: 'user',
+    STAFF: 'staff',
+    ADMIN: 'admin'
+};
+
+export const SUBMISSION_STATUS = {
+    PENDING: 'Pending',
+    COMPILING: 'Compiling',
+    RUNNING: 'Running',
+    ACCEPTED: 'Accepted',
+    WRONG_ANSWER: 'Wrong Answer',
+    TIME_LIMIT_EXCEEDED: 'Time Limit Exceeded',
+    RUNTIME_ERROR: 'Runtime Error',
+    MEMORY_LIMIT_EXCEEDED: 'Memory Limit Exceeded',
+    COMPILATION_ERROR: 'Compilation Error',
+    SKIPPED: 'Skipped'
 };

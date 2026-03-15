@@ -5,6 +5,14 @@ import problemService from '../../services/problemService';
 
 jest.mock('../../services/problemService');
 
+// Mock ThemeContext to prevent useTheme errors from LoadingPage
+jest.mock('../../context/ThemeContext', () => ({
+    useTheme: jest.fn(() => ({ theme: 'light' })),
+}));
+
+// Mock LoadingPage to control the loading text
+jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading Problems...</div>);
+
 describe('Problems Page', () => {
     beforeEach(() => {
         jest.clearAllMocks();
@@ -13,7 +21,7 @@ describe('Problems Page', () => {
     it('renders loading state initially', () => {
         problemService.getAllWithStats.mockReturnValue(new Promise(() => { }));
         render(<BrowserRouter><Problems /></BrowserRouter>);
-        expect(screen.getByText(/loading problems/i)).toBeInTheDocument();
+        expect(screen.getByText(/loading problems\.\.\.$/i)).toBeInTheDocument();
     });
 
     it('displays problems after fetching', async () => {

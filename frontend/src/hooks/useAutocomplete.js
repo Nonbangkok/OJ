@@ -4,7 +4,7 @@ import { useState } from 'react';
  * Generic autocomplete hook for search inputs with suggestions.
  * @param {Function} fetchFn - Async function that takes a query string and returns suggestions
  */
-export const useAutocomplete = (fetchFn) => {
+export const useAutocomplete = (fetchFn, extraParams = {}) => {
     const [query, setQuery] = useState('');
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -14,7 +14,9 @@ export const useAutocomplete = (fetchFn) => {
         setQuery(value);
         if (value.length > 0) {
             try {
-                const data = await fetchFn(value);
+                // Pass extraParams (like contestId) if they exist
+                const params = Object.values(extraParams).some(v => v !== null) ? Object.values(extraParams) : [];
+                const data = await fetchFn(value, ...params);
                 setSuggestions(data);
                 setShowSuggestions(true);
             } catch (err) {

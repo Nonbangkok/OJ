@@ -7,10 +7,7 @@ const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
 const db = require('../db');
-
-// ================================================================= //
-// == Helper functions directly adapted from batch_upload.js == //
-// ================================================================= //
+const { UPLOAD_STATUS, FILE_CONFIG } = require('../constants');
 
 async function processTestcasesFromZip(problemId, zipPath, log) {
   const zip = await unzipper.Open.file(zipPath);
@@ -27,26 +24,26 @@ async function processTestcasesFromZip(problemId, zipPath, log) {
     log.push('Detected input/output directory structure inside zip.');
 
     const tempExtractDir = path.join(os.tmpdir(), `oj_inner_zip_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
-    
+
     try {
-        await fsPromises.mkdir(tempExtractDir, { recursive: true });
-        
-        // Extract the entire zip to the temporary directory
-        // unzipper.Open.file returns a CentralDirectory object which has an extract method.
-        await zip.extract({ path: tempExtractDir });
+      await fsPromises.mkdir(tempExtractDir, { recursive: true });
 
-        // Find the common base path of the input/output directories.
-        // e.g., if path is 'Invasion-testcases/input/01.txt', we want 'Invasion-testcases'
-        const basePathInZip = path.dirname(firstInputFile.path).split('/input')[0];
-        
-        const inputDir = path.join(tempExtractDir, basePathInZip, 'input');
-        const outputDir = path.join(tempExtractDir, basePathInZip, 'output');
+      // Extract the entire zip to the temporary directory
+      // unzipper.Open.file returns a CentralDirectory object which has an extract method.
+      await zip.extract({ path: tempExtractDir });
 
-        return await processTestcasesFromInputOutputDirs(problemId, inputDir, outputDir, log);
+      // Find the common base path of the input/output directories.
+      // e.g., if path is 'Invasion-testcases/input/01.txt', we want 'Invasion-testcases'
+      const basePathInZip = path.dirname(firstInputFile.path).split('/input')[0];
+
+      const inputDir = path.join(tempExtractDir, basePathInZip, 'input');
+      const outputDir = path.join(tempExtractDir, basePathInZip, 'output');
+
+      return await processTestcasesFromInputOutputDirs(problemId, inputDir, outputDir, log);
 
     } finally {
-        // Clean up the temporary extraction directory
-        await execPromise(`rm -rf ${tempExtractDir}`);
+      // Clean up the temporary extraction directory
+      await execPromise(`rm -rf ${tempExtractDir}`);
     }
 
   } else {
@@ -56,21 +53,21 @@ async function processTestcasesFromZip(problemId, zipPath, log) {
     const fileRegex = /^(?:input|output)?(\d+)\.(?:in|out|txt|sol)$/i;
 
     for (const file of zip.files) {
-        const fileName = path.basename(file.path);
-        const isJunk = file.path.startsWith('__MACOSX/') || fileName.startsWith('._');
-        if (file.type !== 'File' || isJunk) continue;
+      const fileName = path.basename(file.path);
+      const isJunk = file.path.startsWith('__MACOSX/') || fileName.startsWith('._');
+      if (file.type !== 'File' || isJunk) continue;
 
-        const match = fileName.match(fileRegex);
-        if (match) {
-            const number = parseInt(match[1], 10);
-            if (!testcaseFiles[number]) testcaseFiles[number] = {};
-            const lowerFileName = fileName.toLowerCase();
-            if (lowerFileName.endsWith('.in') || lowerFileName.includes('input')) {
-                testcaseFiles[number].in = file;
-            } else if (lowerFileName.endsWith('.out') || lowerFileName.endsWith('.sol') || lowerFileName.includes('output')) {
-                testcaseFiles[number].out = file;
-            }
+      const match = fileName.match(fileRegex);
+      if (match) {
+        const number = parseInt(match[1], 10);
+        if (!testcaseFiles[number]) testcaseFiles[number] = {};
+        const lowerFileName = fileName.toLowerCase();
+        if (lowerFileName.endsWith('.in') || lowerFileName.includes('input')) {
+          testcaseFiles[number].in = file;
+        } else if (lowerFileName.endsWith('.out') || lowerFileName.endsWith('.sol') || lowerFileName.includes('output')) {
+          testcaseFiles[number].out = file;
         }
+      }
     }
     return processPairedFiles(problemId, testcaseFiles, (file) => file.stream(), log);
   }
@@ -102,7 +99,7 @@ async function processTestcasesFromInputOutputDirs(problemId, inputDir, outputDi
       out: path.join(outputDir, outputFilenames[i])
     };
   }
-  
+
   return processPairedFiles(problemId, testcaseFiles, (filePath) => fsPromises.readFile(filePath), log);
 }
 
@@ -143,7 +140,7 @@ async function streamToBuffer(stream) {
 async function processPairedFiles(problemId, pairedFiles, readFileFunc, log) {
   const sortedKeys = Object.keys(pairedFiles).map(Number).sort((a, b) => a - b);
   const pairedCases = sortedKeys.filter(key => pairedFiles[key].in && pairedFiles[key].out);
-  
+
   if (pairedCases.length === 0) {
     log.push(`No valid testcase pairs found.`);
     return 0;
@@ -157,151 +154,147 @@ async function processPairedFiles(problemId, pairedFiles, readFileFunc, log) {
     const pair = pairedFiles[key];
     // Ensure the pair is valid before processing
     if (pair && pair.in && pair.out) {
-        const inputContent = await readFileFunc(pair.in);
-        const outputContent = await readFileFunc(pair.out);
+      const inputContent = await readFileFunc(pair.in);
+      const outputContent = await readFileFunc(pair.out);
 
-        const inputData = inputContent instanceof require('stream').Readable ? await streamToBuffer(inputContent) : inputContent;
-        const outputData = outputContent instanceof require('stream').Readable ? await streamToBuffer(outputContent) : outputContent;
+      const inputData = inputContent instanceof require('stream').Readable ? await streamToBuffer(inputContent) : inputContent;
+      const outputData = outputContent instanceof require('stream').Readable ? await streamToBuffer(outputContent) : outputContent;
 
-        await db.query(
-            'INSERT INTO testcases (problem_id, case_number, input_data, output_data) VALUES ($1, $2, $3, $4)',
-            [problemId, caseCounter, inputData.toString('utf-8'), outputData.toString('utf-8')]
-        );
-        caseCounter++;
+      await db.query(
+        'INSERT INTO testcases (problem_id, case_number, input_data, output_data) VALUES ($1, $2, $3, $4)',
+        [problemId, caseCounter, inputData.toString('utf-8'), outputData.toString('utf-8')]
+      );
+      caseCounter++;
     }
   }
   return caseCounter - 1;
 }
 
 async function processProblemDirectory(problemPath) {
-    const problemDirName = path.basename(problemPath);
-    const log = []; // Log for this specific problem
+  const problemDirName = path.basename(problemPath);
+  const log = []; // Log for this specific problem
 
-    // 1. Read config.json
-    const configPath = path.join(problemPath, 'config.json');
-    let config;
-    try {
-        const configFile = await fsPromises.readFile(configPath, 'utf-8');
-        config = JSON.parse(configFile);
-    } catch (e) {
-        throw new Error(`Cannot read or parse config.json.`);
-    }
+  // 1. Read config.json
+  const configPath = path.join(problemPath, 'config.json');
+  let config;
+  try {
+    const configFile = await fsPromises.readFile(configPath, 'utf-8');
+    config = JSON.parse(configFile);
+  } catch (e) {
+    throw new Error(`Cannot read or parse config.json.`);
+  }
 
-    const { id: problemId, title, author, time_limit_ms, memory_limit_mb } = config;
-    if (!problemId || !title || !author || !time_limit_ms || !memory_limit_mb) {
-        throw new Error(`config.json is missing required fields (id, title, etc.).`);
-    }
+  const { id: problemId, title, author, time_limit_ms, memory_limit_mb } = config;
+  if (!problemId || !title || !author || !time_limit_ms || !memory_limit_mb) {
+    throw new Error(`config.json is missing required fields (id, title, etc.).`);
+  }
 
-    // 2. Insert problem, skip if it exists
-    const insertResult = await db.query(`
+  // 2. Insert problem, skip if it exists
+  const insertResult = await db.query(`
         INSERT INTO problems (id, title, author, time_limit_ms, memory_limit_mb, is_visible)
         VALUES ($1, $2, $3, $4, $5, false)
         ON CONFLICT (id) DO NOTHING;
     `, [problemId, title, author, time_limit_ms, memory_limit_mb]);
 
-    if (insertResult.rowCount === 0) {
-        return { status: 'skipped', problemId };
+  if (insertResult.rowCount === 0) {
+    return { status: UPLOAD_STATUS.SKIPPED, problemId };
+  }
+
+  // --- Problem was newly inserted, proceed with file uploads ---
+
+  const filesInProblemDir = await fsPromises.readdir(problemPath);
+
+  // 3. Process PDF
+  const pdfFileName = filesInProblemDir.find(f => f.toLowerCase().endsWith('.pdf'));
+  if (pdfFileName) {
+    try {
+      const pdfPath = path.join(problemPath, pdfFileName);
+      const pdfBuffer = await fsPromises.readFile(pdfPath);
+      await db.query('UPDATE problems SET problem_pdf = $1 WHERE id = $2', [pdfBuffer, problemId]);
+      log.push(`Uploaded ${pdfFileName}.`);
+    } catch (e) {
+      log.push(`ERROR: Could not read PDF file ${pdfFileName}.`);
     }
+  } else {
+    log.push('No .pdf file found, skipping PDF upload.');
+  }
 
-    // --- Problem was newly inserted, proceed with file uploads ---
-    
-    const filesInProblemDir = await fsPromises.readdir(problemPath);
+  // 4. Clear existing testcases before inserting new ones
+  await db.query('DELETE FROM testcases WHERE problem_id = $1', [problemId]);
 
-    // 3. Process PDF
-    const pdfFileName = filesInProblemDir.find(f => f.toLowerCase().endsWith('.pdf'));
-    if (pdfFileName) {
-        try {
-            const pdfPath = path.join(problemPath, pdfFileName);
-            const pdfBuffer = await fsPromises.readFile(pdfPath);
-            await db.query('UPDATE problems SET problem_pdf = $1 WHERE id = $2', [pdfBuffer, problemId]);
-            log.push(`Uploaded ${pdfFileName}.`);
-        } catch (e) {
-            log.push(`ERROR: Could not read PDF file ${pdfFileName}.`);
-        }
-    } else {
-        log.push('No .pdf file found, skipping PDF upload.');
+  // 5. Process testcases
+  const zipFileName = filesInProblemDir.find(f => f.toLowerCase().endsWith('.zip'));
+  let testcasesFound = false;
+
+  if (zipFileName) {
+    const zipPath = path.join(problemPath, zipFileName);
+    try {
+      const processedCount = await processTestcasesFromZip(problemId, zipPath, log);
+      log.push(`Processed ${processedCount} test cases from ${zipFileName}.`);
+      testcasesFound = true;
+    } catch (e) {
+      log.push(`ERROR: Failed to process zip file ${zipFileName}.`);
     }
+  } else {
+    const subdirectories = (await fsPromises.readdir(problemPath, { withFileTypes: true }))
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
 
-    // 4. Clear existing testcases before inserting new ones
-    await db.query('DELETE FROM testcases WHERE problem_id = $1', [problemId]);
+    for (const dirName of subdirectories) {
+      const testcaseRootPath = path.join(problemPath, dirName);
 
-    // 5. Process testcases
-    const zipFileName = filesInProblemDir.find(f => f.toLowerCase().endsWith('.zip'));
-    let testcasesFound = false;
+      // --- Attempt 1: Look for input/output sub-subdirectories ---
+      const inputPath = path.join(testcaseRootPath, 'input');
+      const outputPath = path.join(testcaseRootPath, 'output');
 
-    if (zipFileName) {
-        const zipPath = path.join(problemPath, zipFileName);
-        try {
-            const processedCount = await processTestcasesFromZip(problemId, zipPath, log);
-            log.push(`Processed ${processedCount} test cases from ${zipFileName}.`);
+      try {
+        const inputStats = await fsPromises.stat(inputPath);
+        const outputStats = await fsPromises.stat(outputPath);
+
+        if (inputStats.isDirectory() && outputStats.isDirectory()) {
+          const processedCount = await processTestcasesFromInputOutputDirs(problemId, inputPath, outputPath, log);
+          if (processedCount > 0) {
+            log.push(`Processed ${processedCount} test cases from '${dirName}/input-output' subdirectories.`);
             testcasesFound = true;
-        } catch(e) {
-            log.push(`ERROR: Failed to process zip file ${zipFileName}.`);
+          }
         }
-    } else {
-        const subdirectories = (await fsPromises.readdir(problemPath, { withFileTypes: true }))
-            .filter(d => d.isDirectory())
-            .map(d => d.name);
+      } catch (e) {
+        // This structure doesn't exist, so we will try the next method below.
+      }
 
-        for (const dirName of subdirectories) {
-            const testcaseRootPath = path.join(problemPath, dirName);
-
-            // --- Attempt 1: Look for input/output sub-subdirectories ---
-            const inputPath = path.join(testcaseRootPath, 'input');
-            const outputPath = path.join(testcaseRootPath, 'output');
-
-            try {
-                const inputStats = await fsPromises.stat(inputPath);
-                const outputStats = await fsPromises.stat(outputPath);
-
-                if (inputStats.isDirectory() && outputStats.isDirectory()) {
-                    const processedCount = await processTestcasesFromInputOutputDirs(problemId, inputPath, outputPath, log);
-                    if (processedCount > 0) {
-                        log.push(`Processed ${processedCount} test cases from '${dirName}/input-output' subdirectories.`);
-                        testcasesFound = true;
-                    }
-                }
-            } catch (e) {
-                // This structure doesn't exist, so we will try the next method below.
-            }
-
-            // --- Attempt 2: If not found above, look for flat files in the directory itself ---
-            if (!testcasesFound) {
-                try {
-                    const processedCount = await processTestcasesFromFlatDir(problemId, testcaseRootPath, log);
-                    if (processedCount > 0) {
-                        log.push(`Processed ${processedCount} flat test cases from '${dirName}/' directory.`);
-                        testcasesFound = true;
-                    }
-                } catch (flatDirError) {
-                    // This directory also doesn't contain valid flat testcases, log nothing and continue.
-                }
-            }
-
-            if (testcasesFound) {
-                break; // Found and processed, stop searching in other directories
-            }
+      // --- Attempt 2: If not found above, look for flat files in the directory itself ---
+      if (!testcasesFound) {
+        try {
+          const processedCount = await processTestcasesFromFlatDir(problemId, testcaseRootPath, log);
+          if (processedCount > 0) {
+            log.push(`Processed ${processedCount} flat test cases from '${dirName}/' directory.`);
+            testcasesFound = true;
+          }
+        } catch (flatDirError) {
+          // This directory also doesn't contain valid flat testcases, log nothing and continue.
         }
-    }
-    
-    if (!testcasesFound) {
-        log.push('No .zip file or valid testcase directory found.');
-    }
+      }
 
-    return { status: 'added', problemId, log };
+      if (testcasesFound) {
+        break; // Found and processed, stop searching in other directories
+      }
+    }
+  }
+
+  if (!testcasesFound) {
+    log.push('No .zip file or valid testcase directory found.');
+  }
+
+  return { status: UPLOAD_STATUS.ADDED, problemId, log };
 }
-
-// ================================================================= //
-// == Main exported function for the API == //
-// ================================================================= //
 
 async function processBatchUpload(zipFilePath, onProgress) {
   const results = { added: [], skipped: [], errors: [] };
   const tempDir = path.join(os.tmpdir(), `oj_batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
-  
+
   try {
     await fsPromises.mkdir(tempDir, { recursive: true });
-    
+
     // Using a more robust method to extract the zip file
     const directory = await unzipper.Open.file(zipFilePath);
     await directory.extract({ path: tempDir });
@@ -313,9 +306,9 @@ async function processBatchUpload(zipFilePath, onProgress) {
     const significantTopLevelItems = topLevelItems.filter(item => !junkDirs.has(item.name));
 
     if (significantTopLevelItems.length === 1 && significantTopLevelItems[0].isDirectory()) {
-        problemSourceDir = path.join(tempDir, significantTopLevelItems[0].name);
+      problemSourceDir = path.join(tempDir, significantTopLevelItems[0].name);
     }
-    
+
     const itemsInSource = await fsPromises.readdir(problemSourceDir);
     const problemPathsToProcess = [];
 
@@ -331,16 +324,16 @@ async function processBatchUpload(zipFilePath, onProgress) {
         }
       }
     }
-    
+
     let processedCount = 0;
     const totalProblems = problemPathsToProcess.length;
 
     for (const problemPath of problemPathsToProcess) {
       try {
         const result = await processProblemDirectory(problemPath);
-        if (result.status === 'added') {
+        if (result.status === UPLOAD_STATUS.ADDED) {
           results.added.push(result.problemId);
-        } else if (result.status === 'skipped') {
+        } else if (result.status === UPLOAD_STATUS.SKIPPED) {
           results.skipped.push(result.problemId);
         }
       } catch (error) {
@@ -348,11 +341,11 @@ async function processBatchUpload(zipFilePath, onProgress) {
       } finally {
         processedCount++;
         if (onProgress && typeof onProgress === 'function') {
-          onProgress({ 
-            processed: processedCount, 
-            total: totalProblems, 
-            status: 'processing', 
-            currentProblem: path.basename(problemPath) 
+          onProgress({
+            processed: processedCount,
+            total: totalProblems,
+            status: 'processing',
+            currentProblem: path.basename(problemPath)
           });
         }
       }
@@ -363,10 +356,10 @@ async function processBatchUpload(zipFilePath, onProgress) {
   } finally {
     const delay = ms => new Promise(res => setTimeout(res, ms));
     try {
-        await delay(200);
-        await execPromise(`rm -rf ${tempDir}`);
+      await delay(FILE_CONFIG.CLEANUP_DELAY_MS);
+      await execPromise(`rm -rf ${tempDir}`);
     } catch (err) {
-        console.warn(`[Robust Cleanup] Failed to remove temp directory ${tempDir}:`, err);
+      console.warn(`[Robust Cleanup] Failed to remove temp directory ${tempDir}:`, err);
     }
 
     try {

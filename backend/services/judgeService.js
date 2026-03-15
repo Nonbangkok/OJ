@@ -1,5 +1,6 @@
 const db = require('../db');
 const { exec } = require('child_process');
+const { SUBMISSION_STATUS, JUDGE_CONFIG } = require('../constants');
 
 async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) {
   return new Promise((resolve) => {
@@ -9,8 +10,8 @@ async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) 
     // Use timeout command which is reliable on Linux
     const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${executablePath}`;
     const executionOptions = {
-      timeout: timeLimitMs + 500, // 
-      maxBuffer: 50 * 1024 * 1024, // 50MB
+      timeout: timeLimitMs + JUDGE_CONFIG.TIMEOUT_BUFFER_MS, // 
+      maxBuffer: JUDGE_CONFIG.EXEC_MAX_BUFFER, // 50MB
       shell: '/bin/bash'
     };
 
@@ -44,25 +45,16 @@ async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) 
         programStderr = stderr.split('\n').filter(line => !line.includes('MEM_USED') && !line.includes('TIME_USED')).join('\n').trim();
       }
 
-      // Debugging
-      // if (error || hasEpipError || stderr) {
-      //   console.log(`[DEBUG] Judge Result for ${executablePath}:`);
-      //   console.log(` - error:`, error ? { code: error.code, signal: error.signal, message: error.message } : 'null');
-      //   console.log(` - hasEpipError: ${hasEpipError}`);
-      //   console.log(` - epipErrorMessage: ${epipErrorMessage}`);
-      //   if (stderr) console.log(` - stderr: ${stderr.substring(0, 200)}${stderr.length > 200 ? '...' : ''}`);
-      // }
-
       // 1. Check for TLE first (timeout command exit code 124)
-      if (error && error.code === 124) {
-        return resolve({ status: 'Time Limit Exceeded', timeMs: timeLimitMs, memoryKb });
+      if (error && error.code === JUDGE_CONFIG.TLE_EXIT_CODE) {
+        return resolve({ status: SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED, timeMs: timeLimitMs, memoryKb });
       }
 
       // 2. Check for EPIPE (program crashed while receiving input)
       if (hasEpipError) {
         // Only treat as RE if it's not a TLE (which we checked above)
         return resolve({
-          status: 'Runtime Error',
+          status: SUBMISSION_STATUS.RUNTIME_ERROR,
           output: epipErrorMessage || 'Program crashed while receiving input',
           timeMs,
           memoryKb
@@ -73,18 +65,18 @@ async function runSingleCase(executablePath, input, timeLimitMs, memoryLimitMb) 
       if (error) {
         // Did it run out of memory?
         if (error.signal === 'SIGSEGV' || (stderr && stderr.toLowerCase().includes('memory'))) {
-          return resolve({ status: 'Memory Limit Exceeded', timeMs, memoryKb: memoryLimitMb * 1024 });
+          return resolve({ status: SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED, timeMs, memoryKb: memoryLimitMb * 1024 });
         }
         // For other errors, treat as Runtime Error
         return resolve({
-          status: 'Runtime Error',
+          status: SUBMISSION_STATUS.RUNTIME_ERROR,
           output: programStderr || error.message || 'Program terminated unexpectedly',
           timeMs,
           memoryKb
         });
       }
 
-      resolve({ status: 'Pending', output: programOutput, timeMs, memoryKb });
+      resolve({ status: SUBMISSION_STATUS.PENDING, output: programOutput, timeMs, memoryKb });
     });
 
     // Prevent EPIPE errors from crashing the main process.
@@ -114,7 +106,7 @@ async function judge(problemId, executablePath) {
   try {
     const problemRes = await db.query('SELECT time_limit_ms, memory_limit_mb FROM problems WHERE id = $1', [problemId]);
     if (problemRes.rows.length === 0) {
-      return { overallStatus: "System Error", score: 0, results: [] };
+      return { overallStatus: SUBMISSION_STATUS.SYSTEM_ERROR, score: 0, results: [] };
     }
     const { time_limit_ms, memory_limit_mb } = problemRes.rows[0];
 
@@ -122,7 +114,7 @@ async function judge(problemId, executablePath) {
     const testcases = testcasesRes.rows;
 
     if (testcases.length === 0) {
-      return { overallStatus: "System Error", score: 0, results: [{ testCase: 1, status: 'No test cases found' }] };
+      return { overallStatus: SUBMISSION_STATUS.SYSTEM_ERROR, score: 0, results: [{ testCase: 1, status: 'No test cases found' }] };
     }
 
     const results = [];
@@ -132,13 +124,13 @@ async function judge(problemId, executablePath) {
       const runResult = await runSingleCase(executablePath, input_data, time_limit_ms, memory_limit_mb);
 
       // Now, compare output
-      if (runResult.status === 'Pending') {
+      if (runResult.status === SUBMISSION_STATUS.PENDING) {
         const formattedStdout = runResult.output.trim().replace(/\r\n/g, '\n');
         const formattedExpectedOutput = output_data.trim().replace(/\r\n/g, '\n');
         if (formattedStdout === formattedExpectedOutput) {
-          runResult.status = 'Accepted';
+          runResult.status = SUBMISSION_STATUS.ACCEPTED;
         } else {
-          runResult.status = 'Wrong Answer';
+          runResult.status = SUBMISSION_STATUS.WRONG_ANSWER;
         }
       }
 
@@ -147,25 +139,25 @@ async function judge(problemId, executablePath) {
         status: runResult.status,
         timeMs: runResult.timeMs,
         memoryKb: runResult.memoryKb,
-        output: runResult.status !== 'Accepted' && runResult.status !== 'Wrong Answer' ? runResult.output : undefined,
+        output: runResult.status !== SUBMISSION_STATUS.ACCEPTED && runResult.status !== SUBMISSION_STATUS.WRONG_ANSWER ? runResult.output : undefined,
       });
 
       // Stop on first non-Accepted result for immediate feedback
-      if (runResult.status !== 'Accepted') {
+      if (runResult.status !== SUBMISSION_STATUS.ACCEPTED) {
         // To show all results, comment out the loop break.
         // For now, let's fill the rest with 'Skipped' to show the user there are more.
         for (let j = testcases.findIndex(t => t.case_number === case_number) + 1; j < testcases.length; j++) {
-          results.push({ testCase: testcases[j].case_number, status: 'Skipped' });
+          results.push({ testCase: testcases[j].case_number, status: SUBMISSION_STATUS.SKIPPED });
         }
         break;
       }
     }
 
-    const passedCases = results.filter(r => r.status === 'Accepted').length;
+    const passedCases = results.filter(r => r.status === SUBMISSION_STATUS.ACCEPTED).length;
     const totalCases = testcases.length;
     const score = totalCases > 0 ? Math.round((passedCases / totalCases) * 100) : 0;
-    const firstFailed = results.find(r => r.status !== 'Accepted');
-    const overallStatus = firstFailed ? firstFailed.status : 'Accepted';
+    const firstFailed = results.find(r => r.status !== SUBMISSION_STATUS.ACCEPTED);
+    const overallStatus = firstFailed ? firstFailed.status : SUBMISSION_STATUS.ACCEPTED;
     const maxTime = Math.max(0, ...results.map(r => r.timeMs || 0));
     const maxMemory = Math.max(0, ...results.map(r => r.memoryKb || 0));
 
@@ -173,7 +165,7 @@ async function judge(problemId, executablePath) {
 
   } catch (error) {
     console.error("Error during judging:", error);
-    return { overallStatus: "System Error", score: 0, results: [{ testCase: 1, status: 'Could not read test cases' }] };
+    return { overallStatus: SUBMISSION_STATUS.SYSTEM_ERROR, score: 0, results: [{ testCase: 1, status: 'Could not read test cases' }] };
   }
 }
 

@@ -1,58 +1,40 @@
-import { useState, useEffect } from 'react';
-import authService from '../../services/authService';
+import useAdminPage from '../../hooks/useAdminPage';
 import UserManagement from '../../features/admin/users/UserManagement';
 import ProblemManagement from '../../features/admin/problems/ProblemManagement';
 import ContestManagement from '../../features/admin/contests/ContestManagement';
 import Settings from '../../features/admin/settings/Settings';
 import styles from './Admin.module.css';
+import LoadingPage from '../../components/shared/LoadingPage';
+import { USER_ROLES } from '../../utils/constants';
 
 const Admin = () => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading } = useAdminPage();
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const data = await authService.checkLogin();
-        if (data.isAuthenticated) {
-          setUser(data.user);
-        }
-      } catch (error) {
-        console.error("Could not fetch user data for admin panel", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUser();
-  }, []);
-
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  if (loading) return <LoadingPage />;
 
   return (
     <div className={styles['admin-container']}>
       <h1>Admin Panel</h1>
 
-      {user?.role === 'admin' && (
+      {user?.role === USER_ROLES.ADMIN && (
         <div className={styles['admin-section']}>
           <UserManagement />
         </div>
       )}
 
-      {(user?.role === 'admin' || user?.role === 'staff') && (
+      {(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.STAFF) && (
         <div className={styles['admin-section']}>
           <ProblemManagement currentUser={user} />
         </div>
       )}
 
-      {(user?.role === 'admin' || user?.role === 'staff') && (
+      {(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.STAFF) && (
         <div className={styles['admin-section']}>
           <ContestManagement currentUser={user} />
         </div>
       )}
 
-      {user?.role === 'admin' && (
+      {user?.role === USER_ROLES.ADMIN && (
         <div className={styles['admin-section']}>
           <Settings />
         </div>

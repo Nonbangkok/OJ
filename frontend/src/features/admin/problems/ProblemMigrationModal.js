@@ -1,129 +1,28 @@
-import { useState, useEffect } from 'react';
-import adminService from '../../../services/adminService';
+import useProblemMigrationModal from '../../../hooks/admin/useProblemMigrationModal';
 import formStyles from '../../../components/styles/Form.module.css';
 import modalStyles from '../shared/ModalLayout.module.css';
+import LoadingPage from '../../../components/shared/LoadingPage';
 
 const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
-  const [availableProblems, setAvailableProblems] = useState([]);
-  const [contestProblems, setContestProblems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [migrationLoading, setMigrationLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [selectedAvailable, setSelectedAvailable] = useState([]);
-  const [selectedContest, setSelectedContest] = useState([]);
-
-  useEffect(() => {
-    fetchProblems();
-  }, [contest.id]);
-
-  const fetchProblems = async () => {
-    try {
-      setLoading(true);
-
-      // Fetch available problems and contest problems in parallel
-      const [availableData, contestData] = await Promise.all([
-        adminService.getAvailableProblems(),
-        adminService.getContestProblemsAdmin(contest.id)
-      ]);
-
-      setAvailableProblems(availableData);
-      setContestProblems(contestData);
-    } catch (err) {
-      console.error('Error fetching problems:', err);
-      setError('Failed to load problems');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleMoveToContest = async () => {
-    if (selectedAvailable.length === 0) return;
-
-    try {
-      setMigrationLoading(true);
-      setError('');
-
-      await adminService.migrateContestProblems(contest.id, selectedAvailable, 'move_to_contest');
-
-      setSelectedAvailable([]);
-      await fetchProblems(); // Refresh both lists
-    } catch (err) {
-      console.error('Error moving problems to contest:', err);
-      setError(err.response?.data?.message || 'Failed to move problems to contest');
-    } finally {
-      setMigrationLoading(false);
-    }
-  };
-
-  const handleMoveToMain = async (problemId) => {
-    const problemIdsToRemove = problemId ? [problemId] : selectedContest;
-
-    if (problemIdsToRemove.length === 0) {
-      return;
-    }
-
-    try {
-      setMigrationLoading(true);
-      setError('');
-
-      await adminService.migrateContestProblems(contest.id, problemIdsToRemove, 'move_to_main');
-
-      setSelectedContest([]); // Clear selection after moving
-      await fetchProblems(); // Refresh both lists
-    } catch (err) {
-      console.error('Error moving problems to main:', err);
-      setError(err.response?.data?.message || 'Failed to move problems to main');
-    } finally {
-      setMigrationLoading(false);
-    }
-  };
-
-  const handleSelectAvailable = (problemId) => {
-    setSelectedAvailable(prev =>
-      prev.includes(problemId)
-        ? prev.filter(id => id !== problemId)
-        : [...prev, problemId]
-    );
-  };
-
-  const handleSelectContest = (problemId) => {
-    setSelectedContest(prev =>
-      prev.includes(problemId)
-        ? prev.filter(id => id !== problemId)
-        : [...prev, problemId]
-    );
-  };
-
-  const handleSelectAllAvailable = () => {
-    if (selectedAvailable.length === availableProblems.length) {
-      setSelectedAvailable([]);
-    } else {
-      setSelectedAvailable(availableProblems.map(p => p.id));
-    }
-  };
-
-  const handleSelectAllContest = () => {
-    if (selectedContest.length === contestProblems.length) {
-      setSelectedContest([]);
-    } else {
-      setSelectedContest(contestProblems.map(p => p.id));
-    }
-  };
+  const {
+    availableProblems,
+    contestProblems,
+    loading,
+    migrationLoading,
+    error,
+    selectedAvailable,
+    selectedContest,
+    handleMoveToContest,
+    handleMoveToMain,
+    handleSelectAvailable,
+    handleSelectContest,
+    handleSelectAllAvailable,
+    handleSelectAllContest
+  } = useProblemMigrationModal(contest, onSuccess);
 
   const canMoveProblems = contest.status === 'scheduled' || contest.status === 'running';
 
-  if (loading) {
-    return (
-      <div className={modalStyles['modal-overlay']}>
-        <div className={`${formStyles['form-container']} ${modalStyles.migrationModalContainer}`}>
-          <h2>📝 Manage Contest Problems</h2>
-          <div className={modalStyles.migrationModalLoadingText}>
-            Loading problems...
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingPage />;
 
   return (
     <div className={modalStyles['modal-overlay']} onClick={onClose}>

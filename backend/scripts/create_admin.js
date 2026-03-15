@@ -79,7 +79,8 @@ async function createAdmin() {
   } catch (error) {
     console.error('Error creating admin user:', error);
   } finally {
-    // Make sure to end the pool connection
+    db.pool.end();
+    rl.close();
   }
 }
 

@@ -4,6 +4,14 @@ import Contests from '../../pages/contest/Contests';
 import contestService from '../../services/contestService';
 
 jest.mock('../../services/contestService');
+
+// Mock ThemeContext to prevent useTheme errors from LoadingPage
+jest.mock('../../context/ThemeContext', () => ({
+    useTheme: jest.fn(() => ({ theme: 'light' })),
+}));
+
+// Mock LoadingPage to control the loading text
+jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading Contests...</div>);
 jest.mock('../../context/AuthContext', () => ({
     useAuth: () => ({ user: { username: 'testuser' } })
 }));
@@ -16,7 +24,7 @@ describe('Contests Page', () => {
     it('displays loading state', () => {
         contestService.getAll.mockReturnValue(new Promise(() => { }));
         render(<BrowserRouter><Contests /></BrowserRouter>);
-        expect(screen.getByText(/loading contests/i)).toBeInTheDocument();
+        expect(screen.getByText(/loading contests\.\.\.$/i)).toBeInTheDocument();
     });
 
     it('displays contests on success', async () => {

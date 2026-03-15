@@ -15,6 +15,7 @@ export const useProblems = (contestId) => {
   const fetchProblems = async () => {
     try {
       setLoading(true);
+      setError('');
       const data = contestId
         ? await contestService.getProblems(contestId)
         : await problemService.getAllWithStats();

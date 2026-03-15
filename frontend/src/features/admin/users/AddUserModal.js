@@ -1,29 +1,20 @@
-import { useState } from 'react';
 import formStyles from '../../../components/styles/Form.module.css';
 import modalStyles from '../shared/ModalLayout.module.css';
+import useAddUserModal from '../../../hooks/admin/useAddUserModal';
 
 const AddUserModal = ({ isOpen, onClose, onSave }) => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState('user');
-  const [error, setError] = useState('');
+  const {
+    username,
+    setUsername,
+    password,
+    setPassword,
+    role,
+    setRole,
+    error,
+    handleSave
+  } = useAddUserModal(onSave);
 
-  if (!isOpen) {
-    return null;
-  }
-
-  const handleSave = () => {
-    if (username.length < 3) {
-      setError('Username must be at least 3 characters long.');
-      return;
-    }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long.');
-      return;
-    }
-    setError('');
-    onSave({ username, password, role });
-  };
+  if (!isOpen) return null;
 
   return (
     <div className={modalStyles['modal-overlay']}>

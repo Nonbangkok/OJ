@@ -12,7 +12,7 @@ echo "------------------------------------------------------"
 echo "Running Backend Tests"
 echo "------------------------------------------------------"
 cd backend
-npm test
+npm test -- --watchAll=false
 BACKEND_STATUS=$?
 cd ..
 
@@ -22,7 +22,7 @@ echo "Running Frontend Tests (Non-interactive)"
 echo "------------------------------------------------------"
 cd frontend
 # Setting CI=true ensures Jest runs in non-interactive mode and exits after completion
-CI=true npm test
+CI=true npm test -- --watchAll=false
 FRONTEND_STATUS=$?
 cd ..
 

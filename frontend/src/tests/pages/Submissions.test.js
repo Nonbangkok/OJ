@@ -6,6 +6,14 @@ import authService from '../../services/authService';
 
 jest.mock('../../services/submissionService');
 jest.mock('../../services/authService');
+
+// Mock ThemeContext to prevent useTheme errors from LoadingPage
+jest.mock('../../context/ThemeContext', () => ({
+    useTheme: jest.fn(() => ({ theme: 'light' })),
+}));
+
+// Mock LoadingPage to control the loading text
+jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading Submissions...</div>);
 jest.mock('react-router-dom', () => ({
     ...jest.requireActual('react-router-dom'),
     useParams: () => ({})
@@ -22,7 +30,7 @@ describe('Submissions Page', () => {
     it('renders loading state initially', () => {
         submissionService.getAll.mockReturnValue(new Promise(() => { }));
         render(<BrowserRouter><Submissions /></BrowserRouter>);
-        expect(screen.getByText(/loading submissions/i)).toBeInTheDocument();
+        expect(screen.getByText(/loading submissions\.\.\.$/i)).toBeInTheDocument();
     });
 
     it('displays submissions on success', async () => {
