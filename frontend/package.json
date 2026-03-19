@@ -27,7 +27,8 @@
   },
   "eslintConfig": {
     "extends": [
-      "react-app"
+      "react-app",
+      "react-app/jest"
     ]
   },
   "browserslist": {
@@ -50,16 +51,5 @@
     "transformIgnorePatterns": [
       "[/\\\\]node_modules[/\\\\](?!axios|react-router-dom|@remix-run|turbo-stream).+\\.(js|jsx|mjs|cjs|ts|tsx)$"
     ]
-  },
-  "devDependencies": {
-    "@types/jest": "^29.5.0",
-    "@types/node": "^20.0.0",
-    "@types/react": "^18.2.0",
-    "@types/react-datepicker": "^4.19.0",
-    "@types/react-dom": "^18.2.0",
-    "@types/react-router-dom": "^5.3.3",
-    "@typescript-eslint/parser": "^5.62.0",
-    "@typescript-eslint/eslint-plugin": "^5.62.0",
-    "typescript": "^4.9.5"
   }
 }
