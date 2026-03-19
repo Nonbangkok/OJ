@@ -42,10 +42,10 @@ Service (xxxService)           Axios API calls, request/response mapping
 | React Context Providers | PascalCase + `Provider` suffix | `AuthProvider`, `ThemeProvider` |
 | Context Hooks | `use` + context name | `useAuth()`, `useTheme()` |
 | Custom Hooks | `use` + PascalCase noun | `useContests()`, `useProblemDetail()` |
-| Service files | camelCase + `Service` suffix | `contestService.js`, `authService.js` |
+| Service files | camelCase + `Service` suffix | `contestService.ts`, `authService.ts` |
 | Service objects | camelCase | `contestService.getAll()` |
-| Controller files | camelCase + `Controller` suffix | `authController.js` |
-| Backend services | camelCase | `judgeService.js`, `contestScheduler.js` |
+| Controller files | camelCase + `Controller` suffix | `authController.ts` |
+| Backend services | camelCase | `judgeService.ts`, `contestScheduler.ts` |
 | Utility functions | camelCase | `formatTimeAgo()`, `getStatusClass()` |
 | Constants | UPPER_SNAKE_CASE | `CONTEST_STATUS.RUNNING`, `JUDGE_CONFIG.TLE_EXIT_CODE` |
 | Constant groups | UPPER_SNAKE_CASE objects | `USER_VALIDATION`, `POLLING_INTERVALS` |
@@ -71,7 +71,7 @@ Three global contexts wrap the entire app in this order:
 
 ### Custom Hooks
 
-- **One hook per file**, named `useXxxYyy.js`.
+- **One hook per file**, named `useXxxYyy.ts` (or `.js` for frontend).
 - Always return an object (not an array) with named properties: `{ data, loading, error, actions... }`.
 - Use `useCallback` for functions passed as dependencies or to child components.
 - Hooks own the loading/error state — pages just destructure and render.
@@ -142,7 +142,7 @@ Three global contexts wrap the entire app in this order:
 2. **No ORM** — raw SQL with parameterized queries only. Always use `$1, $2, ...` placeholders.
 3. **JSDoc on all public utility functions** — see `formatters.js` for the standard format.
 4. **Error handling in every async function** — `try/catch` with meaningful error messages.
-5. **Module systems**: Backend uses **CommonJS** (`require` / `module.exports`), Frontend uses **ES Modules** (`import` / `export`).
+5. **Module systems**: Backend uses **TypeScript (ESM via tsx/ts-node)**, Frontend uses **ES Modules** (`import` / `export`).
 6. **Environment variables** — never commit `.env`, use `.env.example` as template. All secrets via env vars.
 7. **File upload limits** — configured via Multer, up to 1GB for problem PDFs and test case ZIPs.
 8. **Session security** — `httpOnly: true`, `sameSite: 'lax'`, `secure: false` (set to `true` in production).
@@ -151,11 +151,12 @@ Three global contexts wrap the entire app in this order:
 
 ## Testing Standards
 
-### Backend (Jest + Supertest)
+### Backend (Jest + Supertest + ts-jest)
 
-- Tests live in `backend/tests/`.
+- Tests live in `backend/tests/` and are written in **TypeScript**.
+- Use `ts-jest` for running TypeScript tests.
 - Use `supertest` to make HTTP requests against the Express app.
-- Test files named by domain: e.g., `auth.test.js`, `submissions.test.js`.
+- Test files named by domain: e.g., `auth.test.ts`, `submissions.test.ts`.
 - Run with `npm test` (uses `cross-env NODE_ENV=test`).
 
 ### Frontend (Jest + React Testing Library)

@@ -23,7 +23,7 @@
 | Containerization | Docker + Compose | — |
 | Testing (BE) | Jest 30 + Supertest 7 | — |
 | Testing (FE) | Jest + React Testing Library 16 | — |
-| Language | JavaScript (CommonJS backend, ESM frontend) | — |
+| Language | TypeScript (backend), JavaScript (ESM frontend) | — |
 | Judged Language | C++ (compiled & executed in isolated sandbox) | — |
 
 ## System Hierarchy
@@ -35,43 +35,45 @@ OJ/
 ├── docker-compose.yml      # Orchestrates 4 containers
 ├── nginx-proxy/            # Nginx reverse proxy config
 │
-├── backend/                # Express API server
-│   ├── server.js           # App entry point, route mounting, scheduler start
-│   ├── db.js               # PostgreSQL connection pool (pg)
+├── backend/                # Express API server (TypeScript)
+│   ├── server.ts           # App entry point, route mounting, scheduler start
+│   ├── db.ts               # PostgreSQL connection pool (pg)
 │   ├── constants/
-│   │   └── index.js        # Centralized constants (roles, statuses, limits)
+│   │   └── index.ts        # Centralized constants (roles, statuses, limits)
 │   ├── controllers/        # Route handlers (Express Router per domain)
-│   │   ├── authController.js
-│   │   ├── adminController.js
-│   │   ├── problemController.js
-│   │   ├── submissionController.js
-│   │   └── contestController.js
+│   │   ├── authController.ts
+│   │   ├── adminController.ts
+│   │   ├── problemController.ts
+│   │   ├── submissionController.ts
+│   │   └── contestController.ts
 │   ├── services/           # Business logic & external processes
-│   │   ├── judgeService.js       # Compile & judge C++ in sandbox
-│   │   ├── submissionService.js  # Submission processing
-│   │   ├── batchUploadService.js # Bulk problem import from ZIP
-│   │   ├── problemMigration.js   # Problem data migration
-│   │   └── contestScheduler.js   # Cron-based contest lifecycle
+│   │   ├── judgeService.ts       # Compile & judge C++ in sandbox
+│   │   ├── submissionService.ts  # Submission processing
+│   │   ├── batchUploadService.ts # Bulk problem import from ZIP
+│   │   ├── problemMigration.ts   # Problem data migration
+│   │   └── contestScheduler.ts   # Cron-based contest lifecycle
 │   ├── middleware/
-│   │   ├── auth.js         # requireAuth, requireStaffOrAdmin, requireAdmin
-│   │   └── upload.js       # Multer configuration
+│   │   ├── auth.ts         # requireAuth, requireStaffOrAdmin, requireAdmin
+│   │   └── upload.ts       # Multer configuration
 │   ├── scripts/
-│   │   ├── init_db.js      # Schema creation (DROP CASCADE + CREATE)
-│   │   ├── create_admin.js # Interactive admin user setup
-│   │   ├── clear_submissions.js
+│   │   ├── init_db.ts      # Schema creation (DROP CASCADE + CREATE)
+│   │   ├── create_admin.ts # Interactive admin user setup
+│   │   ├── clear_submissions.ts
 │   │   └── time_wrapper.c  # C wrapper for microsecond execution timing
-│   └── tests/              # Jest + Supertest API and Unit tests
-│       ├── db.test.js      # DB pool connection tests
-│       ├── authController.test.js, ... # Controller tests
+│   ├── types/              # Type definitions and interfaces
+│   └── tests/              # Jest + Supertest API and Unit tests (TypeScript)
+│       ├── setup.ts        # Test environment setup
+│       ├── db.test.ts      # DB pool connection tests
+│       ├── authController.test.ts, ... # Controller tests
 │       ├── services/       # Mock-heavy unit tests for business logic
-│       │   ├── judgeService.test.js
-│       │   ├── submissionService.test.js
-│       │   ├── batchUploadService.test.js
-│       │   ├── problemMigration.test.js
-│       │   └── contestScheduler.test.js
+│       │   ├── judgeService.test.ts
+│       │   ├── submissionService.test.ts
+│       │   ├── batchUploadService.test.ts
+│       │   ├── problemMigration.test.ts
+│       │   └── contestScheduler.test.ts
 │       └── middleware/     # Tests for auth and upload middlewares
-│           ├── auth.test.js
-│           └── upload.test.js
+│           ├── auth.test.ts
+│           └── upload.test.ts
 │
 ├── frontend/               # React SPA (Create React App)
 │   └── src/
@@ -220,7 +222,7 @@ stateDiagram-v2
 ```
 
 Key behaviors:
-- **`contestScheduler.js`** runs a cron job that checks contest times and transitions statuses automatically.
+- **`contestScheduler.ts`** runs a cron job that checks contest times and transitions statuses automatically.
 - When a contest is **running**, its problems are snapshotted into `contest_problems` (immutable copy) and become inaccessible as standalone problems.
 - Submissions during a contest go to `contest_submissions` (separate from global `submissions`).
 - The `contest_scoreboards` table tracks per-user scores with `last_score_improvement_time` for tiebreaking.
