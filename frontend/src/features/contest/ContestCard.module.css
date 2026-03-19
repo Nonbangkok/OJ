@@ -47,9 +47,15 @@
 }
 
 @keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.7; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 .contestTiming {
@@ -118,7 +124,7 @@
 }
 
 .joinBtn {
-  background: linear-gradient(135deg, #4CAF50, #45a049);
+  background: linear-gradient(135deg, #4caf50, #45a049);
   color: white;
 }
 
@@ -128,32 +134,32 @@
 }
 
 .enterBtn {
-  background: linear-gradient(135deg, #2196F3, #1976D2);
+  background: linear-gradient(135deg, #2196f3, #1976d2);
   color: white;
 }
 
 .enterBtn:hover {
-  background: linear-gradient(135deg, #1976D2, #1565C0);
+  background: linear-gradient(135deg, #1976d2, #1565c0);
   transform: translateY(-2px);
 }
 
 .scoreboardBtn {
-  background: linear-gradient(135deg, #FF9800, #F57C00);
+  background: linear-gradient(135deg, #ff9800, #f57c00);
   color: white;
 }
 
 .scoreboardBtn:hover {
-  background: linear-gradient(135deg, #F57C00, #EF6C00);
+  background: linear-gradient(135deg, #f57c00, #ef6c00);
   transform: translateY(-2px);
 }
 
 .loginBtn {
-  background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+  background: linear-gradient(135deg, #9c27b0, #7b1fa2);
   color: white;
 }
 
 .loginBtn:hover {
-  background: linear-gradient(135deg, #7B1FA2, #6A1B9A);
+  background: linear-gradient(135deg, #7b1fa2, #6a1b9a);
   transform: translateY(-2px);
 }
 
@@ -175,12 +181,12 @@
     align-items: flex-start;
     gap: 10px;
   }
-  
+
   .contestStats {
     flex-direction: column;
     gap: 8px;
   }
-  
+
   .timeInfo {
     flex-direction: column;
     align-items: flex-start;

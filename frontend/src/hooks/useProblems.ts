@@ -21,9 +21,9 @@ export const useProblems = (contestId) => {
         : await problemService.getAllWithStats();
       setProblems(data);
     } catch (err) {
-      setError(contestId
-        ? 'Failed to fetch contest problems.'
-        : 'Failed to fetch problems. Please log in.');
+      setError(
+        contestId ? 'Failed to fetch contest problems.' : 'Failed to fetch problems. Please log in.'
+      );
     } finally {
       setLoading(false);
     }

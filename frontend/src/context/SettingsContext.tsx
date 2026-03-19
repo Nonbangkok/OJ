@@ -38,9 +38,5 @@ export const SettingsProvider = ({ children }) => {
     refreshSettings: fetchSettings, // Expose the fetch function
   };
 
-  return (
-    <SettingsContext.Provider value={value}>
-      {children}
-    </SettingsContext.Provider>
-  );
-}; 
+  return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
+};

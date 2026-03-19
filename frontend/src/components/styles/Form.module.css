@@ -40,7 +40,9 @@
   color: var(--text-primary);
   font-family: var(--font-family-sans-serif);
   font-size: 1rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 /* Fix for autofill background color */
@@ -62,12 +64,13 @@
   min-height: 120px;
 }
 
-.form-time h2{
+.form-time h2 {
   color: black;
 }
 
 /* General Button Style */
-button, .button {
+button,
+.button {
   display: inline-block;
   box-sizing: border-box;
   width: 100%;
@@ -85,7 +88,8 @@ button, .button {
   transition: background-color 0.2s ease;
 }
 
-button:hover, .button:hover {
+button:hover,
+.button:hover {
   background-color: var(--accent-primary-hover);
 }
 
@@ -93,4 +97,4 @@ button:disabled {
   background-color: var(--background-tertiary);
   color: var(--text-muted);
   cursor: not-allowed;
-} 
+}

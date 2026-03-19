@@ -11,22 +11,22 @@ import { USER_ROLES, SUBMISSION_STATUS } from './constants';
  * @returns {string} Relative time string (e.g., "5 minutes ago")
  */
 export const formatTimeAgo = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now - date) / 1000);
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now - date) / 1000);
 
-    let interval = seconds / 31536000;
-    if (interval > 1) return `${Math.floor(interval)} years ago`;
-    interval = seconds / 2592000;
-    if (interval > 1) return `${Math.floor(interval)} months ago`;
-    interval = seconds / 86400;
-    if (interval > 1) return `${Math.floor(interval)} days ago`;
-    interval = seconds / 3600;
-    if (interval > 1) return `${Math.floor(interval)} hours ago`;
-    interval = seconds / 60;
-    if (interval > 1) return `${Math.floor(interval)} minutes ago`;
-    return `${Math.floor(seconds)} seconds ago`;
+  let interval = seconds / 31536000;
+  if (interval > 1) return `${Math.floor(interval)} years ago`;
+  interval = seconds / 2592000;
+  if (interval > 1) return `${Math.floor(interval)} months ago`;
+  interval = seconds / 86400;
+  if (interval > 1) return `${Math.floor(interval)} days ago`;
+  interval = seconds / 3600;
+  if (interval > 1) return `${Math.floor(interval)} hours ago`;
+  interval = seconds / 60;
+  if (interval > 1) return `${Math.floor(interval)} minutes ago`;
+  return `${Math.floor(seconds)} seconds ago`;
 };
 
 /**
@@ -35,10 +35,10 @@ export const formatTimeAgo = (dateString) => {
  * @returns {string} Formatted date (e.g., "01/03/69 09:15:30")
  */
 export const formatDateAbsolute = (dateString) => {
-    if (!dateString) return '';
-    const d = new Date(dateString);
-    const pad = (num) => num.toString().padStart(2, '0');
-    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${(d.getFullYear() + 543) % 100} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  if (!dateString) return '';
+  const d = new Date(dateString);
+  const pad = (num) => num.toString().padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${(d.getFullYear() + 543) % 100} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
 /**
@@ -48,22 +48,22 @@ export const formatDateAbsolute = (dateString) => {
  * @returns {string} Result string (e.g., "[PP-TS]")
  */
 export const generateResultString = (status, results) => {
-    if (status === SUBMISSION_STATUS.COMPILATION_ERROR) {
-        return SUBMISSION_STATUS.COMPILATION_ERROR;
-    }
-    if (!results || results.length === 0) {
-        return '';
-    }
-    const charMap = {
-        [SUBMISSION_STATUS.ACCEPTED]: 'P',
-        [SUBMISSION_STATUS.WRONG_ANSWER]: '-',
-        [SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED]: 'T',
-        [SUBMISSION_STATUS.RUNTIME_ERROR]: 'R',
-        [SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED]: 'M',
-        [SUBMISSION_STATUS.SKIPPED]: 'S',
-    };
-    const resultChars = results.map(r => charMap[r.status] || '?').join('');
-    return `[${resultChars}]`;
+  if (status === SUBMISSION_STATUS.COMPILATION_ERROR) {
+    return SUBMISSION_STATUS.COMPILATION_ERROR;
+  }
+  if (!results || results.length === 0) {
+    return '';
+  }
+  const charMap = {
+    [SUBMISSION_STATUS.ACCEPTED]: 'P',
+    [SUBMISSION_STATUS.WRONG_ANSWER]: '-',
+    [SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED]: 'T',
+    [SUBMISSION_STATUS.RUNTIME_ERROR]: 'R',
+    [SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED]: 'M',
+    [SUBMISSION_STATUS.SKIPPED]: 'S',
+  };
+  const resultChars = results.map((r) => charMap[r.status] || '?').join('');
+  return `[${resultChars}]`;
 };
 
 /**
@@ -72,8 +72,8 @@ export const generateResultString = (status, results) => {
  * @returns {string} CSS class name (e.g., "status-accepted")
  */
 export const getStatusClass = (status) => {
-    if (!status) return '';
-    return `status-${status.split(' ')[0].toLowerCase()}`;
+  if (!status) return '';
+  return `status-${status.split(' ')[0].toLowerCase()}`;
 };
 
 /**
@@ -82,13 +82,13 @@ export const getStatusClass = (status) => {
  * @returns {string} Formatted date (e.g., "Mar 1, 2026, 09:15 AM")
  */
 export const formatDateTime = (dateTime) => {
-    return new Date(dateTime).toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+  return new Date(dateTime).toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
 /**
@@ -97,23 +97,23 @@ export const formatDateTime = (dateTime) => {
  * @returns {string} Human-readable remaining time (e.g., "2h 30m remaining")
  */
 export const getRemainingTime = (endTime) => {
-    const now = new Date();
-    const end = new Date(endTime);
-    const diff = end - now;
+  const now = new Date();
+  const end = new Date(endTime);
+  const diff = end - now;
 
-    if (diff <= 0) return 'Finished';
+  if (diff <= 0) return 'Finished';
 
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
-    if (days > 0) {
-        return `${days}d ${hours}h ${minutes}m remaining`;
-    } else if (hours > 0) {
-        return `${hours}h ${minutes}m remaining`;
-    } else {
-        return `${minutes}m remaining`;
-    }
+  if (days > 0) {
+    return `${days}d ${hours}h ${minutes}m remaining`;
+  } else if (hours > 0) {
+    return `${hours}h ${minutes}m remaining`;
+  } else {
+    return `${minutes}m remaining`;
+  }
 };
 
 /**
@@ -123,7 +123,7 @@ export const getRemainingTime = (endTime) => {
  * @returns {boolean}
  */
 export const canViewCode = (submission, user) => {
-    if (!user) return false;
-    if (user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.STAFF) return true;
-    return submission.username === user.username;
+  if (!user) return false;
+  if (user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.STAFF) return true;
+  return submission.username === user.username;
 };

@@ -31,7 +31,7 @@
 
   --status-success-bg: #48bb78;
   --status-error-bg: #dc3545;
-  --status-warning-bg: #FFC107;
+  --status-warning-bg: #ffc107;
   --status-info-bg: #17a2b8;
 
   --font-family-sans-serif: 'Inter', sans-serif;
@@ -84,12 +84,13 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--background-primary);
   color: var(--text-primary);
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
 /* General container class */

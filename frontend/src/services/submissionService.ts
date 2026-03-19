@@ -26,8 +26,8 @@ const submissionService = {
 
   /**
    * Fetches detailed information for a specific submission.
-   * @param {string|number} submissionId 
-   * @param {string|number|null} [contestId=null] 
+   * @param {string|number} submissionId
+   * @param {string|number|null} [contestId=null]
    * @returns {Promise<Object>} Detailed submission data including code and test case results
    */
   getById: async (submissionId, contestId = null) => {
@@ -38,8 +38,8 @@ const submissionService = {
 
   /**
    * Searches for problems by ID or title (used for autocomplete filters).
-   * @param {string} query 
-   * @param {string|number|null} [contestId=null] 
+   * @param {string} query
+   * @param {string|number|null} [contestId=null]
    * @returns {Promise<Array>} Problem suggestions
    */
   searchProblems: async (query, contestId = null) => {
@@ -51,8 +51,8 @@ const submissionService = {
 
   /**
    * Searches for users by username (used for autocomplete filters).
-   * @param {string} query 
-   * @param {string|number|null} [contestId=null] 
+   * @param {string} query
+   * @param {string|number|null} [contestId=null]
    * @returns {Promise<Array>} User suggestions
    */
   searchUsers: async (query, contestId = null) => {
@@ -60,7 +60,7 @@ const submissionService = {
     if (contestId) url += `&contestId=${contestId}`;
     const response = await api.get(url);
     return response.data;
-  }
+  },
 };
 
 export default submissionService;

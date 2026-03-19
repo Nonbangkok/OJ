@@ -15,8 +15,8 @@ const authService = {
 
   /**
    * Logs in a user.
-   * @param {string} username 
-   * @param {string} password 
+   * @param {string} username
+   * @param {string} password
    * @returns {Promise<Object>} Logged in user data
    */
   login: async (username, password) => {
@@ -34,8 +34,8 @@ const authService = {
 
   /**
    * Registers a new user account.
-   * @param {string} username 
-   * @param {string} password 
+   * @param {string} username
+   * @param {string} password
    * @returns {Promise<Object>} New user data
    */
   register: async (username, password) => {

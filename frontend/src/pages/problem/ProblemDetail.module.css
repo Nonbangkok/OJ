@@ -115,7 +115,7 @@
 }
 
 .problem-info .problem-id {
-  font-family: "Inconsolata";
+  font-family: 'Inconsolata';
   margin-bottom: 1rem;
 }
 
@@ -319,7 +319,7 @@
   border-radius: 6px;
   white-space: pre-wrap;
   word-break: break-all;
-  font-family: "Inconsolata";
+  font-family: 'Inconsolata';
   color: var(--text-primary);
 }
 
@@ -372,7 +372,7 @@
 }
 
 .result-string {
-  font-family: "Inconsolata", monospace;
+  font-family: 'Inconsolata', monospace;
   font-size: 1.3rem;
   font-weight: 600;
   color: var(--text-secondary);

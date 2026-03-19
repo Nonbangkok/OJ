@@ -15,7 +15,7 @@ const problemService = {
 
   /**
    * Fetches details for a specific global problem.
-   * @param {string} problemId 
+   * @param {string} problemId
    * @returns {Promise<Object>} Problem details
    */
   getDetails: async (problemId) => {
@@ -25,8 +25,8 @@ const problemService = {
 
   /**
    * Fetches details for a specific problem within a contest context.
-   * @param {string|number} contestId 
-   * @param {string} problemId 
+   * @param {string|number} contestId
+   * @param {string} problemId
    * @returns {Promise<Object>} Contest problem details
    */
   getContestProblemDetails: async (contestId, problemId) => {
@@ -36,8 +36,8 @@ const problemService = {
 
   /**
    * Generates the API URL for retrieving a problem's PDF file.
-   * @param {string} problemId 
-   * @param {string|number|null} [contestId=null] - Optional contest context 
+   * @param {string} problemId
+   * @param {string|number|null} [contestId=null] - Optional contest context
    * @returns {string} Full URL to the PDF endpoint
    */
   getPdfUrl: (problemId, contestId = null) => {
@@ -46,7 +46,7 @@ const problemService = {
       return `${baseUrl}/contests/${contestId}/problems/${problemId}/pdf`;
     }
     return `${baseUrl}/problems/${problemId}/pdf`;
-  }
+  },
 };
 
 export default problemService;

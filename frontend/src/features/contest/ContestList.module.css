@@ -28,7 +28,7 @@
     grid-template-columns: 1fr;
     gap: 20px;
   }
-  
+
   .contestCard {
     padding: 20px;
   }
@@ -38,4 +38,4 @@
   .contestCard {
     padding: 16px;
   }
-} 
+}

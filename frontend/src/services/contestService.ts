@@ -15,7 +15,7 @@ const contestService = {
 
   /**
    * Fetches details for a specific contest.
-   * @param {string|number} contestId 
+   * @param {string|number} contestId
    * @returns {Promise<Object>} Contest details
    */
   getById: async (contestId) => {
@@ -25,7 +25,7 @@ const contestService = {
 
   /**
    * Allows the current user to join a contest.
-   * @param {string|number} contestId 
+   * @param {string|number} contestId
    * @returns {Promise<Object>} Success message
    */
   join: async (contestId) => {
@@ -35,7 +35,7 @@ const contestService = {
 
   /**
    * Fetches problems available within a specific contest.
-   * @param {string|number} contestId 
+   * @param {string|number} contestId
    * @returns {Promise<Array>} Array of contest problems
    */
   getProblems: async (contestId) => {
@@ -45,13 +45,13 @@ const contestService = {
 
   /**
    * Fetches the scoreboard for a specific contest.
-   * @param {string|number} contestId 
+   * @param {string|number} contestId
    * @returns {Promise<Array>} Contest scoreboard data
    */
   getScoreboard: async (contestId) => {
     const response = await api.get(`/contests/${contestId}/scoreboard`);
     return response.data;
-  }
+  },
 };
 
 export default contestService;
