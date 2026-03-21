@@ -7,9 +7,9 @@
     "@testing-library/jest-dom": "^6.7.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
-    "@types/node": "^20.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
+    "@types/node": "^18.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
     "axios": "^1.11.0",
     "cors": "^2.8.5",
     "date-fns": "^3.0.0",
@@ -21,7 +21,7 @@
     "react-router-dom": "^7.8.1",
     "react-scripts": "5.0.1",
     "react-simple-code-editor": "^0.14.1",
-    "typescript": "^5.0.0",
+    "typescript": "^4.9.5",
     "web-vitals": "^2.1.4"
   },
   "devDependencies": {
@@ -42,8 +42,8 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx --fix",
     "lint:check": "eslint src --ext .ts,.tsx",
-    "format": "prettier --write src/**/*.{ts,tsx,js,jsx,json,css,md}",
-    "format:check": "prettier --check src/**/*.{ts,tsx,js,jsx,json,css,md}",
+    "format": "prettier --write src/**/*.{ts,tsx,css}",
+    "format:check": "prettier --check src/**/*.{ts,tsx,css}",
     "validate": "npm run type-check && npm run lint:check && npm run format:check"
   },
   "browserslist": {
