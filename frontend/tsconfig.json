@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
-    "target": "es6",
+    "target": "ES2020",
     "lib": [
-      "dom",
-      "dom.iterable",
-      "es6"
+      "DOM",
+      "DOM.Iterable",
+      "ES2020"
     ],
     "allowJs": true,
     "skipLibCheck": true,
@@ -19,8 +19,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    
-    // Additional strict options for maximum type safety
+    "useDefineForClassFields": true,
     "noImplicitAny": true,
     "noImplicitReturns": true,
     "noImplicitThis": true,
@@ -28,32 +27,49 @@
     "noUnusedParameters": true,
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,
-    "noPropertyAccessFromIndexSignature": false,
+    "noPropertyAccessFromIndexSignature": true,
     "noUncheckedIndexedAccess": true,
     "allowUnusedLabels": false,
     "allowUnreachableCode": false,
-    
-    // Path mapping for clean imports
     "baseUrl": "src",
     "paths": {
-      "@/*": ["*"],
-      "@/components/*": ["components/*"],
-      "@/pages/*": ["pages/*"],
-      "@/hooks/*": ["hooks/*"],
-      "@/services/*": ["services/*"],
-      "@/utils/*": ["utils/*"],
-      "@/context/*": ["context/*"],
-      "@/features/*": ["features/*"],
-      "@/layouts/*": ["layouts/*"],
-      "@/assets/*": ["assets/*"],
-      "@/styles/*": ["components/styles/*"]
+      "@/*": [
+        "*"
+      ],
+      "@/components/*": [
+        "components/*"
+      ],
+      "@/pages/*": [
+        "pages/*"
+      ],
+      "@/hooks/*": [
+        "hooks/*"
+      ],
+      "@/services/*": [
+        "services/*"
+      ],
+      "@/utils/*": [
+        "utils/*"
+      ],
+      "@/context/*": [
+        "context/*"
+      ],
+      "@/features/*": [
+        "features/*"
+      ],
+      "@/layouts/*": [
+        "layouts/*"
+      ],
+      "@/assets/*": [
+        "assets/*"
+      ],
+      "@/styles/*": [
+        "components/styles/*"
+      ]
     }
   },
   "include": [
-    "src/**/*",
-    "src/**/*.tsx",
-    "src/**/*.ts",
-    "src/types/**/*.d.ts"
+    "src"
   ],
   "exclude": [
     "node_modules",
