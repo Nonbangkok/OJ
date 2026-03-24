@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import bcrypt from 'bcrypt';
 import * as db from '../db';
 import { USER_VALIDATION, SECURITY_CONFIG } from '../constants';
+import { UserRow, SystemSettingRow } from '../types/models';
 
 const router: Router = express.Router();
 
@@ -12,7 +13,7 @@ router.post('/register', [
 ], async (req: Request, res: Response) => {
   try {
     // Check if registration is enabled
-    const regSettings = await db.query(
+    const regSettings = await db.query<Pick<SystemSettingRow, 'setting_value'>>(
       "SELECT setting_value FROM system_settings WHERE setting_key = 'registration_enabled'"
     );
     const isRegistrationEnabled = regSettings.rows.length === 0 || regSettings.rows[0].setting_value === 'true';
@@ -26,11 +27,11 @@ router.post('/register', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { username, password } = req.body;
+    const { username, password } = req.body as { username: string; password: string };
 
     // Check if username already exists
-    const existingUser = await db.query(
-      'SELECT * FROM users WHERE username = $1',
+    const existingUser = await db.query<Pick<UserRow, 'id'>>(
+      'SELECT id FROM users WHERE username = $1',
       [username]
     );
 
@@ -43,7 +44,7 @@ router.post('/register', [
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // Insert new user
-    const result = await db.query(
+    const result = await db.query<Pick<UserRow, 'id' | 'username'>>(
       'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username',
       [username, hashedPassword]
     );
@@ -52,7 +53,7 @@ router.post('/register', [
       message: 'User registered successfully',
       user: result.rows[0]
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Registration error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
@@ -61,7 +62,7 @@ router.post('/register', [
 // PUBLIC facing endpoint to check registration status
 router.get('/settings/registration', async (req: Request, res: Response) => {
   try {
-    const result = await db.query(
+    const result = await db.query<Pick<SystemSettingRow, 'setting_value'>>(
       "SELECT setting_value FROM system_settings WHERE setting_key = 'registration_enabled'"
     );
 
@@ -69,8 +70,7 @@ router.get('/settings/registration', async (req: Request, res: Response) => {
       return res.json({ enabled: true });
     }
     res.json({ enabled: result.rows[0].setting_value === 'true' });
-  } catch (error) {
-    // On error, default to disabled for security.
+  } catch (error: unknown) {
     console.error('Error fetching public registration setting:', error);
     res.json({ enabled: false });
   }
@@ -85,11 +85,11 @@ router.post('/login', [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { username, password } = req.body;
+  const { username, password } = req.body as { username: string; password: string };
 
   try {
     // Find user by username
-    const result = await db.query(
+    const result = await db.query<UserRow>(
       'SELECT * FROM users WHERE username = $1',
       [username]
     );
@@ -119,14 +119,14 @@ router.post('/login', [
         role: user.role, // Send role to frontend
       }
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
 
 router.post('/logout', (req: Request, res: Response) => {
-  req.session.destroy((err: any) => {
+  req.session.destroy((err: unknown) => {
     if (err) {
       return res.status(500).json({ message: 'Error logging out' });
     }

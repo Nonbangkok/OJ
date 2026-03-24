@@ -10,5 +10,5 @@ const pool = new Pool({
     ssl: false,
 });
 
-export const query = (text: string, params?: any[]) => pool.query(text, params);
+export const query = <T extends pg.QueryResultRow = any>(text: string, params?: unknown[]) => pool.query<T>(text, params);
 export { pool };

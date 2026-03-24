@@ -9,6 +9,8 @@ import * as db from '../db';
 import { requireAuth, requireAdmin, requireStaffOrAdmin } from '../middleware/auth';
 import { USER_VALIDATION, USER_ROLES, SECURITY_CONFIG } from '../constants';
 import { diskUpload } from '../middleware/upload';
+import { UserRow, SystemSettingRow, isPgError } from '../types/models';
+import { BatchUserEntry } from '../types/api';
 
 const router = express.Router();
 const execPromise = promisify(exec);
@@ -16,7 +18,9 @@ const execPromise = promisify(exec);
 // Admin API Endpoints
 router.get('/admin/users', requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const result = await db.query('SELECT id, username, role, created_at FROM users ORDER BY id');
+    const result = await db.query<Pick<UserRow, 'id' | 'username' | 'role' | 'created_at'>>(
+      'SELECT id, username, role, created_at FROM users ORDER BY id'
+    );
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -34,10 +38,12 @@ router.post('/admin/users', requireAuth, requireAdmin, [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { username, password, role } = req.body;
+  const { username, password, role } = req.body as { username: string; password: string; role: string };
 
   try {
-    const existingUser = await db.query('SELECT id FROM users WHERE username = $1', [username]);
+    const existingUser = await db.query<Pick<UserRow, 'id'>>(
+      'SELECT id FROM users WHERE username = $1', [username]
+    );
     if (existingUser.rows.length > 0) {
       return res.status(409).json({ message: 'Username already exists.' });
     }
@@ -45,7 +51,7 @@ router.post('/admin/users', requireAuth, requireAdmin, [
     const saltRounds = SECURITY_CONFIG.SALT_ROUNDS;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    const result = await db.query(
+    const result = await db.query<Pick<UserRow, 'id' | 'username' | 'role'>>(
       'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id, username, role',
       [username, hashedPassword, role]
     );
@@ -68,16 +74,18 @@ router.put('/admin/users/:id', requireAuth, requireAdmin, [
   }
 
   const { id } = req.params;
-  const { username, role } = req.body;
+  const { username, role } = req.body as { username: string; role: string };
 
   // Prevent admin from editing their own account
-  if (req.session.userId == (id as any)) {
+  if (req.session.userId === Number(id)) {
     return res.status(403).json({ message: 'Admins cannot edit their own account.' });
   }
 
   try {
     // Fetch the user being edited to check their username
-    const userToEditRes = await db.query('SELECT username FROM users WHERE id = $1', [id]);
+    const userToEditRes = await db.query<Pick<UserRow, 'username'>>(
+      'SELECT username FROM users WHERE id = $1', [id]
+    );
     if (userToEditRes.rows.length === 0) {
       return res.status(404).json({ message: 'User not found.' });
     }
@@ -86,7 +94,7 @@ router.put('/admin/users/:id', requireAuth, requireAdmin, [
     }
 
     // Check if the new username is already taken by another user
-    const existingUser = await db.query(
+    const existingUser = await db.query<Pick<UserRow, 'id'>>(
       'SELECT id FROM users WHERE username = $1 AND id != $2',
       [username, id]
     );
@@ -94,7 +102,7 @@ router.put('/admin/users/:id', requireAuth, requireAdmin, [
       return res.status(409).json({ message: 'Username is already taken.' });
     }
 
-    const result = await db.query(
+    const result = await db.query<Pick<UserRow, 'id' | 'username' | 'role'>>(
       'UPDATE users SET username = $1, role = $2 WHERE id = $3 RETURNING id, username, role',
       [username, role, id]
     );
@@ -102,9 +110,9 @@ router.put('/admin/users/:id', requireAuth, requireAdmin, [
       return res.status(404).json({ message: 'User not found' });
     }
     res.json(result.rows[0]);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`Error updating user ${id}:`, error);
-    if (error.code === '23505') { // unique_violation
+    if (isPgError(error) && error.code === '23505') { // unique_violation
       return res.status(409).json({ message: 'Username is already taken.' });
     }
     res.status(500).json({ message: 'Error updating user' });
@@ -115,13 +123,15 @@ router.delete('/admin/users/:id', requireAuth, requireAdmin, async (req: Request
   const { id } = req.params;
 
   // Prevent admin from deleting their own account
-  if (req.session.userId == (id as any)) {
+  if (req.session.userId === Number(id)) {
     return res.status(403).json({ message: 'Admins cannot delete their own account.' });
   }
 
   try {
     // Fetch the user being deleted to check their username
-    const userToDeleteRes = await db.query('SELECT username FROM users WHERE id = $1', [id]);
+    const userToDeleteRes = await db.query<Pick<UserRow, 'username'>>(
+      'SELECT username FROM users WHERE id = $1', [id]
+    );
     if (userToDeleteRes.rows.length === 0) {
       // User already doesn't exist, so we can consider the delete successful.
       return res.status(200).json({ message: `User ${id} deleted successfully` });
@@ -133,7 +143,9 @@ router.delete('/admin/users/:id', requireAuth, requireAdmin, async (req: Request
     // We also need to handle submissions from this user.
     // For simplicity, we can just delete them. A better approach might be to anonymize them.
     await db.query('DELETE FROM submissions WHERE user_id = $1', [id]);
-    const result = await db.query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
+    const result = await db.query<Pick<UserRow, 'id'>>(
+      'DELETE FROM users WHERE id = $1 RETURNING id', [id]
+    );
 
     if (result.rowCount === 0) {
       return res.status(404).json({ message: 'User not found' });
@@ -154,8 +166,8 @@ router.post('/admin/users/batch', requireAuth, requireAdmin, [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { prefix, count } = req.body;
-  const generatedUsers: any[] = [];
+  const { prefix, count } = req.body as { prefix: string; count: number };
+  const generatedUsers: BatchUserEntry[] = [];
   const saltRounds = 10;
 
   const client = await db.pool.connect();
@@ -172,7 +184,9 @@ router.post('/admin/users/batch', requireAuth, requireAdmin, [
       }
       const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-      const existingUser = await client.query('SELECT id FROM users WHERE username = $1', [username]);
+      const existingUser = await client.query<Pick<UserRow, 'id'>>(
+        'SELECT id FROM users WHERE username = $1', [username]
+      );
       if (existingUser.rows.length > 0) {
         // This username already exists, we must abort the transaction.
         // We could also choose to skip, but aborting is safer to avoid partial creations.
@@ -202,7 +216,7 @@ router.post('/admin/users/batch', requireAuth, requireAdmin, [
 
 router.get('/admin/authors', requireAuth, requireStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const result = await db.query(
+    const result = await db.query<Pick<UserRow, 'id' | 'username'>>(
       "SELECT id, username FROM users WHERE role = 'admin' OR role = 'staff' ORDER BY username"
     );
     res.json(result.rows);
@@ -264,9 +278,10 @@ router.post('/admin/database/import', requireAuth, requireAdmin, diskUpload.sing
 
     res.status(200).json({ message: 'Database imported successfully.' });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error during database import:', error);
-    res.status(500).json({ message: 'Failed to import database.', error: error.message });
+    const message = isPgError(error) ? error.message : 'Unknown error';
+    res.status(500).json({ message: 'Failed to import database.', error: message });
   } finally {
     // Clean up the temporary dump file in all cases
     if (req.file && fs.existsSync(req.file.path)) {
@@ -306,24 +321,25 @@ router.post('/admin/database/export', requireAuth, requireAdmin, async (req: Req
       });
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error during database export:', error);
     if (!res.headersSent) {
-      res.status(500).json({ message: 'Failed to export database.', error: error.message });
+      const message = isPgError(error) ? error.message : 'Unknown error';
+      res.status(500).json({ message: 'Failed to export database.', error: message });
     }
   }
 });
 
 router.get('/admin/settings/registration', requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const result = await db.query(
+    const result = await db.query<Pick<SystemSettingRow, 'setting_value'>>(
       "SELECT setting_value FROM system_settings WHERE setting_key = 'registration_enabled'"
     );
     if (result.rows.length === 0) {
       return res.json({ enabled: true });
     }
     res.json({ enabled: result.rows[0].setting_value === 'true' });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error fetching registration setting:', error);
     res.status(500).json({ message: 'Error fetching settings' });
   }
@@ -337,14 +353,14 @@ router.put('/admin/settings/registration', requireAuth, requireAdmin, [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { enabled } = req.body;
+  const { enabled } = req.body as { enabled: boolean };
   try {
     await db.query(
       "UPDATE system_settings SET setting_value = $1 WHERE setting_key = 'registration_enabled'",
       [enabled.toString()]
     );
     res.status(200).json({ message: 'Registration setting updated successfully.' });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error updating registration setting:', error);
     res.status(500).json({ message: 'Error updating setting' });
   }

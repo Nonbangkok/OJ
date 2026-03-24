@@ -8,9 +8,11 @@ import path from 'path';
 import archiver from 'archiver';
 import { processBatchUpload } from '../services/batchUploadService';
 import { PROBLEM_VALIDATION, USER_ROLES } from '../constants';
+import { ProblemRow, TestcaseRow, ProblemDetailDTO, AdminProblemRow, isPgError, ProblemWithPdf } from '../types/models';
+import { BatchUploadProgressData, ProblemExportConfig } from '../types/api';
 
 const router: Router = express.Router();
-const progressMap = new Map<string, any>();
+const progressMap = new Map<string, Response>();
 
 router.get('/problems-with-stats', requireAuth, async (req: Request, res: Response) => {
   const { userId } = req.session;
@@ -62,7 +64,7 @@ router.get('/problems-with-stats', requireAuth, async (req: Request, res: Respon
     `;
     const result = await db.query(query, [userId]);
     res.json(result.rows);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error fetching problems with stats:', error);
     res.status(500).json({ message: 'Error fetching problem data' });
   }
@@ -71,11 +73,11 @@ router.get('/problems-with-stats', requireAuth, async (req: Request, res: Respon
 // Problem API Endpoints
 router.get('/problems', async (req: Request, res: Response) => {
   try {
-    const result = await db.query(
+    const result = await db.query<Pick<ProblemRow, 'id' | 'title' | 'author'>>(
       'SELECT id, title, author FROM problems WHERE is_visible = true AND contest_id IS NULL ORDER BY id'
     );
     res.json(result.rows);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error fetching problems:', error);
     res.status(500).json({ message: 'Error fetching problems' });
   }
@@ -85,7 +87,10 @@ router.get('/problems', async (req: Request, res: Response) => {
 router.get('/problems/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
-    const result = await db.query('SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible FROM problems WHERE id = $1', [id]);
+    const result = await db.query<ProblemDetailDTO>(
+      'SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible FROM problems WHERE id = $1',
+      [id]
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Problem not found' });
@@ -106,7 +111,7 @@ router.get('/problems/:id', async (req: Request, res: Response) => {
     // Remove is_visible from response for regular users (admin/staff still see it)
     const { is_visible, ...problemData } = result.rows[0];
     res.json(isStaffOrAdmin ? result.rows[0] : problemData);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`Error fetching problem ${id}:`, error);
     res.status(500).json({ message: 'Error fetching problem details' });
   }
@@ -116,14 +121,17 @@ router.get('/problems/:id', async (req: Request, res: Response) => {
 router.get('/admin/problems/:id', requireAuth, requireStaffOrAdmin, async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
-    const result = await db.query('SELECT id, title, author, time_limit_ms, memory_limit_mb, is_visible, (problem_pdf IS NOT NULL) as has_pdf FROM problems WHERE id = $1', [id]);
+    const result = await db.query<ProblemDetailDTO>(
+      'SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible FROM problems WHERE id = $1',
+      [id]
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Problem not found' });
     }
 
     res.json(result.rows[0]);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`Error fetching admin problem ${id}:`, error);
     res.status(500).json({ message: 'Error fetching problem details' });
   }
@@ -132,14 +140,16 @@ router.get('/admin/problems/:id', requireAuth, requireStaffOrAdmin, async (req: 
 router.get('/problems/:id/pdf', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
-    const result = await db.query('SELECT problem_pdf FROM problems WHERE id = $1', [id]);
+    const result = await db.query<Pick<ProblemRow, 'problem_pdf'>>(
+      'SELECT problem_pdf FROM problems WHERE id = $1', [id]
+    );
     if (result.rows.length === 0 || !result.rows[0].problem_pdf) {
       return res.status(404).json({ message: 'Problem PDF not found.' });
     }
     const pdfData = result.rows[0].problem_pdf;
     res.setHeader('Content-Type', 'application/pdf');
     res.send(pdfData);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`Error fetching PDF for problem ${id}:`, error);
     res.status(500).json({ message: 'Error fetching PDF' });
   }
@@ -156,14 +166,14 @@ router.post('/admin/problems', requireAuth, requireStaffOrAdmin, [
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
-  const { id, title, author, time_limit_ms, memory_limit_mb } = req.body;
+  const { id, title, author, time_limit_ms, memory_limit_mb } = req.body as Pick<ProblemRow, 'id' | 'title' | 'author' | 'time_limit_ms' | 'memory_limit_mb'>;
   try {
-    const result = await db.query(
+    const result = await db.query<ProblemRow>(
       'INSERT INTO problems (id, title, author, time_limit_ms, memory_limit_mb) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [id, title, author, time_limit_ms, memory_limit_mb]
     );
     res.status(201).json(result.rows[0]);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error creating problem:', error);
     res.status(500).json({ message: 'Error creating problem' });
   }
@@ -181,18 +191,20 @@ router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin, [
     return res.status(400).json({ errors: errors.array() });
   }
   const oldId = req.params.id;
-  const { id: newId, title, author, time_limit_ms, memory_limit_mb } = req.body;
+  const { id: newId, title, author, time_limit_ms, memory_limit_mb } = req.body as Pick<ProblemRow, 'id' | 'title' | 'author' | 'time_limit_ms' | 'memory_limit_mb'>;
 
   try {
     // If the ID is being changed, check if the new ID already exists
     if (oldId !== newId) {
-      const existingProblem = await db.query('SELECT id FROM problems WHERE id = $1', [newId]);
+      const existingProblem = await db.query<Pick<ProblemRow, 'id'>>(
+        'SELECT id FROM problems WHERE id = $1', [newId]
+      );
       if (existingProblem.rows.length > 0) {
         return res.status(409).json({ message: `Problem ID '${newId}' already exists.` });
       }
     }
 
-    const result = await db.query(
+    const result = await db.query<ProblemRow>(
       'UPDATE problems SET id = $1, title = $2, author = $3, time_limit_ms = $4, memory_limit_mb = $5 WHERE id = $6 RETURNING *',
       [newId, title, author, time_limit_ms, memory_limit_mb, oldId]
     );
@@ -208,7 +220,7 @@ router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin, [
     }
 
     res.json(result.rows[0]);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`Error updating problem ${oldId}:`, error);
     res.status(500).json({ message: 'Error updating problem' });
   }
@@ -222,13 +234,15 @@ router.delete('/admin/problems/:id', requireAuth, requireStaffOrAdmin, async (re
     await db.query('DELETE FROM testcases WHERE problem_id = $1', [id]);
     await db.query('DELETE FROM contest_problems WHERE problem_id = $1', [id]);
     await db.query('DELETE FROM contest_submissions WHERE problem_id = $1', [id]);
-    const result = await db.query('DELETE FROM problems WHERE id = $1 RETURNING id', [id]);
+    const result = await db.query<Pick<ProblemRow, 'id'>>(
+      'DELETE FROM problems WHERE id = $1 RETURNING id', [id]
+    );
 
     if (result.rowCount === 0) {
       return res.status(404).json({ message: 'Problem not found' });
     }
     res.status(200).json({ message: `Problem ${id} deleted successfully` });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`Error deleting problem ${id}:`, error);
     res.status(500).json({ message: 'Error deleting problem' });
   }
@@ -236,9 +250,11 @@ router.delete('/admin/problems/:id', requireAuth, requireStaffOrAdmin, async (re
 
 router.get('/admin/problems', requireAuth, requireStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const result = await db.query('SELECT p.id, p.title, p.author, p.is_visible, p.contest_id, c.status AS contest_status FROM problems p LEFT JOIN contests c ON p.contest_id = c.id ORDER BY p.id');
+    const result = await db.query<AdminProblemRow>(
+      'SELECT p.id, p.title, p.author, p.is_visible, p.contest_id, c.status AS contest_status FROM problems p LEFT JOIN contests c ON p.contest_id = c.id ORDER BY p.id'
+    );
     res.json(result.rows);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error fetching problems for admin:', error);
     res.status(500).json({ message: 'Error fetching problems' });
   }
@@ -253,10 +269,10 @@ router.put('/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin, [
   }
 
   const { id } = req.params;
-  const { isVisible } = req.body;
+  const { isVisible } = req.body as { isVisible: boolean };
 
   try {
-    const result = await db.query(
+    const result = await db.query<Pick<ProblemRow, 'id' | 'title' | 'is_visible'>>(
       'UPDATE problems SET is_visible = $1 WHERE id = $2 RETURNING id, title, is_visible',
       [isVisible, id]
     );
@@ -267,7 +283,7 @@ router.put('/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin, [
       message: `Problem ${id} visibility updated successfully`,
       problem: result.rows[0]
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`Error updating visibility for problem ${id}:`, error);
     res.status(500).json({ message: 'Error updating problem visibility' });
   }
@@ -287,25 +303,26 @@ router.post('/admin/problems/batch-upload', requireAuth, requireStaffOrAdmin, di
       progressId: progressId
     });
 
-    const batchResults = await processBatchUpload(req.file.path, (progressData: any) => {
+    const batchResults = await processBatchUpload(req.file.path, (progressData: BatchUploadProgressData) => {
       const clientRes = progressMap.get(progressId);
-      if (clientRes && !clientRes.finished) {
+      if (clientRes && !clientRes.writableEnded) {
         clientRes.write(`event: progress\ndata: ${JSON.stringify(progressData)}\n\n`);
       }
     });
 
     const clientRes = progressMap.get(progressId);
-    if (clientRes && !clientRes.finished) {
+    if (clientRes && !clientRes.writableEnded) {
       clientRes.write(`event: complete\ndata: ${JSON.stringify({ status: 'complete', message: 'Batch upload process finished.', ...batchResults })}\n\n`);
       clientRes.end();
     }
     progressMap.delete(progressId); // Clean up after completion
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in batch upload endpoint:', error);
+    const message = isPgError(error) ? error.message : 'A critical error occurred during batch upload.';
     const clientRes = progressMap.get(progressId);
-    if (clientRes && !clientRes.finished) {
-      clientRes.write(`event: error\ndata: ${JSON.stringify({ status: 'error', message: error.message || 'A critical error occurred during batch upload.' })}\n\n`);
+    if (clientRes && !clientRes.writableEnded) {
+      clientRes.write(`event: error\ndata: ${JSON.stringify({ status: 'error', message })}\n\n`);
       clientRes.end();
     }
     progressMap.delete(progressId);
@@ -327,8 +344,8 @@ router.get('/admin/problems/batch-upload-progress/:progressId', requireAuth, req
   res.write(`event: initial\ndata: ${JSON.stringify({ message: 'Connected to batch upload progress stream.', progressId: progressId as string })}\n\n`);
 
   req.on('close', () => {
-    if (progressMap.get(progressId as string) === res) {
-      progressMap.delete(progressId as string);
+    if (progressMap.get(progressId) === res) {
+      progressMap.delete(progressId);
     }
   });
 });
@@ -359,7 +376,7 @@ router.post('/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, memo
       await db.query('DELETE FROM testcases WHERE problem_id = $1', [id]);
 
       const zip = await unzipper.Open.buffer(testcasesZipFile.buffer);
-      const testcaseFiles: { [key: number]: { in?: any; out?: any } } = {};
+      const testcaseFiles: { [key: number]: { in?: unzipper.File; out?: unzipper.File } } = {};
       const fileRegex = /^(?:input|output)?(\d+)\.(?:in|out|txt|sol)$/i;
 
       // First pass: Iterate through all files in the zip to find pairs
@@ -412,7 +429,7 @@ router.post('/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, memo
 
     res.status(200).json({ message: 'Files processed successfully.' });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`Error processing uploads for problem ${id}:`, error);
     res.status(500).json({ message: 'An error occurred during file processing.' });
   }
@@ -420,7 +437,7 @@ router.post('/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin, memo
 
 // Admin API Endpoints for Problem Export
 router.post('/admin/problems/export', requireAuth, requireStaffOrAdmin, async (req: Request, res: Response) => {
-  const { problemIds } = req.body; // Expects an array of problem IDs to export
+  const { problemIds } = req.body as { problemIds: string[] }; // Expects an array of problem IDs to export
 
   if (!problemIds || !Array.isArray(problemIds) || problemIds.length === 0) {
     return res.status(400).json({ message: 'No problem IDs provided for export.' });
@@ -440,7 +457,7 @@ router.post('/admin/problems/export', requireAuth, requireStaffOrAdmin, async (r
   // Pipe the archive directly to the response
   archive.pipe(res);
 
-  archive.on('error', (err: any) => {
+  archive.on('error', (err: Error) => {
     console.error('Archive error during streaming export:', err);
     if (!res.headersSent) {
       res.status(500).json({ message: 'Error creating problem export zip.', error: err.message });
@@ -450,7 +467,7 @@ router.post('/admin/problems/export', requireAuth, requireStaffOrAdmin, async (r
 
   try {
     for (const problemId of problemIds) {
-      const problemRes = await db.query(
+      const problemRes = await db.query<ProblemWithPdf>(
         'SELECT id, title, author, time_limit_ms, memory_limit_mb, problem_pdf FROM problems WHERE id = $1',
         [problemId]
       );
@@ -464,7 +481,7 @@ router.post('/admin/problems/export', requireAuth, requireStaffOrAdmin, async (r
       const problemFolderName = `${problem.id}`; // Use problem ID as folder name
 
       // 1. Add config.json
-      const config = {
+      const config: ProblemExportConfig = {
         id: problem.id,
         title: problem.title,
         author: problem.author,
@@ -479,7 +496,7 @@ router.post('/admin/problems/export', requireAuth, requireStaffOrAdmin, async (r
       }
 
       // 3. Add test cases (input/output)
-      const testcasesRes = await db.query(
+      const testcasesRes = await db.query<Pick<TestcaseRow, 'case_number' | 'input_data' | 'output_data'>>(
         'SELECT case_number, input_data, output_data FROM testcases WHERE problem_id = $1 ORDER BY case_number ASC',
         [problemId]
       );
@@ -495,10 +512,11 @@ router.post('/admin/problems/export', requireAuth, requireStaffOrAdmin, async (r
 
     archive.finalize();
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error during problem export:', error);
     if (!res.headersSent) {
-      res.status(500).json({ message: 'Failed to export problems.', error: error.message });
+      const message = isPgError(error) ? error.message : 'Unknown error';
+      res.status(500).json({ message: 'Failed to export problems.', error: message });
     }
     archive.abort();
     res.end(); // Ensure response is ended on error

@@ -4,11 +4,17 @@ import { requireAuth } from '../middleware/auth';
 import { memoryUpload } from '../middleware/upload';
 import { processSubmission, processContestSubmission } from '../services/submissionService';
 import { USER_ROLES, SUBMISSION_STATUS, CONTEST_STATUS } from '../constants';
+import { ContestRow, SubmissionRow, ContestSubmissionRow, SubmissionDetailRow, ContestSubmissionDetailRow } from '../types/models';
 
 const router: Router = express.Router();
 
 router.post('/submit', requireAuth, memoryUpload.none(), async (req: Request, res: Response) => {
-  const { problemId, language, code, contestId } = req.body;
+  const { problemId, language, code, contestId } = req.body as {
+    problemId: string;
+    language: string;
+    code: string;
+    contestId?: string;
+  };
   const { userId } = req.session;
 
   if (language !== 'cpp') {
@@ -22,7 +28,7 @@ router.post('/submit', requireAuth, memoryUpload.none(), async (req: Request, re
     // Check if this is a contest submission
     if (contestId) {
       // Validate contest exists and is running
-      const contestRes = await db.query(
+      const contestRes = await db.query<Pick<ContestRow, 'id' | 'status' | 'start_time' | 'end_time'>>(
         'SELECT id, status, start_time, end_time FROM contests WHERE id = $1',
         [contestId]
       );
@@ -63,7 +69,7 @@ router.post('/submit', requireAuth, memoryUpload.none(), async (req: Request, re
       }
 
       // Create contest submission
-      const submissionRes = await db.query(
+      const submissionRes = await db.query<Pick<ContestSubmissionRow, 'id'>>(
         `INSERT INTO contest_submissions (contest_id, user_id, problem_id, code, language, overall_status, score)
          VALUES ($1, $2, $3, $4, $5, $6, 0) RETURNING id`,
         [contestId, userId, problemId, code, language, SUBMISSION_STATUS.PENDING]
@@ -93,7 +99,7 @@ router.post('/submit', requireAuth, memoryUpload.none(), async (req: Request, re
         });
       }
 
-      const submissionRes = await db.query(
+      const submissionRes = await db.query<Pick<SubmissionRow, 'id'>>(
         `INSERT INTO submissions (user_id, problem_id, code, language, overall_status, score)
          VALUES ($1, $2, $3, $4, $5, 0) RETURNING id`,
         [userId, problemId, code, language, SUBMISSION_STATUS.PENDING]
@@ -122,7 +128,9 @@ router.get('/submissions', requireAuth, async (req: Request, res: Response) => {
   const isStaffOrAdmin = role === USER_ROLES.ADMIN || role === USER_ROLES.STAFF;
 
   try {
-    let query, params = [], conditions = [];
+    let query: string;
+    const params: unknown[] = [];
+    const conditions: string[] = [];
 
     if (contestId) {
       // Fetch contest submissions
@@ -198,7 +206,9 @@ router.get('/search/problems', requireAuth, async (req: Request, res: Response) 
     let result;
     if (contestId) {
       // Check if contest is finished or active to search correct table
-      const contestRes = await db.query('SELECT status FROM contests WHERE id = $1', [contestId]);
+      const contestRes = await db.query<Pick<ContestRow, 'status'>>(
+        'SELECT status FROM contests WHERE id = $1', [contestId]
+      );
       if (contestRes.rows.length === 0) return res.json([]);
 
       const status = contestRes.rows[0].status;
@@ -269,7 +279,7 @@ router.get('/submissions/:id', requireAuth, async (req: Request, res: Response) 
 
     if (contestId) {
       // Fetch contest submission
-      result = await db.query(
+      result = await db.query<ContestSubmissionDetailRow>(
         `SELECT cs.*, u.username 
          FROM contest_submissions cs
          LEFT JOIN users u ON cs.user_id = u.id
@@ -278,7 +288,7 @@ router.get('/submissions/:id', requireAuth, async (req: Request, res: Response) 
       );
     } else {
       // Fetch regular submission
-      result = await db.query(
+      result = await db.query<SubmissionDetailRow>(
         `SELECT s.*, u.username 
          FROM submissions s
          LEFT JOIN users u ON s.user_id = u.id

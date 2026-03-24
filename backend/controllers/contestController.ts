@@ -4,6 +4,15 @@ import * as db from '../db';
 import * as problemMigration from '../services/problemMigration';
 import { requireAuth, requireStaffOrAdmin } from '../middleware/auth';
 import { CONTEST_STATUS, USER_ROLES } from '../constants';
+import {
+  ContestRow,
+  ContestDetailRow,
+  ContestProblemRow,
+  ACTIVE_CONTEST_STATUSES,
+  ContestScoreboardDetailRow,
+  ProblemRow,
+  isPgError,
+} from '../types/models';
 
 const router: Router = express.Router();
 
@@ -78,7 +87,7 @@ router.get('/contests', async (req: Request, res: Response) => {
     }
 
     res.json(result.rows);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error fetching contests:', error);
     res.status(500).json({ message: 'Error fetching contests' });
   }
@@ -113,7 +122,7 @@ router.get('/admin/contests', requireAuth, requireStaffOrAdmin, async (req: Requ
       ORDER BY c.start_time DESC
     `);
     res.json(result.rows);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error fetching admin contests:', error);
     res.status(500).json({ message: 'Error fetching contests' });
   }
@@ -124,7 +133,7 @@ router.get('/admin/contests/available-problems', requireAuth, requireStaffOrAdmi
   try {
     const problems = await problemMigration.getAvailableProblemsForContest();
     res.json(problems);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error fetching available problems:', error);
     res.status(500).json({ message: 'Error fetching available problems' });
   }
@@ -136,7 +145,7 @@ router.get('/contests/:id', async (req: Request, res: Response) => {
   const { userId } = req.session;
 
   try {
-    const contestResult = await db.query(`
+    const contestResult = await db.query<ContestDetailRow>(`
       SELECT 
         c.*,
         COUNT(cp.user_id) as participant_count,
@@ -166,31 +175,33 @@ router.get('/contests/:id', async (req: Request, res: Response) => {
     }
 
     // Get problems in this contest (only if contest has started)
-    let problems = [];
+
+    type ContestProblemSummary = Pick<ContestProblemRow, 'problem_id' | 'title' | 'author'>;
+    let problems: ContestProblemSummary[] = [];
     if (contest.status === CONTEST_STATUS.RUNNING || contest.status === CONTEST_STATUS.FINISHED) {
       if (contest.status === CONTEST_STATUS.FINISHED) {
         // For finished contests, get problems from contest_problems snapshot
-        const problemsResult = await db.query(`
+        const problemsResult = await db.query<ContestProblemSummary>(`
           SELECT problem_id as id, title, author
           FROM contest_problems 
           WHERE contest_id = $1
           ORDER BY problem_id
         `, [id]);
-        problems = problemsResult.rows;
+        problems = problemsResult.rows as unknown as ContestProblemSummary[];
       } else {
         // For running contests, get problems from problems table
-        const problemsResult = await db.query(`
+        const problemsResult = await db.query<ContestProblemSummary>(`
           SELECT id, title, author
           FROM problems 
           WHERE contest_id = $1
           ORDER BY id
         `, [id]);
-        problems = problemsResult.rows;
+        problems = problemsResult.rows as unknown as ContestProblemSummary[];
       }
     }
 
     res.json({ ...contest, problems, is_participant: isParticipant });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`Error fetching contest ${id}:`, error);
     res.status(500).json({ message: 'Error fetching contest details' });
   }
@@ -203,7 +214,7 @@ router.post('/contests/:id/join', requireAuth, async (req: Request, res: Respons
 
   try {
     // Check if contest exists and is joinable
-    const contestResult = await db.query(
+    const contestResult = await db.query<ContestRow>(
       'SELECT * FROM contests WHERE id = $1',
       [id]
     );
@@ -231,8 +242,8 @@ router.post('/contests/:id/join', requireAuth, async (req: Request, res: Respons
         [id, userId]
       );
       res.json({ message: 'Successfully joined contest' });
-    } catch (insertError: any) {
-      if (insertError.code === '23505') { // unique_violation
+    } catch (insertError: unknown) {
+      if (isPgError(insertError) && insertError.code === '23505') { // unique_violation
         res.status(400).json({ message: 'Already joined this contest' });
       } else {
         throw insertError;
@@ -250,7 +261,7 @@ router.get('/contests/:id/scoreboard', requireAuth, async (req: Request, res: Re
 
   try {
     // Check if contest exists
-    const contestResult = await db.query('SELECT * FROM contests WHERE id = $1', [id]);
+    const contestResult = await db.query<ContestRow>('SELECT * FROM contests WHERE id = $1', [id]);
     if (contestResult.rows.length === 0) {
       return res.status(404).json({ message: 'Contest not found' });
     }
@@ -260,7 +271,7 @@ router.get('/contests/:id/scoreboard', requireAuth, async (req: Request, res: Re
     if (contest.status === CONTEST_STATUS.FINISHED) {
       // Get final scoreboard from contest_scoreboards table with problems information
       const [scoreboardResult, problemsResult] = await Promise.all([
-        db.query(`
+        db.query<ContestScoreboardDetailRow>(`
           SELECT 
             cs.*,
             u.username
@@ -269,7 +280,7 @@ router.get('/contests/:id/scoreboard', requireAuth, async (req: Request, res: Re
           WHERE cs.contest_id = $1
           ORDER BY cs.total_score DESC, cs.last_score_improvement_time ASC
         `, [id]),
-        db.query(`
+        db.query<Pick<ContestProblemRow, 'problem_id' | 'title'>>(`
           SELECT problem_id, title
           FROM contest_problems
           WHERE contest_id = $1
@@ -284,7 +295,7 @@ router.get('/contests/:id/scoreboard', requireAuth, async (req: Request, res: Re
     } else if (contest.status === CONTEST_STATUS.RUNNING || contest.status === CONTEST_STATUS.FINISHING) {
       // Generate real-time scoreboard and fetch current problems
       const [scoreboardResult, problemsResult] = await Promise.all([
-        db.query(`
+        db.query<ContestScoreboardDetailRow>(`
           WITH UserBestScores AS (
             SELECT
               cs.user_id,
@@ -379,7 +390,12 @@ router.post('/admin/contests', requireAuth, requireStaffOrAdmin, [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { title, description, startTime, endTime } = req.body;
+  const { title, description, startTime, endTime } = req.body as {
+    title: string;
+    description?: string;
+    startTime: string;
+    endTime: string;
+  };
   const { userId } = req.session;
 
   // Validate that end time is after start time
@@ -390,7 +406,7 @@ router.post('/admin/contests', requireAuth, requireStaffOrAdmin, [
   }
 
   try {
-    const result = await db.query(`
+    const result = await db.query<ContestRow>(`
       INSERT INTO contests (title, description, start_time, end_time, created_by)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
@@ -416,7 +432,12 @@ router.put('/admin/contests/:id', requireAuth, requireStaffOrAdmin, [
   }
 
   const { id } = req.params;
-  const { title, description, startTime, endTime } = req.body;
+  const { title, description, startTime, endTime } = req.body as {
+    title: string;
+    description?: string;
+    startTime: string;
+    endTime: string;
+  };
 
   // Validate that end time is after start time
   if (new Date(endTime) <= new Date(startTime)) {
@@ -426,7 +447,7 @@ router.put('/admin/contests/:id', requireAuth, requireStaffOrAdmin, [
   }
 
   try {
-    const result = await db.query(`
+    const result = await db.query<ContestRow>(`
       UPDATE contests 
       SET title = $1, description = $2, start_time = $3, end_time = $4
       WHERE id = $5
@@ -450,7 +471,7 @@ router.delete('/admin/contests/:id', requireAuth, requireStaffOrAdmin, async (re
 
   try {
     // Check if contest can be deleted (should not be running or finished with data)
-    const contestResult = await db.query('SELECT * FROM contests WHERE id = $1', [id]);
+    const contestResult = await db.query<ContestRow>('SELECT * FROM contests WHERE id = $1', [id]);
     if (contestResult.rows.length === 0) {
       return res.status(404).json({ message: 'Contest not found' });
     }
@@ -482,7 +503,7 @@ router.get('/admin/contests/:id/admin-problems', requireAuth, requireStaffOrAdmi
   const { id } = req.params;
 
   try {
-    const problems = await problemMigration.getProblemsInContest(parseInt(id as string));
+    const problems = await problemMigration.getProblemsInContest(parseInt(id as string, 10));
     res.json(problems);
   } catch (error) {
     console.error(`Error fetching problems for contest ${id}:`, error);
@@ -503,19 +524,20 @@ router.post('/admin/contests/:id/problems', requireAuth, requireStaffOrAdmin, [
   }
 
   const { id } = req.params;
-  const { problemIds, action } = req.body;
+  const { problemIds, action } = req.body as { problemIds: string[]; action: 'move_to_contest' | 'move_to_main' };
 
   try {
     let result;
     if (action === 'move_to_contest') {
-      result = await problemMigration.moveProblemsToContest(parseInt(id as string), problemIds);
+      result = await problemMigration.moveProblemsToContest(parseInt(id as string, 10), problemIds);
     } else if (action === 'move_to_main') {
-      result = await problemMigration.moveProblemsBackToMain(parseInt(id as string), problemIds);
+      result = await problemMigration.moveProblemsBackToMain(parseInt(id as string, 10), problemIds);
     }
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`Error ${action} problems for contest ${id}:`, error);
-    res.status(400).json({ message: error.message || `Error ${action} problems` });
+    const message = isPgError(error) ? error.message : `Error ${action} problems`;
+    res.status(400).json({ message });
   }
 });
 
@@ -525,7 +547,7 @@ router.delete('/admin/contests/:id/problems/:problemId', requireAuth, requireSta
 
   try {
     // Check if contest exists and is in correct status
-    const contestResult = await db.query('SELECT * FROM contests WHERE id = $1', [id]);
+    const contestResult = await db.query<ContestRow>('SELECT * FROM contests WHERE id = $1', [id]);
     if (contestResult.rows.length === 0) {
       return res.status(404).json({ message: 'Contest not found' });
     }
@@ -538,7 +560,7 @@ router.delete('/admin/contests/:id/problems/:problemId', requireAuth, requireSta
     }
 
     // Move single problem back to main system
-    const updateResult = await db.query(
+    const updateResult = await db.query<Pick<ProblemRow, 'id' | 'title'>>(
       'UPDATE problems SET contest_id = NULL WHERE id = $1 AND contest_id = $2 RETURNING id, title',
       [problemId, id]
     );
@@ -566,7 +588,7 @@ router.get('/contests/:id/problems', requireAuth, async (req: Request, res: Resp
 
   try {
     // Check if contest exists
-    const contestResult = await db.query('SELECT * FROM contests WHERE id = $1', [id]);
+    const contestResult = await db.query<ContestRow>('SELECT * FROM contests WHERE id = $1', [id]);
     if (contestResult.rows.length === 0) {
       return res.status(404).json({ message: 'Contest not found' });
     }
@@ -584,7 +606,7 @@ router.get('/contests/:id/problems', requireAuth, async (req: Request, res: Resp
     }
 
     // Only show problems if contest is running, finishing, or finished
-    if (![CONTEST_STATUS.RUNNING, CONTEST_STATUS.FINISHING, CONTEST_STATUS.FINISHED].includes(contest.status)) {
+    if (!ACTIVE_CONTEST_STATUSES.includes(contest.status)) {
       return res.json([]); // Return empty array for scheduled contests
     }
 
@@ -661,13 +683,13 @@ router.get('/contests/:id/problems/:problemId', requireAuth, async (req: Request
 
   try {
     // 1. Check contest status and user participation
-    const contestRes = await db.query('SELECT status FROM contests WHERE id = $1', [contestId]);
+    const contestRes = await db.query<Pick<ContestRow, 'status'>>('SELECT status FROM contests WHERE id = $1', [contestId]);
     if (contestRes.rows.length === 0) {
       return res.status(404).json({ message: 'Contest not found.' });
     }
     const contestStatus = contestRes.rows[0].status;
 
-    if (![CONTEST_STATUS.RUNNING, CONTEST_STATUS.FINISHING, CONTEST_STATUS.FINISHED].includes(contestStatus)) {
+    if (!ACTIVE_CONTEST_STATUSES.includes(contestStatus)) {
       return res.status(403).json({ message: 'Contest is not active.' });
     }
 
@@ -714,13 +736,13 @@ router.get('/contests/:id/problems/:problemId/pdf', requireAuth, async (req: Req
 
   try {
     // 1. Check contest status and user participation (similar to getting problem details)
-    const contestRes = await db.query('SELECT status FROM contests WHERE id = $1', [contestId]);
+    const contestRes = await db.query<Pick<ContestRow, 'status'>>('SELECT status FROM contests WHERE id = $1', [contestId]);
     if (contestRes.rows.length === 0) {
       return res.status(404).json({ message: 'Contest not found.' });
     }
     const contestStatus = contestRes.rows[0].status;
 
-    if (![CONTEST_STATUS.RUNNING, CONTEST_STATUS.FINISHING, CONTEST_STATUS.FINISHED].includes(contestStatus)) {
+    if (!ACTIVE_CONTEST_STATUSES.includes(contestStatus)) {
       return res.status(403).json({ message: 'Contest is not active.' });
     }
 
@@ -735,12 +757,12 @@ router.get('/contests/:id/problems/:problemId/pdf', requireAuth, async (req: Req
     // 2. Fetch the PDF data based on contest status
     let pdfRes;
     if (contestStatus === CONTEST_STATUS.FINISHED) {
-      pdfRes = await db.query(
+      pdfRes = await db.query<Pick<ContestProblemRow, 'problem_pdf'>>(
         'SELECT problem_pdf FROM contest_problems WHERE contest_id = $1 AND problem_id = $2',
         [contestId, problemId]
       );
     } else {
-      pdfRes = await db.query(
+      pdfRes = await db.query<{ problem_pdf: Buffer | null }>(
         'SELECT problem_pdf FROM problems WHERE id = $1 AND contest_id = $2',
         [problemId, contestId]
       );
