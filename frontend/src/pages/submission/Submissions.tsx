@@ -8,7 +8,12 @@ import tableStyles from '../../components/styles/Table.module.css';
 import LoadingPage from '../../components/shared/LoadingPage';
 import { USER_ROLES } from '../../utils/constants';
 
-const Submissions = ({ problemId, showTitle = true }) => {
+type SubmissionsProps = {
+  problemId?: string | null;
+  showTitle?: boolean;
+};
+
+const Submissions = ({ problemId = null, showTitle = true }: SubmissionsProps) => {
   const { contestId } = useParams();
 
   // Logic is now completely in the Hook

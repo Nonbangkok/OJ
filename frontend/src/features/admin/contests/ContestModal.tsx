@@ -96,7 +96,7 @@ const ContestModal = ({ contest, onClose, onSuccess }) => {
                 dateFormat="MMM dd, yyyy, h:mm aa"
                 timeFormat="HH:mm"
                 timeIntervals={30}
-                minDate={formData.start_time || new Date()}
+                minDate={formData.start_time ?? new Date()}
                 required
               />
             </div>
