@@ -5,7 +5,7 @@ import { pool } from './db';
 import { attachRequestUser } from './middleware/requestContext';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { env } from './config/env';
-// import cors from 'cors';
+import cors from 'cors';
 
 // Import routes (Assuming they will be converted or handled by TS)
 import adminRoutes from './controllers/adminController';
@@ -22,12 +22,12 @@ app.set('trust proxy', 1);
 const port = Number(env.PORT) || 5000;
 
 app.use(express.json());
-// app.use(cors({
-//   origin: 'https://www.woi-grader.com',
-//   // credentials: false,
-//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-//   allowedHeaders: ['Content-Type', 'Authorization'],
-// }));
+app.use(cors({
+  origin: 'https://www.woi-grader.com',
+  // credentials: false,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 
 // PostgreSQL session store setup
 app.use(session({
@@ -35,11 +35,12 @@ app.use(session({
     pool: pool, // Use the existing pg pool from db.ts
     tableName: 'user_sessions', // Name of the table to store sessions
   }),
-  secret: env.SECRET_KEY,
+  secret: process.env.SECRET_KEY,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // Set to true for production
+    domain: 'woi-grader.com',
+    secure: true, // Set to true for production
     sameSite: 'lax',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
