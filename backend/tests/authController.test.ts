@@ -1,5 +1,5 @@
 import request from 'supertest';
-import express, { Express } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import authRouter from '../controllers/authController';
 import * as db from '../db';
@@ -24,6 +24,16 @@ describe('Auth Controller', () => {
     });
 
     describe('POST /register', () => {
+        it('should return 400 for invalid payload', async () => {
+            const res = await request(app)
+                .post('/register')
+                .send({ username: '', password: '123' });
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Validation failed');
+            expect(Array.isArray(res.body.errors)).toBe(true);
+        });
+
         it('should return 403 if registration is disabled', async () => {
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ setting_value: 'false' }] });
 
@@ -65,7 +75,36 @@ describe('Auth Controller', () => {
         });
     });
 
+    describe('GET /settings/registration', () => {
+        it('should return enabled=true when setting row is missing', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+
+            const res = await request(app).get('/settings/registration');
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual({ enabled: true });
+        });
+
+        it('should return enabled=false when setting is false', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ setting_value: 'false' }] });
+
+            const res = await request(app).get('/settings/registration');
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual({ enabled: false });
+        });
+    });
+
     describe('POST /login', () => {
+        it('should return 400 for invalid login payload', async () => {
+            const res = await request(app)
+                .post('/login')
+                .send({ username: '' });
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Validation failed');
+        });
+
         it('should login successfully with correct credentials', async () => {
             const hashedPassword = await bcrypt.hash('password123', 10);
             (db.query as jest.Mock).mockResolvedValueOnce({
@@ -107,10 +146,39 @@ describe('Auth Controller', () => {
         });
     });
 
+    describe('POST /logout', () => {
+        it('should logout successfully', async () => {
+            const res = await request(app).post('/logout');
+
+            expect(res.status).toBe(200);
+            expect(res.body.message).toBe('Logout successful');
+        });
+    });
+
     describe('GET /me', () => {
         it('should return user info if authenticated', async () => {
             const res = await request(app).get('/me');
             expect(res.body.isAuthenticated).toBe(false);
+        });
+
+        it('should return authenticated user when req.user is present', async () => {
+            const appWithUser = express();
+            appWithUser.use(express.json());
+            appWithUser.use(session({
+                secret: 'test-secret',
+                resave: false,
+                saveUninitialized: false,
+            }));
+            appWithUser.use((req: Request, _res: Response, next: NextFunction) => {
+                req.user = { id: 1, username: 'tester', role: 'user' };
+                next();
+            });
+            appWithUser.use('/', authRouter);
+
+            const res = await request(appWithUser).get('/me');
+            expect(res.status).toBe(200);
+            expect(res.body.isAuthenticated).toBe(true);
+            expect(res.body.user.username).toBe('tester');
         });
     });
 });

@@ -1,4 +1,5 @@
 import * as db from '../db';
+import { getErrorMessage } from '../utils/errorMessage';
 
 const dropTables = async (): Promise<void> => {
   // Drop in reverse order of creation due to foreign key constraints
@@ -181,8 +182,8 @@ const createTables = async (): Promise<void> => {
         ADD COLUMN IF NOT EXISTS contest_id INTEGER REFERENCES contests(id) ON DELETE SET NULL;
       `);
       console.log('Contest_id column added to problems table!');
-    } catch (alterErr: any) {
-      console.log('Contest_id column already exists or error:', alterErr.message);
+    } catch (alterErr: unknown) {
+      console.log('Contest_id column already exists or error:', getErrorMessage(alterErr));
     }
 
     // Create indexes for better performance
@@ -195,8 +196,8 @@ const createTables = async (): Promise<void> => {
       await db.query('CREATE INDEX IF NOT EXISTS idx_contest_problems_contest ON contest_problems(contest_id);');
       await db.query('CREATE INDEX IF NOT EXISTS idx_contest_scoreboards_score_time ON contest_scoreboards(total_score DESC, last_score_improvement_time ASC);');
       console.log('Database indexes created successfully!');
-    } catch (indexErr: any) {
-      console.log('Error creating indexes:', indexErr.message);
+    } catch (indexErr: unknown) {
+      console.log('Error creating indexes:', getErrorMessage(indexErr));
     }
   } catch (err) {
     console.error('Error creating tables:', err);

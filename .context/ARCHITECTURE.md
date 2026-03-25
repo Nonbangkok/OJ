@@ -15,7 +15,7 @@
 | Database | PostgreSQL (Alpine) | 16 |
 | Session Store | connect-pg-simple | 9.0 |
 | Auth (passwords) | bcrypt | 6.0 |
-| Validation | express-validator | 7.1 |
+| Validation | zod | 4.x |
 | File Upload | multer | 2.0 |
 | ZIP Processing | unzipper | 0.12 |
 | Scheduling | node-cron | 3.0 |
@@ -38,6 +38,8 @@ OJ/
 ├── backend/                # Express API server (TypeScript)
 │   ├── server.ts           # App entry point, route mounting, scheduler start
 │   ├── db.ts               # PostgreSQL connection pool (pg)
+│   ├── config/
+│   │   └── env.ts          # Runtime env validation (zod) + typed env export
 │   ├── constants/
 │   │   └── index.ts        # Centralized constants (roles, statuses, limits)
 │   ├── controllers/        # Route handlers (Express Router per domain)
@@ -49,18 +51,35 @@ OJ/
 │   ├── services/           # Business logic & external processes
 │   │   ├── judgeService.ts       # Compile & judge C++ in sandbox
 │   │   ├── submissionService.ts  # Submission processing
+│   │   ├── submissionQueryService.ts # Submission read/write query orchestration
+│   │   ├── adminQueryService.ts  # Admin user/settings/database query orchestration
+│   │   ├── adminSystemService.ts # Admin database import/export command construction
+│   │   ├── problemQueryService.ts # Problem CRUD/upload/export query orchestration
 │   │   ├── batchUploadService.ts # Bulk problem import from ZIP
 │   │   ├── problemMigration.ts   # Problem data migration
+│   │   ├── contestQueryService.ts # Contest list/detail/scoreboard query orchestration
 │   │   └── contestScheduler.ts   # Cron-based contest lifecycle
 │   ├── middleware/
 │   │   ├── auth.ts         # requireAuth, requireStaffOrAdmin, requireAdmin
+│   │   ├── requestContext.ts # Maps session into typed req.user
+│   │   ├── validation.ts   # zod runtime request validation middleware
+│   │   ├── errorHandler.ts # asyncHandler + AppError + global error middleware
 │   │   └── upload.ts       # Multer configuration
+│   ├── schemas/
+│   │   └── requestSchemas.ts # Shared z.object request schemas (all controllers)
+│   ├── utils/
+│   │   └── errorMessage.ts # Shared unknown->message error normalization helper
 │   ├── scripts/
 │   │   ├── init_db.ts      # Schema creation (DROP CASCADE + CREATE)
 │   │   ├── create_admin.ts # Interactive admin user setup
 │   │   ├── clear_submissions.ts
 │   │   └── time_wrapper.c  # C wrapper for microsecond execution timing
 │   ├── types/              # Type definitions and interfaces
+│   │   ├── api.ts          # Request/response DTO contracts
+│   │   ├── models.ts       # DB row interfaces + shared DTO aliases
+│   │   ├── service.ts      # Shared service-layer interfaces/result unions
+│   │   ├── env.d.ts        # ProcessEnv declaration merging
+│   │   └── express/        # Express Request declaration merging (req.user)
 │   └── tests/              # Jest + Supertest API and Unit tests (TypeScript)
 │       ├── setup.ts        # Test environment setup
 │       ├── db.test.ts      # DB pool connection tests
@@ -140,6 +159,13 @@ graph LR
 ```
 
 Nginx strips the `/api` prefix before forwarding to the backend. The frontend is a static React build served by its own Nginx instance inside the container.
+
+Backend runtime request pipeline (high-level):
+1. `express-session` resolves session state from `user_sessions`.
+2. `attachRequestUser` maps session into typed `req.user`.
+3. Route-level middleware validates payload (`zod` via shared schemas + `validateRequest`).
+4. Controllers call services for DB-heavy logic.
+5. Errors propagate via `asyncHandler` to centralized `errorHandler`.
 
 ### Authentication Flow
 

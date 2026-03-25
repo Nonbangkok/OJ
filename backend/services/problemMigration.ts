@@ -1,5 +1,16 @@
 import * as db from '../db';
 import { PoolClient } from 'pg';
+import { CONTEST_STATUS } from '../constants';
+import { ContestRow } from '../types/models';
+import {
+  AvailableContestProblemRow,
+  ContestMigrationResult,
+  ContestProblemListRow,
+  ContestStatusRow,
+  ProblemContestCheckRow,
+  ProblemIdentityRow,
+  ProblemMoveResult,
+} from '../types/service';
 
 /**
  * Problem Migration Service
@@ -17,15 +28,15 @@ import { PoolClient } from 'pg';
  * @param problemIds - Array of problem IDs to move
  * @returns Result object with success status and details
  */
-export const moveProblemsToContest = async (contestId: number, problemIds: string[]): Promise<any> => {
+export const moveProblemsToContest = async (contestId: number, problemIds: string[]): Promise<ProblemMoveResult> => {
   const client: PoolClient = await db.pool.connect();
 
   try {
     await client.query('BEGIN');
 
     // Check if contest exists and is in correct status
-    const contestResult = await client.query(
-      'SELECT * FROM contests WHERE id = $1',
+    const contestResult = await client.query<ContestStatusRow>(
+      'SELECT id, status FROM contests WHERE id = $1',
       [contestId]
     );
 
@@ -34,12 +45,12 @@ export const moveProblemsToContest = async (contestId: number, problemIds: strin
     }
 
     const contest = contestResult.rows[0];
-    if (contest.status !== 'scheduled' && contest.status !== 'running') {
+    if (contest.status !== 'scheduled' && contest.status !== CONTEST_STATUS.RUNNING) {
       throw new Error('Can only move problems to scheduled or running contests');
     }
 
     // Check if all problems exist and are in main system (contest_id IS NULL)
-    const problemsCheck = await client.query(
+    const problemsCheck = await client.query<ProblemContestCheckRow>(
       'SELECT id, title, contest_id FROM problems WHERE id = ANY($1)',
       [problemIds]
     );
@@ -48,13 +59,13 @@ export const moveProblemsToContest = async (contestId: number, problemIds: strin
       throw new Error('Some problems not found');
     }
 
-    const problemsInContest = problemsCheck.rows.filter((p: any) => p.contest_id !== null);
+    const problemsInContest = problemsCheck.rows.filter((problem) => problem.contest_id !== null);
     if (problemsInContest.length > 0) {
-      throw new Error(`Problems already in contest: ${problemsInContest.map((p: any) => p.id).join(', ')}`);
+      throw new Error(`Problems already in contest: ${problemsInContest.map((problem) => problem.id).join(', ')}`);
     }
 
     // Move problems to contest
-    const updateResult = await client.query(
+    const updateResult = await client.query<ProblemIdentityRow>(
       'UPDATE problems SET contest_id = $1, is_visible = FALSE WHERE id = ANY($2) RETURNING id, title',
       [contestId, problemIds]
     );
@@ -82,15 +93,15 @@ export const moveProblemsToContest = async (contestId: number, problemIds: strin
  * @param problemIds - Optional array of problem IDs to move. If null, all problems are moved.
  * @returns Result object with success status and details
  */
-export const moveProblemsBackToMain = async (contestId: number, problemIds: string[] | null = null): Promise<any> => {
+export const moveProblemsBackToMain = async (contestId: number, problemIds: string[] | null = null): Promise<ProblemMoveResult> => {
   const client: PoolClient = await db.pool.connect();
 
   try {
     await client.query('BEGIN');
 
     // Check if contest exists
-    const contestResult = await client.query(
-      'SELECT * FROM contests WHERE id = $1',
+    const contestResult = await client.query<ContestStatusRow>(
+      'SELECT id, status FROM contests WHERE id = $1',
       [contestId]
     );
 
@@ -100,7 +111,7 @@ export const moveProblemsBackToMain = async (contestId: number, problemIds: stri
 
     // Build query dynamically
     let queryText = 'UPDATE problems SET contest_id = NULL, is_visible = TRUE WHERE contest_id = $1';
-    const queryParams: any[] = [contestId];
+    const queryParams: Array<number | string[]> = [contestId];
 
     if (problemIds && problemIds.length > 0) {
       queryText += ` AND id = ANY($2)`;
@@ -109,7 +120,7 @@ export const moveProblemsBackToMain = async (contestId: number, problemIds: stri
 
     queryText += ' RETURNING id, title';
 
-    const updateResult = await client.query(queryText, queryParams);
+    const updateResult = await client.query<ProblemIdentityRow>(queryText, queryParams);
 
     await client.query('COMMIT');
 
@@ -133,15 +144,15 @@ export const moveProblemsBackToMain = async (contestId: number, problemIds: stri
  * @param contestId - The contest ID to migrate submissions from
  * @returns Result object with migration details
  */
-export const migrateSubmissionsAfterContest = async (contestId: number): Promise<any> => {
+export const migrateSubmissionsAfterContest = async (contestId: number): Promise<ContestMigrationResult> => {
   const client: PoolClient = await db.pool.connect();
 
   try {
     await client.query('BEGIN');
 
     // Check if contest exists and is finished
-    const contestResult = await client.query(
-      'SELECT * FROM contests WHERE id = $1',
+    const contestResult = await client.query<ContestStatusRow>(
+      'SELECT id, status FROM contests WHERE id = $1',
       [contestId]
     );
 
@@ -150,7 +161,7 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
     }
 
     const contest = contestResult.rows[0];
-    if (contest.status !== 'finishing') {
+    if (contest.status !== CONTEST_STATUS.FINISHING) {
       throw new Error('Contest must be in finishing status to migrate submissions');
     }
 
@@ -237,9 +248,9 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
  * Get problems available for moving to contest (problems in main system)
  * @returns Array of available problems
  */
-export const getAvailableProblemsForContest = async (): Promise<any[]> => {
+export const getAvailableProblemsForContest = async (): Promise<AvailableContestProblemRow[]> => {
   try {
-    const result = await db.query(`
+    const result = await db.query<AvailableContestProblemRow>(`
       SELECT id, title, author, is_visible
       FROM problems 
       WHERE contest_id IS NULL
@@ -257,10 +268,10 @@ export const getAvailableProblemsForContest = async (): Promise<any[]> => {
  * @param contestId - The contest ID
  * @returns Array of problems in the contest
  */
-export const getProblemsInContest = async (contestId: number): Promise<any[]> => {
+export const getProblemsInContest = async (contestId: number): Promise<ContestProblemListRow[]> => {
   try {
     // First check contest status
-    const contestResult = await db.query(
+    const contestResult = await db.query<Pick<ContestRow, 'status'>>(
       'SELECT status FROM contests WHERE id = $1',
       [contestId]
     );
@@ -271,9 +282,9 @@ export const getProblemsInContest = async (contestId: number): Promise<any[]> =>
 
     const contest = contestResult.rows[0];
 
-    if (contest.status === 'finished') {
+    if (contest.status === CONTEST_STATUS.FINISHED) {
       // For finished contests, get problems from contest_problems snapshot
-      const result = await db.query(`
+      const result = await db.query<ContestProblemListRow>(`
         SELECT problem_id as id, title, author
         FROM contest_problems 
         WHERE contest_id = $1
@@ -282,7 +293,7 @@ export const getProblemsInContest = async (contestId: number): Promise<any[]> =>
       return result.rows;
     } else {
       // For non-finished contests, get problems from problems table
-      const result = await db.query(`
+      const result = await db.query<ContestProblemListRow>(`
         SELECT id, title, author
         FROM problems 
         WHERE contest_id = $1

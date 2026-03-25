@@ -1,785 +1,304 @@
 import express, { Request, Response, Router } from 'express';
-import { body, validationResult } from 'express-validator';
-import * as db from '../db';
 import * as problemMigration from '../services/problemMigration';
 import { requireAuth, requireStaffOrAdmin } from '../middleware/auth';
-import { CONTEST_STATUS, USER_ROLES } from '../constants';
+import { asyncHandler, AppError } from '../middleware/errorHandler';
+import { ContestCreateRequestBody, ContestUpdateRequestBody, MoveContestProblemsRequestBody } from '../types/api';
+import { validateRequest } from '../middleware/validation';
 import {
-  ContestRow,
-  ContestDetailRow,
-  ContestProblemRow,
-  ACTIVE_CONTEST_STATUSES,
-  ContestScoreboardDetailRow,
-  ProblemRow,
-  isPgError,
-} from '../types/models';
+  contestBodySchema,
+  contestIdParamSchema,
+  contestProblemParamsSchema,
+  moveContestProblemsBodySchema,
+} from '../schemas/requestSchemas';
+import {
+  createContest,
+  deleteContest,
+  getContestDetail,
+  getContestProblemDetailForParticipant,
+  getContestProblemPdfForParticipant,
+  getContestProblemsForParticipant,
+  getContestScoreboard,
+  joinContest,
+  listContests,
+  moveSingleProblemToMainSystem,
+  updateContest,
+} from '../services/contestQueryService';
 
 const router: Router = express.Router();
 
 // List all contests
-router.get('/contests', async (req: Request, res: Response) => {
+router.get('/contests', asyncHandler(async (req: Request, res: Response) => {
   const { userId } = req.session;
-
-  try {
-    let result;
-
-    if (userId) {
-      // If user is logged in, include participation status
-      result = await db.query(`
-        SELECT 
-          c.id, c.title, c.description, c.start_time, c.end_time, c.status,
-          c.created_at,
-          COUNT(DISTINCT cp.user_id) as participant_count,
-          CASE WHEN user_participation.user_id IS NOT NULL THEN true ELSE false END as is_participant,
-          CASE 
-            WHEN c.status = '${CONTEST_STATUS.FINISHED}' THEN COALESCE(finished_problems.problem_count, 0)
-            ELSE COALESCE(active_problems.problem_count, 0)
-          END as problem_count
-        FROM contests c
-        LEFT JOIN contest_participants cp ON c.id = cp.contest_id
-        LEFT JOIN (
-          SELECT DISTINCT contest_id, user_id 
-          FROM contest_participants 
-          WHERE user_id = $1
-        ) user_participation ON c.id = user_participation.contest_id
-        LEFT JOIN (
-          SELECT contest_id, COUNT(*) as problem_count
-          FROM contest_problems
-          GROUP BY contest_id
-        ) finished_problems ON c.id = finished_problems.contest_id AND c.status = '${CONTEST_STATUS.FINISHED}'
-        LEFT JOIN (
-          SELECT contest_id, COUNT(*) as problem_count
-          FROM problems
-          WHERE contest_id IS NOT NULL
-          GROUP BY contest_id
-        ) active_problems ON c.id = active_problems.contest_id AND c.status != '${CONTEST_STATUS.FINISHED}'
-        GROUP BY c.id, c.title, c.description, c.start_time, c.end_time, c.status, c.created_at, user_participation.user_id, finished_problems.problem_count, active_problems.problem_count
-        ORDER BY c.start_time DESC
-      `, [userId]);
-    } else {
-      // If no user logged in, just get basic contest info
-      result = await db.query(`
-        SELECT 
-          c.id, c.title, c.description, c.start_time, c.end_time, c.status,
-          c.created_at,
-          COUNT(DISTINCT cp.user_id) as participant_count,
-          false as is_participant,
-          CASE 
-            WHEN c.status = '${CONTEST_STATUS.FINISHED}' THEN COALESCE(finished_problems.problem_count, 0)
-            ELSE COALESCE(active_problems.problem_count, 0)
-          END as problem_count
-        FROM contests c
-        LEFT JOIN contest_participants cp ON c.id = cp.contest_id
-        LEFT JOIN (
-          SELECT contest_id, COUNT(*) as problem_count
-          FROM contest_problems
-          GROUP BY contest_id
-        ) finished_problems ON c.id = finished_problems.contest_id AND c.status = '${CONTEST_STATUS.FINISHED}'
-        LEFT JOIN (
-          SELECT contest_id, COUNT(*) as problem_count
-          FROM problems
-          WHERE contest_id IS NOT NULL
-          GROUP BY contest_id
-        ) active_problems ON c.id = active_problems.contest_id AND c.status != '${CONTEST_STATUS.FINISHED}'
-        GROUP BY c.id, c.title, c.description, c.start_time, c.end_time, c.status, c.created_at, finished_problems.problem_count, active_problems.problem_count
-        ORDER BY c.start_time DESC
-      `);
-    }
-
-    res.json(result.rows);
-  } catch (error: unknown) {
-    console.error('Error fetching contests:', error);
-    res.status(500).json({ message: 'Error fetching contests' });
-  }
-});
+  const contests = await listContests(userId);
+  res.json(contests);
+}));
 
 // List all contests for admin
-router.get('/admin/contests', requireAuth, requireStaffOrAdmin, async (req: Request, res: Response) => {
-  try {
-    const result = await db.query(`
-      SELECT 
-        c.id, c.title, c.description, c.start_time, c.end_time, c.status,
-        c.created_at,
-        COUNT(DISTINCT cp.user_id) as participant_count,
-        CASE 
-          WHEN c.status = '${CONTEST_STATUS.FINISHED}' THEN COALESCE(finished_problems.problem_count, 0)
-          ELSE COALESCE(active_problems.problem_count, 0)
-        END as problem_count
-      FROM contests c
-      LEFT JOIN contest_participants cp ON c.id = cp.contest_id
-      LEFT JOIN (
-        SELECT contest_id, COUNT(*) as problem_count
-        FROM contest_problems
-        GROUP BY contest_id
-      ) finished_problems ON c.id = finished_problems.contest_id AND c.status = '${CONTEST_STATUS.FINISHED}'
-      LEFT JOIN (
-        SELECT contest_id, COUNT(*) as problem_count
-        FROM problems
-        WHERE contest_id IS NOT NULL
-        GROUP BY contest_id
-      ) active_problems ON c.id = active_problems.contest_id AND c.status != '${CONTEST_STATUS.FINISHED}'
-      GROUP BY c.id, c.title, c.description, c.start_time, c.end_time, c.status, c.created_at, finished_problems.problem_count, active_problems.problem_count
-      ORDER BY c.start_time DESC
-    `);
-    res.json(result.rows);
-  } catch (error: unknown) {
-    console.error('Error fetching admin contests:', error);
-    res.status(500).json({ message: 'Error fetching contests' });
-  }
-});
+router.get('/admin/contests', requireAuth, requireStaffOrAdmin, asyncHandler(async (_req: Request, res: Response) => {
+  const contests = await listContests();
+  res.json(contests);
+}));
 
 // Get problems available for contest (Admin)
-router.get('/admin/contests/available-problems', requireAuth, requireStaffOrAdmin, async (req: Request, res: Response) => {
-  try {
-    const problems = await problemMigration.getAvailableProblemsForContest();
-    res.json(problems);
-  } catch (error: unknown) {
-    console.error('Error fetching available problems:', error);
-    res.status(500).json({ message: 'Error fetching available problems' });
-  }
-});
+router.get('/admin/contests/available-problems', requireAuth, requireStaffOrAdmin, asyncHandler(async (_req: Request, res: Response) => {
+  const problems = await problemMigration.getAvailableProblemsForContest();
+  res.json(problems);
+}));
 
 // Get contest details
-router.get('/contests/:id', async (req: Request, res: Response) => {
-  const { id } = req.params;
+router.get('/contests/:id',
+  validateRequest({ params: contestIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
   const { userId } = req.session;
-
-  try {
-    const contestResult = await db.query<ContestDetailRow>(`
-      SELECT 
-        c.*,
-        COUNT(cp.user_id) as participant_count,
-        u.username as created_by_username
-      FROM contests c
-      LEFT JOIN contest_participants cp ON c.id = cp.contest_id
-      LEFT JOIN users u ON c.created_by = u.id
-      WHERE c.id = $1
-      GROUP BY c.id, c.title, c.description, c.start_time, c.end_time, 
-               c.status, c.created_at, c.created_by, u.username
-    `, [id]);
-
-    if (contestResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Contest not found' });
-    }
-
-    const contest = contestResult.rows[0];
-
-    // Check if current user is a participant
-    let isParticipant = false;
-    if (userId) {
-      const participantResult = await db.query(`
-        SELECT 1 FROM contest_participants 
-        WHERE contest_id = $1 AND user_id = $2
-      `, [id, userId]);
-      isParticipant = participantResult.rows.length > 0;
-    }
-
-    // Get problems in this contest (only if contest has started)
-
-    type ContestProblemSummary = Pick<ContestProblemRow, 'problem_id' | 'title' | 'author'>;
-    let problems: ContestProblemSummary[] = [];
-    if (contest.status === CONTEST_STATUS.RUNNING || contest.status === CONTEST_STATUS.FINISHED) {
-      if (contest.status === CONTEST_STATUS.FINISHED) {
-        // For finished contests, get problems from contest_problems snapshot
-        const problemsResult = await db.query<ContestProblemSummary>(`
-          SELECT problem_id as id, title, author
-          FROM contest_problems 
-          WHERE contest_id = $1
-          ORDER BY problem_id
-        `, [id]);
-        problems = problemsResult.rows as unknown as ContestProblemSummary[];
-      } else {
-        // For running contests, get problems from problems table
-        const problemsResult = await db.query<ContestProblemSummary>(`
-          SELECT id, title, author
-          FROM problems 
-          WHERE contest_id = $1
-          ORDER BY id
-        `, [id]);
-        problems = problemsResult.rows as unknown as ContestProblemSummary[];
-      }
-    }
-
-    res.json({ ...contest, problems, is_participant: isParticipant });
-  } catch (error: unknown) {
-    console.error(`Error fetching contest ${id}:`, error);
-    res.status(500).json({ message: 'Error fetching contest details' });
+  const contest = await getContestDetail(id, userId);
+  if (!contest) {
+    throw new AppError('Contest not found', 404);
   }
-});
+  res.json(contest);
+}));
 
 // Join a contest
-router.post('/contests/:id/join', requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+router.post('/contests/:id/join', requireAuth,
+  validateRequest({ params: contestIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
   const { userId } = req.session;
-
-  try {
-    // Check if contest exists and is joinable
-    const contestResult = await db.query<ContestRow>(
-      'SELECT * FROM contests WHERE id = $1',
-      [id]
-    );
-
-    if (contestResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Contest not found' });
-    }
-
-    const contest = contestResult.rows[0];
-
-    // Check if contest is still open for registration (can join until end time)
-    const now = new Date();
-    const endTime = new Date(contest.end_time);
-
-    if (now >= endTime) {
-      return res.status(400).json({
-        message: 'Cannot join contest that has already ended'
-      });
-    }
-
-    // Try to join (will fail if already joined due to PRIMARY KEY constraint)
-    try {
-      await db.query(
-        'INSERT INTO contest_participants (contest_id, user_id) VALUES ($1, $2)',
-        [id, userId]
-      );
-      res.json({ message: 'Successfully joined contest' });
-    } catch (insertError: unknown) {
-      if (isPgError(insertError) && insertError.code === '23505') { // unique_violation
-        res.status(400).json({ message: 'Already joined this contest' });
-      } else {
-        throw insertError;
-      }
-    }
-  } catch (error) {
-    console.error(`Error joining contest ${id}:`, error);
-    res.status(500).json({ message: 'Error joining contest' });
+  if (!userId) {
+    throw new AppError('Authentication required', 401);
   }
-});
+
+  const result = await joinContest(id, userId);
+  if (result === 'not_found') {
+    res.status(404).json({ message: 'Contest not found' });
+    return;
+  }
+  if (result === 'ended') {
+    res.status(400).json({ message: 'Cannot join contest that has already ended' });
+    return;
+  }
+  if (result === 'already_joined') {
+    res.status(400).json({ message: 'Already joined this contest' });
+    return;
+  }
+
+  res.json({ message: 'Successfully joined contest' });
+}));
 
 // Get contest scoreboard
-router.get('/contests/:id/scoreboard', requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  try {
-    // Check if contest exists
-    const contestResult = await db.query<ContestRow>('SELECT * FROM contests WHERE id = $1', [id]);
-    if (contestResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Contest not found' });
-    }
-
-    const contest = contestResult.rows[0];
-
-    if (contest.status === CONTEST_STATUS.FINISHED) {
-      // Get final scoreboard from contest_scoreboards table with problems information
-      const [scoreboardResult, problemsResult] = await Promise.all([
-        db.query<ContestScoreboardDetailRow>(`
-          SELECT 
-            cs.*,
-            u.username
-          FROM contest_scoreboards cs
-          JOIN users u ON cs.user_id = u.id
-          WHERE cs.contest_id = $1
-          ORDER BY cs.total_score DESC, cs.last_score_improvement_time ASC
-        `, [id]),
-        db.query<Pick<ContestProblemRow, 'problem_id' | 'title'>>(`
-          SELECT problem_id, title
-          FROM contest_problems
-          WHERE contest_id = $1
-          ORDER BY problem_id
-        `, [id])
-      ]);
-
-      res.json({
-        scoreboard: scoreboardResult.rows,
-        problems: problemsResult.rows
-      });
-    } else if (contest.status === CONTEST_STATUS.RUNNING || contest.status === CONTEST_STATUS.FINISHING) {
-      // Generate real-time scoreboard and fetch current problems
-      const [scoreboardResult, problemsResult] = await Promise.all([
-        db.query<ContestScoreboardDetailRow>(`
-          WITH UserBestScores AS (
-            SELECT
-              cs.user_id,
-              cs.problem_id,
-              MAX(cs.score) AS best_score,
-              MAX(cs.submitted_at) AS latest_score_time
-            FROM contest_submissions cs
-            WHERE cs.contest_id = $1
-            GROUP BY cs.user_id, cs.problem_id
-          ),
-          UserTotalScores AS (
-            SELECT
-              ubs.user_id,
-              SUM(ubs.best_score) AS total_score,
-              jsonb_object_agg(ubs.problem_id, jsonb_build_object(
-                'score', ubs.best_score
-              )) AS detailed_scores,
-              MAX(ubs.latest_score_time) AS last_score_improvement_time
-            FROM UserBestScores ubs
-            GROUP BY ubs.user_id
-          ),
-          AllParticipants AS (
-            SELECT
-              cp.user_id,
-              u.username,
-              COALESCE(uts.total_score, 0) AS total_score,
-              COALESCE(uts.detailed_scores, '{}'::jsonb) AS detailed_scores,
-              COALESCE(uts.last_score_improvement_time, cp.joined_at) AS last_score_improvement_time
-            FROM contest_participants cp
-            JOIN users u ON cp.user_id = u.id
-            LEFT JOIN UserTotalScores uts ON uts.user_id = cp.user_id
-            WHERE cp.contest_id = $1
-          )
-          SELECT *
-          FROM AllParticipants
-          ORDER BY total_score DESC, last_score_improvement_time ASC
-        `, [id]),
-        db.query(`
-          SELECT id as problem_id, title
-          FROM problems
-          WHERE contest_id = $1
-          ORDER BY id
-        `, [id])
-      ]);
-
-      res.json({
-        scoreboard: scoreboardResult.rows,
-        problems: problemsResult.rows
-      });
-    } else {
-      // Contest not started yet, but show participants with zero scores and problems
-      const [participantsResult, problemsResult] = await Promise.all([
-        db.query(`
-          SELECT 
-            cp.user_id,
-            u.username,
-            0 AS total_score,
-            '{}'::jsonb AS detailed_scores
-          FROM contest_participants cp
-          JOIN users u ON cp.user_id = u.id
-          WHERE cp.contest_id = $1
-          ORDER BY u.username ASC
-        `, [id]),
-        db.query(`
-          SELECT id as problem_id, title
-          FROM problems
-          WHERE contest_id = $1
-          ORDER BY id
-        `, [id])
-      ]);
-
-      res.json({
-        scoreboard: participantsResult.rows,
-        problems: problemsResult.rows
-      });
-    }
-  } catch (error) {
-    console.error(`Error fetching scoreboard for contest ${id}:`, error);
-    res.status(500).json({ message: 'Error fetching contest scoreboard' });
+router.get('/contests/:id/scoreboard', requireAuth,
+  validateRequest({ params: contestIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const scoreboard = await getContestScoreboard(id);
+  if (!scoreboard) {
+    throw new AppError('Contest not found', 404);
   }
-});
+  res.json(scoreboard);
+}));
 
 // Create new contest (Admin only)
-router.post('/admin/contests', requireAuth, requireStaffOrAdmin, [
-  body('title').isLength({ min: 1 }).trim(),
-  body('description').optional().trim(),
-  body('startTime').isISO8601().toDate(),
-  body('endTime').isISO8601().toDate()
-], async (req: Request, res: Response) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
-  const { title, description, startTime, endTime } = req.body as {
-    title: string;
-    description?: string;
-    startTime: string;
-    endTime: string;
-  };
+router.post('/admin/contests', requireAuth, requireStaffOrAdmin,
+  validateRequest({ body: contestBodySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const { title, description, startTime, endTime } = req.body as ContestCreateRequestBody;
   const { userId } = req.session;
 
-  // Validate that end time is after start time
   if (new Date(endTime) <= new Date(startTime)) {
-    return res.status(400).json({
-      message: 'End time must be after start time'
-    });
+    throw new AppError('End time must be after start time', 400);
   }
 
-  try {
-    const result = await db.query<ContestRow>(`
-      INSERT INTO contests (title, description, start_time, end_time, created_by)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
-    `, [title, description, startTime, endTime, userId]);
-
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error('Error creating contest:', error);
-    res.status(500).json({ message: 'Error creating contest' });
+  if (!userId) {
+    throw new AppError('Authentication required', 401);
   }
-});
+
+  const contest = await createContest(
+    { title, description: description ?? null, startTime, endTime },
+    userId,
+  );
+  res.status(201).json(contest);
+}));
 
 // Update contest (Admin only)
-router.put('/admin/contests/:id', requireAuth, requireStaffOrAdmin, [
-  body('title').isLength({ min: 1 }).trim(),
-  body('description').optional().trim(),
-  body('startTime').isISO8601().toDate(),
-  body('endTime').isISO8601().toDate()
-], async (req: Request, res: Response) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
+router.put('/admin/contests/:id', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: contestIdParamSchema, body: contestBodySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const { title, description, startTime, endTime } = req.body as ContestUpdateRequestBody;
 
-  const { id } = req.params;
-  const { title, description, startTime, endTime } = req.body as {
-    title: string;
-    description?: string;
-    startTime: string;
-    endTime: string;
-  };
-
-  // Validate that end time is after start time
   if (new Date(endTime) <= new Date(startTime)) {
-    return res.status(400).json({
-      message: 'End time must be after start time'
-    });
+    throw new AppError('End time must be after start time', 400);
   }
 
-  try {
-    const result = await db.query<ContestRow>(`
-      UPDATE contests 
-      SET title = $1, description = $2, start_time = $3, end_time = $4
-      WHERE id = $5
-      RETURNING *
-    `, [title, description, startTime, endTime, id]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Contest not found' });
-    }
-
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error(`Error updating contest ${id}:`, error);
-    res.status(500).json({ message: 'Error updating contest' });
+  const contest = await updateContest(id, { title, description: description ?? null, startTime, endTime });
+  if (!contest) {
+    throw new AppError('Contest not found', 404);
   }
-});
+  res.json(contest);
+}));
 
 // Delete contest (Admin only)
-router.delete('/admin/contests/:id', requireAuth, requireStaffOrAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+router.delete('/admin/contests/:id', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: contestIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const result = await deleteContest(id);
 
-  try {
-    // Check if contest can be deleted (should not be running or finished with data)
-    const contestResult = await db.query<ContestRow>('SELECT * FROM contests WHERE id = $1', [id]);
-    if (contestResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Contest not found' });
-    }
-
-    const contest = contestResult.rows[0];
-    if (contest.status === CONTEST_STATUS.RUNNING) {
-      return res.status(400).json({
-        message: 'Cannot delete a running contest'
-      });
-    }
-
-    // Move problems back to main system before deleting
-    await db.query(
-      'UPDATE problems SET contest_id = NULL WHERE contest_id = $1',
-      [id]
-    );
-
-    await db.query('DELETE FROM contests WHERE id = $1 RETURNING id', [id]);
-
-    res.json({ message: `Contest ${id} deleted successfully` });
-  } catch (error) {
-    console.error(`Error deleting contest ${id}:`, error);
-    res.status(500).json({ message: 'Error deleting contest' });
+  if (result === 'not_found') {
+    res.status(404).json({ message: 'Contest not found' });
+    return;
   }
-});
+  if (result === 'running') {
+    res.status(400).json({ message: 'Cannot delete a running contest' });
+    return;
+  }
+
+  res.json({ message: `Contest ${id} deleted successfully` });
+}));
 
 // Get problems in contest (Admin)
-router.get('/admin/contests/:id/admin-problems', requireAuth, requireStaffOrAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  try {
-    const problems = await problemMigration.getProblemsInContest(parseInt(id as string, 10));
-    res.json(problems);
-  } catch (error) {
-    console.error(`Error fetching problems for contest ${id}:`, error);
-    res.status(500).json({ message: 'Error fetching contest problems' });
-  }
-});
+router.get('/admin/contests/:id/admin-problems', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: contestIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const problems = await problemMigration.getProblemsInContest(parseInt(id, 10));
+  res.json(problems);
+}));
 
 
 // Move problems to/from contest (Admin)
-router.post('/admin/contests/:id/problems', requireAuth, requireStaffOrAdmin, [
-  body('problemIds').isArray({ min: 1 }).withMessage('Must provide at least one problem ID'),
-  body('problemIds.*').isString().trim().escape(),
-  body('action').isIn(['move_to_contest', 'move_to_main']).withMessage('Action must be move_to_contest or move_to_main')
-], async (req: Request, res: Response) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
+router.post('/admin/contests/:id/problems', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: contestIdParamSchema, body: moveContestProblemsBodySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const { problemIds, action } = req.body as MoveContestProblemsRequestBody;
 
-  const { id } = req.params;
-  const { problemIds, action } = req.body as { problemIds: string[]; action: 'move_to_contest' | 'move_to_main' };
-
-  try {
-    let result;
-    if (action === 'move_to_contest') {
-      result = await problemMigration.moveProblemsToContest(parseInt(id as string, 10), problemIds);
-    } else if (action === 'move_to_main') {
-      result = await problemMigration.moveProblemsBackToMain(parseInt(id as string, 10), problemIds);
-    }
-    res.json(result);
-  } catch (error: unknown) {
-    console.error(`Error ${action} problems for contest ${id}:`, error);
-    const message = isPgError(error) ? error.message : `Error ${action} problems`;
-    res.status(400).json({ message });
+  let result;
+  if (action === 'move_to_contest') {
+    result = await problemMigration.moveProblemsToContest(Number.parseInt(id, 10), problemIds);
+  } else if (action === 'move_to_main') {
+    result = await problemMigration.moveProblemsBackToMain(Number.parseInt(id, 10), problemIds);
+  } else {
+    throw new AppError('Action must be move_to_contest or move_to_main', 400);
   }
-});
+  res.json(result);
+}));
 
 // Move problem back to main system
-router.delete('/admin/contests/:id/problems/:problemId', requireAuth, requireStaffOrAdmin, async (req: Request, res: Response) => {
-  const { id, problemId } = req.params;
+router.delete('/admin/contests/:id/problems/:problemId', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: contestProblemParamsSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const problemId = String(req.params.problemId);
 
-  try {
-    // Check if contest exists and is in correct status
-    const contestResult = await db.query<ContestRow>('SELECT * FROM contests WHERE id = $1', [id]);
-    if (contestResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Contest not found' });
-    }
-
-    const contest = contestResult.rows[0];
-    if (contest.status !== 'scheduled' && contest.status !== CONTEST_STATUS.RUNNING) {
-      return res.status(400).json({
-        message: 'Can only move problems from scheduled or running contests'
-      });
-    }
-
-    // Move single problem back to main system
-    const updateResult = await db.query<Pick<ProblemRow, 'id' | 'title'>>(
-      'UPDATE problems SET contest_id = NULL WHERE id = $1 AND contest_id = $2 RETURNING id, title',
-      [problemId, id]
-    );
-
-    if (updateResult.rows.length === 0) {
-      return res.status(404).json({
-        message: 'Problem not found in this contest'
-      });
-    }
-
-    res.json({
-      message: `Successfully moved problem ${problemId} back to main system`,
-      problem: updateResult.rows[0]
-    });
-  } catch (error) {
-    console.error(`Error moving problem ${problemId} from contest ${id}:`, error);
-    res.status(500).json({ message: 'Error moving problem from contest' });
+  const result = await moveSingleProblemToMainSystem(id, problemId);
+  if (result.kind === 'not_found_contest') {
+    res.status(404).json({ message: 'Contest not found' });
+    return;
   }
-});
+  if (result.kind === 'invalid_status') {
+    res.status(400).json({ message: 'Can only move problems from scheduled or running contests' });
+    return;
+  }
+  if (result.kind === 'not_found_problem') {
+    res.status(404).json({ message: 'Problem not found in this contest' });
+    return;
+  }
+
+  res.json({
+    message: `Successfully moved problem ${problemId} back to main system`,
+    problem: result.data,
+  });
+}));
 
 // Get contest problems for participants (User endpoint)
-router.get('/contests/:id/problems', requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+router.get('/contests/:id/problems', requireAuth,
+  validateRequest({ params: contestIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
   const { userId } = req.session;
-
-  try {
-    // Check if contest exists
-    const contestResult = await db.query<ContestRow>('SELECT * FROM contests WHERE id = $1', [id]);
-    if (contestResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Contest not found' });
-    }
-
-    const contest = contestResult.rows[0];
-
-    // Check if user is a participant
-    const participantResult = await db.query(
-      'SELECT 1 FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
-      [id, userId]
-    );
-
-    if (participantResult.rows.length === 0) {
-      return res.status(403).json({ message: 'You must join this contest to view problems' });
-    }
-
-    // Only show problems if contest is running, finishing, or finished
-    if (!ACTIVE_CONTEST_STATUSES.includes(contest.status)) {
-      return res.json([]); // Return empty array for scheduled contests
-    }
-
-    // Base query with CTEs to get user's submission stats for this contest
-    const baseQuery = `
-      WITH RankedSubmissions AS (
-        SELECT
-          cs.id, cs.user_id, cs.problem_id, cs.score, cs.overall_status,
-          cs.results, cs.submitted_at,
-          ROW_NUMBER() OVER(PARTITION BY cs.user_id, cs.problem_id ORDER BY cs.score DESC, cs.id DESC) as rn_best,
-          ROW_NUMBER() OVER(PARTITION BY cs.user_id, cs.problem_id ORDER BY cs.id DESC) as rn_latest
-        FROM contest_submissions cs
-        WHERE cs.user_id = $1 AND cs.contest_id = $2
-      ),
-      UserProblemStats AS (
-        SELECT
-          problem_id,
-          MAX(score) AS best_score,
-          COUNT(*) AS submission_count
-        FROM contest_submissions
-        WHERE user_id = $1 AND contest_id = $2
-        GROUP BY problem_id
-      )
-    `;
-
-    let problemsResult;
-    if (contest.status === CONTEST_STATUS.FINISHED) {
-      // For finished contests, get problems from contest_problems snapshot and join with stats
-      problemsResult = await db.query(baseQuery + `
-        SELECT
-          cp.problem_id as id, cp.title, cp.author,
-          ups.best_score, ups.submission_count,
-          latest.submitted_at AS latest_submission_at,
-          latest.overall_status AS latest_submission_status,
-          best.overall_status AS best_submission_status,
-          best.results AS best_submission_results
-        FROM contest_problems cp
-        LEFT JOIN UserProblemStats ups ON cp.problem_id = ups.problem_id
-        LEFT JOIN RankedSubmissions latest ON cp.problem_id = latest.problem_id AND latest.rn_latest = 1
-        LEFT JOIN RankedSubmissions best ON cp.problem_id = best.problem_id AND best.rn_best = 1
-        WHERE cp.contest_id = $2
-        ORDER BY cp.problem_id
-      `, [userId, id]);
-    } else {
-      // For running/finishing contests, get problems from problems table and join with stats
-      problemsResult = await db.query(baseQuery + `
-        SELECT
-          p.id, p.title, p.author, p.time_limit_ms, p.memory_limit_mb,
-          ups.best_score, ups.submission_count,
-          latest.submitted_at AS latest_submission_at,
-          latest.overall_status AS latest_submission_status,
-          best.overall_status AS best_submission_status,
-          best.results AS best_submission_results
-        FROM problems p
-        LEFT JOIN UserProblemStats ups ON p.id = ups.problem_id
-        LEFT JOIN RankedSubmissions latest ON p.id = latest.problem_id AND latest.rn_latest = 1
-        LEFT JOIN RankedSubmissions best ON p.id = best.problem_id AND best.rn_best = 1
-        WHERE p.contest_id = $2
-        ORDER BY p.id
-      `, [userId, id]);
-    }
-
-    res.json(problemsResult.rows);
-  } catch (error) {
-    console.error(`Error fetching contest problems for user ${userId}:`, error);
-    res.status(500).json({ message: 'Error fetching contest problems' });
+  if (!userId) {
+    throw new AppError('Authentication required', 401);
   }
-});
+
+  const result = await getContestProblemsForParticipant(id, userId);
+  if (result.kind === 'not_found') {
+    res.status(404).json({ message: 'Contest not found' });
+    return;
+  }
+  if (result.kind === 'not_participant') {
+    res.status(403).json({ message: 'You must join this contest to view problems' });
+    return;
+  }
+  if (result.kind === 'inactive') {
+    res.json([]);
+    return;
+  }
+  res.json(result.data);
+}));
 
 // Get a single contest problem
-router.get('/contests/:id/problems/:problemId', requireAuth, async (req: Request, res: Response) => {
-  const { id: contestId, problemId } = req.params;
+router.get('/contests/:id/problems/:problemId', requireAuth,
+  validateRequest({ params: contestProblemParamsSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const contestId = String(req.params.id);
+  const problemId = String(req.params.problemId);
   const { userId } = req.session;
-
-  try {
-    // 1. Check contest status and user participation
-    const contestRes = await db.query<Pick<ContestRow, 'status'>>('SELECT status FROM contests WHERE id = $1', [contestId]);
-    if (contestRes.rows.length === 0) {
-      return res.status(404).json({ message: 'Contest not found.' });
-    }
-    const contestStatus = contestRes.rows[0].status;
-
-    if (!ACTIVE_CONTEST_STATUSES.includes(contestStatus)) {
-      return res.status(403).json({ message: 'Contest is not active.' });
-    }
-
-    const participantRes = await db.query(
-      'SELECT 1 FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
-      [contestId, userId]
-    );
-    if (participantRes.rows.length === 0) {
-      return res.status(403).json({ message: 'You are not a participant in this contest.' });
-    }
-
-    // 2. Fetch problem details based on contest status
-    let problemRes;
-    if (contestStatus === CONTEST_STATUS.FINISHED) {
-      // For finished contests, get data from the snapshot
-      problemRes = await db.query(
-        'SELECT problem_id as id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf FROM contest_problems WHERE contest_id = $1 AND problem_id = $2',
-        [contestId, problemId]
-      );
-    } else {
-      // For running contests, get data from the main problems table
-      problemRes = await db.query(
-        'SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf FROM problems WHERE id = $1 AND contest_id = $2',
-        [problemId, contestId]
-      );
-    }
-
-    if (problemRes.rows.length === 0) {
-      return res.status(404).json({ message: 'Problem not found in this contest.' });
-    }
-
-    res.json(problemRes.rows[0]);
-
-  } catch (error) {
-    console.error(`Error fetching contest problem ${problemId} for contest ${contestId}:`, error);
-    res.status(500).json({ message: 'Error fetching problem details.' });
+  if (!userId) {
+    throw new AppError('Authentication required', 401);
   }
-});
+
+  const result = await getContestProblemDetailForParticipant(contestId, problemId, userId);
+  if (result.kind === 'not_found_contest') {
+    res.status(404).json({ message: 'Contest not found.' });
+    return;
+  }
+  if (result.kind === 'inactive') {
+    res.status(403).json({ message: 'Contest is not active.' });
+    return;
+  }
+  if (result.kind === 'not_participant') {
+    res.status(403).json({ message: 'You are not a participant in this contest.' });
+    return;
+  }
+  if (result.kind === 'not_found_problem') {
+    res.status(404).json({ message: 'Problem not found in this contest.' });
+    return;
+  }
+  res.json(result.data);
+}));
 
 // Get a single contest problem's PDF
-router.get('/contests/:id/problems/:problemId/pdf', requireAuth, async (req: Request, res: Response) => {
-  const { id: contestId, problemId } = req.params;
+router.get('/contests/:id/problems/:problemId/pdf', requireAuth,
+  validateRequest({ params: contestProblemParamsSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const contestId = String(req.params.id);
+  const problemId = String(req.params.problemId);
   const { userId } = req.session;
-
-  try {
-    // 1. Check contest status and user participation (similar to getting problem details)
-    const contestRes = await db.query<Pick<ContestRow, 'status'>>('SELECT status FROM contests WHERE id = $1', [contestId]);
-    if (contestRes.rows.length === 0) {
-      return res.status(404).json({ message: 'Contest not found.' });
-    }
-    const contestStatus = contestRes.rows[0].status;
-
-    if (!ACTIVE_CONTEST_STATUSES.includes(contestStatus)) {
-      return res.status(403).json({ message: 'Contest is not active.' });
-    }
-
-    const participantRes = await db.query(
-      'SELECT 1 FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
-      [contestId, userId]
-    );
-    if (participantRes.rows.length === 0) {
-      return res.status(403).json({ message: 'You are not a participant in this contest.' });
-    }
-
-    // 2. Fetch the PDF data based on contest status
-    let pdfRes;
-    if (contestStatus === CONTEST_STATUS.FINISHED) {
-      pdfRes = await db.query<Pick<ContestProblemRow, 'problem_pdf'>>(
-        'SELECT problem_pdf FROM contest_problems WHERE contest_id = $1 AND problem_id = $2',
-        [contestId, problemId]
-      );
-    } else {
-      pdfRes = await db.query<{ problem_pdf: Buffer | null }>(
-        'SELECT problem_pdf FROM problems WHERE id = $1 AND contest_id = $2',
-        [problemId, contestId]
-      );
-    }
-
-    if (pdfRes.rows.length === 0 || !pdfRes.rows[0].problem_pdf) {
-      return res.status(404).json({ message: 'Problem PDF not found.' });
-    }
-
-    const pdfData = pdfRes.rows[0].problem_pdf;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.send(pdfData);
-
-  } catch (error) {
-    console.error(`Error fetching PDF for contest problem ${problemId}:`, error);
-    res.status(500).json({ message: 'Error fetching PDF.' });
+  if (!userId) {
+    throw new AppError('Authentication required', 401);
   }
-});
+
+  const result = await getContestProblemPdfForParticipant(contestId, problemId, userId);
+  if (result.kind === 'not_found_contest') {
+    res.status(404).json({ message: 'Contest not found.' });
+    return;
+  }
+  if (result.kind === 'inactive') {
+    res.status(403).json({ message: 'Contest is not active.' });
+    return;
+  }
+  if (result.kind === 'not_participant') {
+    res.status(403).json({ message: 'You are not a participant in this contest.' });
+    return;
+  }
+  if (result.kind === 'not_found_pdf') {
+    res.status(404).json({ message: 'Problem PDF not found.' });
+    return;
+  }
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.send(result.data);
+}));
 
 export default router;

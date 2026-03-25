@@ -4,6 +4,8 @@ import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { judge } from './judgeService';
+import { ContestSubmissionRow, SubmissionRow } from '../types/models';
+import { CompileCommandError } from '../types/service';
 
 const execPromise = promisify(exec);
 
@@ -12,7 +14,10 @@ export async function processSubmission(submissionId: number): Promise<void> {
   let outputPath = '';
 
   try {
-    const subRes = await db.query('SELECT * FROM submissions WHERE id = $1', [submissionId]);
+    const subRes = await db.query<SubmissionRow>(
+      'SELECT * FROM submissions WHERE id = $1',
+      [submissionId]
+    );
     if (subRes.rows.length === 0) {
       console.error(`Submission ${submissionId} not found for processing.`);
       return;
@@ -35,11 +40,12 @@ export async function processSubmission(submissionId: number): Promise<void> {
     const compileCommand = `g++ -std=c++20 -fsanitize=signed-integer-overflow ${filePath} -o ${outputPath}`;
     try {
       await execPromise(compileCommand);
-    } catch (compileError: any) {
-      console.error(`Compilation error for submission ${submissionId}:`, compileError.stderr);
+    } catch (compileError: unknown) {
+      const error = compileError as CompileCommandError;
+      console.error(`Compilation error for submission ${submissionId}:`, error.stderr);
       await db.query(
         `UPDATE submissions SET overall_status = 'Compilation Error', results = $1 WHERE id = $2`,
-        [JSON.stringify([{ status: 'Compilation Error', output: compileError.stderr }]), submissionId]
+        [JSON.stringify([{ status: 'Compilation Error', output: error.stderr ?? 'Compilation failed' }]), submissionId]
       );
       return;
     } finally {
@@ -79,7 +85,10 @@ export async function processContestSubmission(submissionId: number): Promise<vo
   let outputPath = '';
 
   try {
-    const subRes = await db.query('SELECT * FROM contest_submissions WHERE id = $1', [submissionId]);
+    const subRes = await db.query<ContestSubmissionRow>(
+      'SELECT * FROM contest_submissions WHERE id = $1',
+      [submissionId]
+    );
     if (subRes.rows.length === 0) {
       console.error(`Contest submission ${submissionId} not found for processing.`);
       return;
@@ -102,11 +111,12 @@ export async function processContestSubmission(submissionId: number): Promise<vo
     const compileCommand = `g++ -std=c++20 -fsanitize=signed-integer-overflow ${filePath} -o ${outputPath}`;
     try {
       await execPromise(compileCommand);
-    } catch (compileError: any) {
-      console.error(`Compilation error for contest submission ${submissionId}:`, compileError.stderr);
+    } catch (compileError: unknown) {
+      const error = compileError as CompileCommandError;
+      console.error(`Compilation error for contest submission ${submissionId}:`, error.stderr);
       await db.query(
         `UPDATE contest_submissions SET overall_status = 'Compilation Error', results = $1 WHERE id = $2`,
-        [JSON.stringify([{ status: 'Compilation Error', output: compileError.stderr }]), submissionId]
+        [JSON.stringify([{ status: 'Compilation Error', output: error.stderr ?? 'Compilation failed' }]), submissionId]
       );
       return;
     } finally {

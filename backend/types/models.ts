@@ -5,15 +5,16 @@
  * Each interface maps directly to one table row as returned by pg.
  * Use these as the generic parameter for `db.query<T>()`.
  */
+import { CONTEST_STATUS, SUBMISSION_STATUS, USER_ROLES } from '../constants';
 
 // ---------------------------------------------------------------------------
 // Primitives / Shared
 // ---------------------------------------------------------------------------
 
 /** The full set of valid user roles enforced by the DB CHECK constraint. */
-export type UserRole = 'user' | 'staff' | 'admin';
+export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
 
-export type ContestStatus = 'scheduled' | 'running' | 'finishing' | 'finished';
+export type ContestStatus = 'scheduled' | typeof CONTEST_STATUS[keyof typeof CONTEST_STATUS];
 
 /** Statuses where a contest is effectively active or completed (problems are visible). */
 export const ACTIVE_CONTEST_STATUSES: ContestStatus[] = ['running', 'finishing', 'finished'];
@@ -26,13 +27,10 @@ export const ACTIVE_CONTEST_STATUSES: ContestStatus[] = ['running', 'finishing',
 export type SubmissionStatus =
     | 'pending'
     | 'judging'
-    | 'Accepted'
-    | 'Wrong Answer'
-    | 'Time Limit Exceeded'
-    | 'Memory Limit Exceeded'
-    | 'Runtime Error'
+    | typeof SUBMISSION_STATUS[keyof typeof SUBMISSION_STATUS]
     | 'Compile Error'
-    | 'System Error'
+    | 'Compilation Error'
+    | 'Running'
     | 'Partial';
 
 /**
@@ -73,6 +71,9 @@ export interface UserRow {
     created_at: Date;
 }
 
+/** Reused compact user shape for API responses and request context. */
+export type UserPublicProfileDTO = Pick<UserRow, 'id' | 'username' | 'role'>;
+
 /** `system_settings` table row. */
 export interface SystemSettingRow {
     setting_key: string;
@@ -94,14 +95,14 @@ export interface ProblemRow {
 export type ProblemWithPdf = Pick<
     ProblemRow,
     'id' | 'title' | 'author' | 'time_limit_ms' | 'memory_limit_mb' | 'problem_pdf'
->
+>;
 
 export type ProblemDetailDTO = Pick<
     ProblemRow,
     'id' | 'title' | 'author' | 'time_limit_ms' | 'memory_limit_mb' | 'is_visible'
 > & {
-    has_pdf: boolean
-}
+    has_pdf: boolean;
+};
 
 /** `problems` row augmented with contest status for the admin index. */
 export interface AdminProblemRow extends Pick<
@@ -139,6 +140,7 @@ export interface SubmissionRow {
 /** `submissions` row augmented with username for display. */
 export interface SubmissionDetailRow extends SubmissionRow {
     username: string;
+    problem_name: string;
 }
 
 
@@ -160,6 +162,9 @@ export interface ContestDetailRow extends ContestRow {
     created_by_username: string | null;
 }
 
+/** Reused compact contest info used for validation and flow checks. */
+export type ContestRuntimeRow = Pick<ContestRow, 'id' | 'status' | 'start_time' | 'end_time'>;
+
 /** `contest_submissions` table row. */
 export interface ContestSubmissionRow {
     id: number;
@@ -180,6 +185,7 @@ export interface ContestSubmissionRow {
 /** `contest_submissions` row augmented with username for display. */
 export interface ContestSubmissionDetailRow extends ContestSubmissionRow {
     username: string;
+    problem_name: string;
 }
 
 
@@ -213,4 +219,3 @@ export interface ContestScoreboardRow {
 export interface ContestScoreboardDetailRow extends ContestScoreboardRow {
     username: string;
 }
-

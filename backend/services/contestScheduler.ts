@@ -1,6 +1,7 @@
 import cron, { ScheduledTask } from 'node-cron';
 import * as db from '../db';
 import { migrateSubmissionsAfterContest } from './problemMigration';
+import { ContestSchedulerStatus, ContestTimingRow } from '../types/service';
 
 class ContestScheduler {
   private isRunning: boolean;
@@ -66,7 +67,7 @@ class ContestScheduler {
   // Start contests that should be running now
   async startScheduledContests(now: Date): Promise<void> {
     try {
-      const result = await db.query(`
+      const result = await db.query<ContestTimingRow>(`
         SELECT id, title, start_time 
         FROM contests 
         WHERE status = 'scheduled' 
@@ -98,7 +99,7 @@ class ContestScheduler {
   // End contests that should be finished now
   async endRunningContests(now: Date): Promise<void> {
     try {
-      const result = await db.query(`
+      const result = await db.query<ContestTimingRow>(`
         SELECT id, title, end_time 
         FROM contests 
         WHERE status = 'running' 
@@ -147,7 +148,7 @@ class ContestScheduler {
   }
 
   // Get scheduler status
-  getStatus(): { isRunning: boolean; lastCheck: string; schedulerActive: boolean } {
+  getStatus(): ContestSchedulerStatus {
     return {
       isRunning: this.isRunning,
       lastCheck: new Date().toISOString(),

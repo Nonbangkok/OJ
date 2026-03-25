@@ -21,7 +21,7 @@ describe('Contest Scheduler Service', () => {
     describe('start / stop', () => {
         it('should start the scheduler and register a cron job', () => {
             contestScheduler.start();
-            expect(contestScheduler.isRunning).toBe(true);
+            expect(contestScheduler.getStatus().isRunning).toBe(true);
             expect(cron.schedule).toHaveBeenCalledWith('* * * * *', expect.any(Function), expect.any(Object));
         });
 
@@ -37,7 +37,7 @@ describe('Contest Scheduler Service', () => {
 
             contestScheduler.stop();
 
-            expect(contestScheduler.isRunning).toBe(false);
+            expect(contestScheduler.getStatus().isRunning).toBe(false);
             expect(mockStop).toHaveBeenCalled();
         });
     });

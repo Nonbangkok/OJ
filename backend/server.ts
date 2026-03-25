@@ -2,6 +2,9 @@ import express, { Request, Response } from 'express';
 import session from 'express-session';
 import pgSession from 'connect-pg-simple';
 import { pool } from './db';
+import { attachRequestUser } from './middleware/requestContext';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { env } from './config/env';
 // import cors from 'cors';
 
 // Import routes (Assuming they will be converted or handled by TS)
@@ -10,13 +13,13 @@ import authRoutes from './controllers/authController';
 import problemRoutes from './controllers/problemController';
 import submissionRoutes from './controllers/submissionController';
 import contestRoutes from './controllers/contestController';
-const contestScheduler = require('./services/contestScheduler');
+import contestScheduler from './services/contestScheduler';
 
 const app = express();
 const PgStore = pgSession(session);
 
 app.set('trust proxy', 1);
-const port = process.env.PORT || 5000;
+const port = Number(env.PORT) || 5000;
 
 app.use(express.json());
 // app.use(cors({
@@ -32,7 +35,7 @@ app.use(session({
     pool: pool, // Use the existing pg pool from db.ts
     tableName: 'user_sessions', // Name of the table to store sessions
   }),
-  secret: process.env.SECRET_KEY || 'secret', // Use environment variable
+  secret: env.SECRET_KEY,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -43,6 +46,8 @@ app.use(session({
   }
 }));
 
+app.use(attachRequestUser);
+
 app.use('/', authRoutes);
 app.use('/', adminRoutes);
 app.use('/', problemRoutes);
@@ -52,6 +57,9 @@ app.use('/', contestRoutes);
 app.get('/', (req: Request, res: Response) => {
   res.send('Grader System API is running!');
 });
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);

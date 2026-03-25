@@ -3,6 +3,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import problemRouter from '../controllers/problemController';
 import * as db from '../db';
+import { processBatchUpload } from '../services/batchUploadService';
 
 // Mock dependencies
 jest.mock('../db');
@@ -29,7 +30,14 @@ jest.mock('../middleware/auth', () => ({
 jest.mock('unzipper', () => ({}));
 jest.mock('archiver', () => ({}));
 jest.mock('../middleware/upload', () => ({
-    diskUpload: { single: () => (req: Request, res: Response, next: NextFunction) => next() },
+    diskUpload: {
+        single: () => (req: Request, _res: Response, next: NextFunction) => {
+            if (req.headers['x-test-has-file'] === '1') {
+                req.file = { path: '/tmp/mock-problems.zip' } as Express.Multer.File;
+            }
+            next();
+        }
+    },
     memoryUpload: { fields: () => (req: Request, res: Response, next: NextFunction) => next() }
 }));
 jest.mock('../services/batchUploadService', () => ({
@@ -109,6 +117,52 @@ describe('Problem Controller', () => {
             expect(res.status).toBe(404);
             expect(res.body.message).toBe('Problem not found');
         });
+
+        it('should return 403 when hidden problem is requested by regular user', async () => {
+            const appAsUser = express();
+            appAsUser.use(express.json());
+            appAsUser.use(session({
+                secret: 'test-secret',
+                resave: false,
+                saveUninitialized: false,
+            }));
+            appAsUser.use((req: Request, _res: Response, next: NextFunction) => {
+                if (req.session) {
+                    req.session.userId = 2;
+                    req.session.role = 'user';
+                }
+                next();
+            });
+            appAsUser.use('/', problemRouter);
+
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{
+                    id: 'P2',
+                    title: 'Hidden',
+                    author: 'A',
+                    time_limit_ms: 1000,
+                    memory_limit_mb: 256,
+                    has_pdf: false,
+                    is_visible: false,
+                }]
+            });
+
+            const res = await request(appAsUser).get('/problems/P2');
+            expect(res.status).toBe(403);
+            expect(res.body.message).toBe('Problem is hidden');
+            expect(res.body.problemId).toBe('P2');
+        });
+    });
+
+    describe('GET /problems/:id/pdf', () => {
+        it('should return 404 when problem has no PDF', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+
+            const res = await request(app).get('/problems/P404/pdf');
+
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Problem PDF not found.');
+        });
     });
 
     describe('POST /admin/problems', () => {
@@ -146,6 +200,17 @@ describe('Problem Controller', () => {
         });
     });
 
+    describe('GET /admin/problems/:id', () => {
+        it('should return 404 for missing admin problem detail', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+
+            const res = await request(app).get('/admin/problems/NOPE');
+
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Problem not found');
+        });
+    });
+
     describe('DELETE /admin/problems/:id', () => {
         it('should delete a problem and its related data', async () => {
             // The route makes 5 sequential queries:
@@ -167,6 +232,61 @@ describe('Problem Controller', () => {
             expect(res.body.message).toContain('deleted successfully');
             // Should have called delete for submissions, testcases, etc.
             expect(db.query).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM submissions'), ['P1']);
+        });
+    });
+
+    describe('PUT /admin/problems/:id/visibility', () => {
+        it('should update visibility successfully', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ id: 'P1', title: 'Problem 1', is_visible: false }]
+            });
+
+            const res = await request(app)
+                .put('/admin/problems/P1/visibility')
+                .send({ isVisible: false });
+
+            expect(res.status).toBe(200);
+            expect(res.body.problem.id).toBe('P1');
+            expect(res.body.problem.is_visible).toBe(false);
+        });
+
+        it('should return 404 when updating visibility for missing problem', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+
+            const res = await request(app)
+                .put('/admin/problems/NOPE/visibility')
+                .send({ isVisible: true });
+
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Problem not found');
+        });
+    });
+
+    describe('POST /admin/problems/batch-upload', () => {
+        it('should return 400 if zip file is not uploaded', async () => {
+            const res = await request(app).post('/admin/problems/batch-upload');
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('No zip file uploaded.');
+        });
+
+        it('should return 202 when batch upload starts', async () => {
+            (processBatchUpload as jest.Mock).mockResolvedValueOnce({ added: [], skipped: [], errors: [] });
+            const res = await request(app)
+                .post('/admin/problems/batch-upload')
+                .set('x-test-has-file', '1');
+
+            expect(res.status).toBe(202);
+            expect(res.body.progressId).toBeDefined();
+            expect(res.body.message).toContain('Batch upload initiated');
+        });
+    });
+
+    describe('POST /admin/problems/:id/upload', () => {
+        it('should return 400 when no files are sent', async () => {
+            const res = await request(app).post('/admin/problems/P1/upload');
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('No files uploaded.');
         });
     });
 });

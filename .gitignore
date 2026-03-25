@@ -11,6 +11,7 @@
 # production
 frontend/build/
 /build
+/backend/dist
 
 # misc
 .vscode

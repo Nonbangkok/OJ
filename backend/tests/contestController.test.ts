@@ -3,7 +3,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import contestRouter from '../controllers/contestController';
 import * as db from '../db';
-import { requireStaffOrAdmin, requireAuth } from '../middleware/auth';
+import { errorHandler } from '../middleware/errorHandler';
 
 // Mock Dependencies
 jest.mock('../db');
@@ -43,6 +43,7 @@ describe('Contest Controller', () => {
             next();
         });
         app.use('/', contestRouter);
+        app.use(errorHandler);
         jest.resetAllMocks();
     });
 
@@ -96,6 +97,54 @@ describe('Contest Controller', () => {
         });
     });
 
+    describe('POST /contests/:id/join', () => {
+        it('should return 404 when contest does not exist', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+
+            const res = await request(app).post('/contests/999/join');
+
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Contest not found');
+        });
+
+        it('should return 400 when contest already ended', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ id: 1, end_time: new Date(Date.now() - 60_000) }]
+            });
+
+            const res = await request(app).post('/contests/1/join');
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Cannot join contest that has already ended');
+        });
+
+        it('should return 400 when user already joined', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({
+                    rows: [{ id: 1, end_time: new Date(Date.now() + 60_000) }]
+                })
+                .mockResolvedValueOnce({ rowCount: 0 });
+
+            const res = await request(app).post('/contests/1/join');
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Already joined this contest');
+        });
+
+        it('should join contest successfully', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({
+                    rows: [{ id: 1, end_time: new Date(Date.now() + 60_000) }]
+                })
+                .mockResolvedValueOnce({ rowCount: 1 });
+
+            const res = await request(app).post('/contests/1/join');
+
+            expect(res.status).toBe(200);
+            expect(res.body.message).toBe('Successfully joined contest');
+        });
+    });
+
     describe('POST /admin/contests', () => {
         it('should create a new contest and assign problems', async () => {
             const payload = {
@@ -116,6 +165,20 @@ describe('Contest Controller', () => {
 
             expect(res.status).toBe(201);
             expect(res.body.id).toBe(1);
+        });
+
+        it('should return 400 when endTime is before startTime', async () => {
+            const payload = {
+                title: 'Invalid Contest',
+                description: 'Description',
+                startTime: '2025-01-02T00:00:00Z',
+                endTime: '2025-01-01T00:00:00Z'
+            };
+
+            const res = await request(app).post('/admin/contests').send(payload);
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('End time must be after start time');
         });
     });
 

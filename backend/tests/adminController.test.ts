@@ -3,7 +3,6 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import adminRouter from '../controllers/adminController';
 import * as db from '../db';
-import { requireStaffOrAdmin } from '../middleware/auth';
 
 // Mock Dependencies
 jest.mock('../db');

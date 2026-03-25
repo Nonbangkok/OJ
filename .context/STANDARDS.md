@@ -14,7 +14,7 @@ Service                        Business logic, orchestration, external processes
 db.query()                     Direct SQL via pg Pool (no ORM)
 ```
 
-- **Controllers** define routes using `express.Router()`, validate input with `express-validator`, and return JSON responses.
+- **Controllers** define routes using `express.Router()`, validate input with shared `zod` schemas via `validateRequest`, and return JSON responses.
 - **Services** contain pure business logic. They receive data, interact with the database, and return results.
 - **No ORM** — all database access uses raw parameterized SQL via `db.query(text, params)`.
 
@@ -112,14 +112,24 @@ Three global contexts wrap the entire app in this order:
 
 - Each controller creates an `express.Router()` and exports it.
 - All routes are mounted at the root path (`app.use('/', xxxRoutes)`) — the URL prefix is within the route definition.
-- Input validation uses `express-validator` middleware inline with route definitions.
-- **Error pattern:** `try/catch` with `console.error` + generic 500 response (never leak stack traces).
+- Input validation uses:
+  - `zod` (`validateRequest`) for runtime schema validation aligned with TypeScript DTOs.
+  - Shared schemas from `backend/schemas/requestSchemas.ts` (avoid inline schema duplication inside controllers).
+- Prefer DTO types from `backend/types/api.ts` for `req.body`, `req.query`, and response contracts.
+- Prefer `Response<T>` generics for route response contracts.
+- SQL-heavy read/write orchestration must live in services (`*QueryService.ts`), not controllers.
+- Normalize route params to primitives early (example: `const id = String(req.params.id)`).
+- **Error pattern:** async routes should use `asyncHandler`; throw `AppError` for expected business errors and let `errorHandler` format responses.
+- Exception: streaming/callback-heavy endpoints (SSE, file download callbacks, multer cleanup) may keep local `try/catch` for deterministic cleanup and response-finalization.
 
 ### Middleware
 
-- **`requireAuth`** — checks `req.session.userId` exists.
-- **`requireStaffOrAdmin`** — checks `req.session.role` is `'admin'` or `'staff'`.
-- **`requireAdmin`** — checks `req.session.role` is `'admin'`.
+- **`attachRequestUser`** — maps session fields to typed `req.user`.
+- **`requireAuth`** — checks authenticated context (`req.user` with session fallback).
+- **`requireStaffOrAdmin`** — checks role is `'admin'` or `'staff'`.
+- **`requireAdmin`** — checks role is `'admin'`.
+- **`validateRequest`** — zod-powered runtime validation middleware.
+- **`errorHandler` / `notFoundHandler`** — centralized API error formatting.
 - **`upload`** — Multer configuration for file uploads.
 
 ### Authentication
@@ -133,6 +143,10 @@ Three global contexts wrap the entire app in this order:
 - All magic numbers and string literals are centralized in `backend/constants/index.js`.
 - Groups: `USER_ROLES`, `CONTEST_STATUS`, `SUBMISSION_STATUS`, `UPLOAD_STATUS`, `USER_VALIDATION`, `PROBLEM_VALIDATION`, `SECURITY_CONFIG`, `JUDGE_CONFIG`, `FILE_CONFIG`.
 - Frontend constants split across `src/utils/constants.js` (app-wide) and `src/config/constants.js` (polling/UI timeouts).
+- Type aliases should be derived from constants when possible:
+  - `type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES]`
+  - `type ContestStatus = 'scheduled' | typeof CONTEST_STATUS[keyof typeof CONTEST_STATUS]`
+- Service-local `interface`/`type` declarations should be centralized in `backend/types/service.ts` and imported back into service files.
 
 ---
 
@@ -144,6 +158,8 @@ Three global contexts wrap the entire app in this order:
 4. **Error handling in every async function** — `try/catch` with meaningful error messages.
 5. **Module systems**: Backend uses **TypeScript (ESM via tsx/ts-node)**, Frontend uses **ES Modules** (`import` / `export`).
 6. **Environment variables** — never commit `.env`, use `.env.example` as template. All secrets via env vars.
+   - Runtime env access must go through `backend/config/env.ts` (validated once with zod).
+   - `backend/types/env.d.ts` defines required env variable types for compile-time safety.
 7. **File upload limits** — configured via Multer, up to 1GB for problem PDFs and test case ZIPs.
 8. **Session security** — `httpOnly: true`, `sameSite: 'lax'`, `secure: false` (set to `true` in production).
 

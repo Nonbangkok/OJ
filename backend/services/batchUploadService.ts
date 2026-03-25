@@ -5,23 +5,25 @@ import * as unzipper from 'unzipper';
 import os from 'os';
 import { exec } from 'child_process';
 import util from 'util';
+import { Readable } from 'stream';
 import * as db from '../db';
 import { UPLOAD_STATUS, FILE_CONFIG } from '../constants';
+import { BatchUploadProgressData } from '../types/api';
+import {
+  BatchUploadResult,
+  BufferedContent,
+  ProblemConfig,
+  ProblemProcessResult,
+  TestcasePairMap,
+} from '../types/service';
 
 const execPromise = util.promisify(exec);
 
-interface ProblemConfig {
-  id: string;
-  title: string;
-  author: string;
-  time_limit_ms: number;
-  memory_limit_mb: number;
-}
-
-interface BatchUploadResult {
-  added: string[];
-  skipped: string[];
-  errors: Array<{ directory: string; message: string }>;
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return 'Unknown error';
 }
 
 async function processTestcasesFromZip(problemId: string, zipPath: string, log: string[]): Promise<number> {
@@ -62,7 +64,7 @@ async function processTestcasesFromZip(problemId: string, zipPath: string, log: 
   } else {
     // --- Fallback to original logic for flat zip files ---
     log.push('Detected flat file structure inside zip.');
-    const testcaseFiles: Record<number, { in?: any; out?: any }> = {};
+    const testcaseFiles: TestcasePairMap<unzipper.File> = {};
     const fileRegex = /^(?:input|output)?(\d+)\.(?:in|out|txt|sol)$/i;
 
     for (const file of zip.files) {
@@ -82,7 +84,7 @@ async function processTestcasesFromZip(problemId: string, zipPath: string, log: 
         }
       }
     }
-    return processPairedFiles(problemId, testcaseFiles, (file: any) => file.stream(), log);
+    return processPairedFiles(problemId, testcaseFiles, (file) => Promise.resolve(file.stream()), log);
   }
 }
 
@@ -104,7 +106,7 @@ async function processTestcasesFromInputOutputDirs(problemId: string, inputDir: 
   inputFilenames.sort((a, b) => a.localeCompare(b, undefined, sortOptions));
   outputFilenames.sort((a, b) => a.localeCompare(b, undefined, sortOptions));
 
-  const testcaseFiles: Record<number, { in: string; out: string }> = {};
+  const testcaseFiles: TestcasePairMap<string> = {};
   for (let i = 0; i < inputFilenames.length; i++) {
     const key = i + 1; // Use 1-based indexing for pairs
     testcaseFiles[key] = {
@@ -117,7 +119,7 @@ async function processTestcasesFromInputOutputDirs(problemId: string, inputDir: 
 }
 
 async function processTestcasesFromFlatDir(problemId: string, dirPath: string, log: string[]): Promise<number> {
-  const testcaseFiles: Record<number, { in?: string; out?: string }> = {};
+  const testcaseFiles: TestcasePairMap<string> = {};
   const fileRegex = /^(?:input|output)?(\d+)\.(?:in|out|txt|sol)$/i;
 
   const allFiles = await fsPromises.readdir(dirPath);
@@ -141,7 +143,7 @@ async function processTestcasesFromFlatDir(problemId: string, dirPath: string, l
   return processPairedFiles(problemId, testcaseFiles, (filePath: string) => fsPromises.readFile(filePath), log);
 }
 
-async function streamToBuffer(stream: any): Promise<Buffer> {
+async function streamToBuffer(stream: Readable): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     stream.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -150,7 +152,12 @@ async function streamToBuffer(stream: any): Promise<Buffer> {
   });
 }
 
-async function processPairedFiles(problemId: string, pairedFiles: Record<number, { in?: any; out?: any }>, readFileFunc: Function, log: string[]): Promise<number> {
+async function processPairedFiles<TSource>(
+  problemId: string,
+  pairedFiles: TestcasePairMap<TSource>,
+  readFileFunc: (source: TSource) => Promise<BufferedContent>,
+  log: string[],
+): Promise<number> {
   const keys = Object.keys(pairedFiles).map(Number).sort((a, b) => a - b);
   const pairedCases = keys.filter(key => pairedFiles[key].in && pairedFiles[key].out);
 
@@ -166,8 +173,8 @@ async function processPairedFiles(problemId: string, pairedFiles: Record<number,
       const inputContent = await readFileFunc(pair.in);
       const outputContent = await readFileFunc(pair.out);
 
-      const inputData = inputContent instanceof require('stream').Readable ? await streamToBuffer(inputContent) : inputContent;
-      const outputData = outputContent instanceof require('stream').Readable ? await streamToBuffer(outputContent) : outputContent;
+      const inputData = inputContent instanceof Readable ? await streamToBuffer(inputContent) : inputContent;
+      const outputData = outputContent instanceof Readable ? await streamToBuffer(outputContent) : outputContent;
 
       await db.query(
         'INSERT INTO testcases (problem_id, case_number, input_data, output_data) VALUES ($1, $2, $3, $4)',
@@ -179,7 +186,7 @@ async function processPairedFiles(problemId: string, pairedFiles: Record<number,
   return caseCounter - 1;
 }
 
-async function processProblemDirectory(problemPath: string): Promise<any> {
+async function processProblemDirectory(problemPath: string): Promise<ProblemProcessResult> {
   const log: string[] = [];
 
   const configPath = path.join(problemPath, 'config.json');
@@ -279,7 +286,10 @@ async function processProblemDirectory(problemPath: string): Promise<any> {
   return { status: UPLOAD_STATUS.ADDED, problemId, log };
 }
 
-export async function processBatchUpload(zipFilePath: string, onProgress?: (msg: any) => void): Promise<BatchUploadResult> {
+export async function processBatchUpload(
+  zipFilePath: string,
+  onProgress?: (progress: BatchUploadProgressData) => void,
+): Promise<BatchUploadResult> {
   const results: BatchUploadResult = { added: [], skipped: [], errors: [] };
   const tempDir = path.join(os.tmpdir(), `oj_batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
 
@@ -324,36 +334,41 @@ export async function processBatchUpload(zipFilePath: string, onProgress?: (msg:
         } else if (result.status === UPLOAD_STATUS.SKIPPED) {
           results.skipped.push(result.problemId);
         }
-      } catch (error: any) {
-        results.errors.push({ directory: path.basename(problemPath), message: error.message });
+      } catch (error: unknown) {
+        results.errors.push({ directory: path.basename(problemPath), message: getErrorMessage(error) });
       } finally {
         processedCount++;
         if (onProgress) {
-          onProgress({
+          const progressPayload: BatchUploadProgressData = {
             processed: processedCount,
             total: totalProblems,
             status: 'processing',
-            currentProblem: path.basename(problemPath)
-          });
+            currentProblem: path.basename(problemPath),
+            message: `Processing ${path.basename(problemPath)} (${processedCount}/${totalProblems})`,
+          };
+          onProgress(progressPayload);
         }
       }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('An unexpected error occurred during the batch upload process:', error);
-    results.errors.push({ directory: 'Batch Process', message: error.message || 'A critical error occurred.' });
+    results.errors.push({ directory: 'Batch Process', message: getErrorMessage(error) || 'A critical error occurred.' });
   } finally {
     const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
     try {
       await delay(FILE_CONFIG.CLEANUP_DELAY_MS);
       await execPromise(`rm -rf ${tempDir}`);
-    } catch (err) {
+    } catch (err: unknown) {
       console.warn(`[Robust Cleanup] Failed to remove temp directory ${tempDir}:`, err);
     }
 
     try {
       await fsPromises.unlink(zipFilePath);
-    } catch (unlinkError: any) {
-      if (unlinkError.code !== 'ENOENT') {
+    } catch (unlinkError: unknown) {
+      const errorCode = typeof unlinkError === 'object' && unlinkError !== null && 'code' in unlinkError
+        ? (unlinkError as { code?: string }).code
+        : undefined;
+      if (errorCode !== 'ENOENT') {
         console.warn('Failed to delete uploaded zip file:', unlinkError);
       }
     }

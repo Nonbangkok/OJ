@@ -1,27 +1,13 @@
 import * as db from '../db';
 import { exec } from 'child_process';
 import { SUBMISSION_STATUS, JUDGE_CONFIG } from '../constants';
-
-interface RunResult {
-  status: string;
-  timeMs: number;
-  memoryKb: number;
-  output?: string;
-}
-
-interface JudgeResult {
-  results: Array<{
-    testCase: number;
-    status: string;
-    timeMs?: number;
-    memoryKb?: number;
-    output?: string;
-  }>;
-  score: number;
-  overallStatus: string;
-  maxTimeMs: number;
-  maxMemoryKb: number;
-}
+import {
+  ExecutionError,
+  JudgeProblemLimitsRow,
+  JudgeResult,
+  JudgeTestcaseRow,
+  RunResult,
+} from '../types/service';
 
 async function runSingleCase(
   executablePath: string,
@@ -72,7 +58,8 @@ async function runSingleCase(
       }
 
       // 1. Check for TLE first (timeout command exit code 124)
-      if (error && (error as any).code === JUDGE_CONFIG.TLE_EXIT_CODE) {
+      const executionError = error as ExecutionError | null;
+      if (executionError && executionError.code === JUDGE_CONFIG.TLE_EXIT_CODE) {
         return resolve({ status: SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED, timeMs: timeLimitMs, memoryKb });
       }
 
@@ -88,15 +75,15 @@ async function runSingleCase(
       }
 
       // 3. Check for other errors (MLE, SIGSEGV, generic RE)
-      if (error) {
+      if (executionError) {
         // Did it run out of memory?
-        if (error.signal === 'SIGSEGV' || (stderr && stderr.toLowerCase().includes('memory'))) {
+        if (executionError.signal === 'SIGSEGV' || (stderr && stderr.toLowerCase().includes('memory'))) {
           return resolve({ status: SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED, timeMs, memoryKb: memoryLimitMb * 1024 });
         }
         // For other errors, treat as Runtime Error
         return resolve({
           status: SUBMISSION_STATUS.RUNTIME_ERROR,
-          output: programStderr || error.message || 'Program terminated unexpectedly',
+          output: programStderr || executionError.message || 'Program terminated unexpectedly',
           timeMs,
           memoryKb
         });
@@ -106,7 +93,7 @@ async function runSingleCase(
     });
 
     // Prevent EPIPE errors from crashing the main process.
-    child.stdin?.on('error', (err: any) => {
+    child.stdin?.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EPIPE') {
         hasEpipError = true;
         epipErrorMessage = `Program crashed while receiving input: ${err.message}`;
@@ -130,13 +117,19 @@ async function runSingleCase(
 
 export async function judge(problemId: string, executablePath: string): Promise<JudgeResult> {
   try {
-    const problemRes = await db.query('SELECT time_limit_ms, memory_limit_mb FROM problems WHERE id = $1', [problemId]);
+    const problemRes = await db.query<JudgeProblemLimitsRow>(
+      'SELECT time_limit_ms, memory_limit_mb FROM problems WHERE id = $1',
+      [problemId]
+    );
     if (problemRes.rows.length === 0) {
       return { overallStatus: SUBMISSION_STATUS.SYSTEM_ERROR, score: 0, results: [], maxTimeMs: 0, maxMemoryKb: 0 };
     }
     const { time_limit_ms, memory_limit_mb } = problemRes.rows[0];
 
-    const testcasesRes = await db.query('SELECT case_number, input_data, output_data FROM testcases WHERE problem_id = $1 ORDER BY case_number ASC', [problemId]);
+    const testcasesRes = await db.query<JudgeTestcaseRow>(
+      'SELECT case_number, input_data, output_data FROM testcases WHERE problem_id = $1 ORDER BY case_number ASC',
+      [problemId]
+    );
     const testcases = testcasesRes.rows;
 
     if (testcases.length === 0) {
@@ -172,7 +165,7 @@ export async function judge(problemId: string, executablePath: string): Promise<
       if (runResult.status !== SUBMISSION_STATUS.ACCEPTED) {
         // To show all results, comment out the loop break.
         // For now, let's fill the rest with 'Skipped' to show the user there are more.
-        const currentIndex = testcases.findIndex((t: any) => t.case_number === case_number);
+        const currentIndex = testcases.findIndex((testcaseRow) => testcaseRow.case_number === case_number);
         for (let j = currentIndex + 1; j < testcases.length; j++) {
           results.push({ testCase: testcases[j].case_number, status: SUBMISSION_STATUS.SKIPPED });
         }

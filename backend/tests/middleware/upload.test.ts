@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { memoryUpload, diskUpload } from '../../middleware/upload';
-import { Request, Response } from 'express';
+import { Request } from 'express';
 
 // Mock fs to avoid actually creating directories during tests
 jest.mock('fs', () => ({
@@ -17,15 +17,15 @@ describe('Upload Middleware', () => {
     describe('memoryUpload', () => {
         it('should use memory storage', () => {
             // Memory storage is mostly opaque, but we can verify it was created
-            expect(memoryUpload.storage).toBeDefined();
-            expect(memoryUpload.storage.constructor.name).toBe('MemoryStorage');
+            expect((memoryUpload as any).storage).toBeDefined();
+            expect((memoryUpload as any).storage.constructor.name).toBe('MemoryStorage');
         });
     });
 
     describe('diskUpload', () => {
         it('should define a disk storage with destination and filename functions', () => {
-            expect(diskUpload.storage).toBeDefined();
-            const storage = diskUpload.storage as any;
+            expect((diskUpload as any).storage).toBeDefined();
+            const storage = (diskUpload as any).storage;
             expect(storage.getDestination).toBeInstanceOf(Function);
             expect(storage.getFilename).toBeInstanceOf(Function);
         });
@@ -38,7 +38,7 @@ describe('Upload Middleware', () => {
             const cb = jest.fn();
 
             // Invoke the destination function
-            const storage = diskUpload.storage as any;
+            const storage = (diskUpload as any).storage;
             storage.getDestination(req, file, cb);
 
             // Verify fs functions were called
@@ -57,7 +57,7 @@ describe('Upload Middleware', () => {
             const file = {} as any;
             const cb = jest.fn();
 
-            const storage = diskUpload.storage as any;
+            const storage = (diskUpload as any).storage;
             storage.getDestination(req, file, cb);
 
             const expectedPath = path.join('/tmp', 'oj_uploads');
@@ -77,7 +77,7 @@ describe('Upload Middleware', () => {
             jest.spyOn(Date, 'now').mockReturnValue(mockDateNow);
             jest.spyOn(Math, 'random').mockReturnValue(mockRandom);
 
-            const storage = diskUpload.storage as any;
+            const storage = (diskUpload as any).storage;
             storage.getFilename(req, file, cb);
 
             const expectedSuffix = `${mockDateNow}-${Math.round(mockRandom * 1E9)}`;
