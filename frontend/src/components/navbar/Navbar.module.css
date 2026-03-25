@@ -87,7 +87,9 @@
   padding: 0.5rem 1rem;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .nav-action-link:hover {
@@ -103,11 +105,13 @@
   cursor: pointer;
   font-weight: 500;
   font-family: var(--font-family-sans-serif);
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .logout-btn:hover {
   background-color: var(--status-danger);
   border-color: var(--status-danger);
   color: #fff;
-} 
+}

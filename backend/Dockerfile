@@ -28,5 +28,9 @@ RUN gcc scripts/time_wrapper.c -o scripts/time_wrapper
 # Render will automatically set the PORT environment variable, so we just need to expose it.
 EXPOSE 3000
 
+# Build the app typescript
+RUN npm run build
+
 # The command to run your app
-CMD [ "node", "server.js" ] 
+# CMD [ "node", "server.js" ]
+CMD [ "npm", "start" ]

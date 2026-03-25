@@ -6,6 +6,15 @@
 
 The database contains **11 tables** managed via `backend/scripts/init_db.js`. There is no ORM — all schema is defined as raw SQL DDL.
 
+Schema status for this revision:
+- No table/column/index changes were introduced.
+- Backend typing around this schema was strengthened:
+  - DB row interfaces remain in `backend/types/models.ts`.
+  - API DTO contracts were expanded in `backend/types/api.ts`.
+  - Runtime request validation schemas were centralized in `backend/schemas/requestSchemas.ts` and reused across all controllers.
+  - Reusable projection types (for frequent `SELECT` subsets) were standardized to reduce ad-hoc `Pick<>` usage.
+  - Service return/query helper types were centralized in `backend/types/service.ts`.
+
 ```mermaid
 erDiagram
     users ||--o{ submissions : "submits"
@@ -157,6 +166,10 @@ PostgreSQL-backed session store (used by `connect-pg-simple`). Managed automatic
 | `sid` | `VARCHAR` | PK |
 | `sess` | `JSON` | NOT NULL |
 | `expire` | `TIMESTAMP(6)` | NOT NULL |
+
+Application mapping notes:
+- Session fields (`userId`, `username`, `role`) are mapped to a typed `req.user` object by `backend/middleware/requestContext.ts`.
+- Authentication middleware accepts `req.user` as primary source with session fallback for compatibility in tests.
 
 ### `problems`
 Programming problems. The PDF is stored as `BYTEA` directly in the database.

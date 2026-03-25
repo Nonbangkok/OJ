@@ -7,8 +7,12 @@
     "@testing-library/jest-dom": "^6.7.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "@types/node": "^18.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
     "axios": "^1.11.0",
     "cors": "^2.8.5",
+    "date-fns": "^3.0.0",
     "highlight.js": "^11.11.1",
     "react": "^19.1.1",
     "react-datepicker": "^7.0.0",
@@ -17,19 +21,37 @@
     "react-router-dom": "^7.8.1",
     "react-scripts": "5.0.1",
     "react-simple-code-editor": "^0.14.1",
+    "typescript": "4.9.5",
     "web-vitals": "^2.1.4"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/parser": "^5.62.0",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-import-resolver-typescript": "^3.8.3",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-jsx-a11y": "^6.8.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "prettier": "^3.0.0"
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+    "test:ci": "CI=true react-scripts test --watchAll=false --coverage",
+    "eject": "react-scripts eject",
+    "type-check": "tsc --noEmit",
+    "type-check:tests:services": "tsc -p tsconfig.tests.services.json --noEmit",
+    "lint": "eslint src --ext .ts,.tsx --fix",
+    "lint:check": "eslint src --ext .ts,.tsx",
+    "format": "prettier --write src/**/*.{ts,tsx,css}",
+    "format:check": "prettier --check src/**/*.{ts,tsx,css}",
+    "validate": "npm run type-check && npm run lint:check && npm run test:ci",
+    "type-check:tests:hooks": "tsc -p tsconfig.tests.hooks.json --noEmit",
+    "type-check:tests:all": "tsc -p tsconfig.tests.all.json --noEmit"
   },
   "browserslist": {
     "production": [
@@ -50,6 +72,16 @@
     },
     "transformIgnorePatterns": [
       "[/\\\\]node_modules[/\\\\](?!axios|react-router-dom|@remix-run|turbo-stream).+\\.(js|jsx|mjs|cjs|ts|tsx)$"
-    ]
+    ],
+    "collectCoverageFrom": [
+      "src/services/*.ts",
+      "!src/services/api.ts"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 85,
+        "lines": 90
+      }
+    }
   }
 }

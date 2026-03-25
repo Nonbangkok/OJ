@@ -18,7 +18,7 @@
 .output-container pre {
   white-space: pre-wrap;
   word-wrap: break-word;
-} 
+}
 
 .submission-form-container {
   background-color: var(--background-secondary);
@@ -88,4 +88,4 @@
   border-color: var(--accent-primary);
   color: #ffffff;
   font-weight: 600;
-} 
+}

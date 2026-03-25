@@ -43,28 +43,31 @@ The Grader System offers a rich set of features for both users and administrator
 
 ## Technology
 
-The Grader System is built with a modern tech stack, ensuring a robust, scalable, and responsive application.
+The Grader System is built with a modern, type-safe tech stack (TypeScript-first), ensuring a robust, scalable, and responsive application.
 
 *   **Frontend:**
-    *   **React:** A JavaScript library for building user interfaces.
-    *   **React Router DOM:** For declarative routing in React applications.
-    *   **Axios:** Promise-based HTTP client for making API requests.
+    *   **React 19 & TypeScript:** Modern UI development with strong typing.
+    *   **React Router 7:** For declarative routing and data loading.
+    *   **Axios:** Promise-based HTTP client with typed API contracts.
+    *   **Vanilla CSS & HTML5:** Clean, performant styling without heavy utility frameworks.
 *   **Backend:**
-    *   **Node.js & Express:** A powerful and flexible framework for building RESTful APIs.
-    *   **PostgreSQL:** A robust, open-source relational database.
-    *   **`bcrypt`:** For hashing and salting passwords securely.
-    *   **`multer`:** Middleware for handling `multipart/form-data`, primarily for file uploads.
-    *   **`unzipper`:** For extracting contents from ZIP archives.
-    *   **`node-cron`:** For scheduling tasks (e.g., contest scheduling).
-    *   **`express-session`:** Session management for Express.js.
+    *   **Node.js & Express 5 (TypeScript):** High-performance RESTful API framework.
+    *   **PostgreSQL:** Robust relational database accessed via raw parameterized SQL.
+    *   **Zod:** Centralized runtime validation for request schemas.
+    *   **`bcrypt`:** Secure password hashing.
+    *   **`multer` & `unzipper` & `archiver`:** File upload, extraction, and asset management.
+    *   **`node-cron`:** For automated contest scheduling and lifecycle management.
+    *   **Session-based Auth:** Secure authentication using `express-session` and `connect-pg-simple`.
+*   **Judging System:**
+    *   **C++:** High-performance execution for user-submitted code.
+    *   **GCC:** Used to compile the judging wrapper and user submissions.
 *   **Containerization & Deployment:**
-    *   **Docker:** For containerizing the frontend, backend, and PostgreSQL database.
-    *   **Docker Compose:** For defining and running multi-container Docker applications.
-    *   **Nginx:** Used as a reverse proxy for routing requests to the frontend and backend services, and potentially for SSL termination in the future.
-*   **Language & Tools:**
-    *   **JavaScript:** Primary language for both frontend and backend development.
-    *   **C++:** The judging system compiles and runs user-submitted C++ code.
-    *   **Git:** A distributed version control system for tracking changes in source code.
+    *   **Docker & Docker Compose:** Containerized microservices for consistent environments.
+    *   **Nginx:** Reverse proxy handling `/api` routing and frontend serving.
+*   **Tools & Testing:**
+    *   **Jest & Supertest:** Comprehensive backend integration and unit testing.
+    *   **React Testing Library:** Component-level testing for the frontend.
+    *   **Git:** Version control and collaboration.
 
 ## Prerequisites
 

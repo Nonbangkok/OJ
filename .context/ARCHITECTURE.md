@@ -15,7 +15,7 @@
 | Database | PostgreSQL (Alpine) | 16 |
 | Session Store | connect-pg-simple | 9.0 |
 | Auth (passwords) | bcrypt | 6.0 |
-| Validation | express-validator | 7.1 |
+| Validation | zod | 4.x |
 | File Upload | multer | 2.0 |
 | ZIP Processing | unzipper | 0.12 |
 | Scheduling | node-cron | 3.0 |
@@ -23,7 +23,7 @@
 | Containerization | Docker + Compose | — |
 | Testing (BE) | Jest 30 + Supertest 7 | — |
 | Testing (FE) | Jest + React Testing Library 16 | — |
-| Language | JavaScript (CommonJS backend, ESM frontend) | — |
+| Language | TypeScript (backend + frontend) | — |
 | Judged Language | C++ (compiled & executed in isolated sandbox) | — |
 
 ## System Hierarchy
@@ -35,70 +35,92 @@ OJ/
 ├── docker-compose.yml      # Orchestrates 4 containers
 ├── nginx-proxy/            # Nginx reverse proxy config
 │
-├── backend/                # Express API server
-│   ├── server.js           # App entry point, route mounting, scheduler start
-│   ├── db.js               # PostgreSQL connection pool (pg)
+├── backend/                # Express API server (TypeScript)
+│   ├── server.ts           # App entry point, route mounting, scheduler start
+│   ├── db.ts               # PostgreSQL connection pool (pg)
+│   ├── config/
+│   │   └── env.ts          # Runtime env validation (zod) + typed env export
 │   ├── constants/
-│   │   └── index.js        # Centralized constants (roles, statuses, limits)
+│   │   └── index.ts        # Centralized constants (roles, statuses, limits)
 │   ├── controllers/        # Route handlers (Express Router per domain)
-│   │   ├── authController.js
-│   │   ├── adminController.js
-│   │   ├── problemController.js
-│   │   ├── submissionController.js
-│   │   └── contestController.js
+│   │   ├── authController.ts
+│   │   ├── adminController.ts
+│   │   ├── problemController.ts
+│   │   ├── submissionController.ts
+│   │   └── contestController.ts
 │   ├── services/           # Business logic & external processes
-│   │   ├── judgeService.js       # Compile & judge C++ in sandbox
-│   │   ├── submissionService.js  # Submission processing
-│   │   ├── batchUploadService.js # Bulk problem import from ZIP
-│   │   ├── problemMigration.js   # Problem data migration
-│   │   └── contestScheduler.js   # Cron-based contest lifecycle
+│   │   ├── judgeService.ts       # Compile & judge C++ in sandbox
+│   │   ├── submissionService.ts  # Submission processing
+│   │   ├── submissionQueryService.ts # Submission read/write query orchestration
+│   │   ├── adminQueryService.ts  # Admin user/settings/database query orchestration
+│   │   ├── adminSystemService.ts # Admin database import/export command construction
+│   │   ├── problemQueryService.ts # Problem CRUD/upload/export query orchestration
+│   │   ├── batchUploadService.ts # Bulk problem import from ZIP
+│   │   ├── problemMigration.ts   # Problem data migration
+│   │   ├── contestQueryService.ts # Contest list/detail/scoreboard query orchestration
+│   │   └── contestScheduler.ts   # Cron-based contest lifecycle
 │   ├── middleware/
-│   │   ├── auth.js         # requireAuth, requireStaffOrAdmin, requireAdmin
-│   │   └── upload.js       # Multer configuration
+│   │   ├── auth.ts         # requireAuth, requireStaffOrAdmin, requireAdmin
+│   │   ├── requestContext.ts # Maps session into typed req.user
+│   │   ├── validation.ts   # zod runtime request validation middleware
+│   │   ├── errorHandler.ts # asyncHandler + AppError + global error middleware
+│   │   └── upload.ts       # Multer configuration
+│   ├── schemas/
+│   │   └── requestSchemas.ts # Shared z.object request schemas (all controllers)
+│   ├── utils/
+│   │   └── errorMessage.ts # Shared unknown->message error normalization helper
 │   ├── scripts/
-│   │   ├── init_db.js      # Schema creation (DROP CASCADE + CREATE)
-│   │   ├── create_admin.js # Interactive admin user setup
-│   │   ├── clear_submissions.js
+│   │   ├── init_db.ts      # Schema creation (DROP CASCADE + CREATE)
+│   │   ├── create_admin.ts # Interactive admin user setup
+│   │   ├── clear_submissions.ts
 │   │   └── time_wrapper.c  # C wrapper for microsecond execution timing
-│   └── tests/              # Jest + Supertest API and Unit tests
-│       ├── db.test.js      # DB pool connection tests
-│       ├── authController.test.js, ... # Controller tests
+│   ├── types/              # Type definitions and interfaces
+│   │   ├── api.ts          # Request/response DTO contracts
+│   │   ├── models.ts       # DB row interfaces + shared DTO aliases
+│   │   ├── service.ts      # Shared service-layer interfaces/result unions
+│   │   ├── env.d.ts        # ProcessEnv declaration merging
+│   │   └── express/        # Express Request declaration merging (req.user)
+│   └── tests/              # Jest + Supertest API and Unit tests (TypeScript)
+│       ├── setup.ts        # Test environment setup
+│       ├── db.test.ts      # DB pool connection tests
+│       ├── authController.test.ts, ... # Controller tests
 │       ├── services/       # Mock-heavy unit tests for business logic
-│       │   ├── judgeService.test.js
-│       │   ├── submissionService.test.js
-│       │   ├── batchUploadService.test.js
-│       │   ├── problemMigration.test.js
-│       │   └── contestScheduler.test.js
+│       │   ├── judgeService.test.ts
+│       │   ├── submissionService.test.ts
+│       │   ├── batchUploadService.test.ts
+│       │   ├── problemMigration.test.ts
+│       │   └── contestScheduler.test.ts
 │       └── middleware/     # Tests for auth and upload middlewares
-│           ├── auth.test.js
-│           └── upload.test.js
+│           ├── auth.test.ts
+│           └── upload.test.ts
 │
 ├── frontend/               # React SPA (Create React App)
 │   └── src/
-│       ├── App.js          # Root component, routing, provider tree
-│       ├── index.js        # ReactDOM entry
+│       ├── App.tsx         # Root component, routing, provider tree
+│       ├── index.tsx       # ReactDOM entry
 │       ├── index.css       # Global styles & CSS variables
 │       ├── config/
-│       │   └── constants.js      # Polling intervals, UI timeouts
+│       │   └── constants.ts      # Polling intervals, UI timeouts
 │       ├── context/              # React Context providers
-│       │   ├── AuthContext.js    # User auth state + login/logout
-│       │   ├── ThemeContext.js   # Light/dark theme toggle
-│       │   └── SettingsContext.js # System settings (registration)
+│       │   ├── AuthContext.tsx   # User auth state + login/logout
+│       │   ├── ThemeContext.tsx  # Light/dark theme toggle
+│       │   └── SettingsContext.tsx # System settings (registration)
 │       ├── services/             # API abstraction layer (Axios)
-│       │   ├── api.js            # Axios instance (base URL, credentials)
-│       │   ├── authService.js
-│       │   ├── adminService.js
-│       │   ├── problemService.js
-│       │   ├── submissionService.js
-│       │   ├── contestService.js
-│       │   └── scoreboardService.js
+│       │   ├── api.ts            # Axios instance (base URL, credentials)
+│       │   ├── authService.ts
+│       │   ├── adminService.ts
+│       │   ├── admin/            # usersAdminService, problemsAdminService, ...
+│       │   ├── problemService.ts
+│       │   ├── submissionService.ts
+│       │   ├── contestService.ts
+│       │   └── scoreboardService.ts
 │       ├── hooks/                # Custom React hooks (page logic)
-│       │   ├── useContests.js, useContestDetail.js, ...
-│       │   ├── useProblems.js, useProblemDetail.js, ...
-│       │   ├── useSubmissions.js, useSubmissionModal.js, ...
-│       │   ├── useCodeSubmission.js, useScoreboard.js, ...
-│       │   ├── useAuthForms.js, useAutocomplete.js, ...
-│       │   ├── useHomeQuotes.js, useAdminPage.js
+│       │   ├── useContests.ts, useContestDetail.ts, ...
+│       │   ├── useProblems.ts, useProblemDetail.ts, ...
+│       │   ├── useSubmissions.ts, useSubmissionModal.ts, ...
+│       │   ├── useCodeSubmission.ts, useScoreboard.ts, ...
+│       │   ├── useAuthForms.ts, useAutocomplete.ts, ...
+│       │   ├── useHomeQuotes.ts, useAdminPage.ts
 │       │   └── admin/            # Admin-specific hooks
 │       ├── pages/                # Route-level page components
 │       │   ├── home/       ├── auth/        ├── problem/
@@ -117,13 +139,25 @@ OJ/
 │       │   ├── admin/            # AdminLayout (sidebar + content)
 │       │   └── contest/          # ContestLayout (contest navbar + content)
 │       ├── utils/
-│       │   ├── constants.js      # App-wide constants
-│       │   └── formatters.js     # Date, status, result formatting utilities
+│       │   ├── constants.ts      # App-wide constants
+│       │   ├── error.ts          # Unknown/API-like error normalization helper
+│       │   └── formatters.ts     # Date, status, result formatting utilities
 │       └── tests/                # Jest + RTL tests
 │
 └── tests/
     └── run_tests.sh        # Unified test runner (BE then FE)
 ```
+
+## Frontend Quality Gates
+
+- Main CI validation command: `npm run validate`
+  - `npm run type-check`
+  - `npm run lint:check`
+  - `npm run test:ci`
+- Progressive frontend test typing commands:
+  - `npm run type-check:tests:services`
+  - `npm run type-check:tests:hooks`
+  - `npm run type-check:tests:all`
 
 ## Logical Flows
 
@@ -138,6 +172,13 @@ graph LR
 ```
 
 Nginx strips the `/api` prefix before forwarding to the backend. The frontend is a static React build served by its own Nginx instance inside the container.
+
+Backend runtime request pipeline (high-level):
+1. `express-session` resolves session state from `user_sessions`.
+2. `attachRequestUser` maps session into typed `req.user`.
+3. Route-level middleware validates payload (`zod` via shared schemas + `validateRequest`).
+4. Controllers call services for DB-heavy logic.
+5. Errors propagate via `asyncHandler` to centralized `errorHandler`.
 
 ### Authentication Flow
 
@@ -220,7 +261,7 @@ stateDiagram-v2
 ```
 
 Key behaviors:
-- **`contestScheduler.js`** runs a cron job that checks contest times and transitions statuses automatically.
+- **`contestScheduler.ts`** runs a cron job that checks contest times and transitions statuses automatically.
 - When a contest is **running**, its problems are snapshotted into `contest_problems` (immutable copy) and become inaccessible as standalone problems.
 - Submissions during a contest go to `contest_submissions` (separate from global `submissions`).
 - The `contest_scoreboards` table tracks per-user scores with `last_score_improvement_time` for tiebreaking.

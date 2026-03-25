@@ -1,0 +1,32 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "outDir": "dist",
+        "rootDir": ".",
+        "strict": true,
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "isolatedModules": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "allowJs": true,
+        "types": [
+            "node",
+            "jest"
+        ],
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "declaration": true,
+        "sourceMap": true
+    },
+    "include": [
+        "**/*.ts",
+        "**/*.js"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
+}

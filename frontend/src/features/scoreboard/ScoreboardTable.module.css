@@ -1,4 +1,5 @@
-:global([data-theme='dark']) .rank-1, .rank-1 {
+:global([data-theme='dark']) .rank-1,
+.rank-1 {
   background-color: rgba(255, 215, 0, 0.1); /* Gold/Yellow tint */
   font-weight: bold;
 }
@@ -11,6 +12,7 @@
   background-color: rgba(235, 235, 235, 0.1); /* Silver tint */
 }
 
-:global([data-theme='dark']) .rank-3, .rank-3 {
+:global([data-theme='dark']) .rank-3,
+.rank-3 {
   background-color: rgba(205, 127, 50, 0.1); /* Bronze tint */
 }

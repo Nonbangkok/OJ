@@ -85,7 +85,9 @@
   border-radius: 12px;
   padding: 20px;
   text-align: center;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .infoCard:hover {
@@ -122,7 +124,7 @@
 .joinButton {
   padding: 14px 40px;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--primary-color, #2196F3), var(--primary-dark, #1976D2));
+  background: linear-gradient(135deg, var(--primary-color, #2196f3), var(--primary-dark, #1976d2));
   color: white;
   font-weight: 600;
   font-size: 1.1rem;

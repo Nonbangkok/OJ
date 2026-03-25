@@ -68,7 +68,7 @@
 .delete-btn {
   composes: btn;
   background-color: var(--status-danger);
-} 
+}
 
 .delete-btn:hover {
   background-color: #c82333;
@@ -249,9 +249,15 @@
 }
 
 @keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.7; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 /* Feedback Box for Batch Upload */
@@ -347,7 +353,6 @@
   font-weight: 600;
   color: black;
 }
-
 
 /* Progress Bar for Batch Upload */
 .progressBarContainer {

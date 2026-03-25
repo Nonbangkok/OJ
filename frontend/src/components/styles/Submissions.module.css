@@ -101,7 +101,7 @@ a:hover {
   z-index: 1;
 }
 
-.filter-buttons>input {
+.filter-buttons > input {
   position: relative;
 }
 

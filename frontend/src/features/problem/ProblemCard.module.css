@@ -6,13 +6,15 @@
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1rem 1.5rem;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
   box-shadow: var(--box-shadow);
 }
 
 .problem-list-item:hover {
   transform: translateY(-3px);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
 .problem-info {
@@ -58,28 +60,30 @@
 }
 
 .problem-score-details {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    width: 400px; /* Fixed width for alignment */
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 400px; /* Fixed width for alignment */
 }
 
 .score-bar-container {
-    width: 200px;
-    height: 20px;
-    background-color: var(--background-tertiary);
-    border-radius: 6px;
-    overflow: hidden;
-    border: 1px solid var(--border-color);
+  width: 200px;
+  height: 20px;
+  background-color: var(--background-tertiary);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
 }
 
 .score-bar {
-    height: 100%;
-    transition: width 0.3s ease-in-out, background-color 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
+  height: 100%;
+  transition:
+    width 0.3s ease-in-out,
+    background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
 /* Orange for scores < 100 */
@@ -108,13 +112,12 @@
   color: #fff;
 }
 
-
 .score-text {
-    font-family: "Inconsolata";
-    font-size: 1.1rem;
-    color: var(--text-secondary);
-    white-space: nowrap;
-    font-weight: 600;
+  font-family: 'Inconsolata';
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-weight: 600;
 }
 
 .problem-action-btn {
@@ -137,4 +140,4 @@
 .problem-action-btn.new:hover,
 .problem-action-btn.edit:hover {
   background-color: var(--accent-primary-hover);
-} 
+}

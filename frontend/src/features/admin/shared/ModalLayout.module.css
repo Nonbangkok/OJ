@@ -1,4 +1,5 @@
-.modal-overlay, .modal-backdrop {
+.modal-overlay,
+.modal-backdrop {
   position: fixed;
   top: 0;
   left: 0;
@@ -239,11 +240,10 @@ fieldset {
 }
 
 .migrationProblemCheckbox {
-  
   /* Dimensions of the custom checkbox */
   width: 20px;
   height: 20px;
-  
+
   /* Style of the custom checkbox (unchecked) */
   border: 2px solid var(--border-color);
   border-radius: 4px;

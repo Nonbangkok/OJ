@@ -6,8 +6,10 @@
   border: 1px solid var(--border-color);
   border-radius: 6px;
   font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+
   /* Set max height and allow internal scrolling */
   max-height: 65vh;
   min-height: 50vh;
@@ -64,4 +66,4 @@
 :global(.hljs) {
   background: none !important; /* The wrapper handles the background */
   color: #abb2bf !important;
-} 
+}
