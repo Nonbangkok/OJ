@@ -17,7 +17,7 @@ export const useAuthForms = (initialValues = { username: '', password: '' }) => 
     }));
   };
 
-  const validate = (type) => {
+  const validate = () => {
     if (formData.username.length < 3) {
       setError('Username must be at least 3 characters long.');
       return false;

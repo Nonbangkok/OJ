@@ -18,6 +18,7 @@ const mockContests = [
     {
         id: 1,
         title: 'Contest 1',
+        description: null,
         status: 'scheduled',
         start_time: '2026-01-01T10:00:00Z',
         end_time: '2026-01-01T12:00:00Z',
@@ -27,6 +28,7 @@ const mockContests = [
     {
         id: 2,
         title: 'Contest 2',
+        description: null,
         status: 'running',
         start_time: '2025-01-01T10:00:00Z',
         end_time: '2026-12-31T12:00:00Z',
@@ -36,6 +38,7 @@ const mockContests = [
     {
         id: 3,
         title: 'Contest 3',
+        description: null,
         status: 'finished',
         start_time: '2024-01-01T10:00:00Z',
         end_time: '2024-01-01T12:00:00Z',
@@ -49,7 +52,7 @@ const mockCurrentUser = { id: 1, username: 'admin', role: 'admin' };
 const renderContestManagement = () => {
     return render(
         <BrowserRouter>
-            <ContestManagement currentUser={mockCurrentUser} />
+            <ContestManagement />
         </BrowserRouter>
     );
 };
@@ -57,11 +60,11 @@ const renderContestManagement = () => {
 describe('ContestManagement Component', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        adminService.getContests.mockResolvedValue(mockContests);
+        (jest.mocked(adminService.getContests) as jest.Mock).mockResolvedValue(mockContests);
     });
 
     it('renders loading state initially', () => {
-        adminService.getContests.mockReturnValue(new Promise(() => { }));
+        (jest.mocked(adminService.getContests) as jest.Mock).mockReturnValue(new Promise(() => { }));
         renderContestManagement();
         expect(screen.getByText(/loading contests\.\.\.$/i)).toBeInTheDocument();
     });
@@ -127,7 +130,7 @@ describe('ContestManagement Component', () => {
     });
 
     it('handles contest deletion for non-running contests', async () => {
-        adminService.deleteContest.mockResolvedValue({ message: 'Deleted' });
+        (jest.mocked(adminService.deleteContest) as jest.Mock).mockResolvedValue({ message: 'Deleted' });
         renderContestManagement();
 
         await waitFor(() => screen.getByText('Contest 1'));

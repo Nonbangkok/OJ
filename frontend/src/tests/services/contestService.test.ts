@@ -9,8 +9,15 @@ describe('Contest Service', () => {
     });
 
     it('getAll fetches contests', async () => {
-        const mockData = [{ id: 1, title: 'A contest' }];
-        api.get.mockResolvedValueOnce({ data: mockData });
+        const mockData = [{
+            id: 1,
+            title: 'A contest',
+            description: null,
+            start_time: '2026-01-01T00:00:00.000Z',
+            end_time: '2026-01-01T01:00:00.000Z',
+            status: 'scheduled' as const
+        }];
+        jest.mocked(api.get).mockResolvedValueOnce({ data: mockData });
 
         const result = await contestService.getAll();
 
@@ -19,8 +26,15 @@ describe('Contest Service', () => {
     });
 
     it('getById fetches a single contest', async () => {
-        const mockData = { id: 1, title: 'Test Contest', status: 'running' };
-        api.get.mockResolvedValueOnce({ data: mockData });
+        const mockData = {
+            id: 1,
+            title: 'Test Contest',
+            description: null,
+            start_time: '2026-01-01T00:00:00.000Z',
+            end_time: '2026-01-01T01:00:00.000Z',
+            status: 'running' as const
+        };
+        jest.mocked(api.get).mockResolvedValueOnce({ data: mockData });
 
         const result = await contestService.getById('1');
 
@@ -29,8 +43,8 @@ describe('Contest Service', () => {
     });
 
     it('join posts join request', async () => {
-        const mockData = { success: true };
-        api.post.mockResolvedValueOnce({ data: mockData });
+        const mockData = { message: 'Joined' };
+        jest.mocked(api.post).mockResolvedValueOnce({ data: mockData });
 
         const result = await contestService.join('1');
 
@@ -39,8 +53,8 @@ describe('Contest Service', () => {
     });
 
     it('getProblems fetches contest problems', async () => {
-        const mockData = [{ id: 'P1', title: 'Problem 1' }];
-        api.get.mockResolvedValueOnce({ data: mockData });
+        const mockData = [{ id: 'P1', title: 'Problem 1', author: null }];
+        jest.mocked(api.get).mockResolvedValueOnce({ data: mockData });
 
         const result = await contestService.getProblems('contest-1');
 
@@ -49,8 +63,17 @@ describe('Contest Service', () => {
     });
 
     it('getScoreboard fetches contest scoreboard', async () => {
-        const mockData = [{ username: 'user1', total_score: 100 }];
-        api.get.mockResolvedValueOnce({ data: mockData });
+        const mockData = {
+            scoreboard: [{
+                user_id: 1,
+                username: 'user1',
+                total_score: 100,
+                detailed_scores: {},
+                last_score_improvement_time: null
+            }],
+            problems: [{ id: 'P1', title: 'Problem 1', author: null, problem_id: 'P1' }],
+        };
+        jest.mocked(api.get).mockResolvedValueOnce({ data: mockData });
 
         const result = await contestService.getScoreboard('contest-1');
 

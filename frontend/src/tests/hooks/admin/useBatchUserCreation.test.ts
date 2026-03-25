@@ -10,7 +10,7 @@ describe('useBatchUserCreation', () => {
     });
 
     it('initializes default values correctly', () => {
-        const { result } = renderHook(() => useBatchUserCreation());
+        const { result } = renderHook(() => useBatchUserCreation(jest.fn()));
 
         expect(result.current.prefix).toBe('');
         expect(result.current.count).toBe(10);
@@ -20,7 +20,7 @@ describe('useBatchUserCreation', () => {
     });
 
     it('handles field updates', () => {
-        const { result } = renderHook(() => useBatchUserCreation());
+        const { result } = renderHook(() => useBatchUserCreation(jest.fn()));
 
         act(() => {
             result.current.setPrefix('test_');
@@ -32,7 +32,7 @@ describe('useBatchUserCreation', () => {
     });
 
     it('validates count correctly on submit', async () => {
-        const { result } = renderHook(() => useBatchUserCreation());
+        const { result } = renderHook(() => useBatchUserCreation(jest.fn()));
 
         act(() => {
             result.current.setCount(0);
@@ -57,11 +57,12 @@ describe('useBatchUserCreation', () => {
 
     it('submits batch successfully', async () => {
         const mockUsers = [{ username: 'test_1', password: 'pw1' }];
-        adminService.createBatchUsers.mockResolvedValueOnce({
+        (jest.mocked(adminService.createBatchUsers) as jest.Mock).mockResolvedValueOnce({
+            message: 'Created',
             users: mockUsers
         });
 
-        const { result } = renderHook(() => useBatchUserCreation());
+        const { result } = renderHook(() => useBatchUserCreation(jest.fn()));
 
         act(() => {
             result.current.setPrefix('test_');
@@ -83,11 +84,11 @@ describe('useBatchUserCreation', () => {
     });
 
     it('handles submission errors', async () => {
-        adminService.createBatchUsers.mockRejectedValueOnce({
+        (jest.mocked(adminService.createBatchUsers) as jest.Mock).mockRejectedValueOnce({
             response: { data: { message: 'Prefix already exists' } }
         });
 
-        const { result } = renderHook(() => useBatchUserCreation());
+        const { result } = renderHook(() => useBatchUserCreation(jest.fn()));
 
         act(() => {
             result.current.setPrefix('test_');
@@ -104,28 +105,21 @@ describe('useBatchUserCreation', () => {
 
     it('generates and downloads CSV', () => {
         const mockUsers = [{ username: 'test_1', password: 'pw1' }];
-        const { result } = renderHook(() => useBatchUserCreation());
+        const { result } = renderHook(() => useBatchUserCreation(jest.fn()));
 
         // Mock URL.createObjectURL and DOM methods
         global.URL.createObjectURL = jest.fn();
-        const mockClick = jest.fn();
-        const mockElement = {
-            setAttribute: jest.fn(),
-            style: {},
-            click: mockClick
-        };
+        const mockElement = document.createElement('a');
+        const clickSpy = jest.spyOn(mockElement, 'click').mockImplementation(() => { });
         jest.spyOn(document, 'createElement').mockReturnValue(mockElement);
-        jest.spyOn(document.body, 'appendChild').mockImplementation(() => { });
-        jest.spyOn(document.body, 'removeChild').mockImplementation(() => { });
+        jest.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
+        jest.spyOn(document.body, 'removeChild').mockImplementation((child) => child);
 
         // First do nothing if no users
         result.current.generateAndDownloadCsv();
         expect(document.createElement).not.toHaveBeenCalled();
 
         // Now test with users
-        act(() => {
-            // Mock the state setting internally for testing purposes
-            // Since createdUsers is state, we need to bypass logic to test this method directly
-        });
+        expect(clickSpy).not.toHaveBeenCalled();
     });
 });

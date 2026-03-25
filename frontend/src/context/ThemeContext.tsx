@@ -1,23 +1,44 @@
-import { createContext, useState, useEffect, useContext } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
-const ThemeContext = createContext();
+type ThemeMode = 'light' | 'dark';
 
-export const useTheme = () => useContext(ThemeContext);
+interface ThemeContextValue {
+  theme: ThemeMode;
+  toggleTheme: () => void;
+}
 
-export const ThemeProvider = ({ children }) => {
-  // Initialize state from localStorage or default to 'light'
-  const [theme, setTheme] = useState(() => {
+interface ThemeProviderProps {
+  children: ReactNode;
+}
+
+const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
+
+export const useTheme = (): ThemeContextValue => {
+  const context = useContext(ThemeContext);
+
+  if (!context) {
+    throw new Error('useTheme must be used within ThemeProvider');
+  }
+
+  return context;
+};
+
+export const ThemeProvider = ({ children }: ThemeProviderProps) => {
+  const [theme, setTheme] = useState<ThemeMode>(() => {
     const savedTheme = localStorage.getItem('theme');
-    // Also check for user's OS preference
     const userPrefersDark =
-      window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    return savedTheme || (userPrefersDark ? 'dark' : 'light');
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      return savedTheme;
+    }
+
+    return userPrefersDark ? 'dark' : 'light';
   });
 
   useEffect(() => {
-    // Apply theme to the root element
     document.documentElement.setAttribute('data-theme', theme);
-    // Save theme to localStorage
     localStorage.setItem('theme', theme);
   }, [theme]);
 

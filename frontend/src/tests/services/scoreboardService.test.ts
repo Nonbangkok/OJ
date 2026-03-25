@@ -13,7 +13,7 @@ describe('Scoreboard Service', () => {
             { username: 'user1', total_score: 100, problems_solved: 5 },
             { username: 'user2', total_score: 80, problems_solved: 4 }
         ];
-        api.get.mockResolvedValueOnce({ data: mockData });
+        jest.mocked(api.get).mockResolvedValueOnce({ data: mockData });
 
         const result = await scoreboardService.getGlobal();
 

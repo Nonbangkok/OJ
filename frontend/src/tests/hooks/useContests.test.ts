@@ -11,7 +11,7 @@ describe('useContests', () => {
 
     it('should fetch and return contests on mount', async () => {
         const mockContests = [{ id: 1, title: 'Test Contest' }];
-        contestService.getAll.mockResolvedValue(mockContests);
+        (jest.mocked(contestService.getAll) as jest.Mock).mockResolvedValue(mockContests);
 
         const { result } = renderHook(() => useContests());
 
@@ -27,7 +27,7 @@ describe('useContests', () => {
     });
 
     it('should handle errors when fetching contests', async () => {
-        contestService.getAll.mockRejectedValue(new Error('Network error'));
+        (jest.mocked(contestService.getAll) as jest.Mock).mockRejectedValue(new Error('Network error'));
 
         const { result } = renderHook(() => useContests());
 
@@ -41,8 +41,8 @@ describe('useContests', () => {
 
     it('should join a contest successfully', async () => {
         const mockContests = [{ id: 1, title: 'Test Contest' }];
-        contestService.getAll.mockResolvedValue(mockContests);
-        contestService.join.mockResolvedValue({});
+        (jest.mocked(contestService.getAll) as jest.Mock).mockResolvedValue(mockContests);
+        (jest.mocked(contestService.join) as jest.Mock).mockResolvedValue({});
 
         const { result } = renderHook(() => useContests());
 
@@ -61,8 +61,8 @@ describe('useContests', () => {
 
     it('should handle join contest error', async () => {
         const mockContests = [{ id: 1, title: 'Test Contest' }];
-        contestService.getAll.mockResolvedValue(mockContests);
-        contestService.join.mockRejectedValue({
+        (jest.mocked(contestService.getAll) as jest.Mock).mockResolvedValue(mockContests);
+        (jest.mocked(contestService.join) as jest.Mock).mockRejectedValue({
             response: { data: { message: 'Contest full' } }
         });
 

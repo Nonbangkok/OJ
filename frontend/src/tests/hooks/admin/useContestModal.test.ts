@@ -68,7 +68,7 @@ describe('useContestModal', () => {
     it('creates contest on valid submit', async () => {
         const mockSuccess = jest.fn();
         const mockClose = jest.fn();
-        adminService.createContest.mockResolvedValueOnce({});
+        (jest.mocked(adminService.createContest) as jest.Mock).mockResolvedValueOnce({});
 
         const { result } = renderHook(() => useContestModal(null, mockClose, mockSuccess));
 

@@ -9,16 +9,16 @@ jest.mock('../../services/authService');
 describe('useSubmissions', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        authService.checkLogin.mockResolvedValue({ isAuthenticated: false });
-        submissionService.searchProblems.mockResolvedValue([]);
-        submissionService.searchUsers.mockResolvedValue([]);
+        (jest.mocked(authService.checkLogin) as jest.Mock).mockResolvedValue({ isAuthenticated: false });
+        (jest.mocked(submissionService.searchProblems) as jest.Mock).mockResolvedValue([]);
+        (jest.mocked(submissionService.searchUsers) as jest.Mock).mockResolvedValue([]);
     });
 
     it('fetches and returns submissions on mount', async () => {
         const mockSubmissions = [{ id: 1, overall_status: 'Accepted' }];
-        submissionService.getAll.mockResolvedValue(mockSubmissions);
+        (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue(mockSubmissions);
 
-        const { result } = renderHook(() => useSubmissions());
+        const { result } = renderHook(() => useSubmissions(undefined, undefined));
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
@@ -30,9 +30,9 @@ describe('useSubmissions', () => {
     });
 
     it('handles errors when fetching submissions', async () => {
-        submissionService.getAll.mockRejectedValue(new Error('Network error'));
+        (jest.mocked(submissionService.getAll) as jest.Mock).mockRejectedValue(new Error('Network error'));
 
-        const { result } = renderHook(() => useSubmissions());
+        const { result } = renderHook(() => useSubmissions(undefined, undefined));
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
@@ -44,9 +44,9 @@ describe('useSubmissions', () => {
 
     it('passes problemId and filter when problemId is provided', async () => {
         const mockSubmissions = [{ id: 1, problemId: 5 }];
-        submissionService.getAll.mockResolvedValue(mockSubmissions);
+        (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue(mockSubmissions);
 
-        const { result } = renderHook(() => useSubmissions(5));
+        const { result } = renderHook(() => useSubmissions(5, undefined));
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
@@ -62,7 +62,7 @@ describe('useSubmissions', () => {
 
     it('passes contestId when contestId is provided', async () => {
         const mockSubmissions = [];
-        submissionService.getAll.mockResolvedValue(mockSubmissions);
+        (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue(mockSubmissions);
 
         const { result } = renderHook(() => useSubmissions(null, 'contest-123'));
 
@@ -77,15 +77,15 @@ describe('useSubmissions', () => {
 
     it('refreshes submissions when refresh is called', async () => {
         const mockSubmissions = [{ id: 1 }];
-        submissionService.getAll.mockResolvedValue(mockSubmissions);
+        (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue(mockSubmissions);
 
-        const { result } = renderHook(() => useSubmissions());
+        const { result } = renderHook(() => useSubmissions(undefined, undefined));
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 
-        const callCount = submissionService.getAll.mock.calls.length;
+        const callCount = jest.mocked(submissionService.getAll).mock.calls.length;
 
         await act(async () => {
             result.current.refresh();
@@ -95,16 +95,16 @@ describe('useSubmissions', () => {
             expect(result.current.loading).toBe(false);
         });
 
-        expect(submissionService.getAll.mock.calls.length).toBeGreaterThan(callCount);
+        expect(jest.mocked(submissionService.getAll).mock.calls.length).toBeGreaterThan(callCount);
     });
 
     it('opens modal and fetches submission details when handleViewCode is called', async () => {
         const mockSubmissions = [];
         const mockSubmissionDetail = { id: 1, code: 'print("hello")' };
-        submissionService.getAll.mockResolvedValue(mockSubmissions);
-        submissionService.getById.mockResolvedValue(mockSubmissionDetail);
+        (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue(mockSubmissions);
+        (jest.mocked(submissionService.getById) as jest.Mock).mockResolvedValue(mockSubmissionDetail);
 
-        const { result } = renderHook(() => useSubmissions());
+        const { result } = renderHook(() => useSubmissions(undefined, undefined));
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
@@ -122,10 +122,10 @@ describe('useSubmissions', () => {
     it('closes modal when handleCloseModal is called', async () => {
         const mockSubmissions = [];
         const mockSubmissionDetail = { id: 1 };
-        submissionService.getAll.mockResolvedValue(mockSubmissions);
-        submissionService.getById.mockResolvedValue(mockSubmissionDetail);
+        (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue(mockSubmissions);
+        (jest.mocked(submissionService.getById) as jest.Mock).mockResolvedValue(mockSubmissionDetail);
 
-        const { result } = renderHook(() => useSubmissions());
+        const { result } = renderHook(() => useSubmissions(undefined, undefined));
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
@@ -144,9 +144,9 @@ describe('useSubmissions', () => {
     });
 
     it('updates filter when setFilter is called', async () => {
-        submissionService.getAll.mockResolvedValue([]);
+        (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
 
-        const { result } = renderHook(() => useSubmissions());
+        const { result } = renderHook(() => useSubmissions(undefined, undefined));
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
@@ -161,9 +161,9 @@ describe('useSubmissions', () => {
     });
 
     it('returns initial state values', async () => {
-        submissionService.getAll.mockResolvedValue([]);
+        (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
 
-        const { result } = renderHook(() => useSubmissions());
+        const { result } = renderHook(() => useSubmissions(undefined, undefined));
 
         expect(result.current.submissions).toEqual([]);
         expect(result.current.loading).toBe(true);

@@ -13,7 +13,7 @@ jest.mock('../../context/ThemeContext', () => ({
 // Mock LoadingPage to control the loading text
 jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading Contests...</div>);
 jest.mock('../../context/AuthContext', () => ({
-    useAuth: () => ({ user: { username: 'testuser' } })
+    useAuth: () => ({ user: { id: 1, username: 'testuser', role: 'user' }, isLoading: false, login: jest.fn(), logout: jest.fn() })
 }));
 
 describe('Contests Page', () => {
@@ -22,16 +22,24 @@ describe('Contests Page', () => {
     });
 
     it('displays loading state', () => {
-        contestService.getAll.mockReturnValue(new Promise(() => { }));
+        jest.mocked(contestService.getAll).mockReturnValue(new Promise(() => { }));
         render(<BrowserRouter><Contests /></BrowserRouter>);
         expect(screen.getByText(/loading contests\.\.\.$/i)).toBeInTheDocument();
     });
 
     it('displays contests on success', async () => {
         const mockContests = [
-            { id: '1', title: 'Monthly Contest', status: 'running', participant_count: 5 }
+            {
+                id: 1,
+                title: 'Monthly Contest',
+                description: null,
+                start_time: '2026-01-01T00:00:00Z',
+                end_time: '2026-01-01T01:00:00Z',
+                status: 'running' as const,
+                participant_count: '5'
+            }
         ];
-        contestService.getAll.mockResolvedValueOnce(mockContests);
+        jest.mocked(contestService.getAll).mockResolvedValueOnce(mockContests);
 
         render(<BrowserRouter><Contests /></BrowserRouter>);
 
@@ -41,7 +49,7 @@ describe('Contests Page', () => {
     });
 
     it('displays fallback message when no contests', async () => {
-        contestService.getAll.mockResolvedValueOnce([]);
+        jest.mocked(contestService.getAll).mockResolvedValueOnce([]);
 
         render(<BrowserRouter><Contests /></BrowserRouter>);
 
@@ -51,7 +59,7 @@ describe('Contests Page', () => {
     });
 
     it('handles fetch error gracefully', async () => {
-        contestService.getAll.mockRejectedValueOnce(new Error('Fetch error'));
+        jest.mocked(contestService.getAll).mockRejectedValueOnce(new Error('Fetch error'));
 
         render(<BrowserRouter><Contests /></BrowserRouter>);
 

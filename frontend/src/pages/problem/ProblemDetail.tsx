@@ -22,7 +22,7 @@ const ProblemDetail = () => {
     navRef,
     sliderStyle,
     handleMouseEnter,
-    resetSlider
+    resetSlider,
   } = useProblemDetail();
 
   useEffect(() => {
@@ -31,15 +31,13 @@ const ProblemDetail = () => {
       resetSlider();
     }, 150);
     return () => clearTimeout(timer);
-  }, [activeView, problem]); // Recalculate on view or problem change
+  }, [activeView, problem, resetSlider]); // Recalculate on view or problem change
 
   const handlePdfView = () => {
-    if (!problem || !problem.has_pdf) return;
+    if (!problem || !problem.has_pdf || !problemId) return;
     const pdfUrl = problemService.getPdfUrl(problemId, contestId);
     window.open(pdfUrl, '_blank');
   };
-
-
 
   if (loading) return <LoadingPage />;
   if (error) return <div className={styles['error-message']}>{error}</div>;
@@ -62,9 +60,6 @@ const ProblemDetail = () => {
     );
   }
   if (!problem) return <div className={styles['error-message']}>Problem not found.</div>;
-
-
-
   const renderContent = () => {
     switch (activeView) {
       case 'statement':
@@ -122,7 +117,7 @@ const ProblemDetail = () => {
               </button>
             )}
           </div>
-          <nav ref={navRef} className={styles['problem-nav']} onMouseLeave={resetSlider}>
+          <nav ref={navRef} className={styles['problem-nav']} onMouseLeave={() => resetSlider()}>
             <div className={styles.slider} style={sliderStyle} />
             <button
               className={`${styles['nav-btn']} ${activeView === 'statement' ? styles.active : ''}`}
@@ -177,4 +172,4 @@ const ProblemDetail = () => {
   );
 };
 
-export default ProblemDetail; 
+export default ProblemDetail;

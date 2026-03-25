@@ -1,42 +1,65 @@
-import { createContext, useState, useEffect, useContext } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+
 import authService from '../services/authService';
+import { getErrorMessage } from '../utils/error';
 
-export const SettingsContext = createContext();
+interface SettingsState {
+  registrationEnabled: boolean;
+}
 
-export const useSettings = () => useContext(SettingsContext);
+export interface SettingsContextValue extends SettingsState {
+  isLoading: boolean;
+  refreshSettings: () => Promise<void>;
+}
 
-export const SettingsProvider = ({ children }) => {
-  const [settings, setSettings] = useState({
-    registrationEnabled: false, // Default to false initially
-  });
+interface SettingsProviderProps {
+  children: ReactNode;
+}
+
+export const SettingsContext = createContext<SettingsContextValue | undefined>(undefined);
+
+export const useSettings = (): SettingsContextValue => {
+  const context = useContext(SettingsContext);
+
+  if (!context) {
+    throw new Error('useSettings must be used within SettingsProvider');
+  }
+
+  return context;
+};
+
+export const SettingsProvider = ({ children }: SettingsProviderProps) => {
+  const [settings, setSettings] = useState<SettingsState>({ registrationEnabled: false });
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async (): Promise<void> => {
     try {
       const data = await authService.getRegistrationSettings();
       setSettings({
         registrationEnabled: data.enabled,
       });
     } catch (error) {
-      console.error('Failed to fetch system settings:', error);
-      // In case of error, default to registration being disabled for safety
+      console.error(getErrorMessage(error, 'Failed to fetch system settings.'));
       setSettings({
         registrationEnabled: false,
       });
     } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchSettings();
   }, []);
 
-  const value = {
-    ...settings,
-    isLoading,
-    refreshSettings: fetchSettings, // Expose the fetch function
-  };
+  useEffect(() => {
+    void fetchSettings();
+  }, [fetchSettings]);
+
+  const value = useMemo<SettingsContextValue>(
+    () => ({
+      ...settings,
+      isLoading,
+      refreshSettings: fetchSettings,
+    }),
+    [settings, isLoading, fetchSettings],
+  );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 };

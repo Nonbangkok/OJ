@@ -18,12 +18,12 @@ jest.mock('../../../context/ThemeContext', () => ({
 jest.mock('../../../components/shared/LoadingPage', () => () => <div>Loading Users...</div>);
 
 const mockUsers = [
-    { id: 1, username: 'Nonbangkok', role: 'admin' },
-    { id: 2, username: 'user1', role: 'user' },
-    { id: 3, username: 'staff1', role: 'staff' },
+    { id: 1, username: 'Nonbangkok', role: 'admin' as const },
+    { id: 2, username: 'user1', role: 'user' as const },
+    { id: 3, username: 'staff1', role: 'staff' as const },
 ];
 
-const mockCurrentUser = { id: 1, username: 'Nonbangkok', role: 'admin' };
+const mockCurrentUser = { id: 1, username: 'Nonbangkok', role: 'admin' as const };
 
 const renderUserManagement = () => {
     return render(
@@ -36,12 +36,12 @@ const renderUserManagement = () => {
 describe('UserManagement Component', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        useAuth.mockReturnValue({ user: mockCurrentUser });
-        adminService.getUsers.mockResolvedValue(mockUsers);
+        (jest.mocked(useAuth) as jest.Mock).mockReturnValue({ user: mockCurrentUser, isLoading: false, login: jest.fn(), logout: jest.fn() });
+        (jest.mocked(adminService.getUsers) as jest.Mock).mockResolvedValue(mockUsers);
     });
 
     it('renders loading state initially', () => {
-        adminService.getUsers.mockReturnValue(new Promise(() => { }));
+        (jest.mocked(adminService.getUsers) as jest.Mock).mockReturnValue(new Promise(() => { }));
         renderUserManagement();
         expect(screen.getByText(/loading users\.\.\.$/i)).toBeInTheDocument();
     });
@@ -91,7 +91,7 @@ describe('UserManagement Component', () => {
     });
 
     it('calls deleteUser service when confirmed', async () => {
-        adminService.deleteUser.mockResolvedValue({ message: 'Success' });
+        (jest.mocked(adminService.deleteUser) as jest.Mock).mockResolvedValue({ message: 'Success' });
         renderUserManagement();
 
         await waitFor(() => screen.getByText('user1'));
@@ -108,7 +108,7 @@ describe('UserManagement Component', () => {
     });
 
     it('displays error message on service failure', async () => {
-        adminService.getUsers.mockRejectedValue(new Error('Fetch failed'));
+        (jest.mocked(adminService.getUsers) as jest.Mock).mockRejectedValue(new Error('Fetch failed'));
         renderUserManagement();
 
         await waitFor(() => {

@@ -1,15 +1,10 @@
 import api from './api';
 
-/**
- * Service for handling global scoreboard data retrieval.
- */
+import type { GlobalScoreboardResponse } from '../types';
+
 const scoreboardService = {
-  /**
-   * Fetches the global scoreboard rankings.
-   * @returns {Promise<Array>} Global scoreboard data
-   */
-  getGlobal: async () => {
-    const response = await api.get('/scoreboard');
+  getGlobal: async (): Promise<GlobalScoreboardResponse> => {
+    const response = await api.get<GlobalScoreboardResponse>('/scoreboard');
     return response.data;
   },
 };

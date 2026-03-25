@@ -11,7 +11,7 @@ describe('useAdminPage', () => {
 
     it('initializes with loading state and handles successful auth', async () => {
         const mockUser = { id: 1, username: 'admin', role: 'admin' };
-        authService.checkLogin.mockResolvedValueOnce({ isAuthenticated: true, user: mockUser });
+        (jest.mocked(authService.checkLogin) as jest.Mock).mockResolvedValueOnce({ isAuthenticated: true, user: mockUser });
 
         const { result } = renderHook(() => useAdminPage());
 
@@ -27,7 +27,7 @@ describe('useAdminPage', () => {
     });
 
     it('handles failed auth (not authenticated)', async () => {
-        authService.checkLogin.mockResolvedValueOnce({ isAuthenticated: false });
+        (jest.mocked(authService.checkLogin) as jest.Mock).mockResolvedValueOnce({ isAuthenticated: false });
 
         const { result } = renderHook(() => useAdminPage());
 
@@ -39,7 +39,7 @@ describe('useAdminPage', () => {
     });
 
     it('handles auth service error', async () => {
-        authService.checkLogin.mockRejectedValueOnce(new Error('Network Error'));
+        (jest.mocked(authService.checkLogin) as jest.Mock).mockRejectedValueOnce(new Error('Network Error'));
 
         const { result } = renderHook(() => useAdminPage());
 

@@ -1,36 +1,45 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import contestService from '../services/contestService';
 import { POLLING_INTERVALS } from '../config/constants';
+import type {
+  Contest,
+  ContestProblem,
+  ContestProblemScore,
+  ContestScoreboardEntry,
+} from '../types';
+import { getErrorStatus } from '../utils/error';
 
-const useContestScoreboard = (contestId) => {
-  const [contest, setContest] = useState(null);
-  const [scoreboard, setScoreboard] = useState([]);
-  const [problems, setProblems] = useState([]);
+type ScoreValue = ContestProblemScore | null;
+
+interface UseContestScoreboardResult {
+  contest: Contest | null;
+  scoreboard: ContestScoreboardEntry[];
+  problems: ContestProblem[];
+  loading: boolean;
+  error: string;
+  lastUpdate: Date | null;
+  formatDateTime: (dateTime: Date | string) => string;
+  getProblemScore: (userScores: Record<string, unknown> | null | undefined, problemId: string) => ScoreValue;
+}
+
+const useContestScoreboard = (contestId?: string | number): UseContestScoreboardResult => {
+  const [contest, setContest] = useState<Contest | null>(null);
+  const [scoreboard, setScoreboard] = useState<ContestScoreboardEntry[]>([]);
+  const [problems, setProblems] = useState<ContestProblem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [lastUpdate, setLastUpdate] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  useEffect(() => {
-    fetchContestData();
-  }, [contestId]);
-
-  useEffect(() => {
-    // Auto-refresh for running contests
-    let interval;
-    if (contest?.status === 'running') {
-      interval = setInterval(fetchScoreboard, POLLING_INTERVALS.SCOREBOARD); // Refresh every 30 seconds
+  const fetchContestData = useCallback(async () => {
+    if (!contestId) {
+      setError('Contest not found.');
+      setLoading(false);
+      return;
     }
 
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [contest?.status]);
-
-  const fetchContestData = async () => {
     try {
       setLoading(true);
 
-      // Fetch contest details and scoreboard in parallel
       const [contestData, scoreboardData] = await Promise.all([
         contestService.getById(contestId),
         contestService.getScoreboard(contestId),
@@ -40,11 +49,12 @@ const useContestScoreboard = (contestId) => {
       setScoreboard(scoreboardData.scoreboard);
       setProblems(scoreboardData.problems || []);
       setLastUpdate(new Date());
-    } catch (err) {
-      console.error('Error fetching contest data:', err);
-      if (err.response?.status === 404) {
+    } catch (errorValue) {
+      console.error('Error fetching contest data:', errorValue);
+      const status = getErrorStatus(errorValue);
+      if (status === 404) {
         setError('Contest not found.');
-      } else if (err.response?.status === 403) {
+      } else if (status === 403) {
         setError('You do not have permission to view this contest scoreboard');
       } else {
         setError('Failed to load contest scoreboard.');
@@ -52,21 +62,43 @@ const useContestScoreboard = (contestId) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [contestId]);
 
-  const fetchScoreboard = async () => {
+  const fetchScoreboard = useCallback(async () => {
+    if (!contestId) {
+      return;
+    }
+
     try {
       const data = await contestService.getScoreboard(contestId);
 
-      // The response will always have scoreboard and problems, but we only need to update the scoreboard on refresh.
       setScoreboard(data.scoreboard);
       setLastUpdate(new Date());
     } catch (err) {
       console.error('Error refreshing scoreboard:', err);
     }
-  };
+  }, [contestId]);
 
-  const formatDateTime = (dateTime) => {
+  useEffect(() => {
+    void fetchContestData();
+  }, [fetchContestData]);
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | undefined;
+    if (contest?.status === 'running') {
+      interval = setInterval(() => {
+        void fetchScoreboard();
+      }, POLLING_INTERVALS.SCOREBOARD);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [contest?.status, fetchScoreboard]);
+
+  const formatDateTime = (dateTime: Date | string) => {
     return new Date(dateTime).toLocaleString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
@@ -74,26 +106,29 @@ const useContestScoreboard = (contestId) => {
     });
   };
 
-  const getProblemScore = (userScores, problemId) => {
+  const getProblemScore = (
+    userScores: Record<string, unknown> | null | undefined,
+    problemId: string,
+  ): ScoreValue => {
     if (!userScores || typeof userScores !== 'object') return null;
 
-    const problemScore = userScores[problemId];
+    const problemScore = userScores[problemId] as unknown;
     if (!problemScore) return null;
 
-    // Handle both old format (just number) and new format (object)
     if (typeof problemScore === 'number') {
       return {
         score: problemScore,
-        attempts: 1, // Default to 1 for old format
+        attempts: 1,
         solved: problemScore === 100,
       };
     }
 
     if (typeof problemScore === 'object') {
+      const normalizedScore = problemScore as Partial<ContestProblemScore>;
       return {
-        score: problemScore.score || 0,
-        attempts: problemScore.attempts || 1,
-        solved: (problemScore.score || 0) === 100,
+        score: normalizedScore.score ?? 0,
+        attempts: normalizedScore.attempts ?? 1,
+        solved: (normalizedScore.score ?? 0) === 100,
       };
     }
 

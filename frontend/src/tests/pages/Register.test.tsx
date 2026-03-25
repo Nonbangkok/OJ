@@ -67,7 +67,10 @@ describe('Register Page', () => {
     });
 
     it('submits registration successfully', async () => {
-        authService.register.mockResolvedValueOnce({});
+        jest.mocked(authService.register).mockResolvedValueOnce({
+            message: 'Registered',
+            user: { id: 1, username: 'newuser' }
+        });
 
         render(
             <BrowserRouter>
@@ -86,7 +89,7 @@ describe('Register Page', () => {
     });
 
     it('displays error on failed registration from service', async () => {
-        authService.register.mockRejectedValueOnce({
+        jest.mocked(authService.register).mockRejectedValueOnce({
             response: { data: { message: 'Username already taken' } }
         });
 

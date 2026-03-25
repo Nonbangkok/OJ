@@ -1,48 +1,35 @@
 import api from './api';
 
-/**
- * Service for handling problem retrieval operations.
- */
+import type {
+  ContestProblemDetailResponse,
+  ProblemDetailResponse,
+  ProblemsWithStatsResponse,
+} from '../types';
+
 const problemService = {
-  /**
-   * Fetches all visible problems with their success statistics.
-   * @returns {Promise<Array>} Array of problems with stats
-   */
-  getAllWithStats: async () => {
-    const response = await api.get('/problems-with-stats');
+  getAllWithStats: async (): Promise<ProblemsWithStatsResponse> => {
+    const response = await api.get<ProblemsWithStatsResponse>('/problems-with-stats');
     return response.data;
   },
 
-  /**
-   * Fetches details for a specific global problem.
-   * @param {string} problemId
-   * @returns {Promise<Object>} Problem details
-   */
-  getDetails: async (problemId) => {
-    const response = await api.get(`/problems/${problemId}`);
+  getDetails: async (problemId: string): Promise<ProblemDetailResponse> => {
+    const response = await api.get<ProblemDetailResponse>(`/problems/${problemId}`);
     return response.data;
   },
 
-  /**
-   * Fetches details for a specific problem within a contest context.
-   * @param {string|number} contestId
-   * @param {string} problemId
-   * @returns {Promise<Object>} Contest problem details
-   */
-  getContestProblemDetails: async (contestId, problemId) => {
-    const response = await api.get(`/contests/${contestId}/problems/${problemId}`);
+  getContestProblemDetails: async (
+    contestId: string | number,
+    problemId: string,
+  ): Promise<ContestProblemDetailResponse> => {
+    const response = await api.get<ContestProblemDetailResponse>(
+      `/contests/${contestId}/problems/${problemId}`,
+    );
     return response.data;
   },
 
-  /**
-   * Generates the API URL for retrieving a problem's PDF file.
-   * @param {string} problemId
-   * @param {string|number|null} [contestId=null] - Optional contest context
-   * @returns {string} Full URL to the PDF endpoint
-   */
-  getPdfUrl: (problemId, contestId = null) => {
-    const baseUrl = api.defaults.baseURL || '';
-    if (contestId) {
+  getPdfUrl: (problemId: string, contestId: string | number | null = null): string => {
+    const baseUrl = api.defaults.baseURL ?? '';
+    if (contestId !== null) {
       return `${baseUrl}/contests/${contestId}/problems/${problemId}/pdf`;
     }
     return `${baseUrl}/problems/${problemId}/pdf`;

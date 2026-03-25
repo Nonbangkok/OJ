@@ -17,7 +17,7 @@ describe('useContestGuard Hook', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        useNavigate.mockReturnValue(mockNavigate);
+        (jest.mocked(useNavigate) as jest.Mock).mockReturnValue(mockNavigate);
         jest.useFakeTimers();
     });
 
@@ -27,7 +27,7 @@ describe('useContestGuard Hook', () => {
 
     it('successfully loads an ongoing contest', async () => {
         const mockContest = { id: contestId, status: 'ongoing', is_participant: true };
-        contestService.getById.mockResolvedValueOnce(mockContest);
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce(mockContest);
 
         const { result } = renderHook(() => useContestGuard(contestId));
 
@@ -45,7 +45,7 @@ describe('useContestGuard Hook', () => {
 
     it('redirects to scoreboard if contest is finished and user is participant', async () => {
         const mockContest = { id: contestId, status: 'finished', is_participant: true };
-        contestService.getById.mockResolvedValueOnce(mockContest);
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce(mockContest);
 
         renderHook(() => useContestGuard(contestId));
 
@@ -58,7 +58,7 @@ describe('useContestGuard Hook', () => {
 
     it('redirects to contests list if contest is finished and user is NOT participant', async () => {
         const mockContest = { id: contestId, status: 'finished', is_participant: false };
-        contestService.getById.mockResolvedValueOnce(mockContest);
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce(mockContest);
 
         renderHook(() => useContestGuard(contestId));
 
@@ -70,11 +70,11 @@ describe('useContestGuard Hook', () => {
     });
 
     it('handles 403 Forbidden error', async () => {
-        const error = new Error('Forbidden');
+        const error = new Error('Forbidden') as Error & { response?: { status?: number } };
         error.response = { status: 403 };
-        contestService.getById.mockRejectedValueOnce(error);
+        (jest.mocked(contestService.getById) as jest.Mock).mockRejectedValueOnce(error);
         // Second call for status check in 403 handler
-        contestService.getById.mockResolvedValueOnce({ status: 'ongoing' });
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce({ status: 'ongoing' });
 
         const { result } = renderHook(() => useContestGuard(contestId));
 
@@ -87,9 +87,9 @@ describe('useContestGuard Hook', () => {
     });
 
     it('handles 404 Not Found error', async () => {
-        const error = new Error('Not Found');
+        const error = new Error('Not Found') as Error & { response?: { status?: number } };
         error.response = { status: 404 };
-        contestService.getById.mockRejectedValueOnce(error);
+        (jest.mocked(contestService.getById) as jest.Mock).mockRejectedValueOnce(error);
 
         const { result } = renderHook(() => useContestGuard(contestId));
 
@@ -102,7 +102,7 @@ describe('useContestGuard Hook', () => {
 
     it('polls contest status every 15 seconds', async () => {
         const mockContest = { id: contestId, status: 'ongoing' };
-        contestService.getById.mockResolvedValue(mockContest);
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValue(mockContest);
 
         renderHook(() => useContestGuard(contestId));
 

@@ -14,7 +14,7 @@ const mockUseTheme = require('../../context/ThemeContext').useTheme;
 describe('ThemeToggleButton', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        mockUseTheme.mockReturnValue({ theme: 'light', toggleTheme: mockToggleTheme });
+        jest.mocked(mockUseTheme).mockReturnValue({ theme: 'light', toggleTheme: mockToggleTheme });
     });
 
     it('renders with light theme (moon icon)', () => {
@@ -26,7 +26,7 @@ describe('ThemeToggleButton', () => {
     });
 
     it('renders with dark theme (sun icon)', () => {
-        mockUseTheme.mockReturnValue({ theme: 'dark', toggleTheme: mockToggleTheme });
+        jest.mocked(mockUseTheme).mockReturnValue({ theme: 'dark', toggleTheme: mockToggleTheme });
 
         render(<ThemeToggleButton />);
 

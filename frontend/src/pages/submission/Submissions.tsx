@@ -10,11 +10,13 @@ import { USER_ROLES } from '../../utils/constants';
 
 type SubmissionsProps = {
   problemId?: string | null;
+  contestId?: string | null;
   showTitle?: boolean;
 };
 
-const Submissions = ({ problemId = null, showTitle = true }: SubmissionsProps) => {
-  const { contestId } = useParams();
+const Submissions = ({ problemId = null, contestId = null, showTitle = true }: SubmissionsProps) => {
+  const { contestId: contestIdFromParams } = useParams();
+  const effectiveContestId = contestId ?? contestIdFromParams ?? null;
 
   // Logic is now completely in the Hook
   const {
@@ -41,7 +43,7 @@ const Submissions = ({ problemId = null, showTitle = true }: SubmissionsProps) =
     handleUserChange,
     selectProblem,
     selectUser
-  } = useSubmissions(problemId, contestId);
+  } = useSubmissions(problemId, effectiveContestId);
 
   // UI Only state
   const [visibleCount, setVisibleCount] = useState(10);

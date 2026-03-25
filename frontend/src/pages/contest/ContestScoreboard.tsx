@@ -56,9 +56,9 @@ const ContestScoreboard = () => {
                 <th>Participant</th>
                 <th>Total Score</th>
                 {problems.map((problem) => (
-                  <th key={problem.problem_id}>
+                  <th key={problem.problem_id ?? problem.id}>
                     <div className={styles.problemHeader}>
-                      <div className={styles.problemId}>{problem.problem_id}</div>
+                      <div className={styles.problemId}>{problem.problem_id ?? problem.id}</div>
                     </div>
                   </th>
                 ))}
@@ -68,18 +68,22 @@ const ContestScoreboard = () => {
               {scoreboard.map((participant, index) => {
                 const rank = index + 1;
                 return (
-                  <tr key={participant.user_id} className={rank <= 3 ? `rank-${rank}` : ''}>
+                  <tr
+                    key={participant.user_id ?? `${participant.username}-${index}`}
+                    className={rank <= 3 ? `rank-${rank}` : ''}
+                  >
                     <td>{rank}</td>
                     <td>{participant.username}</td>
                     <td>{participant.total_score}</td>
                     {problems.map((problem) => {
+                      const problemId = problem.problem_id ?? problem.id;
                       const problemScore = getProblemScore(
                         participant.detailed_scores,
-                        problem.problem_id
+                        problemId
                       );
 
                       return (
-                        <td key={problem.problem_id}>
+                        <td key={problemId}>
                           {problemScore ? (
                             <div
                               className={`${styles.problemScore} ${problemScore.solved

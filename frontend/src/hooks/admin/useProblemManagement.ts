@@ -1,406 +1,456 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
+
 import adminService from '../../services/adminService';
 import { POLLING_INTERVALS } from '../../config/constants';
+import type {
+  AdminProblem,
+  BatchUploadFeedback,
+  BatchUploadProgressState,
+  ProblemDetail,
+  ProblemSelectionBulkConfirm,
+  UploadProgressState,
+} from '../../types';
+import { getErrorMessage, toApiLikeError } from '../../utils/error';
+
+import {
+  buildBatchUploadSuccessMessage,
+  EMPTY_BATCH_PROGRESS,
+  getBulkVisibilityTargets,
+  getFilenameFromDisposition,
+  normalizeUploadProgress,
+  parseProgressEventData,
+  toggleSelectedProblem,
+} from './problemManagement.helpers';
+
+interface ProblemSaveData {
+  id: string;
+  title: string;
+  author: string;
+  time_limit_ms: number;
+  memory_limit_mb: number;
+}
+
+interface ProblemSavePayload {
+  problemData: ProblemSaveData;
+  pdfFile: File | null;
+  zipFile: File | null;
+}
+
+const DEFAULT_BATCH_FEEDBACK: BatchUploadFeedback = { visible: false, message: '', type: 'info' };
 
 const useProblemManagement = () => {
-    const [problems, setProblems] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingProblem, setEditingProblem] = useState(null);
-    const [uploadProgress, setUploadProgress] = useState(null);
-    const [selectedProblems, setSelectedProblems] = useState([]);
+  const [problems, setProblems] = useState<AdminProblem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProblem, setEditingProblem] = useState<ProblemDetail | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgressState | null>(null);
+  const [selectedProblems, setSelectedProblems] = useState<Array<string | number>>([]);
 
-    // Batch upload feedback
-    const [batchUploadFeedback, setBatchUploadFeedback] = useState({ visible: false, message: '', type: 'info' });
-    const [batchUploadProgress, setBatchUploadProgress] = useState({ visible: false, processed: 0, total: 0, message: '', status: '' });
+  const [batchUploadFeedback, setBatchUploadFeedback] = useState<BatchUploadFeedback>(DEFAULT_BATCH_FEEDBACK);
+  const [batchUploadProgress, setBatchUploadProgress] = useState<BatchUploadProgressState>(EMPTY_BATCH_PROGRESS);
 
-    // Ref for the hidden file input
-    const batchUploadInputRef = useRef(null);
+  const batchUploadInputRef = useRef<HTMLInputElement | null>(null);
 
-    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-    const [problemToDelete, setProblemToDelete] = useState(null);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [problemToDelete, setProblemToDelete] = useState<string | null>(null);
 
-    // Bulk action confirmation
-    const [bulkConfirm, setBulkConfirm] = useState({ isOpen: false, type: null });
+  const [bulkConfirm, setBulkConfirm] = useState<ProblemSelectionBulkConfirm>({ isOpen: false, type: null });
 
-    const fetchProblems = useCallback(async () => {
-        try {
-            // setLoading(true); // Don't trigger full reload on every refetch to prevent UI jumps
-            const data = await adminService.getProblems();
-            setProblems(data);
-        } catch (err) {
-            setError('Failed to fetch problems.');
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+  const fetchProblems = useCallback(async () => {
+    try {
+      const data = await adminService.getProblems();
+      setProblems(data);
+    } catch (errorValue) {
+      setError('Failed to fetch problems.');
+      console.error(errorValue);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    useEffect(() => {
-        fetchProblems();
-    }, [fetchProblems]);
+  useEffect(() => {
+    void fetchProblems();
+  }, [fetchProblems]);
 
-    const handleDeleteClick = (problemId) => {
-        setProblemToDelete(problemId);
-        setIsConfirmModalOpen(true);
-    };
+  const handleDeleteClick = (problemId: string) => {
+    setProblemToDelete(problemId);
+    setIsConfirmModalOpen(true);
+  };
 
-    const handleConfirmDelete = async () => {
-        if (problemToDelete) {
-            try {
-                await adminService.deleteProblem(problemToDelete);
-                fetchProblems();
-            } catch (err) {
-                setError('Failed to delete problem.');
-                console.error(err);
-            } finally {
-                setIsConfirmModalOpen(false);
-                setProblemToDelete(null);
-            }
-        }
-    };
+  const handleConfirmDelete = async () => {
+    if (!problemToDelete) {
+      return;
+    }
 
-    const handleToggleVisibility = async (problemId, currentVisibility) => {
-        try {
-            await adminService.updateProblemVisibility(problemId, !currentVisibility);
-            fetchProblems();
-        } catch (err) {
-            setError('Failed to update problem visibility.');
-            console.error(err);
-        }
-    };
+    try {
+      await adminService.deleteProblem(problemToDelete);
+      await fetchProblems();
+    } catch (errorValue) {
+      setError('Failed to delete problem.');
+      console.error(errorValue);
+    } finally {
+      setIsConfirmModalOpen(false);
+      setProblemToDelete(null);
+    }
+  };
 
-    const handleHideAll = () => {
-        setBulkConfirm({ isOpen: true, type: 'hide' });
-    };
+  const handleToggleVisibility = async (problemId: string, currentVisibility: boolean) => {
+    try {
+      await adminService.updateProblemVisibility(problemId, !currentVisibility);
+      await fetchProblems();
+    } catch (errorValue) {
+      setError('Failed to update problem visibility.');
+      console.error(errorValue);
+    }
+  };
 
-    const executeHideAll = async () => {
-        try {
-            setLoading(true);
-            const hidePromises = problems
-                .filter(problem => problem.is_visible && !problem.contest_id)
-                .map(problem =>
-                    adminService.updateProblemVisibility(problem.id, false)
-                );
+  const executeBulkVisibility = async (nextVisible: boolean) => {
+    try {
+      setLoading(true);
+      const targets = getBulkVisibilityTargets(problems, nextVisible);
+      await Promise.all(
+        targets.map((problem) => adminService.updateProblemVisibility(problem.id, nextVisible)),
+      );
+      await fetchProblems();
+    } catch (errorValue) {
+      setError(nextVisible ? 'Failed to show all problems.' : 'Failed to hide all problems.');
+      console.error(errorValue);
+    } finally {
+      setLoading(false);
+      setBulkConfirm({ isOpen: false, type: null });
+    }
+  };
 
-            await Promise.all(hidePromises);
-            fetchProblems();
-        } catch (err) {
-            setError('Failed to hide all problems.');
-            console.error(err);
-        } finally {
-            setLoading(false);
-            setBulkConfirm({ isOpen: false, type: null });
-        }
-    };
+  const handleHideAll = () => {
+    setBulkConfirm({ isOpen: true, type: 'hide' });
+  };
 
-    const handleShowAll = () => {
-        setBulkConfirm({ isOpen: true, type: 'show' });
-    };
+  const executeHideAll = async () => {
+    await executeBulkVisibility(false);
+  };
 
-    const executeShowAll = async () => {
-        try {
-            setLoading(true);
-            const showPromises = problems
-                .filter(problem => !problem.is_visible && !problem.contest_id)
-                .map(problem =>
-                    adminService.updateProblemVisibility(problem.id, true)
-                );
+  const handleShowAll = () => {
+    setBulkConfirm({ isOpen: true, type: 'show' });
+  };
 
-            await Promise.all(showPromises);
-            fetchProblems();
-        } catch (err) {
-            setError('Failed to show all problems.');
-            console.error(err);
-        } finally {
-            setLoading(false);
-            setBulkConfirm({ isOpen: false, type: null });
-        }
-    };
+  const executeShowAll = async () => {
+    await executeBulkVisibility(true);
+  };
 
-    const handleEdit = async (problem) => {
-        try {
-            setLoading(true);
-            const data = await adminService.getProblemDetail(problem.id);
-            setEditingProblem(data);
-            setIsModalOpen(true);
-        } catch (err) {
-            setError('Failed to fetch problem details.');
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
+  const handleEdit = async (problem: AdminProblem) => {
+    try {
+      setLoading(true);
+      const data = await adminService.getProblemDetail(problem.id);
+      setEditingProblem(data);
+      setIsModalOpen(true);
+    } catch (errorValue) {
+      setError('Failed to fetch problem details.');
+      console.error(errorValue);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleCreate = () => {
-        setEditingProblem(null);
-        setIsModalOpen(true);
-    };
+  const handleCreate = () => {
+    setEditingProblem(null);
+    setIsModalOpen(true);
+  };
 
-    const handleToggleSelectProblem = (problemId) => {
-        setSelectedProblems(prev =>
-            prev.includes(problemId)
-                ? prev.filter(id => id !== problemId)
-                : [...prev, problemId]
-        );
-    };
+  const handleToggleSelectProblem = (problemId: string | number) => {
+    setSelectedProblems((prev) => toggleSelectedProblem(prev, problemId));
+  };
 
-    const handleSelectAll = (event) => {
-        if (event.target.checked) {
-            const allProblemIds = problems.map(p => p.id);
-            setSelectedProblems(allProblemIds);
-        } else {
-            setSelectedProblems([]);
-        }
-    };
+  const handleSelectAll = (event: ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      setSelectedProblems(problems.map((problem) => problem.id));
+      return;
+    }
 
-    const handleExportSelected = async () => {
-        if (selectedProblems.length === 0) {
-            setBatchUploadFeedback({ visible: true, message: 'Please select at least one problem to export.', type: 'warning' });
+    setSelectedProblems([]);
+  };
+
+  const handleExportSelected = async () => {
+    if (selectedProblems.length === 0) {
+      setBatchUploadFeedback({
+        visible: true,
+        message: 'Please select at least one problem to export.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    setBatchUploadFeedback({ visible: true, message: 'Initiating problem export...', type: 'info' });
+
+    try {
+      const response = await adminService.exportProblems(selectedProblems);
+      const blob = new Blob([response.data], { type: response.headers['content-type'] });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const filename = getFilenameFromDisposition(response.headers['content-disposition']);
+
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+
+      setBatchUploadFeedback({
+        visible: true,
+        message: `${selectedProblems.length} problems exported successfully!`,
+        type: 'success',
+      });
+      setSelectedProblems([]);
+    } catch (errorValue) {
+      const errorMsg = getErrorMessage(errorValue, 'Failed to export problems.');
+      setBatchUploadFeedback({ visible: true, message: errorMsg, type: 'error' });
+      console.error('Error exporting problems:', errorValue);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTriggerBatchUpload = () => {
+    setBatchUploadFeedback(DEFAULT_BATCH_FEEDBACK);
+    batchUploadInputRef.current?.click();
+  };
+
+  const handleBatchUploadFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setLoading(true);
+    setBatchUploadFeedback({ visible: true, message: 'Initiating batch upload...', type: 'info' });
+    setBatchUploadProgress({
+      visible: true,
+      processed: 0,
+      total: 0,
+      message: 'Starting upload...',
+      status: 'pending',
+      currentProblem: '',
+    });
+
+    const formData = new FormData();
+    formData.append('problemsZip', file);
+
+    try {
+      const response = await adminService.batchUploadProblems(formData);
+      const { progressId } = response;
+
+      if (progressId) {
+        setBatchUploadFeedback({
+          visible: true,
+          message: 'File uploaded. Waiting for processing to start...',
+          type: 'info',
+        });
+
+        const eventSource = adminService.getBatchUploadProgressEventSource(progressId);
+
+        eventSource.addEventListener('progress', (progressEvent: MessageEvent<string>) => {
+          const progressState = parseProgressEventData(progressEvent.data);
+          if (!progressState) {
+            console.warn('Received malformed progress data (progress event):', progressEvent.data);
+            setBatchUploadFeedback({ visible: true, message: 'Received malformed progress update.', type: 'info' });
             return;
+          }
+
+          setBatchUploadProgress(progressState);
+          setBatchUploadFeedback({ visible: true, message: 'Batch processing problems...', type: 'info' });
+        });
+
+        eventSource.addEventListener('complete', (completeEvent: MessageEvent<string>) => {
+          const data = JSON.parse(completeEvent.data) as Partial<BatchUploadProgressState>;
+          setBatchUploadProgress({
+            ...EMPTY_BATCH_PROGRESS,
+            ...data,
+            visible: false,
+            status: 'completed',
+            currentProblem: data.currentProblem ?? '',
+          });
+
+          setBatchUploadFeedback({
+            visible: true,
+            message: buildBatchUploadSuccessMessage(data.added, data.skipped, data.message),
+            type: 'success',
+          });
+
+          eventSource.close();
+          void fetchProblems();
+          setLoading(false);
+        });
+
+        eventSource.addEventListener('error', (errorEvent: MessageEvent<string>) => {
+          let errorMsg = 'An unknown error occurred during processing.';
+          if (errorEvent.data) {
+            try {
+              const data = JSON.parse(errorEvent.data) as { message?: string };
+              errorMsg = data.message || errorMsg;
+            } catch {
+              errorMsg = errorEvent.data;
+            }
+          }
+
+          setBatchUploadProgress({
+            ...EMPTY_BATCH_PROGRESS,
+            visible: false,
+            message: errorMsg,
+            status: 'error',
+          });
+          setBatchUploadFeedback({ visible: true, message: errorMsg, type: 'error' });
+          eventSource.close();
+          setLoading(false);
+        });
+      } else {
+        const { added = [], skipped = [], errors = [] } = response;
+        let feedbackMessage = `Batch upload complete. Added: ${added.length}. Skipped: ${skipped.length}.`;
+
+        if (errors.length > 0) {
+          const errorDetails = errors.map((item) => `${item.directory}: ${item.message}`).join('; ');
+          feedbackMessage += ` Errors: ${errors.length} (${errorDetails})`;
+          setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'error' });
+        } else {
+          setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'success' });
         }
 
-        setBatchUploadFeedback({ visible: true, message: 'Initiating problem export...', type: 'info' });
+        await fetchProblems();
+        setLoading(false);
+      }
+    } catch (errorValue) {
+      const errorMsg = getErrorMessage(errorValue, 'Failed to batch upload problems.');
+      setBatchUploadFeedback({ visible: true, message: errorMsg, type: 'error' });
+      setBatchUploadProgress({
+        ...EMPTY_BATCH_PROGRESS,
+        visible: false,
+        message: errorMsg,
+        status: 'error',
+      });
+      setLoading(false);
+    } finally {
+      if (batchUploadInputRef.current) {
+        batchUploadInputRef.current.value = '';
+      }
+    }
+  };
 
-        try {
-            const response = await adminService.exportProblems(selectedProblems);
+  const handleSave = async ({ problemData, pdfFile, zipFile }: ProblemSavePayload) => {
+    const isEditing = Boolean(editingProblem);
+    setUploadProgress({ status: 'pending', message: 'Initiating save...' });
 
-            const blob = new Blob([response.data], { type: response.headers['content-type'] });
-            const downloadUrl = window.URL.createObjectURL(blob);
+    try {
+      let problemIdForUpload = problemData.id;
 
-            const contentDisposition = response.headers['content-disposition'];
-            let filename = `problems_export_${Date.now()}.zip`;
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-                if (filenameMatch && filenameMatch[1]) {
-                    filename = filenameMatch[1];
+      if (isEditing && editingProblem) {
+        await adminService.updateProblem(editingProblem.id, problemData);
+      } else {
+        const data = await adminService.createProblem(problemData);
+        problemIdForUpload = data.id || problemData.id;
+      }
+
+      if (pdfFile || zipFile) {
+        const fileData = new FormData();
+        if (pdfFile) {
+          fileData.append('problemPdf', pdfFile);
+        }
+        if (zipFile) {
+          fileData.append('testcasesZip', zipFile);
+        }
+
+        setUploadProgress({ status: 'uploading', message: 'Uploading files to server...' });
+
+        const data = await adminService.uploadFiles(problemIdForUpload, fileData);
+        const { jobId } = data;
+
+        if (jobId) {
+          const pollInterval = setInterval(async () => {
+            try {
+              const progressData = await adminService.getUploadProgress(jobId);
+              setUploadProgress(normalizeUploadProgress(progressData));
+
+              if (progressData.status === 'completed' || progressData.status === 'failed') {
+                clearInterval(pollInterval);
+                if (progressData.status === 'completed') {
+                  setIsModalOpen(false);
+                  await fetchProblems();
+                  setUploadProgress(null);
                 }
+              }
+            } catch (pollError) {
+              console.error('Polling error:', pollError);
+              setError('Failed to get upload progress.');
+              setUploadProgress({ status: 'failed', message: 'Could not retrieve processing status.' });
+              clearInterval(pollInterval);
             }
-
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.setAttribute('download', filename);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(downloadUrl);
-
-            setBatchUploadFeedback({ visible: true, message: `${selectedProblems.length} problems exported successfully!`, type: 'success' });
-            setSelectedProblems([]);
-        } catch (err) {
-            const errorMsg = err.response?.data?.message || 'Failed to export problems.';
-            setBatchUploadFeedback({ visible: true, message: errorMsg, type: 'error' });
-            console.error('Error exporting problems:', err);
-        } finally {
-            setLoading(false);
+          }, POLLING_INTERVALS.BATCH_PROCESS);
+        } else {
+          setIsModalOpen(false);
+          await fetchProblems();
+          setUploadProgress(null);
         }
-    };
-
-    const handleTriggerBatchUpload = () => {
-        setBatchUploadFeedback({ visible: false, message: '', type: 'info' });
-        if (batchUploadInputRef.current) {
-            batchUploadInputRef.current.click();
-        }
-    };
-
-    const handleBatchUploadFileChange = async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        setLoading(true);
-        setBatchUploadFeedback({ visible: true, message: 'Initiating batch upload...', type: 'info' });
-        setBatchUploadProgress({ visible: true, processed: 0, total: 0, message: 'Starting upload...', status: 'pending' });
-
-        const formData = new FormData();
-        formData.append('problemsZip', file);
-
-        try {
-            const response = await adminService.batchUploadProblems(formData);
-
-            const { progressId } = response.data;
-            if (progressId) {
-                setBatchUploadFeedback({ visible: true, message: 'File uploaded. Waiting for processing to start...', type: 'info' });
-                const eventSource = adminService.getBatchUploadProgressEventSource(progressId);
-
-                eventSource.addEventListener('progress', (event) => {
-                    const data = JSON.parse(event.data);
-                    if (data && typeof data.processed === 'number' && typeof data.total === 'number') {
-                        setBatchUploadProgress({ ...data, visible: true, status: 'in_progress' });
-                        setBatchUploadFeedback({ visible: true, message: 'Batch processing problems...', type: 'info' });
-                    } else {
-                        console.warn('Received malformed progress data (progress event):', data);
-                        setBatchUploadFeedback({ visible: true, message: 'Received malformed progress update.', type: 'info' });
-                    }
-                });
-
-                eventSource.addEventListener('complete', (event) => {
-                    const data = JSON.parse(event.data);
-                    setBatchUploadProgress({ ...data, visible: false, status: 'completed' });
-
-                    let successMessage = 'Batch upload process finished.';
-                    if (data.added && data.skipped) {
-                        successMessage = `Batch upload complete. Added ${data.added.length} problems, skipped ${data.skipped.length} problems.`;
-                    } else if (data.message) {
-                        successMessage = data.message;
-                    }
-                    setBatchUploadFeedback({ visible: true, message: successMessage, type: 'success' });
-
-                    eventSource.close();
-                    fetchProblems();
-                    setLoading(false);
-                });
-
-                eventSource.addEventListener('error', (event) => {
-                    let errorMsg = 'An unknown error occurred during processing.';
-                    if (event.data) {
-                        try {
-                            const data = JSON.parse(event.data);
-                            errorMsg = data.message || errorMsg;
-                        } catch (e) {
-                            errorMsg = event.data;
-                        }
-                    }
-                    setBatchUploadProgress({ visible: false, processed: 0, total: 0, message: errorMsg, status: 'error' });
-                    setBatchUploadFeedback({ visible: true, message: errorMsg, type: 'error' });
-                    eventSource.close();
-                    setLoading(false);
-                });
-            } else {
-                const { added = [], skipped = [], errors = [] } = response.data;
-                let feedbackMessage = `Batch upload complete. Added: ${added.length}. Skipped: ${skipped.length}.`;
-                if (errors.length > 0) {
-                    const errorDetails = errors.map(e => `${e.directory}: ${e.message}`).join('; ');
-                    feedbackMessage += ` Errors: ${errors.length} (${errorDetails})`;
-                    setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'error' });
-                } else {
-                    setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'success' });
-                }
-                fetchProblems();
-                setLoading(false);
-            }
-        } catch (err) {
-            const errorMsg = err.response?.data?.message || 'Failed to batch upload problems.';
-            setBatchUploadFeedback({ visible: true, message: errorMsg, type: 'error' });
-            setBatchUploadProgress({ visible: false, processed: 0, total: 0, message: errorMsg, status: 'error' });
-            setLoading(false);
-        } finally {
-            if (batchUploadInputRef.current) {
-                batchUploadInputRef.current.value = '';
-            }
-        }
-    };
-
-    const handleSave = async ({ problemData, pdfFile, zipFile }) => {
-        const isEditing = !!editingProblem;
-        setUploadProgress({ status: 'pending', message: 'Initiating save...' });
-
-        try {
-            let problemIdForUpload = problemData.id;
-
-            if (isEditing) {
-                await adminService.updateProblem(editingProblem.id, problemData);
-            } else {
-                const data = await adminService.createProblem(problemData);
-                problemIdForUpload = data.id;
-            }
-
-            if (pdfFile || zipFile) {
-                const fileData = new FormData();
-                if (pdfFile) fileData.append('problemPdf', pdfFile);
-                if (zipFile) fileData.append('testcasesZip', zipFile);
-
-                setUploadProgress({ status: 'uploading', message: 'Uploading files to server...' });
-
-                const data = await adminService.uploadFiles(problemIdForUpload, fileData);
-
-                const { jobId } = data;
-                if (jobId) {
-                    const pollInterval = setInterval(async () => {
-                        try {
-                            const progressData = await adminService.getUploadProgress(jobId);
-                            setUploadProgress(progressData);
-
-                            if (progressData.status === 'completed' || progressData.status === 'failed') {
-                                clearInterval(pollInterval);
-                                if (progressData.status === 'completed') {
-                                    setIsModalOpen(false);
-                                    fetchProblems();
-                                    setUploadProgress(null);
-                                }
-                            }
-                        } catch (pollError) {
-                            console.error('Polling error:', pollError);
-                            setError('Failed to get upload progress.');
-                            setUploadProgress({ status: 'failed', message: 'Could not retrieve processing status.' });
-                            clearInterval(pollInterval);
-                        }
-                    }, POLLING_INTERVALS.BATCH_PROCESS);
-                } else {
-                    setIsModalOpen(false);
-                    fetchProblems();
-                    setUploadProgress(null);
-                }
-            } else {
-                setIsModalOpen(false);
-                fetchProblems();
-                setUploadProgress(null);
-            }
-        } catch (err) {
-            const errorMsg = err.response?.data?.message || 'Failed to save problem.';
-            setError(errorMsg);
-            setUploadProgress({ status: 'failed', message: errorMsg });
-            console.error(err);
-        }
-    };
-
-    const handleCloseModal = () => {
+      } else {
         setIsModalOpen(false);
+        await fetchProblems();
         setUploadProgress(null);
-    };
+      }
+    } catch (errorValue) {
+      const apiError = toApiLikeError(errorValue);
+      const errorMsg = getErrorMessage(apiError, 'Failed to save problem.');
+      setError(errorMsg);
+      setUploadProgress({ status: 'failed', message: errorMsg });
+      console.error(apiError);
+    }
+  };
 
-    return {
-        problems,
-        loading,
-        error,
-        isModalOpen,
-        setIsModalOpen,
-        editingProblem,
-        setEditingProblem,
-        uploadProgress,
-        setUploadProgress,
-        selectedProblems,
-        setSelectedProblems,
-        batchUploadFeedback,
-        setBatchUploadFeedback,
-        batchUploadProgress,
-        setBatchUploadProgress,
-        batchUploadInputRef,
-        isConfirmModalOpen,
-        setIsConfirmModalOpen,
-        problemToDelete,
-        setProblemToDelete,
-        bulkConfirm,
-        setBulkConfirm,
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setUploadProgress(null);
+  };
 
-        fetchProblems,
-        handleDeleteClick,
-        handleConfirmDelete,
-        handleToggleVisibility,
-        handleHideAll,
-        executeHideAll,
-        handleShowAll,
-        executeShowAll,
-        handleEdit,
-        handleCreate,
-        handleToggleSelectProblem,
-        handleSelectAll,
-        handleExportSelected,
-        handleTriggerBatchUpload,
-        handleBatchUploadFileChange,
-        handleSave,
-        handleCloseModal
-    };
+  return {
+    problems,
+    loading,
+    error,
+    isModalOpen,
+    setIsModalOpen,
+    editingProblem,
+    setEditingProblem,
+    uploadProgress,
+    setUploadProgress,
+    selectedProblems,
+    setSelectedProblems,
+    batchUploadFeedback,
+    setBatchUploadFeedback,
+    batchUploadProgress,
+    setBatchUploadProgress,
+    batchUploadInputRef,
+    isConfirmModalOpen,
+    setIsConfirmModalOpen,
+    problemToDelete,
+    setProblemToDelete,
+    bulkConfirm,
+    setBulkConfirm,
+
+    fetchProblems,
+    handleDeleteClick,
+    handleConfirmDelete,
+    handleToggleVisibility,
+    handleHideAll,
+    executeHideAll,
+    handleShowAll,
+    executeShowAll,
+    handleEdit,
+    handleCreate,
+    handleToggleSelectProblem,
+    handleSelectAll,
+    handleExportSelected,
+    handleTriggerBatchUpload,
+    handleBatchUploadFileChange,
+    handleSave,
+    handleCloseModal,
+  };
 };
 
 export default useProblemManagement;

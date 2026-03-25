@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type MouseEvent } from 'react';
 import { NavLink, useParams, useNavigate, useLocation } from 'react-router-dom';
 import contestService from '../../services/contestService';
 import styles from './ContestNavbar.module.css';
@@ -7,21 +7,26 @@ import ThemeToggleButton from '../../components/shared/ThemeToggleButton';
 import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/logo512.png';
 import darkmodeLogo from '../../assets/logo512_darkmode.png';
+import type { Contest, SliderStyle } from '../../types';
 
 const ContestNavbar = () => {
   const { contestId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
-  const [contest, setContest] = useState(null);
-  const navRef = useRef(null);
+  const [contest, setContest] = useState<Contest | null>(null);
+  const navRef = useRef<HTMLUListElement | null>(null);
   const { theme } = useTheme(); // Get current theme
   const currentLogo = theme === 'dark' ? darkmodeLogo : logo; // Choose logo based on theme
-  const [sliderStyle, setSliderStyle] = useState({ opacity: 0 });
+  const [sliderStyle, setSliderStyle] = useState<SliderStyle>({ opacity: 0 });
 
   useEffect(() => {
     const fetchContestDetails = async () => {
       try {
+        if (!contestId) {
+          return;
+        }
+
         const data = await contestService.getById(contestId);
         setContest(data);
       } catch (error) {
@@ -35,11 +40,11 @@ const ContestNavbar = () => {
   }, [contestId]);
 
   const handleLogout = () => {
-    logout();
+    void logout();
     navigate('/');
   };
 
-  const handleMouseEnter = (e) => {
+  const handleMouseEnter = (e: MouseEvent<HTMLLIElement>) => {
     const li = e.currentTarget;
     setSliderStyle({
       width: li.offsetWidth + 20,
@@ -50,7 +55,7 @@ const ContestNavbar = () => {
 
   const resetSlider = () => {
     try {
-      const activeLink = navRef.current?.querySelector('a.active');
+      const activeLink = navRef.current?.querySelector<HTMLAnchorElement>('a.active');
       if (activeLink && activeLink.parentElement) {
         const activeLi = activeLink.parentElement;
         setSliderStyle({
@@ -59,7 +64,7 @@ const ContestNavbar = () => {
           opacity: 1,
         });
       } else {
-        setSliderStyle({ ...sliderStyle, opacity: 0 });
+        setSliderStyle((prev) => ({ ...prev, opacity: 0 }));
       }
     } catch (e) {
       setSliderStyle({ opacity: 0 });

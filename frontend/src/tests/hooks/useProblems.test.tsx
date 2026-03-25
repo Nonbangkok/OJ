@@ -13,7 +13,7 @@ describe('useProblems', () => {
 
     it('should fetch and return problems on mount', async () => {
         const mockProblems = [{ id: 1, title: 'Test Problem' }];
-        problemService.getAllWithStats.mockResolvedValue(mockProblems);
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValue(mockProblems);
 
         const { result } = renderHook(() => useProblems());
 
@@ -30,7 +30,7 @@ describe('useProblems', () => {
     });
 
     it('should handle errors gracefully when fetching problems', async () => {
-        problemService.getAllWithStats.mockRejectedValue(new Error('Network error'));
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockRejectedValue(new Error('Network error'));
 
         const { result } = renderHook(() => useProblems());
 
@@ -44,7 +44,7 @@ describe('useProblems', () => {
 
     it('should fetch contest problems when contestId is provided', async () => {
         const mockContestProblems = [{ id: 1, title: 'Contest Problem' }];
-        contestService.getProblems.mockResolvedValue(mockContestProblems);
+        (jest.mocked(contestService.getProblems) as jest.Mock).mockResolvedValue(mockContestProblems);
 
         const { result } = renderHook(() => useProblems('contest-123'));
 
@@ -61,7 +61,7 @@ describe('useProblems', () => {
     });
 
     it('should handle errors when fetching contest problems', async () => {
-        contestService.getProblems.mockRejectedValue(new Error('Unauthorized'));
+        (jest.mocked(contestService.getProblems) as jest.Mock).mockRejectedValue(new Error('Unauthorized'));
 
         const { result } = renderHook(() => useProblems('contest-123'));
 
@@ -75,7 +75,7 @@ describe('useProblems', () => {
 
     it('should refresh problems when refresh is called', async () => {
         const mockProblems = [{ id: 1, title: 'Test Problem' }];
-        problemService.getAllWithStats.mockResolvedValue(mockProblems);
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValue(mockProblems);
 
         const { result } = renderHook(() => useProblems());
 
@@ -100,7 +100,7 @@ describe('useProblems', () => {
     it('should refetch when contestId changes', async () => {
         const mockProblems1 = [{ id: 1, title: 'Problem 1' }];
         const mockProblems2 = [{ id: 2, title: 'Problem 2' }];
-        contestService.getProblems
+        (jest.mocked(contestService.getProblems) as jest.Mock)
             .mockResolvedValueOnce(mockProblems1)
             .mockResolvedValueOnce(mockProblems2);
 

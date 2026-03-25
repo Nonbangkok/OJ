@@ -1,64 +1,57 @@
 import api from './api';
 
-/**
- * Service for handling code submissions and searching relative to submissions.
- */
+import type {
+  ProblemSearchResponse,
+  SubmissionDetailResponse,
+  SubmissionsResponse,
+  SubmitResponse,
+  UserSearchResponse,
+} from '../types';
+import type { SubmitRequest, SubmissionQueryParams } from '../types';
+
 const submissionService = {
-  /**
-   * Submits code for a problem.
-   * @param {Object} submitData
-   * @returns {Promise<Object>} Submission result
-   */
-  submit: async (submitData) => {
-    const response = await api.post('/submit', submitData);
+  submit: async (submitData: SubmitRequest): Promise<SubmitResponse> => {
+    const response = await api.post<SubmitResponse>('/submit', submitData);
     return response.data;
   },
 
-  /**
-   * Fetches all submissions, optionally filtered by params.
-   * @param {Object} params - Query parameters for filtering
-   * @returns {Promise<Array>} Array of submissions
-   */
-  getAll: async (params) => {
-    const response = await api.get('/submissions', { params });
+  getAll: async (params?: SubmissionQueryParams): Promise<SubmissionsResponse> => {
+    const response = await api.get<SubmissionsResponse>('/submissions', { params });
     return response.data;
   },
 
-  /**
-   * Fetches detailed information for a specific submission.
-   * @param {string|number} submissionId
-   * @param {string|number|null} [contestId=null]
-   * @returns {Promise<Object>} Detailed submission data including code and test case results
-   */
-  getById: async (submissionId, contestId = null) => {
-    const params = contestId ? { contestId } : {};
-    const response = await api.get(`/submissions/${submissionId}`, { params });
+  getById: async (
+    submissionId: string | number,
+    contestId: string | number | null = null,
+  ): Promise<SubmissionDetailResponse> => {
+    const params = contestId !== null ? { contestId } : {};
+    const response = await api.get<SubmissionDetailResponse>(`/submissions/${submissionId}`, { params });
     return response.data;
   },
 
-  /**
-   * Searches for problems by ID or title (used for autocomplete filters).
-   * @param {string} query
-   * @param {string|number|null} [contestId=null]
-   * @returns {Promise<Array>} Problem suggestions
-   */
-  searchProblems: async (query, contestId = null) => {
-    let url = `/search/problems?q=${query}`;
-    if (contestId) url += `&contestId=${contestId}`;
-    const response = await api.get(url);
+  searchProblems: async (
+    query: string,
+    contestId: string | number | null = null,
+  ): Promise<ProblemSearchResponse> => {
+    const params = new URLSearchParams({ q: query });
+    if (contestId !== null) {
+      params.set('contestId', String(contestId));
+    }
+
+    const response = await api.get<ProblemSearchResponse>(`/search/problems?${params.toString()}`);
     return response.data;
   },
 
-  /**
-   * Searches for users by username (used for autocomplete filters).
-   * @param {string} query
-   * @param {string|number|null} [contestId=null]
-   * @returns {Promise<Array>} User suggestions
-   */
-  searchUsers: async (query, contestId = null) => {
-    let url = `/search/users?q=${query}`;
-    if (contestId) url += `&contestId=${contestId}`;
-    const response = await api.get(url);
+  searchUsers: async (
+    query: string,
+    contestId: string | number | null = null,
+  ): Promise<UserSearchResponse> => {
+    const params = new URLSearchParams({ q: query });
+    if (contestId !== null) {
+      params.set('contestId', String(contestId));
+    }
+
+    const response = await api.get<UserSearchResponse>(`/search/users?${params.toString()}`);
     return response.data;
   },
 };

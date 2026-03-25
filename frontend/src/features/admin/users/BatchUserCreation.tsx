@@ -39,7 +39,7 @@ const BatchUserCreation = ({ onUsersCreated }) => {
             type="number"
             id="count"
             value={count}
-            onChange={(e) => setCount(e.target.value)}
+            onChange={(e) => setCount(Number(e.target.value))}
             required
             min="1"
             max="100"

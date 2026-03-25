@@ -22,13 +22,13 @@ jest.mock('react-router-dom', () => ({
 describe('Submissions Page', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        authService.checkLogin.mockResolvedValue({ isAuthenticated: false });
-        submissionService.searchProblems.mockResolvedValue([]);
-        submissionService.searchUsers.mockResolvedValue([]);
+        jest.mocked(authService.checkLogin).mockResolvedValue({ isAuthenticated: false });
+        jest.mocked(submissionService.searchProblems).mockResolvedValue([]);
+        jest.mocked(submissionService.searchUsers).mockResolvedValue([]);
     });
 
     it('renders loading state initially', () => {
-        submissionService.getAll.mockReturnValue(new Promise(() => { }));
+        jest.mocked(submissionService.getAll).mockReturnValue(new Promise(() => { }));
         render(<BrowserRouter><Submissions /></BrowserRouter>);
         expect(screen.getByText(/loading submissions\.\.\.$/i)).toBeInTheDocument();
     });
@@ -37,7 +37,7 @@ describe('Submissions Page', () => {
         const mockSubmissions = [
             { id: 1, problem_id: 'P1', problem_title: 'Test Problem', username: 'user1', overall_status: 'Accepted', score: 100, language: 'python', submitted_at: '2025-01-01T00:00:00Z' }
         ];
-        submissionService.getAll.mockResolvedValueOnce(mockSubmissions);
+        jest.mocked(submissionService.getAll).mockResolvedValueOnce(mockSubmissions);
 
         render(<BrowserRouter><Submissions /></BrowserRouter>);
 
@@ -48,7 +48,7 @@ describe('Submissions Page', () => {
     });
 
     it('handles fetch error gracefully', async () => {
-        submissionService.getAll.mockRejectedValueOnce(new Error('Fetch error'));
+        jest.mocked(submissionService.getAll).mockRejectedValueOnce(new Error('Fetch error'));
 
         render(<BrowserRouter><Submissions /></BrowserRouter>);
 

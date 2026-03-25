@@ -4,6 +4,7 @@ import authService from '../services/authService';
 import { useAutocomplete } from './useAutocomplete';
 import { USER_ROLES, SUBMISSION_STATUS } from '../utils/constants';
 import { POLLING_INTERVALS } from '../config/constants';
+import type { SubmissionQueryParams } from '../types';
 
 export const useSubmissions = (problemId, contestId) => {
   const [submissions, setSubmissions] = useState([]);
@@ -39,7 +40,7 @@ export const useSubmissions = (problemId, contestId) => {
     lastRequestIdRef.current = currentRequestId;
 
     try {
-      const params = {};
+      const params: SubmissionQueryParams = {};
       if (problemId) {
         params.filter = 'mine';
         params.problemId = problemId;

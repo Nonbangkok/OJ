@@ -21,12 +21,20 @@ jest.mock('react-router-dom', () => ({
 describe('ContestProblems Page', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        contestService.getById.mockResolvedValue({ id: 'contest-1', status: 'running', is_participant: true });
-        contestService.getProblems.mockResolvedValue([]);
+        jest.mocked(contestService.getById).mockResolvedValue({
+            id: 1,
+            title: 'Contest 1',
+            description: null,
+            start_time: '2026-01-01T00:00:00Z',
+            end_time: '2026-01-01T01:00:00Z',
+            status: 'running',
+            is_participant: true
+        });
+        jest.mocked(contestService.getProblems).mockResolvedValue([]);
     });
 
     it('displays loading state', () => {
-        contestService.getById.mockReturnValue(new Promise(() => { }));
+        jest.mocked(contestService.getById).mockReturnValue(new Promise(() => { }));
 
         render(
             <BrowserRouter>
@@ -38,8 +46,8 @@ describe('ContestProblems Page', () => {
     });
 
     it('displays contest problems on success', async () => {
-        const mockProblems = [{ id: 'P1', title: 'Problem 1', best_score: 0 }];
-        contestService.getProblems.mockResolvedValue(mockProblems);
+        const mockProblems = [{ id: 'P1', title: 'Problem 1', author: null, best_score: 0 }];
+        jest.mocked(contestService.getProblems).mockResolvedValue(mockProblems);
 
         render(
             <BrowserRouter>

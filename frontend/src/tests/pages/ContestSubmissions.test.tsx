@@ -21,21 +21,29 @@ jest.mock('react-router-dom', () => ({
     useParams: () => ({ contestId: 'contest-1' }),
 }));
 jest.mock('../../context/AuthContext', () => ({
-    useAuth: () => ({ user: { username: 'testuser', role: 'user' } }),
+    useAuth: () => ({ user: { id: 1, username: 'testuser', role: 'user' }, isLoading: false, login: jest.fn(), logout: jest.fn() }),
 }));
 
 describe('ContestSubmissions Page', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        contestService.getById.mockResolvedValue({ id: 'contest-1', status: 'running', is_participant: true });
-        submissionService.getAll.mockResolvedValue([]);
-        submissionService.searchProblems.mockResolvedValue([]);
-        submissionService.searchUsers.mockResolvedValue([]);
-        authService.checkLogin.mockResolvedValue({ isAuthenticated: true });
+        jest.mocked(contestService.getById).mockResolvedValue({
+            id: 1,
+            title: 'Contest 1',
+            description: null,
+            start_time: '2026-01-01T00:00:00Z',
+            end_time: '2026-01-01T01:00:00Z',
+            status: 'running',
+            is_participant: true
+        });
+        jest.mocked(submissionService.getAll).mockResolvedValue([]);
+        jest.mocked(submissionService.searchProblems).mockResolvedValue([]);
+        jest.mocked(submissionService.searchUsers).mockResolvedValue([]);
+        jest.mocked(authService.checkLogin).mockResolvedValue({ isAuthenticated: true, user: { id: 1, username: 'testuser', role: 'user' } });
     });
 
     it('displays loading state', () => {
-        contestService.getById.mockReturnValue(new Promise(() => { }));
+        jest.mocked(contestService.getById).mockReturnValue(new Promise(() => { }));
 
         render(
             <BrowserRouter>
@@ -72,7 +80,7 @@ describe('ContestSubmissions Page', () => {
                 submitted_at: '2026-01-01T00:00:00Z',
             },
         ];
-        submissionService.getAll.mockResolvedValue(mockSubmissions);
+        jest.mocked(submissionService.getAll).mockResolvedValue(mockSubmissions);
 
         render(
             <BrowserRouter>
@@ -86,4 +94,3 @@ describe('ContestSubmissions Page', () => {
         });
     });
 });
-

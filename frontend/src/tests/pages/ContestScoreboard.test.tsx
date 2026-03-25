@@ -23,8 +23,8 @@ describe('ContestScoreboard Page', () => {
     });
 
     it('displays loading state', () => {
-        contestService.getById.mockReturnValue(new Promise(() => { }));
-        contestService.getScoreboard.mockReturnValue(new Promise(() => { }));
+        jest.mocked(contestService.getById).mockReturnValue(new Promise(() => { }));
+        jest.mocked(contestService.getScoreboard).mockReturnValue(new Promise(() => { }));
 
         render(
             <BrowserRouter>
@@ -36,14 +36,21 @@ describe('ContestScoreboard Page', () => {
     });
 
     it('displays contest scoreboard on success', async () => {
-        const mockContest = { id: 'contest-1', status: 'running' };
+        const mockContest = {
+            id: 1,
+            title: 'Contest 1',
+            description: null,
+            start_time: '2026-01-01T00:00:00Z',
+            end_time: '2026-01-01T01:00:00Z',
+            status: 'running' as const
+        };
         const mockScoreboardData = {
-            scoreboard: [{ user_id: 1, username: 'user1', total_score: 100, detailed_scores: {} }],
-            problems: [{ problem_id: 'P1' }],
+            scoreboard: [{ user_id: 1, username: 'user1', total_score: 100, detailed_scores: {}, last_score_improvement_time: null }],
+            problems: [{ id: 'P1', title: 'Problem 1', author: null, problem_id: 'P1' }],
         };
 
-        contestService.getById.mockResolvedValueOnce(mockContest);
-        contestService.getScoreboard.mockResolvedValueOnce(mockScoreboardData);
+        jest.mocked(contestService.getById).mockResolvedValueOnce(mockContest);
+        jest.mocked(contestService.getScoreboard).mockResolvedValueOnce(mockScoreboardData);
 
         render(
             <BrowserRouter>
@@ -62,8 +69,8 @@ describe('ContestScoreboard Page', () => {
     });
 
     it('displays error when contest not found', async () => {
-        contestService.getById.mockRejectedValueOnce({ response: { status: 404 } });
-        contestService.getScoreboard.mockResolvedValueOnce({ scoreboard: [], problems: [] });
+        jest.mocked(contestService.getById).mockRejectedValueOnce({ response: { status: 404 } });
+        jest.mocked(contestService.getScoreboard).mockResolvedValueOnce({ scoreboard: [], problems: [] });
 
         render(
             <BrowserRouter>

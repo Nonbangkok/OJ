@@ -6,7 +6,7 @@ import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 import LoadingPage from '../../../components/shared/LoadingPage';
 
-const ContestManagement = ({ currentUser }) => {
+const ContestManagement = () => {
   const {
     contests,
     loading,
@@ -204,8 +204,6 @@ const ContestManagement = ({ currentUser }) => {
           onConfirm={handleDelete}
           title="Delete Contest"
           message="Are you sure you want to delete this contest? This action cannot be undone."
-          confirmText="Delete"
-          confirmStyle="danger"
         />
       )}
     </div>

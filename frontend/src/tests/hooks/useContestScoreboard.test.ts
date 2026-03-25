@@ -19,8 +19,8 @@ describe('useContestScoreboard', () => {
     };
 
     it('fetches contest data and scoreboard on mount', async () => {
-        contestService.getById.mockResolvedValueOnce(mockContest);
-        contestService.getScoreboard.mockResolvedValueOnce(mockScoreboardData);
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce(mockContest);
+        (jest.mocked(contestService.getScoreboard) as jest.Mock).mockResolvedValueOnce(mockScoreboardData);
 
         const { result } = renderHook(() => useContestScoreboard(mockContestId));
 
@@ -39,8 +39,8 @@ describe('useContestScoreboard', () => {
 
     it('handles API errors correctly (404 Not Found)', async () => {
         const error404 = { response: { status: 404 } };
-        contestService.getById.mockRejectedValueOnce(error404);
-        contestService.getScoreboard.mockRejectedValueOnce(error404);
+        (jest.mocked(contestService.getById) as jest.Mock).mockRejectedValueOnce(error404);
+        (jest.mocked(contestService.getScoreboard) as jest.Mock).mockRejectedValueOnce(error404);
 
         const { result } = renderHook(() => useContestScoreboard(mockContestId));
 
@@ -56,14 +56,14 @@ describe('useContestScoreboard', () => {
         const { result } = renderHook(() => useContestScoreboard(mockContestId));
 
         // Old format (number)
-        const oldScore = result.current.getProblemScore({ 1: 100 }, 1);
+        const oldScore = result.current.getProblemScore({ 1: 100 }, '1');
         expect(oldScore).toEqual({ score: 100, attempts: 1, solved: true });
 
         // New format (object)
-        const newScore = result.current.getProblemScore({ 2: { score: 50, attempts: 2 } }, 2);
+        const newScore = result.current.getProblemScore({ 2: { score: 50, attempts: 2 } }, '2');
         expect(newScore).toEqual({ score: 50, attempts: 2, solved: false });
 
         // Missing problem
-        expect(result.current.getProblemScore({ 1: 100 }, 2)).toBeNull();
+        expect(result.current.getProblemScore({ 1: 100 }, '2')).toBeNull();
     });
 });

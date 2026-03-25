@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type MouseEvent } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -8,27 +8,28 @@ import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/logo512.png';
 import darkmodeLogo from '../../assets/logo512_darkmode.png';
 import { USER_ROLES } from '../../utils/constants';
+import type { SliderStyle } from '../../types';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
   const { registrationEnabled } = useSettings();
   const navigate = useNavigate();
   const location = useLocation();
-  const navRef = useRef(null);
+  const navRef = useRef<HTMLUListElement | null>(null);
   const { theme } = useTheme(); // Get current theme
   const currentLogo = theme === 'dark' ? darkmodeLogo : logo; // Choose logo based on theme
-  const [sliderStyle, setSliderStyle] = useState({ opacity: 0 });
+  const [sliderStyle, setSliderStyle] = useState<SliderStyle>({ opacity: 0 });
 
   const handleLogout = () => {
     try {
-      logout();
+      void logout();
       navigate('/');
     } catch (error) {
       console.error('Error logging out:', error);
     }
   };
 
-  const handleMouseEnter = (e) => {
+  const handleMouseEnter = (e: MouseEvent<HTMLLIElement>) => {
     const li = e.currentTarget;
     setSliderStyle({
       width: li.offsetWidth + 20,
@@ -39,7 +40,7 @@ const Navbar = () => {
 
   const resetSlider = () => {
     try {
-      const activeLink = navRef.current?.querySelector('a.active');
+      const activeLink = navRef.current?.querySelector<HTMLAnchorElement>('a.active');
       if (activeLink && activeLink.parentElement) {
         const activeLi = activeLink.parentElement;
         setSliderStyle({
@@ -48,7 +49,7 @@ const Navbar = () => {
           opacity: 1,
         });
       } else {
-        setSliderStyle({ ...sliderStyle, opacity: 0 });
+        setSliderStyle((prev) => ({ ...prev, opacity: 0 }));
       }
     } catch (e) {
       // Catch potential errors if navRef.current is not available

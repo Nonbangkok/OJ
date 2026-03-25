@@ -19,7 +19,7 @@ describe('useAuth Hook', () => {
 
     it('initializes and checks auth on mount', async () => {
         const mockUser = { username: 'testuser', role: 'user' };
-        authService.checkLogin.mockResolvedValueOnce({ isAuthenticated: true, user: mockUser });
+        (jest.mocked(authService.checkLogin) as jest.Mock).mockResolvedValueOnce({ isAuthenticated: true, user: mockUser });
 
         let result;
         await act(async () => {
@@ -32,7 +32,7 @@ describe('useAuth Hook', () => {
     });
 
     it('handles failed auth check on mount', async () => {
-        authService.checkLogin.mockResolvedValueOnce({ isAuthenticated: false });
+        (jest.mocked(authService.checkLogin) as jest.Mock).mockResolvedValueOnce({ isAuthenticated: false });
 
         let result;
         await act(async () => {
@@ -45,7 +45,7 @@ describe('useAuth Hook', () => {
     });
 
     it('handles login successfully', async () => {
-        authService.checkLogin.mockResolvedValueOnce({ isAuthenticated: false });
+        (jest.mocked(authService.checkLogin) as jest.Mock).mockResolvedValueOnce({ isAuthenticated: false });
         const mockUser = { username: 'loggeduser', role: 'admin' };
 
         let result;
@@ -63,8 +63,8 @@ describe('useAuth Hook', () => {
 
     it('handles logout successfully', async () => {
         const mockUser = { username: 'testuser', role: 'user' };
-        authService.checkLogin.mockResolvedValueOnce({ isAuthenticated: true, user: mockUser });
-        authService.logout.mockResolvedValueOnce();
+        (jest.mocked(authService.checkLogin) as jest.Mock).mockResolvedValueOnce({ isAuthenticated: true, user: mockUser });
+        (jest.mocked(authService.logout) as jest.Mock).mockResolvedValueOnce(undefined);
 
         let result;
         await act(async () => {

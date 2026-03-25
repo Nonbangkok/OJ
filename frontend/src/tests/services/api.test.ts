@@ -22,3 +22,5 @@ describe('API Utility', () => {
         expect(api.defaults.withCredentials).toBe(true);
     });
 });
+
+export {};

@@ -19,7 +19,7 @@ describe('Scoreboard Page', () => {
     });
 
     it('renders loading state initially', () => {
-        scoreboardService.getGlobal.mockReturnValue(new Promise(() => { }));
+        jest.mocked(scoreboardService.getGlobal).mockReturnValue(new Promise(() => { }));
         render(<BrowserRouter><Scoreboard /></BrowserRouter>);
         expect(screen.getByText(/loading scoreboard\.\.\.$/i)).toBeInTheDocument();
     });
@@ -31,7 +31,7 @@ describe('Scoreboard Page', () => {
             { username: 'thirduser', total_score: 60, problems_solved: 3 },
             { username: 'regularuser', total_score: 40, problems_solved: 2 }
         ];
-        scoreboardService.getGlobal.mockResolvedValueOnce(mockScoreboard);
+        jest.mocked(scoreboardService.getGlobal).mockResolvedValueOnce(mockScoreboard);
 
         render(<BrowserRouter><Scoreboard /></BrowserRouter>);
 
@@ -49,7 +49,7 @@ describe('Scoreboard Page', () => {
     });
 
     it('handles fetch error gracefully', async () => {
-        scoreboardService.getGlobal.mockRejectedValueOnce(new Error('Fetch error'));
+        jest.mocked(scoreboardService.getGlobal).mockRejectedValueOnce(new Error('Fetch error'));
 
         render(<BrowserRouter><Scoreboard /></BrowserRouter>);
 

@@ -4,13 +4,13 @@
 export const APP_CONSTANTS = {
   SYSTEM_ADMIN_USERNAME: 'Nonbangkok',
   SUBMISSION_CACHE_EXPIRY: 30 * 60 * 1000, // 30 minutes in milliseconds
-};
+} as const;
 
 export const USER_ROLES = {
   USER: 'user',
   STAFF: 'staff',
   ADMIN: 'admin',
-};
+} as const;
 
 export const SUBMISSION_STATUS = {
   PENDING: 'Pending',
@@ -23,4 +23,4 @@ export const SUBMISSION_STATUS = {
   MEMORY_LIMIT_EXCEEDED: 'Memory Limit Exceeded',
   COMPILATION_ERROR: 'Compilation Error',
   SKIPPED: 'Skipped',
-};
+} as const;

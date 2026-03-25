@@ -19,16 +19,16 @@ describe('Problems Page', () => {
     });
 
     it('renders loading state initially', () => {
-        problemService.getAllWithStats.mockReturnValue(new Promise(() => { }));
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockReturnValue(new Promise(() => { }));
         render(<BrowserRouter><Problems /></BrowserRouter>);
         expect(screen.getByText(/loading problems\.\.\.$/i)).toBeInTheDocument();
     });
 
     it('displays problems after fetching', async () => {
         const mockProblems = [
-            { id: '1', title: 'Problem 1', difficulty: 'easy', best_score: 100 }
+            { id: '1', title: 'Problem 1', author: null, difficulty: 'easy', time_limit_ms: 1000, memory_limit_mb: 256, best_score: 100 }
         ];
-        problemService.getAllWithStats.mockResolvedValueOnce(mockProblems);
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(mockProblems);
 
         render(<BrowserRouter><Problems /></BrowserRouter>);
 
@@ -38,7 +38,7 @@ describe('Problems Page', () => {
     });
 
     it('displays error if fetch fails', async () => {
-        problemService.getAllWithStats.mockRejectedValueOnce(new Error('Fetch failed'));
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockRejectedValueOnce(new Error('Fetch failed'));
 
         render(<BrowserRouter><Problems /></BrowserRouter>);
 

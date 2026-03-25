@@ -15,7 +15,7 @@ describe('useUserManagement', () => {
     ];
 
     it('fetches users on mount', async () => {
-        adminService.getUsers.mockResolvedValueOnce(mockUsers);
+        (jest.mocked(adminService.getUsers) as jest.Mock).mockResolvedValueOnce(mockUsers);
 
         const { result } = renderHook(() => useUserManagement());
 
@@ -31,13 +31,13 @@ describe('useUserManagement', () => {
     });
 
     it('handles user deletion correctly', async () => {
-        adminService.getUsers.mockResolvedValueOnce(mockUsers);
+        (jest.mocked(adminService.getUsers) as jest.Mock).mockResolvedValueOnce(mockUsers);
 
         // allow initial fetch
         const { result } = renderHook(() => useUserManagement());
         await waitFor(() => expect(result.current.loading).toBe(false));
 
-        adminService.deleteUser.mockResolvedValueOnce({});
+        (jest.mocked(adminService.deleteUser) as jest.Mock).mockResolvedValueOnce({});
 
         act(() => {
             result.current.handleDeleteClick(mockUsers[1]);
@@ -56,7 +56,7 @@ describe('useUserManagement', () => {
     });
 
     it('handles API errors during fetching', async () => {
-        adminService.getUsers.mockRejectedValueOnce(new Error('Network Error'));
+        (jest.mocked(adminService.getUsers) as jest.Mock).mockRejectedValueOnce(new Error('Network Error'));
 
         const { result } = renderHook(() => useUserManagement());
 

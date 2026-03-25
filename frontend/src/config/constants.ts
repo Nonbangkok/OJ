@@ -7,15 +7,15 @@ export const POLLING_INTERVALS = {
   SCOREBOARD: 30000,
   SUBMISSIONS: 2500,
   BATCH_PROCESS: 2000,
-};
+} as const;
 
 export const UI_TIMEOUTS = {
   SUCCESS_MESSAGE_SHORT: 3000,
   SUCCESS_MESSAGE_LONG: 5000,
   COPY_CLIPBOARD: 2000,
   MODAL_CHECK: 50,
-};
+} as const;
 
 export const UI_CONFIG = {
   DEFAULT_EDITOR_FONT_SIZE: 16,
-};
+} as const;

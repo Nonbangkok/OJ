@@ -4,6 +4,7 @@ import hljs from 'highlight.js/lib/core';
 import cpp from 'highlight.js/lib/languages/cpp';
 import 'highlight.js/styles/atom-one-dark.css';
 import submissionService from '../services/submissionService';
+import type { SubmitRequest } from '../types';
 
 // Register C++ language
 hljs.registerLanguage('cpp', cpp);
@@ -76,7 +77,7 @@ const useCodeSubmission = (problemId, contestId) => {
     setError('');
 
     try {
-      const submitData = {
+      const submitData: SubmitRequest = {
         problemId,
         language,
         code,

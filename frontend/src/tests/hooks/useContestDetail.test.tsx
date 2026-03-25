@@ -19,9 +19,9 @@ describe('useContestDetail Hook', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        useNavigate.mockReturnValue(mockNavigate);
-        useAuth.mockReturnValue({ user: mockUser });
-        useParams.mockReturnValue({ contestId: '123' });
+        (jest.mocked(useNavigate) as jest.Mock).mockReturnValue(mockNavigate);
+        (jest.mocked(useAuth) as jest.Mock).mockReturnValue({ user: mockUser });
+        (jest.mocked(useParams) as jest.Mock).mockReturnValue({ contestId: '123' });
 
         // Mock timers for interval testing
         jest.useFakeTimers();
@@ -38,7 +38,7 @@ describe('useContestDetail Hook', () => {
             status: 'scheduled',
             is_participant: false
         };
-        contestService.getById.mockResolvedValue(mockContest);
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValue(mockContest);
 
         const { result } = renderHook(() => useContestDetail());
 
@@ -59,7 +59,7 @@ describe('useContestDetail Hook', () => {
             status: 'finished',
             is_participant: true
         };
-        contestService.getById.mockResolvedValueOnce(mockContest);
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce(mockContest);
 
         renderHook(() => useContestDetail());
 
@@ -74,7 +74,7 @@ describe('useContestDetail Hook', () => {
             status: 'finished',
             is_participant: false
         };
-        contestService.getById.mockResolvedValueOnce(mockContest);
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce(mockContest);
 
         renderHook(() => useContestDetail());
 
@@ -84,9 +84,9 @@ describe('useContestDetail Hook', () => {
     });
 
     it('handles 403 error (needs to join)', async () => {
-        const error = new Error('Forbidden');
+        const error = new Error('Forbidden') as Error & { response?: { status?: number; data?: { message?: string } } };
         error.response = { status: 403 };
-        contestService.getById.mockRejectedValueOnce(error);
+        (jest.mocked(contestService.getById) as jest.Mock).mockRejectedValueOnce(error);
 
         const { result } = renderHook(() => useContestDetail());
 
@@ -98,9 +98,9 @@ describe('useContestDetail Hook', () => {
     });
 
     it('handles 404 error (not found)', async () => {
-        const error = new Error('Not Found');
+        const error = new Error('Not Found') as Error & { response?: { status?: number; data?: { message?: string } } };
         error.response = { status: 404 };
-        contestService.getById.mockRejectedValueOnce(error);
+        (jest.mocked(contestService.getById) as jest.Mock).mockRejectedValueOnce(error);
 
         const { result } = renderHook(() => useContestDetail());
 
@@ -113,7 +113,7 @@ describe('useContestDetail Hook', () => {
 
     it('handles general fetch error', async () => {
         const error = new Error('Network Error');
-        contestService.getById.mockRejectedValueOnce(error);
+        (jest.mocked(contestService.getById) as jest.Mock).mockRejectedValueOnce(error);
 
         const { result } = renderHook(() => useContestDetail());
 
@@ -128,9 +128,9 @@ describe('useContestDetail Hook', () => {
         const mockContest = { id: '123', is_participant: false };
         const updatedContest = { id: '123', is_participant: true };
 
-        contestService.getById.mockResolvedValueOnce(mockContest);
-        contestService.join.mockResolvedValueOnce({});
-        contestService.getById.mockResolvedValueOnce(updatedContest);
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce(mockContest);
+        (jest.mocked(contestService.join) as jest.Mock).mockResolvedValueOnce({});
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce(updatedContest);
 
         const { result } = renderHook(() => useContestDetail());
 
@@ -147,11 +147,11 @@ describe('useContestDetail Hook', () => {
 
     it('handles joining contest failure', async () => {
         const mockContest = { id: '123', is_participant: false };
-        contestService.getById.mockResolvedValueOnce(mockContest);
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce(mockContest);
 
-        const error = new Error('Join failed');
+        const error = new Error('Join failed') as Error & { response?: { status?: number; data?: { message?: string } } };
         error.response = { data: { message: 'Too late to join' } };
-        contestService.join.mockRejectedValueOnce(error);
+        (jest.mocked(contestService.join) as jest.Mock).mockRejectedValueOnce(error);
 
         window.alert = jest.fn();
 
@@ -168,7 +168,7 @@ describe('useContestDetail Hook', () => {
     });
 
     it('polls for data every 15 seconds', async () => {
-        contestService.getById.mockResolvedValue({ id: '123', status: 'running' });
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValue({ id: '123', status: 'running' });
 
         renderHook(() => useContestDetail());
 

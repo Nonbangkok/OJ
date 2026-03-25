@@ -19,7 +19,7 @@ jest.mock('react-router-dom', () => ({
 }));
 
 jest.mock('../../context/AuthContext', () => ({
-    useAuth: () => ({ user: { username: 'testuser' } })
+    useAuth: () => ({ user: { id: 1, username: 'testuser', role: 'user' }, isLoading: false, login: jest.fn(), logout: jest.fn() })
 }));
 
 describe('ContestDetail Page', () => {
@@ -28,21 +28,22 @@ describe('ContestDetail Page', () => {
     });
 
     it('renders loading state initially', () => {
-        contestService.getById.mockReturnValue(new Promise(() => { }));
+        jest.mocked(contestService.getById).mockReturnValue(new Promise(() => { }));
         render(<BrowserRouter><ContestDetail /></BrowserRouter>);
         expect(screen.getByText(/loading contest data\.\.\.$/i)).toBeInTheDocument();
     });
 
     it('displays contest details successfully', async () => {
         const mockContest = {
-            id: '1', title: 'Test Contest', status: 'running',
-            problems: [{ id: 'P1', title: 'Problem 1' }],
+            id: 1, title: 'Test Contest', status: 'running' as const,
+            description: null,
+            problems: [{ id: 'P1', title: 'Problem 1', author: null }],
             is_participant: true,
             start_time: '2026-01-01T00:00:00Z',
             end_time: '2026-01-02T00:00:00Z',
-            participant_count: 5
+            participant_count: '5'
         };
-        contestService.getById.mockResolvedValueOnce(mockContest);
+        jest.mocked(contestService.getById).mockResolvedValueOnce(mockContest);
 
         render(<BrowserRouter><ContestDetail /></BrowserRouter>);
 
@@ -52,7 +53,7 @@ describe('ContestDetail Page', () => {
     });
 
     it('shows error if fetch fails', async () => {
-        contestService.getById.mockRejectedValueOnce(new Error('Fetch failed'));
+        jest.mocked(contestService.getById).mockRejectedValueOnce(new Error('Fetch failed'));
 
         render(<BrowserRouter><ContestDetail /></BrowserRouter>);
 

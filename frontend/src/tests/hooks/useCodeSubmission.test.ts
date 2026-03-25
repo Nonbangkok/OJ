@@ -6,13 +6,21 @@ import { useNavigate } from 'react-router-dom';
 jest.mock('../../services/submissionService');
 
 // Mock matchMedia for highlight.js which might be imported in useCodeSubmission
-window.matchMedia = window.matchMedia || function () {
-    return {
-        matches: false,
-        addListener: function () { },
-        removeListener: function () { }
-    };
-};
+if (!window.matchMedia) {
+    Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        value: ((query: string) => ({
+            matches: false,
+            media: query,
+            onchange: null,
+            addListener: () => { },
+            removeListener: () => { },
+            addEventListener: () => { },
+            removeEventListener: () => { },
+            dispatchEvent: () => false,
+        })) as unknown as typeof window.matchMedia,
+    });
+}
 
 jest.mock('react-router-dom', () => ({
     useNavigate: jest.fn()
@@ -23,7 +31,7 @@ describe('useCodeSubmission', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        useNavigate.mockReturnValue(mockNavigate);
+        (jest.mocked(useNavigate) as jest.Mock).mockReturnValue(mockNavigate);
         localStorage.clear();
     });
 
@@ -31,7 +39,7 @@ describe('useCodeSubmission', () => {
     const mockContestId = 'contest-1';
 
     it('initializes with default values and blank cache', () => {
-        const { result } = renderHook(() => useCodeSubmission(mockProblemId));
+        const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined));
 
         expect(result.current.language).toBe('cpp');
         expect(result.current.code).toBe('');
@@ -48,7 +56,7 @@ describe('useCodeSubmission', () => {
         };
         localStorage.setItem('oj-submission-cache', JSON.stringify(cacheObj));
 
-        const { result } = renderHook(() => useCodeSubmission(mockProblemId));
+        const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined));
 
         expect(result.current.code).toBe('console.log("cached")');
     });
@@ -62,16 +70,16 @@ describe('useCodeSubmission', () => {
         };
         localStorage.setItem('oj-submission-cache', JSON.stringify(cacheObj));
 
-        const { result } = renderHook(() => useCodeSubmission(mockProblemId));
+        const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined));
 
         // Cache should be ignored since it's > 30 minutes old
         expect(result.current.code).toBe('');
     });
 
     it('handles successful submission, saves to cache and navigates', async () => {
-        submissionService.submit.mockResolvedValueOnce({ success: true });
+        (jest.mocked(submissionService.submit) as jest.Mock).mockResolvedValueOnce({ success: true });
 
-        const { result } = renderHook(() => useCodeSubmission(mockProblemId));
+        const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined));
 
         act(() => {
             result.current.setCode('print("hello")');

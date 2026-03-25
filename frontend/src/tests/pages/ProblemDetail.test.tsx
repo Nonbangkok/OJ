@@ -17,11 +17,12 @@ describe('ProblemDetail Page', () => {
     it('displays problem details successfully', async () => {
         const mockProblem = {
             id: '1', title: 'Test Problem', description: 'Test Desc', difficulty: 'easy',
+            author: null,
             time_limit_ms: 1000, memory_limit_mb: 256
         };
-        const mockStats = [{ id: '1', best_score: 0 }];
-        problemService.getDetails.mockResolvedValueOnce(mockProblem);
-        problemService.getAllWithStats.mockResolvedValueOnce(mockStats);
+        const mockStats = [{ id: '1', title: 'Test Problem', author: null, time_limit_ms: 1000, memory_limit_mb: 256, best_score: 0 }];
+        (jest.mocked(problemService.getDetails) as jest.Mock).mockResolvedValueOnce(mockProblem);
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(mockStats);
 
         render(<BrowserRouter><ProblemDetail /></BrowserRouter>);
 
@@ -33,7 +34,7 @@ describe('ProblemDetail Page', () => {
     });
 
     it('displays error if problem fetch fails', async () => {
-        problemService.getDetails.mockRejectedValueOnce(new Error('Fetch failed'));
+        (jest.mocked(problemService.getDetails) as jest.Mock).mockRejectedValueOnce(new Error('Fetch failed'));
 
         render(<BrowserRouter><ProblemDetail /></BrowserRouter>);
 

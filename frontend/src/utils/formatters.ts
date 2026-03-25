@@ -14,7 +14,7 @@ export const formatTimeAgo = (dateString) => {
   if (!dateString) return '';
   const date = new Date(dateString);
   const now = new Date();
-  const seconds = Math.floor((now - date) / 1000);
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
   let interval = seconds / 31536000;
   if (interval > 1) return `${Math.floor(interval)} years ago`;
@@ -99,7 +99,7 @@ export const formatDateTime = (dateTime) => {
 export const getRemainingTime = (endTime) => {
   const now = new Date();
   const end = new Date(endTime);
-  const diff = end - now;
+  const diff = end.getTime() - now.getTime();
 
   if (diff <= 0) return 'Finished';
 

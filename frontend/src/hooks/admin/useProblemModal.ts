@@ -10,10 +10,10 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
         memory_limit_mb: 512,
     });
     const [authors, setAuthors] = useState([]);
-    const [pdfFile, setPdfFile] = useState(null);
-    const [zipFile, setZipFile] = useState(null);
-    const pdfRef = useRef();
-    const zipRef = useRef();
+    const [pdfFile, setPdfFile] = useState<File | null>(null);
+    const [zipFile, setZipFile] = useState<File | null>(null);
+    const pdfRef = useRef<HTMLInputElement | null>(null);
+    const zipRef = useRef<HTMLInputElement | null>(null);
 
     const isEditing = !!problem;
     const isUploading = uploadProgress && !['completed', 'failed'].includes(uploadProgress.status);

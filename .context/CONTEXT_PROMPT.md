@@ -13,7 +13,7 @@ Before generating any code, consult the files in the `.context/` directory:
 - **`.context/ARCHITECTURE.md`** — System hierarchy, directory structure, tech stack, Mermaid diagrams of all major flows (submission judging, contest lifecycle, authentication, request routing, provider tree).
 - **`.context/STANDARDS.md`** — Coding patterns, naming conventions, architecture rules, and testing standards. Your code MUST follow these patterns exactly.
 - **`.context/DATA_MODEL.md`** — Complete database schema (11 tables), entity relationships, JSONB structures, indexes, and migration instructions.
-- **`.context/API_schema.md`** — Canonical API contract reference (50 endpoints across admin/auth/contest/problem/submission controllers).
+- **`.context/API_SCHEMA.md`** — Canonical API contract reference (50 endpoints across admin/auth/contest/problem/submission controllers).
 
 ## Core Rules
 
@@ -45,3 +45,17 @@ Before finalizing any implementation:
 - [ ] Is error handling complete (no empty catch blocks)?
 - [ ] Does backend request validation use shared `z.object` schemas via `validateRequest`?
 - [ ] Are new utility functions documented with JSDoc?
+
+## Frontend Baseline
+
+- Frontend codebase is now TypeScript-first (`.ts/.tsx`) with centralized types under `frontend/src/types/`.
+- Service layer uses explicit typed I/O contracts and admin service domain split (`frontend/src/services/admin/*` with compatibility facade in `adminService.ts`).
+- Context contracts are explicitly typed (`AuthContext`, `ThemeContext`, `SettingsContext`) with safe `useXxx()` guards.
+- Frontend validation gates are stable:
+  - `npm run type-check`
+  - `npm run lint:check`
+  - `CI=true npm test -- --watchAll=false --coverage`
+- Test typing now has dedicated progressive gates:
+  - `npm run type-check:tests:services`
+  - `npm run type-check:tests:hooks`
+  - `npm run type-check:tests:all`

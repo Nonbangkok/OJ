@@ -8,8 +8,8 @@ jest.mock('../../../services/adminService');
 
 describe('useAdminSettings', () => {
     const mockRefreshSettings = jest.fn();
-    const wrapper = ({ children }) => (
-        <SettingsContext.Provider value={{ refreshSettings: mockRefreshSettings }}>
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <SettingsContext.Provider value={{ refreshSettings: mockRefreshSettings, isLoading: false, registrationEnabled: true }}>
             {children}
         </SettingsContext.Provider>
     );
@@ -17,7 +17,7 @@ describe('useAdminSettings', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         // Default mocks
-        adminService.getRegistrationSettings.mockResolvedValue({ enabled: true });
+        (jest.mocked(adminService.getRegistrationSettings) as jest.Mock).mockResolvedValue({ enabled: true });
     });
 
     it('fetches registration status on mount', async () => {
@@ -34,7 +34,7 @@ describe('useAdminSettings', () => {
     });
 
     it('handles toggle registration', async () => {
-        adminService.updateRegistrationSettings.mockResolvedValueOnce({ message: 'Success' });
+        (jest.mocked(adminService.updateRegistrationSettings) as jest.Mock).mockResolvedValueOnce({ message: 'Success', enabled: false });
 
         const { result } = renderHook(() => useAdminSettings(), { wrapper });
 
@@ -51,7 +51,13 @@ describe('useAdminSettings', () => {
 
     it('handles database export', async () => {
         const mockData = new Blob(['dummy content'], { type: 'application/sql' });
-        adminService.exportDatabase.mockResolvedValueOnce({ data: mockData });
+        (jest.mocked(adminService.exportDatabase) as jest.Mock).mockResolvedValueOnce({
+            data: mockData,
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            config: { headers: {} }
+        });
 
         // Mock URL.createObjectURL and other DOM APIs
         window.URL.createObjectURL = jest.fn(() => 'mock-url');

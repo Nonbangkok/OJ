@@ -26,15 +26,20 @@ describe('Navbar Component', () => {
   const mockLogout = jest.fn();
 
   beforeEach(() => {
-    useAuth.mockReturnValue({
+    jest.mocked(useAuth).mockReturnValue({
       user: null,
+      isLoading: false,
+      login: jest.fn(),
       logout: mockLogout,
     });
-    useSettings.mockReturnValue({
+    jest.mocked(useSettings).mockReturnValue({
       registrationEnabled: true,
+      isLoading: false,
+      refreshSettings: jest.fn(),
     });
-    useTheme.mockReturnValue({
+    jest.mocked(useTheme).mockReturnValue({
       theme: 'light',
+      toggleTheme: jest.fn(),
     });
   });
 
@@ -46,8 +51,10 @@ describe('Navbar Component', () => {
   });
 
   test('does not render register link if registration is disabled', () => {
-    useSettings.mockReturnValue({
+    jest.mocked(useSettings).mockReturnValue({
       registrationEnabled: false,
+      isLoading: false,
+      refreshSettings: jest.fn(),
     });
 
     render(<Navbar />);
@@ -57,8 +64,10 @@ describe('Navbar Component', () => {
   });
 
   test('renders username and logout button when user is logged in', () => {
-    useAuth.mockReturnValue({
-      user: { username: 'testuser', role: 'user' },
+    jest.mocked(useAuth).mockReturnValue({
+      user: { id: 1, username: 'testuser', role: 'user' },
+      isLoading: false,
+      login: jest.fn(),
       logout: mockLogout,
     });
 
@@ -69,8 +78,10 @@ describe('Navbar Component', () => {
   });
 
   test('renders Admin Panel link only for admins', () => {
-    useAuth.mockReturnValue({
-      user: { username: 'adminuser', role: 'admin' },
+    jest.mocked(useAuth).mockReturnValue({
+      user: { id: 2, username: 'adminuser', role: 'admin' },
+      isLoading: false,
+      login: jest.fn(),
       logout: mockLogout,
     });
 
@@ -80,8 +91,10 @@ describe('Navbar Component', () => {
   });
 
   test('calls logout function when logout button is clicked', () => {
-    useAuth.mockReturnValue({
-      user: { username: 'testuser', role: 'user' },
+    jest.mocked(useAuth).mockReturnValue({
+      user: { id: 3, username: 'testuser', role: 'user' },
+      isLoading: false,
+      login: jest.fn(),
       logout: mockLogout,
     });
 

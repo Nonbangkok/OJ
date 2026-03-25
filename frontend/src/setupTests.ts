@@ -7,10 +7,13 @@ jest.mock('./context/ThemeContext', () => ({
     useTheme: () => ({ theme: 'light' })
 }));
 
+let consoleErrorSpy: jest.SpyInstance | null = null;
+
 beforeEach(() => {
-    jest.spyOn(console, 'error').mockImplementation(() => { });
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
 });
 
 afterEach(() => {
-    console.error.mockRestore();
+    consoleErrorSpy?.mockRestore();
+    consoleErrorSpy = null;
 });

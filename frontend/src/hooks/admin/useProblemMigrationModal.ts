@@ -53,7 +53,7 @@ const useProblemMigrationModal = (contest, onSuccess) => {
         }
     };
 
-    const handleMoveToMain = async (problemId) => {
+    const handleMoveToMain = async (problemId = null) => {
         const problemIdsToRemove = problemId ? [problemId] : selectedContest;
 
         if (problemIdsToRemove.length === 0) {

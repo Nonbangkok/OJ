@@ -15,9 +15,9 @@ describe('useContestManagement', () => {
     ];
 
     it('fetches contests on mount', async () => {
-        adminService.getContests.mockResolvedValueOnce(mockContests);
+        (jest.mocked(adminService.getContests) as jest.Mock).mockResolvedValueOnce(mockContests);
 
-        const { result } = renderHook(() => useContestManagement());
+        const { result } = renderHook(() => useContestManagement(undefined));
 
         expect(result.current.loading).toBe(true);
         expect(result.current.contests).toEqual([]);
@@ -31,9 +31,9 @@ describe('useContestManagement', () => {
     });
 
     it('handles API errors when fetching', async () => {
-        adminService.getContests.mockRejectedValueOnce(new Error('Fetch Failed'));
+        (jest.mocked(adminService.getContests) as jest.Mock).mockRejectedValueOnce(new Error('Fetch Failed'));
 
-        const { result } = renderHook(() => useContestManagement());
+        const { result } = renderHook(() => useContestManagement(undefined));
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
@@ -43,10 +43,10 @@ describe('useContestManagement', () => {
     });
 
     it('handles contest deletion', async () => {
-        adminService.getContests.mockResolvedValueOnce(mockContests);
-        adminService.deleteContest.mockResolvedValueOnce({});
+        (jest.mocked(adminService.getContests) as jest.Mock).mockResolvedValueOnce(mockContests);
+        (jest.mocked(adminService.deleteContest) as jest.Mock).mockResolvedValueOnce({});
 
-        const { result } = renderHook(() => useContestManagement());
+        const { result } = renderHook(() => useContestManagement(undefined));
 
         await waitFor(() => expect(result.current.loading).toBe(false));
 

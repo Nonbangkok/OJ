@@ -1,3 +1,4 @@
+import type { AxiosDefaults } from 'axios';
 import api from '../../services/api';
 import problemService from '../../services/problemService';
 
@@ -14,8 +15,8 @@ describe('Problem Service', () => {
     });
 
     it('getAllWithStats fetches problems with stats', async () => {
-        const mockData = [{ id: 1, title: 'A problem', best_score: 100 }];
-        api.get.mockResolvedValueOnce({ data: mockData });
+        const mockData = [{ id: 'P1', title: 'A problem', author: null, time_limit_ms: 1000, memory_limit_mb: 256, best_score: 100 }];
+        jest.mocked(api.get).mockResolvedValueOnce({ data: mockData });
 
         const result = await problemService.getAllWithStats();
 
@@ -24,8 +25,8 @@ describe('Problem Service', () => {
     });
 
     it('getDetails fetches a single problem', async () => {
-        const mockData = { id: 1, title: 'A problem', time_limit_ms: 1000 };
-        api.get.mockResolvedValueOnce({ data: mockData });
+        const mockData = { id: 'P1', title: 'A problem', author: null, time_limit_ms: 1000, memory_limit_mb: 256 };
+        jest.mocked(api.get).mockResolvedValueOnce({ data: mockData });
 
         const result = await problemService.getDetails('1');
 
@@ -34,8 +35,8 @@ describe('Problem Service', () => {
     });
 
     it('getContestProblemDetails fetches contest problem', async () => {
-        const mockData = { id: 'P1', title: 'Contest Problem' };
-        api.get.mockResolvedValueOnce({ data: mockData });
+        const mockData = { id: 'P1', title: 'Contest Problem', author: null, time_limit_ms: 1000, memory_limit_mb: 256 };
+        jest.mocked(api.get).mockResolvedValueOnce({ data: mockData });
 
         const result = await problemService.getContestProblemDetails('contest-1', 'P1');
 
@@ -53,5 +54,13 @@ describe('Problem Service', () => {
         const url = problemService.getPdfUrl('P1', 'contest-1');
 
         expect(url).toBe('http://localhost:5000/api/contests/contest-1/problems/P1/pdf');
+    });
+
+    it('getPdfUrl uses empty base URL fallback when API baseURL is missing', () => {
+        (api.defaults as AxiosDefaults).baseURL = undefined;
+
+        const url = problemService.getPdfUrl('P1');
+
+        expect(url).toBe('/problems/P1/pdf');
     });
 });

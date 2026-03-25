@@ -1,37 +1,59 @@
-import { createContext, useState, useEffect, useContext } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+
 import authService from '../services/authService';
+import type { AuthUser } from '../types';
 
-const AuthContext = createContext();
+interface AuthContextValue {
+  user: AuthUser | null;
+  isLoading: boolean;
+  login: (userData: AuthUser) => void;
+  logout: () => Promise<void>;
+}
 
-export const useAuth = () => useContext(AuthContext);
+interface AuthProviderProps {
+  children: ReactNode;
+}
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+export const useAuth = (): AuthContextValue => {
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+
+  return context;
+};
+
+export const AuthProvider = ({ children }: AuthProviderProps) => {
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const checkLoggedIn = async () => {
-      try {
-        const data = await authService.checkLogin();
-        if (data.isAuthenticated) {
-          setUser(data.user);
-        } else {
-          setUser(null);
-        }
-      } catch (error) {
+  const checkLoggedIn = useCallback(async () => {
+    try {
+      const data = await authService.checkLogin();
+      if (data.isAuthenticated) {
+        setUser(data.user);
+      } else {
         setUser(null);
-      } finally {
-        setIsLoading(false);
       }
-    };
-    checkLoggedIn();
+    } catch {
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const login = (userData) => {
-    setUser(userData);
-  };
+  useEffect(() => {
+    void checkLoggedIn();
+  }, [checkLoggedIn]);
 
-  const logout = async () => {
+  const login = useCallback((userData: AuthUser) => {
+    setUser(userData);
+  }, []);
+
+  const logout = useCallback(async () => {
     try {
       await authService.logout();
     } catch (error) {
@@ -39,14 +61,12 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setUser(null);
     }
-  };
+  }, []);
 
-  const value = {
-    user,
-    isLoading,
-    login,
-    logout,
-  };
+  const value = useMemo<AuthContextValue>(
+    () => ({ user, isLoading, login, logout }),
+    [user, isLoading, login, logout],
+  );
 
   return <AuthContext.Provider value={value}>{!isLoading && children}</AuthContext.Provider>;
 };

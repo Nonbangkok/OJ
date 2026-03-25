@@ -14,7 +14,7 @@ describe('useScoreboard', () => {
             { username: 'user1', problems_solved: 5, total_score: 500 },
             { username: 'user2', problems_solved: 3, total_score: 300 }
         ];
-        scoreboardService.getGlobal.mockResolvedValue(mockScoreboard);
+        (jest.mocked(scoreboardService.getGlobal) as jest.Mock).mockResolvedValue(mockScoreboard);
 
         const { result } = renderHook(() => useScoreboard());
 
@@ -30,7 +30,7 @@ describe('useScoreboard', () => {
     });
 
     it('should handle errors when fetching scoreboard', async () => {
-        scoreboardService.getGlobal.mockRejectedValue(new Error('Network error'));
+        (jest.mocked(scoreboardService.getGlobal) as jest.Mock).mockRejectedValue(new Error('Network error'));
 
         const { result } = renderHook(() => useScoreboard());
 

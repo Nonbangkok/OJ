@@ -18,12 +18,12 @@ describe('useProblemDetail Hook', () => {
     });
 
     it('fetches problem detail successfully without contestId', async () => {
-        useParams.mockReturnValue({ problemId: '1' });
+        (jest.mocked(useParams) as jest.Mock).mockReturnValue({ problemId: '1' });
         const mockDetails = { id: '1', title: 'Problem 1' };
         const mockStats = [{ id: '1', accepted: 10, total: 20 }];
 
-        problemService.getDetails.mockResolvedValueOnce(mockDetails);
-        problemService.getAllWithStats.mockResolvedValueOnce(mockStats);
+        (jest.mocked(problemService.getDetails) as jest.Mock).mockResolvedValueOnce(mockDetails);
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(mockStats);
 
         const { result } = renderHook(() => useProblemDetail());
 
@@ -36,12 +36,12 @@ describe('useProblemDetail Hook', () => {
     });
 
     it('fetches problem detail successfully with contestId', async () => {
-        useParams.mockReturnValue({ problemId: '1', contestId: 'contest-123' });
+        (jest.mocked(useParams) as jest.Mock).mockReturnValue({ problemId: '1', contestId: 'contest-123' });
         const mockProblem = { id: '1', title: 'Contest Problem' };
         const mockContest = { id: 'contest-123', title: 'Contest' };
 
-        problemService.getContestProblemDetails.mockResolvedValueOnce(mockProblem);
-        contestService.getById.mockResolvedValueOnce(mockContest);
+        (jest.mocked(problemService.getContestProblemDetails) as jest.Mock).mockResolvedValueOnce(mockProblem);
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce(mockContest);
 
         const { result } = renderHook(() => useProblemDetail());
 
@@ -54,8 +54,10 @@ describe('useProblemDetail Hook', () => {
     });
 
     it('handles hidden problem (403)', async () => {
-        useParams.mockReturnValue({ problemId: '1' });
-        const error = new Error('Forbidden');
+        (jest.mocked(useParams) as jest.Mock).mockReturnValue({ problemId: '1' });
+        const error = new Error('Forbidden') as Error & {
+            response?: { status?: number; data?: { message?: string; problemId?: string; title?: string; detail?: string } };
+        };
         error.response = {
             status: 403,
             data: {
@@ -65,7 +67,7 @@ describe('useProblemDetail Hook', () => {
                 detail: 'Detailed info'
             }
         };
-        problemService.getDetails.mockRejectedValueOnce(error);
+        (jest.mocked(problemService.getDetails) as jest.Mock).mockRejectedValueOnce(error);
 
         const { result } = renderHook(() => useProblemDetail());
 
@@ -81,10 +83,10 @@ describe('useProblemDetail Hook', () => {
     });
 
     it('handles problem not found (404)', async () => {
-        useParams.mockReturnValue({ problemId: '999' });
-        const error = new Error('Not Found');
+        (jest.mocked(useParams) as jest.Mock).mockReturnValue({ problemId: '999' });
+        const error = new Error('Not Found') as Error & { response?: { status?: number; data?: { message?: string } } };
         error.response = { status: 404 };
-        problemService.getDetails.mockRejectedValueOnce(error);
+        (jest.mocked(problemService.getDetails) as jest.Mock).mockRejectedValueOnce(error);
 
         const { result } = renderHook(() => useProblemDetail());
 
@@ -96,10 +98,10 @@ describe('useProblemDetail Hook', () => {
     });
 
     it('handles general fetch error', async () => {
-        useParams.mockReturnValue({ problemId: '1' });
-        const error = new Error('Server Error');
+        (jest.mocked(useParams) as jest.Mock).mockReturnValue({ problemId: '1' });
+        const error = new Error('Server Error') as Error & { response?: { status?: number; data?: { message?: string } } };
         error.response = { data: { message: 'Something went wrong' } };
-        problemService.getDetails.mockRejectedValueOnce(error);
+        (jest.mocked(problemService.getDetails) as jest.Mock).mockRejectedValueOnce(error);
 
         const { result } = renderHook(() => useProblemDetail());
 

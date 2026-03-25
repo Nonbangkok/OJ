@@ -8,7 +8,7 @@ jest.mock('../context/ThemeContext', () => ({
 
 describe('ThemeToggleButton', () => {
   test('renders the toggle button', () => {
-    useTheme.mockReturnValue({ theme: 'light', toggleTheme: jest.fn() });
+    jest.mocked(useTheme).mockReturnValue({ theme: 'light', toggleTheme: jest.fn() });
     render(<ThemeToggleButton />);
     const button = screen.getByRole('button');
     expect(button).toBeInTheDocument();

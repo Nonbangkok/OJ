@@ -19,9 +19,9 @@ window.URL.createObjectURL = jest.fn();
 window.URL.revokeObjectURL = jest.fn();
 
 const mockProblems = [
-    { id: 'P1', title: 'Problem 1', is_visible: true, contest_id: null },
-    { id: 'P2', title: 'Problem 2', is_visible: false, contest_id: null },
-    { id: 'P3', title: 'Problem 3', is_visible: true, contest_id: 1, contest_status: 'running' },
+    { id: 'P1', title: 'Problem 1', author: 'admin', is_visible: true, contest_id: null, contest_status: null },
+    { id: 'P2', title: 'Problem 2', author: 'admin', is_visible: false, contest_id: null, contest_status: null },
+    { id: 'P3', title: 'Problem 3', author: 'admin', is_visible: true, contest_id: 1, contest_status: 'running' },
 ];
 
 const mockCurrentUser = { id: 1, username: 'admin', role: 'admin' };
@@ -37,11 +37,11 @@ const renderProblemManagement = () => {
 describe('ProblemManagement Component', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        adminService.getProblems.mockResolvedValue(mockProblems);
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(mockProblems);
     });
 
     it('renders loading state initially', () => {
-        adminService.getProblems.mockReturnValue(new Promise(() => { }));
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockReturnValue(new Promise(() => { }));
         renderProblemManagement();
         expect(screen.getByText(/loading problems\.\.\.$/i)).toBeInTheDocument();
     });
@@ -57,7 +57,7 @@ describe('ProblemManagement Component', () => {
     });
 
     it('handles visibility toggle', async () => {
-        adminService.updateProblemVisibility.mockResolvedValue({ message: 'Updated' });
+        (jest.mocked(adminService.updateProblemVisibility) as jest.Mock).mockResolvedValue({ message: 'Updated' });
         renderProblemManagement();
 
         await waitFor(() => screen.getByText('Problem 2'));
@@ -80,7 +80,7 @@ describe('ProblemManagement Component', () => {
     });
 
     it('handles bulk actions (Hide All)', async () => {
-        adminService.updateProblemVisibility.mockResolvedValue({ message: 'Updated' });
+        (jest.mocked(adminService.updateProblemVisibility) as jest.Mock).mockResolvedValue({ message: 'Updated' });
         renderProblemManagement();
 
         await waitFor(() => screen.getByText('Hide All'));
@@ -98,7 +98,7 @@ describe('ProblemManagement Component', () => {
     });
 
     it('handles individual problem deletion', async () => {
-        adminService.deleteProblem.mockResolvedValue({ message: 'Deleted' });
+        (jest.mocked(adminService.deleteProblem) as jest.Mock).mockResolvedValue({ message: 'Deleted' });
         renderProblemManagement();
 
         await waitFor(() => screen.getByText('Problem 1'));
@@ -116,9 +116,12 @@ describe('ProblemManagement Component', () => {
     });
 
     it('handles problem export', async () => {
-        adminService.exportProblems.mockResolvedValue({
+        (jest.mocked(adminService.exportProblems) as jest.Mock).mockResolvedValue({
             data: new Blob(),
-            headers: { 'content-type': 'application/zip' }
+            headers: { 'content-type': 'application/zip' },
+            status: 200,
+            statusText: 'OK',
+            config: { headers: {} },
         });
         renderProblemManagement();
 

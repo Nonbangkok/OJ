@@ -71,7 +71,7 @@ Three global contexts wrap the entire app in this order:
 
 ### Custom Hooks
 
-- **One hook per file**, named `useXxxYyy.ts` (or `.js` for frontend).
+- **One hook per file**, named `useXxxYyy.ts`/`useXxxYyy.tsx`.
 - Always return an object (not an array) with named properties: `{ data, loading, error, actions... }`.
 - Use `useCallback` for functions passed as dependencies or to child components.
 - Hooks own the loading/error state — pages just destructure and render.
@@ -79,13 +79,13 @@ Three global contexts wrap the entire app in this order:
 ### Service Layer
 
 - Each service is a **plain object** with methods (not a class).
-- All services import the shared `api` Axios instance from `services/api.js`.
+- All services import the shared `api` Axios instance from `services/api.ts`.
 - The Axios instance has `withCredentials: true` (session cookies) and `baseURL` from `REACT_APP_API_URL`.
 - **Pattern:**
-  ```javascript
+  ```typescript
   const xxxService = {
-    getAll: async (params) => {
-      const response = await api.get('/endpoint', { params });
+    getAll: async (params: SomeQuery): Promise<SomeResponse> => {
+      const response = await api.get<SomeResponse>('/endpoint', { params });
       return response.data;
     },
   };
@@ -142,7 +142,7 @@ Three global contexts wrap the entire app in this order:
 
 - All magic numbers and string literals are centralized in `backend/constants/index.js`.
 - Groups: `USER_ROLES`, `CONTEST_STATUS`, `SUBMISSION_STATUS`, `UPLOAD_STATUS`, `USER_VALIDATION`, `PROBLEM_VALIDATION`, `SECURITY_CONFIG`, `JUDGE_CONFIG`, `FILE_CONFIG`.
-- Frontend constants split across `src/utils/constants.js` (app-wide) and `src/config/constants.js` (polling/UI timeouts).
+- Frontend constants split across `src/utils/constants.ts` (app-wide) and `src/config/constants.ts` (polling/UI timeouts).
 - Type aliases should be derived from constants when possible:
   - `type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES]`
   - `type ContestStatus = 'scheduled' | typeof CONTEST_STATUS[keyof typeof CONTEST_STATUS]`
@@ -152,7 +152,7 @@ Three global contexts wrap the entire app in this order:
 
 ## Constraints & Rules
 
-1. **No hardcoded values** — use constants files (`backend/constants/index.js`, `frontend/src/config/constants.js`) or environment variables.
+1. **No hardcoded values** — use constants files (`backend/constants/index.ts`, `frontend/src/config/constants.ts`) or environment variables.
 2. **No ORM** — raw SQL with parameterized queries only. Always use `$1, $2, ...` placeholders.
 3. **JSDoc on all public utility functions** — see `formatters.js` for the standard format.
 4. **Error handling in every async function** — `try/catch` with meaningful error messages.
@@ -183,3 +183,11 @@ Three global contexts wrap the entire app in this order:
 - Mock services and context providers in tests.
 - Run with `npm test` (watch mode) or `CI=true npm test` (single run).
 - Jest config includes custom `moduleNameMapper` for `react-router-dom` v7 compatibility.
+- Frontend CI validation gates:
+  - `npm run type-check`
+  - `npm run lint:check`
+  - `npm run test:ci`
+- Progressive frontend test typing gates:
+  - `npm run type-check:tests:services`
+  - `npm run type-check:tests:hooks`
+  - `npm run type-check:tests:all`

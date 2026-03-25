@@ -7,7 +7,7 @@ jest.mock('../../../services/adminService');
 describe('useProblemModal', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        adminService.getAuthors.mockResolvedValue([{ id: 1, username: 'admin' }]);
+        (jest.mocked(adminService.getAuthors) as jest.Mock).mockResolvedValue([{ id: 1, username: 'admin' }]);
     });
 
     it('initializes default values', async () => {

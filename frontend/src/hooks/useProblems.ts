@@ -1,18 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import problemService from '../services/problemService';
 import contestService from '../services/contestService';
+import type { ProblemBase, ProblemDetail } from '../types';
 
 /**
  * Fetches problem list with stats. If contestId is provided,
  * fetches contest-specific problems instead.
  * @param {string} [contestId] - Optional contest ID for contest problems
  */
-export const useProblems = (contestId) => {
-  const [problems, setProblems] = useState([]);
+type ProblemsList = ProblemBase[] | ProblemDetail[];
+
+interface UseProblemsResult {
+  problems: ProblemsList;
+  loading: boolean;
+  error: string;
+  refresh: () => Promise<void>;
+}
+
+export const useProblems = (contestId: string | null = null): UseProblemsResult => {
+  const [problems, setProblems] = useState<ProblemsList>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const fetchProblems = async () => {
+  const fetchProblems = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -27,11 +37,11 @@ export const useProblems = (contestId) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [contestId]);
 
   useEffect(() => {
-    fetchProblems();
-  }, [contestId]);
+    void fetchProblems();
+  }, [fetchProblems]);
 
   return { problems, loading, error, refresh: fetchProblems };
 };

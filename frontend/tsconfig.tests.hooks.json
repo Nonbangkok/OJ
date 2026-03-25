@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "isolatedModules": false,
+    "types": ["node", "jest"]
+  },
+  "include": [
+    "src/hooks/**/*.ts",
+    "src/hooks/**/*.tsx",
+    "src/services/**/*.ts",
+    "src/context/**/*.tsx",
+    "src/types/**/*.ts",
+    "src/utils/**/*.ts",
+    "src/config/**/*.ts",
+    "src/tests/hooks/**/*.ts",
+    "src/tests/hooks/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "build",
+    "dist"
+  ]
+}

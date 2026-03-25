@@ -30,7 +30,7 @@ const Admin = () => {
 
       {(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.STAFF) && (
         <div className={styles['admin-section']}>
-          <ContestManagement currentUser={user} />
+          <ContestManagement />
         </div>
       )}
 

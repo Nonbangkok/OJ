@@ -37,7 +37,10 @@ describe('Login Page', () => {
     });
 
     it('submits credentials successfully', async () => {
-        authService.login.mockResolvedValueOnce({ user: { username: 'testuser', role: 'user' } });
+        jest.mocked(authService.login).mockResolvedValueOnce({
+            message: 'Logged in',
+            user: { id: 1, username: 'testuser', role: 'user' }
+        });
 
         render(
             <BrowserRouter>
@@ -55,7 +58,7 @@ describe('Login Page', () => {
     });
 
     it('displays error on failed login', async () => {
-        authService.login.mockRejectedValueOnce({ response: { data: { message: 'Invalid credentials' } } });
+        jest.mocked(authService.login).mockRejectedValueOnce({ response: { data: { message: 'Invalid credentials' } } });
 
         render(
             <BrowserRouter>

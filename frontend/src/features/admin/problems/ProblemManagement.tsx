@@ -5,7 +5,11 @@ import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 import LoadingPage from '../../../components/shared/LoadingPage';
 
-const ProblemManagement = ({ currentUser }) => {
+interface ProblemManagementProps {
+  currentUser?: { username?: string } | null;
+}
+
+const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
   const {
     problems,
     loading,

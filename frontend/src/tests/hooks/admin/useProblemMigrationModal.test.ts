@@ -16,12 +16,12 @@ describe('useProblemMigrationModal', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        adminService.getAvailableProblems.mockResolvedValue(mockAvailable);
-        adminService.getContestProblemsAdmin.mockResolvedValue(mockContestProblems);
+        (jest.mocked(adminService.getAvailableProblems) as jest.Mock).mockResolvedValue(mockAvailable);
+        (jest.mocked(adminService.getContestProblemsAdmin) as jest.Mock).mockResolvedValue(mockContestProblems);
     });
 
     it('fetches problems on mount', async () => {
-        const { result } = renderHook(() => useProblemMigrationModal(mockContest));
+        const { result } = renderHook(() => useProblemMigrationModal(mockContest, jest.fn()));
 
         expect(result.current.loading).toBe(true);
 
@@ -34,7 +34,7 @@ describe('useProblemMigrationModal', () => {
     });
 
     it('handles moving problems to contest', async () => {
-        adminService.migrateContestProblems.mockResolvedValueOnce({});
+        (jest.mocked(adminService.migrateContestProblems) as jest.Mock).mockResolvedValueOnce({});
         const mockSuccess = jest.fn();
         const { result } = renderHook(() => useProblemMigrationModal(mockContest, mockSuccess));
 
@@ -57,8 +57,8 @@ describe('useProblemMigrationModal', () => {
     });
 
     it('handles moving problems to main', async () => {
-        adminService.migrateContestProblems.mockResolvedValueOnce({});
-        const { result } = renderHook(() => useProblemMigrationModal(mockContest));
+        (jest.mocked(adminService.migrateContestProblems) as jest.Mock).mockResolvedValueOnce({});
+        const { result } = renderHook(() => useProblemMigrationModal(mockContest, jest.fn()));
 
         await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -76,7 +76,7 @@ describe('useProblemMigrationModal', () => {
     });
 
     it('handles selection of all problems', async () => {
-        const { result } = renderHook(() => useProblemMigrationModal(mockContest));
+        const { result } = renderHook(() => useProblemMigrationModal(mockContest, jest.fn()));
 
         await waitFor(() => expect(result.current.loading).toBe(false));
 

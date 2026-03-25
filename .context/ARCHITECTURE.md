@@ -23,7 +23,7 @@
 | Containerization | Docker + Compose | — |
 | Testing (BE) | Jest 30 + Supertest 7 | — |
 | Testing (FE) | Jest + React Testing Library 16 | — |
-| Language | TypeScript (backend), JavaScript (ESM frontend) | — |
+| Language | TypeScript (backend + frontend) | — |
 | Judged Language | C++ (compiled & executed in isolated sandbox) | — |
 
 ## System Hierarchy
@@ -96,30 +96,31 @@ OJ/
 │
 ├── frontend/               # React SPA (Create React App)
 │   └── src/
-│       ├── App.js          # Root component, routing, provider tree
-│       ├── index.js        # ReactDOM entry
+│       ├── App.tsx         # Root component, routing, provider tree
+│       ├── index.tsx       # ReactDOM entry
 │       ├── index.css       # Global styles & CSS variables
 │       ├── config/
-│       │   └── constants.js      # Polling intervals, UI timeouts
+│       │   └── constants.ts      # Polling intervals, UI timeouts
 │       ├── context/              # React Context providers
-│       │   ├── AuthContext.js    # User auth state + login/logout
-│       │   ├── ThemeContext.js   # Light/dark theme toggle
-│       │   └── SettingsContext.js # System settings (registration)
+│       │   ├── AuthContext.tsx   # User auth state + login/logout
+│       │   ├── ThemeContext.tsx  # Light/dark theme toggle
+│       │   └── SettingsContext.tsx # System settings (registration)
 │       ├── services/             # API abstraction layer (Axios)
-│       │   ├── api.js            # Axios instance (base URL, credentials)
-│       │   ├── authService.js
-│       │   ├── adminService.js
-│       │   ├── problemService.js
-│       │   ├── submissionService.js
-│       │   ├── contestService.js
-│       │   └── scoreboardService.js
+│       │   ├── api.ts            # Axios instance (base URL, credentials)
+│       │   ├── authService.ts
+│       │   ├── adminService.ts
+│       │   ├── admin/            # usersAdminService, problemsAdminService, ...
+│       │   ├── problemService.ts
+│       │   ├── submissionService.ts
+│       │   ├── contestService.ts
+│       │   └── scoreboardService.ts
 │       ├── hooks/                # Custom React hooks (page logic)
-│       │   ├── useContests.js, useContestDetail.js, ...
-│       │   ├── useProblems.js, useProblemDetail.js, ...
-│       │   ├── useSubmissions.js, useSubmissionModal.js, ...
-│       │   ├── useCodeSubmission.js, useScoreboard.js, ...
-│       │   ├── useAuthForms.js, useAutocomplete.js, ...
-│       │   ├── useHomeQuotes.js, useAdminPage.js
+│       │   ├── useContests.ts, useContestDetail.ts, ...
+│       │   ├── useProblems.ts, useProblemDetail.ts, ...
+│       │   ├── useSubmissions.ts, useSubmissionModal.ts, ...
+│       │   ├── useCodeSubmission.ts, useScoreboard.ts, ...
+│       │   ├── useAuthForms.ts, useAutocomplete.ts, ...
+│       │   ├── useHomeQuotes.ts, useAdminPage.ts
 │       │   └── admin/            # Admin-specific hooks
 │       ├── pages/                # Route-level page components
 │       │   ├── home/       ├── auth/        ├── problem/
@@ -138,13 +139,25 @@ OJ/
 │       │   ├── admin/            # AdminLayout (sidebar + content)
 │       │   └── contest/          # ContestLayout (contest navbar + content)
 │       ├── utils/
-│       │   ├── constants.js      # App-wide constants
-│       │   └── formatters.js     # Date, status, result formatting utilities
+│       │   ├── constants.ts      # App-wide constants
+│       │   ├── error.ts          # Unknown/API-like error normalization helper
+│       │   └── formatters.ts     # Date, status, result formatting utilities
 │       └── tests/                # Jest + RTL tests
 │
 └── tests/
     └── run_tests.sh        # Unified test runner (BE then FE)
 ```
+
+## Frontend Quality Gates
+
+- Main CI validation command: `npm run validate`
+  - `npm run type-check`
+  - `npm run lint:check`
+  - `npm run test:ci`
+- Progressive frontend test typing commands:
+  - `npm run type-check:tests:services`
+  - `npm run type-check:tests:hooks`
+  - `npm run type-check:tests:all`
 
 ## Logical Flows
 

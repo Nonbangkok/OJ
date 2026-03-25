@@ -2,7 +2,12 @@ import { Link } from 'react-router-dom';
 import { formatTimeAgo, formatDateAbsolute, generateResultString } from '../../utils/formatters';
 import styles from './ProblemCard.module.css';
 
-const ProblemCard = ({ problem, contestId }) => {
+interface ProblemCardProps {
+    problem: any;
+    contestId?: string | null;
+}
+
+const ProblemCard = ({ problem, contestId = null }: ProblemCardProps) => {
     const hasSubmitted = problem.submission_count > 0;
     const linkPath = contestId
         ? `/contests/${contestId}/problems/${problem.id}`

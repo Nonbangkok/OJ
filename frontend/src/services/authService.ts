@@ -1,54 +1,38 @@
 import api from './api';
 
-/**
- * Service for handling authentication and user sessions.
- */
+import type {
+  LoginResponse,
+  MeResponse,
+  RegisterResponse,
+  RegistrationSettingsResponse,
+} from '../types';
+import type { LoginRequest, RegisterRequest } from '../types';
+
 const authService = {
-  /**
-   * Checks the current session login status.
-   * @returns {Promise<Object>} User data and authentication status
-   */
-  checkLogin: async () => {
-    const response = await api.get('/me');
+  checkLogin: async (): Promise<MeResponse> => {
+    const response = await api.get<MeResponse>('/me');
     return response.data;
   },
 
-  /**
-   * Logs in a user.
-   * @param {string} username
-   * @param {string} password
-   * @returns {Promise<Object>} Logged in user data
-   */
-  login: async (username, password) => {
-    const response = await api.post('/login', { username, password });
+  login: async (username: LoginRequest['username'], password: LoginRequest['password']): Promise<LoginResponse> => {
+    const response = await api.post<LoginResponse>('/login', { username, password });
     return response.data;
   },
 
-  /**
-   * Logs out the current user by destroying the session.
-   * @returns {Promise<void>}
-   */
-  logout: async () => {
+  logout: async (): Promise<void> => {
     await api.post('/logout');
   },
 
-  /**
-   * Registers a new user account.
-   * @param {string} username
-   * @param {string} password
-   * @returns {Promise<Object>} New user data
-   */
-  register: async (username, password) => {
-    const response = await api.post('/register', { username, password });
+  register: async (
+    username: RegisterRequest['username'],
+    password: RegisterRequest['password'],
+  ): Promise<RegisterResponse> => {
+    const response = await api.post<RegisterResponse>('/register', { username, password });
     return response.data;
   },
 
-  /**
-   * Fetches current registration settings (e.g., if registration is enabled).
-   * @returns {Promise<Object>} Registration settings
-   */
-  getRegistrationSettings: async () => {
-    const response = await api.get('/settings/registration');
+  getRegistrationSettings: async (): Promise<RegistrationSettingsResponse> => {
+    const response = await api.get<RegistrationSettingsResponse>('/settings/registration');
     return response.data;
   },
 };

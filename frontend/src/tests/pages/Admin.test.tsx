@@ -23,7 +23,7 @@ describe('Admin Page', () => {
     });
 
     it('displays loading state initially', () => {
-        authService.checkLogin.mockReturnValue(new Promise(() => { }));
+        jest.mocked(authService.checkLogin).mockReturnValue(new Promise(() => { }));
 
         render(
             <BrowserRouter>
@@ -35,8 +35,8 @@ describe('Admin Page', () => {
     });
 
     it('displays admin panel and sections for admin user', async () => {
-        authService.checkLogin.mockResolvedValueOnce({
-            isAuthenticated: true, user: { username: 'admin', role: 'admin' }
+        jest.mocked(authService.checkLogin).mockResolvedValueOnce({
+            isAuthenticated: true, user: { id: 1, username: 'admin', role: 'admin' }
         });
 
         render(
@@ -55,8 +55,8 @@ describe('Admin Page', () => {
     });
 
     it('displays only staff sections for staff user', async () => {
-        authService.checkLogin.mockResolvedValueOnce({
-            isAuthenticated: true, user: { username: 'staff', role: 'staff' }
+        jest.mocked(authService.checkLogin).mockResolvedValueOnce({
+            isAuthenticated: true, user: { id: 2, username: 'staff', role: 'staff' }
         });
 
         render(
@@ -75,8 +75,8 @@ describe('Admin Page', () => {
     });
 
     it('displays nothing for regular user', async () => {
-        authService.checkLogin.mockResolvedValueOnce({
-            isAuthenticated: true, user: { username: 'user', role: 'user' }
+        jest.mocked(authService.checkLogin).mockResolvedValueOnce({
+            isAuthenticated: true, user: { id: 3, username: 'user', role: 'user' }
         });
 
         render(

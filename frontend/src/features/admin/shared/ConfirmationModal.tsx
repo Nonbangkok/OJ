@@ -1,7 +1,28 @@
 import styles from './ModalLayout.module.css';
 
-const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => {
+interface ConfirmationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void | Promise<void>;
+  title: string;
+  message: string;
+  confirmText?: string;
+  confirmStyle?: 'danger' | 'default';
+}
+
+const ConfirmationModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmText = 'Confirm',
+  confirmStyle = 'danger',
+}: ConfirmationModalProps) => {
   if (!isOpen) return null;
+
+  const confirmClass =
+    confirmStyle === 'danger' ? styles['button-danger'] : styles['button-save'];
 
   return (
     <div className={styles['modal-overlay']}>
@@ -10,7 +31,7 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => {
         <p>{message}</p>
         <div className={styles['modal-actions']}>
           <button onClick={onClose} className={styles['button-cancel']}>Cancel</button>
-          <button onClick={onConfirm} className={styles['button-danger']}>Confirm</button>
+          <button onClick={onConfirm} className={confirmClass}>{confirmText}</button>
         </div>
       </div>
     </div>

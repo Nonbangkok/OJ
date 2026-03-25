@@ -15,7 +15,7 @@ describe('useProblemManagement', () => {
     ];
 
     it('fetches problems correctly', async () => {
-        adminService.getProblems.mockResolvedValueOnce(mockProblems);
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(mockProblems);
 
         const { result } = renderHook(() => useProblemManagement());
 
@@ -30,8 +30,8 @@ describe('useProblemManagement', () => {
     });
 
     it('handles problem deletion', async () => {
-        adminService.getProblems.mockResolvedValueOnce(mockProblems);
-        adminService.deleteProblem.mockResolvedValueOnce({});
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(mockProblems);
+        (jest.mocked(adminService.deleteProblem) as jest.Mock).mockResolvedValueOnce({});
 
         const { result } = renderHook(() => useProblemManagement());
 
@@ -51,8 +51,8 @@ describe('useProblemManagement', () => {
     });
 
     it('handles visibility toggle', async () => {
-        adminService.getProblems.mockResolvedValueOnce(mockProblems);
-        adminService.updateProblemVisibility.mockResolvedValueOnce({});
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(mockProblems);
+        (jest.mocked(adminService.updateProblemVisibility) as jest.Mock).mockResolvedValueOnce({});
 
         const { result } = renderHook(() => useProblemManagement());
 
