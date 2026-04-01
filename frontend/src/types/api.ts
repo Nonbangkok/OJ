@@ -20,6 +20,10 @@ export interface ApiMessageResponse {
   message: string;
 }
 
+export interface JobStartResponse extends ApiMessageResponse {
+  jobId?: string;
+}
+
 export interface MeAuthenticatedResponse {
   isAuthenticated: true;
   user: AuthUser;

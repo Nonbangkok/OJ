@@ -15,14 +15,35 @@ export const buildDatabaseImportCommand = (
   if (fileExtension === '.sql') {
     return {
       kind: 'ok',
-      command: `PGPASSWORD=${databasePassword} psql -h ${databaseHost} -p ${databasePort} -U ${databaseUser} -d ${databaseName} -f ${dumpFilePath} -v ON_ERROR_STOP=1`,
+      executable: 'psql',
+      args: [
+        '-h', databaseHost,
+        '-p', databasePort,
+        '-U', databaseUser,
+        '-d', databaseName,
+        '-f', dumpFilePath,
+        '-v', 'ON_ERROR_STOP=1',
+      ],
+      env: {
+        PGPASSWORD: databasePassword,
+      },
     };
   }
 
   if (fileExtension === '.dump' || fileExtension === '.tar') {
     return {
       kind: 'ok',
-      command: `PGPASSWORD=${databasePassword} pg_restore -h ${databaseHost} -p ${databasePort} -U ${databaseUser} -d ${databaseName} -v ${dumpFilePath}`,
+      executable: 'pg_restore',
+      args: [
+        '-h', databaseHost,
+        '-p', databasePort,
+        '-U', databaseUser,
+        '-d', databaseName,
+        dumpFilePath,
+      ],
+      env: {
+        PGPASSWORD: databasePassword,
+      },
     };
   }
 

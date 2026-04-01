@@ -17,7 +17,9 @@ COPY . .
 
 # Build the application for production
 ARG REACT_APP_API_URL
+ARG REACT_APP_LARGE_UPLOAD_API_URL
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
+ENV REACT_APP_LARGE_UPLOAD_API_URL=$REACT_APP_LARGE_UPLOAD_API_URL
 # CRA's production build runs ESLint in this container, but the repo's strict
 # type-aware ESLint config is not compatible with the pinned plugin version.
 ENV DISABLE_ESLINT_PLUGIN=true

@@ -1,11 +1,13 @@
 import type { AxiosResponse } from 'axios';
 
-import api from '../api';
+import api, { largeUploadApi } from '../api';
 
 import type {
   ApiMessageResponse,
+  JobStartResponse,
   RegistrationSettingsResponse,
   RegistrationSettingsUpdateResponse,
+  UploadProgressResponse,
 } from '../../types';
 
 const settingsAdminService = {
@@ -23,10 +25,15 @@ const settingsAdminService = {
     return api.post<Blob>('/admin/database/export', {}, { responseType: 'blob' });
   },
 
-  importDatabase: async (formData: FormData): Promise<ApiMessageResponse> => {
-    const response = await api.post<ApiMessageResponse>('/admin/database/import', formData, {
+  importDatabase: async (formData: FormData): Promise<JobStartResponse> => {
+    const response = await largeUploadApi.post<JobStartResponse>('/admin/database/import', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+    return response.data;
+  },
+
+  getImportDatabaseProgress: async (jobId: string): Promise<UploadProgressResponse> => {
+    const response = await api.get<UploadProgressResponse>(`/admin/database/import-progress/${jobId}`);
     return response.data;
   },
 };

@@ -17,20 +17,7 @@ import contestScheduler from './services/contestScheduler';
 
 const app = express();
 const PgStore = pgSession(session);
-
-app.set('trust proxy', 1);
-const port = Number(env.PORT) || 5000;
-
-app.use(express.json());
-app.use(cors({
-  origin: 'https://www.woi-grader.com',
-  // credentials: false,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
-
-// PostgreSQL session store setup
-app.use(session({
+const sessionMiddleware = session({
   store: new PgStore({
     pool: pool, // Use the existing pg pool from db.ts
     tableName: 'user_sessions', // Name of the table to store sessions
@@ -45,7 +32,28 @@ app.use(session({
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
+});
+
+app.set('trust proxy', 1);
+const port = Number(env.PORT) || 5000;
+
+app.use(express.json());
+app.use(cors({
+  origin: ['https://www.woi-grader.com', 'https://woi-grader.com', 'https://upload.woi-grader.com'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// Database import progress must remain readable while the import temporarily
+// drops the session table.
+app.use((req, res, next) => {
+  if (req.path.startsWith('/admin/database/import-progress/')) {
+    next();
+    return;
+  }
+  sessionMiddleware(req, res, next);
+});
 
 app.use(attachRequestUser);
 

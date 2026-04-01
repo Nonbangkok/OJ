@@ -40,6 +40,7 @@ import {
 
 const router: Router = express.Router();
 const progressMap = new Map<string, Response>();
+const progressHeartbeatMap = new Map<string, NodeJS.Timeout>();
 
 const writeProgressEvent = (progressId: string, event: string, payload: unknown): void => {
   const clientResponse = progressMap.get(progressId);
@@ -55,6 +56,11 @@ const endProgressStream = (progressId: string): void => {
     clientResponse.end();
   }
   progressMap.delete(progressId);
+  const heartbeat = progressHeartbeatMap.get(progressId);
+  if (heartbeat) {
+    clearInterval(heartbeat);
+    progressHeartbeatMap.delete(progressId);
+  }
 };
 
 router.get('/problems-with-stats', requireAuth, asyncHandler(async (req: Request, res: Response) => {
@@ -215,21 +221,43 @@ router.get('/admin/problems/batch-upload-progress/:progressId', requireAuth, req
   validateRequest({ params: progressIdParamSchema }),
   (req: Request, res: Response) => {
   const progressId = String(req.params.progressId);
+  const requestOrigin = req.headers.origin;
+  const allowedOrigins = new Set([
+    'https://www.woi-grader.com',
+    'https://woi-grader.com',
+    'https://upload.woi-grader.com',
+  ]);
+  const responseOrigin = requestOrigin && allowedOrigins.has(requestOrigin)
+    ? requestOrigin
+    : 'https://woi-grader.com';
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*'
+    'Access-Control-Allow-Origin': responseOrigin,
+    'Access-Control-Allow-Credentials': 'true',
+    'Vary': 'Origin',
   });
 
   progressMap.set(progressId, res);
+  const heartbeat = setInterval(() => {
+    if (!res.writableEnded) {
+      res.write(': keepalive\n\n');
+    }
+  }, 15000);
+  progressHeartbeatMap.set(progressId, heartbeat);
 
   res.write(`event: initial\ndata: ${JSON.stringify({ message: 'Connected to batch upload progress stream.', progressId })}\n\n`);
 
   req.on('close', () => {
     if (progressMap.get(progressId) === res) {
       progressMap.delete(progressId);
+    }
+    const currentHeartbeat = progressHeartbeatMap.get(progressId);
+    if (currentHeartbeat) {
+      clearInterval(currentHeartbeat);
+      progressHeartbeatMap.delete(progressId);
     }
   });
 });

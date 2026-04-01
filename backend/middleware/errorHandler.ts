@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import multer from 'multer';
 
 export class AppError extends Error {
     statusCode: number;
@@ -33,6 +34,14 @@ export const errorHandler = (
     res: Response,
     _next: NextFunction,
 ): void => {
+    if (err instanceof multer.MulterError) {
+        const message = err.code === 'LIMIT_FILE_SIZE'
+            ? 'Uploaded file is too large. Maximum allowed size is 2GB.'
+            : err.message;
+        res.status(400).json({ message });
+        return;
+    }
+
     const statusCode = err instanceof AppError ? err.statusCode : 500;
     const message = err instanceof AppError ? err.message : 'Internal server error';
 

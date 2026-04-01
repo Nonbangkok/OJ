@@ -4,6 +4,7 @@
 export const APP_CONSTANTS = {
   SYSTEM_ADMIN_USERNAME: 'Nonbangkok',
   SUBMISSION_CACHE_EXPIRY: 30 * 60 * 1000, // 30 minutes in milliseconds
+  LARGE_UPLOAD_WARNING_BYTES: 100 * 1024 * 1024,
 } as const;
 
 export const USER_ROLES = {

@@ -12,6 +12,7 @@ import type {
   UploadProgressState,
 } from '../../types';
 import { getErrorMessage, toApiLikeError } from '../../utils/error';
+import { APP_CONSTANTS } from '../../utils/constants';
 
 import {
   buildBatchUploadSuccessMessage,
@@ -220,6 +221,18 @@ const useProblemManagement = () => {
   const handleBatchUploadFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
+      return;
+    }
+
+    if (file.size > APP_CONSTANTS.LARGE_UPLOAD_WARNING_BYTES && !process.env.REACT_APP_LARGE_UPLOAD_API_URL) {
+      setBatchUploadFeedback({
+        visible: true,
+        message: 'This ZIP is over 100MB. Through proxied Cloudflare it will usually fail before reaching the server. Set REACT_APP_LARGE_UPLOAD_API_URL to a DNS-only/origin upload endpoint first.',
+        type: 'warning',
+      });
+      if (batchUploadInputRef.current) {
+        batchUploadInputRef.current.value = '';
+      }
       return;
     }
 

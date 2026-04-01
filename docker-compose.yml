@@ -38,6 +38,7 @@ services:
       dockerfile: Dockerfile
       args:
         - REACT_APP_API_URL=${REACT_APP_API_URL}
+        - REACT_APP_LARGE_UPLOAD_API_URL=${REACT_APP_LARGE_UPLOAD_API_URL}
     container_name: oj_frontend
     depends_on:
       - backend
@@ -55,6 +56,7 @@ services:
       - "443:443" # For future SSL
     volumes:
       - ./nginx-proxy:/etc/nginx/conf.d
+      - ./certbot-www:/var/www/certbot
       - /etc/letsencrypt:/etc/letsencrypt
       - /var/lib/letsencrypt:/var/lib/letsencrypt
     networks:

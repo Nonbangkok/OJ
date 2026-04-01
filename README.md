@@ -17,10 +17,10 @@ The Grader System offers a rich set of features for both users and administrator
     *   **User Roles:** Differentiated access for regular users, staffs and administrators.
     *   **Batch User Creation (Admin):** Administrators can generate multiple user accounts with a defined prefix and random passwords.
 *   **Problem Management:**
-    *   **Problem Statements (PDF):** Upload and display problem descriptions in PDF format (up to 1GB).
+    *   **Problem Statements (PDF):** Upload and display problem descriptions in PDF format (up to 2GB).
     *   **Test Case Management:** Store and manage test cases (input/output) for each problem in the database.
     *   **Single Problem Upload (Admin):** Administrators can add new problems or update existing ones individually, including their metadata, PDF, and test cases (via ZIP upload).
-    *   **Batch Problem Upload (Admin):** Efficiently upload multiple problems at once using structured ZIP files (up to 1GB).
+    *   **Batch Problem Upload (Admin):** Efficiently upload multiple problems at once using structured ZIP files (up to 2GB).
     *   **Problem Visibility Control (Admin):** Administrators can toggle the visibility of problems to users.
 *   **Code Submission & Judging:**
     *   **C++ Code Submission:** Users can submit C++ solutions to problems (C++ only currently supported).
@@ -201,11 +201,11 @@ The system provides robust tools for administrators to manage programming proble
 *   **Single Problem Upload:**
     Administrators can add new problems or update existing ones individually. This includes:
     1.  **Problem Metadata:** Define problem ID, title, author, time limit (in milliseconds), and memory limit (in megabytes).
-    2.  **Problem Statement (PDF):** Upload a single PDF file (up to 1GB) containing the problem description.
-    3.  **Test Cases:** Upload a `.zip` archive (up to 1GB) containing the input and output test cases for the problem. The system will automatically parse and store these test cases.
+    2.  **Problem Statement (PDF):** Upload a single PDF file (up to 2GB) containing the problem description.
+    3.  **Test Cases:** Upload a `.zip` archive (up to 2GB) containing the input and output test cases for the problem. The system will automatically parse and store these test cases.
     *   **Note:** Uploading new test cases for an existing problem will **clear all previously associated test cases** before inserting the new ones.
 *   **Batch Problem Upload:**
-    For efficiency, administrators can upload multiple problems simultaneously using a single structured `.zip` file (up to 1GB). This feature is available via the "Batch Upload" button on the Problem Management page.
+    For efficiency, administrators can upload multiple problems simultaneously using a single structured `.zip` file (up to 2GB). This feature is available via the "Batch Upload" button on the Problem Management page.
     *   **Zip File Structure:** The uploaded `.zip` file can follow two main structures:
         *   **Single Problem ZIP:** The root of the ZIP contains all files for one problem (`config.json`, PDF, and test cases).
         *   **Multiple Problems ZIP:** The root of the ZIP contains multiple directories, where each directory represents a distinct problem.
@@ -286,7 +286,7 @@ Each problem directory (either at the root of a multi-problem ZIP or the content
     *   `memory_limit_mb`: The maximum allowed memory usage for a solution, in megabytes.
 
 2.  **Problem Statement PDF:**
-    A single `.pdf` file (up to 1GB) containing the problem description. The system will automatically detect and use the first PDF file found within the problem's directory.
+    A single `.pdf` file (up to 2GB) containing the problem description. The system will automatically detect and use the first PDF file found within the problem's directory.
 
 3.  **Test Cases:**
     Test cases can be organized in one of several flexible formats:
