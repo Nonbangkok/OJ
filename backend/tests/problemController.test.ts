@@ -155,13 +155,92 @@ describe('Problem Controller', () => {
     });
 
     describe('GET /problems/:id/pdf', () => {
-        it('should return 404 when problem has no PDF', async () => {
+        const visibleProblemRow = {
+            id: 'P1',
+            title: 'Problem 1',
+            author: 'Author 1',
+            time_limit_ms: 1000,
+            memory_limit_mb: 256,
+            has_pdf: true,
+            is_visible: true,
+            contest_id: null,
+        };
+
+        // Helper to build an app where the session role can be controlled per test.
+        const buildAppAsRole = (role: string, userId: number) => {
+            const roleApp = express();
+            roleApp.use(express.json());
+            roleApp.use(session({
+                secret: 'test-secret',
+                resave: false,
+                saveUninitialized: false,
+            }));
+            roleApp.use((req: Request, _res: Response, next: NextFunction) => {
+                if (req.session) {
+                    req.session.userId = userId;
+                    req.session.role = role;
+                }
+                next();
+            });
+            roleApp.use('/', problemRouter);
+            return roleApp;
+        };
+
+        it('should return 404 when problem does not exist', async () => {
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 
             const res = await request(app).get('/problems/P404/pdf');
 
             expect(res.status).toBe(404);
             expect(res.body.message).toBe('Problem PDF not found.');
+        });
+
+        it('should return the PDF for a visible problem', async () => {
+            // 1. getProblemDetail
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [visibleProblemRow] });
+            // 2. getProblemPdf
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ problem_pdf: Buffer.from('%PDF-1.4 mock') }] });
+
+            const res = await request(app).get('/problems/P1/pdf');
+
+            expect(res.status).toBe(200);
+            expect(res.headers['content-type']).toContain('application/pdf');
+        });
+
+        it('should return 403 when a regular user requests a hidden problem PDF', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ ...visibleProblemRow, id: 'P2', is_visible: false }]
+            });
+
+            const res = await request(buildAppAsRole('user', 2)).get('/problems/P2/pdf');
+
+            expect(res.status).toBe(403);
+            expect(res.body.message).toBe('Problem is hidden');
+            // Must not fall through to fetching the PDF buffer.
+            expect(db.query).toHaveBeenCalledTimes(1);
+        });
+
+        it('should return 403 when a regular user requests a contest problem PDF', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ ...visibleProblemRow, id: 'P3', is_visible: true, contest_id: 42 }]
+            });
+
+            const res = await request(buildAppAsRole('user', 2)).get('/problems/P3/pdf');
+
+            expect(res.status).toBe(403);
+            expect(db.query).toHaveBeenCalledTimes(1);
+        });
+
+        it('should allow staff to fetch a hidden/contest problem PDF', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ ...visibleProblemRow, id: 'P3', is_visible: false, contest_id: 42 }]
+            });
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ problem_pdf: Buffer.from('%PDF-1.4 mock') }] });
+
+            const res = await request(buildAppAsRole('staff', 3)).get('/problems/P3/pdf');
+
+            expect(res.status).toBe(200);
+            expect(res.headers['content-type']).toContain('application/pdf');
         });
     });
 

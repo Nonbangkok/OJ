@@ -1,6 +1,7 @@
 import express, { Request, Response, Router } from 'express';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
+import crypto from 'crypto';
 import fs from 'fs';
 import { requireAuth, requireAdmin, requireStaffOrAdmin } from '../middleware/auth';
 import { USER_VALIDATION, SECURITY_CONFIG } from '../constants';
@@ -42,7 +43,22 @@ import {
 
 const router: Router = express.Router();
 const execPromise = promisify(exec);
-const importProgressMap = new Map<string, { status: string; message: string }>();
+const importProgressMap = new Map<string, { status: string; message: string; token: string }>();
+
+// The import-progress endpoint cannot use session auth because the import drops
+// the session table mid-run (see server.ts). Use a constant-time comparison of a
+// per-job token instead so the endpoint authenticates without a session.
+const isValidImportToken = (expected: string, provided: unknown): boolean => {
+  if (typeof provided !== 'string' || provided.length === 0) {
+    return false;
+  }
+  const expectedBuffer = Buffer.from(expected);
+  const providedBuffer = Buffer.from(provided);
+  if (expectedBuffer.length !== providedBuffer.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(expectedBuffer, providedBuffer);
+};
 
 const runImportCommand = async (command: Exclude<ReturnType<typeof buildDatabaseImportCommand>, { kind: 'unsupported_extension' }>): Promise<void> => {
   await new Promise<void>((resolve, reject) => {
@@ -192,35 +208,41 @@ router.post('/admin/database/import', requireAuth, requireAdmin, diskUpload.sing
   }
 
   const jobId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-  importProgressMap.set(jobId, { status: 'pending', message: 'Database import queued.' });
+  const token = crypto.randomBytes(32).toString('hex');
+  importProgressMap.set(jobId, { status: 'pending', message: 'Database import queued.', token });
+
+  const setProgress = (status: string, message: string): void => {
+    importProgressMap.set(jobId, { status, message, token });
+  };
 
   res.status(202).json({
     message: 'Database import started. Check progress endpoint for status updates.',
     jobId,
+    token,
   });
 
   void (async () => {
     try {
-      importProgressMap.set(jobId, { status: 'uploading', message: 'Preparing database import.' });
+      setProgress('uploading', 'Preparing database import.');
       console.log('Dropping existing tables before import...');
       await dropAllTablesForImport();
 
-      importProgressMap.set(jobId, { status: 'uploading', message: 'Importing database dump. This may take several minutes.' });
+      setProgress('uploading', 'Importing database dump. This may take several minutes.');
       await runImportCommand(importCommandResult);
 
-      importProgressMap.set(jobId, { status: 'completed', message: 'Database imported successfully.' });
+      setProgress('completed', 'Database imported successfully.');
     } catch (error: unknown) {
       console.error('Error during database import:', error);
-      importProgressMap.set(jobId, {
-        status: 'failed',
-        message: `Failed to import database: ${getErrorMessage(error)}`,
-      });
+      setProgress('failed', `Failed to import database: ${getErrorMessage(error)}`);
     } finally {
       await unlinkIfExists(dumpFilePath);
     }
   })();
 });
 
+// No session middleware runs for this path (server.ts skips it because the import
+// drops the session table). Authenticate with the per-job token returned by the
+// import start endpoint instead of being fully open.
 router.get('/admin/database/import-progress/:jobId', async (req: Request, res: Response) => {
   const jobId = String(req.params.jobId);
   const progress = importProgressMap.get(jobId);
@@ -229,7 +251,13 @@ router.get('/admin/database/import-progress/:jobId', async (req: Request, res: R
     return res.status(404).json({ message: 'Import job not found.' });
   }
 
-  res.json(progress);
+  const providedToken = req.query.token ?? req.headers['x-import-token'];
+  if (!isValidImportToken(progress.token, providedToken)) {
+    return res.status(401).json({ message: 'Invalid or missing import token.' });
+  }
+
+  const { token: _token, ...publicProgress } = progress;
+  res.json(publicProgress);
 });
 
 router.post('/admin/database/export', requireAuth, requireAdmin, async (req: Request, res: Response) => {

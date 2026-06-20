@@ -67,7 +67,7 @@ export const getVisibleProblems = async (): Promise<Array<Pick<ProblemRow, 'id' 
 
 export const getProblemDetail = async (problemId: string): Promise<ProblemDetailDTO | null> => {
   const result = await db.query<ProblemDetailDTO>(
-    'SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible FROM problems WHERE id = $1',
+    'SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible, contest_id FROM problems WHERE id = $1',
     [problemId]
   );
   return result.rows[0] ?? null;

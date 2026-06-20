@@ -22,6 +22,7 @@ export interface ApiMessageResponse {
 
 export interface JobStartResponse extends ApiMessageResponse {
   jobId?: string;
+  token?: string;
 }
 
 export interface MeAuthenticatedResponse {

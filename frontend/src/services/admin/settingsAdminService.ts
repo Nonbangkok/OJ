@@ -32,8 +32,12 @@ const settingsAdminService = {
     return response.data;
   },
 
-  getImportDatabaseProgress: async (jobId: string): Promise<UploadProgressResponse> => {
-    const response = await api.get<UploadProgressResponse>(`/admin/database/import-progress/${jobId}`);
+  getImportDatabaseProgress: async (jobId: string, token: string): Promise<UploadProgressResponse> => {
+    // The import-progress endpoint authenticates via a per-job token instead of
+    // the session (the import drops the session table while it runs).
+    const response = await api.get<UploadProgressResponse>(`/admin/database/import-progress/${jobId}`, {
+      params: { token },
+    });
     return response.data;
   },
 };

@@ -99,7 +99,7 @@ export type ProblemWithPdf = Pick<
 
 export type ProblemDetailDTO = Pick<
     ProblemRow,
-    'id' | 'title' | 'author' | 'time_limit_ms' | 'memory_limit_mb' | 'is_visible'
+    'id' | 'title' | 'author' | 'time_limit_ms' | 'memory_limit_mb' | 'is_visible' | 'contest_id'
 > & {
     has_pdf: boolean;
 };

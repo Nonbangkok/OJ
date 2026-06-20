@@ -120,7 +120,7 @@ describe('Auth Controller', () => {
             expect(res.body.user.username).toBe('testuser');
         });
 
-        it('should return 401 for wrong password', async () => {
+        it('should return 401 with a neutral message for wrong password', async () => {
             const hashedPassword = await bcrypt.hash('password123', 10);
             (db.query as jest.Mock).mockResolvedValueOnce({
                 rows: [{ id: 1, username: 'testuser', password_hash: hashedPassword, role: 'user' }]
@@ -131,10 +131,10 @@ describe('Auth Controller', () => {
                 .send({ username: 'testuser', password: 'wrongpassword' });
 
             expect(res.status).toBe(401);
-            expect(res.body.message).toBe('Wrong Password');
+            expect(res.body.message).toBe('Invalid username or password');
         });
 
-        it('should return 401 if user not found', async () => {
+        it('should return 401 with the same neutral message if user not found', async () => {
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 
             const res = await request(app)
@@ -142,7 +142,27 @@ describe('Auth Controller', () => {
                 .send({ username: 'nonexistent', password: 'password123' });
 
             expect(res.status).toBe(401);
-            expect(res.body.message).toBe('User not found');
+            expect(res.body.message).toBe('Invalid username or password');
+        });
+
+        it('should not reveal whether the username exists', async () => {
+            // Unknown username
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+            const unknownRes = await request(app)
+                .post('/login')
+                .send({ username: 'nobody', password: 'password123' });
+
+            // Known username, wrong password
+            const hashedPassword = await bcrypt.hash('password123', 10);
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ id: 1, username: 'testuser', password_hash: hashedPassword, role: 'user' }]
+            });
+            const wrongPassRes = await request(app)
+                .post('/login')
+                .send({ username: 'testuser', password: 'wrongpassword' });
+
+            expect(unknownRes.status).toBe(wrongPassRes.status);
+            expect(unknownRes.body.message).toBe(wrongPassRes.body.message);
         });
     });
 
