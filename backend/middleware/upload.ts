@@ -1,9 +1,13 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { FILE_CONFIG } from '../constants';
 
 // Multer configuration for single file uploads (in memory)
-export const memoryUpload = multer({ storage: multer.memoryStorage() });
+export const memoryUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: FILE_CONFIG.MAX_UPLOAD_SIZE_BYTES },
+});
 
 // Multer configuration for batch uploads (to disk)
 const diskStorage = multer.diskStorage({
@@ -25,4 +29,7 @@ const diskStorage = multer.diskStorage({
     }
 });
 
-export const diskUpload = multer({ storage: diskStorage });
+export const diskUpload = multer({
+    storage: diskStorage,
+    limits: { fileSize: FILE_CONFIG.MAX_UPLOAD_SIZE_BYTES },
+});

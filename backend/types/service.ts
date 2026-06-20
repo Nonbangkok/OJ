@@ -221,15 +221,28 @@ export interface BatchUserBuildInput {
   passwordLength: number;
 }
 
+// ---------------------------------------------------------------------------
+// adminSystemService
+// ---------------------------------------------------------------------------
+
+export type DatabaseImportExecutable = 'psql' | 'pg_restore';
+
+export interface DatabaseImportExecution {
+  kind: 'ok';
+  executable: DatabaseImportExecutable;
+  args: string[];
+  env: NodeJS.ProcessEnv | Record<string, string>;
+}
+
+export type BuildDatabaseImportCommandResult =
+  | DatabaseImportExecution
+  | { kind: 'unsupported_extension' };
+
 export type CreateBatchUsersResult =
   | { kind: 'duplicate_username'; username: string }
   | { kind: 'ok'; users: Array<{ username: string; password: string }> };
 
 export interface RegistrationSettingRow extends Pick<SystemSettingRow, 'setting_value'> {}
-
-export type BuildDatabaseImportCommandResult =
-  | { kind: 'unsupported_extension' }
-  | { kind: 'ok'; command: string };
 
 // ---------------------------------------------------------------------------
 // contestQueryService

@@ -54,6 +54,8 @@ export const JUDGE_CONFIG = {
     TLE_EXIT_CODE: 124,
 } as const;
 
+
 export const FILE_CONFIG = {
     CLEANUP_DELAY_MS: 200,
+    MAX_UPLOAD_SIZE_BYTES: 2 * 1024 * 1024 * 1024, // 2 GiB
 } as const;

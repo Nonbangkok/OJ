@@ -19,8 +19,8 @@ describe('adminSystemService', () => {
 
       expect(result.kind).toBe('ok');
       if (result.kind === 'ok') {
-        expect(result.command).toContain('psql');
-        expect(result.command).toContain('-f /tmp/backup.sql');
+        expect(result.executable).toBe('psql');
+        expect(result.args).toContain('/tmp/backup.sql');
       }
     });
 
@@ -37,8 +37,8 @@ describe('adminSystemService', () => {
 
       expect(result.kind).toBe('ok');
       if (result.kind === 'ok') {
-        expect(result.command).toContain('pg_restore');
-        expect(result.command).toContain('/tmp/backup.dump');
+        expect(result.executable).toBe('pg_restore');
+        expect(result.args).toContain('/tmp/backup.dump');
       }
     });
 

@@ -1,5 +1,5 @@
 import express, { Request, Response, Router } from 'express';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import { requireAuth, requireAdmin, requireStaffOrAdmin } from '../middleware/auth';
@@ -42,6 +42,37 @@ import {
 
 const router: Router = express.Router();
 const execPromise = promisify(exec);
+const importProgressMap = new Map<string, { status: string; message: string }>();
+
+const runImportCommand = async (command: Exclude<ReturnType<typeof buildDatabaseImportCommand>, { kind: 'unsupported_extension' }>): Promise<void> => {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command.executable, command.args, {
+      env: {
+        ...process.env,
+        ...command.env,
+      },
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+
+    let stderrTail = '';
+
+    child.stderr.on('data', (chunk: Buffer | string) => {
+      stderrTail = `${stderrTail}${chunk.toString()}`;
+      if (stderrTail.length > 8192) {
+        stderrTail = stderrTail.slice(-8192);
+      }
+    });
+
+    child.on('error', (error) => reject(error));
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(stderrTail.trim() || `${command.executable} exited with code ${code}`));
+    });
+  });
+};
 
 const unlinkIfExists = async (filePath: string): Promise<void> => {
   if (!fs.existsSync(filePath)) {
@@ -141,43 +172,64 @@ router.post('/admin/database/import', requireAuth, requireAdmin, diskUpload.sing
   }
 
   const dumpFilePath = req.file.path;
-  try {
-    const dbName = env.PGDATABASE;
-    const dbUser = env.PGUSER;
-    const dbHost = env.PGHOST;
-    const dbPort = env.PGPORT;
+  const dbName = env.PGDATABASE;
+  const dbUser = env.PGUSER;
+  const dbHost = env.PGHOST;
+  const dbPort = env.PGPORT;
 
-    const importCommandResult = buildDatabaseImportCommand(
-      req.file.originalname,
-      dumpFilePath,
-      dbName,
-      dbUser,
-      dbHost,
-      dbPort,
-      env.PGPASSWORD,
-    );
-    if (importCommandResult.kind === 'unsupported_extension') {
-      await unlinkIfExists(dumpFilePath);
-      return res.status(400).json({ message: 'Unsupported file type. Only .sql, .dump, or .tar files are allowed.' });
-    }
-
-    // IMPORTANT: Drop all existing tables before importing to ensure a clean state.
-    console.log('Dropping existing tables before import...');
-
-    await dropAllTablesForImport();
-
-    console.log(`Executing database import command: ${importCommandResult.command}`);
-    await execPromise(importCommandResult.command);
-
-    res.status(200).json({ message: 'Database imported successfully.' });
-
-  } catch (error: unknown) {
-    console.error('Error during database import:', error);
-    const message = getErrorMessage(error);
-    res.status(500).json({ message: 'Failed to import database.', error: message });
-  } finally {
+  const importCommandResult = buildDatabaseImportCommand(
+    req.file.originalname,
+    dumpFilePath,
+    dbName,
+    dbUser,
+    dbHost,
+    dbPort,
+    env.PGPASSWORD,
+  );
+  if (importCommandResult.kind === 'unsupported_extension') {
     await unlinkIfExists(dumpFilePath);
+    return res.status(400).json({ message: 'Unsupported file type. Only .sql, .dump, or .tar files are allowed.' });
   }
+
+  const jobId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  importProgressMap.set(jobId, { status: 'pending', message: 'Database import queued.' });
+
+  res.status(202).json({
+    message: 'Database import started. Check progress endpoint for status updates.',
+    jobId,
+  });
+
+  void (async () => {
+    try {
+      importProgressMap.set(jobId, { status: 'uploading', message: 'Preparing database import.' });
+      console.log('Dropping existing tables before import...');
+      await dropAllTablesForImport();
+
+      importProgressMap.set(jobId, { status: 'uploading', message: 'Importing database dump. This may take several minutes.' });
+      await runImportCommand(importCommandResult);
+
+      importProgressMap.set(jobId, { status: 'completed', message: 'Database imported successfully.' });
+    } catch (error: unknown) {
+      console.error('Error during database import:', error);
+      importProgressMap.set(jobId, {
+        status: 'failed',
+        message: `Failed to import database: ${getErrorMessage(error)}`,
+      });
+    } finally {
+      await unlinkIfExists(dumpFilePath);
+    }
+  })();
+});
+
+router.get('/admin/database/import-progress/:jobId', async (req: Request, res: Response) => {
+  const jobId = String(req.params.jobId);
+  const progress = importProgressMap.get(jobId);
+
+  if (!progress) {
+    return res.status(404).json({ message: 'Import job not found.' });
+  }
+
+  res.json(progress);
 });
 
 router.post('/admin/database/export', requireAuth, requireAdmin, async (req: Request, res: Response) => {

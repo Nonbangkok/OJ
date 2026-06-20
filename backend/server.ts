@@ -30,7 +30,7 @@ app.use(express.json());
 // }));
 
 // PostgreSQL session store setup
-app.use(session({
+const sessionMiddleware = session({
   store: new PgStore({
     pool: pool, // Use the existing pg pool from db.ts
     tableName: 'user_sessions', // Name of the table to store sessions
@@ -44,7 +44,17 @@ app.use(session({
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
-}));
+});
+
+// Database import progress must remain readable while the import temporarily
+// drops the session table.
+app.use((req, res, next) => {
+  if (req.path.startsWith('/admin/database/import-progress/')) {
+    next();
+    return;
+  }
+  sessionMiddleware(req, res, next);
+});
 
 app.use(attachRequestUser);
 

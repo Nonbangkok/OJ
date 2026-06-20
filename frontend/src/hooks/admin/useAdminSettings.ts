@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import adminService from '../../services/adminService';
 import { useSettings } from '../../context/SettingsContext';
+import { APP_CONSTANTS } from '../../utils/constants';
 
 const useAdminSettings = () => {
     const [isRegistrationEnabled, setIsRegistrationEnabled] = useState(true);
@@ -74,8 +75,13 @@ const useAdminSettings = () => {
     };
 
     const handleFileChange = (event) => {
-        setDatabaseFile(event.target.files[0]);
+        const selectedFile = event.target.files[0] || null;
+        setDatabaseFile(selectedFile);
         setDatabaseError('');
+
+        if (selectedFile && selectedFile.size > APP_CONSTANTS.LARGE_UPLOAD_WARNING_BYTES && !process.env.REACT_APP_LARGE_UPLOAD_API_URL) {
+            setDatabaseError('Large uploads over 100MB will usually fail through proxied Cloudflare. Set REACT_APP_LARGE_UPLOAD_API_URL to a DNS-only/origin upload endpoint before importing this file.');
+        }
     };
 
     const handleImportDatabase = async () => {
@@ -103,14 +109,41 @@ const useAdminSettings = () => {
         formData.append('databaseDump', databaseFile);
 
         try {
-            await adminService.importDatabase(formData);
-            setDatabaseSuccess('Database imported successfully! You may need to refresh or re-login.');
-            setDatabaseFile(null);
-            setTimeout(() => setDatabaseSuccess(''), 5000);
+            const response = await adminService.importDatabase(formData);
+
+            if (!response.jobId) {
+                throw new Error('Database import job did not return a job ID.');
+            }
+
+            setDatabaseSuccess('Database file uploaded. Import is running in the background...');
+
+            const pollImportProgress = async () => {
+                const progress = await adminService.getImportDatabaseProgress(response.jobId);
+
+                if (progress.status === 'completed') {
+                    setDatabaseSuccess(progress.message || 'Database imported successfully! You may need to refresh or re-login.');
+                    setDatabaseFile(null);
+                    setIsImporting(false);
+                    setTimeout(() => setDatabaseSuccess(''), 5000);
+                    return;
+                }
+
+                if (progress.status === 'failed') {
+                    setDatabaseError(progress.message || 'Database import failed.');
+                    setIsImporting(false);
+                    return;
+                }
+
+                setDatabaseSuccess(progress.message || 'Database import is still running...');
+                window.setTimeout(() => {
+                    void pollImportProgress();
+                }, 3000);
+            };
+
+            void pollImportProgress();
         } catch (err) {
             console.error('Import error:', err);
             setDatabaseError(`Failed to import database: ${err.response?.data?.message || err.message}`);
-        } finally {
             setIsImporting(false);
         }
     };

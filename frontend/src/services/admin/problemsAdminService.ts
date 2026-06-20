@@ -1,6 +1,5 @@
 import type { AxiosResponse } from 'axios';
-
-import api from '../api';
+import api, { getLargeUploadBaseUrl, largeUploadApi } from '../api';
 
 import type {
   AdminProblemDetailResponse,
@@ -55,7 +54,7 @@ const problemsAdminService = {
   },
 
   batchUploadProblems: async (formData: FormData): Promise<BatchUploadStartResponse> => {
-    const response = await api.post<BatchUploadStartResponse>('/admin/problems/batch-upload', formData, {
+    const response = await largeUploadApi.post<BatchUploadStartResponse>('/admin/problems/batch-upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
@@ -74,7 +73,7 @@ const problemsAdminService = {
   },
 
   getBatchUploadProgressEventSource: (progressId: string): EventSource => {
-    const baseUrl = api.defaults.baseURL ?? '';
+    const baseUrl = getLargeUploadBaseUrl();
     return new EventSource(`${baseUrl}/admin/problems/batch-upload-progress/${progressId}`, {
       withCredentials: true,
     });
