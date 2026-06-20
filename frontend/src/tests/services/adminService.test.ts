@@ -1,4 +1,4 @@
-import api from '../../services/api';
+import api, { getLargeUploadBaseUrl } from '../../services/api';
 import adminService from '../../services/adminService';
 import type { AxiosResponse } from 'axios';
 import type {
@@ -137,8 +137,7 @@ describe('adminService', () => {
             const mockEventSource = jest.fn() as unknown as typeof EventSource;
             globalThis.EventSource = mockEventSource;
 
-            const defaults = api.defaults as typeof api.defaults & { baseURL: string };
-            defaults.baseURL = 'http://api.test';
+            jest.mocked(getLargeUploadBaseUrl).mockReturnValue('http://api.test');
             const progressId = 'test-id';
 
             adminService.getBatchUploadProgressEventSource(progressId);
