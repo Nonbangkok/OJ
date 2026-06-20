@@ -1,6 +1,5 @@
 import express, { Request, Response, Router } from 'express';
-import { exec, spawn } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import fs from 'fs';
 import { requireAuth, requireAdmin, requireStaffOrAdmin } from '../middleware/auth';
 import { USER_VALIDATION, SECURITY_CONFIG } from '../constants';
@@ -41,7 +40,6 @@ import {
 } from '../services/adminQueryService';
 
 const router: Router = express.Router();
-const execPromise = promisify(exec);
 const importProgressMap = new Map<string, { status: string; message: string }>();
 
 const runImportCommand = async (command: Exclude<ReturnType<typeof buildDatabaseImportCommand>, { kind: 'unsupported_extension' }>): Promise<void> => {
@@ -241,7 +239,7 @@ router.post('/admin/database/export', requireAuth, requireAdmin, async (req: Req
 
     const timestamp = Date.now();
     const dumpFilePath = buildDatabaseExportFilePath(timestamp);
-    const pgDumpCommand = buildDatabaseExportCommand(
+    const exportCommand = buildDatabaseExportCommand(
       dumpFilePath,
       dbName,
       dbUser,
@@ -250,8 +248,33 @@ router.post('/admin/database/export', requireAuth, requireAdmin, async (req: Req
       env.PGPASSWORD,
     );
 
-    console.log(`Executing pg_dump command: ${pgDumpCommand}`);
-    await execPromise(pgDumpCommand);
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(exportCommand.executable, exportCommand.args, {
+        env: {
+          ...process.env,
+          ...exportCommand.env,
+        },
+        stdio: ['ignore', 'ignore', 'pipe'],
+      });
+
+      let stderrTail = '';
+
+      child.stderr.on('data', (chunk: Buffer | string) => {
+        stderrTail = `${stderrTail}${chunk.toString()}`;
+        if (stderrTail.length > 8192) {
+          stderrTail = stderrTail.slice(-8192);
+        }
+      });
+
+      child.on('error', (spawnError) => reject(spawnError));
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+          return;
+        }
+        reject(new Error(stderrTail.trim() || `${exportCommand.executable} exited with code ${code}`));
+      });
+    });
 
     // Send the file as a download
     res.download(dumpFilePath, `oj_backup_${timestamp}.sql`, (err) => {

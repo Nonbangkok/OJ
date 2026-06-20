@@ -238,6 +238,15 @@ export type BuildDatabaseImportCommandResult =
   | DatabaseImportExecution
   | { kind: 'unsupported_extension' };
 
+export interface DatabaseExportExecution {
+  kind: 'ok';
+  executable: 'pg_dump';
+  args: string[];
+  env: NodeJS.ProcessEnv | Record<string, string>;
+}
+
+export type BuildDatabaseExportCommandResult = DatabaseExportExecution;
+
 export type CreateBatchUsersResult =
   | { kind: 'duplicate_username'; username: string }
   | { kind: 'ok'; users: Array<{ username: string; password: string }> };
