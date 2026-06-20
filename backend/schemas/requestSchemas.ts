@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { PROBLEM_VALIDATION, USER_ROLES, USER_VALIDATION } from '../constants';
+import {
+  PROBLEM_VALIDATION,
+  STRING_LIMITS,
+  SUBMISSION_VALIDATION,
+  USER_ROLES,
+  USER_VALIDATION,
+} from '../constants';
 
 const nonEmptyString = z.string().trim().min(1);
 const optionalTrimmedString = z.string().trim().optional();
@@ -14,29 +20,29 @@ export const idParamSchema = z.object({
 
 // Auth schemas
 export const registerSchema = z.object({
-  username: z.string().trim().min(USER_VALIDATION.MIN_USERNAME_LENGTH),
-  password: z.string().min(USER_VALIDATION.MIN_PASSWORD_LENGTH),
+  username: z.string().trim().min(USER_VALIDATION.MIN_USERNAME_LENGTH).max(STRING_LIMITS.USERNAME),
+  password: z.string().min(USER_VALIDATION.MIN_PASSWORD_LENGTH).max(STRING_LIMITS.PASSWORD),
 });
 
 export const loginSchema = z.object({
-  username: nonEmptyString,
-  password: nonEmptyString,
+  username: nonEmptyString.max(STRING_LIMITS.USERNAME),
+  password: nonEmptyString.max(STRING_LIMITS.PASSWORD),
 });
 
 // Admin schemas
 export const createAdminUserSchema = z.object({
-  username: z.string().trim().min(USER_VALIDATION.MIN_USERNAME_LENGTH),
-  password: z.string().min(USER_VALIDATION.MIN_PASSWORD_LENGTH),
+  username: z.string().trim().min(USER_VALIDATION.MIN_USERNAME_LENGTH).max(STRING_LIMITS.USERNAME),
+  password: z.string().min(USER_VALIDATION.MIN_PASSWORD_LENGTH).max(STRING_LIMITS.PASSWORD),
   role: z.enum([USER_ROLES.USER, USER_ROLES.STAFF]),
 });
 
 export const updateAdminUserSchema = z.object({
-  username: z.string().trim().min(USER_VALIDATION.MIN_USERNAME_LENGTH),
+  username: z.string().trim().min(USER_VALIDATION.MIN_USERNAME_LENGTH).max(STRING_LIMITS.USERNAME),
   role: z.enum([USER_ROLES.USER, USER_ROLES.STAFF, USER_ROLES.ADMIN]),
 });
 
 export const batchCreateUsersSchema = z.object({
-  prefix: nonEmptyString,
+  prefix: nonEmptyString.max(STRING_LIMITS.PREFIX),
   count: z.number().int().min(1).max(USER_VALIDATION.BATCH_MAX_COUNT),
 });
 
@@ -53,7 +59,7 @@ export const contestProblemParamsSchema = z.object({
 });
 
 export const contestBodySchema = z.object({
-  title: nonEmptyString,
+  title: nonEmptyString.max(STRING_LIMITS.TITLE),
   description: optionalTrimmedString,
   startTime: dateTimeString,
   endTime: dateTimeString,
@@ -67,16 +73,16 @@ export const moveContestProblemsBodySchema = z.object({
 // Problem schemas
 export const createProblemSchema = z.object({
   id: nonEmptyString,
-  title: z.string().trim().min(PROBLEM_VALIDATION.MIN_TITLE_LENGTH),
-  author: z.string().trim().min(PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH),
+  title: z.string().trim().min(PROBLEM_VALIDATION.MIN_TITLE_LENGTH).max(STRING_LIMITS.TITLE),
+  author: z.string().trim().min(PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH).max(STRING_LIMITS.AUTHOR),
   time_limit_ms: z.number().int().min(PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS),
   memory_limit_mb: z.number().int().min(PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB),
 });
 
 export const updateProblemSchema = z.object({
   id: nonEmptyString,
-  title: z.string().trim().min(PROBLEM_VALIDATION.MIN_TITLE_LENGTH).optional(),
-  author: z.string().trim().min(PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH).optional(),
+  title: z.string().trim().min(PROBLEM_VALIDATION.MIN_TITLE_LENGTH).max(STRING_LIMITS.TITLE).optional(),
+  author: z.string().trim().min(PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH).max(STRING_LIMITS.AUTHOR).optional(),
   time_limit_ms: z.number().int().min(PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS).optional(),
   memory_limit_mb: z.number().int().min(PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB).optional(),
 });
@@ -97,7 +103,7 @@ export const problemExportSchema = z.object({
 export const submitSchema = z.object({
   problemId: nonEmptyString,
   language: nonEmptyString,
-  code: nonEmptyString,
+  code: nonEmptyString.max(SUBMISSION_VALIDATION.MAX_CODE_LENGTH),
   contestId: nonEmptyString.optional(),
 });
 

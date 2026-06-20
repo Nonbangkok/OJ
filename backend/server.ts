@@ -4,6 +4,7 @@ import pgSession from 'connect-pg-simple';
 import { pool } from './db';
 import { attachRequestUser } from './middleware/requestContext';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { generalApiLimiter } from './middleware/rateLimit';
 import { env } from './config/env';
 // import cors from 'cors';
 
@@ -57,6 +58,11 @@ app.use((req, res, next) => {
 });
 
 app.use(attachRequestUser);
+
+// General API rate limiter — mounted before routes. Stricter per-route limiters
+// (auth, submit) are applied inside their controllers. `trust proxy` (set above)
+// ensures the real client IP is used behind the nginx reverse proxy.
+app.use(generalApiLimiter);
 
 app.use('/', authRoutes);
 app.use('/', adminRoutes);
