@@ -18,7 +18,8 @@ jest.mock('fs', () => {
             readdir: jest.fn(),
             readFile: jest.fn(),
             stat: jest.fn(),
-            unlink: jest.fn()
+            unlink: jest.fn(),
+            rm: jest.fn()
         },
     };
 });
@@ -74,7 +75,7 @@ describe('Batch Upload Service', () => {
                 memory_limit_mb: 256
             });
             (fsPromises.readFile as jest.Mock).mockResolvedValueOnce(mockConfig); // Read config
-            (fsPromises.readFile as jest.Mock).mockResolvedValueOnce(Buffer.from('pdf')); // Read PDF
+            (fsPromises.readFile as jest.Mock).mockResolvedValueOnce(Buffer.from('%PDF-1.4 fake')); // Read PDF (valid magic bytes)
 
             // Mock DB insertion of new problem
             (db.pool.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 }); // Insert Problem

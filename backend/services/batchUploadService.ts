@@ -3,8 +3,6 @@ const fsPromises = fs.promises;
 import path from 'path';
 import * as unzipper from 'unzipper';
 import os from 'os';
-import { exec } from 'child_process';
-import util from 'util';
 import { Readable } from 'stream';
 import * as db from '../db';
 import { UPLOAD_STATUS, FILE_CONFIG } from '../constants';
@@ -17,13 +15,70 @@ import {
   TestcasePairMap,
 } from '../types/service';
 
-const execPromise = util.promisify(exec);
+// --- Archive safety limits (zip-slip / zip-bomb protection) ---
+// Caps on the *uncompressed* contents of an uploaded archive. These guard
+// against decompression bombs (a tiny zip that expands to gigabytes / millions
+// of files) before we extract anything to disk.
+const MAX_ARCHIVE_UNCOMPRESSED_BYTES = 500 * 1024 * 1024; // 500 MB total
+const MAX_ARCHIVE_ENTRIES = 5000; // file count
+const PDF_MAGIC = Buffer.from('%PDF');
+
+interface ArchiveEntryLike {
+  path: string;
+  type?: string;
+  uncompressedSize?: number;
+}
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
   return 'Unknown error';
+}
+
+/**
+ * Validate every entry of an opened archive *before* extraction.
+ *
+ * - Zip-slip: reject absolute paths and any path that escapes the target
+ *   directory via `..` segments (normalised, cross-platform).
+ * - Zip-bomb: reject archives with too many entries or whose total
+ *   uncompressed size exceeds the cap.
+ *
+ * Throws an Error (which callers surface as a per-archive failure) if unsafe.
+ */
+function assertSafeArchive(entries: ArchiveEntryLike[] | undefined | null): void {
+  if (!Array.isArray(entries)) {
+    return;
+  }
+  if (entries.length > MAX_ARCHIVE_ENTRIES) {
+    throw new Error(`Archive rejected: too many entries (${entries.length} > ${MAX_ARCHIVE_ENTRIES}).`);
+  }
+
+  let totalUncompressed = 0;
+  for (const entry of entries) {
+    const entryPath = entry.path ?? '';
+
+    // Reject absolute paths (POSIX or Windows-style).
+    if (path.isAbsolute(entryPath) || /^[a-zA-Z]:[\\/]/.test(entryPath)) {
+      throw new Error(`Archive rejected: absolute entry path "${entryPath}".`);
+    }
+
+    // Normalise and ensure the entry stays within the extraction root.
+    const normalized = path.normalize(entryPath);
+    if (normalized.startsWith('..' + path.sep) || normalized === '..' || normalized.includes('..' + path.sep)) {
+      throw new Error(`Archive rejected: path traversal in entry "${entryPath}".`);
+    }
+
+    totalUncompressed += entry.uncompressedSize ?? 0;
+    if (totalUncompressed > MAX_ARCHIVE_UNCOMPRESSED_BYTES) {
+      throw new Error(`Archive rejected: uncompressed size exceeds ${MAX_ARCHIVE_UNCOMPRESSED_BYTES} bytes (decompression bomb).`);
+    }
+  }
+}
+
+/** Remove a directory tree without spawning a shell (avoids command injection). */
+async function removeDir(dir: string): Promise<void> {
+  await fsPromises.rm(dir, { recursive: true, force: true });
 }
 
 async function processTestcasesFromZip(problemId: string, zipPath: string, log: string[]): Promise<number> {
@@ -45,6 +100,9 @@ async function processTestcasesFromZip(problemId: string, zipPath: string, log: 
     try {
       await fsPromises.mkdir(tempExtractDir, { recursive: true });
 
+      // Validate entries (zip-slip / zip-bomb) before extracting to disk.
+      assertSafeArchive(zip.files as unknown as ArchiveEntryLike[]);
+
       // Extract the entire zip to the temporary directory
       await zip.extract({ path: tempExtractDir });
 
@@ -57,8 +115,8 @@ async function processTestcasesFromZip(problemId: string, zipPath: string, log: 
       return await processTestcasesFromInputOutputDirs(problemId, inputDir, outputDir, log);
 
     } finally {
-      // Clean up the temporary extraction directory
-      await execPromise(`rm -rf ${tempExtractDir}`);
+      // Clean up the temporary extraction directory (no shell — avoids injection).
+      await removeDir(tempExtractDir);
     }
 
   } else {
@@ -220,8 +278,13 @@ async function processProblemDirectory(problemPath: string): Promise<ProblemProc
     try {
       const pdfPath = path.join(problemPath, pdfFileName);
       const pdfBuffer = await fsPromises.readFile(pdfPath);
-      await db.query('UPDATE problems SET problem_pdf = $1 WHERE id = $2', [pdfBuffer, problemId]);
-      log.push(`Uploaded ${pdfFileName}.`);
+      // Validate the PDF magic bytes before persisting / later serving it.
+      if (pdfBuffer.length < PDF_MAGIC.length || !pdfBuffer.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC)) {
+        log.push(`Skipped ${pdfFileName}: not a valid PDF (missing %PDF header).`);
+      } else {
+        await db.query('UPDATE problems SET problem_pdf = $1 WHERE id = $2', [pdfBuffer, problemId]);
+        log.push(`Uploaded ${pdfFileName}.`);
+      }
     } catch (e) {
       log.push(`ERROR: Could not read PDF file ${pdfFileName}.`);
     }
@@ -297,6 +360,10 @@ export async function processBatchUpload(
     await fsPromises.mkdir(tempDir, { recursive: true });
 
     const directory = await unzipper.Open.file(zipFilePath);
+
+    // Validate entries (zip-slip / zip-bomb) before extracting to disk.
+    assertSafeArchive(directory.files as unknown as ArchiveEntryLike[]);
+
     await directory.extract({ path: tempDir });
 
     const junkDirs = new Set(['__MACOSX', '.vscode']);
@@ -357,7 +424,7 @@ export async function processBatchUpload(
     const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
     try {
       await delay(FILE_CONFIG.CLEANUP_DELAY_MS);
-      await execPromise(`rm -rf ${tempDir}`);
+      await removeDir(tempDir);
     } catch (err: unknown) {
       console.warn(`[Robust Cleanup] Failed to remove temp directory ${tempDir}:`, err);
     }

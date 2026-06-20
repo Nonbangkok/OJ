@@ -10,7 +10,8 @@ COPY package*.json ./
 # Install dependencies
 # CRA 5 + modern lint/tooling can emit peer-dependency conflicts in npm v10+.
 # Use legacy peer resolution in container build to avoid ERESOLVE hard-fail.
-RUN npm install --legacy-peer-deps
+# Use `npm ci` for reproducible, lockfile-exact installs (requires package-lock.json).
+RUN npm ci --legacy-peer-deps
 
 # Copy the rest of the application source code
 COPY . .

@@ -38,4 +38,5 @@ yarn-error.log*
 /frontend/node_modules
 /frontend/.env
 
-package-lock.json
+# NOTE: package-lock.json is intentionally committed so that the Docker images
+# can use `npm ci` for reproducible, lockfile-exact installs. Do not re-ignore.
