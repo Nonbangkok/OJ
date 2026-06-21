@@ -14,6 +14,7 @@ import {
 } from '../types/api';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
+import { authLimiter } from '../middleware/rateLimit';
 import { loginSchema, registerSchema } from '../schemas/requestSchemas';
 
 const router: Router = express.Router();
@@ -32,6 +33,7 @@ const destroySession = (req: Request): Promise<void> => {
 
 router.post(
   '/register',
+  authLimiter,
   validateRequest({ body: registerSchema }),
   asyncHandler(async (req: Request, res: Response<RegisterSuccessResponse | MessageResponse>) => {
     const { username, password } = req.body as RegisterRequestBody;
@@ -85,6 +87,7 @@ router.get(
 
 router.post(
   '/login',
+  authLimiter,
   validateRequest({ body: loginSchema }),
   asyncHandler(async (req: Request, res: Response<LoginSuccessResponse | MessageResponse>) => {
     const { username, password } = req.body as LoginRequestBody;
