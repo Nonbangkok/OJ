@@ -111,14 +111,16 @@ const useAdminSettings = () => {
         try {
             const response = await adminService.importDatabase(formData);
 
-            if (!response.jobId) {
+            if (!response.jobId || !response.token) {
                 throw new Error('Database import job did not return a job ID.');
             }
+
+            const { jobId, token } = response;
 
             setDatabaseSuccess('Database file uploaded. Import is running in the background...');
 
             const pollImportProgress = async () => {
-                const progress = await adminService.getImportDatabaseProgress(response.jobId);
+                const progress = await adminService.getImportDatabaseProgress(jobId, token);
 
                 if (progress.status === 'completed') {
                     setDatabaseSuccess(progress.message || 'Database imported successfully! You may need to refresh or re-login.');

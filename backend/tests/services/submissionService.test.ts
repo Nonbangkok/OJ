@@ -15,7 +15,12 @@ jest.mock('fs', () => ({
     }
 }));
 jest.mock('child_process', () => ({
-    exec: jest.fn((cmd, cb) => cb(null, { stdout: '', stderr: '' }))
+    // exec is promisified in the service and now called as
+    // exec(cmd, options, callback) since a compile timeout/maxBuffer was added.
+    exec: jest.fn((cmd, options, cb) => {
+        const callback = typeof options === 'function' ? options : cb;
+        callback(null, { stdout: '', stderr: '' });
+    })
 }));
 jest.mock('../../services/judgeService');
 
@@ -60,8 +65,12 @@ describe('Submission Service', () => {
             expect(db.query).toHaveBeenNthCalledWith(2, expect.stringContaining('UPDATE submissions SET overall_status = \'Compiling\''), [1]);
             expect(fs.promises.writeFile).toHaveBeenCalled();
 
-            // Verify compilation was called
-            expect(cp.exec).toHaveBeenCalledWith(expect.stringContaining('g++ -std=c++20'), expect.any(Function));
+            // Verify compilation was called with a timeout/maxBuffer guard
+            expect(cp.exec).toHaveBeenCalledWith(
+                expect.stringContaining('g++ -std=c++20'),
+                expect.objectContaining({ timeout: expect.any(Number), maxBuffer: expect.any(Number) }),
+                expect.any(Function)
+            );
 
             // Verify Running status updated
             expect(db.query).toHaveBeenNthCalledWith(3, expect.stringContaining('UPDATE submissions SET overall_status = \'Running\''), [1]);
@@ -81,8 +90,12 @@ describe('Submission Service', () => {
 
             (fs.existsSync as jest.Mock).mockReturnValue(true);
 
-            // Mock cp.exec to fail for compilation
-            (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, cb) => cb({ stderr: 'syntax error' }, null, 'syntax error'));
+            // Mock cp.exec to fail for compilation. exec is now called as
+            // exec(cmd, options, callback), so resolve the callback from either arg.
+            (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, options, cb) => {
+                const callback = typeof options === 'function' ? options : cb;
+                callback({ stderr: 'syntax error' }, null, 'syntax error');
+            });
 
             await processSubmission(1);
 

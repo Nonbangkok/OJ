@@ -14,6 +14,7 @@ import {
 } from '../types/api';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
+import { authLimiter } from '../middleware/rateLimit';
 import { loginSchema, registerSchema } from '../schemas/requestSchemas';
 
 const router: Router = express.Router();
@@ -30,8 +31,33 @@ const destroySession = (req: Request): Promise<void> => {
   });
 };
 
+const regenerateSession = (req: Request): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    req.session.regenerate((error: unknown) => {
+      if (error) {
+        reject(new AppError('Error establishing session', 500));
+        return;
+      }
+      resolve();
+    });
+  });
+};
+
+const saveSession = (req: Request): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    req.session.save((error: unknown) => {
+      if (error) {
+        reject(new AppError('Error establishing session', 500));
+        return;
+      }
+      resolve();
+    });
+  });
+};
+
 router.post(
   '/register',
+  authLimiter,
   validateRequest({ body: registerSchema }),
   asyncHandler(async (req: Request, res: Response<RegisterSuccessResponse | MessageResponse>) => {
     const { username, password } = req.body as RegisterRequestBody;
@@ -85,26 +111,35 @@ router.get(
 
 router.post(
   '/login',
+  authLimiter,
   validateRequest({ body: loginSchema }),
   asyncHandler(async (req: Request, res: Response<LoginSuccessResponse | MessageResponse>) => {
     const { username, password } = req.body as LoginRequestBody;
 
     const result = await db.query<UserRow>('SELECT * FROM users WHERE username = $1', [username]);
     if (result.rows.length === 0) {
-      res.status(401).json({ message: 'User not found' });
+      // Use a single neutral message for both unknown-username and wrong-password
+      // failures so the endpoint does not leak which usernames exist.
+      res.status(401).json({ message: 'Invalid username or password' });
       return;
     }
 
     const user = result.rows[0];
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
-      res.status(401).json({ message: 'Wrong Password' });
+      res.status(401).json({ message: 'Invalid username or password' });
       return;
     }
+
+    // Regenerate the session on successful authentication to prevent session
+    // fixation: any pre-login session id is discarded and a fresh cookie is issued.
+    await regenerateSession(req);
 
     req.session.userId = user.id;
     req.session.username = user.username;
     req.session.role = user.role;
+
+    await saveSession(req);
 
     res.json({
       message: 'Login successful',

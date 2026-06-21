@@ -39,6 +39,14 @@ import {
 } from '../schemas/requestSchemas';
 
 const router: Router = express.Router();
+
+// A valid PDF file always begins with the magic bytes "%PDF". Reject anything
+// that does not, so a renamed HTML/script payload cannot be stored and later
+// served from the same origin.
+const PDF_MAGIC = Buffer.from('%PDF');
+const isPdfBuffer = (buffer: Buffer | undefined | null): boolean =>
+  !!buffer && buffer.length >= PDF_MAGIC.length && buffer.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC);
+
 const progressMap = new Map<string, Response>();
 const progressHeartbeatMap = new Map<string, NodeJS.Timeout>();
 
@@ -99,7 +107,7 @@ router.get('/problems/:id',
     });
   }
 
-  const { is_visible, ...problemData } = problemDetail;
+  const { is_visible, contest_id, ...problemData } = problemDetail;
   res.json(isStaffOrAdmin ? problemDetail : problemData);
 }));
 
@@ -119,11 +127,32 @@ router.get('/problems/:id/pdf', requireAuth,
   validateRequest({ params: idParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
+
+  // Enforce the same visibility rule as GET /problems/:id before serving the PDF.
+  // Hidden problems and problems attached to a contest must only be reachable by
+  // staff/admin via this endpoint (contest PDFs have their own guarded endpoint).
+  const problemDetail = await getProblemDetail(id);
+  if (!problemDetail) {
+    return res.status(404).json({ message: 'Problem PDF not found.' });
+  }
+
+  const isStaffOrAdmin = req.session.role === USER_ROLES.ADMIN || req.session.role === USER_ROLES.STAFF;
+  if ((!problemDetail.is_visible || problemDetail.contest_id !== null) && !isStaffOrAdmin) {
+    return res.status(403).json({
+      detail: 'This problem has been hidden by administrators and is not accessible to regular users.',
+      problemId: id,
+      message: 'Problem is hidden',
+    });
+  }
+
   const pdfData = await getProblemPdf(id);
   if (!pdfData) {
     return res.status(404).json({ message: 'Problem PDF not found.' });
   }
   res.setHeader('Content-Type', 'application/pdf');
+  // Prevent content-type sniffing: ensures the browser treats this strictly as
+  // a PDF and never re-interprets the bytes as HTML/JS (XSS via uploaded file).
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.send(pdfData);
 }));
 
@@ -275,6 +304,11 @@ router.post('/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin,
 
   if (!problemPdfFile && !testcasesZipFile) {
     return res.status(400).json({ message: 'No files uploaded.' });
+  }
+
+  // Reject non-PDF payloads before they ever reach the database / get served.
+  if (problemPdfFile && !isPdfBuffer(problemPdfFile.buffer)) {
+    return res.status(400).json({ message: 'Uploaded problem PDF is not a valid PDF file.' });
   }
 
   try {

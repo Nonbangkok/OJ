@@ -20,6 +20,8 @@ import {
 } from '../types/api';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
+import { submitLimiter } from '../middleware/rateLimit';
+import { enqueueJudgeTask } from '../services/judgeQueue';
 import {
   idParamSchema,
   searchQuerySchema,
@@ -33,6 +35,7 @@ const router: Router = express.Router();
 
 router.post(
   '/submit',
+  submitLimiter,
   requireAuth,
   memoryUpload.none(),
   validateRequest({ body: submitSchema }),
@@ -62,12 +65,14 @@ router.post(
       isContestSubmission: queueResult.isContestSubmission,
     });
 
+    // Dispatch the actual compile/run work through the judge concurrency gate so
+    // that at most JUDGE_CONFIG.MAX_CONCURRENT_JUDGES run at once; excess queue.
     if (queueResult.isContestSubmission) {
-      void processContestSubmission(queueResult.submissionId);
+      enqueueJudgeTask(() => processContestSubmission(queueResult.submissionId));
       return;
     }
 
-    void processSubmission(queueResult.submissionId);
+    enqueueJudgeTask(() => processSubmission(queueResult.submissionId));
   }),
 );
 

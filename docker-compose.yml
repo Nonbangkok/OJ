@@ -31,6 +31,27 @@ services:
     networks:
       - oj-network
     restart: unless-stopped
+    # --- A2: sandbox hardening for the code-execution container ---
+    # This container compiles and runs untrusted, user-submitted C++. Limit the
+    # blast radius if a submission escapes the in-process sandbox (time_wrapper
+    # setrlimit + privilege drop).
+    security_opt:
+      # Prevent any process (incl. setuid binaries) from gaining new privileges.
+      - "no-new-privileges:true"
+    cap_drop:
+      # Drop ALL Linux capabilities; the judge needs none of them. The wrapper
+      # only needs to setuid/setgid DOWN to nobody, which does not require a
+      # capability when starting from root within the container's user namespace.
+      - "ALL"
+    # Cap total processes/threads to contain fork bombs at the cgroup level even
+    # if a submission slips past RLIMIT_NPROC.
+    pids_limit: 256
+    # Bound memory so a runaway compile/submission cannot OOM the host.
+    # mem_reservation is the soft target; mem_limit is the hard ceiling.
+    mem_reservation: 512m
+    mem_limit: 1g
+    # NOTE: a stronger isolation (separate judge container with
+    # network_mode: none and no DB secrets) is described in SANDBOX.md.
 
   frontend:
     build:

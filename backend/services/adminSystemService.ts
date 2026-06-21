@@ -1,5 +1,5 @@
 import path from 'path';
-import { BuildDatabaseImportCommandResult } from '../types/service';
+import { BuildDatabaseExportCommandResult, BuildDatabaseImportCommandResult } from '../types/service';
 
 export const buildDatabaseImportCommand = (
   originalFileName: string,
@@ -59,6 +59,18 @@ export const buildDatabaseExportCommand = (
   databaseHost: string,
   databasePort: string,
   databasePassword: string,
-): string => (
-  `PGPASSWORD=${databasePassword} pg_dump -h ${databaseHost} -p ${databasePort} -U ${databaseUser} -d ${databaseName} -F p -f ${dumpFilePath}`
-);
+): BuildDatabaseExportCommandResult => ({
+  kind: 'ok',
+  executable: 'pg_dump',
+  args: [
+    '-h', databaseHost,
+    '-p', databasePort,
+    '-U', databaseUser,
+    '-d', databaseName,
+    '-F', 'p',
+    '-f', dumpFilePath,
+  ],
+  env: {
+    PGPASSWORD: databasePassword,
+  },
+});

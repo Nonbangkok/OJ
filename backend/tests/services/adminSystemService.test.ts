@@ -75,9 +75,17 @@ describe('adminSystemService', () => {
         'secret'
       );
 
-      expect(command).toContain('pg_dump');
-      expect(command).toContain('-f /tmp/db_backup.sql');
-      expect(command).toContain('PGPASSWORD=secret');
+      expect(command.kind).toBe('ok');
+      expect(command.executable).toBe('pg_dump');
+      expect(command.args).toEqual([
+        '-h', 'db',
+        '-p', '5432',
+        '-U', 'postgres',
+        '-d', 'oj_db',
+        '-F', 'p',
+        '-f', '/tmp/db_backup.sql',
+      ]);
+      expect(command.env).toEqual({ PGPASSWORD: 'secret' });
     });
   });
 });
