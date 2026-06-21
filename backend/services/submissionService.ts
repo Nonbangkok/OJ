@@ -6,8 +6,19 @@ import { promisify } from 'util';
 import { judge } from './judgeService';
 import { ContestSubmissionRow, SubmissionRow } from '../types/models';
 import { CompileCommandError } from '../types/service';
+import { JUDGE_CONFIG } from '../constants';
 
 const execPromise = promisify(exec);
+
+// Guard the compile step against compiler bombs / pathological sources that
+// could otherwise hang the single-threaded judge worker indefinitely. A
+// timeout kills runaway g++ invocations; maxBuffer caps compiler output so a
+// flood of diagnostics cannot exhaust memory. A timeout surfaces as a normal
+// compile failure (caught below) rather than crashing the process.
+const COMPILE_EXEC_OPTIONS = {
+  timeout: JUDGE_CONFIG.COMPILE_TIMEOUT_MS,
+  maxBuffer: JUDGE_CONFIG.COMPILE_MAX_BUFFER,
+} as const;
 
 export async function processSubmission(submissionId: number): Promise<void> {
   let filePath = '';
@@ -39,7 +50,7 @@ export async function processSubmission(submissionId: number): Promise<void> {
     // Use UndefinedBehaviorSanitizer to reliably catch signed integer overflow as a runtime error.
     const compileCommand = `g++ -std=c++20 -fsanitize=signed-integer-overflow ${filePath} -o ${outputPath}`;
     try {
-      await execPromise(compileCommand);
+      await execPromise(compileCommand, COMPILE_EXEC_OPTIONS);
     } catch (compileError: unknown) {
       const error = compileError as CompileCommandError;
       console.error(`Compilation error for submission ${submissionId}:`, error.stderr);
@@ -110,7 +121,7 @@ export async function processContestSubmission(submissionId: number): Promise<vo
     // Use UndefinedBehaviorSanitizer to reliably catch signed integer overflow as a runtime error.
     const compileCommand = `g++ -std=c++20 -fsanitize=signed-integer-overflow ${filePath} -o ${outputPath}`;
     try {
-      await execPromise(compileCommand);
+      await execPromise(compileCommand, COMPILE_EXEC_OPTIONS);
     } catch (compileError: unknown) {
       const error = compileError as CompileCommandError;
       console.error(`Compilation error for contest submission ${submissionId}:`, error.stderr);

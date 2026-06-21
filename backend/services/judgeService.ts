@@ -19,12 +19,26 @@ async function runSingleCase(
     // Using custom C wrapper for microsecond precision
     const timeCommand = `./scripts/time_wrapper`;
 
-    // Use timeout command which is reliable on Linux
-    const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${executablePath}`;
+    // Resource limits handed to the sandbox wrapper. RLIMIT_AS gets a little
+    // headroom over the problem's memory limit (runtime/loader/UBSan overhead);
+    // RLIMIT_CPU gets the wall-clock limit plus slack as a hard backstop.
+    const asLimitMb = memoryLimitMb + JUDGE_CONFIG.MEMORY_LIMIT_SLACK_MB;
+    const cpuLimitS = Math.ceil(timeLimitMs / 1000) + JUDGE_CONFIG.CPU_LIMIT_SLACK_S;
+
+    // Use timeout command which is reliable on Linux. The wrapper now also
+    // applies setrlimit() + privilege-drop on the untrusted binary itself.
+    const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${executablePath} ${asLimitMb} ${cpuLimitS}`;
+    // Strip the backend's environment from the executed user code so a
+    // submission cannot read DATABASE_URL/PGPASSWORD/SECRET_KEY via getenv().
+    // Only a minimal PATH is exposed (needed for the `timeout` lookup).
+    // The project augments NodeJS.ProcessEnv to mark the secret keys as
+    // required, so this intentionally-sparse env is asserted to that type.
+    const sandboxEnv = { PATH: JUDGE_CONFIG.SANDBOX_PATH } as unknown as NodeJS.ProcessEnv;
     const executionOptions = {
       timeout: timeLimitMs + JUDGE_CONFIG.TIMEOUT_BUFFER_MS,
       maxBuffer: JUDGE_CONFIG.EXEC_MAX_BUFFER, // 50MB
-      shell: '/bin/bash'
+      shell: '/bin/bash',
+      env: sandboxEnv
     };
 
     let hasEpipError = false;
