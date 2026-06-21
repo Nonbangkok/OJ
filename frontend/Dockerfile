@@ -25,6 +25,10 @@ ENV REACT_APP_LARGE_UPLOAD_API_URL=$REACT_APP_LARGE_UPLOAD_API_URL
 # type-aware ESLint config is not compatible with the pinned plugin version.
 ENV DISABLE_ESLINT_PLUGIN=true
 ENV TSC_COMPILE_ON_ERROR=true
+# Emit the webpack runtime as a separate self-hosted file instead of an inline
+# <script>. The reverse-proxy CSP uses `script-src 'self'` (no 'unsafe-inline'),
+# which would otherwise block CRA's inlined runtime chunk and break the app.
+ENV INLINE_RUNTIME_CHUNK=false
 RUN npm run build
 
 # Stage 2: Serve the application with Nginx

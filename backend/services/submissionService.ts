@@ -15,10 +15,53 @@ const execPromise = promisify(exec);
 // timeout kills runaway g++ invocations; maxBuffer caps compiler output so a
 // flood of diagnostics cannot exhaust memory. A timeout surfaces as a normal
 // compile failure (caught below) rather than crashing the process.
+//
+// `env` is stripped to a minimal PATH so a malicious source cannot exfiltrate
+// the backend's secrets at COMPILE time — e.g. `#include "/proc/self/environ"`
+// would otherwise make g++ quote the environment (DATABASE_URL / PGPASSWORD /
+// SECRET_KEY) back in its error output. (The run step is already env-stripped.)
 const COMPILE_EXEC_OPTIONS = {
   timeout: JUDGE_CONFIG.COMPILE_TIMEOUT_MS,
   maxBuffer: JUDGE_CONFIG.COMPILE_MAX_BUFFER,
-} as const;
+  env: { PATH: JUDGE_CONFIG.SANDBOX_PATH } as unknown as NodeJS.ProcessEnv,
+};
+
+/**
+ * Detect an `#include` directive that would read a file outside the submission
+ * (absolute path or `..` traversal). g++ resolves such includes at compile time
+ * and quotes the file's contents in its diagnostics, turning a submission into
+ * an arbitrary file read. Returns the offending target, or null if the source
+ * is clean. Defence-in-depth alongside the compile env-strip above.
+ */
+export function findForbiddenInclude(code: string): string | null {
+  const includeRe = /^\s*#\s*include\s*[<"]\s*([^>"]*?)\s*[>"]/;
+  for (const line of code.split('\n')) {
+    const match = line.match(includeRe);
+    if (!match) {
+      continue;
+    }
+    const target = match[1];
+    if (target.startsWith('/') || target.includes('..')) {
+      return target;
+    }
+  }
+  return null;
+}
+
+/**
+ * Replace the internal temporary source path in compiler output with a neutral
+ * name so server filesystem paths are not disclosed to submitters.
+ */
+export function sanitizeCompilerStderr(stderr: string | undefined, sourcePath: string): string {
+  if (!stderr) {
+    return 'Compilation failed';
+  }
+  return sourcePath ? stderr.split(sourcePath).join('solution.cpp') : stderr;
+}
+
+const FORBIDDEN_INCLUDE_MESSAGE = (target: string): string =>
+  `Compilation rejected: #include of a non-permitted path ("${target}") is not allowed. ` +
+  `Use standard library headers (e.g. <bits/stdc++.h>) only.`;
 
 export async function processSubmission(submissionId: number): Promise<void> {
   let filePath = '';
@@ -45,6 +88,17 @@ export async function processSubmission(submissionId: number): Promise<void> {
     if (!fs.existsSync(submissionsDir)) {
       fs.mkdirSync(submissionsDir, { recursive: true });
     }
+    // Reject sources that try to read files outside the submission via #include
+    // before compiling — closes the compile-time arbitrary file-read vector.
+    const forbiddenInclude = findForbiddenInclude(code);
+    if (forbiddenInclude) {
+      await db.query(
+        `UPDATE submissions SET overall_status = 'Compilation Error', results = $1 WHERE id = $2`,
+        [JSON.stringify([{ status: 'Compilation Error', output: FORBIDDEN_INCLUDE_MESSAGE(forbiddenInclude) }]), submissionId]
+      );
+      return;
+    }
+
     await fs.promises.writeFile(filePath, code);
 
     // Use UndefinedBehaviorSanitizer to reliably catch signed integer overflow as a runtime error.
@@ -56,7 +110,7 @@ export async function processSubmission(submissionId: number): Promise<void> {
       console.error(`Compilation error for submission ${submissionId}:`, error.stderr);
       await db.query(
         `UPDATE submissions SET overall_status = 'Compilation Error', results = $1 WHERE id = $2`,
-        [JSON.stringify([{ status: 'Compilation Error', output: error.stderr ?? 'Compilation failed' }]), submissionId]
+        [JSON.stringify([{ status: 'Compilation Error', output: sanitizeCompilerStderr(error.stderr, filePath) }]), submissionId]
       );
       return;
     } finally {
@@ -116,6 +170,17 @@ export async function processContestSubmission(submissionId: number): Promise<vo
     if (!fs.existsSync(submissionsDir)) {
       fs.mkdirSync(submissionsDir, { recursive: true });
     }
+    // Reject sources that try to read files outside the submission via #include
+    // before compiling — closes the compile-time arbitrary file-read vector.
+    const forbiddenInclude = findForbiddenInclude(code);
+    if (forbiddenInclude) {
+      await db.query(
+        `UPDATE contest_submissions SET overall_status = 'Compilation Error', results = $1 WHERE id = $2`,
+        [JSON.stringify([{ status: 'Compilation Error', output: FORBIDDEN_INCLUDE_MESSAGE(forbiddenInclude) }]), submissionId]
+      );
+      return;
+    }
+
     await fs.promises.writeFile(filePath, code);
 
     // Use UndefinedBehaviorSanitizer to reliably catch signed integer overflow as a runtime error.
@@ -127,7 +192,7 @@ export async function processContestSubmission(submissionId: number): Promise<vo
       console.error(`Compilation error for contest submission ${submissionId}:`, error.stderr);
       await db.query(
         `UPDATE contest_submissions SET overall_status = 'Compilation Error', results = $1 WHERE id = $2`,
-        [JSON.stringify([{ status: 'Compilation Error', output: error.stderr ?? 'Compilation failed' }]), submissionId]
+        [JSON.stringify([{ status: 'Compilation Error', output: sanitizeCompilerStderr(error.stderr, filePath) }]), submissionId]
       );
       return;
     } finally {
