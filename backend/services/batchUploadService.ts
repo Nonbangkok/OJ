@@ -19,11 +19,11 @@ import {
 // Caps on the *uncompressed* contents of an uploaded archive. These guard
 // against decompression bombs (a tiny zip that expands to gigabytes / millions
 // of files) before we extract anything to disk.
-const MAX_ARCHIVE_UNCOMPRESSED_BYTES = 500 * 1024 * 1024; // 500 MB total
-const MAX_ARCHIVE_ENTRIES = 5000; // file count
+export const MAX_ARCHIVE_UNCOMPRESSED_BYTES = 500 * 1024 * 1024; // 500 MB total
+export const MAX_ARCHIVE_ENTRIES = 5000; // file count
 const PDF_MAGIC = Buffer.from('%PDF');
 
-interface ArchiveEntryLike {
+export interface ArchiveEntryLike {
   path: string;
   type?: string;
   uncompressedSize?: number;
@@ -46,7 +46,7 @@ function getErrorMessage(error: unknown): string {
  *
  * Throws an Error (which callers surface as a per-archive failure) if unsafe.
  */
-function assertSafeArchive(entries: ArchiveEntryLike[] | undefined | null): void {
+export function assertSafeArchive(entries: ArchiveEntryLike[] | undefined | null): void {
   if (!Array.isArray(entries)) {
     return;
   }

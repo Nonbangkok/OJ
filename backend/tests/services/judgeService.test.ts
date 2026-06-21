@@ -1,7 +1,7 @@
 import { judge } from '../../services/judgeService';
 import * as db from '../../db';
 import cp from 'child_process';
-import { SUBMISSION_STATUS } from '../../constants';
+import { SUBMISSION_STATUS, JUDGE_CONFIG } from '../../constants';
 
 jest.mock('../../db');
 jest.mock('child_process');
@@ -98,5 +98,33 @@ describe('Judge Service', () => {
 
         const result = await judge('P1', '/tmp/a.out');
         expect(result.overallStatus).toBe(SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED);
+    });
+
+    it('strips secrets from the executed program environment (sandbox env-strip)', async () => {
+        // Plant secrets on the judge process environment; submitted code must NOT
+        // be able to read these via getenv().
+        process.env.SECRET_KEY = 'super-secret-session-key';
+        process.env.PGPASSWORD = 'db-password';
+        process.env.DATABASE_URL = 'postgres://user:pw@database:5432/oj';
+
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ time_limit_ms: 1000, memory_limit_mb: 256 }] });
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ case_number: 1, input_data: '', output_data: '' }] });
+
+        const mockChild = { stdin: { write: jest.fn(), end: jest.fn(), on: jest.fn() }, on: jest.fn() };
+        (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, opts, cb) => {
+            cb(null, '', '');
+            return mockChild;
+        });
+
+        await judge('P1', '/tmp/a.out');
+
+        expect(cp.exec).toHaveBeenCalledTimes(1);
+        const opts = (cp.exec as unknown as jest.Mock).mock.calls[0][1];
+        // The child must receive a minimal, locked-down environment.
+        expect(opts.env).toBeDefined();
+        expect(opts.env.PATH).toBe(JUDGE_CONFIG.SANDBOX_PATH);
+        expect(opts.env.SECRET_KEY).toBeUndefined();
+        expect(opts.env.PGPASSWORD).toBeUndefined();
+        expect(opts.env.DATABASE_URL).toBeUndefined();
     });
 });
