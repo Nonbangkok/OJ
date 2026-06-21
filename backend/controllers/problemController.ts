@@ -107,7 +107,7 @@ router.get('/problems/:id',
     });
   }
 
-  const { is_visible, ...problemData } = problemDetail;
+  const { is_visible, contest_id, ...problemData } = problemDetail;
   res.json(isStaffOrAdmin ? problemDetail : problemData);
 }));
 
@@ -127,6 +127,24 @@ router.get('/problems/:id/pdf', requireAuth,
   validateRequest({ params: idParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
+
+  // Enforce the same visibility rule as GET /problems/:id before serving the PDF.
+  // Hidden problems and problems attached to a contest must only be reachable by
+  // staff/admin via this endpoint (contest PDFs have their own guarded endpoint).
+  const problemDetail = await getProblemDetail(id);
+  if (!problemDetail) {
+    return res.status(404).json({ message: 'Problem PDF not found.' });
+  }
+
+  const isStaffOrAdmin = req.session.role === USER_ROLES.ADMIN || req.session.role === USER_ROLES.STAFF;
+  if ((!problemDetail.is_visible || problemDetail.contest_id !== null) && !isStaffOrAdmin) {
+    return res.status(403).json({
+      detail: 'This problem has been hidden by administrators and is not accessible to regular users.',
+      problemId: id,
+      message: 'Problem is hidden',
+    });
+  }
+
   const pdfData = await getProblemPdf(id);
   if (!pdfData) {
     return res.status(404).json({ message: 'Problem PDF not found.' });
