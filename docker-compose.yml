@@ -84,6 +84,18 @@ services:
       - oj-network
     restart: unless-stopped
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: oj_cloudflared
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - nginx-proxy
+    networks:
+      - oj-network
+    restart: unless-stopped
+
 networks:
   oj-network:
     driver: bridge
