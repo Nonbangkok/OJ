@@ -11,6 +11,12 @@ services:
     networks:
       - oj-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   backend:
     build:
@@ -18,7 +24,8 @@ services:
       dockerfile: Dockerfile
     container_name: oj_backend
     depends_on:
-      - database
+      database:
+        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
       - PORT=3000
@@ -31,6 +38,12 @@ services:
     networks:
       - oj-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/ >/dev/null && pg_isready -h database -U $$PGUSER -d $$PGDATABASE"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     # --- A2: sandbox hardening for the code-execution container ---
     # This container compiles and runs untrusted, user-submitted C++. Limit the
     # blast radius if a submission escapes the in-process sandbox (time_wrapper
@@ -62,19 +75,28 @@ services:
         - REACT_APP_LARGE_UPLOAD_API_URL=${REACT_APP_LARGE_UPLOAD_API_URL}
     container_name: oj_frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - oj-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   nginx-proxy:
     image: nginx:1.25-alpine
     container_name: oj_proxy
     depends_on:
-      - frontend
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
     ports:
       - "80:80"
-      - "443:443" # For future SSL
     volumes:
       - ./nginx-proxy:/etc/nginx/conf.d
       - ./certbot-www:/var/www/certbot
@@ -83,18 +105,31 @@ services:
     networks:
       - oj-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared@sha256:0aa26e284f05e6c77ae375b8c9c11d9eb6a448fb7bcd8d40f31cb6176189eb38
     container_name: oj_cloudflared
     command: tunnel --no-autoupdate run
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
-      - nginx-proxy
+      nginx-proxy:
+        condition: service_healthy
     networks:
       - oj-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "localhost:20241", "ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
 networks:
   oj-network:
