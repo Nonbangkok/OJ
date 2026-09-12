@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "license": "GPL-3.0-or-later",
+  "engines": {
+    "node": "20.x"
+  },
   "dependencies": {
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.7.0",

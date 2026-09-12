@@ -6,6 +6,7 @@
   "scripts": {
     "test": "cross-env NODE_ENV=test jest",
     "build": "tsc",
+    "migrate": "npm run build && node dist/scripts/migrate.js",
     "start": "npm run build && node dist/server.js",
     "dev": "tsx watch server.ts"
   },
@@ -13,6 +14,9 @@
   "author": "",
   "license": "GPL-3.0-or-later",
   "type": "commonjs",
+  "engines": {
+    "node": "20.x"
+  },
   "dependencies": {
     "archiver": "^7.0.1",
     "bcrypt": "^6.0.0",
@@ -48,6 +52,7 @@
     "cross-env": "^10.1.0",
     "jest": "^30.2.0",
     "supertest": "^7.2.2",
+    "ts-node": "^10.9.2",
     "ts-jest": "^29.4.6",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
