@@ -167,6 +167,7 @@ Three global contexts wrap the entire app in this order:
 8. **Session security** — `httpOnly: true`, `sameSite: 'lax'`, `secure: false` (set to `true` in production).
 9. **Author image safety** — verify decoded image format rather than trusting upload MIME metadata; reject corrupt/animated images and apply a pixel-count limit before normalization.
 10. **Statement asset safety** — re-encode validated images to remove metadata, hash normalized bytes with SHA-256, and enforce the 10 MiB limit after normalization.
+11. **Asset/revision atomicity** — add or delete an authoring asset in the same transaction that optimistically advances its draft revision; every rejected asset mutation must roll back that revision change.
 
 ---
 

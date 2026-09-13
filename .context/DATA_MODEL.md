@@ -325,7 +325,7 @@ Private authoring workspace state. Author display fields and image are snapshots
 
 ### `problem_draft_assets`
 
-Statement assets keyed by UUID, with a filename unique within each draft. Stores MIME type, normalized bytes, SHA-256 checksum, byte size, and timestamps. Deleting a draft cascades to its assets.
+Statement assets keyed by UUID, with a filename unique within each draft. Stores MIME type, normalized bytes, SHA-256 checksum, byte size, and timestamps. Deleting a draft cascades to its assets. Each asset is capped at 10 MiB after normalization and each draft at 100 MiB total; the total is checked while the draft row is locked by the same revision-advancing transaction.
 
 ### `problem_draft_testcases`
 

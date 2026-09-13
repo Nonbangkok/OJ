@@ -55,6 +55,7 @@ OJ/
 │   │   ├── authorProfileImageService.ts # Canonical profile PNGs and fallback avatars
 │   │   ├── authorProfileQueryService.ts # Author profile persistence
 │   │   ├── authorProfileSnapshotService.ts # Immutable draft author snapshots
+│   │   ├── authoringAssetQueryService.ts # Transactional draft asset persistence
 │   │   ├── statementAssetService.ts # Safe statement image preparation
 │   │   ├── judgeService.ts       # Compile & judge C++ in sandbox
 │   │   ├── submissionService.ts  # Submission processing
@@ -203,6 +204,8 @@ Draft author refreshes first compare `expectedRevision` with the current draft. 
 ### Statement Asset Preparation
 
 The first authoring release accepts JPEG, PNG, and WebP statement images. `statementAssetService.ts` rejects unsafe filenames, path traversal, MIME/content mismatches, corrupt or animated images, and excessive pixel counts. Valid images are auto-oriented, re-encoded in their declared format to remove metadata, capped at 10 MiB after normalization, and assigned a SHA-256 checksum before persistence.
+
+Asset add/delete operations lock and advance the draft through an optimistic revision update in the same database transaction as the asset mutation. Duplicate filenames, missing assets, and the 100 MiB per-draft cap roll back the transaction, so a failed asset action never advances revision or invalidates readiness by itself.
 
 ### Authentication Flow
 
