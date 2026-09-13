@@ -55,6 +55,7 @@ OJ/
 │   │   ├── authorProfileImageService.ts # Canonical profile PNGs and fallback avatars
 │   │   ├── authorProfileQueryService.ts # Author profile persistence
 │   │   ├── authorProfileSnapshotService.ts # Immutable draft author snapshots
+│   │   ├── statementAssetService.ts # Safe statement image preparation
 │   │   ├── judgeService.ts       # Compile & judge C++ in sandbox
 │   │   ├── submissionService.ts  # Submission processing
 │   │   ├── submissionQueryService.ts # Submission read/write query orchestration
@@ -198,6 +199,10 @@ Backend runtime request pipeline (high-level):
 Controllers and query services must store only the normalized PNG. Raw profile-image uploads are never persisted.
 
 Draft author refreshes first compare `expectedRevision` with the current draft. Profile fields are then copied into the draft through the existing optimistic update, which increments revision and invalidates any previous readiness result.
+
+### Statement Asset Preparation
+
+The first authoring release accepts JPEG, PNG, and WebP statement images. `statementAssetService.ts` rejects unsafe filenames, path traversal, MIME/content mismatches, corrupt or animated images, and excessive pixel counts. Valid images are auto-oriented, re-encoded in their declared format to remove metadata, capped at 10 MiB after normalization, and assigned a SHA-256 checksum before persistence.
 
 ### Authentication Flow
 

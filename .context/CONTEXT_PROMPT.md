@@ -28,6 +28,7 @@ Before generating any code, consult the files in the `.context/` directory:
 9. **Testing:** Backend tests use Jest + Supertest. Frontend tests use Jest + React Testing Library. Mock services and context providers.
 10. **Validation Standard:** Backend request validation must use `zod` only, wired through `validateRequest`, and prefer shared schemas from `backend/schemas/requestSchemas.ts` (avoid inline validation duplication in controllers).
 11. **Author Image Standard:** Normalize author JPEG/PNG/WebP uploads through `authorProfileImageService.ts`; database profile and draft snapshot images use canonical 512×512 PNG bytes.
+12. **Statement Asset Standard:** Prepare statement JPEG/PNG/WebP files through `statementAssetService.ts`; reject unsafe filenames and store only validated, metadata-stripped bytes with their SHA-256 checksum.
 
 ## Communication
 

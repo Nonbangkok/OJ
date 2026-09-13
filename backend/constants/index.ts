@@ -101,6 +101,15 @@ export const AUTHOR_PROFILE_IMAGE = {
     ALLOWED_MIME_TYPES: ['image/jpeg', 'image/png', 'image/webp'],
 } as const;
 
+export const STATEMENT_ASSET = {
+    MAX_FILENAME_LENGTH: 255,
+    MAX_INPUT_PIXELS: 25_000_000,
+    MAX_FILE_BYTES: 10 * 1024 * 1024,
+    MAX_TOTAL_BYTES: 100 * 1024 * 1024,
+    FIELD_NAME: 'asset',
+    ALLOWED_MIME_TYPES: ['image/jpeg', 'image/png', 'image/webp'],
+} as const;
+
 export const RATE_LIMIT_CONFIG = {
     // General API limiter.
     GENERAL_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
