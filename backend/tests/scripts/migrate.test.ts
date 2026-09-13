@@ -12,17 +12,35 @@ type MigrationPool = {
   connect: () => Promise<MigrationClient>;
 };
 
+type ClosableMigrationPool = MigrationPool & {
+  end: () => Promise<void>;
+};
+
 type RunMigrationsFromPool = (
   pool: MigrationPool,
   migrations?: readonly Migration[],
 ) => Promise<string[]>;
 
-const loadCommand = (): RunMigrationsFromPool => {
+type MigrationCommandModule = {
+  migrateAndClose?: (
+    pool?: ClosableMigrationPool,
+    migrations?: readonly Migration[],
+  ) => Promise<string[]>;
+  runMigrationsFromPool?: RunMigrationsFromPool;
+};
+
+const loadCommand = (): MigrationCommandModule => {
   const module = require('../../scripts/migrate') as {
+    migrateAndClose?: MigrationCommandModule['migrateAndClose'];
     runMigrationsFromPool?: RunMigrationsFromPool;
   };
-  expect(module.runMigrationsFromPool).toBeInstanceOf(Function);
-  return module.runMigrationsFromPool!;
+  return module;
+};
+
+const loadRunMigrationsFromPool = (): RunMigrationsFromPool => {
+  const command = loadCommand().runMigrationsFromPool;
+  expect(command).toBeInstanceOf(Function);
+  return command!;
 };
 
 describe('migration command', () => {
@@ -46,7 +64,7 @@ describe('migration command', () => {
     };
     const migrations = [{ version: '0001_test', sql: 'CREATE TABLE example (id INT)' }];
 
-    const applied = await loadCommand()(pool, migrations);
+    const applied = await loadRunMigrationsFromPool()(pool, migrations);
 
     expect(applied).toEqual(['0001_test']);
     expect(calls).toEqual([
@@ -85,7 +103,7 @@ describe('migration command', () => {
       connect: async () => client,
     };
 
-    await expect(loadCommand()(pool, [
+    await expect(loadRunMigrationsFromPool()(pool, [
       { version: '0001_failure', sql: failingSql },
     ])).rejects.toThrow('migration failed');
 
@@ -99,5 +117,89 @@ describe('migration command', () => {
       'SELECT pg_advisory_unlock($1)',
     ]);
     expect(releaseCount).toBe(1);
+  });
+
+  it('uses the complete migration registry by default', async () => {
+    const calls: Array<{ text: string; params?: readonly unknown[] }> = [];
+    const client: MigrationClient = {
+      query: async (text, params) => {
+        calls.push({ text, params });
+        if (text.startsWith('SELECT version')) {
+          return { rows: [{ version: '0001_core_schema' }] };
+        }
+        return { rows: [] };
+      },
+      release: jest.fn(),
+    };
+    const pool: MigrationPool = {
+      connect: async () => client,
+    };
+
+    const applied = await loadRunMigrationsFromPool()(pool);
+
+    expect(applied).toEqual(['0002_problem_authoring_foundation']);
+    expect(calls).toContainEqual({
+      text: expect.stringContaining('CREATE TABLE author_profiles'),
+      params: undefined,
+    });
+    expect(calls).toContainEqual({
+      text: expect.stringContaining('INSERT INTO schema_migrations'),
+      params: ['0002_problem_authoring_foundation'],
+    });
+  });
+
+  it('closes the pool after applying migrations', async () => {
+    let endCount = 0;
+    const client: MigrationClient = {
+      query: async (text) => {
+        if (text.startsWith('SELECT version')) {
+          return { rows: [] };
+        }
+        return { rows: [] };
+      },
+      release: jest.fn(),
+    };
+    const pool: ClosableMigrationPool = {
+      connect: async () => client,
+      end: async () => {
+        endCount += 1;
+      },
+    };
+    const migrateAndClose = loadCommand().migrateAndClose;
+
+    expect(migrateAndClose).toBeInstanceOf(Function);
+    await expect(migrateAndClose!(pool, [
+      { version: '0001_test', sql: 'CREATE TABLE example (id INT)' },
+    ])).resolves.toEqual(['0001_test']);
+    expect(endCount).toBe(1);
+  });
+
+  it('closes the pool when applying migrations fails', async () => {
+    let endCount = 0;
+    const client: MigrationClient = {
+      query: async (text) => {
+        if (text.startsWith('SELECT version')) {
+          return { rows: [] };
+        }
+        if (text === 'INVALID MIGRATION') {
+          throw new Error('migration failed');
+        }
+        return { rows: [] };
+      },
+      release: jest.fn(),
+    };
+    const pool: ClosableMigrationPool = {
+      connect: async () => client,
+      end: async () => {
+        endCount += 1;
+      },
+    };
+    const migrateAndClose = loadCommand().migrateAndClose;
+
+    expect(migrateAndClose).toBeInstanceOf(Function);
+    await expect(migrateAndClose!(pool, [
+      { version: '0001_failure', sql: 'INVALID MIGRATION' },
+    ])).rejects.toThrow('migration failed');
+    expect(endCount).toBe(1);
   });
 });

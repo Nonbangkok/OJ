@@ -6,8 +6,9 @@
   "scripts": {
     "test": "cross-env NODE_ENV=test jest",
     "build": "tsc",
+    "db:migrate": "tsx scripts/migrate.ts",
     "migrate": "npm run build && node dist/scripts/migrate.js",
-    "start": "npm run build && node dist/server.js",
+    "start": "npm run build && node dist/scripts/migrate.js && node dist/server.js",
     "dev": "tsx watch server.ts"
   },
   "keywords": [],

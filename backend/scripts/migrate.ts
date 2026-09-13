@@ -1,6 +1,6 @@
 import type { Pool } from 'pg';
 import { pool } from '../db';
-import { coreMigrations } from '../migrations';
+import { migrations as registeredMigrations } from '../migrations';
 import {
   Migration,
   MigrationDatabase,
@@ -10,7 +10,7 @@ import { getErrorMessage } from '../utils/errorMessage';
 
 export const runMigrationsFromPool = async (
   databasePool: Pick<Pool, 'connect'>,
-  migrations: readonly Migration[] = coreMigrations,
+  migrations: readonly Migration[] = registeredMigrations,
 ): Promise<string[]> => {
   const client = await databasePool.connect();
 
@@ -28,17 +28,24 @@ export const runMigrationsFromPool = async (
   }
 };
 
-const main = async (): Promise<void> => {
+export const migrateAndClose = async (
+  databasePool: Pick<Pool, 'connect' | 'end'> = pool,
+  migrations: readonly Migration[] = registeredMigrations,
+): Promise<string[]> => {
   try {
-    const applied = await runMigrationsFromPool(pool);
-    if (applied.length === 0) {
-      console.log('Database schema is already up to date.');
-      return;
-    }
-    console.log(`Applied database migrations: ${applied.join(', ')}`);
+    return await runMigrationsFromPool(databasePool, migrations);
   } finally {
-    await pool.end();
+    await databasePool.end();
   }
+};
+
+const main = async (): Promise<void> => {
+  const applied = await migrateAndClose();
+  if (applied.length === 0) {
+    console.log('Database schema is already up to date.');
+    return;
+  }
+  console.log(`Applied database migrations: ${applied.join(', ')}`);
 };
 
 if (require.main === module) {

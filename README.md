@@ -124,6 +124,22 @@ stack is healthy:
 Runtime checks are available at `/api/health/live` (process) and
 `/api/health/ready` (database and schema readiness).
 
+### Database migrations
+
+Apply pending non-destructive schema migrations from the host:
+
+```bash
+cd backend
+npm run db:migrate
+```
+
+Production `npm start` applies the same migrations after compilation and before
+the API starts. Applied versions are recorded in `schema_migrations`; rerunning
+the command is safe.
+
+`backend/scripts/init_db.ts` is a destructive development reset that drops
+existing tables. Do not use it to upgrade an existing database.
+
 ## Production Configuration
 
 Production uses the same base Compose file plus a production-only overlay. This
