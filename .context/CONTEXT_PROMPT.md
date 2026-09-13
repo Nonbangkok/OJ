@@ -13,7 +13,7 @@ Before generating any code, consult the files in the `.context/` directory:
 - **`.context/ARCHITECTURE.md`** — System hierarchy, directory structure, tech stack, Mermaid diagrams of all major flows (submission judging, contest lifecycle, authentication, request routing, provider tree).
 - **`.context/STANDARDS.md`** — Coding patterns, naming conventions, architecture rules, and testing standards. Your code MUST follow these patterns exactly.
 - **`.context/DATA_MODEL.md`** — Complete database schema (17 tables), entity relationships, JSONB structures, indexes, and non-destructive migration instructions.
-- **`.context/API_SCHEMA.md`** — Canonical API contract reference (57 endpoints across admin/auth/contest/problem/submission/authoring controllers).
+- **`.context/API_SCHEMA.md`** — Canonical API contract reference (58 endpoints across admin/auth/contest/problem/submission/authoring controllers).
 
 ## Core Rules
 

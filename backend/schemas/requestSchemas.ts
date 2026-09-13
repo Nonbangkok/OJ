@@ -173,10 +173,31 @@ const editableProblemDraftFields = {
 export const createProblemDraftSchema = z.object({
   ...editableProblemDraftFields,
   authorProfileId: editableProblemDraftFields.authorProfileId.default(null),
+  authorAkaName: editableProblemDraftFields.authorAkaName.optional(),
+  authorRealName: editableProblemDraftFields.authorRealName.optional(),
+  language: editableProblemDraftFields.language.optional(),
+  countryCode: editableProblemDraftFields.countryCode.optional(),
   statementHtml: editableProblemDraftFields.statementHtml.default(''),
   solutionCpp: editableProblemDraftFields.solutionCpp.default(''),
   generatorCpp: editableProblemDraftFields.generatorCpp.default(null),
   templateVersion: editableProblemDraftFields.templateVersion.default('red-gate-v1'),
+}).strict().superRefine((value, context) => {
+  if (value.authorProfileId !== null) {
+    return;
+  }
+  for (const field of ['authorAkaName', 'authorRealName', 'language', 'countryCode'] as const) {
+    if (value[field] === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: [field],
+        message: `${field} is required when no author profile is selected`,
+      });
+    }
+  }
+});
+
+export const refreshProblemDraftAuthorSchema = z.object({
+  expectedRevision: z.number().int().positive(),
 }).strict();
 
 export const updateProblemDraftSchema = z.object({

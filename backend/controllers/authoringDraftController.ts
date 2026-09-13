@@ -1,10 +1,11 @@
 import express, { Request, Response, Router } from 'express';
 import { requireAdmin, requireAuth } from '../middleware/auth';
-import { asyncHandler } from '../middleware/errorHandler';
+import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
 import {
   createProblemDraftSchema,
   problemDraftIdParamSchema,
+  refreshProblemDraftAuthorSchema,
   updateProblemDraftSchema,
 } from '../schemas/requestSchemas';
 import {
@@ -16,7 +17,14 @@ import {
   updateProblemDraft,
 } from '../services/authoringDraftQueryService';
 import {
+  AuthorProfileSnapshot,
+  createManualAuthorSnapshot,
+  getAuthorProfileSnapshot,
+  refreshProblemDraftAuthor,
+} from '../services/authorProfileSnapshotService';
+import {
   CreateProblemDraftRequestBody,
+  RefreshProblemDraftAuthorRequestBody,
   UpdateProblemDraftRequestBody,
 } from '../types/api';
 import { ProblemDraftRow } from '../types/authoring';
@@ -81,20 +89,39 @@ const toDraftUpdates = (
   ...(body.templateVersion !== undefined ? { template_version: body.templateVersion } : {}),
 });
 
+const resolveCreateAuthorSnapshot = async (
+  body: CreateProblemDraftRequestBody,
+): Promise<AuthorProfileSnapshot> => {
+  if (body.authorProfileId) {
+    const result = await getAuthorProfileSnapshot(body.authorProfileId);
+    if (result.kind === 'profile_not_found') {
+      throw new AppError('Author profile not found', 404);
+    }
+    return result.snapshot;
+  }
+
+  if (!body.authorAkaName || !body.authorRealName || !body.language || !body.countryCode) {
+    throw new AppError('Manual author display fields are required', 400);
+  }
+  return createManualAuthorSnapshot({
+    author_aka_name: body.authorAkaName,
+    author_real_name: body.authorRealName,
+    language: body.language,
+    country_code: body.countryCode,
+  });
+};
+
 router.use('/admin/authoring/drafts', requireAuth, requireAdmin);
 
 router.post('/admin/authoring/drafts',
   validateRequest({ body: createProblemDraftSchema }),
   asyncHandler(async (req: Request, res: Response) => {
     const body = req.body as CreateProblemDraftRequestBody;
+    const authorSnapshot = await resolveCreateAuthorSnapshot(body);
     const created = await createProblemDraft({
       problem_id: body.problemId,
       title: body.title,
-      author_profile_id: body.authorProfileId,
-      author_aka_name: body.authorAkaName,
-      author_real_name: body.authorRealName,
-      language: body.language,
-      country_code: body.countryCode,
+      ...authorSnapshot,
       time_limit_ms: body.timeLimitMs,
       memory_limit_mb: body.memoryLimitMb,
       statement_html: body.statementHtml,
@@ -126,14 +153,66 @@ router.patch('/admin/authoring/drafts/:id',
   validateRequest({ params: problemDraftIdParamSchema, body: updateProblemDraftSchema }),
   asyncHandler(async (req: Request, res: Response) => {
     const { expectedRevision, ...body } = req.body as UpdateProblemDraftRequestBody;
+    let updates = toDraftUpdates(body);
+    if (body.authorProfileId) {
+      const snapshotResult = await getAuthorProfileSnapshot(body.authorProfileId);
+      if (snapshotResult.kind === 'profile_not_found') {
+        throw new AppError('Author profile not found', 404);
+      }
+      updates = { ...updates, ...snapshotResult.snapshot };
+    }
     const result = await updateProblemDraft(
       String(req.params.id),
       expectedRevision,
-      toDraftUpdates(body),
+      updates,
     );
 
     if (result.kind === 'not_found') {
       res.status(404).json({ message: 'Problem draft not found' });
+      return;
+    }
+    if (result.kind === 'published') {
+      res.status(409).json({
+        message: 'Published problem drafts are read-only',
+        code: 'draft_published',
+        draft: toDraftDetailResponse(result.draft),
+      });
+      return;
+    }
+    if (result.kind === 'revision_conflict') {
+      res.status(409).json({
+        message: 'Problem draft revision conflict',
+        code: 'revision_conflict',
+        currentRevision: result.draft.revision,
+        draft: toDraftDetailResponse(result.draft),
+      });
+      return;
+    }
+    res.json(toDraftDetailResponse(result.draft));
+  }));
+
+router.post('/admin/authoring/drafts/:id/refresh-author-profile',
+  validateRequest({ params: problemDraftIdParamSchema, body: refreshProblemDraftAuthorSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { expectedRevision } = req.body as RefreshProblemDraftAuthorRequestBody;
+    const result = await refreshProblemDraftAuthor(String(req.params.id), expectedRevision);
+
+    if (result.kind === 'not_found') {
+      res.status(404).json({ message: 'Problem draft not found' });
+      return;
+    }
+    if (result.kind === 'profile_not_selected') {
+      res.status(409).json({
+        message: 'Problem draft has no linked author profile',
+        code: 'author_profile_not_selected',
+      });
+      return;
+    }
+    if (result.kind === 'profile_not_found') {
+      res.status(409).json({
+        message: 'The linked author profile no longer exists',
+        code: 'author_profile_missing',
+      });
       return;
     }
     if (result.kind === 'published') {

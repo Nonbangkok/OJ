@@ -3,6 +3,7 @@ import {
   createAuthorProfileSchema,
   createProblemDraftSchema,
   problemDraftIdParamSchema,
+  refreshProblemDraftAuthorSchema,
   updateAuthorProfileSchema,
   updateProblemDraftSchema,
 } from '../../schemas/requestSchemas';
@@ -92,6 +93,31 @@ describe('problem authoring request schemas', () => {
       id: '11111111-1111-4111-8111-111111111111',
     }).success).toBe(true);
     expect(problemDraftIdParamSchema.safeParse({ id: 'redgate' }).success).toBe(false);
+  });
+
+  it('allows profile-backed creation without caller-supplied snapshot fields', () => {
+    expect(createProblemDraftSchema.safeParse({
+      problemId: 'redgate',
+      title: 'Red Gate',
+      authorProfileId: '11111111-1111-4111-8111-111111111111',
+      timeLimitMs: 1000,
+      memoryLimitMb: 256,
+    }).success).toBe(true);
+  });
+
+  it('still requires display fields for a manual author', () => {
+    expect(createProblemDraftSchema.safeParse({
+      problemId: 'redgate',
+      title: 'Red Gate',
+      authorProfileId: null,
+      timeLimitMs: 1000,
+      memoryLimitMb: 256,
+    }).success).toBe(false);
+  });
+
+  it('requires a positive revision for explicit profile refresh', () => {
+    expect(refreshProblemDraftAuthorSchema.safeParse({ expectedRevision: 3 }).success).toBe(true);
+    expect(refreshProblemDraftAuthorSchema.safeParse({ expectedRevision: 0 }).success).toBe(false);
   });
 });
 

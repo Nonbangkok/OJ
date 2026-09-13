@@ -132,6 +132,7 @@ Three global contexts wrap the entire app in this order:
 - **`errorHandler` / `notFoundHandler`** — centralized API error formatting.
 - **`upload`** — Multer configuration for file uploads.
 - Author profile image processing belongs in `authorProfileImageService.ts`, not controllers. Only JPEG, PNG, and WebP inputs are accepted; persisted profile and draft snapshot images must be normalized 512×512 PNG buffers.
+- A non-null `authorProfileId` is authoritative: create/select/explicit-refresh operations copy profile display fields into the draft snapshot and never trust duplicate display fields supplied by the client.
 
 ### Authentication
 

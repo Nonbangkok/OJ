@@ -4,9 +4,11 @@ import request from 'supertest';
 import authoringDraftRouter from '../controllers/authoringDraftController';
 import { errorHandler } from '../middleware/errorHandler';
 import * as authoringDraftService from '../services/authoringDraftQueryService';
+import * as authorSnapshotService from '../services/authorProfileSnapshotService';
 import { ProblemDraftRow } from '../types/authoring';
 
 jest.mock('../services/authoringDraftQueryService');
+jest.mock('../services/authorProfileSnapshotService');
 
 const draftRow = (overrides: Partial<ProblemDraftRow> = {}): ProblemDraftRow => ({
   id: '11111111-1111-4111-8111-111111111111',
@@ -80,6 +82,16 @@ describe('Problem Authoring draft controller', () => {
 
   it('creates a draft for the authenticated admin and omits binary values', async () => {
     const draft = draftRow();
+    const manualSnapshot = {
+      author_profile_id: null,
+      author_aka_name: 'Author',
+      author_real_name: 'Example Author',
+      language: 'Thai',
+      country_code: 'THA',
+      author_profile_image_png: Buffer.from('fallback png'),
+    };
+    (authorSnapshotService.createManualAuthorSnapshot as jest.Mock)
+      .mockResolvedValueOnce(manualSnapshot);
     (authoringDraftService.createProblemDraft as jest.Mock).mockResolvedValueOnce(draft);
 
     const response = await request(createTestApp('admin'))
@@ -93,6 +105,7 @@ describe('Problem Authoring draft controller', () => {
       statement_html: '',
       solution_cpp: '',
       generator_cpp: null,
+      author_profile_image_png: manualSnapshot.author_profile_image_png,
     }));
     expect(response.body).toEqual(expect.objectContaining({
       id: draft.id,
@@ -103,6 +116,45 @@ describe('Problem Authoring draft controller', () => {
     }));
     expect(response.body.latestPdf).toBeUndefined();
     expect(response.body.authorProfileImagePng).toBeUndefined();
+  });
+
+  it('creates a draft from authoritative profile snapshot data', async () => {
+    const profileId = '33333333-3333-4333-8333-333333333333';
+    const snapshot = {
+      author_profile_id: profileId,
+      author_aka_name: 'Profile AKA',
+      author_real_name: 'Profile Name',
+      language: 'English',
+      country_code: 'USA',
+      author_profile_image_png: Buffer.from('profile png'),
+    };
+    const draft = draftRow({ ...snapshot, author_profile_id: profileId });
+    (authorSnapshotService.getAuthorProfileSnapshot as jest.Mock).mockResolvedValueOnce({
+      kind: 'resolved',
+      snapshot,
+    });
+    (authoringDraftService.createProblemDraft as jest.Mock).mockResolvedValueOnce(draft);
+
+    const response = await request(createTestApp('admin'))
+      .post('/admin/authoring/drafts')
+      .send({
+        problemId: 'redgate',
+        title: 'Red Gate',
+        authorProfileId: profileId,
+        authorAkaName: 'Caller must not win',
+        authorRealName: 'Caller must not win',
+        language: 'Thai',
+        countryCode: 'THA',
+        timeLimitMs: 1000,
+        memoryLimitMb: 256,
+      });
+
+    expect(response.status).toBe(201);
+    expect(authorSnapshotService.getAuthorProfileSnapshot).toHaveBeenCalledWith(profileId);
+    expect(authoringDraftService.createProblemDraft).toHaveBeenCalledWith(
+      expect.objectContaining(snapshot),
+    );
+    expect(response.body.authorAkaName).toBe('Profile AKA');
   });
 
   it('lists camel-case draft summaries', async () => {
@@ -188,6 +240,62 @@ describe('Problem Authoring draft controller', () => {
 
     expect(response.status).toBe(409);
     expect(response.body.code).toBe('draft_published');
+  });
+
+  it('selects a profile by copying its snapshot in the same optimistic update', async () => {
+    const profileId = '33333333-3333-4333-8333-333333333333';
+    const snapshot = {
+      author_profile_id: profileId,
+      author_aka_name: 'Profile AKA',
+      author_real_name: 'Profile Name',
+      language: 'English',
+      country_code: 'USA',
+      author_profile_image_png: Buffer.from('profile png'),
+    };
+    const updated = draftRow({ ...snapshot, revision: 2 });
+    (authorSnapshotService.getAuthorProfileSnapshot as jest.Mock).mockResolvedValueOnce({
+      kind: 'resolved',
+      snapshot,
+    });
+    (authoringDraftService.updateProblemDraft as jest.Mock).mockResolvedValueOnce({
+      kind: 'updated',
+      draft: updated,
+    });
+
+    const response = await request(createTestApp('admin'))
+      .patch(`/admin/authoring/drafts/${updated.id}`)
+      .send({
+        expectedRevision: 1,
+        authorProfileId: profileId,
+        authorAkaName: 'Caller must not win',
+      });
+
+    expect(response.status).toBe(200);
+    expect(authoringDraftService.updateProblemDraft).toHaveBeenCalledWith(
+      updated.id,
+      1,
+      snapshot,
+    );
+  });
+
+  it('refreshes the linked author profile using expectedRevision', async () => {
+    const refreshed = draftRow({ revision: 2, author_aka_name: 'Refreshed AKA' });
+    (authorSnapshotService.refreshProblemDraftAuthor as jest.Mock).mockResolvedValueOnce({
+      kind: 'updated',
+      draft: refreshed,
+    });
+
+    const response = await request(createTestApp('admin'))
+      .post(`/admin/authoring/drafts/${refreshed.id}/refresh-author-profile`)
+      .send({ expectedRevision: 1 });
+
+    expect(response.status).toBe(200);
+    expect(authorSnapshotService.refreshProblemDraftAuthor)
+      .toHaveBeenCalledWith(refreshed.id, 1);
+    expect(response.body).toEqual(expect.objectContaining({
+      authorAkaName: 'Refreshed AKA',
+      revision: 2,
+    }));
   });
 
   it('validates UUID parameters and patch bodies before calling the service', async () => {

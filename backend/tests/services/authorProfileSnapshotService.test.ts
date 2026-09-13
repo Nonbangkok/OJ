@@ -1,4 +1,5 @@
 import {
+  createManualAuthorSnapshot,
   getAuthorProfileSnapshot,
   refreshProblemDraftAuthor,
 } from '../../services/authorProfileSnapshotService';
@@ -46,6 +47,26 @@ const draftRow = (overrides: Partial<ProblemDraftRow> = {}): ProblemDraftRow => 
 });
 
 describe('author profile snapshots', () => {
+  it('creates a canonical fallback snapshot for a manual author', async () => {
+    const snapshot = await createManualAuthorSnapshot({
+      author_aka_name: 'Manual Author',
+      author_real_name: 'Example Author',
+      language: 'Thai',
+      country_code: 'THA',
+    });
+
+    expect(snapshot).toEqual(expect.objectContaining({
+      author_profile_id: null,
+      author_aka_name: 'Manual Author',
+      author_real_name: 'Example Author',
+      language: 'Thai',
+      country_code: 'THA',
+    }));
+    expect(snapshot.author_profile_image_png.subarray(0, 8)).toEqual(
+      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    );
+  });
+
   it('copies display data and canonical image bytes from a profile', async () => {
     const profile = profileRow();
     const database = {

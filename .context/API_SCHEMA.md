@@ -462,7 +462,7 @@
 
 ---
 
-## 6) Problem Authoring Controller (7 APIs)
+## 6) Problem Authoring Controller (8 APIs)
 
 All endpoints in this section require an authenticated `admin`; `staff` is not sufficient.
 
@@ -499,7 +499,9 @@ All endpoints in this section require an authenticated `admin`; `staff` is not s
 ### 54. `POST /admin/authoring/drafts`
 
 - Purpose: Create a private problem draft at revision 1.
-- Body: `problemId`, `title`, author snapshot fields, time/memory limits, plus optional statement/C++/template fields.
+- Body: `problemId`, `title`, `authorProfileId`, time/memory limits, plus optional statement/C++/template fields.
+- When `authorProfileId` is non-null, display fields and canonical/fallback PNG are copied from that profile; caller-supplied author display fields cannot override it.
+- When `authorProfileId` is null, `authorAkaName`, `authorRealName`, `language`, and `countryCode` are required and a fallback PNG is generated.
 - Response 201: complete camel-case draft data, excluding PDF and profile-image bytes.
 
 ### 55. `GET /admin/authoring/drafts`
@@ -520,7 +522,16 @@ All endpoints in this section require an authenticated `admin`; `staff` is not s
 - Params: UUID `id`.
 - Body: positive `expectedRevision` plus at least one editable field.
 - A successful update increments revision and invalidates readiness.
+- Selecting a non-null `authorProfileId` copies its current display fields and image snapshot in the same optimistic update.
 - Errors: 404 draft missing; 409 revision conflict or published/read-only draft.
+
+### 58. `POST /admin/authoring/drafts/:id/refresh-author-profile`
+
+- Purpose: Explicitly replace the draft author snapshot with current values from its linked profile.
+- Params: UUID `id`.
+- Body: `{ expectedRevision: positive integer }`.
+- Success increments draft revision and invalidates readiness through the normal optimistic update.
+- Errors: 404 draft missing; 409 revision conflict, published draft, no linked profile, or linked profile removed during the operation.
 
 ---
 

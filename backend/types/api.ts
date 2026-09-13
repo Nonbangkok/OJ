@@ -165,10 +165,10 @@ export interface CreateProblemDraftRequestBody {
     problemId: string;
     title: string;
     authorProfileId: string | null;
-    authorAkaName: string;
-    authorRealName: string;
-    language: string;
-    countryCode: string;
+    authorAkaName?: string;
+    authorRealName?: string;
+    language?: string;
+    countryCode?: string;
     timeLimitMs: number;
     memoryLimitMb: number;
     statementHtml: string;
@@ -180,6 +180,10 @@ export interface CreateProblemDraftRequestBody {
 export type UpdateProblemDraftRequestBody = {
     expectedRevision: number;
 } & Partial<CreateProblemDraftRequestBody>;
+
+export interface RefreshProblemDraftAuthorRequestBody {
+    expectedRevision: number;
+}
 
 // ---------------------------------------------------------------------------
 // Submission

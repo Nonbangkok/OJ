@@ -31,6 +31,26 @@ export type RefreshProblemDraftAuthorResult = UpdateProblemDraftResult
 
 type AuthorSnapshotDatabase = AuthorProfileDatabase & AuthoringDraftDatabase;
 
+export type ManualAuthorSnapshotInput = Pick<
+  ProblemDraftRow,
+  'author_aka_name' | 'author_real_name' | 'language' | 'country_code'
+>;
+
+/** Creates a draft author snapshot when no reusable profile is selected. */
+export const createManualAuthorSnapshot = async (
+  input: ManualAuthorSnapshotInput,
+): Promise<AuthorProfileSnapshot> => {
+  try {
+    return {
+      author_profile_id: null,
+      ...input,
+      author_profile_image_png: await createFallbackAuthorAvatar(input.author_aka_name),
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
 /** Resolves immutable author display fields and canonical PNG bytes for a draft. */
 export const getAuthorProfileSnapshot = async (
   profileId: string,
