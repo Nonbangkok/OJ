@@ -1,6 +1,14 @@
 import { randomUUID } from 'crypto';
+import type { QueryResultRow } from 'pg';
 import * as db from '../db';
 import { ProblemDraftRow } from '../types/authoring';
+
+export type AuthoringDraftDatabase = {
+  query<T extends QueryResultRow = QueryResultRow>(
+    text: string,
+    params?: unknown[],
+  ): Promise<{ rows: T[] }>;
+};
 
 export type CreateProblemDraftInput = Pick<
   ProblemDraftRow,
@@ -78,9 +86,10 @@ const EDITABLE_FIELDS: readonly (keyof EditableProblemDraftFields)[] = [
 
 export const createProblemDraft = async (
   input: CreateProblemDraftInput,
+  database: AuthoringDraftDatabase = db,
 ): Promise<ProblemDraftRow> => {
   const id = randomUUID();
-  const result = await db.query<ProblemDraftRow>(`
+  const result = await database.query<ProblemDraftRow>(`
     INSERT INTO problem_drafts (
       id, problem_id, title, author_profile_id, author_aka_name,
       author_real_name, language, country_code, time_limit_ms,
@@ -115,8 +124,10 @@ export const createProblemDraft = async (
   return result.rows[0];
 };
 
-export const listProblemDrafts = async (): Promise<ProblemDraftListRow[]> => {
-  const result = await db.query<ProblemDraftListRow>(`
+export const listProblemDrafts = async (
+  database: AuthoringDraftDatabase = db,
+): Promise<ProblemDraftListRow[]> => {
+  const result = await database.query<ProblemDraftListRow>(`
     SELECT
       id, problem_id, title, author_aka_name, status, revision,
       verified_revision, created_by, created_at, updated_at
@@ -126,8 +137,11 @@ export const listProblemDrafts = async (): Promise<ProblemDraftListRow[]> => {
   return result.rows;
 };
 
-export const getProblemDraft = async (draftId: string): Promise<ProblemDraftRow | null> => {
-  const result = await db.query<ProblemDraftRow>(
+export const getProblemDraft = async (
+  draftId: string,
+  database: AuthoringDraftDatabase = db,
+): Promise<ProblemDraftRow | null> => {
+  const result = await database.query<ProblemDraftRow>(
     'SELECT * FROM problem_drafts WHERE id = $1',
     [draftId],
   );
@@ -138,6 +152,7 @@ export const updateProblemDraft = async (
   draftId: string,
   expectedRevision: number,
   updates: ProblemDraftUpdates,
+  database: AuthoringDraftDatabase = db,
 ): Promise<UpdateProblemDraftResult> => {
   const assignments: string[] = [];
   const values: unknown[] = [draftId, expectedRevision];
@@ -155,7 +170,7 @@ export const updateProblemDraft = async (
     throw new Error('At least one editable draft field is required');
   }
 
-  const updateResult = await db.query<ProblemDraftRow>(`
+  const updateResult = await database.query<ProblemDraftRow>(`
     UPDATE problem_drafts
     SET ${assignments.join(', ')},
         revision = revision + 1, status = 'draft', verified_revision = NULL,
@@ -169,7 +184,7 @@ export const updateProblemDraft = async (
     return { kind: 'updated', draft: updatedDraft };
   }
 
-  const currentResult = await db.query<ProblemDraftRow>(
+  const currentResult = await database.query<ProblemDraftRow>(
     'SELECT * FROM problem_drafts WHERE id = $1',
     [draftId],
   );
