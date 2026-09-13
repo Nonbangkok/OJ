@@ -146,6 +146,30 @@ export interface ProblemExportRequestBody {
 }
 
 // ---------------------------------------------------------------------------
+// Problem Authoring
+// ---------------------------------------------------------------------------
+
+export interface CreateProblemDraftRequestBody {
+    problemId: string;
+    title: string;
+    authorProfileId: string | null;
+    authorAkaName: string;
+    authorRealName: string;
+    language: string;
+    countryCode: string;
+    timeLimitMs: number;
+    memoryLimitMb: number;
+    statementHtml: string;
+    solutionCpp: string;
+    generatorCpp: string | null;
+    templateVersion: string;
+}
+
+export type UpdateProblemDraftRequestBody = {
+    expectedRevision: number;
+} & Partial<CreateProblemDraftRequestBody>;
+
+// ---------------------------------------------------------------------------
 // Submission
 // ---------------------------------------------------------------------------
 
