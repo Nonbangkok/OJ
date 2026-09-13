@@ -18,7 +18,7 @@ bad = [row["Name"] for row in rows if row.get("State") != "running" or row.get("
 print(" ".join(bad))
 ')
     if [[ -z "$unhealthy" ]]; then
-        curl -fsS -H 'Host: woi-grader.com' http://127.0.0.1/ >/dev/null
+        curl -fsS -H 'Host: nonbangkokgrader.com' http://127.0.0.1/ >/dev/null
         echo "OJ deployment healthy"
         exit 0
     fi

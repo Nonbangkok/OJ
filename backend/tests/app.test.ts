@@ -50,19 +50,19 @@ describe('HTTP runtime configuration', () => {
     const app = createApp({
       runtimeEnv: parseRuntimeEnv({
         ...baseEnv,
-        CORS_ORIGINS: 'https://www.woi-grader.com',
+        CORS_ORIGINS: 'https://www.nonbangkokgrader.com',
       }),
       sessionStore: new session.MemoryStore(),
     });
 
     const allowed = await request(app)
       .get('/')
-      .set('Origin', 'https://www.woi-grader.com');
+      .set('Origin', 'https://www.nonbangkokgrader.com');
     const denied = await request(app)
       .get('/')
       .set('Origin', 'https://attacker.example');
 
-    expect(allowed.headers['access-control-allow-origin']).toBe('https://www.woi-grader.com');
+    expect(allowed.headers['access-control-allow-origin']).toBe('https://www.nonbangkokgrader.com');
     expect(allowed.headers['access-control-allow-credentials']).toBe('true');
     expect(denied.headers['access-control-allow-origin']).toBeUndefined();
   });
@@ -94,7 +94,7 @@ describe('HTTP runtime configuration', () => {
         ...baseEnv,
         NODE_ENV: 'production',
         COOKIE_SECURE: 'true',
-        COOKIE_DOMAIN: 'woi-grader.com',
+        COOKIE_DOMAIN: 'nonbangkokgrader.com',
       }),
       sessionStore: new session.MemoryStore(),
     });
@@ -105,7 +105,7 @@ describe('HTTP runtime configuration', () => {
       .send({ username: 'testuser', password: 'password123' });
 
     expect(response.status).toBe(200);
-    expect(response.headers['set-cookie'][0]).toContain('Domain=woi-grader.com');
+    expect(response.headers['set-cookie'][0]).toContain('Domain=nonbangkokgrader.com');
     expect(response.headers['set-cookie'][0]).toContain('Secure');
     expect(response.headers['set-cookie'][0]).toContain('HttpOnly');
     expect(response.headers['set-cookie'][0]).toContain('SameSite=Lax');

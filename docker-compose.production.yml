@@ -3,8 +3,8 @@ services:
     environment:
       NODE_ENV: production
       COOKIE_SECURE: "true"
-      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-woi-grader.com}
-      CORS_ORIGINS: ${CORS_ORIGINS:-https://www.woi-grader.com,https://woi-grader.com,https://upload.woi-grader.com}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-nonbangkokgrader.com}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://www.nonbangkokgrader.com,https://nonbangkokgrader.com,https://upload.nonbangkokgrader.com}
 
   migrate:
     environment:

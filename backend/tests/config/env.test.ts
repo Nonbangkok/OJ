@@ -39,16 +39,16 @@ describe('runtime environment configuration', () => {
       ...requiredEnv,
       NODE_ENV: 'production',
       COOKIE_SECURE: 'true',
-      COOKIE_DOMAIN: 'woi-grader.com',
-      CORS_ORIGINS: ' https://www.woi-grader.com,https://upload.woi-grader.com ',
+      COOKIE_DOMAIN: 'nonbangkokgrader.com',
+      CORS_ORIGINS: ' https://www.nonbangkokgrader.com,https://upload.nonbangkokgrader.com ',
       TRUST_PROXY: '2',
     });
 
     expect(parsed.COOKIE_SECURE).toBe(true);
-    expect(parsed.COOKIE_DOMAIN).toBe('woi-grader.com');
+    expect(parsed.COOKIE_DOMAIN).toBe('nonbangkokgrader.com');
     expect(parsed.CORS_ORIGINS).toEqual([
-      'https://www.woi-grader.com',
-      'https://upload.woi-grader.com',
+      'https://www.nonbangkokgrader.com',
+      'https://upload.nonbangkokgrader.com',
     ]);
     expect(parsed.TRUST_PROXY).toBe(2);
   });

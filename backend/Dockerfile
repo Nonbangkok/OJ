@@ -41,7 +41,7 @@ RUN npm run build
 #      the parent (this container) starts as root; running the whole container
 #      as `node` would make the wrapper's privilege drop a no-op (an
 #      unprivileged user cannot setuid without CAP_SETUID, and docker-compose
-#      drops ALL capabilities for this service).
+#      retains SETUID/SETGID only so the wrapper can perform this drop).
 #   2. The g++ compile step and submissions dir need write access to paths that
 #      are root-owned in this image.
 #
@@ -49,8 +49,8 @@ RUN npm run build
 # the whole node process as non-root:
 #   - per-submission privilege drop to nobody (scripts/time_wrapper.c)
 #   - setrlimit() caps on the untrusted child (scripts/time_wrapper.c)
-#   - container-level cap_drop: ALL + no-new-privileges + pids/mem limits
-#     (docker-compose.yml)
+#   - container-level cap_drop: ALL followed by only SETUID/SETGID being added
+#     back, plus no-new-privileges and pids/memory limits (docker-compose.yml)
 #
 # TODO (A2 hardening, follow-up): move judging into a dedicated, network-isolated
 # `judge` container that runs as a non-root user, owns its own submissions dir,

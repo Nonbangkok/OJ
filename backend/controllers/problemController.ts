@@ -29,6 +29,7 @@ import {
 } from '../types/api';
 import { getErrorMessage } from '../utils/errorMessage';
 import { validateRequest } from '../middleware/validation';
+import { env } from '../config/env';
 import {
   createProblemSchema,
   idParamSchema,
@@ -49,6 +50,13 @@ const isPdfBuffer = (buffer: Buffer | undefined | null): boolean =>
 
 const progressMap = new Map<string, Response>();
 const progressHeartbeatMap = new Map<string, NodeJS.Timeout>();
+
+export const selectProgressResponseOrigin = (
+  requestOrigin: string | undefined,
+  allowedOrigins: readonly string[] = env.CORS_ORIGINS,
+): string | undefined => requestOrigin && allowedOrigins.includes(requestOrigin)
+  ? requestOrigin
+  : allowedOrigins[0];
 
 const writeProgressEvent = (progressId: string, event: string, payload: unknown): void => {
   const clientResponse = progressMap.get(progressId);
@@ -250,21 +258,13 @@ router.get('/admin/problems/batch-upload-progress/:progressId', requireAuth, req
   validateRequest({ params: progressIdParamSchema }),
   (req: Request, res: Response) => {
   const progressId = String(req.params.progressId);
-  const requestOrigin = req.headers.origin;
-  const allowedOrigins = new Set([
-    'https://www.woi-grader.com',
-    'https://woi-grader.com',
-    'https://upload.woi-grader.com',
-  ]);
-  const responseOrigin = requestOrigin && allowedOrigins.has(requestOrigin)
-    ? requestOrigin
-    : 'https://woi-grader.com';
+  const responseOrigin = selectProgressResponseOrigin(req.headers.origin);
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': responseOrigin,
+    ...(responseOrigin ? { 'Access-Control-Allow-Origin': responseOrigin } : {}),
     'Access-Control-Allow-Credentials': 'true',
     'Vary': 'Origin',
   });

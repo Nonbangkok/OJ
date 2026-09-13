@@ -73,8 +73,8 @@ test('backend retains only the capabilities required to drop judge privileges', 
       ['docker-compose.yml', 'docker-compose.production.yml'],
       {
         CLOUDFLARE_TUNNEL_TOKEN: 'test-tunnel-token',
-        COOKIE_DOMAIN: 'woi-grader.com',
-        CORS_ORIGINS: 'https://woi-grader.com',
+        COOKIE_DOMAIN: 'nonbangkokgrader.com',
+        CORS_ORIGINS: 'https://nonbangkokgrader.com',
       },
     ),
   ];
@@ -85,13 +85,41 @@ test('backend retains only the capabilities required to drop judge privileges', 
   }
 });
 
+test('production defaults consistently target nonbangkokgrader.com', () => {
+  const config = renderComposeConfig(
+    ['docker-compose.yml', 'docker-compose.production.yml'],
+    { CLOUDFLARE_TUNNEL_TOKEN: 'test-tunnel-token' },
+  );
+
+  assert.equal(config.services.backend.environment.COOKIE_DOMAIN, 'nonbangkokgrader.com');
+  assert.deepEqual(config.services.backend.environment.CORS_ORIGINS.split(','), [
+    'https://www.nonbangkokgrader.com',
+    'https://nonbangkokgrader.com',
+    'https://upload.nonbangkokgrader.com',
+  ]);
+
+  const productionFiles = [
+    '.env.production.example',
+    'docker-compose.production.yml',
+    'nginx-proxy/production.conf',
+    'deploy.sh',
+  ].map((file) => readFileSync(path.join(repositoryRoot, file), 'utf8'));
+  const productionText = productionFiles.join('\n');
+
+  assert.doesNotMatch(productionText, /(?:^|\.)woi-grader\.com/m);
+  assert.match(productionText, /server_name nonbangkokgrader\.com www\.nonbangkokgrader\.com/);
+  assert.match(productionText, /server_name upload\.nonbangkokgrader\.com/);
+  assert.match(productionText, /\/etc\/letsencrypt\/live\/nonbangkokgrader\.com\/fullchain\.pem/);
+  assert.match(productionText, /Host: nonbangkokgrader\.com/);
+});
+
 test('production overlay enables public security and tunnel configuration', () => {
   const config = renderComposeConfig(
     ['docker-compose.yml', 'docker-compose.production.yml'],
     {
       CLOUDFLARE_TUNNEL_TOKEN: 'test-tunnel-token',
-      COOKIE_DOMAIN: 'woi-grader.com',
-      CORS_ORIGINS: 'https://www.woi-grader.com,https://woi-grader.com,https://upload.woi-grader.com',
+      COOKIE_DOMAIN: 'nonbangkokgrader.com',
+      CORS_ORIGINS: 'https://www.nonbangkokgrader.com,https://nonbangkokgrader.com,https://upload.nonbangkokgrader.com',
     },
   );
 
@@ -99,8 +127,8 @@ test('production overlay enables public security and tunnel configuration', () =
   assert.equal(config.services.cloudflared.environment.TUNNEL_TOKEN, 'test-tunnel-token');
   assert.equal(config.services.backend.environment.NODE_ENV, 'production');
   assert.equal(config.services.backend.environment.COOKIE_SECURE, 'true');
-  assert.equal(config.services.backend.environment.COOKIE_DOMAIN, 'woi-grader.com');
-  assert.match(config.services.backend.environment.CORS_ORIGINS, /upload\.woi-grader\.com/);
+  assert.equal(config.services.backend.environment.COOKIE_DOMAIN, 'nonbangkokgrader.com');
+  assert.match(config.services.backend.environment.CORS_ORIGINS, /upload\.nonbangkokgrader\.com/);
   assert.equal(
     config.services['nginx-proxy'].ports.some(({ target, published }) => target === 443 && published === '443'),
     true,
@@ -118,7 +146,7 @@ test('production overlay enables public security and tunnel configuration', () =
   assert.match(productionNginx, /style-src[^;]*https:\/\/fonts\.googleapis\.com/);
   assert.match(productionNginx, /font-src[^;]*https:\/\/fonts\.gstatic\.com/);
   assert.match(productionNginx, /listen 443 ssl/);
-  assert.match(productionNginx, /ssl_certificate \/etc\/letsencrypt\/live\/woi-grader\.com\/fullchain\.pem/);
+  assert.match(productionNginx, /ssl_certificate \/etc\/letsencrypt\/live\/nonbangkokgrader\.com\/fullchain\.pem/);
   assert.equal(config.services.cloudflared.networks['tunnel-network'].ipv4_address, '172.30.250.3');
   assert.equal('tunnel-network' in config.services['nginx-proxy'].networks, true);
   assert.equal(config.networks['tunnel-network'].ipam.config[0].subnet, '172.30.250.0/29');

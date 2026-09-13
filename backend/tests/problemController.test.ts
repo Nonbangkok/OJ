@@ -1,7 +1,7 @@
 import request from 'supertest';
 import express, { Express, Request, Response, NextFunction } from 'express';
 import session from 'express-session';
-import problemRouter from '../controllers/problemController';
+import problemRouter, { selectProgressResponseOrigin } from '../controllers/problemController';
 import * as db from '../db';
 import { processBatchUpload } from '../services/batchUploadService';
 
@@ -70,6 +70,27 @@ describe('Problem Controller', () => {
     afterAll(() => {
         // Clear anything that might keep the event loop alive
         jest.restoreAllMocks();
+    });
+
+    describe('batch upload progress origin', () => {
+        const allowedOrigins = [
+            'https://www.nonbangkokgrader.com',
+            'https://nonbangkokgrader.com',
+            'https://upload.nonbangkokgrader.com',
+        ];
+
+        it('uses the request origin only when runtime CORS configuration allows it', () => {
+            expect(selectProgressResponseOrigin(
+                'https://upload.nonbangkokgrader.com',
+                allowedOrigins,
+            )).toBe('https://upload.nonbangkokgrader.com');
+            expect(selectProgressResponseOrigin('https://attacker.example', allowedOrigins))
+                .toBe('https://www.nonbangkokgrader.com');
+        });
+
+        it('omits the cross-origin header when local runtime has no configured origins', () => {
+            expect(selectProgressResponseOrigin('http://localhost:18080', [])).toBeUndefined();
+        });
     });
 
     describe('GET /problems', () => {

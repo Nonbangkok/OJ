@@ -140,7 +140,7 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml config --q
 The production overlay sets `NODE_ENV=production`, enables secure cookies, mounts
 the production Nginx configuration and certificate directories, publishes HTTPS
 for the DNS-only large-upload hostname, and starts the Cloudflare tunnel. The
-certificate at `/etc/letsencrypt/live/woi-grader.com/` must cover the main, `www`,
+certificate at `/etc/letsencrypt/live/nonbangkokgrader.com/` must cover the main, `www`,
 and `upload` hostnames. Do not use this overlay as the localhost configuration.
 
 ## Testing
