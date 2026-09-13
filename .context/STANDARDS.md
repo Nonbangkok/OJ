@@ -180,6 +180,13 @@ Three global contexts wrap the entire app in this order:
 - Use `supertest` to make HTTP requests against the Express app.
 - Test files named by domain: e.g., `auth.test.ts`, `submissions.test.ts`.
 - Run with `npm test` (uses `cross-env NODE_ENV=test`).
+- Slice 3 HTTP/PostgreSQL coverage lives in `tests/integration/authoringProfilesAndAssets.test.ts`.
+  Only DB transport is redirected; controllers, image decoding, services, and transactions run for real.
+  It uses a unique schema per suite and cleans that schema up afterwards.
+- Set `INTEGRATION_DATABASE_URL` to a disposable database when running integration tests.
+  Older migration/restore suites reset `public`; never point the full suite at a working stack.
+- Run final authoring checks inside the backend Docker image to exercise Node 20,
+  native sharp, PostgreSQL client tools, and Thai/Latin avatar fonts. See README commands.
 
 ### Frontend (Jest + React Testing Library)
 

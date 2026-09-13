@@ -175,6 +175,38 @@ From the project root, execute the unified test script to run both backend and f
 *   Most backend tests mock PostgreSQL. The migration integration test requires a
     PostgreSQL test URL and is skipped unless `INTEGRATION_DATABASE_URL` is provided.
 
+### Authoring integration tests
+
+The Slice 3 integration suite sends HTTP requests through real image processing and
+PostgreSQL transactions. It creates a randomly named schema and removes only that
+schema when finished. The older migration/restore tests reset the `public` schema,
+so run the complete integration suite only on a disposable database.
+
+From the repository root, build the backend and start a dedicated test database:
+
+```bash
+docker build -t oj-authoring-test-backend backend
+docker run --rm -d --name oj-authoring-test-db \
+  -e POSTGRES_USER=oj_test -e POSTGRES_PASSWORD=oj_test -e POSTGRES_DB=oj_test \
+  postgres:16-alpine
+docker exec oj-authoring-test-db pg_isready -U oj_test -d oj_test
+```
+
+Once `pg_isready` reports accepting connections, run the suite in Node 20 with the
+same native dependencies and fonts as the deployed backend:
+
+```bash
+docker run --rm --network container:oj-authoring-test-db \
+  -e INTEGRATION_DATABASE_URL=postgres://oj_test:oj_test@127.0.0.1:5432/oj_test \
+  oj-authoring-test-backend npm test -- --runInBand --verbose=false
+docker stop oj-authoring-test-db
+```
+
+No production/local-stack database or persistent volume is used by these commands.
+For host-only tests, provide a disposable `INTEGRATION_DATABASE_URL`. On Linux,
+install `fontconfig`, `fonts-dejavu-core`, and `fonts-tlwg-garuda` for fallback-avatar
+Thai/Latin coverage. The font-registry check runs on Linux and is skipped on macOS.
+
 ### Local Compose and Session Smoke Tests
 
 With the stack running on the default port:

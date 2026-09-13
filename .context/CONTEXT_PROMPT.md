@@ -10,6 +10,7 @@ You are an expert software engineer working on **OJ (Grader System)** — an onl
 
 Before generating any code, consult the files in the `.context/` directory:
 
+- **`.context/AUTHORING_PROGRESS.md`** — Current authoring slice status, completion evidence, and the boundary between Slice 3, the runner, PDF rendering, and frontend work.
 - **`.context/ARCHITECTURE.md`** — System hierarchy, directory structure, tech stack, Mermaid diagrams of all major flows (submission judging, contest lifecycle, authentication, request routing, provider tree).
 - **`.context/STANDARDS.md`** — Coding patterns, naming conventions, architecture rules, and testing standards. Your code MUST follow these patterns exactly.
 - **`.context/DATA_MODEL.md`** — Complete database schema (17 tables), entity relationships, JSONB structures, indexes, and non-destructive migration instructions.
