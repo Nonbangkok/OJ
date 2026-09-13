@@ -199,6 +199,12 @@ Backend runtime request pipeline (high-level):
 
 Controllers and query services must store only the normalized PNG. Raw profile-image uploads are never persisted.
 
+The backend Docker image supplies DejaVu and Garuda fonts plus Fontconfig for Latin
+and Thai fallback-avatar initials. A Linux runtime test checks both language
+coverages; without Thai fonts, sharp's SVG renderer emits a missing-glyph box even
+though PNG creation succeeds. Fallbacks are deterministic within the same font and
+renderer environment; persisted snapshots retain their original bytes across upgrades.
+
 Draft author refreshes first compare `expectedRevision` with the current draft. Profile fields are then copied into the draft through the existing optimistic update, which increments revision and invalidates any previous readiness result.
 
 ### Statement Asset Preparation

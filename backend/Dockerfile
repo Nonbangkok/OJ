@@ -10,6 +10,11 @@ RUN apt-get update \
     && apt-get update \
     && apt-get install -y build-essential time postgresql-client-16
 
+# sharp's SVG fallback avatars need actual glyphs in the deployed runtime.
+# DejaVu covers Latin; Garuda supplies Thai initials instead of missing-glyph boxes.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fontconfig fonts-dejavu-core fonts-tlwg-garuda
+
 # Set the working directory inside the container
 WORKDIR /usr/src/app
 
