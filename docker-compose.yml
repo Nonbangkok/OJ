@@ -70,6 +70,9 @@ services:
       - "no-new-privileges:true"
     cap_drop:
       - "ALL"
+    cap_add:
+      - "SETGID"
+      - "SETUID"
     pids_limit: 256
     mem_reservation: 512m
     mem_limit: 1g

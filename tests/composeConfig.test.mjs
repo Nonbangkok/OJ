@@ -66,6 +66,25 @@ test('local Compose config is self-contained and migration-gated', () => {
   assert.match(frontendNginx, /font-src[^;]*https:\/\/fonts\.gstatic\.com/);
 });
 
+test('backend retains only the capabilities required to drop judge privileges', () => {
+  const configurations = [
+    renderComposeConfig(['docker-compose.yml']),
+    renderComposeConfig(
+      ['docker-compose.yml', 'docker-compose.production.yml'],
+      {
+        CLOUDFLARE_TUNNEL_TOKEN: 'test-tunnel-token',
+        COOKIE_DOMAIN: 'woi-grader.com',
+        CORS_ORIGINS: 'https://woi-grader.com',
+      },
+    ),
+  ];
+
+  for (const config of configurations) {
+    assert.deepEqual(config.services.backend.cap_drop, ['ALL']);
+    assert.deepEqual(config.services.backend.cap_add.sort(), ['SETGID', 'SETUID']);
+  }
+});
+
 test('production overlay enables public security and tunnel configuration', () => {
   const config = renderComposeConfig(
     ['docker-compose.yml', 'docker-compose.production.yml'],
