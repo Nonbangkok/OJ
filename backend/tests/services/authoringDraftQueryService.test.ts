@@ -119,6 +119,7 @@ describe('problem draft reads and creation', () => {
 
   it('creates a draft with an application-generated UUID and safe initial state', async () => {
     const id = '33333333-3333-4333-8333-333333333333';
+    const profileImage = Buffer.from('profile snapshot png');
     const created = draftRow({
       id,
       revision: 1,
@@ -126,6 +127,7 @@ describe('problem draft reads and creation', () => {
       status: 'draft',
       statement_html: '',
       solution_cpp: '',
+      author_profile_image_png: profileImage,
     });
     (randomUUID as jest.Mock).mockReturnValue(id);
     (db.query as jest.Mock).mockResolvedValueOnce({ rows: [created] });
@@ -138,6 +140,7 @@ describe('problem draft reads and creation', () => {
       author_real_name: 'Example Author',
       language: 'Thai',
       country_code: 'THA',
+      author_profile_image_png: profileImage,
       time_limit_ms: 1000,
       memory_limit_mb: 256,
       created_by: 7,
@@ -155,6 +158,7 @@ describe('problem draft reads and creation', () => {
         'Example Author',
         'Thai',
         'THA',
+        profileImage,
         1000,
         256,
         '',

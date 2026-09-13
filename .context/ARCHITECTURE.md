@@ -54,6 +54,7 @@ OJ/
 │   ├── services/           # Business logic & external processes
 │   │   ├── authorProfileImageService.ts # Canonical profile PNGs and fallback avatars
 │   │   ├── authorProfileQueryService.ts # Author profile persistence
+│   │   ├── authorProfileSnapshotService.ts # Immutable draft author snapshots
 │   │   ├── judgeService.ts       # Compile & judge C++ in sandbox
 │   │   ├── submissionService.ts  # Submission processing
 │   │   ├── submissionQueryService.ts # Submission read/write query orchestration
@@ -192,9 +193,11 @@ Backend runtime request pipeline (high-level):
 1. Accept JPEG, PNG, or WebP bytes and verify that decoded content matches the declared MIME type.
 2. Reject corrupt, animated, or excessively large pixel inputs.
 3. Apply EXIF orientation, center-crop to a square, and encode a 512×512 PNG with `sharp`.
-4. When no profile image exists, create a deterministic 512×512 PNG avatar from the first character of the trimmed AKA name.
+4. When a profile is copied or refreshed into a draft and has no custom image, create a deterministic 512×512 PNG avatar from the first character of the trimmed AKA name.
 
 Controllers and query services must store only the normalized PNG. Raw profile-image uploads are never persisted.
+
+Draft author refreshes first compare `expectedRevision` with the current draft. Profile fields are then copied into the draft through the existing optimistic update, which increments revision and invalidates any previous readiness result.
 
 ### Authentication Flow
 

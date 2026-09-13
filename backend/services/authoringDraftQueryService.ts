@@ -24,7 +24,11 @@ export type CreateProblemDraftInput = Pick<
   | 'created_by'
 > & Partial<Pick<
   ProblemDraftRow,
-  'statement_html' | 'solution_cpp' | 'generator_cpp' | 'template_version'
+  | 'author_profile_image_png'
+  | 'statement_html'
+  | 'solution_cpp'
+  | 'generator_cpp'
+  | 'template_version'
 >>;
 
 export type ProblemDraftListRow = Pick<
@@ -92,15 +96,15 @@ export const createProblemDraft = async (
   const result = await database.query<ProblemDraftRow>(`
     INSERT INTO problem_drafts (
       id, problem_id, title, author_profile_id, author_aka_name,
-      author_real_name, language, country_code, time_limit_ms,
-      memory_limit_mb, statement_html, solution_cpp, generator_cpp,
-      template_version, created_by
+      author_real_name, language, country_code, author_profile_image_png,
+      time_limit_ms, memory_limit_mb, statement_html, solution_cpp,
+      generator_cpp, template_version, created_by
     )
     VALUES (
       $1, $2, $3, $4, $5,
       $6, $7, $8, $9,
       $10, $11, $12, $13,
-      $14, $15
+      $14, $15, $16
     )
     RETURNING *
   `, [
@@ -112,6 +116,7 @@ export const createProblemDraft = async (
     input.author_real_name,
     input.language,
     input.country_code,
+    input.author_profile_image_png ?? null,
     input.time_limit_ms,
     input.memory_limit_mb,
     input.statement_html ?? '',
