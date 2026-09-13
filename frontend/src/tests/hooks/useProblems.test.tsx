@@ -60,6 +60,28 @@ describe('useProblems', () => {
         expect(problemService.getAllWithStats).not.toHaveBeenCalled();
     });
 
+    it('should not fetch until explicitly enabled', async () => {
+        const { result, rerender } = renderHook(
+            ({ enabled }) => useProblems('contest-123', enabled),
+            { initialProps: { enabled: false } }
+        );
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+        expect(contestService.getProblems).not.toHaveBeenCalled();
+        expect(problemService.getAllWithStats).not.toHaveBeenCalled();
+
+        const contestProblems = [{ id: 'P1', title: 'Contest Problem', author: null }];
+        jest.mocked(contestService.getProblems).mockResolvedValue(contestProblems);
+        rerender({ enabled: true });
+
+        await waitFor(() => {
+            expect(result.current.problems).toEqual(contestProblems);
+        });
+        expect(contestService.getProblems).toHaveBeenCalledWith('contest-123');
+    });
+
     it('should handle errors when fetching contest problems', async () => {
         (jest.mocked(contestService.getProblems) as jest.Mock).mockRejectedValue(new Error('Unauthorized'));
 

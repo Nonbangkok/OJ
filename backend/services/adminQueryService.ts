@@ -143,18 +143,23 @@ export const getAuthors = async (): Promise<AdminAuthorListRow[]> => {
   return result.rows;
 };
 
-export const dropAllTablesForImport = async (): Promise<void> => {
-  await db.query('DROP TABLE IF EXISTS contest_scoreboards CASCADE;');
-  await db.query('DROP TABLE IF EXISTS contest_problems CASCADE;');
-  await db.query('DROP TABLE IF EXISTS contest_submissions CASCADE;');
-  await db.query('DROP TABLE IF EXISTS contest_participants CASCADE;');
-  await db.query('DROP TABLE IF EXISTS contests CASCADE;');
-  await db.query('DROP TABLE IF EXISTS submissions CASCADE;');
-  await db.query('DROP TABLE IF EXISTS testcases CASCADE;');
-  await db.query('DROP TABLE IF EXISTS problems CASCADE;');
-  await db.query('DROP TABLE IF EXISTS users CASCADE;');
-  await db.query('DROP TABLE IF EXISTS user_sessions CASCADE;');
-  await db.query('DROP TABLE IF EXISTS system_settings CASCADE;');
+type ImportDatabase = {
+  query: (text: string) => Promise<unknown>;
+};
+
+export const dropAllTablesForImport = async (database: ImportDatabase = db): Promise<void> => {
+  await database.query('DROP TABLE IF EXISTS schema_migrations CASCADE;');
+  await database.query('DROP TABLE IF EXISTS contest_scoreboards CASCADE;');
+  await database.query('DROP TABLE IF EXISTS contest_problems CASCADE;');
+  await database.query('DROP TABLE IF EXISTS contest_submissions CASCADE;');
+  await database.query('DROP TABLE IF EXISTS contest_participants CASCADE;');
+  await database.query('DROP TABLE IF EXISTS contests CASCADE;');
+  await database.query('DROP TABLE IF EXISTS submissions CASCADE;');
+  await database.query('DROP TABLE IF EXISTS testcases CASCADE;');
+  await database.query('DROP TABLE IF EXISTS problems CASCADE;');
+  await database.query('DROP TABLE IF EXISTS users CASCADE;');
+  await database.query('DROP TABLE IF EXISTS user_sessions CASCADE;');
+  await database.query('DROP TABLE IF EXISTS system_settings CASCADE;');
 };
 
 export const getRegistrationEnabled = async (): Promise<boolean> => {

@@ -75,6 +75,8 @@ To get the Grader System up and running, you only need to install a few essentia
 
 *   **[Docker](https://www.docker.com/):** Essential for containerizing, building, running, and managing the application's services.
 *   **[Git](https://git-scm.com/downloads):** Required to clone the project repository for local development and version control.
+*   **Node.js 20 (optional):** Required only for running npm and root-level smoke
+    tests directly on the host. Docker remains the primary runtime.
 
 ## Installation & Setup
 
@@ -84,12 +86,12 @@ To get the Grader System up and running, you only need to install a few essentia
     cd OJ
     ```
 
-2.  **Create the environment file:**
-    -   Copy the example environment file to create your own local configuration.
-        ```bash
-        cp .env.example .env
-        ```
-    -   Open the `.env` file and change all of them and the `POSTGRES_PASSWORD` and `SECRET_KEY` to your own strong, secret values.
+2.  **Create the local environment file:**
+    ```bash
+    cp .env.example .env
+    ```
+    Change `POSTGRES_PASSWORD` and `SECRET_KEY` before sharing the environment
+    with anyone. The remaining defaults are suitable for plain HTTP on localhost.
 
 ## Running the Project
 
@@ -98,7 +100,7 @@ Once the installation and setup are complete, you can start the application:
 1.  **Build and Run Docker Containers:**
     Navigate to the root directory of the project (where `docker-compose.yml` is located) and execute the following command:
     ```bash
-    docker-compose up --build -d
+    docker compose up --build -d
     ```
     *   The first time you run this command, it might take several minutes as Docker downloads the PostgreSQL image and builds the frontend and backend images.
 2.  **Access the Application:**
@@ -108,22 +110,38 @@ Once the installation and setup are complete, you can start the application:
 
 ## Database Initialization
 
-After successfully running the Docker containers for the first time, you need to initialize the PostgreSQL database and create an administrative user. This is a crucial step as the database tables are **not automatically created** when the containers start.
+The `migrate` service applies versioned, non-destructive migrations before the
+backend starts. A fresh database therefore needs no manual schema command, and
+restarting the stack does not erase existing data.
 
-1.  **Create Database Tables:**
-    Execute the following command from the project's root directory to set up all necessary database tables and default system settings:
-    ```bash
-    docker-compose exec backend node init_db.js
-    ```
-    *   This script connects to the `oj_database` container and runs the database schema initialization.
-2.  **Create an Admin User:**
-    After creating the tables, you must create an initial administrator account. Run this command and follow the interactive prompts in your terminal to set up your admin username and password:
-    ```bash
-    docker-compose exec backend node create_admin.js
-    ```
-    *   This command will guide you through creating an admin user, which is essential for accessing the administrative functionalities of the system.
+To create the first administrator account, run the interactive script after the
+stack is healthy:
 
-Your Grader System is now fully set up and ready for use!
+    ```bash
+    docker compose exec backend node dist/scripts/create_admin.js
+    ```
+
+Runtime checks are available at `/api/health/live` (process) and
+`/api/health/ready` (database and schema readiness).
+
+## Production Configuration
+
+Production uses the same base Compose file plus a production-only overlay. This
+keeps local HTTP, cookies, and ports separate from the public domain, secure
+cookies, allowed origins, certificates, and Cloudflare tunnel.
+
+```bash
+cp .env.production.example .env
+# Replace every placeholder in .env before continuing.
+docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
+./deploy.sh
+```
+
+The production overlay sets `NODE_ENV=production`, enables secure cookies, mounts
+the production Nginx configuration and certificate directories, publishes HTTPS
+for the DNS-only large-upload hostname, and starts the Cloudflare tunnel. The
+certificate at `/etc/letsencrypt/live/woi-grader.com/` must cover the main, `www`,
+and `upload` hostnames. Do not use this overlay as the localhost configuration.
 
 ## Testing
 
@@ -138,7 +156,20 @@ From the project root, execute the unified test script to run both backend and f
 ```
 
 *   This script runs backend tests first, then frontend tests. It exits with status code 0 if all tests pass, or 1 if any test fails.
-*   **Note:** Ensure Docker containers (including the database) are running before executing this script, as backend tests may require a database connection.
+*   Most backend tests mock PostgreSQL. The migration integration test requires a
+    PostgreSQL test URL and is skipped unless `INTEGRATION_DATABASE_URL` is provided.
+
+### Local Compose and Session Smoke Tests
+
+With the stack running on the default port:
+
+```bash
+node --test tests/composeConfig.test.mjs
+BASE_URL=http://127.0.0.1 node --test tests/localSessionSmoke.test.mjs
+```
+
+The session smoke test creates a uniquely named local test user, verifies the cookie,
+reads the authenticated session, logs out, and confirms that the session is gone.
 
 ### Run Backend Tests Only
 

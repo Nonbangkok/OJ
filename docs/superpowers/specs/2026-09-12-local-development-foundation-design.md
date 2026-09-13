@@ -1,7 +1,7 @@
 # Local Development Foundation Design
 
-**Date:** 2026-09-12  
-**Status:** Draft for review; implementation pending  
+**Date:** 2026-09-12
+**Status:** Implemented and verified
 **Branch:** `codex/local-dev-foundation` (based on `origin/local`)
 
 ## Purpose
@@ -25,7 +25,7 @@ does not add problem-authoring tables, APIs, or UI.
    called`, while the Dockerfiles use Node 20 successfully.
 3. Backend Jest cannot start from a clean lockfile install because
    `jest.config.ts` requires `ts-node`, but `ts-node` is not declared.
-4. The frontend test baseline is healthy under Node 20: 57 suites and 270 tests
+4. The frontend test baseline is healthy under Node 20: 57 suites and 271 tests
    pass. Its production Docker build can hide TypeScript failures through
    `TSC_COMPILE_ON_ERROR=true`.
 5. A fresh PostgreSQL database has no application tables. The backend can still

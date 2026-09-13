@@ -13,7 +13,8 @@ const ContestProblems = () => {
 
   // Fetch contest problems using the shared hook
   const { problems, loading: problemsLoading, error: problemsError } = useProblems(
-    isAccessible ? contestId : null
+    contestId ?? null,
+    isAccessible,
   );
 
   if (!contestId) {

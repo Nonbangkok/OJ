@@ -1,5 +1,5 @@
 # Stage 1: Build the React application
-FROM node:20-alpine as build
+FROM node:20-alpine AS build
 
 # Set the working directory
 WORKDIR /app
@@ -24,7 +24,6 @@ ENV REACT_APP_LARGE_UPLOAD_API_URL=$REACT_APP_LARGE_UPLOAD_API_URL
 # CRA's production build runs ESLint in this container, but the repo's strict
 # type-aware ESLint config is not compatible with the pinned plugin version.
 ENV DISABLE_ESLINT_PLUGIN=true
-ENV TSC_COMPILE_ON_ERROR=true
 # Emit the webpack runtime as a separate self-hosted file instead of an inline
 # <script>. The reverse-proxy CSP uses `script-src 'self'` (no 'unsafe-inline'),
 # which would otherwise block CRA's inlined runtime chunk and break the app.

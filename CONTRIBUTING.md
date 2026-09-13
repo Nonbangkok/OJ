@@ -19,34 +19,36 @@ You only need these on your host machine — everything else runs in containers:
 
 - [Docker](https://www.docker.com/) (with Docker Compose v2, i.e. `docker compose`)
 - [Git](https://git-scm.com/)
+- Node.js 20 when running npm or root-level smoke tests on the host (optional
+  when using only the container workflow; see `.nvmrc`)
 
 ## Getting started (local development)
 
 Everything runs through Docker Compose from the repo root. The database schema is
-**not** auto-created — initialize it after the first `up`.
+applied automatically by the one-shot `migrate` service before the backend starts.
 
 ```bash
 cp .env.example .env          # then edit POSTGRES_PASSWORD and SECRET_KEY
 docker compose up --build -d  # app at http://localhost
 
-# Initialize the DB (DROPS existing tables) and create an admin account:
-docker compose exec backend node dist/scripts/init_db.js
+# Create an admin account after the stack is healthy:
 docker compose exec backend node dist/scripts/create_admin.js
 ```
 
-If a script path fails, verify it inside the container — the scripts are TypeScript
-(`backend/scripts/*.ts`) compiled to `dist/scripts/` during the image build.
+Check `http://localhost/api/health/ready` when startup fails. Migrations are
+versioned and non-destructive; do not use the legacy destructive initialization
+script for normal development.
 
 ## Branch model
 
-- **`local`** — the development branch. It carries the **dev configuration**
-  (CORS disabled, plain HTTP Nginx, relaxed cookies). **Branch off `local` and
-  open your pull requests against `local`.**
-- **`master`** — the production branch. It carries the **production configuration**
-  (CORS enabled, TLS/Let's Encrypt + HSTS, secure cookies, the `upload.*`
-  subdomain). Changes flow `local → master` via merge; when resolving conflicts,
-  **master always keeps its production config** — only application/logic changes
-  are taken from `local`. Do not commit dev config onto `master`.
+- **`local`** — the integration branch for development work. Branch from it and
+  open feature pull requests against it.
+- **`master`** — the release branch. Changes flow `local → master` after
+  verification.
+
+Both environments now live in the same codebase. `docker-compose.yml` is the
+local-safe base; production adds `docker-compose.production.yml`. Do not encode
+environment behavior by keeping conflicting versions of files on the two branches.
 
 Use descriptive branch names, e.g. `feature/contest-export`, `fix/pdf-idor`,
 `security/rate-limiting`.
@@ -89,6 +91,20 @@ npm run validate                           # type-check + lint:check + test:ci (
 
 ```bash
 ./tests/run_tests.sh    # backend then frontend; exit 0 only if both pass
+```
+
+Compose and localhost authentication smoke tests:
+
+```bash
+node --test tests/composeConfig.test.mjs
+BASE_URL=http://127.0.0.1 node --test tests/localSessionSmoke.test.mjs
+```
+
+Before a production deployment, render and validate the combined configuration:
+
+```bash
+cp .env.production.example .env
+docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
 ```
 
 ## Coding conventions
