@@ -52,6 +52,18 @@ test('local Compose config is self-contained and migration-gated', () => {
   const nginxVolumes = config.services['nginx-proxy'].volumes;
   assert.equal(nginxVolumes.some(({ target }) => target === '/etc/letsencrypt'), false);
   assert.equal(nginxVolumes.some(({ source }) => source.endsWith('/nginx-proxy/local.conf')), true);
+
+  const localNginx = readFileSync(path.join(repositoryRoot, 'nginx-proxy/local.conf'), 'utf8');
+  assert.match(localNginx, /X-Frame-Options "SAMEORIGIN"/);
+  assert.match(localNginx, /frame-ancestors 'self'/);
+  assert.match(localNginx, /style-src[^;]*https:\/\/fonts\.googleapis\.com/);
+  assert.match(localNginx, /font-src[^;]*https:\/\/fonts\.gstatic\.com/);
+
+  const frontendNginx = readFileSync(path.join(repositoryRoot, 'frontend/nginx.conf'), 'utf8');
+  assert.match(frontendNginx, /X-Frame-Options "SAMEORIGIN"/);
+  assert.match(frontendNginx, /frame-ancestors 'self'/);
+  assert.match(frontendNginx, /style-src[^;]*https:\/\/fonts\.googleapis\.com/);
+  assert.match(frontendNginx, /font-src[^;]*https:\/\/fonts\.gstatic\.com/);
 });
 
 test('production overlay enables public security and tunnel configuration', () => {
@@ -82,6 +94,10 @@ test('production overlay enables public security and tunnel configuration', () =
   assert.equal(nginxVolumes.some(({ target }) => target === '/var/lib/letsencrypt'), true);
 
   const productionNginx = readFileSync(path.join(repositoryRoot, 'nginx-proxy/production.conf'), 'utf8');
+  assert.match(productionNginx, /X-Frame-Options "SAMEORIGIN"/);
+  assert.match(productionNginx, /frame-ancestors 'self'/);
+  assert.match(productionNginx, /style-src[^;]*https:\/\/fonts\.googleapis\.com/);
+  assert.match(productionNginx, /font-src[^;]*https:\/\/fonts\.gstatic\.com/);
   assert.match(productionNginx, /listen 443 ssl/);
   assert.match(productionNginx, /ssl_certificate \/etc\/letsencrypt\/live\/woi-grader\.com\/fullchain\.pem/);
   assert.equal(config.services.cloudflared.networks['tunnel-network'].ipv4_address, '172.30.250.3');
