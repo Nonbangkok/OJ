@@ -462,7 +462,7 @@
 
 ---
 
-## 6) Problem Authoring Controller (8 APIs)
+## 6) Problem Authoring Controller (11 APIs)
 
 All endpoints in this section require an authenticated `admin`; `staff` is not sufficient.
 
@@ -532,6 +532,34 @@ All endpoints in this section require an authenticated `admin`; `staff` is not s
 - Body: `{ expectedRevision: positive integer }`.
 - Success increments draft revision and invalidates readiness through the normal optimistic update.
 - Errors: 404 draft missing; 409 revision conflict, published draft, no linked profile, or linked profile removed during the operation.
+
+### 59. `GET /admin/authoring/drafts/:id/assets`
+
+- Purpose: List statement image metadata without loading or returning binary content.
+- Params: UUID `id` of an existing draft.
+- Response 200: array of `{ id, draftId, filename, mimeType, checksumSha256, sizeBytes, createdAt, updatedAt }`, ordered by filename.
+- Error 404: draft missing. An existing draft with no assets returns an empty array.
+
+### 60. `POST /admin/authoring/drafts/:id/assets`
+
+- Purpose: Validate, normalize, and add one statement image while atomically advancing draft revision.
+- Params: UUID `id`.
+- Content type: `multipart/form-data`.
+- Fields:
+  - `asset`: required JPEG/PNG/WebP file, maximum 10 MiB raw upload.
+  - `expectedRevision`: required positive integer.
+  - `filename`: optional override; otherwise the uploaded filename is used.
+- Filename must use safe ASCII characters and an extension matching the verified media type. The backend decodes and re-encodes the image before persistence.
+- Response 201: `{ asset: assetMetadata, draftRevision: number }`.
+- Errors: 400 invalid request/image/filename; 404 draft missing; 409 revision conflict, published draft, or duplicate filename; 413 raw upload too large or draft asset total above 100 MiB.
+
+### 61. `DELETE /admin/authoring/drafts/:id/assets/:assetId`
+
+- Purpose: Delete one statement image while atomically advancing draft revision.
+- Params: UUID `id` and UUID `assetId`.
+- Query: required positive integer `expectedRevision`.
+- Response 200: `{ asset: deletedAssetMetadata, draftRevision: number }`.
+- Errors: 400 invalid params/query; 404 draft or asset missing; 409 revision conflict or published draft.
 
 ---
 

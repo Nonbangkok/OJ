@@ -130,7 +130,7 @@ Three global contexts wrap the entire app in this order:
 - **`requireAdmin`** — checks role is `'admin'`.
 - **`validateRequest`** — zod-powered runtime validation middleware.
 - **`errorHandler` / `notFoundHandler`** — centralized API error formatting.
-- **`upload`** — Multer configuration for file uploads.
+- **`upload`** — Multer configuration for file uploads, with dedicated 10 MiB in-memory policies for author profile images and statement assets.
 - Author profile image processing belongs in `authorProfileImageService.ts`, not controllers. Only JPEG, PNG, and WebP inputs are accepted; persisted profile and draft snapshot images must be normalized 512×512 PNG buffers.
 - A non-null `authorProfileId` is authoritative: create/select/explicit-refresh operations copy profile display fields into the draft snapshot and never trust duplicate display fields supplied by the client.
 - Statement asset filenames use ASCII letters, digits, dots, underscores, and hyphens only; no path separators, leading dots, or `..` sequences. The extension must match a validated JPEG/PNG/WebP MIME type.
@@ -163,7 +163,7 @@ Three global contexts wrap the entire app in this order:
 6. **Environment variables** — never commit `.env`, use `.env.example` as template. All secrets via env vars.
    - Runtime env access must go through `backend/config/env.ts` (validated once with zod).
    - `backend/types/env.d.ts` defines required env variable types for compile-time safety.
-7. **File upload limits** — configured via Multer per workflow: up to 2 GiB for legacy problem PDFs/testcase ZIPs and 10 MiB for raw author profile images.
+7. **File upload limits** — configured via Multer per workflow: up to 2 GiB for legacy problem PDFs/testcase ZIPs and 10 MiB for raw author profile images or statement assets.
 8. **Session security** — `httpOnly: true`, `sameSite: 'lax'`, `secure: false` (set to `true` in production).
 9. **Author image safety** — verify decoded image format rather than trusting upload MIME metadata; reject corrupt/animated images and apply a pixel-count limit before normalization.
 10. **Statement asset safety** — re-encode validated images to remove metadata, hash normalized bytes with SHA-256, and enforce the 10 MiB limit after normalization.

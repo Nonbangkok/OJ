@@ -44,6 +44,10 @@ export type DeleteStatementAssetResult =
   | { kind: 'asset_not_found' }
   | DraftMutationFailure;
 
+export type ListStatementAssetsResult =
+  | { kind: 'found'; assets: StatementAssetMetadataRow[] }
+  | { kind: 'not_found' };
+
 type DraftAdvanceResult =
   | { kind: 'advanced'; draft: ProblemDraftRow }
   | DraftMutationFailure;
@@ -211,17 +215,21 @@ export const deleteStatementAsset = async (
 export const listStatementAssets = async (
   draftId: string,
   database: AuthoringAssetListDatabase = db,
-): Promise<StatementAssetMetadataRow[]> => {
-  try {
-    const result = await database.query<StatementAssetMetadataRow>(`
-      SELECT id, draft_id, filename, mime_type, checksum_sha256,
-             size_bytes, created_at, updated_at
-      FROM problem_draft_assets
-      WHERE draft_id = $1
-      ORDER BY filename ASC, id ASC
-    `, [draftId]);
-    return result.rows;
-  } catch (error) {
-    throw error;
+): Promise<ListStatementAssetsResult> => {
+  const draftResult = await database.query<{ exists: number }>(
+    'SELECT 1 AS exists FROM problem_drafts WHERE id = $1',
+    [draftId],
+  );
+  if (!draftResult.rows[0]) {
+    return { kind: 'not_found' };
   }
+
+  const result = await database.query<StatementAssetMetadataRow>(`
+    SELECT id, draft_id, filename, mime_type, checksum_sha256,
+           size_bytes, created_at, updated_at
+    FROM problem_draft_assets
+    WHERE draft_id = $1
+    ORDER BY filename ASC, id ASC
+  `, [draftId]);
+  return { kind: 'found', assets: result.rows };
 };

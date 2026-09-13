@@ -1,6 +1,9 @@
 import { AUTHORING_VALIDATION } from '../../constants';
 import {
   createAuthorProfileSchema,
+  createStatementAssetSchema,
+  deleteStatementAssetQuerySchema,
+  draftAssetParamsSchema,
   createProblemDraftSchema,
   problemDraftIdParamSchema,
   refreshProblemDraftAuthorSchema,
@@ -118,6 +121,29 @@ describe('problem authoring request schemas', () => {
   it('requires a positive revision for explicit profile refresh', () => {
     expect(refreshProblemDraftAuthorSchema.safeParse({ expectedRevision: 3 }).success).toBe(true);
     expect(refreshProblemDraftAuthorSchema.safeParse({ expectedRevision: 0 }).success).toBe(false);
+  });
+
+  it('parses multipart asset fields and asset route parameters', () => {
+    expect(createStatementAssetSchema.parse({
+      expectedRevision: '3',
+      filename: 'diagram.png',
+    })).toEqual({ expectedRevision: 3, filename: 'diagram.png' });
+    expect(deleteStatementAssetQuerySchema.parse({ expectedRevision: '4' }))
+      .toEqual({ expectedRevision: 4 });
+    expect(draftAssetParamsSchema.safeParse({
+      id: '11111111-1111-4111-8111-111111111111',
+      assetId: '22222222-2222-4222-8222-222222222222',
+    }).success).toBe(true);
+  });
+
+  it('rejects invalid asset revisions and identifiers', () => {
+    expect(createStatementAssetSchema.safeParse({ expectedRevision: '0' }).success).toBe(false);
+    expect(createStatementAssetSchema.safeParse({ expectedRevision: '1.5' }).success).toBe(false);
+    expect(deleteStatementAssetQuerySchema.safeParse({ expectedRevision: '-1' }).success).toBe(false);
+    expect(draftAssetParamsSchema.safeParse({
+      id: '11111111-1111-4111-8111-111111111111',
+      assetId: 'not-a-uuid',
+    }).success).toBe(false);
   });
 });
 

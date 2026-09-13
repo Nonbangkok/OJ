@@ -185,6 +185,15 @@ export interface RefreshProblemDraftAuthorRequestBody {
     expectedRevision: number;
 }
 
+export interface CreateStatementAssetRequestBody {
+    expectedRevision: number;
+    filename?: string;
+}
+
+export interface DeleteStatementAssetQuery {
+    expectedRevision: string;
+}
+
 // ---------------------------------------------------------------------------
 // Submission
 // ---------------------------------------------------------------------------

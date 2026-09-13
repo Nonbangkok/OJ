@@ -1,7 +1,7 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { AUTHOR_PROFILE_IMAGE, FILE_CONFIG } from '../constants';
+import { AUTHOR_PROFILE_IMAGE, FILE_CONFIG, STATEMENT_ASSET } from '../constants';
 import { AppError } from './errorHandler';
 
 // Multer configuration for single file uploads (in memory)
@@ -16,6 +16,18 @@ export const authorProfileImageUpload = multer({
     fileFilter: (_req, file, callback) => {
         if (!(AUTHOR_PROFILE_IMAGE.ALLOWED_MIME_TYPES as readonly string[]).includes(file.mimetype)) {
             callback(new AppError('Unsupported author profile image type', 400));
+            return;
+        }
+        callback(null, true);
+    },
+});
+
+export const statementAssetUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: STATEMENT_ASSET.MAX_FILE_BYTES },
+    fileFilter: (_req, file, callback) => {
+        if (!(STATEMENT_ASSET.ALLOWED_MIME_TYPES as readonly string[]).includes(file.mimetype)) {
+            callback(new AppError('Unsupported statement asset type', 400));
             return;
         }
         callback(null, true);

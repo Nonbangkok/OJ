@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   AUTHORING_VALIDATION,
   PROBLEM_VALIDATION,
+  STATEMENT_ASSET,
   STRING_LIMITS,
   SUBMISSION_VALIDATION,
   USER_ROLES,
@@ -29,6 +30,10 @@ const parseOptionalInteger = (value: unknown): unknown => {
 const optionalBooleanFromForm = z.preprocess(
   (value) => value === 'true' ? true : value === 'false' ? false : value,
   z.boolean().optional(),
+);
+const positiveIntegerFromForm = z.preprocess(
+  (value) => typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value,
+  z.number().int().positive(),
 );
 
 // Common schemas
@@ -124,6 +129,11 @@ export const problemDraftIdParamSchema = z.object({
 
 export const authorProfileIdParamSchema = problemDraftIdParamSchema;
 
+export const draftAssetParamsSchema = z.object({
+  id: z.string().uuid(),
+  assetId: z.string().uuid(),
+}).strict();
+
 const authorProfileFields = {
   userId: z.preprocess(
     parseOptionalInteger,
@@ -198,6 +208,15 @@ export const createProblemDraftSchema = z.object({
 
 export const refreshProblemDraftAuthorSchema = z.object({
   expectedRevision: z.number().int().positive(),
+}).strict();
+
+export const createStatementAssetSchema = z.object({
+  expectedRevision: positiveIntegerFromForm,
+  filename: nonEmptyString.max(STATEMENT_ASSET.MAX_FILENAME_LENGTH).optional(),
+}).strict();
+
+export const deleteStatementAssetQuerySchema = z.object({
+  expectedRevision: positiveIntegerFromForm,
 }).strict();
 
 export const updateProblemDraftSchema = z.object({

@@ -1,9 +1,14 @@
 import express, { Request, Response, Router } from 'express';
+import { STATEMENT_ASSET } from '../constants';
 import { requireAdmin, requireAuth } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
+import { statementAssetUpload } from '../middleware/upload';
 import { validateRequest } from '../middleware/validation';
 import {
   createProblemDraftSchema,
+  createStatementAssetSchema,
+  deleteStatementAssetQuerySchema,
+  draftAssetParamsSchema,
   problemDraftIdParamSchema,
   refreshProblemDraftAuthorSchema,
   updateProblemDraftSchema,
@@ -17,12 +22,21 @@ import {
   updateProblemDraft,
 } from '../services/authoringDraftQueryService';
 import {
+  addStatementAsset,
+  deleteStatementAsset,
+  listStatementAssets,
+  StatementAssetMetadataRow,
+} from '../services/authoringAssetQueryService';
+import {
   AuthorProfileSnapshot,
   createManualAuthorSnapshot,
   getAuthorProfileSnapshot,
   refreshProblemDraftAuthor,
 } from '../services/authorProfileSnapshotService';
+import { prepareStatementAsset } from '../services/statementAssetService';
 import {
+  CreateStatementAssetRequestBody,
+  DeleteStatementAssetQuery,
   CreateProblemDraftRequestBody,
   RefreshProblemDraftAuthorRequestBody,
   UpdateProblemDraftRequestBody,
@@ -69,6 +83,17 @@ const toDraftDetailResponse = (draft: ProblemDraftRow) => ({
   createdAt: draft.created_at,
   updatedAt: draft.updated_at,
   publishedAt: draft.published_at,
+});
+
+const toAssetResponse = (asset: StatementAssetMetadataRow) => ({
+  id: asset.id,
+  draftId: asset.draft_id,
+  filename: asset.filename,
+  mimeType: asset.mime_type,
+  checksumSha256: asset.checksum_sha256,
+  sizeBytes: Number(asset.size_bytes),
+  createdAt: asset.created_at,
+  updatedAt: asset.updated_at,
 });
 
 const toDraftUpdates = (
@@ -233,6 +258,125 @@ router.post('/admin/authoring/drafts/:id/refresh-author-profile',
       return;
     }
     res.json(toDraftDetailResponse(result.draft));
+  }));
+
+router.get('/admin/authoring/drafts/:id/assets',
+  validateRequest({ params: problemDraftIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const result = await listStatementAssets(String(req.params.id));
+    if (result.kind === 'not_found') {
+      res.status(404).json({ message: 'Problem draft not found' });
+      return;
+    }
+    res.json(result.assets.map(toAssetResponse));
+  }));
+
+router.post('/admin/authoring/drafts/:id/assets',
+  statementAssetUpload.single(STATEMENT_ASSET.FIELD_NAME),
+  validateRequest({ params: problemDraftIdParamSchema, body: createStatementAssetSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.file) {
+      throw new AppError('Statement asset file is required', 400);
+    }
+    const body = req.body as CreateStatementAssetRequestBody;
+    let preparedAsset;
+    try {
+      preparedAsset = await prepareStatementAsset(
+        body.filename ?? req.file.originalname,
+        req.file.buffer,
+        req.file.mimetype,
+      );
+    } catch (error) {
+      throw new AppError(
+        error instanceof Error ? error.message : 'Invalid statement asset image',
+        400,
+      );
+    }
+
+    const result = await addStatementAsset(
+      String(req.params.id),
+      body.expectedRevision,
+      preparedAsset,
+    );
+    if (result.kind === 'not_found') {
+      res.status(404).json({ message: 'Problem draft not found' });
+      return;
+    }
+    if (result.kind === 'published') {
+      res.status(409).json({
+        message: 'Published problem drafts are read-only',
+        code: 'draft_published',
+        draft: toDraftDetailResponse(result.draft),
+      });
+      return;
+    }
+    if (result.kind === 'revision_conflict') {
+      res.status(409).json({
+        message: 'Problem draft revision conflict',
+        code: 'revision_conflict',
+        currentRevision: result.draft.revision,
+        draft: toDraftDetailResponse(result.draft),
+      });
+      return;
+    }
+    if (result.kind === 'duplicate_filename') {
+      res.status(409).json({
+        message: 'A statement asset with this filename already exists',
+        code: 'asset_filename_conflict',
+      });
+      return;
+    }
+    if (result.kind === 'total_size_exceeded') {
+      res.status(413).json({
+        message: `Statement assets must not exceed ${STATEMENT_ASSET.MAX_TOTAL_MIB} MiB per draft`,
+        code: 'asset_total_size_exceeded',
+      });
+      return;
+    }
+    res.status(201).json({
+      asset: toAssetResponse(result.asset),
+      draftRevision: result.draft.revision,
+    });
+  }));
+
+router.delete('/admin/authoring/drafts/:id/assets/:assetId',
+  validateRequest({ params: draftAssetParamsSchema, query: deleteStatementAssetQuerySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const query = req.query as unknown as DeleteStatementAssetQuery;
+    const result = await deleteStatementAsset(
+      String(req.params.id),
+      String(req.params.assetId),
+      Number(query.expectedRevision),
+    );
+    if (result.kind === 'not_found') {
+      res.status(404).json({ message: 'Problem draft not found' });
+      return;
+    }
+    if (result.kind === 'asset_not_found') {
+      res.status(404).json({ message: 'Statement asset not found' });
+      return;
+    }
+    if (result.kind === 'published') {
+      res.status(409).json({
+        message: 'Published problem drafts are read-only',
+        code: 'draft_published',
+        draft: toDraftDetailResponse(result.draft),
+      });
+      return;
+    }
+    if (result.kind === 'revision_conflict') {
+      res.status(409).json({
+        message: 'Problem draft revision conflict',
+        code: 'revision_conflict',
+        currentRevision: result.draft.revision,
+        draft: toDraftDetailResponse(result.draft),
+      });
+      return;
+    }
+    res.json({
+      asset: toAssetResponse(result.asset),
+      draftRevision: result.draft.revision,
+    });
   }));
 
 export default router;

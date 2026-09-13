@@ -216,11 +216,26 @@ describe('statement asset persistence', () => {
       created_at: new Date('2026-09-13T00:00:00.000Z'),
       updated_at: new Date('2026-09-13T00:00:00.000Z'),
     }];
-    const database = { query: jest.fn().mockResolvedValueOnce({ rows: metadata }) };
+    const database = { query: jest.fn()
+      .mockResolvedValueOnce({ rows: [{ exists: 1 }] })
+      .mockResolvedValueOnce({ rows: metadata }) };
 
-    await expect(listStatementAssets(metadata[0].draft_id, database)).resolves.toEqual(metadata);
-    const sql = database.query.mock.calls[0][0];
+    await expect(listStatementAssets(metadata[0].draft_id, database)).resolves.toEqual({
+      kind: 'found',
+      assets: metadata,
+    });
+    const sql = database.query.mock.calls[1][0];
     expect(sql).not.toContain('content');
     expect(sql).toContain('ORDER BY filename ASC, id ASC');
+  });
+
+  it('distinguishes a missing draft from an empty asset list', async () => {
+    const database = { query: jest.fn().mockResolvedValueOnce({ rows: [] }) };
+
+    await expect(listStatementAssets(
+      '44444444-4444-4444-8444-444444444444',
+      database,
+    )).resolves.toEqual({ kind: 'not_found' });
+    expect(database.query).toHaveBeenCalledTimes(1);
   });
 });
