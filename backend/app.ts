@@ -4,6 +4,7 @@ import session from 'express-session';
 import pgSession from 'connect-pg-simple';
 import { pool } from './db';
 import { env, parseRuntimeEnv } from './config/env';
+import { AUTHORING_VALIDATION } from './constants';
 import { attachRequestUser } from './middleware/requestContext';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { generalApiLimiter } from './middleware/rateLimit';
@@ -13,6 +14,7 @@ import problemRoutes from './controllers/problemController';
 import submissionRoutes from './controllers/submissionController';
 import contestRoutes from './controllers/contestController';
 import healthRoutes from './controllers/healthController';
+import authoringDraftRoutes from './controllers/authoringDraftController';
 
 type RuntimeEnv = ReturnType<typeof parseRuntimeEnv>;
 
@@ -28,7 +30,14 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
   const app = express();
 
   app.set('trust proxy', runtimeEnv.TRUST_PROXY);
-  app.use(express.json());
+  const defaultJsonParser = express.json();
+  const authoringJsonParser = express.json({ limit: AUTHORING_VALIDATION.MAX_JSON_BODY_BYTES });
+  app.use((req, res, next) => {
+    const parser = req.path.startsWith('/admin/authoring/drafts')
+      ? authoringJsonParser
+      : defaultJsonParser;
+    parser(req, res, next);
+  });
 
   if (runtimeEnv.CORS_ORIGINS.length > 0) {
     app.use(cors({
@@ -36,7 +45,7 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
         callback(null, origin === undefined || runtimeEnv.CORS_ORIGINS.includes(origin));
       },
       credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
     }));
   }
@@ -81,6 +90,7 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
   app.use('/', problemRoutes);
   app.use('/', submissionRoutes);
   app.use('/', contestRoutes);
+  app.use('/', authoringDraftRoutes);
 
   app.get('/', (_req: Request, res: Response) => {
     res.send('Grader System API is running!');

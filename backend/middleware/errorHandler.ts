@@ -34,6 +34,16 @@ export const errorHandler = (
     res: Response,
     _next: NextFunction,
 ): void => {
+    if (
+        typeof err === 'object'
+        && err !== null
+        && 'type' in err
+        && err.type === 'entity.too.large'
+    ) {
+        res.status(413).json({ message: 'JSON request body is too large' });
+        return;
+    }
+
     if (err instanceof multer.MulterError) {
         const message = err.code === 'LIMIT_FILE_SIZE'
             ? 'Uploaded file is too large. Maximum allowed size is 2GB.'

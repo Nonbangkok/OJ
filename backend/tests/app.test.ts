@@ -67,6 +67,54 @@ describe('HTTP runtime configuration', () => {
     expect(denied.headers['access-control-allow-origin']).toBeUndefined();
   });
 
+  it('allows PATCH preflight requests for the authoring API', async () => {
+    const createApp = loadCreateApp();
+    const app = createApp({
+      runtimeEnv: parseRuntimeEnv({
+        ...baseEnv,
+        CORS_ORIGINS: 'https://www.nonbangkokgrader.com',
+      }),
+      sessionStore: new session.MemoryStore(),
+    });
+
+    const response = await request(app)
+      .options('/admin/authoring/drafts/11111111-1111-4111-8111-111111111111')
+      .set('Origin', 'https://www.nonbangkokgrader.com')
+      .set('Access-Control-Request-Method', 'PATCH');
+
+    expect(response.status).toBe(204);
+    expect(response.headers['access-control-allow-methods']).toContain('PATCH');
+  });
+
+  it('parses authoring JSON payloads above the Express default before authorization', async () => {
+    const createApp = loadCreateApp();
+    const app = createApp({
+      runtimeEnv: parseRuntimeEnv({ ...baseEnv }),
+      sessionStore: new session.MemoryStore(),
+    });
+
+    const response = await request(app)
+      .post('/admin/authoring/drafts')
+      .send({ statementHtml: 'a'.repeat(128 * 1024) });
+
+    expect(response.status).toBe(401);
+  });
+
+  it('keeps the default JSON ceiling for non-authoring endpoints', async () => {
+    const createApp = loadCreateApp();
+    const app = createApp({
+      runtimeEnv: parseRuntimeEnv({ ...baseEnv }),
+      sessionStore: new session.MemoryStore(),
+    });
+
+    const response = await request(app)
+      .post('/register')
+      .send({ username: 'a'.repeat(128 * 1024), password: 'password123' });
+
+    expect(response.status).toBe(413);
+    expect(response.body).toEqual({ message: 'JSON request body is too large' });
+  });
+
   it('uses the configured trust proxy hop count', () => {
     const createApp = loadCreateApp();
     const app = createApp({
