@@ -1,9 +1,19 @@
+import { randomUUID } from 'crypto';
 import * as db from '../../db';
-import { updateProblemDraft } from '../../services/authoringDraftQueryService';
+import {
+  createProblemDraft,
+  getProblemDraft,
+  listProblemDrafts,
+  updateProblemDraft,
+} from '../../services/authoringDraftQueryService';
 import { ProblemDraftRow } from '../../types/authoring';
 
 jest.mock('../../db', () => ({
   query: jest.fn(),
+}));
+
+jest.mock('crypto', () => ({
+  randomUUID: jest.fn(),
 }));
 
 const draftRow = (overrides: Partial<ProblemDraftRow> = {}): ProblemDraftRow => ({
@@ -99,5 +109,103 @@ describe('updateProblemDraft', () => {
     );
 
     expect(result).toEqual({ kind: 'not_found' });
+  });
+});
+
+describe('problem draft reads and creation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('creates a draft with an application-generated UUID and safe initial state', async () => {
+    const id = '33333333-3333-4333-8333-333333333333';
+    const created = draftRow({
+      id,
+      revision: 1,
+      verified_revision: null,
+      status: 'draft',
+      statement_html: '',
+      solution_cpp: '',
+    });
+    (randomUUID as jest.Mock).mockReturnValue(id);
+    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [created] });
+
+    const result = await createProblemDraft({
+      problem_id: 'redgate',
+      title: 'Red Gate',
+      author_profile_id: null,
+      author_aka_name: 'Author',
+      author_real_name: 'Example Author',
+      language: 'Thai',
+      country_code: 'THA',
+      time_limit_ms: 1000,
+      memory_limit_mb: 256,
+      created_by: 7,
+    });
+
+    expect(result).toEqual(created);
+    expect(db.query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO problem_drafts'),
+      [
+        id,
+        'redgate',
+        'Red Gate',
+        null,
+        'Author',
+        'Example Author',
+        'Thai',
+        'THA',
+        1000,
+        256,
+        '',
+        '',
+        null,
+        'red-gate-v1',
+        7,
+      ],
+    );
+  });
+
+  it('lists draft summaries without loading private sources or binary artifacts', async () => {
+    const summaries = [{
+      id: '11111111-1111-4111-8111-111111111111',
+      problem_id: 'redgate',
+      title: 'Red Gate',
+      author_aka_name: 'Author',
+      status: 'draft',
+      revision: 3,
+      verified_revision: null,
+      created_by: 7,
+      created_at: new Date('2026-09-13T00:00:00.000Z'),
+      updated_at: new Date('2026-09-13T00:00:00.000Z'),
+    }];
+    (db.query as jest.Mock).mockResolvedValueOnce({ rows: summaries });
+
+    const result = await listProblemDrafts();
+
+    expect(result).toEqual(summaries);
+    const sql = (db.query as jest.Mock).mock.calls[0][0] as string;
+    expect(sql).not.toContain('solution_cpp');
+    expect(sql).not.toContain('generator_cpp');
+    expect(sql).not.toContain('latest_pdf');
+    expect(sql).not.toContain('profile_image_png');
+    expect(sql).toContain('ORDER BY updated_at DESC, id ASC');
+  });
+
+  it('returns a complete draft by id', async () => {
+    const draft = draftRow();
+    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [draft] });
+
+    await expect(getProblemDraft(draft.id)).resolves.toEqual(draft);
+    expect(db.query).toHaveBeenCalledWith(
+      'SELECT * FROM problem_drafts WHERE id = $1',
+      [draft.id],
+    );
+  });
+
+  it('returns null when a draft id does not exist', async () => {
+    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+
+    await expect(getProblemDraft('44444444-4444-4444-8444-444444444444')).resolves.toBeNull();
   });
 });
