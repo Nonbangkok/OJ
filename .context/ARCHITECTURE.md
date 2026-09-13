@@ -17,6 +17,7 @@
 | Auth (passwords) | bcrypt | 6.0 |
 | Validation | zod | 4.x |
 | File Upload | multer | 2.0 |
+| Image Processing | sharp | 0.34 |
 | ZIP Processing | unzipper | 0.12 |
 | Scheduling | node-cron | 3.0 |
 | Reverse Proxy | Nginx | 1.25 |
@@ -49,6 +50,7 @@ OJ/
 │   │   ├── submissionController.ts
 │   │   └── contestController.ts
 │   ├── services/           # Business logic & external processes
+│   │   ├── authorProfileImageService.ts # Canonical profile PNGs and fallback avatars
 │   │   ├── judgeService.ts       # Compile & judge C++ in sandbox
 │   │   ├── submissionService.ts  # Submission processing
 │   │   ├── submissionQueryService.ts # Submission read/write query orchestration
@@ -179,6 +181,17 @@ Backend runtime request pipeline (high-level):
 3. Route-level middleware validates payload (`zod` via shared schemas + `validateRequest`).
 4. Controllers call services for DB-heavy logic.
 5. Errors propagate via `asyncHandler` to centralized `errorHandler`.
+
+### Author Profile Image Flow
+
+`authorProfileImageService.ts` owns the canonical PDF-author image format:
+
+1. Accept JPEG, PNG, or WebP bytes and verify that decoded content matches the declared MIME type.
+2. Reject corrupt, animated, or excessively large pixel inputs.
+3. Apply EXIF orientation, center-crop to a square, and encode a 512×512 PNG with `sharp`.
+4. When no profile image exists, create a deterministic 512×512 PNG avatar from the first character of the trimmed AKA name.
+
+Controllers and query services must store only the normalized PNG. Raw profile-image uploads are never persisted.
 
 ### Authentication Flow
 

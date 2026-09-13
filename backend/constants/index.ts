@@ -90,6 +90,12 @@ export const AUTHORING_VALIDATION = {
     MAX_INT: 2_147_483_647,
 } as const;
 
+export const AUTHOR_PROFILE_IMAGE = {
+    SIZE_PX: 512,
+    MAX_INPUT_PIXELS: 25_000_000,
+    ALLOWED_MIME_TYPES: ['image/jpeg', 'image/png', 'image/webp'],
+} as const;
+
 export const RATE_LIMIT_CONFIG = {
     // General API limiter.
     GENERAL_WINDOW_MS: 15 * 60 * 1000, // 15 minutes

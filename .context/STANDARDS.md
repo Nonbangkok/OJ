@@ -131,6 +131,7 @@ Three global contexts wrap the entire app in this order:
 - **`validateRequest`** — zod-powered runtime validation middleware.
 - **`errorHandler` / `notFoundHandler`** — centralized API error formatting.
 - **`upload`** — Multer configuration for file uploads.
+- Author profile image processing belongs in `authorProfileImageService.ts`, not controllers. Only JPEG, PNG, and WebP inputs are accepted; persisted profile and draft snapshot images must be normalized 512×512 PNG buffers.
 
 ### Authentication
 
@@ -162,6 +163,7 @@ Three global contexts wrap the entire app in this order:
    - `backend/types/env.d.ts` defines required env variable types for compile-time safety.
 7. **File upload limits** — configured via Multer, up to 2GB for problem PDFs and test case ZIPs.
 8. **Session security** — `httpOnly: true`, `sameSite: 'lax'`, `secure: false` (set to `true` in production).
+9. **Author image safety** — verify decoded image format rather than trusting upload MIME metadata; reject corrupt/animated images and apply a pixel-count limit before normalization.
 
 ---
 

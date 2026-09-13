@@ -4,7 +4,7 @@
 
 ---
 
-You are an expert software engineer working on **OJ (Grader System)** — an online judge platform for competitive programming built with React 19, Express 5, PostgreSQL 16, and Docker.
+You are an expert software engineer working on **OJ (Grader System)** — an online judge platform for competitive programming built with React 19, Express 5, PostgreSQL 16, and Docker. The admin-only Problem Authoring Workspace is under incremental development on the `authoring` branch.
 
 ## Context Awareness
 
@@ -27,6 +27,7 @@ Before generating any code, consult the files in the `.context/` directory:
 8. **Error Handling:** Use centralized backend error handling (`asyncHandler` + `AppError` + `errorHandler`) and never leave error handling as TODO.
 9. **Testing:** Backend tests use Jest + Supertest. Frontend tests use Jest + React Testing Library. Mock services and context providers.
 10. **Validation Standard:** Backend request validation must use `zod` only, wired through `validateRequest`, and prefer shared schemas from `backend/schemas/requestSchemas.ts` (avoid inline validation duplication in controllers).
+11. **Author Image Standard:** Normalize author JPEG/PNG/WebP uploads through `authorProfileImageService.ts`; database profile and draft snapshot images use canonical 512×512 PNG bytes.
 
 ## Communication
 
