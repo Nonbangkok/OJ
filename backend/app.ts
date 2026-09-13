@@ -15,6 +15,7 @@ import submissionRoutes from './controllers/submissionController';
 import contestRoutes from './controllers/contestController';
 import healthRoutes from './controllers/healthController';
 import authoringDraftRoutes from './controllers/authoringDraftController';
+import authorProfileRoutes from './controllers/authorProfileController';
 
 type RuntimeEnv = ReturnType<typeof parseRuntimeEnv>;
 
@@ -91,6 +92,7 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
   app.use('/', submissionRoutes);
   app.use('/', contestRoutes);
   app.use('/', authoringDraftRoutes);
+  app.use('/', authorProfileRoutes);
 
   app.get('/', (_req: Request, res: Response) => {
     res.send('Grader System API is running!');

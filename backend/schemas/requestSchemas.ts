@@ -17,6 +17,19 @@ const authoringSource = z.string().refine(
   (value) => Buffer.byteLength(value, 'utf8') <= AUTHORING_VALIDATION.MAX_SOURCE_BYTES,
   { message: `Content must not exceed ${AUTHORING_VALIDATION.MAX_SOURCE_BYTES} UTF-8 bytes` },
 );
+const parseOptionalInteger = (value: unknown): unknown => {
+  if (value === '' || value === 'null') {
+    return null;
+  }
+  if (typeof value === 'string' && /^\d+$/.test(value)) {
+    return Number(value);
+  }
+  return value;
+};
+const optionalBooleanFromForm = z.preprocess(
+  (value) => value === 'true' ? true : value === 'false' ? false : value,
+  z.boolean().optional(),
+);
 
 // Common schemas
 export const idParamSchema = z.object({
@@ -107,6 +120,36 @@ export const problemExportSchema = z.object({
 // Problem Authoring schemas
 export const problemDraftIdParamSchema = z.object({
   id: z.string().uuid(),
+}).strict();
+
+export const authorProfileIdParamSchema = problemDraftIdParamSchema;
+
+const authorProfileFields = {
+  userId: z.preprocess(
+    parseOptionalInteger,
+    z.number().int().positive().nullable(),
+  ),
+  akaName: nonEmptyString.max(AUTHORING_VALIDATION.MAX_AKA_NAME_LENGTH),
+  realName: nonEmptyString.max(AUTHORING_VALIDATION.MAX_REAL_NAME_LENGTH),
+  defaultLanguage: nonEmptyString.max(AUTHORING_VALIDATION.MAX_LANGUAGE_LENGTH),
+  countryCode: z.string().regex(/^[A-Z]{3}$/),
+};
+
+export const createAuthorProfileSchema = z.object({
+  ...authorProfileFields,
+  userId: authorProfileFields.userId.default(null),
+}).strict();
+
+export const updateAuthorProfileSchema = z.object({
+  userId: z.preprocess(
+    parseOptionalInteger,
+    z.number().int().positive().nullable().optional(),
+  ),
+  akaName: authorProfileFields.akaName.optional(),
+  realName: authorProfileFields.realName.optional(),
+  defaultLanguage: authorProfileFields.defaultLanguage.optional(),
+  countryCode: authorProfileFields.countryCode.optional(),
+  removeProfileImage: optionalBooleanFromForm,
 }).strict();
 
 const editableProblemDraftFields = {

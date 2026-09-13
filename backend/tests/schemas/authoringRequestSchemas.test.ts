@@ -1,7 +1,9 @@
 import { AUTHORING_VALIDATION } from '../../constants';
 import {
+  createAuthorProfileSchema,
   createProblemDraftSchema,
   problemDraftIdParamSchema,
+  updateAuthorProfileSchema,
   updateProblemDraftSchema,
 } from '../../schemas/requestSchemas';
 
@@ -90,5 +92,45 @@ describe('problem authoring request schemas', () => {
       id: '11111111-1111-4111-8111-111111111111',
     }).success).toBe(true);
     expect(problemDraftIdParamSchema.safeParse({ id: 'redgate' }).success).toBe(false);
+  });
+});
+
+describe('author profile request schemas', () => {
+  const validProfile = {
+    userId: null,
+    akaName: 'Nonbangkok',
+    realName: 'Example Author',
+    defaultLanguage: 'Thai',
+    countryCode: 'THA',
+  };
+
+  it('accepts JSON profile metadata and converts multipart numeric fields', () => {
+    expect(createAuthorProfileSchema.parse(validProfile)).toEqual(validProfile);
+    expect(createAuthorProfileSchema.parse({ ...validProfile, userId: '7' })).toEqual({
+      ...validProfile,
+      userId: 7,
+    });
+  });
+
+  it('rejects invalid profile metadata', () => {
+    expect(createAuthorProfileSchema.safeParse({
+      ...validProfile,
+      akaName: ' ',
+    }).success).toBe(false);
+    expect(createAuthorProfileSchema.safeParse({
+      ...validProfile,
+      countryCode: 'th',
+    }).success).toBe(false);
+    expect(createAuthorProfileSchema.safeParse({
+      ...validProfile,
+      userId: 'not-a-number',
+    }).success).toBe(false);
+  });
+
+  it('parses multipart removal flags without treating "false" as true', () => {
+    expect(updateAuthorProfileSchema.parse({ removeProfileImage: 'true' }))
+      .toEqual({ removeProfileImage: true });
+    expect(updateAuthorProfileSchema.parse({ removeProfileImage: 'false' }))
+      .toEqual({ removeProfileImage: false });
   });
 });

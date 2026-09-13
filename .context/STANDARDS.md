@@ -161,7 +161,7 @@ Three global contexts wrap the entire app in this order:
 6. **Environment variables** — never commit `.env`, use `.env.example` as template. All secrets via env vars.
    - Runtime env access must go through `backend/config/env.ts` (validated once with zod).
    - `backend/types/env.d.ts` defines required env variable types for compile-time safety.
-7. **File upload limits** — configured via Multer, up to 2GB for problem PDFs and test case ZIPs.
+7. **File upload limits** — configured via Multer per workflow: up to 2 GiB for legacy problem PDFs/testcase ZIPs and 10 MiB for raw author profile images.
 8. **Session security** — `httpOnly: true`, `sameSite: 'lax'`, `secure: false` (set to `true` in production).
 9. **Author image safety** — verify decoded image format rather than trusting upload MIME metadata; reject corrupt/animated images and apply a pixel-count limit before normalization.
 

@@ -48,7 +48,9 @@ OJ/
 │   │   ├── adminController.ts
 │   │   ├── problemController.ts
 │   │   ├── submissionController.ts
-│   │   └── contestController.ts
+│   │   ├── contestController.ts
+│   │   ├── authorProfileController.ts # Admin author identity API
+│   │   └── authoringDraftController.ts # Admin draft CRUD API
 │   ├── services/           # Business logic & external processes
 │   │   ├── authorProfileImageService.ts # Canonical profile PNGs and fallback avatars
 │   │   ├── authorProfileQueryService.ts # Author profile persistence

@@ -90,9 +90,14 @@ export const AUTHORING_VALIDATION = {
     MAX_INT: 2_147_483_647,
 } as const;
 
+const AUTHOR_PROFILE_MAX_UPLOAD_MIB = 10;
+
 export const AUTHOR_PROFILE_IMAGE = {
     SIZE_PX: 512,
     MAX_INPUT_PIXELS: 25_000_000,
+    FIELD_NAME: 'profileImage',
+    MAX_UPLOAD_MIB: AUTHOR_PROFILE_MAX_UPLOAD_MIB,
+    MAX_UPLOAD_BYTES: AUTHOR_PROFILE_MAX_UPLOAD_MIB * 1024 * 1024,
     ALLOWED_MIME_TYPES: ['image/jpeg', 'image/png', 'image/webp'],
 } as const;
 

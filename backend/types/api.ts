@@ -149,6 +149,18 @@ export interface ProblemExportRequestBody {
 // Problem Authoring
 // ---------------------------------------------------------------------------
 
+export interface CreateAuthorProfileRequestBody {
+    userId: number | null;
+    akaName: string;
+    realName: string;
+    defaultLanguage: string;
+    countryCode: string;
+}
+
+export type UpdateAuthorProfileRequestBody = Partial<CreateAuthorProfileRequestBody> & {
+    removeProfileImage?: boolean;
+};
+
 export interface CreateProblemDraftRequestBody {
     problemId: string;
     title: string;

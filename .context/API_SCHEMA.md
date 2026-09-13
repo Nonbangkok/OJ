@@ -462,6 +462,68 @@
 
 ---
 
+## 6) Problem Authoring Controller (7 APIs)
+
+All endpoints in this section require an authenticated `admin`; `staff` is not sufficient.
+
+### 51. `POST /admin/author-profiles`
+
+- Purpose: Create a reusable author identity, optionally linked to one OJ account.
+- Accepts JSON metadata, or multipart form data when uploading an image.
+- Metadata:
+  - `userId: number | null` (optional, defaults to `null`)
+  - `akaName: string`
+  - `realName: string`
+  - `defaultLanguage: string`
+  - `countryCode: string` (three uppercase letters)
+- Optional multipart file: `profileImage` (JPEG/PNG/WebP, maximum 10 MiB).
+- The backend verifies decoded format and stores only a normalized 512×512 PNG.
+- Response 201: camel-case profile metadata with `hasProfileImage`; image bytes are omitted.
+- Errors: 400 validation/image error, 409 account already linked, 413 image too large.
+
+### 52. `GET /admin/author-profiles`
+
+- Purpose: List author profile metadata ordered by AKA name.
+- Response 200: camel-case rows including `hasProfileImage`; image BYTEA is never loaded into this list query.
+
+### 53. `PATCH /admin/author-profiles/:id`
+
+- Purpose: Update profile metadata, replace its image, or remove its image.
+- Params: UUID `id`.
+- Accepts JSON or multipart form data. Metadata fields are optional.
+- Optional multipart file: `profileImage`.
+- Optional body field: `removeProfileImage: boolean`; it cannot be true in the same request as a new image.
+- Response 200: updated camel-case profile metadata.
+- Errors: 400 empty/invalid update, 404 profile missing, 409 account already linked, 413 image too large.
+
+### 54. `POST /admin/authoring/drafts`
+
+- Purpose: Create a private problem draft at revision 1.
+- Body: `problemId`, `title`, author snapshot fields, time/memory limits, plus optional statement/C++/template fields.
+- Response 201: complete camel-case draft data, excluding PDF and profile-image bytes.
+
+### 55. `GET /admin/authoring/drafts`
+
+- Purpose: List draft summaries without private C++ source or binary artifacts.
+- Response 200: draft summaries ordered by most recently updated.
+
+### 56. `GET /admin/authoring/drafts/:id`
+
+- Purpose: Load a complete private draft for editing.
+- Params: UUID `id`.
+- Response 200: draft detail with binary presence flags.
+- Error 404: draft missing.
+
+### 57. `PATCH /admin/authoring/drafts/:id`
+
+- Purpose: Optimistically update editable draft content.
+- Params: UUID `id`.
+- Body: positive `expectedRevision` plus at least one editable field.
+- A successful update increments revision and invalidates readiness.
+- Errors: 404 draft missing; 409 revision conflict or published/read-only draft.
+
+---
+
 ## Frontend Implementation Notes (สำคัญ)
 
 - ใช้ axios instance แบบ `withCredentials: true` ทุก request ที่ต้องใช้ session
