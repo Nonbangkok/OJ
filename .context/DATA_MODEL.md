@@ -4,11 +4,12 @@
 
 ## Schema Overview
 
-The database contains **11 tables** managed via `backend/scripts/init_db.js`. There is no ORM — all schema is defined as raw SQL DDL.
+The database contains **17 tables**. The 11 legacy application tables are bootstrapped by `backend/scripts/init_db.js`; `schema_migrations` and the 5 authoring tables are managed by the non-destructive migration runner in `backend/migrations/`. There is no ORM — all schema is defined as raw SQL DDL.
 
 Schema status for this revision:
-- No table/column/index changes were introduced.
-- Backend typing around this schema was strengthened:
+- Migration `0002_problem_authoring_foundation` adds `author_profiles`, `problem_drafts`, `problem_draft_assets`, `problem_draft_testcases`, and `authoring_jobs`.
+- `schema_migrations` serializes and records applied migrations.
+- Backend typing around the schema includes:
   - DB row interfaces remain in `backend/types/models.ts`.
   - API DTO contracts were expanded in `backend/types/api.ts`.
   - Runtime request validation schemas were centralized in `backend/schemas/requestSchemas.ts` and reused across all controllers.
@@ -22,6 +23,8 @@ erDiagram
     users ||--o{ contest_submissions : "submits in contest"
     users ||--o{ contest_scoreboards : "has score in"
     users ||--o{ contests : "creates"
+    users ||--o| author_profiles : "optionally owns"
+    users ||--o{ problem_drafts : "creates"
 
     problems ||--o{ testcases : "has"
     problems ||--o{ submissions : "receives"
@@ -31,6 +34,10 @@ erDiagram
     contests ||--o{ contest_submissions : "receives"
     contests ||--o{ contest_scoreboards : "has"
     contests ||--o{ contest_problems : "snapshots"
+    author_profiles ||--o{ problem_drafts : "snapshotted into"
+    problem_drafts ||--o{ problem_draft_assets : "contains"
+    problem_drafts ||--o{ problem_draft_testcases : "contains"
+    problem_drafts ||--o{ authoring_jobs : "runs"
 
     users {
         SERIAL id PK
@@ -279,6 +286,55 @@ Aggregated scores per user per contest.
 | `memory_limit_mb` | `INT` | DEFAULT `256` |
 | `created_at` | `TIMESTAMPTZ` | DEFAULT `NOW()` |
 
+### `schema_migrations`
+
+Tracks non-destructive migrations that have completed. Migration execution is protected by a PostgreSQL advisory lock.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `name` | `TEXT` | PK |
+| `applied_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()` |
+
+### `author_profiles`
+
+Reusable author identity, independent from login accounts. Profile image bytes are either NULL or canonical 512×512 PNG data.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | `UUID` | PK, application-generated |
+| `user_id` | `INT` | UNIQUE, nullable FK → `users(id)` ON DELETE SET NULL |
+| `aka_name` | `VARCHAR(100)` | NOT NULL |
+| `real_name` | `VARCHAR(255)` | NOT NULL |
+| `default_language` | `VARCHAR(50)` | NOT NULL |
+| `country_code` | `VARCHAR(3)` | NOT NULL |
+| `profile_image_png` | `BYTEA` | NULLABLE, normalized PNG only |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()` |
+| `updated_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()` |
+
+### `problem_drafts`
+
+Private authoring workspace state. Author display fields and image are snapshots, so later profile edits do not silently change a draft.
+
+| Column group | Notes |
+|---|---|
+| Identity | UUID `id`, proposed `problem_id`, `title` |
+| Author snapshot | nullable `author_profile_id`; AKA, real name, language, country and nullable PNG snapshot |
+| Problem content | limits, statement HTML, private C++ solution, nullable private C++ generator |
+| Generated state | nullable PDF and source revision, template version, revision and verified revision |
+| Lifecycle | `draft`, `generated`, `ready`, or `published`; creator and timestamps |
+
+### `problem_draft_assets`
+
+Statement assets keyed by UUID, with a filename unique within each draft. Stores MIME type, normalized bytes, SHA-256 checksum, byte size, and timestamps. Deleting a draft cascades to its assets.
+
+### `problem_draft_testcases`
+
+Draft input/output pairs keyed by UUID and unique `(draft_id, case_number)`. Records original input filename, source (`uploaded` or `generated`), source revision, and timestamps. Output may be NULL while authoring is incomplete.
+
+### `authoring_jobs`
+
+Durable job record for solution/generator compilation, generator execution, output generation, PDF builds, and full verification. Each job captures a draft revision and transitions through the constrained authoring job statuses.
+
 ---
 
 ## Key Relationships
@@ -294,6 +350,11 @@ Aggregated scores per user per contest.
 | Contest → Contest Submissions | 1 : N | Separate from global submissions |
 | Contest → Contest Scoreboards | 1 : N | One row per (contest, user) pair |
 | Contest → Contest Participants | 1 : N | Tracks join time |
+| User → Author Profile | 1 : 0..1 | Optional account link; profile may exist without an account |
+| Author Profile → Problem Drafts | 1 : N | Draft stores a point-in-time author snapshot |
+| Problem Draft → Assets | 1 : N | `ON DELETE CASCADE` |
+| Problem Draft → Draft Testcases | 1 : N | `ON DELETE CASCADE` |
+| Problem Draft → Authoring Jobs | 1 : N | Each job captures one draft revision |
 
 ---
 
@@ -341,14 +402,12 @@ Maps `problem_id` to the user's best score for that problem in the contest.
 
 ## Migration Instructions
 
-This project uses a **destructive migration** pattern (no incremental migrations):
+Legacy initialization remains destructive, but normal backend startup now uses a **non-destructive migration registry**:
 
-1. **Schema is defined** in `backend/scripts/init_db.js`.
-2. **Running `init_db.js`** drops ALL tables (`DROP ... CASCADE`) and recreates them from scratch.
-3. **To add a new table or column:**
-   - Add the DDL to `init_db.js` in the appropriate position (respecting FK dependencies).
-   - Run `docker-compose exec backend node scripts/init_db.js` (⚠️ destroys all data).
-4. **For production changes:** Use manual `ALTER TABLE` statements directly, or export/import the database via the Admin Panel.
-5. **No migration framework** (e.g., Knex, Flyway) is currently in use.
+1. `backend/scripts/init_db.js` is only for explicitly rebuilding a development database and still drops legacy tables.
+2. `backend/scripts/migrate.ts` creates `schema_migrations`, takes an advisory lock, and applies pending entries from `backend/migrations/index.ts` in order.
+3. Backend `start` runs compiled migrations before starting the HTTP server.
+4. Every production schema change must be a new immutable migration. Never edit an already-applied migration.
+5. Migrations must be idempotent at the registry level and must preserve existing production data.
 
-> ⚠️ **CAUTION:** Running `init_db.js` on a populated database will irreversibly delete ALL data. Always export a backup first via the Admin Panel's "Export Database" feature.
+> ⚠️ **CAUTION:** Running `init_db.js` on a populated database will irreversibly delete data. Use the migration runner for normal local and production upgrades.

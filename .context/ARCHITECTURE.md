@@ -51,6 +51,7 @@ OJ/
 │   │   └── contestController.ts
 │   ├── services/           # Business logic & external processes
 │   │   ├── authorProfileImageService.ts # Canonical profile PNGs and fallback avatars
+│   │   ├── authorProfileQueryService.ts # Author profile persistence
 │   │   ├── judgeService.ts       # Compile & judge C++ in sandbox
 │   │   ├── submissionService.ts  # Submission processing
 │   │   ├── submissionQueryService.ts # Submission read/write query orchestration
