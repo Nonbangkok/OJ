@@ -27,7 +27,7 @@ const sessionMiddleware = session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    domain: 'woi-grader.com',
+    domain: 'nonbangkokgrader.com',
     secure: true, // Set to true for production
     sameSite: 'lax',
     httpOnly: true,
@@ -40,7 +40,11 @@ const port = Number(env.PORT) || 5000;
 
 app.use(express.json());
 app.use(cors({
-  origin: ['https://www.woi-grader.com', 'https://woi-grader.com', 'https://upload.woi-grader.com'],
+  origin: [
+    'https://www.nonbangkokgrader.com',
+    'https://nonbangkokgrader.com',
+    'https://upload.nonbangkokgrader.com',
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

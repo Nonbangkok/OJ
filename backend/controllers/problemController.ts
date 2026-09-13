@@ -252,13 +252,13 @@ router.get('/admin/problems/batch-upload-progress/:progressId', requireAuth, req
   const progressId = String(req.params.progressId);
   const requestOrigin = req.headers.origin;
   const allowedOrigins = new Set([
-    'https://www.woi-grader.com',
-    'https://woi-grader.com',
-    'https://upload.woi-grader.com',
+    'https://www.nonbangkokgrader.com',
+    'https://nonbangkokgrader.com',
+    'https://upload.nonbangkokgrader.com',
   ]);
   const responseOrigin = requestOrigin && allowedOrigins.has(requestOrigin)
     ? requestOrigin
-    : 'https://woi-grader.com';
+    : 'https://nonbangkokgrader.com';
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
