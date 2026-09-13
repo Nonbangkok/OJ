@@ -12,10 +12,16 @@ type RunMigrations = (
   migrations: readonly Migration[],
 ) => Promise<string[]>;
 
-const loadRunMigrations = (): RunMigrations => {
-  const module = require('../../migrations/migrationRunner') as { runMigrations?: RunMigrations };
+type MigrationRunnerModule = {
+  runMigrations?: RunMigrations;
+  SCHEMA_MIGRATION_LOCK_ID?: number;
+};
+
+const loadMigrationRunner = (): Required<MigrationRunnerModule> => {
+  const module = require('../../migrations/migrationRunner') as MigrationRunnerModule;
   expect(module.runMigrations).toBeInstanceOf(Function);
-  return module.runMigrations!;
+  expect(module.SCHEMA_MIGRATION_LOCK_ID).toBe(734001);
+  return module as Required<MigrationRunnerModule>;
 };
 
 const migrations: readonly Migration[] = [
@@ -36,18 +42,23 @@ describe('migration runner', () => {
       },
     };
 
-    const applied = await loadRunMigrations()(database, migrations);
+    const { runMigrations, SCHEMA_MIGRATION_LOCK_ID } = loadMigrationRunner();
+    const applied = await runMigrations(database, migrations);
 
     expect(applied).toEqual(['0002_problems']);
     expect(calls.map((call) => call.text)).toEqual([
+      'SELECT pg_advisory_lock($1)',
       expect.stringContaining('CREATE TABLE IF NOT EXISTS schema_migrations'),
       expect.stringContaining('SELECT version'),
       'BEGIN',
       'CREATE TABLE problems (id TEXT PRIMARY KEY)',
       expect.stringContaining('INSERT INTO schema_migrations'),
       'COMMIT',
+      'SELECT pg_advisory_unlock($1)',
     ]);
-    expect(calls[4].params).toEqual(['0002_problems']);
+    expect(calls[0].params).toEqual([SCHEMA_MIGRATION_LOCK_ID]);
+    expect(calls[5].params).toEqual(['0002_problems']);
+    expect(calls[7].params).toEqual([SCHEMA_MIGRATION_LOCK_ID]);
   });
 
   it('does nothing when every migration version is already recorded', async () => {
@@ -62,10 +73,16 @@ describe('migration runner', () => {
       },
     };
 
-    const applied = await loadRunMigrations()(database, migrations);
+    const { runMigrations } = loadMigrationRunner();
+    const applied = await runMigrations(database, migrations);
 
     expect(applied).toEqual([]);
-    expect(calls).toHaveLength(2);
+    expect(calls).toEqual([
+      'SELECT pg_advisory_lock($1)',
+      expect.stringContaining('CREATE TABLE IF NOT EXISTS schema_migrations'),
+      expect.stringContaining('SELECT version'),
+      'SELECT pg_advisory_unlock($1)',
+    ]);
   });
 
   it('rolls back a failed migration and never records its version', async () => {
@@ -83,15 +100,19 @@ describe('migration runner', () => {
       },
     };
 
-    await expect(loadRunMigrations()(database, migrations)).rejects.toThrow('invalid migration SQL');
+    const { runMigrations, SCHEMA_MIGRATION_LOCK_ID } = loadMigrationRunner();
+    await expect(runMigrations(database, migrations)).rejects.toThrow('invalid migration SQL');
 
     expect(calls.map((call) => call.text)).toEqual([
+      'SELECT pg_advisory_lock($1)',
       expect.stringContaining('CREATE TABLE IF NOT EXISTS schema_migrations'),
       expect.stringContaining('SELECT version'),
       'BEGIN',
       migrations[0].sql,
       'ROLLBACK',
+      'SELECT pg_advisory_unlock($1)',
     ]);
     expect(calls.some((call) => call.text.includes('INSERT INTO schema_migrations'))).toBe(false);
+    expect(calls.at(-1)?.params).toEqual([SCHEMA_MIGRATION_LOCK_ID]);
   });
 });

@@ -50,21 +50,25 @@ describe('migration command', () => {
 
     expect(applied).toEqual(['0001_test']);
     expect(calls).toEqual([
+      'SELECT pg_advisory_lock($1)',
       expect.stringContaining('CREATE TABLE IF NOT EXISTS schema_migrations'),
       expect.stringContaining('SELECT version'),
       'BEGIN',
       'CREATE TABLE example (id INT)',
       expect.stringContaining('INSERT INTO schema_migrations'),
       'COMMIT',
+      'SELECT pg_advisory_unlock($1)',
     ]);
     expect(releaseCount).toBe(1);
   });
 
   it('releases the acquired connection when a migration fails', async () => {
+    const calls: string[] = [];
     let releaseCount = 0;
     const failingSql = 'INVALID MIGRATION';
     const client: MigrationClient = {
       query: async (text) => {
+        calls.push(text);
         if (text.startsWith('SELECT version')) {
           return { rows: [] };
         }
@@ -85,6 +89,15 @@ describe('migration command', () => {
       { version: '0001_failure', sql: failingSql },
     ])).rejects.toThrow('migration failed');
 
+    expect(calls).toEqual([
+      'SELECT pg_advisory_lock($1)',
+      expect.stringContaining('CREATE TABLE IF NOT EXISTS schema_migrations'),
+      expect.stringContaining('SELECT version'),
+      'BEGIN',
+      failingSql,
+      'ROLLBACK',
+      'SELECT pg_advisory_unlock($1)',
+    ]);
     expect(releaseCount).toBe(1);
   });
 });
