@@ -13,6 +13,7 @@ describe('problem authoring foundation migration', () => {
       '0001_core_schema',
       '0002_problem_authoring_foundation',
       '0003_authoring_job_delivery',
+      '0004_authoring_job_inputs',
     ]);
   });
 

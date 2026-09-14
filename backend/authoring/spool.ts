@@ -3,7 +3,7 @@ import { chmod, lstat, mkdir, mkdtemp, open, opendir, readdir, rename, rm, write
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { AUTHORING_RUNNER, failedResult, InputArtifact, JobResult, JobSnapshot, jobResultSchema, jobSnapshotSchema } from './protocol';
+import { AUTHORING_RUNNER, CaseInput, failedResult, InputArtifact, JobResult, JobSnapshot, jobResultSchema, jobSnapshotSchema } from './protocol';
 import { TESTCASE_LIMITS, TestcaseError, validateTestcaseFilename, naturalFilenameCompare, readTestcaseFile, decodeTestcaseText } from './testcases';
 
 const missing = (error: unknown) => (error as NodeJS.ErrnoException).code === 'ENOENT';
@@ -46,13 +46,22 @@ export class AuthoringSpool {
     try { await lstat(file); return true; } catch (error) { if (missing(error)) return false; throw error; }
   }
 
-  async deliver(input: JobSnapshot): Promise<void> {
+  async deliver(input: JobSnapshot, readInput?: (index: number, artifact: CaseInput) => Promise<string>): Promise<void> {
     const job = jobSnapshotSchema.parse(input);
     if (await this.exists(`${this.location('results', job.jobId)}.json`)
       || await this.exists(this.location('active', job.jobId))
       || await this.exists(this.location('ready', job.jobId))) return;
     const stage = await mkdtemp(path.join(this.root, 'staging', `${job.jobId}-`));
     try {
+      if (job.kind === 'generate_outputs') {
+        if (!readInput) throw new TestcaseError('invalid_job_inputs', 'Input snapshot reader is required');
+        await mkdir(path.join(stage, 'inputs'), { mode: 0o700 });
+        for (const [index, artifact] of job.cases!.entries()) {
+          const content = Buffer.from(await readInput(index, artifact), 'utf8');
+          this.validateArtifact(content, artifact, 'invalid_job_inputs');
+          await writeFile(path.join(stage, 'inputs', `${index}.txt`), content, { mode: 0o600, flag: 'wx' });
+        }
+      }
       await writeFile(path.join(stage, 'request.json'), JSON.stringify(job), { mode: 0o600, flag: 'wx' });
       await rename(stage, this.location('ready', job.jobId));
     } catch (error) {
@@ -163,17 +172,66 @@ export class AuthoringSpool {
   }
 
   async readInput(id: string, index: number, artifact: InputArtifact): Promise<string> {
+    return this.readArtifact(this.location('artifacts', id), index, artifact, 'invalid_generated_inputs');
+  }
+
+  async readOutput(id: string, index: number, artifact: InputArtifact): Promise<string> {
+    return this.readArtifact(this.location('artifacts', id), index, artifact, 'invalid_generated_outputs');
+  }
+
+  async readJobInput(id: string, index: number, artifact: InputArtifact): Promise<string> {
+    const active = this.location('active', id);
+    if (!(await lstat(active)).isDirectory()) throw new TestcaseError('invalid_job_inputs', 'Invalid active job directory');
+    return this.readArtifact(path.join(active, 'inputs'), index, artifact, 'invalid_job_inputs');
+  }
+
+  private validateArtifact(content: Buffer, artifact: InputArtifact, code: string): string {
+    if (content.length !== artifact.sizeBytes || createHash('sha256').update(content).digest('hex') !== artifact.sha256) {
+      throw new TestcaseError(code, 'Artifact checksum mismatch');
+    }
+    return decodeTestcaseText(content, artifact.filename);
+  }
+
+  private async readArtifact(directory: string, index: number, artifact: InputArtifact, code: string): Promise<string> {
     if (!Number.isInteger(index) || index < 0 || index >= TESTCASE_LIMITS.MAX_CASES) throw new TestcaseError('invalid_generated_inputs', 'Invalid case index');
     try {
-      const directory = this.location('artifacts', id);
       if (!(await lstat(directory)).isDirectory()) throw new Error('Invalid artifact directory');
       const content = await readTestcaseFile(path.join(directory, `${index}.txt`));
-      if (content.length !== artifact.sizeBytes || createHash('sha256').update(content).digest('hex') !== artifact.sha256) throw new Error('Artifact checksum mismatch');
-      return decodeTestcaseText(content, artifact.filename);
+      return this.validateArtifact(content, artifact, code);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code && !['ENOENT', 'ELOOP'].includes((error as NodeJS.ErrnoException).code!)) throw error;
-      throw new TestcaseError('invalid_generated_inputs', `Missing or invalid generated input: ${artifact.filename}`);
+      if (!(error instanceof TestcaseError) && (error as NodeJS.ErrnoException).code
+        && !['ENOENT', 'ELOOP'].includes((error as NodeJS.ErrnoException).code!)) throw error;
+      throw new TestcaseError(code, `Missing or invalid artifact: ${artifact.filename}`);
     }
+  }
+
+  async beginOutputArtifacts(id: string): Promise<string> {
+    return mkdtemp(path.join(this.root, 'staging', `${uuid.parse(id)}-outputs-`));
+  }
+
+  private validateOutputStage(stage: string): void {
+    if (path.dirname(stage) !== path.join(this.root, 'staging')
+      || !/^[a-f0-9-]{36}-outputs-[A-Za-z0-9]+$/.test(path.basename(stage))) throw new Error('Invalid output stage');
+  }
+
+  async appendOutputArtifact(stage: string, index: number, file: string): Promise<Pick<InputArtifact, 'sizeBytes' | 'sha256'>> {
+    this.validateOutputStage(stage);
+    if (!Number.isInteger(index) || index < 0 || index >= TESTCASE_LIMITS.MAX_CASES) throw new TestcaseError('invalid_generated_outputs', 'Invalid output index');
+    const content = await readTestcaseFile(file);
+    decodeTestcaseText(content, `output ${index + 1}`);
+    await writeFile(path.join(stage, `${index}.txt`), content, { mode: 0o600, flag: 'wx' });
+    return { sizeBytes: content.length, sha256: createHash('sha256').update(content).digest('hex') };
+  }
+
+  async finishOutputArtifacts(id: string, stage: string): Promise<void> {
+    this.validateOutputStage(stage);
+    if (!path.basename(stage).startsWith(`${uuid.parse(id)}-outputs-`)) throw new Error('Output stage identity mismatch');
+    await rename(stage, this.location('artifacts', id));
+  }
+
+  async discardOutputArtifacts(stage: string): Promise<void> {
+    this.validateOutputStage(stage);
+    await rm(stage, { recursive: true, force: true });
   }
 
   async cleanupStaging(now: number): Promise<void> {

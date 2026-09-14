@@ -4,7 +4,7 @@ import { findForbiddenInclude } from '../utils/compileGuard';
 import { AUTHORING_RUNNER, failedResult, JobResult, JobSnapshot, jobSnapshotSchema } from './protocol';
 import { runBoundedProcess } from './process';
 
-/** Compiles one immutable C++20 source as nobody; no binaries execute in Slice 4. */
+/** Compiles one immutable C++20 source as nobody, then optionally enters its runtime. */
 export async function compileJob(input: JobSnapshot, workRoot: string, options: {
   timeoutMs?: number; signal?: AbortSignal; onCompiled?: (cwd: string) => Promise<JobResult>;
 } = {}): Promise<JobResult> {
@@ -15,7 +15,7 @@ export async function compileJob(input: JobSnapshot, workRoot: string, options: 
   const cwd = await mkdtemp(path.join(workRoot, 'compile-'));
   try {
     await chmod(cwd, 0o777);
-    const filename = job.kind === 'compile_solution' ? 'solution.cpp' : 'generator.cpp';
+    const filename = job.kind === 'compile_solution' || job.kind === 'generate_outputs' ? 'solution.cpp' : 'generator.cpp';
     await writeFile(path.join(cwd, filename), job.source, { mode: 0o644 });
     const timeoutMs = Math.max(1, Math.min(options.timeoutMs ?? AUTHORING_RUNNER.COMPILE_TIMEOUT_MS,
       AUTHORING_RUNNER.COMPILE_TIMEOUT_MS, Date.parse(job.deadline) - Date.now()));
@@ -23,7 +23,7 @@ export async function compileJob(input: JobSnapshot, workRoot: string, options: 
       `--as=${AUTHORING_RUNNER.MEMORY_BYTES}`, `--cpu=${Math.ceil(timeoutMs / 1000) + 1}`,
       `--nproc=${AUTHORING_RUNNER.MAX_PROCESSES}`, `--fsize=${AUTHORING_RUNNER.MAX_BINARY_BYTES}`, '--core=0',
       '--', '/usr/bin/g++', '-std=c++20', '-O2', '-pipe', '-fdiagnostics-color=never', '-fmax-errors=30',
-      ...(job.kind === 'run_generator' ? ['-static'] : []),
+      ...(job.kind === 'run_generator' || job.kind === 'generate_outputs' ? ['-static'] : []),
       filename, '-o', 'program',
     ], { cwd, timeoutMs, uid: 65534, gid: 65534, maxLogBytes: AUTHORING_RUNNER.MAX_DIAGNOSTIC_BYTES, signal: options.signal });
     const result = failedResult(job, 'compile_error');

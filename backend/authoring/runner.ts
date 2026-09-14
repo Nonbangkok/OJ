@@ -4,6 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { AuthoringSpool } from './spool';
 import { compileJob } from './compiler';
 import { generateInputs } from './generator';
+import { generateOutputs } from './outputs';
 import { AUTHORING_RUNNER, failedResult } from './protocol';
 
 /** Single-consumer worker; the container entrypoint holds a kernel flock across restarts. */
@@ -24,6 +25,8 @@ async function main(): Promise<void> {
     let result;
     try { result = job.kind === 'run_generator'
       ? await generateInputs(job, '/work', spool, { signal: abort.signal })
+      : job.kind === 'generate_outputs'
+      ? await generateOutputs(job, '/work', spool, { signal: abort.signal })
       : await compileJob(job, '/work', { signal: abort.signal }); }
     catch { result = failedResult(job, 'runner_error'); }
     await spool.complete(job.jobId, result);

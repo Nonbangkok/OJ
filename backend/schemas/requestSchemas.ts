@@ -11,6 +11,9 @@ import {
 } from '../constants';
 
 const nonEmptyString = z.string().trim().min(1);
+export const outputAuthoringJobSchema = z.object({
+  expectedRevision: z.number().int().positive().max(2147483647),
+}).strict();
 export const generateAuthoringJobSchema = z.object({
   expectedRevision: z.number().int().positive().max(2147483647),
   seed: seedSchema,

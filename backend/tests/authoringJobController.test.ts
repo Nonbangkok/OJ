@@ -31,6 +31,15 @@ it('returns 503 if the authoring runner transport is not configured', async () =
   expect((await request(app('admin', false)).post(`/admin/authoring/drafts/${id}/jobs/generate`).send({ expectedRevision: 1, seed: '1' })).status).toBe(503);
 });
 
+it('protects output generation with admin authorization, revision validation and runner availability', async () => {
+  const url = `/admin/authoring/drafts/${id}/jobs/outputs`;
+  expect((await request(app()).post(url).send({ expectedRevision: 1 })).status).toBe(401);
+  expect((await request(app('staff')).post(url).send({ expectedRevision: 1 })).status).toBe(403);
+  expect((await request(app('admin')).post(url).send({ expectedRevision: 0 })).status).toBe(400);
+  expect((await request(app('admin')).post(url).send({ expectedRevision: 1, seed: '1' })).status).toBe(400);
+  expect((await request(app('admin', false)).post(url).send({ expectedRevision: 1 })).status).toBe(503);
+});
+
 it('requires a bounded explicit seed for generation and accepts generator-less drafts without queueing', async () => {
   for (const seed of [undefined, 1, '-1', '18446744073709551616', '1; rm']) {
     expect((await request(app('admin')).post(`/admin/authoring/drafts/${id}/jobs/generate`).send({ expectedRevision: 1, seed })).status).toBe(400);

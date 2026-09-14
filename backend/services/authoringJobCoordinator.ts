@@ -2,7 +2,7 @@ import * as db from '../db';
 import { AUTHORING_RUNNER, jobSnapshotSchema } from '../authoring/protocol';
 import { AuthoringSpool } from '../authoring/spool';
 import { TestcaseError } from '../authoring/testcases';
-import { ACTIVE_JOB_STATUSES, AUTHORING_COORDINATOR_LOCK, applyJobResult, DurableJob, failAuthoringJob, getAuthoringJob, JobDatabase } from './authoringJobQueryService';
+import { ACTIVE_JOB_STATUSES, AUTHORING_COORDINATOR_LOCK, applyJobResult, DurableJob, failAuthoringJob, getAuthoringJob, JobDatabase, readQueuedInput } from './authoringJobQueryService';
 
 /** Reconciles durable queue entries with disk, including both crash windows around result import. */
 export async function reconcileAuthoringJobs(spool: AuthoringSpool, database: JobDatabase = db, now = Date.now()): Promise<void> {
@@ -28,7 +28,8 @@ export async function reconcileAuthoringJobs(spool: AuthoringSpool, database: Jo
         if (result.jobId !== job.id || result.draftId !== job.draft_id || result.revision !== job.draft_revision) {
           await failAuthoringJob(job.id, 'result_identity_mismatch', false, database);
         } else {
-          try { await applyJobResult(job.id, result, database, (index, artifact) => spool.readInput(job.id, index, artifact)); }
+          try { await applyJobResult(job.id, result, database, (index, artifact) => job.job_type === 'generate_outputs'
+            ? spool.readOutput(job.id, index, artifact) : spool.readInput(job.id, index, artifact)); }
           catch (error) {
             if (!(error instanceof TestcaseError)) throw error;
             await failAuthoringJob(job.id, error.code, false, database);
@@ -42,7 +43,13 @@ export async function reconcileAuthoringJobs(spool: AuthoringSpool, database: Jo
         await failAuthoringJob(job.id, 'job_expired', true, database);
       } else if (await spool.isActive(job.id)) {
         await database.query("UPDATE authoring_jobs SET status='compiling', started_at=COALESCE(started_at,NOW()) WHERE id=$1 AND status='queued'", [job.id]);
-      } else { await spool.deliver(snapshot.data); }
+      } else {
+        try { await spool.deliver(snapshot.data, (_index, artifact) => readQueuedInput(job.id, artifact.caseId, database)); }
+        catch (error) {
+          if (!(error instanceof TestcaseError)) throw error;
+          await failAuthoringJob(job.id, 'invalid_job_inputs', false, database);
+        }
+      }
     }
     // A crash after DB commit but before file cleanup is harmless and recovered here.
     for (const id of await spool.jobIds()) {

@@ -15,6 +15,7 @@ export const AUTHORING_RUNNER = {
   MEMORY_BYTES: 768 * 1024 * 1024,
   MAX_PROCESSES: 128,
   MAX_PENDING_JOBS: 100,
+  MAX_SOLUTION_MEMORY_MB: 736,
 } as const;
 
 export const seedSchema = z.string().regex(/^(0|[1-9][0-9]{0,19})$/)
@@ -27,14 +28,31 @@ export const inputArtifactSchema = z.object({
 }).strict();
 export type InputArtifact = z.infer<typeof inputArtifactSchema>;
 
+const caseIdentity = { caseId: z.string().uuid(), caseNumber: z.number().int().positive() };
+const caseInputSchema = inputArtifactSchema.extend(caseIdentity);
+export type CaseInput = z.infer<typeof caseInputSchema>;
+const caseMeasurementSchema = z.object({ ...caseIdentity,
+  durationMs: z.number().int().min(0).max(AUTHORING_RUNNER.JOB_TIMEOUT_MS) }).strict();
+const outputArtifactSchema = caseInputSchema.extend({ durationMs: caseMeasurementSchema.shape.durationMs });
+export type OutputArtifact = z.infer<typeof outputArtifactSchema>;
+const uniqueCases = (cases: CaseInput[]) => new Set(cases.map(c => c.caseId)).size === cases.length
+  && new Set(cases.map(c => c.caseNumber)).size === cases.length
+  && new Set(cases.map(c => c.filename)).size === cases.length
+  && cases.reduce((sum, c) => sum + c.sizeBytes, 0) <= TESTCASE_LIMITS.MAX_TOTAL_BYTES;
+
 export const jobSnapshotSchema = z.object({
   version: z.literal(1), jobId: z.string().uuid(), draftId: z.string().uuid(),
   revision: z.number().int().positive(),
-  kind: z.enum(['compile_solution', 'compile_generator', 'run_generator']),
+  kind: z.enum(['compile_solution', 'compile_generator', 'run_generator', 'generate_outputs']),
   seed: seedSchema.optional(),
+  cases: z.array(caseInputSchema).min(1).max(TESTCASE_LIMITS.MAX_CASES).refine(uniqueCases).optional(),
+  limits: z.object({ timeLimitMs: z.number().int().positive().max(AUTHORING_RUNNER.JOB_TIMEOUT_MS),
+    memoryLimitMb: z.number().int().positive().max(AUTHORING_RUNNER.MAX_SOLUTION_MEMORY_MB) }).strict().optional(),
   source: z.string().refine(value => Buffer.byteLength(value) <= AUTHORING_RUNNER.MAX_SOURCE_BYTES),
   deadline: z.string().datetime(),
-}).strict().refine(value => value.kind === 'run_generator' ? value.seed !== undefined : value.seed === undefined);
+}).strict().refine(value => value.kind === 'run_generator' ? value.seed !== undefined : value.seed === undefined)
+  .refine(value => value.kind === 'generate_outputs' ? value.cases !== undefined && value.limits !== undefined
+    : value.cases === undefined && value.limits === undefined);
 
 export const jobResultSchema = z.object({
   version: z.literal(1), jobId: z.string().uuid(), draftId: z.string().uuid(),
@@ -42,14 +60,19 @@ export const jobResultSchema = z.object({
   status: z.enum(['succeeded', 'failed', 'timed_out']),
   errorCode: z.enum(['compile_error', 'compile_timeout', 'diagnostic_limit', 'forbidden_include',
     'runner_interrupted', 'runner_error', 'job_expired', 'generator_runtime_error',
-    'generator_timeout', 'generator_output_limit', 'invalid_generated_inputs']).nullable(),
+    'generator_timeout', 'generator_output_limit', 'invalid_generated_inputs', 'solution_runtime_error',
+    'solution_timeout', 'solution_output_limit', 'invalid_generated_outputs', 'invalid_job_inputs',
+    'unsupported_resource_limits']).nullable(),
   log: z.string().refine(value => Buffer.byteLength(value) <= AUTHORING_RUNNER.MAX_LOG_BYTES),
   durationMs: z.number().int().min(0).max(AUTHORING_RUNNER.JOB_TIMEOUT_MS),
   exitCode: z.number().int().nullable(),
   inputs: z.array(inputArtifactSchema).min(1).max(TESTCASE_LIMITS.MAX_CASES).optional(),
+  outputs: z.array(outputArtifactSchema).min(1).max(TESTCASE_LIMITS.MAX_CASES).refine(uniqueCases).optional(),
+  failedCase: caseMeasurementSchema.optional(),
 }).strict().refine(value => value.status === 'succeeded'
-  ? value.errorCode === null && value.exitCode === 0
-  : value.errorCode !== null && value.inputs === undefined)
+  ? value.errorCode === null && value.exitCode === 0 && value.failedCase === undefined
+  : value.errorCode !== null && value.inputs === undefined && value.outputs === undefined)
+  .refine(value => !(value.inputs && value.outputs))
   .refine(value => !value.inputs || (new Set(value.inputs.map(i => i.filename)).size === value.inputs.length
     && value.inputs.reduce((total, i) => total + i.sizeBytes, 0) <= TESTCASE_LIMITS.MAX_TOTAL_BYTES));
 

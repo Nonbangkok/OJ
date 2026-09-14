@@ -12,7 +12,7 @@
 #include <sys/prctl.h>
 #include <sys/syscall.h>
 
-/* Runtime only. A static generator sees its private jail, never the spool or /proc.
+/* Runtime only. A static executable sees its private jail, never the spool or /proc.
  * Descendants may fork but cannot escape the process group killed by the supervisor.
  * clone3 returns ENOSYS so libc can use the inspectable legacy clone syscall. */
 #if defined(__x86_64__)
@@ -24,7 +24,7 @@
 #endif
 #define DENY(nr) BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, nr, 0, 1), BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_ERRNO|EPERM)
 
-static int restrict_processes(void) {
+static int restrict_processes(int solution) {
     struct sock_filter rules[] = {
         BPF_STMT(BPF_LD|BPF_W|BPF_ABS, offsetof(struct seccomp_data, arch)),
         BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, NATIVE_ARCH, 1, 0),
@@ -37,6 +37,7 @@ static int restrict_processes(void) {
 #endif
         DENY(__NR_setsid), DENY(__NR_setpgid), DENY(__NR_unshare), DENY(__NR_setns),
         DENY(__NR_ptrace), DENY(__NR_mount), DENY(__NR_chroot),
+        DENY(__NR_socket), DENY(__NR_socketpair), DENY(__NR_io_uring_setup),
         BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, __NR_clone3, 0, 1),
         BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_ERRNO|ENOSYS),
         BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, __NR_clone, 0, 3),
@@ -46,18 +47,37 @@ static int restrict_processes(void) {
         BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_ALLOW),
     };
     struct sock_fprog program = { .len = sizeof(rules)/sizeof(rules[0]), .filter = rules };
-    return prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) || prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &program);
+    if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) || prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &program)) return -1;
+    if (!solution) return 0;
+    /* RLIMIT_AS must bound the entire case: threads share the limited address space,
+     * but separate child processes could each consume a fresh memory allowance. */
+    struct sock_filter thread_rules[] = {
+        BPF_STMT(BPF_LD|BPF_W|BPF_ABS, offsetof(struct seccomp_data, nr)),
+#ifdef __NR_fork
+        DENY(__NR_fork),
+#endif
+#ifdef __NR_vfork
+        DENY(__NR_vfork),
+#endif
+        BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, __NR_clone, 0, 3),
+        BPF_STMT(BPF_LD|BPF_W|BPF_ABS, offsetof(struct seccomp_data, args[0])),
+        BPF_JUMP(BPF_JMP|BPF_JSET|BPF_K, CLONE_THREAD, 1, 0),
+        BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_ERRNO|EPERM),
+        BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_ALLOW),
+    };
+    struct sock_fprog threads = { .len = sizeof(thread_rules)/sizeof(thread_rules[0]), .filter = thread_rules };
+    return prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &threads);
 }
 
 int main(int argc, char **argv) {
-    if (argc != 3 || geteuid() != 0) return 125;
+    if ((argc != 2 && argc != 3) || geteuid() != 0) return 125;
     if (chdir(argv[1]) || chroot(".") || chdir("/") || setgroups(0, NULL)
-        || setgid(65534) || setuid(65534) || restrict_processes()) {
+        || setgid(65534) || setuid(65534) || restrict_processes(argc == 2)) {
         perror("authoring sandbox setup failed");
         return 125;
     }
-    char *const args[] = { "/generator", argv[2], NULL };
+    char *const args[] = { argc == 3 ? "/generator" : "/solution", argc == 3 ? argv[2] : NULL, NULL };
     execv(args[0], args);
-    perror("authoring generator execution failed");
+    perror("authoring execution failed");
     return 125;
 }
