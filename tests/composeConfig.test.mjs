@@ -29,6 +29,7 @@ test('local Compose config is self-contained and migration-gated', () => {
   const serviceNames = Object.keys(config.services).sort();
 
   assert.deepEqual(serviceNames, [
+    'authoring-runner',
     'backend',
     'database',
     'frontend',
@@ -64,6 +65,25 @@ test('local Compose config is self-contained and migration-gated', () => {
   assert.match(frontendNginx, /frame-ancestors 'self'/);
   assert.match(frontendNginx, /style-src[^;]*https:\/\/fonts\.googleapis\.com/);
   assert.match(frontendNginx, /font-src[^;]*https:\/\/fonts\.gstatic\.com/);
+});
+
+test('authoring runner shares only its spool and has no network or backend secrets', () => {
+  for (const files of [['docker-compose.yml'], ['docker-compose.yml', 'docker-compose.production.yml']]) {
+    const config = renderComposeConfig(files, { CLOUDFLARE_TUNNEL_TOKEN: 'test-only' });
+    const runner = config.services['authoring-runner'];
+    assert.equal(runner.network_mode, 'none');
+    assert.equal(runner.read_only, true);
+    assert.deepEqual(runner.cap_drop, ['ALL']);
+    assert.deepEqual([...runner.cap_add].sort(), ['KILL', 'SETGID', 'SETUID']);
+    assert.equal(runner.mem_limit, '1073741824');
+    assert.equal(runner.pids_limit, 256);
+    assert.equal(runner.volumes.length, 1);
+    assert.equal(runner.volumes[0].target, '/jobs');
+    assert.equal(runner.environment?.DATABASE_URL, undefined);
+    assert.equal(runner.environment?.SECRET_KEY, undefined);
+    assert.equal(config.services.backend.environment.AUTHORING_JOBS_DIR, '/jobs');
+    assert.equal(config.services.backend.volumes.some(v => v.target === '/jobs' && v.source === runner.volumes[0].source), true);
+  }
 });
 
 test('backend retains only the capabilities required to drop judge privileges', () => {

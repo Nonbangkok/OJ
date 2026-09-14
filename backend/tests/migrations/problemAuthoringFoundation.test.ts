@@ -12,6 +12,7 @@ describe('problem authoring foundation migration', () => {
     expect(migrations.map((migration) => migration.version)).toEqual([
       '0001_core_schema',
       '0002_problem_authoring_foundation',
+      '0003_authoring_job_delivery',
     ]);
   });
 

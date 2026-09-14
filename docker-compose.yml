@@ -16,6 +16,7 @@ x-backend-environment: &backend-environment
   COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
   CORS_ORIGINS: ${CORS_ORIGINS:-}
   TRUST_PROXY: ${TRUST_PROXY:-1}
+  AUTHORING_JOBS_DIR: /jobs
 
 services:
   database:
@@ -57,6 +58,8 @@ services:
       migrate:
         condition: service_completed_successfully
     environment: *backend-environment
+    volumes:
+      - authoring-jobs:/jobs
     networks:
       - oj-network
     restart: unless-stopped
@@ -76,6 +79,31 @@ services:
     pids_limit: 256
     mem_reservation: 512m
     mem_limit: 1g
+
+  authoring-runner:
+    build:
+      context: ./backend
+      dockerfile: authoring/Dockerfile
+    network_mode: none
+    read_only: true
+    init: true
+    volumes:
+      - authoring-jobs:/jobs
+    tmpfs:
+      - /work:rw,nosuid,nodev,size=256m,mode=0755
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - KILL
+    pids_limit: 256
+    mem_limit: 1g
+    cpus: 1.0
+    restart: unless-stopped
 
   frontend:
     build:
@@ -123,5 +151,7 @@ networks:
     driver: bridge
 
 volumes:
+  authoring-jobs:
+    driver: local
   db-data:
     driver: local

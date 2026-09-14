@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import path from 'node:path';
 
 const baseEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).optional(),
@@ -22,6 +23,8 @@ const baseEnvSchema = z.object({
     .transform((value) => value.split(',').map((origin) => origin.trim()).filter(Boolean))
     .pipe(z.array(z.string().url())),
   TRUST_PROXY: z.coerce.number().int().min(0).default(1),
+  AUTHORING_JOBS_DIR: z.string().default('').refine(value => value === ''
+    || (path.isAbsolute(value) && path.resolve(value) !== path.parse(value).root)),
 });
 
 export const parseRuntimeEnv = (input: NodeJS.ProcessEnv) => {

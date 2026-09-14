@@ -1,0 +1,55 @@
+# Disposable integration stack only; never attach a real OJ database here.
+services:
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: oj_test
+      POSTGRES_PASSWORD: oj_test
+      POSTGRES_DB: oj_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: [CMD, pg_isready, -U, oj_test, -d, oj_test]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+  authoring-runner:
+    build:
+      context: ../../backend
+      dockerfile: authoring/Dockerfile
+    network_mode: none
+    read_only: true
+    init: true
+    volumes:
+      - authoring-jobs:/jobs
+    tmpfs:
+      - /work:rw,nosuid,nodev,size=256m,mode=0755
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - KILL
+    pids_limit: 256
+    mem_limit: 1g
+    cpus: 1.0
+  tests:
+    build:
+      context: ../../backend
+    environment:
+      INTEGRATION_DATABASE_URL: postgres://oj_test:oj_test@database:5432/oj_test
+      INTEGRATION_RUNNER_SPOOL: /jobs
+    volumes:
+      - authoring-jobs:/jobs
+    depends_on:
+      database:
+        condition: service_healthy
+      authoring-runner:
+        condition: service_started
+    command: [npm, test, --, --runInBand, --verbose=false]
+
+volumes:
+  authoring-jobs:

@@ -16,6 +16,7 @@ import contestRoutes from './controllers/contestController';
 import healthRoutes from './controllers/healthController';
 import authoringDraftRoutes from './controllers/authoringDraftController';
 import authorProfileRoutes from './controllers/authorProfileController';
+import { createAuthoringJobRouter } from './controllers/authoringJobController';
 
 type RuntimeEnv = ReturnType<typeof parseRuntimeEnv>;
 
@@ -87,6 +88,7 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
   app.use(generalApiLimiter);
 
   app.use('/', authRoutes);
+  app.use('/', createAuthoringJobRouter(Boolean(runtimeEnv.AUTHORING_JOBS_DIR)));
   app.use('/', adminRoutes);
   app.use('/', problemRoutes);
   app.use('/', submissionRoutes);

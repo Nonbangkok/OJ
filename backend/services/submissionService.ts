@@ -7,6 +7,8 @@ import { judge } from './judgeService';
 import { ContestSubmissionRow, SubmissionRow } from '../types/models';
 import { CompileCommandError } from '../types/service';
 import { JUDGE_CONFIG } from '../constants';
+import { findForbiddenInclude } from '../utils/compileGuard';
+export { findForbiddenInclude } from '../utils/compileGuard';
 
 const execPromise = promisify(exec);
 
@@ -25,28 +27,6 @@ const COMPILE_EXEC_OPTIONS = {
   maxBuffer: JUDGE_CONFIG.COMPILE_MAX_BUFFER,
   env: { PATH: JUDGE_CONFIG.SANDBOX_PATH } as unknown as NodeJS.ProcessEnv,
 };
-
-/**
- * Detect an `#include` directive that would read a file outside the submission
- * (absolute path or `..` traversal). g++ resolves such includes at compile time
- * and quotes the file's contents in its diagnostics, turning a submission into
- * an arbitrary file read. Returns the offending target, or null if the source
- * is clean. Defence-in-depth alongside the compile env-strip above.
- */
-export function findForbiddenInclude(code: string): string | null {
-  const includeRe = /^\s*#\s*include\s*[<"]\s*([^>"]*?)\s*[>"]/;
-  for (const line of code.split('\n')) {
-    const match = line.match(includeRe);
-    if (!match) {
-      continue;
-    }
-    const target = match[1];
-    if (target.startsWith('/') || target.includes('..')) {
-      return target;
-    }
-  }
-  return null;
-}
 
 /**
  * Replace the internal temporary source path in compiler output with a neutral

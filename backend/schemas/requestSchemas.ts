@@ -129,6 +129,11 @@ export const problemDraftIdParamSchema = z.object({
 
 export const authorProfileIdParamSchema = problemDraftIdParamSchema;
 
+export const compileAuthoringJobSchema = z.object({
+  expectedRevision: z.number().int().positive().max(AUTHORING_VALIDATION.MAX_INT),
+  target: z.enum(['solution', 'generator']).default('solution'),
+}).strict();
+
 export const draftAssetParamsSchema = z.object({
   id: z.string().uuid(),
   assetId: z.string().uuid(),
