@@ -1,13 +1,14 @@
-# API Schema — WOI Grader Backend (50 APIs)
+# API Schema — WOI Grader Backend (63 APIs)
 
-เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 50 APIs** ตามรายการด้านล่าง
+เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 63 APIs** ตามรายการด้านล่าง
 - `adminController.ts` = 10 APIs
 - `authController.ts` = 5 APIs
 - `contestController.ts` = 15 APIs
 - `problemController.ts` = 14 APIs
 - `submissionController.ts` = 6 APIs
+- Problem authoring/profile/asset/job controllers = 13 APIs
 
-รวมทั้งหมด: **50 APIs**
+รวมทั้งหมด: **63 APIs**
 
 ## Global Conventions
 
@@ -462,7 +463,7 @@
 
 ---
 
-## 6) Problem Authoring Controller (11 APIs)
+## 6) Problem Authoring Controller (13 APIs)
 
 All endpoints in this section require an authenticated `admin`; `staff` is not sufficient.
 
@@ -560,6 +561,24 @@ All endpoints in this section require an authenticated `admin`; `staff` is not s
 - Query: required positive integer `expectedRevision`.
 - Response 200: `{ asset: deletedAssetMetadata, draftRevision: number }`.
 - Errors: 400 invalid params/query; 404 draft or asset missing; 409 revision conflict or published draft.
+
+---
+
+### 62. `POST /admin/authoring/drafts/:id/jobs/compile`
+
+- Auth: admin. Params: UUID draft `id`.
+- Body: `{ expectedRevision: positive integer, target?: "solution" | "generator" }`; target defaults to solution.
+- Response 202: queued job metadata including ID, captured revision, type and status; never the private request snapshot.
+- Errors: 400 empty source/validation; 404 missing draft; 409 revision conflict, published draft, or existing active job; 429 global queue full; 503 runner not configured.
+- Compiles a captured C++20 source asynchronously. It does not execute the binary, change draft revision, or mark the draft Ready.
+
+### 63. `GET /admin/authoring/jobs/:id`
+
+- Auth: admin. Params: UUID job `id`.
+- Response 200: job metadata, bounded compiler log, result summary and error/timestamps. No source snapshot or binary artifacts.
+- Error 404: job missing.
+- Poll until a terminal status (`succeeded`, `failed`, `timed_out`, `stale`). A result for an edited draft becomes stale even when compilation succeeded.
+- Existing history remains readable when queue submission is disabled.
 
 ---
 

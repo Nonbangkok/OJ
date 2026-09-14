@@ -1,6 +1,6 @@
 # Problem Authoring Progress
 
-Updated: 2026-09-13. Branch: `authoring`.
+Updated: 2026-09-14. Branch: `authoring`.
 
 Scope authority: `docs/superpowers/specs/2026-09-12-problem-authoring-workspace-design.md`, section 17.
 
@@ -39,9 +39,46 @@ Reproduction commands are in `README.md`, under Authoring integration tests. The
 new profile/asset suite owns a unique schema and removes it afterward. Older
 integration suites reset `public`, so the full suite requires a disposable database.
 
+## Slice 4 — Complete
+
+The asynchronous runner protocol is implemented with minimal C++20 compile
+fixtures for both solution and generator sources. Full protocol details are in
+`AUTHORING_RUNNER.md`; new endpoints are listed in `API_SCHEMA.md`.
+
+- `backend/authoring/`: strict versioned request/result schemas, atomic spool,
+  bounded compiler process, isolated runner image and single-consumer entrypoint.
+- `backend/services/authoringJob*`: durable queue reservations, revision-safe
+  result import, idempotency, timeout/restart reconciliation, and file cleanup.
+- `backend/migrations/0003AuthoringJobDelivery.ts`: durable source snapshots and
+  a unique active-job-per-draft constraint; pre-protocol active jobs fail explicitly.
+- `backend/controllers/authoringJobController.ts`: admin-only enqueue/status APIs;
+  authentication, revision conflicts, queue limits, and metadata-only responses.
+- `docker-compose.yml`: network-disabled runner with resource limits and a private
+  shared spool. Backend startup enables reconciliation through `AUTHORING_JOBS_DIR`.
+- `tests/authoring/compose.yml`: disposable database + isolated runner + complete
+  backend test suite, independent of the existing local/production stack.
+- The contestant judge's include guard was extracted without changing its behavior.
+
+### Final verification
+
+- `docker compose -p oj-authoring-tests -f tests/authoring/compose.yml up --build --abort-on-container-exit --exit-code-from tests`:
+  **46 suites / 330 tests passed, zero skipped, zero failures**, exit 0.
+  Includes real PostgreSQL, Linux C++ compilation, and HTTP-to-runner success/failure fixtures.
+- `npm run build` in backend: passed on host and both Docker image builds.
+- `node --test tests/composeConfig.test.mjs`: **5 tests passed**, including local
+  and production worker isolation configuration.
+- `git diff --check`: passed.
+- Regression tests demonstrated failures before fixing canonical UUID snapshot
+  identity and connection cleanup after advisory-unlock failure.
+- Code review: primary-agent review completed. A separate reviewer was requested
+  but could not run because its usage limit was exhausted; no independent-review
+  approval is claimed.
+- Existing localhost/production services and their databases were not redeployed
+  or modified by this verification. Disposable test resources were removed afterward.
+
 ## Next slices
 
-Slice 4 is the runner job protocol with minimal C++ fixtures. PDF template
-extraction, statement sanitization, and asset-reference resolution belong to
-Slice 7. Admin UI, square-crop controls, and the complete browser workflow belong
-to Slice 10. Completing Slice 3 does not imply those later slices are implemented.
+Slice 5 adds legacy multi-file generator execution and generator-less/manual-input
+flows. Slice 6 adds reference-solution execution and output generation. Slice 4
+compiles but does not execute or retain binaries, create testcases, or mark drafts
+Ready. PDF/sanitization belongs to Slice 7 and the Admin UI to Slice 10.

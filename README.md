@@ -177,6 +177,23 @@ From the project root, execute the unified test script to run both backend and f
 
 ### Authoring integration tests
 
+To run the complete backend suite including Slice 4 HTTP → PostgreSQL → isolated
+C++ runner checks, use the dedicated disposable stack from the repository root:
+
+```bash
+docker compose -p oj-authoring-tests -f tests/authoring/compose.yml up --build --abort-on-container-exit --exit-code-from tests
+docker compose -p oj-authoring-tests -f tests/authoring/compose.yml down -v
+```
+
+This stack publishes no ports, uses a temporary database, and shares only its own
+job volume with the network-disabled runner. The cleanup command deletes only this
+test project's containers/network/job volume. Do not reuse its project name for
+a stack containing real data. Protocol, limits, recovery, and configuration are
+documented in [`.context/AUTHORING_RUNNER.md`](.context/AUTHORING_RUNNER.md).
+
+The commands below run integration tests without the separate runner; the two
+HTTP-to-runner cases are skipped when `INTEGRATION_RUNNER_SPOOL` is unset.
+
 The Slice 3 integration suite sends HTTP requests through real image processing and
 PostgreSQL transactions. It creates a randomly named schema and removes only that
 schema when finished. The older migration/restore tests reset the `public` schema,
