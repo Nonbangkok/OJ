@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 
-type ProcessOptions = { cwd: string; timeoutMs: number; maxLogBytes: number; uid?: number; gid?: number; signal?: AbortSignal };
+type ProcessOptions = { cwd: string; timeoutMs: number; maxLogBytes: number; uid?: number; gid?: number; signal?: AbortSignal; seed?: string };
 type ProcessResult = { exitCode: number | null; reason: 'exited' | 'timeout' | 'output_limit' | 'spawn_error' | 'aborted'; log: string; durationMs: number };
 
 /** Executes without a shell or inherited secrets; kills the whole process group on limits. */
@@ -13,7 +13,8 @@ export async function runBoundedProcess(command: string, args: string[], options
     const child = spawn(command, args, {
       cwd: options.cwd, uid: options.uid, gid: options.gid, detached: true,
       // ProcessEnv's application-level required fields must NOT be passed to children.
-      env: { PATH: '/usr/bin:/bin', LANG: 'C.UTF-8', TMPDIR: options.cwd } as unknown as NodeJS.ProcessEnv,
+      env: { PATH: '/usr/bin:/bin', LANG: 'C.UTF-8', TMPDIR: options.seed === undefined ? options.cwd : '/input',
+        ...(options.seed === undefined ? {} : { OJ_SEED: options.seed }) } as unknown as NodeJS.ProcessEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const kill = () => {

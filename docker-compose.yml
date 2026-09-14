@@ -90,7 +90,7 @@ services:
     volumes:
       - authoring-jobs:/jobs
     tmpfs:
-      - /work:rw,nosuid,nodev,size=256m,mode=0755
+      - /work:rw,exec,nosuid,nodev,size=768m,mode=0755
       - /tmp:rw,noexec,nosuid,nodev,size=32m
     security_opt:
       - no-new-privileges:true
@@ -100,6 +100,8 @@ services:
       - SETUID
       - SETGID
       - KILL
+      - SYS_CHROOT
+      - DAC_OVERRIDE
     pids_limit: 256
     mem_limit: 1g
     cpus: 1.0

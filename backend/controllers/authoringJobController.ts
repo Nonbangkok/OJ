@@ -2,8 +2,8 @@ import { Router } from 'express';
 import { requireAdmin, requireAuth } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
-import { compileAuthoringJobSchema, problemDraftIdParamSchema } from '../schemas/requestSchemas';
-import { DurableJob, getAuthoringJob, queueCompileJob } from '../services/authoringJobQueryService';
+import { compileAuthoringJobSchema, generateAuthoringJobSchema, problemDraftIdParamSchema } from '../schemas/requestSchemas';
+import { DurableJob, getAuthoringJob, queueCompileJob, queueGeneratorJob } from '../services/authoringJobQueryService';
 
 const projectJob = (job: DurableJob) => ({
   id: job.id, draftId: job.draft_id, draftRevision: job.draft_revision, jobType: job.job_type,
@@ -15,11 +15,13 @@ const projectJob = (job: DurableJob) => ({
 /** Admin-only asynchronous compilation; snapshots are never returned by job APIs. */
 export function createAuthoringJobRouter(enabled: boolean): Router {
   const router = Router();
-  router.post('/admin/authoring/drafts/:id/jobs/compile', requireAuth, requireAdmin,
-    validateRequest({ params: problemDraftIdParamSchema, body: compileAuthoringJobSchema }),
+  for (const action of ['compile', 'generate'] as const) router.post(`/admin/authoring/drafts/:id/jobs/${action}`, requireAuth, requireAdmin,
+    validateRequest({ params: problemDraftIdParamSchema, body: action === 'compile' ? compileAuthoringJobSchema : generateAuthoringJobSchema }),
     asyncHandler(async (req, res) => {
       if (!enabled) { res.status(503).json({ code: 'runner_unavailable', message: 'Authoring runner is not configured' }); return; }
-      const result = await queueCompileJob(String(req.params.id), req.body.expectedRevision, req.body.target);
+      const result = action === 'compile'
+        ? await queueCompileJob(String(req.params.id), req.body.expectedRevision, req.body.target)
+        : await queueGeneratorJob(String(req.params.id), req.body.expectedRevision, req.body.seed);
       if (result.kind === 'queued') { res.status(202).json(projectJob(result.job)); return; }
       const errors = {
         not_found: [404, 'draft_not_found', 'Problem draft not found'],

@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { Pool, QueryResultRow } from 'pg';
 import * as db from '../db';
 import { AuthoringJobRow, ProblemDraftRow } from '../types/authoring';
-import { AUTHORING_RUNNER, JobSnapshot, jobResultSchema, jobSnapshotSchema } from '../authoring/protocol';
+import { AUTHORING_RUNNER, InputArtifact, JobSnapshot, jobResultSchema, jobSnapshotSchema, seedSchema } from '../authoring/protocol';
+import { TestcaseError } from '../authoring/testcases';
 
 export type JobDatabase = {
   pool: Pick<Pool, 'connect'>;
@@ -19,6 +20,14 @@ type QueueResult = { kind: 'queued'; job: DurableJob }
 
 /** Atomically reserves one job and its immutable source/revision before dispatch. */
 export async function queueCompileJob(draftId: string, revision: number, target: 'solution' | 'generator', database: JobDatabase = db): Promise<QueueResult> {
+  return queueJob(draftId, revision, target === 'generator' ? 'compile_generator' : 'compile_solution', undefined, database);
+}
+
+export async function queueGeneratorJob(draftId: string, revision: number, seed: string, database: JobDatabase = db): Promise<QueueResult> {
+  return queueJob(draftId, revision, 'run_generator', seedSchema.parse(seed), database);
+}
+
+async function queueJob(draftId: string, revision: number, kind: JobSnapshot['kind'], seed: string | undefined, database: JobDatabase): Promise<QueueResult> {
   const client = await database.pool.connect();
   try {
     await client.query('BEGIN');
@@ -33,10 +42,10 @@ export async function queueCompileJob(draftId: string, revision: number, target:
     if (active.rows[0]) return await reject({ kind: 'busy', jobId: active.rows[0].id });
     const count = await client.query('SELECT COUNT(*)::int AS count FROM authoring_jobs WHERE status=ANY($1::text[])', [ACTIVE_JOB_STATUSES]);
     if (count.rows[0].count >= AUTHORING_RUNNER.MAX_PENDING_JOBS) return await reject({ kind: 'queue_full' });
-    const source = target === 'generator' ? draft.generator_cpp : draft.solution_cpp;
+    const source = kind === 'compile_solution' ? draft.solution_cpp : draft.generator_cpp;
     if (!source?.trim()) return await reject({ kind: 'source_missing' });
     const snapshot = jobSnapshotSchema.parse({ version: 1, jobId: randomUUID(), draftId: draft.id, revision,
-      kind: target === 'generator' ? 'compile_generator' : 'compile_solution', source,
+      kind, source, ...(seed === undefined ? {} : { seed }),
       deadline: new Date(Date.now() + AUTHORING_RUNNER.JOB_TIMEOUT_MS).toISOString() });
     const inserted = await client.query<DurableJob>(`
       INSERT INTO authoring_jobs (id, draft_id, job_type, draft_revision, request_snapshot)
@@ -54,7 +63,8 @@ export async function getAuthoringJob(id: string, database: JobDatabase = db): P
 }
 
 /** Imports a terminal result once; compilation alone never changes draft readiness. */
-export async function applyJobResult(id: string, input: unknown, database: JobDatabase = db): Promise<boolean> {
+export async function applyJobResult(id: string, input: unknown, database: JobDatabase = db,
+  readInput?: (index: number, artifact: InputArtifact) => Promise<string>): Promise<boolean> {
   const result = jobResultSchema.parse(input);
   const client = await database.pool.connect();
   try {
@@ -62,16 +72,39 @@ export async function applyJobResult(id: string, input: unknown, database: JobDa
     const job = (await client.query<DurableJob>('SELECT * FROM authoring_jobs WHERE id=$1', [id])).rows[0];
     if (!job || !ACTIVE_JOB_STATUSES.includes(job.status)) { await client.query('ROLLBACK'); return false; }
     if (result.jobId !== id || result.draftId !== job.draft_id || result.revision !== job.draft_revision) throw new Error('Result identity mismatch');
+    const generating = job.job_type === 'run_generator';
+    if (result.status === 'succeeded' && (generating ? !result.inputs || !readInput : result.inputs !== undefined)) {
+      throw new TestcaseError('invalid_generated_inputs', 'Result artifacts do not match the requested job type');
+    }
     // Serialize the revision check with Save/Publish before finalizing the job.
     const draft = (await client.query<ProblemDraftRow>('SELECT * FROM problem_drafts WHERE id=$1 FOR UPDATE', [job.draft_id])).rows[0];
     if (!draft) { await client.query('ROLLBACK'); return false; }
-    const status = draft.revision !== result.revision ? 'stale' : result.status;
+    const status = draft.revision !== result.revision || draft.status === 'published' ? 'stale' : result.status;
+    // Locking the draft serializes duplicate imports and all manual testcase changes.
+    const current = (await client.query('SELECT status FROM authoring_jobs WHERE id=$1', [id])).rows[0];
+    if (!current || !ACTIVE_JOB_STATUSES.includes(current.status)) { await client.query('ROLLBACK'); return false; }
+    if (generating && status === 'succeeded') {
+      await client.query('DELETE FROM problem_draft_testcases WHERE draft_id=$1', [job.draft_id]);
+      for (const [index, artifact] of result.inputs!.entries()) {
+        const text = await readInput!(index, artifact);
+        await client.query(`INSERT INTO problem_draft_testcases
+          (id,draft_id,case_number,original_input_filename,input_data,output_data,source,source_revision)
+          VALUES ($1,$2,$3,$4,$5,NULL,'generated',$6)`,
+        [randomUUID(), job.draft_id, index + 1, artifact.filename, text, result.revision]);
+      }
+      await client.query("UPDATE problem_drafts SET status='generated',verified_revision=NULL,updated_at=NOW() WHERE id=$1", [job.draft_id]);
+    }
     const updated = await client.query(`
       UPDATE authoring_jobs SET status=$2, result_summary=$3::jsonb, log=$4,
         error_code=$5::text, error_message=$5::text, finished_at=NOW(), request_snapshot=NULL
       WHERE id=$1 AND status=ANY($6::text[]) RETURNING id
-    `, [id, status, JSON.stringify({ runnerStatus: result.status, durationMs: result.durationMs, exitCode: result.exitCode }),
+    `, [id, status, JSON.stringify({ runnerStatus: result.status, durationMs: result.durationMs, exitCode: result.exitCode,
+      ...(generating ? { seed: job.request_snapshot?.seed, reproducibility: 'unverified',
+        warnings: ['Reproducibility has not been demonstrated; legacy generators may ignore the seed.'],
+        caseCount: result.inputs?.length ?? 0, inputs: result.inputs ?? [] } : {}),
+    }),
       result.log, result.errorCode, ACTIVE_JOB_STATUSES]);
+    if (updated.rows.length !== 1) { await client.query('ROLLBACK'); return false; }
     await client.query('COMMIT');
     return updated.rows.length === 1;
   } catch (error) { await client.query('ROLLBACK'); throw error; }

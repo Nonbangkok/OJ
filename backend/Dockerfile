@@ -30,6 +30,7 @@ COPY . .
 
 # Compile the high-precision time wrapper
 RUN gcc scripts/time_wrapper.c -o scripts/time_wrapper
+RUN gcc -Wall -Wextra -Werror authoring/sandbox.c -o /usr/local/bin/oj-authoring-sandbox
 
 # Render will automatically set the PORT environment variable, so we just need to expose it.
 EXPOSE 3000

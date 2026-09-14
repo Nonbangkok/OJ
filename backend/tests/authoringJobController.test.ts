@@ -20,6 +20,7 @@ const app = (role?: string, enabled = true) => {
 it('authorizes both queueing and reading jobs for admins only', async () => {
   for (const [role, status] of [[undefined, 401], ['staff', 403]] as const) {
     expect((await request(app(role)).post(`/admin/authoring/drafts/${id}/jobs/compile`).send({ expectedRevision: 1 })).status).toBe(status);
+    expect((await request(app(role)).post(`/admin/authoring/drafts/${id}/jobs/generate`).send({ expectedRevision: 1, seed: '1' })).status).toBe(status);
     expect((await request(app(role)).get(`/admin/authoring/jobs/${id}`)).status).toBe(status);
   }
 });
@@ -27,6 +28,17 @@ it('authorizes both queueing and reading jobs for admins only', async () => {
 it('returns 503 if the authoring runner transport is not configured', async () => {
   const response = await request(app('admin', false)).post(`/admin/authoring/drafts/${id}/jobs/compile`).send({ expectedRevision: 1 });
   expect(response.status).toBe(503);
+  expect((await request(app('admin', false)).post(`/admin/authoring/drafts/${id}/jobs/generate`).send({ expectedRevision: 1, seed: '1' })).status).toBe(503);
+});
+
+it('requires a bounded explicit seed for generation and accepts generator-less drafts without queueing', async () => {
+  for (const seed of [undefined, 1, '-1', '18446744073709551616', '1; rm']) {
+    expect((await request(app('admin')).post(`/admin/authoring/drafts/${id}/jobs/generate`).send({ expectedRevision: 1, seed })).status).toBe(400);
+  }
+  (jobs.queueGeneratorJob as jest.Mock).mockResolvedValue({ kind: 'source_missing' });
+  const response = await request(app('admin')).post(`/admin/authoring/drafts/${id}/jobs/generate`).send({ expectedRevision: 1, seed: '0' });
+  expect(response.status).toBe(400);
+  expect(response.body.code).toBe('source_missing');
 });
 
 it('returns accepted job metadata without its private snapshot', async () => {

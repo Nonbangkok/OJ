@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import pg from 'pg';
@@ -12,7 +12,7 @@ import { createAuthoringJobRouter } from '../../controllers/authoringJobControll
 import { errorHandler } from '../../middleware/errorHandler';
 import { runMigrationsFromPool } from '../../scripts/migrate';
 import { createProblemDraft, updateProblemDraft } from '../../services/authoringDraftQueryService';
-import { queueCompileJob, applyJobResult, getAuthoringJob } from '../../services/authoringJobQueryService';
+import { queueCompileJob, queueGeneratorJob, applyJobResult, getAuthoringJob, failAuthoringJob } from '../../services/authoringJobQueryService';
 import { reconcileAuthoringJobs } from '../../services/authoringJobCoordinator';
 import { AuthoringSpool } from '../../authoring/spool';
 
@@ -130,6 +130,102 @@ describeDatabase('durable authoring job protocol', () => {
   });
 
   const testWithRunner = process.env.INTEGRATION_RUNNER_SPOOL ? it : it.skip;
+  async function generationFixture() {
+    const d = await draft();
+    await updateProblemDraft(d.id, 1, { generator_cpp: 'int main(){}' }, database);
+    await pool.query(`INSERT INTO problem_draft_testcases
+      (id,draft_id,case_number,original_input_filename,input_data,output_data,source,source_revision)
+      VALUES ($1,$2,1,'old.in','old','OLD','uploaded',2)`, [randomUUID(), d.id]);
+    await pool.query("UPDATE problem_drafts SET status='ready',verified_revision=2 WHERE id=$1", [d.id]);
+    const queued = await queueGeneratorJob(d.id, 2, '1', database);
+    if (queued.kind !== 'queued') throw new Error('Expected queue');
+    const directory = path.join(root, 'generated');
+    await mkdir(directory); await writeFile(path.join(directory, '1.in'), 'new');
+    const inputs = await spool.storeInputs(queued.job.id, directory);
+    const result = { version: 1 as const, jobId: queued.job.id, draftId: d.id, revision: 2,
+      status: 'succeeded' as const, errorCode: null, log: '', durationMs: 1, exitCode: 0, inputs };
+    return { d, result };
+  }
+
+  it('preserves old inputs and outputs when generated artifacts fail validation during import', async () => {
+    const { d, result } = await generationFixture();
+    await writeFile(path.join(root, 'artifacts', result.jobId, '0.txt'), 'corrupted');
+    await spool.complete(result.jobId, result);
+    await reconcileAuthoringJobs(spool, database);
+    expect((await getAuthoringJob(result.jobId, database))?.error_code).toBe('invalid_generated_inputs');
+    expect((await pool.query('SELECT input_data,output_data FROM problem_draft_testcases WHERE draft_id=$1', [d.id])).rows)
+      .toEqual([{ input_data: 'old', output_data: 'OLD' }]);
+    expect((await pool.query('SELECT status,verified_revision FROM problem_drafts WHERE id=$1', [d.id])).rows[0])
+      .toEqual({ status: 'ready', verified_revision: 2 });
+  });
+
+  it('never installs a stale generation and never reapplies a duplicate successful result', async () => {
+    const { d, result } = await generationFixture();
+    await updateProblemDraft(d.id, 2, { title: 'Edited' }, database);
+    await spool.complete(result.jobId, result);
+    await reconcileAuthoringJobs(spool, database);
+    expect((await getAuthoringJob(result.jobId, database))?.status).toBe('stale');
+    expect((await pool.query('SELECT input_data FROM problem_draft_testcases WHERE draft_id=$1', [d.id])).rows[0].input_data).toBe('old');
+    const next = await queueGeneratorJob(d.id, 3, '2', database);
+    if (next.kind !== 'queued') throw new Error('Expected queue');
+    const newResult = { ...result, revision: 3, jobId: next.job.id };
+    const read = async () => 'new';
+    expect(await applyJobResult(next.job.id, newResult, database, read)).toBe(true);
+    const rows = (await pool.query('SELECT * FROM problem_draft_testcases WHERE draft_id=$1', [d.id])).rows;
+    expect(await applyJobResult(next.job.id, newResult, database, read)).toBe(false);
+    expect((await pool.query('SELECT * FROM problem_draft_testcases WHERE draft_id=$1', [d.id])).rows).toEqual(rows);
+    expect(rows[0]).toEqual(expect.objectContaining({ input_data: 'new', output_data: null, source_revision: 3 }));
+  });
+
+  it('rolls back all artifact changes if the job becomes terminal during import', async () => {
+    const { d, result } = await generationFixture();
+    const imported = await applyJobResult(result.jobId, result, database, async () => {
+      await failAuthoringJob(result.jobId, 'job_expired', true, database);
+      return 'new';
+    });
+    expect(imported).toBe(false);
+    expect((await getAuthoringJob(result.jobId, database))?.status).toBe('timed_out');
+    expect((await pool.query('SELECT input_data,output_data FROM problem_draft_testcases WHERE draft_id=$1', [d.id])).rows)
+      .toEqual([{ input_data: 'old', output_data: 'OLD' }]);
+  });
+
+  testWithRunner('generates naturally sorted inputs with a recorded seed through HTTP and the isolated runner', async () => {
+    const shared = new AuthoringSpool(process.env.INTEGRATION_RUNNER_SPOOL!);
+    await shared.initialize();
+    const d = await draft();
+    await updateProblemDraft(d.id, 1, { generator_cpp: `#include <fstream>
+#include <cstdlib>
+int main(int argc,char**argv){
+  std::ofstream("./input/input10.txt") << argv[1] << "\\n";
+  std::ofstream("./input/input2.txt") << std::getenv("OJ_SEED") << "\\r\\n";
+}` }, database);
+    const app = express();
+    app.use(express.json());
+    app.use(session({ secret: 'job-test', resave: false, saveUninitialized: false }));
+    app.use((req, _res, next) => { req.session.userId = 1; req.session.role = 'admin'; next(); });
+    app.use(createAuthoringJobRouter(true));
+    app.use(errorHandler);
+    const response = await request(app).post(`/admin/authoring/drafts/${d.id}/jobs/generate`)
+      .send({ expectedRevision: 2, seed: '12345' });
+    expect(response.status).toBe(202);
+    const deadline = Date.now() + 20_000;
+    let job;
+    do {
+      await reconcileAuthoringJobs(shared, database);
+      job = await getAuthoringJob(response.body.id, database);
+      if (job && !['queued', 'compiling', 'running'].includes(job.status)) break;
+      await delay(100);
+    } while (Date.now() < deadline);
+    expect(job).toEqual(expect.objectContaining({ status: 'succeeded', result_summary: expect.objectContaining({ seed: '12345', reproducibility: 'unverified', caseCount: 2 }) }));
+    expect((await pool.query('SELECT case_number,original_input_filename,input_data,output_data,source,source_revision FROM problem_draft_testcases ORDER BY case_number')).rows).toEqual([
+      { case_number: 1, original_input_filename: 'input2.txt', input_data: '12345\r\n', output_data: null, source: 'generated', source_revision: 2 },
+      { case_number: 2, original_input_filename: 'input10.txt', input_data: '12345\n', output_data: null, source: 'generated', source_revision: 2 },
+    ]);
+    expect((await pool.query('SELECT status,revision,verified_revision FROM problem_drafts WHERE id=$1', [d.id])).rows[0])
+      .toEqual({ status: 'generated', revision: 2, verified_revision: null });
+    expect(await shared.jobIds()).not.toContain(response.body.id);
+  });
+
   testWithRunner.each([
     ['solution', '#include <iostream>\nint main(){std::cout << 42;}', 'succeeded'],
     ['generator', 'int main(){deliberate_compile_error;}', 'failed'],

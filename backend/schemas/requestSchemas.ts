@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { seedSchema } from '../authoring/protocol';
 import {
   AUTHORING_VALIDATION,
   PROBLEM_VALIDATION,
@@ -10,6 +11,10 @@ import {
 } from '../constants';
 
 const nonEmptyString = z.string().trim().min(1);
+export const generateAuthoringJobSchema = z.object({
+  expectedRevision: z.number().int().positive().max(2147483647),
+  seed: seedSchema,
+}).strict();
 const optionalTrimmedString = z.string().trim().optional();
 const dateTimeString = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
   message: 'Invalid datetime format',

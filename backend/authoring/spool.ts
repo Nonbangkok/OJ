@@ -1,9 +1,10 @@
 import { constants } from 'node:fs';
-import { chmod, lstat, mkdir, mkdtemp, open, readdir, rename, rm, writeFile } from 'node:fs/promises';
+import { chmod, lstat, mkdir, mkdtemp, open, opendir, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { AUTHORING_RUNNER, failedResult, JobResult, JobSnapshot, jobResultSchema, jobSnapshotSchema } from './protocol';
+import { AUTHORING_RUNNER, failedResult, InputArtifact, JobResult, JobSnapshot, jobResultSchema, jobSnapshotSchema } from './protocol';
+import { TESTCASE_LIMITS, TestcaseError, validateTestcaseFilename, naturalFilenameCompare, readTestcaseFile, decodeTestcaseText } from './testcases';
 
 const missing = (error: unknown) => (error as NodeJS.ErrnoException).code === 'ENOENT';
 const uuid = z.string().uuid();
@@ -30,7 +31,7 @@ export class AuthoringSpool {
     await mkdir(this.root, { recursive: true, mode: 0o700 });
     if (!(await lstat(this.root)).isDirectory()) throw new Error('Invalid spool directory');
     await chmod(this.root, 0o700);
-    for (const name of ['staging', 'ready', 'active', 'results']) {
+    for (const name of ['staging', 'ready', 'active', 'results', 'artifacts']) {
       const dir = path.join(this.root, name);
       await mkdir(dir, { recursive: true, mode: 0o700 });
       if (!(await lstat(dir)).isDirectory()) throw new Error('Invalid spool directory');
@@ -118,19 +119,61 @@ export class AuthoringSpool {
   }
 
   async cleanup(id: string): Promise<void> {
-    for (const area of ['ready', 'active']) await rm(this.location(area, id), { recursive: true, force: true });
+    for (const area of ['ready', 'active', 'artifacts']) await rm(this.location(area, id), { recursive: true, force: true });
     await rm(`${this.location('results', id)}.json`, { force: true });
   }
 
   async jobIds(): Promise<string[]> {
     const ids = new Set<string>();
-    for (const area of ['ready', 'active', 'results']) {
+    for (const area of ['ready', 'active', 'results', 'artifacts']) {
       for (const name of await readdir(path.join(this.root, area))) {
         const id = area === 'results' ? name.replace(/\.json$/, '') : name;
         if (uuid.safeParse(id).success) ids.add(id);
       }
     }
     return [...ids];
+  }
+
+  /** Freeze validated files into a root-private artifact set; publish result JSON only afterward. */
+  async storeInputs(id: string, directory: string): Promise<InputArtifact[]> {
+    const names: string[] = [];
+    for await (const entry of await opendir(directory)) {
+      if (!entry.isFile()) throw new TestcaseError('invalid_testcase_file', `Generator output must be a regular file: ${entry.name.slice(0, 255)}`);
+      names.push(entry.name);
+      if (names.length > TESTCASE_LIMITS.MAX_CASES) throw new TestcaseError('invalid_case_count', 'Generator exceeds 1000 input files');
+    }
+    names.sort(naturalFilenameCompare);
+    if (!names.length || names.length > TESTCASE_LIMITS.MAX_CASES) throw new TestcaseError('invalid_case_count', 'Generator must create 1–1000 input files');
+    const stage = await mkdtemp(path.join(this.root, 'staging', `${uuid.parse(id)}-`));
+    const manifest: InputArtifact[] = [];
+    let total = 0;
+    try {
+      for (const [index, name] of names.entries()) {
+        validateTestcaseFilename(name);
+        const content = await readTestcaseFile(path.join(directory, name));
+        decodeTestcaseText(content, name);
+        total += content.length;
+        if (total > TESTCASE_LIMITS.MAX_TOTAL_BYTES) throw new TestcaseError('testcases_too_large', 'Generated inputs exceed 512 MiB');
+        manifest.push({ filename: name, sizeBytes: content.length, sha256: createHash('sha256').update(content).digest('hex') });
+        await writeFile(path.join(stage, `${index}.txt`), content, { mode: 0o600, flag: 'wx' });
+      }
+      await rename(stage, this.location('artifacts', id));
+      return manifest;
+    } finally { await rm(stage, { recursive: true, force: true }); }
+  }
+
+  async readInput(id: string, index: number, artifact: InputArtifact): Promise<string> {
+    if (!Number.isInteger(index) || index < 0 || index >= TESTCASE_LIMITS.MAX_CASES) throw new TestcaseError('invalid_generated_inputs', 'Invalid case index');
+    try {
+      const directory = this.location('artifacts', id);
+      if (!(await lstat(directory)).isDirectory()) throw new Error('Invalid artifact directory');
+      const content = await readTestcaseFile(path.join(directory, `${index}.txt`));
+      if (content.length !== artifact.sizeBytes || createHash('sha256').update(content).digest('hex') !== artifact.sha256) throw new Error('Artifact checksum mismatch');
+      return decodeTestcaseText(content, artifact.filename);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code && !['ENOENT', 'ELOOP'].includes((error as NodeJS.ErrnoException).code!)) throw error;
+      throw new TestcaseError('invalid_generated_inputs', `Missing or invalid generated input: ${artifact.filename}`);
+    }
   }
 
   async cleanupStaging(now: number): Promise<void> {

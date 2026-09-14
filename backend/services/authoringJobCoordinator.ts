@@ -1,6 +1,7 @@
 import * as db from '../db';
 import { AUTHORING_RUNNER, jobSnapshotSchema } from '../authoring/protocol';
 import { AuthoringSpool } from '../authoring/spool';
+import { TestcaseError } from '../authoring/testcases';
 import { ACTIVE_JOB_STATUSES, AUTHORING_COORDINATOR_LOCK, applyJobResult, DurableJob, failAuthoringJob, getAuthoringJob, JobDatabase } from './authoringJobQueryService';
 
 /** Reconciles durable queue entries with disk, including both crash windows around result import. */
@@ -26,7 +27,13 @@ export async function reconcileAuthoringJobs(spool: AuthoringSpool, database: Jo
       if (result) {
         if (result.jobId !== job.id || result.draftId !== job.draft_id || result.revision !== job.draft_revision) {
           await failAuthoringJob(job.id, 'result_identity_mismatch', false, database);
-        } else { await applyJobResult(job.id, result, database); }
+        } else {
+          try { await applyJobResult(job.id, result, database, (index, artifact) => spool.readInput(job.id, index, artifact)); }
+          catch (error) {
+            if (!(error instanceof TestcaseError)) throw error;
+            await failAuthoringJob(job.id, error.code, false, database);
+          }
+        }
         continue;
       }
       const snapshot = jobSnapshotSchema.safeParse(job.request_snapshot);

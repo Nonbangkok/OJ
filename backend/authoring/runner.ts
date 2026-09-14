@@ -3,6 +3,7 @@ import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { AuthoringSpool } from './spool';
 import { compileJob } from './compiler';
+import { generateInputs } from './generator';
 import { AUTHORING_RUNNER, failedResult } from './protocol';
 
 /** Single-consumer worker; the container entrypoint holds a kernel flock across restarts. */
@@ -21,7 +22,9 @@ async function main(): Promise<void> {
     const job = await spool.claim();
     if (!job) { await delay(AUTHORING_RUNNER.POLL_MS, undefined, { signal: abort.signal }).catch(() => {}); continue; }
     let result;
-    try { result = await compileJob(job, '/work', { signal: abort.signal }); }
+    try { result = job.kind === 'run_generator'
+      ? await generateInputs(job, '/work', spool, { signal: abort.signal })
+      : await compileJob(job, '/work', { signal: abort.signal }); }
     catch { result = failedResult(job, 'runner_error'); }
     await spool.complete(job.jobId, result);
   }

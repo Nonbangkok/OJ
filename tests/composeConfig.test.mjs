@@ -74,7 +74,8 @@ test('authoring runner shares only its spool and has no network or backend secre
     assert.equal(runner.network_mode, 'none');
     assert.equal(runner.read_only, true);
     assert.deepEqual(runner.cap_drop, ['ALL']);
-    assert.deepEqual([...runner.cap_add].sort(), ['KILL', 'SETGID', 'SETUID']);
+    assert.deepEqual([...runner.cap_add].sort(), ['DAC_OVERRIDE', 'KILL', 'SETGID', 'SETUID', 'SYS_CHROOT']);
+    assert.match(runner.tmpfs.find(value => value.startsWith('/work:')), /(?:[:,])exec(?:,|$)/);
     assert.equal(runner.mem_limit, '1073741824');
     assert.equal(runner.pids_limit, 256);
     assert.equal(runner.volumes.length, 1);

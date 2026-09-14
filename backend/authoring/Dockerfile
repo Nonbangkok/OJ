@@ -12,6 +12,8 @@ WORKDIR /runner
 COPY --from=build /build/node_modules/zod ./node_modules/zod
 COPY --from=build /build/dist/authoring ./authoring
 COPY --from=build /build/dist/utils/compileGuard.js ./utils/compileGuard.js
+COPY --from=build /build/authoring/sandbox.c ./sandbox.c
+RUN gcc -Wall -Wextra -Werror sandbox.c -o /usr/local/bin/oj-authoring-sandbox && rm sandbox.c
 # The supervisor owns the spool; only the compiler drops to uid/gid 65534.
 # No database client, server app, credentials, or Docker socket enter this image.
 CMD ["sh", "-c", "mkdir -p /jobs && chmod 700 /jobs && exec flock -n -F /jobs/runner.lock node authoring/runner.js"]
