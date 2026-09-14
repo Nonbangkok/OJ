@@ -1,14 +1,14 @@
-# API Schema — WOI Grader Backend (63 APIs)
+# API Schema — WOI Grader Backend (69 APIs)
 
-เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 63 APIs** ตามรายการด้านล่าง
+เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 69 APIs** ตามรายการด้านล่าง
 - `adminController.ts` = 10 APIs
 - `authController.ts` = 5 APIs
 - `contestController.ts` = 15 APIs
 - `problemController.ts` = 14 APIs
 - `submissionController.ts` = 6 APIs
-- Problem authoring/profile/asset/job controllers = 13 APIs
+- Problem authoring/profile/asset/job/testcase controllers = 19 APIs
 
-รวมทั้งหมด: **63 APIs**
+รวมทั้งหมด: **69 APIs**
 
 ## Global Conventions
 
@@ -463,7 +463,7 @@
 
 ---
 
-## 6) Problem Authoring Controller (13 APIs)
+## 6) Problem Authoring Controller (19 APIs)
 
 All endpoints in this section require an authenticated `admin`; `staff` is not sufficient.
 
@@ -579,6 +579,48 @@ All endpoints in this section require an authenticated `admin`; `staff` is not s
 - Error 404: job missing.
 - Poll until a terminal status (`succeeded`, `failed`, `timed_out`, `stale`). A result for an edited draft becomes stale even when compilation succeeded.
 - Existing history remains readable when queue submission is disabled.
+
+---
+
+### 64. `POST /admin/authoring/drafts/:id/jobs/generate`
+
+- Auth: admin. Body: `{ expectedRevision: positive integer, seed: unsigned-64-bit decimal string }`.
+- Response 202: job metadata; poll endpoint 63 for completion. Same queue/conflict/disabled errors as compilation.
+- Uses saved generator source once to create multiple files in `./input/`; missing generator returns 400 `source_missing`.
+- Successful current-revision results replace the entire testcase set atomically, clear outputs/readiness, and set draft status to `generated` without incrementing revision.
+- Result summary includes seed, input hashes/sizes/names, case count, and an unverified-reproducibility warning. Failed/stale jobs preserve prior data.
+
+### 65. `GET /admin/authoring/drafts/:id/testcases`
+
+- Auth: admin. Response 200: `{ revision, testcases: [...] }`, metadata only, sorted by case number.
+- Metadata includes ID, filename, case number, input/output byte sizes, `hasOutput`, source/source revision and timestamps.
+- Error 404: draft missing. Existing empty drafts return an empty array.
+
+### 66. `GET /admin/authoring/drafts/:id/testcases/:caseId`
+
+- Auth: admin. Response 200: one case's metadata plus exact `input` and nullable `output` strings.
+- Error 404: case missing or belongs to another draft.
+
+### 67. `POST /admin/authoring/drafts/:id/testcases`
+
+- Auth: admin. Multipart fields: `expectedRevision`, either `input` plus optional `output`, OR `archive` ZIP.
+- Individual files append one case. A ZIP replaces the entire set atomically using existing grader pairing conventions; missing outputs are allowed.
+- Response 201: `{ revision }`; successful upload advances revision and invalidates readiness.
+- Errors: 400 invalid text/paths/pairing/request; 404 draft missing; 409 stale revision/published; 413 count/file/total limits.
+
+### 68. `PATCH /admin/authoring/drafts/:id/testcases/:caseId`
+
+- Auth: admin. Multipart fields: `expectedRevision` and `input` and/or `output`.
+- Output-only updates attach a missing answer. Replacing only input clears the old output. Empty output is retained as an empty string.
+- Response 200: `{ revision }`. Same validation/revision/size rules as POST; cross-draft cases return 404.
+
+### 69. `DELETE /admin/authoring/drafts/:id/testcases/:caseId`
+
+- Auth: admin. JSON body: `{ expectedRevision: positive integer }`.
+- Response 200: `{ revision }`; advances revision, clears readiness, preserves remaining case numbers.
+- Errors: 400 invalid request; 404 missing draft/case; 409 stale revision/published.
+
+Detailed limits, ZIP pairing and runtime isolation: `AUTHORING_TESTCASES.md`.
 
 ---
 

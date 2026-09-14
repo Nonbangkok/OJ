@@ -1,9 +1,10 @@
-# Authoring runner protocol — Slice 4
+# Authoring runner protocol — Slices 4–5
 
-Version 1 implements asynchronous `compile_solution` and `compile_generator` jobs.
-It compiles C++20 and records diagnostics; compiled binaries are disposable and are
-not executed or persisted in this slice. Generator execution/output generation and
-PDF jobs extend this protocol in later slices.
+Version 1 implements asynchronous `compile_solution`, `compile_generator` and
+`run_generator` jobs. Compilation-only jobs discard their binaries. Generator jobs
+execute a statically linked C++20 binary inside a private jail and persist validated
+inputs through the spool. See `AUTHORING_TESTCASES.md` for the Slice 5 artifact and
+manual-upload workflow. Reference-solution execution and PDF jobs remain later slices.
 
 ## Data flow
 
@@ -51,9 +52,10 @@ Compose supplies a dedicated `authoring-jobs` volume to backend and runner. The
 runner image contains only the worker, Zod, compiler, and OS tools. It receives no
 database credentials, API secrets, Docker socket, host workspace, or network.
 
-- Read-only container root; disposable 256 MiB `/work` and 32 MiB `/tmp`.
+- Read-only container root; disposable 768 MiB executable `/work` and 32 MiB noexec `/tmp`.
 - Container: 1 CPU, 1 GiB memory, 256 processes, no-new-privileges.
-- Root supervisor retains only SETUID, SETGID, and KILL capabilities.
+- Root supervisor retains SETUID, SETGID, KILL, SYS_CHROOT and DAC_OVERRIDE capabilities;
+  the last two enable the runtime jail and cleanup of unreadable child-owned files.
 - Compiler: uid/gid 65534; minimal PATH/LANG/TMPDIR environment; no shell.
 - Compiler limits: 30 seconds wall time, 768 MiB address space, 128 processes,
   64 MiB per output file, no core dumps, 10 MiB diagnostics before termination.
@@ -61,7 +63,8 @@ database credentials, API secrets, Docker socket, host workspace, or network.
 - Literal forbidden includes use the same guard as the existing judge. Filesystem
   permissions isolate private job files even when macro includes bypass that guard.
 - Compiler process groups are killed on timeout/output overflow/shutdown and workspaces
-  removed after completion. Arbitrary contestant/reference binary execution is not enabled.
+  removed after completion. Generator execution is enabled in a private chroot;
+  contestant/reference binary execution is not enabled here.
 
 `AUTHORING_JOBS_DIR` is validated in backend runtime config. Compose sets `/jobs`;
 an empty host value disables queue submission (HTTP 503) while existing job history

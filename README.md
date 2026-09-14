@@ -190,8 +190,10 @@ job volume with the network-disabled runner. The cleanup command deletes only th
 test project's containers/network/job volume. Do not reuse its project name for
 a stack containing real data. Protocol, limits, recovery, and configuration are
 documented in [`.context/AUTHORING_RUNNER.md`](.context/AUTHORING_RUNNER.md).
+Slice 5 generator/seed and manual testcase API conventions are documented in
+[`.context/AUTHORING_TESTCASES.md`](.context/AUTHORING_TESTCASES.md).
 
-The commands below run integration tests without the separate runner; the two
+The commands below run integration tests without the separate runner; the
 HTTP-to-runner cases are skipped when `INTEGRATION_RUNNER_SPOOL` is unset.
 
 The Slice 3 integration suite sends HTTP requests through real image processing and

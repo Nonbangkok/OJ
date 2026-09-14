@@ -76,9 +76,52 @@ fixtures for both solution and generator sources. Full protocol details are in
 - Existing localhost/production services and their databases were not redeployed
   or modified by this verification. Disposable test resources were removed afterward.
 
+## Slice 5 — Complete
+
+Legacy multi-file generator execution and generator-less testcase workflows are
+implemented. There is no remaining backend work in the approved Slice 5 scope.
+Details and API usage are in `AUTHORING_TESTCASES.md`.
+
+- `backend/authoring/generator.ts`, `sandbox.c`, compiler/process changes: compile
+  and run C++20 once in a fresh jail, seed via argv/environment, bounded resources,
+  privilege drop, process-group containment and cleanup. Old random_device code works.
+- Protocol/spool changes: bounded input manifests, natural sort, exact UTF-8 data,
+  root-private atomic artifact delivery and checksum validation before import.
+- Job query/coordinator/router changes: generate endpoint, immutable seed/source,
+  transactional whole-set replacement, stale/duplicate rejection, readiness invalidation,
+  and durable unverified-reproducibility warnings. No algorithm-correctness claims.
+- `authoringTestcaseController` and upload/query services: admin-only list/detail,
+  individual input/output append/update/delete, ZIP whole-set replacement, optimistic
+  revisions, generator-less drafts, private streaming uploads and late-failure rollback.
+- ZIP guards: exact EOCD selection, bounded verified central records, safe pairing,
+  paths/types/counts/sizes, and lazy per-pair decoding rather than retaining the full set.
+- Compose and image changes: static generator runtime helper; executable bounded
+  work tmpfs; root-only jail/cleanup capabilities. Contestant judging is unchanged.
+- No new database migration is required; existing Slice 1/4 tables support this flow.
+
+### Final verification
+
+- `docker compose -p oj-authoring-tests -f tests/authoring/compose.yml up --build --abort-on-container-exit --exit-code-from tests`:
+  **50 suites / 374 tests passed, zero skipped, zero failures**, exit 0.
+- Includes real PostgreSQL rollback/concurrency/size-cap tests, real HTTP-to-runner
+  seeded generation, and legacy random_device, filesystem and process-limit fixtures.
+- The 10 generator runtime tests also passed separately with the deployed runner's
+  network-none/read-only/no-new-privileges/capability/1 GiB/256 PID/1 CPU limits.
+- `npm run build`: passed locally and in both Docker image builds; native sandbox
+  helper compiled with `-Wall -Wextra -Werror`.
+- `node --test tests/composeConfig.test.mjs`: **5 tests passed**, local + production policy.
+- `git diff --check`: passed.
+- Independent review found two ZIP blockers (EOCD parser disagreement and eager memory
+  retention). Both were reproduced, fixed, regression-tested, and re-reviewed as resolved;
+  the reviewer independently passed 19 testcase unit tests and found no further blocker.
+- Runtime tests exposed Docker's default noexec work mount and cleanup permission
+  failures. Explicit work `exec` and supervisor-only DAC_OVERRIDE resolved them.
+- The original local/production stacks and databases were not redeployed or changed.
+  Disposable verification containers/data were removed after testing.
+
 ## Next slices
 
-Slice 5 adds legacy multi-file generator execution and generator-less/manual-input
-flows. Slice 6 adds reference-solution execution and output generation. Slice 4
-compiles but does not execute or retain binaries, create testcases, or mark drafts
-Ready. PDF/sanitization belongs to Slice 7 and the Admin UI to Slice 10.
+Slice 6 adds reference-solution execution and output generation. Slice 5 does not
+generate answers automatically, prove reproducibility, verify algorithms, or make
+drafts Ready. PDF/sanitization belongs to Slice 7, mechanical verification to Slice 8,
+Publish to Slice 9, and the Admin UI to Slice 10.
