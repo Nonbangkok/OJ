@@ -1,14 +1,14 @@
-# API Schema — WOI Grader Backend (69 APIs)
+# API Schema — WOI Grader Backend (70 APIs)
 
-เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 69 APIs** ตามรายการด้านล่าง
+เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 70 APIs** ตามรายการด้านล่าง
 - `adminController.ts` = 10 APIs
 - `authController.ts` = 5 APIs
 - `contestController.ts` = 15 APIs
 - `problemController.ts` = 14 APIs
 - `submissionController.ts` = 6 APIs
-- Problem authoring/profile/asset/job/testcase controllers = 19 APIs
+- Problem authoring/profile/asset/job/testcase controllers = 20 APIs
 
-รวมทั้งหมด: **69 APIs**
+รวมทั้งหมด: **70 APIs**
 
 ## Global Conventions
 
@@ -463,7 +463,7 @@
 
 ---
 
-## 6) Problem Authoring Controller (19 APIs)
+## 6) Problem Authoring Controller (20 APIs)
 
 All endpoints in this section require an authenticated `admin`; `staff` is not sufficient.
 
@@ -621,6 +621,16 @@ All endpoints in this section require an authenticated `admin`; `staff` is not s
 - Errors: 400 invalid request; 404 missing draft/case; 409 stale revision/published.
 
 Detailed limits, ZIP pairing and runtime isolation: `AUTHORING_TESTCASES.md`.
+
+### 70. `POST /admin/authoring/drafts/:id/jobs/outputs`
+
+- Auth: admin. JSON body: `{ expectedRevision: positive integer }` (no seed or generator required).
+- Response 202: queued job metadata; poll `GET /admin/authoring/jobs/:id`.
+- Captures immutable solution, ordered inputs and execution limits. Compiles once and runs once per input.
+- Replaces all outputs only after every execution and artifact validation succeeds. Failed/stale/incomplete results preserve previous outputs.
+- Success summary: `caseCount`, output case IDs/names/sizes/hashes/wall durations. Runtime failures include `failedCase`.
+- Errors: 400 invalid body, `source_missing`, `inputs_missing`, `unsupported_resource_limits`; 404 missing draft; 409 busy/revision/published; 429 queue full; 503 runner unavailable.
+- Current supported limits: requested memory up to 736 MiB, per-case time up to 900000ms, total job 15min. See `AUTHORING_OUTPUTS.md`.
 
 ---
 

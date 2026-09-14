@@ -2,7 +2,7 @@
 
 The backend supports legacy multi-file C++ generators and manual input/output
 uploads. The Admin frontend remains Slice 10; reference-solution output generation
-remains Slice 6. Existing public problem uploads and contestant judging are unchanged.
+is documented in `AUTHORING_OUTPUTS.md` (Slice 6). Existing public problem uploads and contestant judging are unchanged.
 
 ## Generate inputs
 

@@ -1,10 +1,11 @@
-# Authoring runner protocol — Slices 4–5
+# Authoring runner protocol — Slices 4–6
 
-Version 1 implements asynchronous `compile_solution`, `compile_generator` and
-`run_generator` jobs. Compilation-only jobs discard their binaries. Generator jobs
+Version 1 implements asynchronous `compile_solution`, `compile_generator`,
+`run_generator` and `generate_outputs` jobs. Compilation-only jobs discard their binaries. Generator jobs
 execute a statically linked C++20 binary inside a private jail and persist validated
 inputs through the spool. See `AUTHORING_TESTCASES.md` for the Slice 5 artifact and
-manual-upload workflow. Reference-solution execution and PDF jobs remain later slices.
+manual-upload workflow. `AUTHORING_OUTPUTS.md` describes immutable input snapshots,
+per-case reference execution and transactional output replacement. PDF jobs remain Slice 7.
 
 ## Data flow
 
@@ -64,7 +65,7 @@ database credentials, API secrets, Docker socket, host workspace, or network.
   permissions isolate private job files even when macro includes bypass that guard.
 - Compiler process groups are killed on timeout/output overflow/shutdown and workspaces
   removed after completion. Generator execution is enabled in a private chroot;
-  contestant/reference binary execution is not enabled here.
+  reference execution uses a read-only chroot and captured stdin (see Slice 6 contract).
 
 `AUTHORING_JOBS_DIR` is validated in backend runtime config. Compose sets `/jobs`;
 an empty host value disables queue submission (HTTP 503) while existing job history

@@ -4,10 +4,12 @@
 
 ## Schema Overview
 
-The database contains **17 tables**. The 11 legacy application tables are bootstrapped by `backend/scripts/init_db.js`; `schema_migrations` and the 5 authoring tables are managed by the non-destructive migration runner in `backend/migrations/`. There is no ORM — all schema is defined as raw SQL DDL.
+The database contains **18 tables**. The 11 legacy application tables are bootstrapped by `backend/scripts/init_db.js`; `schema_migrations` and the 6 authoring tables are managed by the non-destructive migration runner in `backend/migrations/`. There is no ORM — all schema is defined as raw SQL DDL.
 
 Schema status for this revision:
 - Migration `0002_problem_authoring_foundation` adds `author_profiles`, `problem_drafts`, `problem_draft_assets`, `problem_draft_testcases`, and `authoring_jobs`.
+- Migration `0003_authoring_job_delivery` adds durable request JSON and the partial unique active-job-per-draft index.
+- Migration `0004_authoring_job_inputs` adds immutable input snapshots for output-generation jobs.
 - `schema_migrations` serializes and records applied migrations.
 - Backend typing around the schema includes:
   - DB row interfaces remain in `backend/types/models.ts`.
@@ -38,6 +40,7 @@ erDiagram
     problem_drafts ||--o{ problem_draft_assets : "contains"
     problem_drafts ||--o{ problem_draft_testcases : "contains"
     problem_drafts ||--o{ authoring_jobs : "runs"
+    authoring_jobs ||--o{ authoring_job_inputs : "captures"
 
     users {
         SERIAL id PK
@@ -335,6 +338,19 @@ Draft input/output pairs keyed by UUID and unique `(draft_id, case_number)`. Rec
 
 Durable job record for solution/generator compilation, generator execution, output generation, PDF builds, and full verification. Each job captures a draft revision and transitions through the constrained authoring job statuses.
 
+`request_snapshot` is private JSONB containing source, identity, deadline and job-specific
+seed or input manifest/limits. Terminal import clears it while preserving the bounded
+log and result summary. Only one queued/compiling/running job may exist per draft.
+
+### `authoring_job_inputs`
+
+Durable output-job input bytes, keyed by `(job_id, case_id)`, with unique
+`(job_id, case_number)`. Columns: job UUID (FK to `authoring_jobs`, cascade delete),
+captured case UUID, positive case number, and UTF-8 `input_data` text. No live-case
+foreign key: snapshots survive live testcase changes/deletion. Queueing copies
+inputs under the draft lock. Every terminal job path releases snapshot rows;
+completed history retains only metadata/hashes, not this extra copy of input text.
+
 ---
 
 ## Key Relationships
@@ -355,6 +371,7 @@ Durable job record for solution/generator compilation, generator execution, outp
 | Problem Draft → Assets | 1 : N | `ON DELETE CASCADE` |
 | Problem Draft → Draft Testcases | 1 : N | `ON DELETE CASCADE` |
 | Problem Draft → Authoring Jobs | 1 : N | Each job captures one draft revision |
+| Authoring Job → Captured Inputs | 1 : N | `ON DELETE CASCADE`; no link back to mutable testcase rows |
 
 ---
 

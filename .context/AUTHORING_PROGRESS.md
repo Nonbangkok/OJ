@@ -119,9 +119,51 @@ Details and API usage are in `AUTHORING_TESTCASES.md`.
 - The original local/production stacks and databases were not redeployed or changed.
   Disposable verification containers/data were removed after testing.
 
+## Slice 6 — Complete
+
+Reference-solution execution and atomic output generation are implemented and
+verified. Details, limits and API usage are in `AUTHORING_OUTPUTS.md`.
+
+- Admin-only `POST /admin/authoring/drafts/:id/jobs/outputs`, expected-revision
+  validation, generator-less support and explicit missing-input/source/limit errors.
+- `0004_authoring_job_inputs` migration: durable input bytes separate from bounded
+  source/manifest JSON; snapshots survive live testcase edits and backend restart.
+- Private checksum-validated delivery; compile-once C++20 solution, sequential
+  stdin/stdout execution; per-case wall/address-space/output limits and overall deadline.
+- Root-private disk staging prevents retaining the full testcase set in process
+  memory or work tmpfs. Exact UTF-8 output bytes are preserved; malformed text fails.
+- Whole-output-set replacement in one revision-locked transaction; case identity,
+  input provenance and order preserved. Failures, corrupt/incomplete results, stale
+  revisions, duplicates and concurrent expiry cannot partly replace old outputs.
+- First failed case plus trusted wall duration; successful output hashes/sizes and
+  per-case durations. All terminal paths release extra DB input snapshots.
+- Solution chroot is read-only; socket/namespace/process-group escape is denied.
+  Separate process creation is denied for solutions to prevent multiplying memory
+  limits; standard threads and existing generator behavior remain supported.
+- Documented runner limit: requested memory at most 736 MiB plus existing 32 MiB
+  slack. Larger limits are rejected explicitly. No peak-RSS/MLE classification,
+  algorithm proof, Ready transition or contestant-judge changes are claimed.
+
+### Final verification
+
+- `docker compose -p oj-authoring-tests -f tests/authoring/compose.yml up --build --abort-on-container-exit --exit-code-from tests`:
+  **54 suites / 409 tests passed, zero skipped, zero failures**, exit 0.
+- Includes real HTTP → PostgreSQL → isolated runner output generation without a
+  generator, migration/restore regressions and the complete pre-existing backend suite.
+- **29 solution/generator runtime tests passed** again under the deployed runner's
+  exact network-none/read-only/no-new-privileges/capability/1 GiB/256 PID/1 CPU policy.
+- TypeScript build passed on host and both Docker images; sandbox C compiled with
+  `-Wall -Wextra -Werror`. Compose local/production configuration tests: **5 passed**.
+- `git diff --check`: passed. Tests demonstrated missing endpoint/protocol/snapshot
+  behavior before implementation and fork isolation before its security fix.
+- Independent read-only review found no critical/important blocker. A requested
+  concurrent-expiry-during-last-artifact regression was added, passed, and reviewed.
+- Full-suite host testing cannot run the `pg_dump` integration on this host; the
+  canonical Node 20/PostgreSQL 16 Docker suite above passed it successfully.
+- No existing local/production service or user database was redeployed or changed.
+
 ## Next slices
 
-Slice 6 adds reference-solution execution and output generation. Slice 5 does not
-generate answers automatically, prove reproducibility, verify algorithms, or make
-drafts Ready. PDF/sanitization belongs to Slice 7, mechanical verification to Slice 8,
-Publish to Slice 9, and the Admin UI to Slice 10.
+PDF/sanitization is Slice 7, mechanical verification Slice 8, Publish Slice 9, and
+the Admin UI Slice 10. Output generation trusts the reference algorithm supplied
+by the author; it does not prove algorithm correctness or generator reproducibility.
