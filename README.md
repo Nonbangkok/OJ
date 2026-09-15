@@ -177,7 +177,7 @@ From the project root, execute the unified test script to run both backend and f
 
 ### Authoring integration tests
 
-To run the complete backend suite including Slices 4–8 HTTP → PostgreSQL → isolated
+To run the complete backend suite including Slices 4–9 HTTP → PostgreSQL → isolated
 C++/PDF runner checks, use the dedicated disposable stack from the repository root:
 
 ```bash
@@ -219,6 +219,9 @@ The visual check ignores PDF timestamps by comparing rasterized pages. A differe
 fails explicitly; inspect the pages instead of automatically replacing the baseline.
 
 Slice8 Verify All is documented in [`.context/AUTHORING_VERIFY.md`](.context/AUTHORING_VERIFY.md).
+Slice9 Publish, hidden legacy-record mapping, privacy and transactional conflicts
+are documented in [`.context/AUTHORING_PUBLISH.md`](.context/AUTHORING_PUBLISH.md).
+The full Compose suite includes real Verify→Publish and rollback/concurrency tests.
 The standalone runtime matrix checks exact output matching, compile-only generators,
 runtime failures, resource bounds and expected-output isolation with the same worker image:
 

@@ -1,14 +1,14 @@
-# API Schema — WOI Grader Backend (73 APIs)
+# API Schema — WOI Grader Backend (74 APIs)
 
-เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 73 APIs** ตามรายการด้านล่าง
+เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 74 APIs** ตามรายการด้านล่าง
 - `adminController.ts` = 10 APIs
 - `authController.ts` = 5 APIs
 - `contestController.ts` = 15 APIs
 - `problemController.ts` = 14 APIs
 - `submissionController.ts` = 6 APIs
-- Problem authoring/profile/asset/job/testcase controllers = 23 APIs
+- Problem authoring/profile/asset/job/testcase controllers = 24 APIs
 
-รวมทั้งหมด: **73 APIs**
+รวมทั้งหมด: **74 APIs**
 
 ## Global Conventions
 
@@ -668,6 +668,22 @@ Detailed limits, ZIP pairing and runtime isolation: `AUTHORING_TESTCASES.md`.
   sizes, PDF manifest, warnings and verified revision. No peak-RSS claim.
 - Only a complete, current, unexpired result atomically installs PDF and sets `ready`.
   Does not generate/replace testcase outputs or Publish. See `AUTHORING_VERIFY.md`.
+
+---
+
+### 74. `POST /admin/authoring/drafts/:id/publish`
+
+- Auth: admin. Body: `{ expectedRevision: positive integer }`; no visibility/source overrides.
+- Response201: `{ draftId, problemId, revision, caseCount, publishedAt, status: "published", isVisible: false }`.
+- Requires current ready/verified revision, no active job, matching successful
+  Verify All report/PDF and complete testcase pairs. Runs synchronously in one DB transaction.
+- Inserts new hidden legacy problem + exact cases with stable numbers and marks
+  draft published atomically. Never copies private C++ sources into grader records/export.
+- Errors:400 invalid request;404 `draft_not_found`;409 `draft_published`,
+  `revision_conflict`, `job_active`, `draft_not_ready`, `pdf_not_verified`,
+  `invalid_testcases`, `problem_id_conflict`. All failures preserve existing records.
+- Does not require an online runner or automatically expose the problem to contestants.
+  See `AUTHORING_PUBLISH.md` for mapping, retry and concurrency details.
 
 ---
 

@@ -365,6 +365,16 @@ Slice8 reuses these tables without a migration. A successful current, unexpired
 verification atomically installs PDF and sets `status='ready'` plus
 `verified_revision=revision`. An accepted re-verification clears old readiness.
 
+### Publication (Slice9)
+
+No schema change. The Publish service locks a current ready draft, validates its
+latest successful verification/PDF/case metadata and absence of active jobs, then
+inserts a new hidden `problems` row plus exact `testcases` in one transaction.
+`author_aka_name` maps to legacy `author`; private C++ source stays in the draft.
+Problem ID primary-key conflicts never overwrite existing rows. On success the
+draft becomes `published` with `published_at`, retaining its revision/provenance.
+All failures roll back the three-table write. See `AUTHORING_PUBLISH.md`.
+
 ---
 
 ## Key Relationships

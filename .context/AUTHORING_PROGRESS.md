@@ -253,8 +253,43 @@ reports and limits: `AUTHORING_VERIFY.md`. No Publish or Admin UI work is includ
 - Existing local/production services and their databases were not redeployed or
   changed. Verification used disposable test resources only.
 
+## Slice 9 — Complete
+
+Transactional Publish is implemented. API, transaction boundaries, legacy mapping
+and retry behavior: `AUTHORING_PUBLISH.md`. No Admin UI or deployment is included.
+
+- Admin-only synchronous Publish API with strict expected revision and existing
+  authentication/authorization. Requires ready status and successful current
+  Verify All provenance, matching PDF hash/template and complete bounded pairs.
+- Locks the draft, inserts a new hidden legacy problem, copies exact testcase
+  bytes inside PostgreSQL and marks the draft published in one transaction.
+- Preserves testcase numbering gaps and empty expected outputs; maps the author
+  display name to the existing legacy author field. Contest association stays NULL.
+- Duplicate IDs never overwrite another problem. Same-draft/different-draft
+  concurrent publication, legacy insertion races and concurrent Save are covered.
+- Failures roll back all writes. Published drafts remain read-only; private C++
+  sources, raw HTML, source assets and job logs are not copied into legacy records
+  or included in the existing grader ZIP export.
+- No migration, dependency addition or runner availability requirement for Publish.
+
+### Final verification
+
+- Canonical disposable Compose suite (Node20/PostgreSQL16/isolated runner):
+  **61 suites /553 tests passed**, zero failures or skips, exit0.
+- Includes **20 Publish integration tests**, real Verify-to-Publish through the
+  worker, hidden/public access boundaries, exact ZIP contents and source privacy,
+  stale/missing/corrupt artifacts, observed database lock contention and rollback
+  after both partial testcase insertion and final draft-status update failure.
+- Host Publish tests: **19 passed /1 runner-only skipped**; that runner test passed
+  in the full Docker suite. TDD RED was observed before implementation.
+- TypeScript build passed on host and both Docker images. Local/production Compose
+  configuration tests: **5 passed**. `git diff --check` passed.
+- Primary-agent code/diff review completed. Independent reviewer hit its usage
+  limit before returning findings; no independent-review clearance is claimed.
+- Existing local/production services and user databases were not redeployed or
+  changed. Tests published disposable fixtures only, not user drafts.
+
 ## Next slices
 
-Transactional Publish is Slice 9, and
-the Admin UI Slice 10. Output generation trusts the reference algorithm supplied
+The remaining planned slice is the Admin UI, Slice 10. Output generation trusts the reference algorithm supplied
 by the author; it does not prove algorithm correctness or generator reproducibility.
