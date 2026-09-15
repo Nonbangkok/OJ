@@ -50,6 +50,16 @@ it('protects output generation with admin authorization, revision validation and
   expect((await request(app('admin', false)).post(url).send({ expectedRevision: 1 })).status).toBe(503);
 });
 
+it('protects Verify All and accepts only an explicit current revision', async () => {
+  const url = `/admin/authoring/drafts/${id}/jobs/verify`;
+  expect((await request(app()).post(url).send({ expectedRevision: 1 })).status).toBe(401);
+  expect((await request(app('staff')).post(url).send({ expectedRevision: 1 })).status).toBe(403);
+  for (const body of [{}, { expectedRevision: 0 }, { expectedRevision: 1, regenerate: true }]) {
+    expect((await request(app('admin')).post(url).send(body)).status).toBe(400);
+  }
+  expect((await request(app('admin', false)).post(url).send({ expectedRevision: 1 })).status).toBe(503);
+});
+
 it('requires a bounded explicit seed for generation and accepts generator-less drafts without queueing', async () => {
   for (const seed of [undefined, 1, '-1', '18446744073709551616', '1; rm']) {
     expect((await request(app('admin')).post(`/admin/authoring/drafts/${id}/jobs/generate`).send({ expectedRevision: 1, seed })).status).toBe(400);

@@ -3,7 +3,7 @@ import { requireAdmin, requireAuth } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
 import { compileAuthoringJobSchema, generateAuthoringJobSchema, outputAuthoringJobSchema, problemDraftIdParamSchema } from '../schemas/requestSchemas';
-import { DurableJob, getAuthoringJob, getDraftPdf, queueCompileJob, queueGeneratorJob, queueOutputJob, queuePdfJob } from '../services/authoringJobQueryService';
+import { DurableJob, getAuthoringJob, getDraftPdf, queueCompileJob, queueGeneratorJob, queueOutputJob, queuePdfJob, queueVerifyJob } from '../services/authoringJobQueryService';
 
 const projectJob = (job: DurableJob) => ({
   id: job.id, draftId: job.draft_id, draftRevision: job.draft_revision, jobType: job.job_type,
@@ -15,7 +15,7 @@ const projectJob = (job: DurableJob) => ({
 /** Admin-only asynchronous compilation; snapshots are never returned by job APIs. */
 export function createAuthoringJobRouter(enabled: boolean): Router {
   const router = Router();
-  for (const action of ['compile', 'generate', 'outputs', 'pdf'] as const) router.post(`/admin/authoring/drafts/:id/jobs/${action}`, requireAuth, requireAdmin,
+  for (const action of ['compile', 'generate', 'outputs', 'pdf', 'verify'] as const) router.post(`/admin/authoring/drafts/:id/jobs/${action}`, requireAuth, requireAdmin,
     validateRequest({ params: problemDraftIdParamSchema, body: action === 'compile' ? compileAuthoringJobSchema
       : action === 'generate' ? generateAuthoringJobSchema : outputAuthoringJobSchema }),
     asyncHandler(async (req, res) => {
@@ -24,11 +24,15 @@ export function createAuthoringJobRouter(enabled: boolean): Router {
         ? await queueCompileJob(String(req.params.id), req.body.expectedRevision, req.body.target)
         : action === 'generate' ? await queueGeneratorJob(String(req.params.id), req.body.expectedRevision, req.body.seed)
           : action === 'outputs' ? await queueOutputJob(String(req.params.id), req.body.expectedRevision)
-            : await queuePdfJob(String(req.params.id), req.body.expectedRevision);
+            : action === 'pdf' ? await queuePdfJob(String(req.params.id), req.body.expectedRevision)
+              : await queueVerifyJob(String(req.params.id), req.body.expectedRevision);
       if (result.kind === 'queued') { res.status(202).json(projectJob(result.job)); return; }
       const errors = {
         not_found: [404, 'draft_not_found', 'Problem draft not found'],
         source_missing: [400, 'source_missing', 'The selected C++ source is empty'],
+        invalid_metadata: [400, 'invalid_metadata', 'Problem ID, author metadata or limits are invalid'],
+        outputs_missing: [400, 'outputs_missing', 'Every stored input needs an expected output before verification'],
+        invalid_testcases: [400, 'invalid_testcases', 'Testcase names, pairing, count, size or source snapshot exceed supported limits'],
         unsupported_template: [400, 'unsupported_template', 'This PDF template version is not supported'],
         invalid_statement: [400, 'invalid_statement', 'Statement is empty, unsafe, exceeds limits, or references missing assets'],
         inputs_missing: [400, 'inputs_missing', 'Store at least one input before generating outputs'],

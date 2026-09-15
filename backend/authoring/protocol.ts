@@ -67,8 +67,11 @@ export const pdfSnapshotSchema = z.object({
 export const jobSnapshotSchema = z.object({
   version: z.literal(1), jobId: z.string().uuid(), draftId: z.string().uuid(),
   revision: z.number().int().positive(),
-  kind: z.enum(['compile_solution', 'compile_generator', 'run_generator', 'generate_outputs', 'build_pdf']),
+  kind: z.enum(['compile_solution', 'compile_generator', 'run_generator', 'generate_outputs', 'build_pdf', 'verify_all']),
   pdf: pdfSnapshotSchema.optional(),
+  generatorSource: z.string().refine(value => value.trim().length > 0
+    && Buffer.byteLength(value) <= AUTHORING_RUNNER.MAX_SOURCE_BYTES).optional(),
+  expectedOutputs: z.array(caseInputSchema).min(1).max(TESTCASE_LIMITS.MAX_CASES).refine(uniqueCases).optional(),
   seed: seedSchema.optional(),
   cases: z.array(caseInputSchema).min(1).max(TESTCASE_LIMITS.MAX_CASES).refine(uniqueCases).optional(),
   limits: z.object({ timeLimitMs: z.number().int().positive().max(AUTHORING_RUNNER.JOB_TIMEOUT_MS),
@@ -76,9 +79,32 @@ export const jobSnapshotSchema = z.object({
   source: z.string().refine(value => Buffer.byteLength(value) <= AUTHORING_RUNNER.MAX_SOURCE_BYTES),
   deadline: z.string().datetime(),
 }).strict().refine(value => value.kind === 'run_generator' ? value.seed !== undefined : value.seed === undefined)
-  .refine(value => value.kind === 'generate_outputs' ? value.cases !== undefined && value.limits !== undefined
+  .refine(value => ['generate_outputs', 'verify_all'].includes(value.kind) ? value.cases !== undefined && value.limits !== undefined
     : value.cases === undefined && value.limits === undefined)
-  .refine(value => value.kind === 'build_pdf' ? value.pdf !== undefined && value.source === '' : value.pdf === undefined);
+  .refine(value => value.kind === 'build_pdf' ? value.pdf !== undefined && value.source === ''
+    : value.kind === 'verify_all' ? value.pdf !== undefined : value.pdf === undefined)
+  .refine(value => value.kind === 'verify_all' ? value.source.trim().length > 0
+    && value.expectedOutputs !== undefined && value.cases !== undefined
+    && value.expectedOutputs.length === value.cases.length
+    && value.expectedOutputs.every((output, i) => output.caseId === value.cases![i]!.caseId
+      && output.caseNumber === value.cases![i]!.caseNumber && output.filename === value.cases![i]!.filename)
+    && [...value.cases, ...value.expectedOutputs].reduce((total, item) => total + item.sizeBytes, 0) <= TESTCASE_LIMITS.MAX_TOTAL_BYTES
+    : value.generatorSource === undefined && value.expectedOutputs === undefined);
+
+const checkStatus = z.enum(['pending', 'passed', 'failed']);
+export const verificationSchema = z.object({
+  checks: z.object({ pdf: checkStatus, solution: checkStatus,
+    generator: z.enum(['pending', 'passed', 'failed', 'skipped']), execution: checkStatus }).strict(),
+  cases: z.array(caseMeasurementSchema).max(TESTCASE_LIMITS.MAX_CASES)
+    .refine(cases => new Set(cases.map(c => c.caseId)).size === cases.length
+      && new Set(cases.map(c => c.caseNumber)).size === cases.length),
+  caseCount: z.number().int().min(1).max(TESTCASE_LIMITS.MAX_CASES),
+  totalTestcaseBytes: z.number().int().min(0).max(TESTCASE_LIMITS.MAX_TOTAL_BYTES),
+  memoryLimitMb: z.number().int().positive().max(AUTHORING_RUNNER.MAX_SOLUTION_MEMORY_MB),
+  peakMemoryBytes: z.null(),
+  warnings: z.array(z.string().max(1000)).min(1).max(20),
+}).strict().refine(value => value.cases.length <= value.caseCount);
+export type Verification = z.infer<typeof verificationSchema>;
 
 export const jobResultSchema = z.object({
   version: z.literal(1), jobId: z.string().uuid(), draftId: z.string().uuid(),
@@ -89,7 +115,8 @@ export const jobResultSchema = z.object({
     'generator_timeout', 'generator_output_limit', 'invalid_generated_inputs', 'solution_runtime_error',
     'solution_timeout', 'solution_output_limit', 'invalid_generated_outputs', 'invalid_job_inputs',
     'unsupported_resource_limits', 'pdf_render_error', 'pdf_timeout', 'pdf_output_limit',
-    'invalid_pdf', 'invalid_pdf_inputs', 'invalid_statement']).nullable(),
+    'invalid_pdf', 'invalid_pdf_inputs', 'invalid_statement', 'wrong_answer', 'invalid_expected_outputs',
+    'invalid_verification_result']).nullable(),
   log: z.string().refine(value => Buffer.byteLength(value) <= AUTHORING_RUNNER.MAX_LOG_BYTES),
   durationMs: z.number().int().min(0).max(AUTHORING_RUNNER.JOB_TIMEOUT_MS),
   exitCode: z.number().int().nullable(),
@@ -97,11 +124,18 @@ export const jobResultSchema = z.object({
   outputs: z.array(outputArtifactSchema).min(1).max(TESTCASE_LIMITS.MAX_CASES).refine(uniqueCases).optional(),
   failedCase: caseMeasurementSchema.optional(),
   pdf: pdfArtifactSchema.optional(),
+  verification: verificationSchema.optional(),
 }).strict().refine(value => value.status === 'succeeded'
   ? value.errorCode === null && value.exitCode === 0 && value.failedCase === undefined
   : value.errorCode !== null && value.inputs === undefined && value.outputs === undefined && value.pdf === undefined)
   .refine(value => !(value.inputs && value.outputs))
   .refine(value => !value.pdf || (!value.inputs && !value.outputs))
+  .refine(value => !value.verification || (!value.inputs && !value.outputs
+    && (value.status !== 'succeeded' || (value.pdf !== undefined
+      && value.verification.checks.pdf === 'passed' && value.verification.checks.solution === 'passed'
+      && ['passed', 'skipped'].includes(value.verification.checks.generator)
+      && value.verification.checks.execution === 'passed'
+      && value.verification.cases.length === value.verification.caseCount))))
   .refine(value => !value.inputs || (new Set(value.inputs.map(i => i.filename)).size === value.inputs.length
     && value.inputs.reduce((total, i) => total + i.sizeBytes, 0) <= TESTCASE_LIMITS.MAX_TOTAL_BYTES));
 

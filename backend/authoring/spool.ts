@@ -54,7 +54,7 @@ export class AuthoringSpool {
       || await this.exists(this.location('ready', job.jobId))) return;
     const stage = await mkdtemp(path.join(this.root, 'staging', `${job.jobId}-`));
     try {
-      if (job.kind === 'build_pdf') {
+      if (job.kind === 'build_pdf' || job.kind === 'verify_all') {
         if (!readFile) throw new TestcaseError('invalid_pdf_inputs', 'PDF snapshot reader is required');
         await mkdir(path.join(stage, 'pdf', 'assets'), { recursive: true, mode: 0o700 });
         for (const [name, file, artifact] of [
@@ -65,13 +65,22 @@ export class AuthoringSpool {
           await writeFile(path.join(stage, 'pdf', file), content, { mode: 0o600, flag: 'wx' });
         }
       }
-      if (job.kind === 'generate_outputs') {
+      if (job.kind === 'generate_outputs' || job.kind === 'verify_all') {
         if (!readInput) throw new TestcaseError('invalid_job_inputs', 'Input snapshot reader is required');
         await mkdir(path.join(stage, 'inputs'), { mode: 0o700 });
         for (const [index, artifact] of job.cases!.entries()) {
           const content = Buffer.from(await readInput(index, artifact), 'utf8');
           this.validateArtifact(content, artifact, 'invalid_job_inputs');
           await writeFile(path.join(stage, 'inputs', `${index}.txt`), content, { mode: 0o600, flag: 'wx' });
+        }
+      }
+      if (job.kind === 'verify_all') {
+        if (!readFile) throw new TestcaseError('invalid_expected_outputs', 'Expected-output snapshot reader is required');
+        await mkdir(path.join(stage, 'expected'), { mode: 0o700 });
+        for (const [index, artifact] of job.expectedOutputs!.entries()) {
+          const content = await readFile(`output:${artifact.caseId}`);
+          this.validateArtifact(content, artifact, 'invalid_expected_outputs');
+          await writeFile(path.join(stage, 'expected', `${index}.txt`), content, { mode: 0o600, flag: 'wx' });
         }
       }
       await writeFile(path.join(stage, 'request.json'), JSON.stringify(job), { mode: 0o600, flag: 'wx' });
@@ -195,6 +204,12 @@ export class AuthoringSpool {
     const active = this.location('active', id);
     if (!(await lstat(active)).isDirectory()) throw new TestcaseError('invalid_job_inputs', 'Invalid active job directory');
     return this.readArtifact(path.join(active, 'inputs'), index, artifact, 'invalid_job_inputs');
+  }
+
+  async readJobExpectedOutput(id: string, index: number, artifact: InputArtifact): Promise<string> {
+    const active = this.location('active', id);
+    if (!(await lstat(active)).isDirectory()) throw new TestcaseError('invalid_expected_outputs', 'Invalid active job directory');
+    return this.readArtifact(path.join(active, 'expected'), index, artifact, 'invalid_expected_outputs');
   }
 
   private validateArtifact(content: Buffer, artifact: InputArtifact, code: string): string {

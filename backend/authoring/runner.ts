@@ -6,6 +6,7 @@ import { compileJob } from './compiler';
 import { generateInputs } from './generator';
 import { generateOutputs } from './outputs';
 import { buildPdf } from './pdf';
+import { verifyAll } from './verify';
 import { AUTHORING_RUNNER, failedResult } from './protocol';
 
 /** Single-consumer worker; the container entrypoint holds a kernel flock across restarts. */
@@ -28,6 +29,7 @@ async function main(): Promise<void> {
       ? await generateInputs(job, '/work', spool, { signal: abort.signal })
       : job.kind === 'generate_outputs'
       ? await generateOutputs(job, '/work', spool, { signal: abort.signal })
+      : job.kind === 'verify_all' ? await verifyAll(job, '/work', spool, { signal: abort.signal })
       : job.kind === 'build_pdf' ? await buildPdf(job, '/work', spool, { signal: abort.signal })
       : await compileJob(job, '/work', { signal: abort.signal }); }
     catch { result = failedResult(job, 'runner_error'); }
