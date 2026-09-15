@@ -206,8 +206,55 @@ snapshots are implemented. Contract and reproduction details: `AUTHORING_PDF.md`
   no dependency-security audit clearance is claimed. Builds use `--no-audit`.
 - Existing local/production services and user databases were not redeployed or changed.
 
+## Slice 8 — Complete
+
+Mechanical Verify All and revision-safe readiness are implemented. Contract,
+reports and limits: `AUTHORING_VERIFY.md`. No Publish or Admin UI work is included.
+
+- Admin-only `POST /admin/authoring/drafts/:id/jobs/verify`, metadata/source/pair
+  validation, immutable PDF/input/expected-output/source snapshots, optional generator.
+- Existing snapshot tables reused without migration. Expected outputs are private
+  binary job files and survive live testcase edits/deletions or backend restart.
+- PDF render, one solution compile, optional compile-only generator, sequential
+  bounded solution execution, exact current-judge trim/CRLF output comparison.
+- No generator execution, input regeneration or expected-output replacement.
+  A wrong answer reports the first failed case instead of overwriting the answer.
+- Per-stage checks/logs, per-case wall duration, testcase/artifact sizes, PDF
+  status, applied verified revision and explicit memory/reproducibility warnings.
+- Accepted re-verification clears previous readiness. Successful current jobs
+  atomically install their PDF and become ready. Stale, failed, incomplete,
+  corrupted, duplicate and expired jobs preserve existing artifacts and cannot ready a draft.
+- Deadline is rechecked with database wall-clock time in the final job transition,
+  so expiry during PDF import rolls back pending artifact/readiness writes.
+- Peak RSS and exact MLE classification remain unavailable, as in Slice6; memory
+  is bounded via address-space/container limits. No algorithm proof is claimed.
+
+### Final verification
+
+- Disposable Compose backend suite (Node20/PostgreSQL16/isolated runner):
+  **60 suites /533 tests passed**, zero failures or skips, exit0.
+- Includes real HTTP-to-runner success with an optional generator, wrong answer
+  rejection without testcase replacement, immutable expected bytes, revision
+  invalidation, corrupt/incomplete report handling, duplicate/expiry rollback,
+  and the full existing compile/generation/PDF/database restore regressions.
+- Standalone actual worker runtime matrix: **1 test covering14 verification
+  runs passed**, including normalized CRLF/outer whitespace, significant internal
+  spaces, first mismatch, no-generator success, compile-only nonterminating
+  generator, compile/include/runtime/timeout/output-limit failures, tampered
+  expected files, unsafe HTML, cancellation and both compiler diagnostics.
+- Runtime matrix used network-none, read-only, no-new-privileges, deployed
+  capabilities and1 CPU/1 GiB RAM/256 PID limits. No isolation settings loosened.
+- TypeScript build passed on host and both Docker images. Local/production Compose
+  configuration tests: **5 passed**. `git diff --check` passed.
+- TDD RED observed missing Verify API/worker/protocol before implementation.
+  An independent review found a late-expiry race; the real PostgreSQL regression
+  failed before its fix and passed afterward. Reviewer confirmed resolution and
+  found no additional blocker. A missing generator warning was also regression-tested.
+- Existing local/production services and their databases were not redeployed or
+  changed. Verification used disposable test resources only.
+
 ## Next slices
 
-Mechanical verification is Slice 8, Publish Slice 9, and
+Transactional Publish is Slice 9, and
 the Admin UI Slice 10. Output generation trusts the reference algorithm supplied
 by the author; it does not prove algorithm correctness or generator reproducibility.

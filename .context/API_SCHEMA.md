@@ -1,14 +1,14 @@
-# API Schema — WOI Grader Backend (72 APIs)
+# API Schema — WOI Grader Backend (73 APIs)
 
-เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 72 APIs** ตามรายการด้านล่าง
+เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 73 APIs** ตามรายการด้านล่าง
 - `adminController.ts` = 10 APIs
 - `authController.ts` = 5 APIs
 - `contestController.ts` = 15 APIs
 - `problemController.ts` = 14 APIs
 - `submissionController.ts` = 6 APIs
-- Problem authoring/profile/asset/job/testcase controllers = 22 APIs
+- Problem authoring/profile/asset/job/testcase controllers = 23 APIs
 
-รวมทั้งหมด: **72 APIs**
+รวมทั้งหมด: **73 APIs**
 
 ## Global Conventions
 
@@ -651,6 +651,23 @@ Detailed limits, ZIP pairing and runtime isolation: `AUTHORING_TESTCASES.md`.
 - `X-PDF-Revision` / `X-Draft-Revision` allow the editor to label an outdated preview.
 - Error404: missing draft or `pdf_missing`. Editing a draft does not erase its previous PDF.
 - Full statement/security/runtime contract: `AUTHORING_PDF.md`.
+
+---
+
+### 73. `POST /admin/authoring/drafts/:id/jobs/verify`
+
+- Auth: admin. Body: `{ expectedRevision: positive integer }`. Response202 job metadata.
+- Revalidates saved metadata, statement/assets, source, resource limits and complete
+  testcase pairs; captures immutable solution, optional generator, PDF inputs and
+  expected outputs. Existing queue/revision/published guards apply.
+- Additional400 codes: `invalid_metadata`, `outputs_missing`, `invalid_testcases`.
+- Accepted requests clear previous readiness; old PDF and all testcase bytes remain.
+- Renders PDF, compiles solution + optional generator (never runs the generator),
+  runs solution and compares outputs using current judge trim/CRLF/exact semantics.
+- Poll endpoint63 for per-stage checks, attempted-case wall durations, first failure,
+  sizes, PDF manifest, warnings and verified revision. No peak-RSS claim.
+- Only a complete, current, unexpired result atomically installs PDF and sets `ready`.
+  Does not generate/replace testcase outputs or Publish. See `AUTHORING_VERIFY.md`.
 
 ---
 

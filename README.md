@@ -177,7 +177,7 @@ From the project root, execute the unified test script to run both backend and f
 
 ### Authoring integration tests
 
-To run the complete backend suite including Slices 4–7 HTTP → PostgreSQL → isolated
+To run the complete backend suite including Slices 4–8 HTTP → PostgreSQL → isolated
 C++/PDF runner checks, use the dedicated disposable stack from the repository root:
 
 ```bash
@@ -217,6 +217,23 @@ node tests/authoring/pdf-visual.mjs
 
 The visual check ignores PDF timestamps by comparing rasterized pages. A difference
 fails explicitly; inspect the pages instead of automatically replacing the baseline.
+
+Slice8 Verify All is documented in [`.context/AUTHORING_VERIFY.md`](.context/AUTHORING_VERIFY.md).
+The standalone runtime matrix checks exact output matching, compile-only generators,
+runtime failures, resource bounds and expected-output isolation with the same worker image:
+
+```bash
+docker run --rm --network none --read-only --init \
+  --label com.docker.compose.project=oj-verify-runtime-tests \
+  --security-opt no-new-privileges:true --cap-drop ALL \
+  --cap-add SETUID --cap-add SETGID --cap-add KILL --cap-add SYS_CHROOT --cap-add DAC_OVERRIDE \
+  --pids-limit 256 --memory 1g --cpus 1 \
+  --tmpfs /work:rw,exec,nosuid,nodev,size=768m,mode=0755 \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=32m \
+  -v "$PWD/tests/authoring/verify-runtime.mjs:/tests/verify-runtime.mjs:ro" \
+  -v "$PWD/backend/tests/fixtures/pdf:/fixtures:ro" \
+  --entrypoint node oj-authoring-tests-authoring-runner --test /tests/verify-runtime.mjs
+```
 
 The commands below run integration tests without the separate runner; the
 HTTP-to-runner cases are skipped when `INTEGRATION_RUNNER_SPOOL` is unset.

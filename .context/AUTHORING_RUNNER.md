@@ -1,12 +1,14 @@
-# Authoring runner protocol — Slices 4–7
+# Authoring runner protocol — Slices 4–8
 
 Version 1 implements asynchronous `compile_solution`, `compile_generator`,
-`run_generator`, `generate_outputs` and `build_pdf` jobs. Compilation-only jobs discard their binaries. Generator jobs
+`run_generator`, `generate_outputs`, `build_pdf` and `verify_all` jobs. Compilation-only jobs discard their binaries. Generator jobs
 execute a statically linked C++20 binary inside a private jail and persist validated
 inputs through the spool. See `AUTHORING_TESTCASES.md` for the Slice 5 artifact and
 manual-upload workflow. `AUTHORING_OUTPUTS.md` describes immutable input snapshots,
 per-case reference execution and transactional output replacement. `AUTHORING_PDF.md`
 describes sanitized immutable statement/image snapshots, bounded PDF rendering and private previews.
+`AUTHORING_VERIFY.md` describes frozen expected outputs, compile-only optional
+generators, exact comparison and atomic revision/deadline-gated readiness.
 
 ## Data flow
 

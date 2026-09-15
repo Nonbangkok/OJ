@@ -346,7 +346,7 @@ log and result summary. Only one queued/compiling/running job may exist per draf
 
 ### `authoring_job_inputs`
 
-Durable output-job input bytes, keyed by `(job_id, case_id)`, with unique
+Durable output/verification-job input bytes, keyed by `(job_id, case_id)`, with unique
 `(job_id, case_number)`. Columns: job UUID (FK to `authoring_jobs`, cascade delete),
 captured case UUID, positive case number, and UTF-8 `input_data` text. No live-case
 foreign key: snapshots survive live testcase changes/deletion. Queueing copies
@@ -355,12 +355,15 @@ completed history retains only metadata/hashes, not this extra copy of input tex
 
 ### `authoring_job_files`
 
-Durable PDF-job image bytes keyed by `(job_id, name)`. Columns: `job_id` UUID
+Durable PDF-job images and verification expected-output bytes keyed by `(job_id, name)`. Columns: `job_id` UUID
 (FK to `authoring_jobs`, cascade delete), `name` TEXT and `content` BYTEA NOT NULL.
-Internal names are `avatar` or `asset:filename`. No link to mutable draft assets;
+Internal names are `avatar`, `asset:filename`, or `output:<case UUID>`. No link to mutable draft assets/testcases;
 queueing captures bytes while holding the draft lock. All terminal paths release
 these extra snapshots atomically with job completion. PDF bytes remain in
 `problem_drafts.latest_pdf`, with provenance in `latest_pdf_revision`.
+Slice8 reuses these tables without a migration. A successful current, unexpired
+verification atomically installs PDF and sets `status='ready'` plus
+`verified_revision=revision`. An accepted re-verification clears old readiness.
 
 ---
 
