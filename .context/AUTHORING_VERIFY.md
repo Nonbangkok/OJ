@@ -103,5 +103,6 @@ expected answer is mathematically incorrect. The author owns content correctness
 
 Deploy backend and runner together; do not mix expanded strict protocol variants
 with an older runner. This slice does not redeploy existing stacks. Transactional
-Publish is implemented in Slice9 (`AUTHORING_PUBLISH.md`); the Admin UI is Slice10.
-Reproduction commands are in README.
+Publish is implemented in Slice9 (`AUTHORING_PUBLISH.md`), and its reports/history
+are presented by the Slice10 Admin UI (`AUTHORING_UI.md`). Reproduction commands
+are in README.

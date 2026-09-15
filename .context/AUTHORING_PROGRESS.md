@@ -1,6 +1,6 @@
 # Problem Authoring Progress
 
-Updated: 2026-09-15. Branch: `authoring`.
+Updated: 2026-09-16. Branch: `authoring`.
 
 Scope authority: `docs/superpowers/specs/2026-09-12-problem-authoring-workspace-design.md`, section 17.
 
@@ -289,7 +289,46 @@ and retry behavior: `AUTHORING_PUBLISH.md`. No Admin UI or deployment is include
 - Existing local/production services and user databases were not redeployed or
   changed. Tests published disposable fixtures only, not user drafts.
 
-## Next slices
+## Slice 10 — Complete
 
-The remaining planned slice is the Admin UI, Slice 10. Output generation trusts the reference algorithm supplied
-by the author; it does not prove algorithm correctness or generator reproducibility.
+The complete human-first workflow is integrated into the existing Admin Panel.
+UI behavior and the three workspace APIs are documented in `AUTHORING_UI.md`.
+
+- Admin-only draft list plus five-tab workspace for Metadata, Statement, Solution,
+  Testcases and Verify & Publish. Explicit Save, dirty/conflict/read-only state,
+  navigation warning and active-job locks prevent accidental overwrites.
+- Reusable author profile editor with optional account link, adjustable square
+  image crop/removal and snapshot semantics.
+- Script-free sanitized HTML/KaTeX preview for unsaved source, private assets and
+  authoritative runner-built PDF preview.
+- Optional seeded/legacy generator controls, manual or ZIP testcase management,
+  missing-versus-empty output handling, destructive confirmations and bounded inspection.
+- Durable latest100 job history with on-demand logs/reports. Idle drafts do not
+  poll; polling resumes only while a durable job is active, avoiding the global
+  API rate-limit exhaustion found during browser verification.
+- Confirmed Publish creates a hidden legacy problem and makes the draft read-only;
+  visibility stays in existing Problem Management.
+- Fast-preview templates are copied into the compiled backend image/runtime.
+
+### Final verification
+
+- Canonical disposable Compose suite: **64 suites /572 tests passed**, zero
+  failures/skips, exit0. Includes the full real HTTP → PostgreSQL → C++20/PDF
+  runner → Verify → hidden Publish fixture and all previous regressions.
+- Frontend: **62 suites /311 tests passed**, zero failures; application and all-test
+  TypeScript checks, ESLint and optimized production build passed.
+- Local/production Compose configuration policy: **5 tests passed**.
+- Browser verification on disposable port18090 completed draft creation, Thai +
+  KaTeX/manual-table preview, solution compile, seeded multi-file generation,
+  output generation, PDF, Verify report and hidden read-only publication. The five
+  tabs render horizontally at desktop width and an idle page no longer reports429.
+- Primary-agent code review completed. A separate reviewer was requested but hit
+  its usage limit before returning findings; no independent-review clearance is claimed.
+- Existing local/production stacks and user databases were not redeployed or changed.
+
+## Planned slices
+
+Slices0–10 are complete. No additional implementation slice is currently approved.
+Output generation still trusts the reference algorithm supplied by the author; it
+does not prove algorithm correctness or generator reproducibility. AI integration,
+published-problem revision editing and alternate checkers remain future work.

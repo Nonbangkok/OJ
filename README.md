@@ -177,8 +177,9 @@ From the project root, execute the unified test script to run both backend and f
 
 ### Authoring integration tests
 
-To run the complete backend suite including Slices 4–9 HTTP → PostgreSQL → isolated
-C++/PDF runner checks, use the dedicated disposable stack from the repository root:
+To run the complete backend suite including Slices 4–10 HTTP → PostgreSQL → isolated
+C++/PDF runner and end-to-end authoring checks, use the dedicated disposable stack
+from the repository root:
 
 ```bash
 docker compose -p oj-authoring-tests -f tests/authoring/compose.yml up --build --abort-on-container-exit --exit-code-from tests
@@ -221,6 +222,8 @@ fails explicitly; inspect the pages instead of automatically replacing the basel
 Slice8 Verify All is documented in [`.context/AUTHORING_VERIFY.md`](.context/AUTHORING_VERIFY.md).
 Slice9 Publish, hidden legacy-record mapping, privacy and transactional conflicts
 are documented in [`.context/AUTHORING_PUBLISH.md`](.context/AUTHORING_PUBLISH.md).
+Slice10 Admin UI, fast preview, history polling and browser workflow are documented
+in [`.context/AUTHORING_UI.md`](.context/AUTHORING_UI.md).
 The full Compose suite includes real Verify→Publish and rollback/concurrency tests.
 The standalone runtime matrix checks exact output matching, compile-only generators,
 runtime failures, resource bounds and expected-output isolation with the same worker image:

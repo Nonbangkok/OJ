@@ -1,14 +1,14 @@
-# API Schema — WOI Grader Backend (74 APIs)
+# API Schema — WOI Grader Backend (77 APIs)
 
-เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 74 APIs** ตามรายการด้านล่าง
+เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 77 APIs** ตามรายการด้านล่าง
 - `adminController.ts` = 10 APIs
 - `authController.ts` = 5 APIs
 - `contestController.ts` = 15 APIs
 - `problemController.ts` = 14 APIs
 - `submissionController.ts` = 6 APIs
-- Problem authoring/profile/asset/job/testcase controllers = 24 APIs
+- Problem authoring/profile/asset/job/testcase/workspace controllers = 27 APIs
 
-รวมทั้งหมด: **74 APIs**
+รวมทั้งหมด: **77 APIs**
 
 ## Global Conventions
 
@@ -684,6 +684,33 @@ Detailed limits, ZIP pairing and runtime isolation: `AUTHORING_TESTCASES.md`.
   `invalid_testcases`, `problem_id_conflict`. All failures preserve existing records.
 - Does not require an online runner or automatically expose the problem to contestants.
   See `AUTHORING_PUBLISH.md` for mapping, retry and concurrency details.
+
+### 75. `GET /admin/authoring/drafts/:id/jobs`
+
+- Auth: admin. Params: UUID draft `id`.
+- Response200: latest100 jobs ordered by creation time and ID descending.
+- List rows contain only IDs, revision/type/status, bounded error text and timestamps.
+  Full result reports and logs are intentionally omitted; fetch endpoint63 only
+  when an admin selects one job. Source snapshots are never returned.
+- Error404: missing draft. Response is private and not cacheable.
+
+### 76. `POST /admin/authoring/drafts/:id/preview`
+
+- Auth: admin. Body: strict `{ statementHtml: string }`, at most2 MiB UTF-8.
+- Response200: `{ html }`, a self-contained sanitized preview using the saved
+  metadata/avatar/assets and the current unsaved statement text.
+- KaTeX is rendered on the server for `$...$`, `$$...$$`, `\(...\)` and `\[...\]`.
+  Scripts and remote resources are absent; CSP permits only inline style and
+  embedded image/font data. This endpoint creates no runner job and writes no data.
+- Errors:400 unsafe/invalid/oversized content, math, asset or template;404 missing draft.
+
+### 77. `GET /admin/authoring/drafts/:id/assets/:assetId`
+
+- Auth: admin. Params: draft and asset UUIDs.
+- Response200: exact stored normalized PNG/JPEG/WebP bytes with private/no-store,
+  nosniff and sandbox CSP headers.
+- Errors:400 unsupported stored media type;404 missing/cross-draft asset.
+- Used only for private authoring inspection. Public statement/PDF APIs never expose it.
 
 ---
 
