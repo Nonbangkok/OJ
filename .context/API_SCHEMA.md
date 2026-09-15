@@ -1,14 +1,14 @@
-# API Schema — WOI Grader Backend (70 APIs)
+# API Schema — WOI Grader Backend (72 APIs)
 
-เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 70 APIs** ตามรายการด้านล่าง
+เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 72 APIs** ตามรายการด้านล่าง
 - `adminController.ts` = 10 APIs
 - `authController.ts` = 5 APIs
 - `contestController.ts` = 15 APIs
 - `problemController.ts` = 14 APIs
 - `submissionController.ts` = 6 APIs
-- Problem authoring/profile/asset/job/testcase controllers = 20 APIs
+- Problem authoring/profile/asset/job/testcase controllers = 22 APIs
 
-รวมทั้งหมด: **70 APIs**
+รวมทั้งหมด: **72 APIs**
 
 ## Global Conventions
 
@@ -634,6 +634,26 @@ Detailed limits, ZIP pairing and runtime isolation: `AUTHORING_TESTCASES.md`.
 
 ---
 
+### 71. `POST /admin/authoring/drafts/:id/jobs/pdf`
+
+- Auth: admin. JSON body: `{ expectedRevision: positive integer }`.
+- Response 202: queued job metadata; poll endpoint63. No C++ source or testcases required.
+- Captures sanitized HTML, author metadata/avatar, assets and template version immutably.
+- Errors: 400 invalid body, `unsupported_template`, `invalid_statement`; 404 draft missing;
+  409 revision/published/busy; 429 queue full; 503 runner not configured.
+- Success atomically installs PDF at the captured revision and sets `generated`, never Ready.
+  Failed, stale or corrupt results preserve the last successful PDF.
+
+### 72. `GET /admin/authoring/drafts/:id/pdf`
+
+- Auth: admin. Response200: last successful PDF, `application/pdf`, inline disposition.
+- `Cache-Control: private, no-store`, `X-Content-Type-Options: nosniff`, same-origin framing.
+- `X-PDF-Revision` / `X-Draft-Revision` allow the editor to label an outdated preview.
+- Error404: missing draft or `pdf_missing`. Editing a draft does not erase its previous PDF.
+- Full statement/security/runtime contract: `AUTHORING_PDF.md`.
+
+---
+
 ## Frontend Implementation Notes (สำคัญ)
 
 - ใช้ axios instance แบบ `withCredentials: true` ทุก request ที่ต้องใช้ session
@@ -642,6 +662,7 @@ Detailed limits, ZIP pairing and runtime isolation: `AUTHORING_TESTCASES.md`.
   - `/contests/:id/problems/:problemId/pdf`
   - `/admin/problems/export`
   - `/admin/database/export`
+  - `/admin/authoring/drafts/:id/pdf`
 - SSE endpoint:
   - `/admin/problems/batch-upload-progress/:progressId`
   - ใช้ `EventSource` แล้ว parse payload ตาม event name

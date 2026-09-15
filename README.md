@@ -177,8 +177,8 @@ From the project root, execute the unified test script to run both backend and f
 
 ### Authoring integration tests
 
-To run the complete backend suite including Slice 4 HTTP → PostgreSQL → isolated
-C++ runner checks, use the dedicated disposable stack from the repository root:
+To run the complete backend suite including Slices 4–7 HTTP → PostgreSQL → isolated
+C++/PDF runner checks, use the dedicated disposable stack from the repository root:
 
 ```bash
 docker compose -p oj-authoring-tests -f tests/authoring/compose.yml up --build --abort-on-container-exit --exit-code-from tests
@@ -192,6 +192,31 @@ a stack containing real data. Protocol, limits, recovery, and configuration are
 documented in [`.context/AUTHORING_RUNNER.md`](.context/AUTHORING_RUNNER.md).
 Slice 5 generator/seed and manual testcase API conventions are documented in
 [`.context/AUTHORING_TESTCASES.md`](.context/AUTHORING_TESTCASES.md).
+Slice 6 output generation and Slice 7 statement/PDF contracts are documented in
+[`.context/AUTHORING_OUTPUTS.md`](.context/AUTHORING_OUTPUTS.md) and
+[`.context/AUTHORING_PDF.md`](.context/AUTHORING_PDF.md).
+
+After building the runner image above, verify the actual PDF runtime and approved
+three-page Red Gate layout (Poppler `pdftoppm` must be on PATH for the last command):
+
+```bash
+mkdir -p output/pdf
+docker run --rm --network none --read-only --init \
+  --label com.docker.compose.project=oj-pdf-runtime-tests \
+  --security-opt no-new-privileges:true --cap-drop ALL \
+  --cap-add SETUID --cap-add SETGID --cap-add KILL --cap-add SYS_CHROOT --cap-add DAC_OVERRIDE \
+  --pids-limit 256 --memory 1g --cpus 1 \
+  --tmpfs /work:rw,exec,nosuid,nodev,size=768m,mode=0755 \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=32m \
+  -v "$PWD/tests/authoring/pdf-runtime.mjs:/tests/pdf-runtime.mjs:ro" \
+  -v "$PWD/backend/tests/fixtures/pdf:/fixtures:ro" \
+  -v "$PWD/output/pdf:/qa" -e PDF_QA_OUTPUT=/qa \
+  --entrypoint node oj-authoring-tests-authoring-runner --test /tests/pdf-runtime.mjs
+node tests/authoring/pdf-visual.mjs
+```
+
+The visual check ignores PDF timestamps by comparing rasterized pages. A difference
+fails explicitly; inspect the pages instead of automatically replacing the baseline.
 
 The commands below run integration tests without the separate runner; the
 HTTP-to-runner cases are skipped when `INTEGRATION_RUNNER_SPOOL` is unset.

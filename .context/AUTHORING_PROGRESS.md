@@ -1,6 +1,6 @@
 # Problem Authoring Progress
 
-Updated: 2026-09-14. Branch: `authoring`.
+Updated: 2026-09-15. Branch: `authoring`.
 
 Scope authority: `docs/superpowers/specs/2026-09-12-problem-authoring-workspace-design.md`, section 17.
 
@@ -162,8 +162,52 @@ verified. Details, limits and API usage are in `AUTHORING_OUTPUTS.md`.
   canonical Node 20/PostgreSQL 16 Docker suite above passed it successfully.
 - No existing local/production service or user database was redeployed or changed.
 
+## Slice 7 — Complete
+
+Versioned generic PDF generation, statement sanitization and immutable image
+snapshots are implemented. Contract and reproduction details: `AUTHORING_PDF.md`.
+
+- Admin-only PDF enqueue and private inline download APIs. HTML fragments retain
+  manual sample tables, Thai text, inline/display KaTeX and explicit page breaks.
+- Parser-based allowlist rejects executable HTML, arbitrary CSS, external URLs,
+  path traversal, missing assets and excessive nesting/size; worker checks again.
+- Extracted `red-gate-v1` shell with captured author metadata/avatar, original
+  layout and vendored fonts/KaTeX, including provenance and licenses.
+- Migration0005 stores immutable avatar/asset bytes independently of live rows.
+  Captured source, metadata and images survive subsequent edits/deletions.
+- Network-disabled, unprivileged wkhtmltopdf with bounded wall/CPU/address-space,
+  file size and logs. Template/image paths are explicitly allowlisted.
+- Revision-locked PDF import and terminal snapshot cleanup are atomic. Failed,
+  stale, corrupt, duplicate or concurrently expired jobs preserve the old PDF.
+- Success installs PDF and its revision, sets `generated` and clears readiness;
+  neither solution/generator nor testcases are required to build a statement.
+
+### Final verification
+
+- Canonical disposable Compose suite: **58 suites / 512 tests passed**, zero
+  skipped/failures, exit0. Includes HTTP → PostgreSQL → actual isolated PDF runner,
+  existing C++ compile/generator/output flows and database migration/restore tests.
+- Actual worker-image PDF runtime test: passed with the deployed network-none,
+  read-only, capability, 1 CPU / 1 GiB RAM /256 PID policy. Valid Red Gate succeeds;
+  malformed KaTeX and unsafe HTML fail without installing an artifact.
+- Poppler comparison: **all3 pages pixel-identical** to approved Red Gate fixture
+  at909×1286. Every rendered page visually inspected: Thai/fonts/math, image,
+  manual sample tables, spacing and page breaks match. Reproducible visual check
+  is `node tests/authoring/pdf-visual.mjs`.
+- Real runtime checks exposed root-only copied asset permissions and insufficient
+  Qt virtual address space. Template read permissions were fixed; PDF-only virtual
+  cap is2 GiB while physical container RAM remains1 GiB. Observed Qt loading RSS
+  about89 MiB versus about886 MiB reserved address space explains the old768 MiB failure.
+- TypeScript build passed on host and Docker; Compose local/production policy
+  tests: **5 passed**. `git diff --check` passed.
+- Independent read-only review found no critical/important blocker; runtime and
+  visual verification above were performed separately by the primary agent.
+- npm audit was not run successfully (registry metadata transmission was denied);
+  no dependency-security audit clearance is claimed. Builds use `--no-audit`.
+- Existing local/production services and user databases were not redeployed or changed.
+
 ## Next slices
 
-PDF/sanitization is Slice 7, mechanical verification Slice 8, Publish Slice 9, and
+Mechanical verification is Slice 8, Publish Slice 9, and
 the Admin UI Slice 10. Output generation trusts the reference algorithm supplied
 by the author; it does not prove algorithm correctness or generator reproducibility.

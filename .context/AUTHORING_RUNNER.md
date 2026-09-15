@@ -1,11 +1,12 @@
-# Authoring runner protocol — Slices 4–6
+# Authoring runner protocol — Slices 4–7
 
 Version 1 implements asynchronous `compile_solution`, `compile_generator`,
-`run_generator` and `generate_outputs` jobs. Compilation-only jobs discard their binaries. Generator jobs
+`run_generator`, `generate_outputs` and `build_pdf` jobs. Compilation-only jobs discard their binaries. Generator jobs
 execute a statically linked C++20 binary inside a private jail and persist validated
 inputs through the spool. See `AUTHORING_TESTCASES.md` for the Slice 5 artifact and
 manual-upload workflow. `AUTHORING_OUTPUTS.md` describes immutable input snapshots,
-per-case reference execution and transactional output replacement. PDF jobs remain Slice 7.
+per-case reference execution and transactional output replacement. `AUTHORING_PDF.md`
+describes sanitized immutable statement/image snapshots, bounded PDF rendering and private previews.
 
 ## Data flow
 
@@ -50,7 +51,8 @@ must not be able to read or write it.
 ## Runtime boundaries
 
 Compose supplies a dedicated `authoring-jobs` volume to backend and runner. The
-runner image contains only the worker, Zod, compiler, and OS tools. It receives no
+runner image contains the worker, Zod/HTML parser, compiler, pinned wkhtmltopdf,
+versioned template/font bundle and OS tools. It receives no
 database credentials, API secrets, Docker socket, host workspace, or network.
 
 - Read-only container root; disposable 768 MiB executable `/work` and 32 MiB noexec `/tmp`.
@@ -61,6 +63,9 @@ database credentials, API secrets, Docker socket, host workspace, or network.
 - Compiler limits: 30 seconds wall time, 768 MiB address space, 128 processes,
   64 MiB per output file, no core dumps, 10 MiB diagnostics before termination.
 - Persisted logs: at most 64 KiB; workspace paths and control characters removed.
+- PDF renderer: Ubuntu24.04/wkhtmltopdf0.12.6-2build2, uid/gid65534, offscreen Qt,
+  60s wall, 2 GiB virtual address space within the unchanged1 GiB container RAM cap,
+  64 MiB PDF maximum, captured-image/template-only local loading and no network.
 - Literal forbidden includes use the same guard as the existing judge. Filesystem
   permissions isolate private job files even when macro includes bypass that guard.
 - Compiler process groups are killed on timeout/output overflow/shutdown and workspaces
