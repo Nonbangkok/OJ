@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { Pool, QueryResultRow } from 'pg';
 import * as db from '../db';
 import { AuthoringJobRow, ProblemDraftRow } from '../types/authoring';
-import { AUTHORING_RUNNER, CaseInput, InputArtifact, JobSnapshot, jobResultSchema, jobSnapshotSchema, seedSchema } from '../authoring/protocol';
+import { AUTHORING_RUNNER, CaseInput, InputArtifact, JobSnapshot, PdfArtifact, jobResultSchema, jobSnapshotSchema, seedSchema } from '../authoring/protocol';
 import { TESTCASE_LIMITS, TestcaseError } from '../authoring/testcases';
+import { StatementError } from '../authoring/statementSanitizer';
+import { capturePdfSnapshot } from './authoringPdfSnapshotService';
 
 export type JobDatabase = {
   pool: Pick<Pool, 'connect'>;
@@ -14,7 +16,7 @@ export const ACTIVE_JOB_STATUSES = ['queued', 'compiling', 'running'];
 export const AUTHORING_COORDINATOR_LOCK = 734002;
 const QUEUE_RESERVATION_LOCK = 734003;
 type QueueResult = { kind: 'queued'; job: DurableJob }
-  | { kind: 'not_found' | 'source_missing' | 'queue_full' | 'inputs_missing' | 'unsupported_resource_limits' }
+  | { kind: 'not_found' | 'source_missing' | 'queue_full' | 'inputs_missing' | 'unsupported_resource_limits' | 'unsupported_template' | 'invalid_statement' }
   | { kind: 'revision_conflict' | 'published'; currentRevision: number }
   | { kind: 'busy'; jobId: string };
 
@@ -29,6 +31,21 @@ export async function queueGeneratorJob(draftId: string, revision: number, seed:
 
 export async function queueOutputJob(draftId: string, revision: number, database: JobDatabase = db): Promise<QueueResult> {
   return queueJob(draftId, revision, 'generate_outputs', undefined, database);
+}
+
+export async function queuePdfJob(draftId: string, revision: number, database: JobDatabase = db): Promise<QueueResult> {
+  return queueJob(draftId, revision, 'build_pdf', undefined, database);
+}
+
+export async function readQueuedFile(jobId: string, name: string, database: JobDatabase = db): Promise<Buffer> {
+  const row = (await database.query('SELECT content FROM authoring_job_files WHERE job_id=$1 AND name=$2', [jobId, name])).rows[0];
+  if (!row) throw new TestcaseError('invalid_pdf_inputs', 'Captured PDF file is missing');
+  return row.content;
+}
+
+export async function getDraftPdf(id: string, database: JobDatabase = db) {
+  return (await database.query<Pick<ProblemDraftRow, 'latest_pdf' | 'latest_pdf_revision' | 'revision'>>(
+    'SELECT latest_pdf,latest_pdf_revision,revision FROM problem_drafts WHERE id=$1', [id])).rows[0] ?? null;
 }
 
 export async function readQueuedInput(jobId: string, caseId: string, database: JobDatabase = db): Promise<string> {
@@ -52,8 +69,15 @@ async function queueJob(draftId: string, revision: number, kind: JobSnapshot['ki
     if (active.rows[0]) return await reject({ kind: 'busy', jobId: active.rows[0].id });
     const count = await client.query('SELECT COUNT(*)::int AS count FROM authoring_jobs WHERE status=ANY($1::text[])', [ACTIVE_JOB_STATUSES]);
     if (count.rows[0].count >= AUTHORING_RUNNER.MAX_PENDING_JOBS) return await reject({ kind: 'queue_full' });
-    const source = kind === 'compile_solution' || kind === 'generate_outputs' ? draft.solution_cpp : draft.generator_cpp;
-    if (!source?.trim()) return await reject({ kind: 'source_missing' });
+    const source = kind === 'build_pdf' ? '' : kind === 'compile_solution' || kind === 'generate_outputs' ? draft.solution_cpp : draft.generator_cpp;
+    if (kind !== 'build_pdf' && !source?.trim()) return await reject({ kind: 'source_missing' });
+    let pdf: Awaited<ReturnType<typeof capturePdfSnapshot>> | undefined;
+    if (kind === 'build_pdf') {
+      if (draft.template_version !== 'red-gate-v1') return await reject({ kind: 'unsupported_template' });
+      if (!draft.statement_html.trim()) return await reject({ kind: 'invalid_statement' });
+      try { pdf = await capturePdfSnapshot(client, draft); }
+      catch (error) { if (error instanceof StatementError || (error as Error).name === 'ZodError') return await reject({ kind: 'invalid_statement' }); throw error; }
+    }
     let cases: CaseInput[] | undefined;
     if (kind === 'generate_outputs') {
       if (draft.memory_limit_mb > AUTHORING_RUNNER.MAX_SOLUTION_MEMORY_MB || draft.time_limit_ms > AUTHORING_RUNNER.JOB_TIMEOUT_MS) {
@@ -68,6 +92,7 @@ async function queueJob(draftId: string, revision: number, kind: JobSnapshot['ki
     const snapshot = jobSnapshotSchema.parse({ version: 1, jobId: randomUUID(), draftId: draft.id, revision,
       kind, source, ...(seed === undefined ? {} : { seed }),
       ...(cases ? { cases, limits: { timeLimitMs: draft.time_limit_ms, memoryLimitMb: draft.memory_limit_mb } } : {}),
+      ...(pdf ? { pdf: pdf.snapshot } : {}),
       deadline: new Date(Date.now() + AUTHORING_RUNNER.JOB_TIMEOUT_MS).toISOString() });
     const inserted = await client.query<DurableJob>(`
       INSERT INTO authoring_jobs (id, draft_id, job_type, draft_revision, request_snapshot)
@@ -75,6 +100,11 @@ async function queueJob(draftId: string, revision: number, kind: JobSnapshot['ki
     `, [snapshot.jobId, draftId, snapshot.kind, revision, JSON.stringify(snapshot)]);
     if (cases) await client.query(`INSERT INTO authoring_job_inputs (job_id,case_id,case_number,input_data)
       SELECT $1,id,case_number,input_data FROM problem_draft_testcases WHERE draft_id=$2`, [snapshot.jobId, draftId]);
+    if (pdf) {
+      await client.query("INSERT INTO authoring_job_files (job_id,name,content) VALUES ($1,'avatar',$2)", [snapshot.jobId, pdf.avatar]);
+      await client.query(`INSERT INTO authoring_job_files (job_id,name,content)
+        SELECT $1,'asset:'||filename,content FROM problem_draft_assets WHERE draft_id=$2`, [snapshot.jobId, draftId]);
+    }
     await client.query('COMMIT');
     return { kind: 'queued', job: inserted.rows[0] };
   } catch (error) { await client.query('ROLLBACK'); throw error; }
@@ -88,7 +118,8 @@ export async function getAuthoringJob(id: string, database: JobDatabase = db): P
 
 /** Imports a terminal result once; compilation alone never changes draft readiness. */
 export async function applyJobResult(id: string, input: unknown, database: JobDatabase = db,
-  readInput?: (index: number, artifact: InputArtifact) => Promise<string>): Promise<boolean> {
+  readInput?: (index: number, artifact: InputArtifact) => Promise<string>,
+  readPdf?: (artifact: PdfArtifact) => Promise<Buffer>): Promise<boolean> {
   const result = jobResultSchema.parse(input);
   const client = await database.pool.connect();
   try {
@@ -98,6 +129,11 @@ export async function applyJobResult(id: string, input: unknown, database: JobDa
     if (result.jobId !== id || result.draftId !== job.draft_id || result.revision !== job.draft_revision) throw new Error('Result identity mismatch');
     const generating = job.job_type === 'run_generator';
     const outputting = job.job_type === 'generate_outputs';
+    const buildingPdf = job.job_type === 'build_pdf';
+    if (result.status === 'succeeded' && (buildingPdf ? !result.pdf || !readPdf
+      || result.pdf.templateVersion !== job.request_snapshot?.pdf?.document.templateVersion : result.pdf !== undefined)) {
+      throw new TestcaseError('invalid_pdf', 'PDF artifact does not match the requested job');
+    }
     if (result.status === 'succeeded' && (generating ? !result.inputs || !readInput || result.outputs !== undefined
       : outputting ? !result.outputs || !readInput || result.inputs !== undefined
         : result.inputs !== undefined || result.outputs !== undefined)) {
@@ -139,6 +175,11 @@ export async function applyJobResult(id: string, input: unknown, database: JobDa
       }
       await client.query("UPDATE problem_drafts SET status='generated',verified_revision=NULL,updated_at=NOW() WHERE id=$1", [job.draft_id]);
     }
+    if (buildingPdf && status === 'succeeded') {
+      const content = await readPdf!(result.pdf!);
+      await client.query(`UPDATE problem_drafts SET latest_pdf=$1,latest_pdf_revision=$2,
+        status='generated',verified_revision=NULL,updated_at=NOW() WHERE id=$3`, [content, result.revision, job.draft_id]);
+    }
     const updated = await client.query(`
       UPDATE authoring_jobs SET status=$2, result_summary=$3::jsonb, log=$4,
         error_code=$5::text, error_message=$5::text, finished_at=NOW(), request_snapshot=NULL
@@ -149,10 +190,12 @@ export async function applyJobResult(id: string, input: unknown, database: JobDa
         caseCount: result.inputs?.length ?? 0, inputs: result.inputs ?? [] } : {}),
       ...(outputting ? { caseCount: result.outputs?.length ?? 0, outputs: result.outputs ?? [],
         ...(result.failedCase ? { failedCase: result.failedCase } : {}) } : {}),
+      ...(buildingPdf ? { pdf: result.pdf ?? null } : {}),
     }),
       result.log, result.errorCode, ACTIVE_JOB_STATUSES]);
     if (updated.rows.length !== 1) { await client.query('ROLLBACK'); return false; }
     await client.query('DELETE FROM authoring_job_inputs WHERE job_id=$1', [id]);
+    await client.query('DELETE FROM authoring_job_files WHERE job_id=$1', [id]);
     await client.query('COMMIT');
     return updated.rows.length === 1;
   } catch (error) { await client.query('ROLLBACK'); throw error; }
@@ -163,6 +206,7 @@ export async function applyJobResult(id: string, input: unknown, database: JobDa
 export async function failAuthoringJob(id: string, code: string, timedOut: boolean, database: JobDatabase = db): Promise<void> {
   await database.query(`WITH terminal AS (UPDATE authoring_jobs SET status=$2, error_code=$3::text, error_message=$3::text,
     finished_at=NOW(), request_snapshot=NULL WHERE id=$1 AND status=ANY($4::text[]) RETURNING id)
-    DELETE FROM authoring_job_inputs WHERE job_id IN (SELECT id FROM terminal)`,
+    , inputs AS (DELETE FROM authoring_job_inputs WHERE job_id IN (SELECT id FROM terminal))
+    DELETE FROM authoring_job_files WHERE job_id IN (SELECT id FROM terminal)`,
   [id, timedOut ? 'timed_out' : 'failed', code, ACTIVE_JOB_STATUSES]);
 }

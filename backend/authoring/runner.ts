@@ -5,6 +5,7 @@ import { AuthoringSpool } from './spool';
 import { compileJob } from './compiler';
 import { generateInputs } from './generator';
 import { generateOutputs } from './outputs';
+import { buildPdf } from './pdf';
 import { AUTHORING_RUNNER, failedResult } from './protocol';
 
 /** Single-consumer worker; the container entrypoint holds a kernel flock across restarts. */
@@ -14,7 +15,7 @@ async function main(): Promise<void> {
   await mkdir('/work', { recursive: true, mode: 0o755 });
   // Only the runner's disposable compiler directories live under this tmpfs.
   for (const name of await readdir('/work')) {
-    if (/^compile-[A-Za-z0-9]+$/.test(name)) await rm(path.join('/work', name), { recursive: true, force: true });
+    if (/^(compile|pdf)-[A-Za-z0-9]+$/.test(name)) await rm(path.join('/work', name), { recursive: true, force: true });
   }
   await spool.recoverInterrupted();
   const abort = new AbortController();
@@ -27,6 +28,7 @@ async function main(): Promise<void> {
       ? await generateInputs(job, '/work', spool, { signal: abort.signal })
       : job.kind === 'generate_outputs'
       ? await generateOutputs(job, '/work', spool, { signal: abort.signal })
+      : job.kind === 'build_pdf' ? await buildPdf(job, '/work', spool, { signal: abort.signal })
       : await compileJob(job, '/work', { signal: abort.signal }); }
     catch { result = failedResult(job, 'runner_error'); }
     await spool.complete(job.jobId, result);

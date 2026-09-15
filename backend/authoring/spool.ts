@@ -3,7 +3,7 @@ import { chmod, lstat, mkdir, mkdtemp, open, opendir, readdir, rename, rm, write
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { AUTHORING_RUNNER, CaseInput, failedResult, InputArtifact, JobResult, JobSnapshot, jobResultSchema, jobSnapshotSchema } from './protocol';
+import { AUTHORING_RUNNER, CaseInput, failedResult, InputArtifact, JobResult, JobSnapshot, PdfArtifact, PdfFile, jobResultSchema, jobSnapshotSchema } from './protocol';
 import { TESTCASE_LIMITS, TestcaseError, validateTestcaseFilename, naturalFilenameCompare, readTestcaseFile, decodeTestcaseText } from './testcases';
 
 const missing = (error: unknown) => (error as NodeJS.ErrnoException).code === 'ENOENT';
@@ -46,13 +46,25 @@ export class AuthoringSpool {
     try { await lstat(file); return true; } catch (error) { if (missing(error)) return false; throw error; }
   }
 
-  async deliver(input: JobSnapshot, readInput?: (index: number, artifact: CaseInput) => Promise<string>): Promise<void> {
+  async deliver(input: JobSnapshot, readInput?: (index: number, artifact: CaseInput) => Promise<string>,
+    readFile?: (name: string) => Promise<Buffer>): Promise<void> {
     const job = jobSnapshotSchema.parse(input);
     if (await this.exists(`${this.location('results', job.jobId)}.json`)
       || await this.exists(this.location('active', job.jobId))
       || await this.exists(this.location('ready', job.jobId))) return;
     const stage = await mkdtemp(path.join(this.root, 'staging', `${job.jobId}-`));
     try {
+      if (job.kind === 'build_pdf') {
+        if (!readFile) throw new TestcaseError('invalid_pdf_inputs', 'PDF snapshot reader is required');
+        await mkdir(path.join(stage, 'pdf', 'assets'), { recursive: true, mode: 0o700 });
+        for (const [name, file, artifact] of [
+          ['avatar', 'avatar.png', job.pdf!.avatar],
+          ...job.pdf!.assets.map(a => [`asset:${a.filename}`, `assets/${a.filename}`, a] as const),
+        ] as const) {
+          const content = await readFile(name); this.validateBinary(content, artifact, 'invalid_pdf_inputs');
+          await writeFile(path.join(stage, 'pdf', file), content, { mode: 0o600, flag: 'wx' });
+        }
+      }
       if (job.kind === 'generate_outputs') {
         if (!readInput) throw new TestcaseError('invalid_job_inputs', 'Input snapshot reader is required');
         await mkdir(path.join(stage, 'inputs'), { mode: 0o700 });
@@ -186,10 +198,54 @@ export class AuthoringSpool {
   }
 
   private validateArtifact(content: Buffer, artifact: InputArtifact, code: string): string {
+    this.validateBinary(content, artifact, code);
+    return decodeTestcaseText(content, artifact.filename);
+  }
+
+  private validateBinary(content: Buffer, artifact: Pick<InputArtifact, 'sizeBytes' | 'sha256'>, code: string): void {
     if (content.length !== artifact.sizeBytes || createHash('sha256').update(content).digest('hex') !== artifact.sha256) {
       throw new TestcaseError(code, 'Artifact checksum mismatch');
     }
-    return decodeTestcaseText(content, artifact.filename);
+  }
+
+  async readPdfInput(id: string, artifact: PdfFile, avatar = false): Promise<Buffer> {
+    const active = this.location('active', id);
+    try {
+      for (const directory of [active, path.join(active, 'pdf'), ...(!avatar ? [path.join(active, 'pdf', 'assets')] : [])]) {
+        if (!(await lstat(directory)).isDirectory()) throw new Error('Invalid PDF input directory');
+      }
+      validateTestcaseFilename(artifact.filename);
+      const content = await readTestcaseFile(path.join(active, 'pdf', avatar ? 'avatar.png' : `assets/${artifact.filename}`));
+      this.validateBinary(content, artifact, 'invalid_pdf_inputs'); return content;
+    } catch { throw new TestcaseError('invalid_pdf_inputs', `Missing or invalid PDF image: ${artifact.filename}`); }
+  }
+
+  private validatePdf(content: Buffer): void {
+    if (content.length > AUTHORING_RUNNER.MAX_PDF_BYTES || content.subarray(0, 5).toString() !== '%PDF-'
+      || !content.subarray(-1024).toString('latin1').includes('%%EOF')) throw new TestcaseError('invalid_pdf', 'Invalid PDF document');
+  }
+
+  async storePdf(id: string, file: string): Promise<PdfArtifact> {
+    const content = await readTestcaseFile(file); this.validatePdf(content);
+    const stage = await mkdtemp(path.join(this.root, 'staging', `${uuid.parse(id)}-pdf-`));
+    try {
+      await writeFile(path.join(stage, 'document.pdf'), content, { mode: 0o600, flag: 'wx' });
+      await rename(stage, this.location('artifacts', id));
+      return { sizeBytes: content.length, sha256: createHash('sha256').update(content).digest('hex'), templateVersion: 'red-gate-v1' };
+    } finally { await rm(stage, { recursive: true, force: true }); }
+  }
+
+  async readPdf(id: string, artifact: PdfArtifact): Promise<Buffer> {
+    try {
+      const dir = this.location('artifacts', id);
+      if (!(await lstat(dir)).isDirectory()) throw new Error('Invalid artifact directory');
+      const content = await readTestcaseFile(path.join(dir, 'document.pdf'));
+      this.validateBinary(content, artifact, 'invalid_pdf'); this.validatePdf(content); return content;
+    } catch (error) {
+      if (!(error instanceof TestcaseError) && (error as NodeJS.ErrnoException).code
+        && !['ENOENT', 'ELOOP'].includes((error as NodeJS.ErrnoException).code!)) throw error;
+      throw new TestcaseError('invalid_pdf', 'Missing or corrupt PDF artifact');
+    }
   }
 
   private async readArtifact(directory: string, index: number, artifact: InputArtifact, code: string): Promise<string> {

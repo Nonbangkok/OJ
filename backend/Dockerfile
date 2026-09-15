@@ -23,7 +23,7 @@ COPY package*.json ./
 
 # Install app dependencies
 # Use `npm ci` for reproducible, lockfile-exact installs (requires package-lock.json).
-RUN npm ci
+RUN npm ci --no-audit
 
 # Copy the rest of your app's source code from the 'backend' directory
 COPY . .

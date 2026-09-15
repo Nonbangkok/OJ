@@ -12,6 +12,8 @@
 frontend/build/
 /build
 /backend/dist
+/output/pdf/
+/tmp/pdfs/
 
 # misc
 .vscode

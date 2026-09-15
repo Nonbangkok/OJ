@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 
-type ProcessOptions = { cwd: string; timeoutMs: number; maxLogBytes: number; uid?: number; gid?: number; signal?: AbortSignal; seed?: string };
+type ProcessOptions = { cwd: string; timeoutMs: number; maxLogBytes: number; uid?: number; gid?: number; signal?: AbortSignal; seed?: string; headless?: boolean };
 type ProcessResult = { exitCode: number | null; reason: 'exited' | 'timeout' | 'output_limit' | 'spawn_error' | 'aborted'; log: string; durationMs: number };
 
 /** Executes without a shell or inherited secrets; kills the whole process group on limits. */
@@ -14,7 +14,8 @@ export async function runBoundedProcess(command: string, args: string[], options
       cwd: options.cwd, uid: options.uid, gid: options.gid, detached: true,
       // ProcessEnv's application-level required fields must NOT be passed to children.
       env: { PATH: '/usr/bin:/bin', LANG: 'C.UTF-8', TMPDIR: options.seed === undefined ? options.cwd : '/input',
-        ...(options.seed === undefined ? {} : { OJ_SEED: options.seed }) } as unknown as NodeJS.ProcessEnv,
+        ...(options.seed === undefined ? {} : { OJ_SEED: options.seed }),
+        ...(options.headless ? { QT_QPA_PLATFORM: 'offscreen' } : {}) } as unknown as NodeJS.ProcessEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const kill = () => {

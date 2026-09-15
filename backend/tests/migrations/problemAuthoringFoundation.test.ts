@@ -14,6 +14,7 @@ describe('problem authoring foundation migration', () => {
       '0002_problem_authoring_foundation',
       '0003_authoring_job_delivery',
       '0004_authoring_job_inputs',
+      '0005_authoring_job_files',
     ]);
   });
 

@@ -16,6 +16,10 @@ export const AUTHORING_RUNNER = {
   MAX_PROCESSES: 128,
   MAX_PENDING_JOBS: 100,
   MAX_SOLUTION_MEMORY_MB: 736,
+  PDF_TIMEOUT_MS: 60_000,
+  MAX_PDF_BYTES: 64 * 1024 * 1024,
+  // Qt reserves virtual address ranges beyond its resident memory usage.
+  PDF_ADDRESS_SPACE_BYTES: 2 * 1024 * 1024 * 1024,
 } as const;
 
 export const seedSchema = z.string().regex(/^(0|[1-9][0-9]{0,19})$/)
@@ -40,10 +44,31 @@ const uniqueCases = (cases: CaseInput[]) => new Set(cases.map(c => c.caseId)).si
   && new Set(cases.map(c => c.filename)).size === cases.length
   && cases.reduce((sum, c) => sum + c.sizeBytes, 0) <= TESTCASE_LIMITS.MAX_TOTAL_BYTES;
 
+export const pdfFileSchema = inputArtifactSchema.extend({
+  sizeBytes: z.number().int().positive().max(10 * 1024 * 1024),
+  mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp']),
+});
+export type PdfFile = z.infer<typeof pdfFileSchema>;
+export const pdfArtifactSchema = z.object({
+  sizeBytes: z.number().int().min(8).max(AUTHORING_RUNNER.MAX_PDF_BYTES),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/), templateVersion: z.literal('red-gate-v1'),
+}).strict();
+export type PdfArtifact = z.infer<typeof pdfArtifactSchema>;
+const metadataText = z.string().max(1000);
+export const pdfSnapshotSchema = z.object({
+  document: z.object({ templateVersion: z.literal('red-gate-v1'), title: metadataText, taskCode: metadataText,
+    akaName: metadataText, realName: metadataText, language: metadataText, countryCode: metadataText,
+    statementHtml: z.string().refine(value => Buffer.byteLength(value) <= 2 * 1024 * 1024) }).strict(),
+  avatar: pdfFileSchema.extend({ mimeType: z.literal('image/png') }),
+  assets: z.array(pdfFileSchema).max(1000).refine(files => new Set(files.map(f => f.filename)).size === files.length
+    && files.reduce((sum, f) => sum + f.sizeBytes, 0) <= 100 * 1024 * 1024),
+}).strict();
+
 export const jobSnapshotSchema = z.object({
   version: z.literal(1), jobId: z.string().uuid(), draftId: z.string().uuid(),
   revision: z.number().int().positive(),
-  kind: z.enum(['compile_solution', 'compile_generator', 'run_generator', 'generate_outputs']),
+  kind: z.enum(['compile_solution', 'compile_generator', 'run_generator', 'generate_outputs', 'build_pdf']),
+  pdf: pdfSnapshotSchema.optional(),
   seed: seedSchema.optional(),
   cases: z.array(caseInputSchema).min(1).max(TESTCASE_LIMITS.MAX_CASES).refine(uniqueCases).optional(),
   limits: z.object({ timeLimitMs: z.number().int().positive().max(AUTHORING_RUNNER.JOB_TIMEOUT_MS),
@@ -52,7 +77,8 @@ export const jobSnapshotSchema = z.object({
   deadline: z.string().datetime(),
 }).strict().refine(value => value.kind === 'run_generator' ? value.seed !== undefined : value.seed === undefined)
   .refine(value => value.kind === 'generate_outputs' ? value.cases !== undefined && value.limits !== undefined
-    : value.cases === undefined && value.limits === undefined);
+    : value.cases === undefined && value.limits === undefined)
+  .refine(value => value.kind === 'build_pdf' ? value.pdf !== undefined && value.source === '' : value.pdf === undefined);
 
 export const jobResultSchema = z.object({
   version: z.literal(1), jobId: z.string().uuid(), draftId: z.string().uuid(),
@@ -62,17 +88,20 @@ export const jobResultSchema = z.object({
     'runner_interrupted', 'runner_error', 'job_expired', 'generator_runtime_error',
     'generator_timeout', 'generator_output_limit', 'invalid_generated_inputs', 'solution_runtime_error',
     'solution_timeout', 'solution_output_limit', 'invalid_generated_outputs', 'invalid_job_inputs',
-    'unsupported_resource_limits']).nullable(),
+    'unsupported_resource_limits', 'pdf_render_error', 'pdf_timeout', 'pdf_output_limit',
+    'invalid_pdf', 'invalid_pdf_inputs', 'invalid_statement']).nullable(),
   log: z.string().refine(value => Buffer.byteLength(value) <= AUTHORING_RUNNER.MAX_LOG_BYTES),
   durationMs: z.number().int().min(0).max(AUTHORING_RUNNER.JOB_TIMEOUT_MS),
   exitCode: z.number().int().nullable(),
   inputs: z.array(inputArtifactSchema).min(1).max(TESTCASE_LIMITS.MAX_CASES).optional(),
   outputs: z.array(outputArtifactSchema).min(1).max(TESTCASE_LIMITS.MAX_CASES).refine(uniqueCases).optional(),
   failedCase: caseMeasurementSchema.optional(),
+  pdf: pdfArtifactSchema.optional(),
 }).strict().refine(value => value.status === 'succeeded'
   ? value.errorCode === null && value.exitCode === 0 && value.failedCase === undefined
-  : value.errorCode !== null && value.inputs === undefined && value.outputs === undefined)
+  : value.errorCode !== null && value.inputs === undefined && value.outputs === undefined && value.pdf === undefined)
   .refine(value => !(value.inputs && value.outputs))
+  .refine(value => !value.pdf || (!value.inputs && !value.outputs))
   .refine(value => !value.inputs || (new Set(value.inputs.map(i => i.filename)).size === value.inputs.length
     && value.inputs.reduce((total, i) => total + i.sizeBytes, 0) <= TESTCASE_LIMITS.MAX_TOTAL_BYTES));
 

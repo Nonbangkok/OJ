@@ -28,6 +28,7 @@
     "express-rate-limit": "^8.5.2",
     "express-session": "^1.18.0",
     "express-sse": "^0.5.3",
+    "htmlparser2": "10.0.0",
     "multer": "^2.0.2",
     "node-cron": "^3.0.3",
     "pg": "^8.16.3",

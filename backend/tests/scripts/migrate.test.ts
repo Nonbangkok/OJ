@@ -137,7 +137,7 @@ describe('migration command', () => {
 
     const applied = await loadRunMigrationsFromPool()(pool);
 
-    expect(applied).toEqual(['0002_problem_authoring_foundation', '0003_authoring_job_delivery', '0004_authoring_job_inputs']);
+    expect(applied).toEqual(['0002_problem_authoring_foundation', '0003_authoring_job_delivery', '0004_authoring_job_inputs', '0005_authoring_job_files']);
     expect(calls).toContainEqual({
       text: expect.stringContaining('CREATE TABLE author_profiles'),
       params: undefined,
