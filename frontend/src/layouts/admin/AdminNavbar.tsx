@@ -84,6 +84,9 @@ const AdminNavbar = () => {
             </>
           )}
           {user?.role === USER_ROLES.ADMIN && (
+            <li onMouseEnter={handleMouseEnter}><NavLink to="/admin/authoring">Authoring</NavLink></li>
+          )}
+          {user?.role === USER_ROLES.ADMIN && (
             <li onMouseEnter={handleMouseEnter}><NavLink to="/admin/settings">Settings</NavLink></li>
           )}
         </ul>

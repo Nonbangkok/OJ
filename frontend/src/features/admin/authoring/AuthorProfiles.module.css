@@ -1,0 +1,25 @@
+.root { color: var(--text-primary); }
+.heading, .actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.heading { justify-content: space-between; }
+.root h3, .root h4 { margin: 0.5rem 0; }
+.root p { line-height: 1.5; }
+.hint, .root small { color: var(--text-secondary); font-size: 0.9rem; }
+.profiles { list-style: none; padding: 0; margin: 1rem 0; }
+.profiles li { display: flex; gap: 0.75rem; align-items: center; padding: 0.85rem 0; border-bottom: 1px solid var(--border-color); }
+.profiles li > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.profiles li > div > span { display: block; margin-top: 0.2rem; }
+.avatar { display: inline-flex; flex: 0 0 auto; width: 2.5rem; height: 2.5rem; justify-content: center; align-items: center; border-radius: var(--radius-sm); background: var(--background-secondary); border: 1px solid var(--border-color); font-weight: 700; }
+.editor { padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--background-secondary); }
+.root fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.legend { margin-top: 0.75rem; font-weight: 600; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 0 1rem; }
+.root label { display: flex; flex-direction: column; gap: 0.4rem; margin: 0.8rem 0; }
+.root input { min-width: 0; max-width: 100%; padding: 0.55rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--background-primary); color: var(--text-primary); }
+.root input[type="range"] { padding: 0; width: 100%; }
+.root button { padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--background-primary); color: var(--text-primary); cursor: pointer; }
+.root button:disabled, .root fieldset:disabled button { opacity: 0.55; cursor: not-allowed; }
+.root button:focus-visible, .root input:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+.crop { display: flex; gap: 1rem; align-items: start; flex-wrap: wrap; }
+.crop canvas { display: block; width: 220px; max-width: 100%; height: auto; aspect-ratio: 1; border: 1px solid var(--border-color); }
+.crop > div { flex: 1 1 220px; }
+.actions { margin-top: 1.25rem; }

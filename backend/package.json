@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "cross-env NODE_ENV=test jest",
-    "build": "tsc",
+    "build": "tsc && node scripts/copyAuthoringTemplates.cjs",
     "db:migrate": "tsx scripts/migrate.ts",
     "migrate": "npm run build && node dist/scripts/migrate.js",
     "start": "npm run build && node dist/scripts/migrate.js && node dist/server.js",
