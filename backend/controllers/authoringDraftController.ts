@@ -12,7 +12,9 @@ import {
   problemDraftIdParamSchema,
   refreshProblemDraftAuthorSchema,
   updateProblemDraftSchema,
+  outputAuthoringJobSchema,
 } from '../schemas/requestSchemas';
+import { publishProblemDraft } from '../services/authoringPublishService';
 import {
   createProblemDraft,
   getProblemDraft,
@@ -137,6 +139,29 @@ const resolveCreateAuthorSnapshot = async (
 };
 
 router.use('/admin/authoring/drafts', requireAuth, requireAdmin);
+
+router.post('/admin/authoring/drafts/:id/publish',
+  validateRequest({ params: problemDraftIdParamSchema, body: outputAuthoringJobSchema }),
+  asyncHandler(async (req, res) => {
+    const result = await publishProblemDraft(String(req.params.id), req.body.expectedRevision);
+    if (result.kind === 'created') {
+      const { kind: _kind, ...published } = result;
+      res.status(201).json({ ...published, status: 'published', isVisible: false }); return;
+    }
+    const errors = {
+      not_found: ['draft_not_found', 'Problem draft not found'],
+      published: ['draft_published', 'Published problem drafts are read-only'],
+      revision_conflict: ['revision_conflict', 'Problem draft revision conflict'],
+      not_ready: ['draft_not_ready', 'Verify the current draft revision before publishing'],
+      pdf_not_verified: ['pdf_not_verified', 'The current PDF does not match successful verification'],
+      invalid_testcases: ['invalid_testcases', 'Stored testcase pairs do not match successful verification'],
+      busy: ['job_active', 'Wait for the active authoring job before publishing'],
+      problem_id_conflict: ['problem_id_conflict', 'A problem with this ID already exists; nothing was overwritten'],
+    } as const;
+    const [code, message] = errors[result.kind];
+    res.status(result.kind === 'not_found' ? 404 : 409).json({ code, message,
+      ...(result.currentRevision === undefined ? {} : { currentRevision: result.currentRevision }) });
+  }));
 
 router.post('/admin/authoring/drafts',
   validateRequest({ body: createProblemDraftSchema }),
