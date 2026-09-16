@@ -332,7 +332,8 @@ UI behavior and the three workspace APIs are documented in `AUTHORING_UI.md`.
   tabs render horizontally at desktop width and an idle page no longer reports429.
 - The saved Red Gate draft that originally failed on `<image>` was rechecked after
   the compatibility correction without editing its source: fast preview rendered
-  one H1, one private image, two sample tables and19 KaTeX nodes with zero scripts.
+  one H1, two private images (avatar and statement), two sample tables and19 KaTeX
+  nodes with zero scripts.
   Runner build revision6 succeeded. Poppler rendered its A4 PDF as3 pages; all
   pages were visually inspected and retained the profile image, statement image,
   Thai text, math, tables and requested page break.
@@ -341,9 +342,11 @@ UI behavior and the three workspace APIs are documented in `AUTHORING_UI.md`.
   four-attempt random constant-work reservation; non-math source follows the
   authoritative task-pdf-writer renderer and enters Marked unchanged. Both fixes
   have RED/GREEN regressions, and Verify now captures hybrid source plus an image.
+  Re-review found no remaining critical, important or minor issue and assessed the
+  compatibility correction as ready to merge.
 - The `oj-authoring-demo` local stack was rebuilt on port18090 for this check while
   preserving its local-only database; the statement source/revision was unchanged
-  and only a successful PDF artifact/job was added. Production was not redeployed.
+  and only successful PDF artifacts/jobs were added. Production was not redeployed.
 
 ## Planned slices
 
