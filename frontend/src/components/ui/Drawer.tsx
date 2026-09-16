@@ -2,40 +2,33 @@ import { useEffect, useId, useRef } from 'react';
 import type React from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from './Button';
-import styles from './Dialog.module.css';
+import styles from './Drawer.module.css';
 import { getFocusableElements, wrapTabFocus } from './focusTrap';
 
-export interface DialogProps {
+export interface DrawerProps {
   open: boolean;
   title: string;
-  description?: string;
-  children?: React.ReactNode;
-  footer?: React.ReactNode;
+  side?: 'right' | 'left';
+  children: React.ReactNode;
   onClose: () => void;
   initialFocusRef?: React.RefObject<HTMLElement | null>;
-  closeOnEscape?: boolean;
 }
 
-export function Dialog({
+export function Drawer({
   open,
   title,
-  description,
+  side = 'right',
   children,
-  footer,
   onClose,
   initialFocusRef,
-  closeOnEscape = true,
-}: DialogProps) {
+}: DrawerProps) {
   const titleId = useId();
-  const descriptionId = useId();
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   const initialFocusRefRef = useRef(initialFocusRef);
-  const closeOnEscapeRef = useRef(closeOnEscape);
 
   onCloseRef.current = onClose;
   initialFocusRefRef.current = initialFocusRef;
-  closeOnEscapeRef.current = closeOnEscape;
 
   useEffect(() => {
     if (!open) {
@@ -44,26 +37,24 @@ export function Dialog({
 
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
-    const dialog = dialogRef.current;
+    const drawer = drawerRef.current;
 
     document.body.style.overflow = 'hidden';
 
     const initialTarget = initialFocusRefRef.current?.current;
-    const fallbackTarget = dialog ? getFocusableElements(dialog)[0] : undefined;
-    (initialTarget ?? fallbackTarget ?? dialog)?.focus();
+    const fallbackTarget = drawer ? getFocusableElements(drawer)[0] : undefined;
+    (initialTarget ?? fallbackTarget ?? drawer)?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && closeOnEscapeRef.current) {
+      if (event.key === 'Escape') {
         event.preventDefault();
         onCloseRef.current();
         return;
       }
 
-      if (!dialog) {
-        return;
+      if (drawer) {
+        wrapTabFocus(event, drawer);
       }
-
-      wrapTabFocus(event, dialog);
     };
 
     document.addEventListener('keydown', handleKeyDown);
@@ -81,7 +72,7 @@ export function Dialog({
 
   return createPortal(
     <div
-      className={styles.backdrop}
+      className={`${styles.backdrop} ${styles[side]}`}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -89,12 +80,11 @@ export function Dialog({
       }}
     >
       <div
-        ref={dialogRef}
-        className={styles.dialog}
+        ref={drawerRef}
+        className={`${styles.drawer} ${styles[side]} ${styles.motionSafe}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
       >
         <div className={styles.header}>
@@ -105,19 +95,13 @@ export function Dialog({
             className={styles.closeButton}
             variant="neutral"
             size="compact"
-            aria-label="Close dialog"
+            aria-label="Close drawer"
             onClick={onClose}
           >
             <span aria-hidden="true">×</span>
           </Button>
         </div>
-        {description && (
-          <p id={descriptionId} className={styles.description}>
-            {description}
-          </p>
-        )}
-        {children && <div className={styles.body}>{children}</div>}
-        {footer && <div className={styles.footer}>{footer}</div>}
+        <div className={styles.body}>{children}</div>
       </div>
     </div>,
     document.body
