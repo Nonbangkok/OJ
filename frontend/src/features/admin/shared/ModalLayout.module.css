@@ -20,13 +20,6 @@
   margin-bottom: 1rem;
 }
 
-.confirmation-modal-content {
-  background-color: var(--background-secondary);
-  padding: 2rem;
-  border-radius: 8px;
-  text-align: center;
-}
-
 .modal-actions {
   margin-top: 1.5rem;
   display: flex;
@@ -48,14 +41,6 @@
 }
 .button-save:hover {
   background-color: #218838;
-}
-
-.button-danger {
-  background-color: #dc3545;
-  color: white;
-}
-.button-danger:hover {
-  background-color: #c82333;
 }
 
 .modal-overlay fieldset {
