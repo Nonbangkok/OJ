@@ -19,6 +19,22 @@
   --accent-primary: #007bff;
   --accent-primary-hover: #0056b3;
 
+  --action-primary-foreground: #ffffff;
+  --action-primary-background: var(--accent-primary);
+  --action-primary-hover-background: var(--accent-primary-hover);
+  --action-secondary-foreground: var(--text-primary);
+  --action-secondary-background: var(--surface-elevated);
+  --action-secondary-hover-background: var(--background-secondary);
+  --action-neutral-foreground: var(--text-primary);
+  --action-neutral-background: var(--background-tertiary);
+  --action-neutral-hover-background: var(--border-color);
+  --action-destructive-foreground: #ffffff;
+  --action-destructive-background: var(--button-danger-bg);
+  --action-destructive-hover-background: var(--button-danger-hover);
+  --action-focus-ring: rgba(13, 110, 253, 0.35);
+  --surface-elevated: #ffffff;
+  --surface-elevation: var(--box-shadow);
+
   --button-danger-bg: #dc3545;
   /* Red color for danger buttons */
   --button-danger-hover: #c82333;
@@ -58,6 +74,22 @@
 
   --accent-primary: #0d6efd;
   --accent-primary-hover: #3d8bfd;
+
+  --action-primary-foreground: #ffffff;
+  --action-primary-background: var(--accent-primary);
+  --action-primary-hover-background: var(--accent-primary-hover);
+  --action-secondary-foreground: var(--text-primary);
+  --action-secondary-background: var(--surface-elevated);
+  --action-secondary-hover-background: var(--background-tertiary);
+  --action-neutral-foreground: var(--text-primary);
+  --action-neutral-background: var(--background-tertiary);
+  --action-neutral-hover-background: var(--navbar-slider-background);
+  --action-destructive-foreground: #ffffff;
+  --action-destructive-background: var(--button-danger-bg);
+  --action-destructive-hover-background: var(--button-danger-hover);
+  --action-focus-ring: rgba(61, 139, 253, 0.5);
+  --surface-elevated: #1e1e1e;
+  --surface-elevation: var(--box-shadow);
 
   --button-danger-bg: #dc3545;
   /* Ensure consistent danger color in dark mode */
