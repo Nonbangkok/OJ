@@ -6,6 +6,7 @@ import { getErrorMessage } from '../../../utils/error';
 import { Draft, DraftFields, Profile } from './types';
 import MetadataFields from './MetadataFields';
 import DraftWorkspace from './DraftWorkspace';
+import StatementEditor from './StatementEditor';
 import AuthorProfiles from './AuthorProfiles';
 import styles from './Authoring.module.css';
 
@@ -62,10 +63,11 @@ function DraftList() {
   </section>;
 }
 
-export default function ProblemAuthoring() {
+export default function ProblemAuthoring({ editorMode = false }: { editorMode?: boolean }) {
   const { user, isLoading } = useAuth();
   const { draftId } = useParams();
   if (isLoading) return <p role="status">Loading authoring…</p>;
   if (user?.role !== 'admin') return <p role="alert">Admin access required for Problem Authoring.</p>;
-  return draftId ? <DraftWorkspace key={draftId} id={draftId} /> : <DraftList />;
+  return draftId ? editorMode ? <StatementEditor key={draftId} id={draftId} />
+    : <DraftWorkspace key={draftId} id={draftId} /> : <DraftList />;
 }

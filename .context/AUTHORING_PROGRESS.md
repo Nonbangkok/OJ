@@ -302,6 +302,14 @@ UI behavior and the three workspace APIs are documented in `AUTHORING_UI.md`.
   image crop/removal and snapshot semantics.
 - Script-free compiled/sanitized Markdown/HTML/KaTeX preview for unsaved source, private assets and
   authoritative runner-built PDF preview.
+- Dedicated `/admin/authoring/:draftId/editor` mode bypasses the Admin nav and
+  narrow container. It provides a full-viewport source/preview split, 400 ms
+  realtime preview, stale-response protection, responsive stacking and
+  collapsible asset controls. Clean drafts resync on focus/visibility changes;
+  dirty source is retained and requires an explicit conflict-only discard.
+  Per-tab recovery preserves source across browser Back/Forward while keeping
+  the original base revision, and raced active jobs refresh job state without a
+  false content conflict.
 - Optional seeded/legacy generator controls, manual or ZIP testcase management,
   missing-versus-empty output handling, destructive confirmations and bounded inspection.
 - Durable latest100 job history with on-demand logs/reports. Idle drafts do not
@@ -323,7 +331,7 @@ UI behavior and the three workspace APIs are documented in `AUTHORING_UI.md`.
   failures/skips, exit0. Includes the full real HTTP → PostgreSQL → C++20/PDF
   runner → Verify → hidden Publish fixture, task-pdf-writer source compilation,
   and all previous regressions.
-- Frontend: **62 suites /311 tests passed**, zero failures; application and all-test
+- Frontend: **63 suites /322 tests passed**, zero failures; application and all-test
   TypeScript checks, ESLint and optimized production build passed.
 - Local/production Compose configuration policy: **5 tests passed**.
 - Browser verification on disposable port18090 completed draft creation, Thai +
@@ -337,6 +345,15 @@ UI behavior and the three workspace APIs are documented in `AUTHORING_UI.md`.
   Runner build revision6 succeeded. Poppler rendered its A4 PDF as3 pages; all
   pages were visually inspected and retained the profile image, statement image,
   Thai text, math, tables and requested page break.
+- The same saved draft was opened in the dedicated editor at 1280×720. The Admin
+  navbar/container were absent, the split workspace occupied 610px of the 720px
+  viewport and its sandbox retained the same one-H1/two-image/two-table/19-KaTeX,
+  zero-script result. A grid-row regression first reproduced the short editor,
+  then passed after introducing a stable notices row.
+- Independent review found Back/Forward recovery and false `job_active` conflict
+  gaps. Recovery now preserves its original revision across further edits while
+  clean post-sync edits start from the new revision; raced jobs refresh job state.
+  All four RED/GREEN regressions passed and targeted re-review found no blocker.
 - Independent review found an unbounded placeholder-collision scan and ordinary
   backslash corruption in code/preformatted HTML. The collision search is now a
   four-attempt random constant-work reservation; non-math source follows the

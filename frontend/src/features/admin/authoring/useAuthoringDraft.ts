@@ -27,7 +27,7 @@ export default function useAuthoringDraft(id: string, pollMs = 3000) {
   const onError = useCallback((err: unknown) => {
     const code = toApiLikeError(err).response?.data?.code;
     setError(getErrorMessage(err, 'Request failed. Retry when the connection is available.'));
-    if (['revision_conflict', 'draft_published', 'job_active'].includes(String(code))) setConflict(true);
+    if (code === 'revision_conflict') setConflict(true);
   }, []);
 
   const refresh = useCallback(async (discard = false) => {
@@ -37,10 +37,13 @@ export default function useAuthoringDraft(id: string, pollMs = 3000) {
     setJobs(history.data); setLoaded(true);
     if (discard || !dirtyRef.current) {
       setDraft(detail.data); setForm(detail.data); setConflict(false); setError(''); dirtyRef.current = false;
-    } else setConflict(true);
+    } else setDraft(previous => {
+      if (previous && previous.revision !== detail.data.revision) setConflict(true);
+      return previous;
+    });
   }, [id]);
 
-  async function reload() {
+  async function discardAndRefresh() {
     if (busyRef.current) return;
     setOperationBusy(true);
     try { await refresh(true); } catch (err) { onError(err); }
@@ -62,6 +65,19 @@ export default function useAuthoringDraft(id: string, pollMs = 3000) {
     void load();
     return () => { cancelled = true; };
   }, [id, onError]);
+
+  useEffect(() => {
+    const sync = () => {
+      if (document.visibilityState !== 'visible' || busyRef.current) return;
+      void refresh().catch(onError);
+    };
+    window.addEventListener('focus', sync);
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      window.removeEventListener('focus', sync);
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }, [refresh, onError]);
 
   useEffect(() => {
     if (!activeJobId) return;
@@ -93,6 +109,12 @@ export default function useAuthoringDraft(id: string, pollMs = 3000) {
     dirtyRef.current = true;
     setForm(previous => previous ? { ...previous, [key]: value } : null);
   }
+  function restoreStatement(statementHtml: string, baseRevision: number) {
+    if (!draft || !form || statementHtml === form.statementHtml) return;
+    dirtyRef.current = true;
+    setForm(previous => previous ? { ...previous, statementHtml } : null);
+    if (baseRevision !== draft.revision) setConflict(true);
+  }
   async function save() {
     if (!draft || !form || !dirty || busyRef.current || activeJob || conflict || !loaded || draft.status === 'published') return;
     setOperationBusy(true); setError('');
@@ -100,7 +122,13 @@ export default function useAuthoringDraft(id: string, pollMs = 3000) {
     try {
       const result = await api.patch<Draft>(draftBase(id), { expectedRevision: draft.revision, ...changes });
       setDraft(result.data); setForm(result.data); dirtyRef.current = false;
-    } catch (err) { onError(err); }
+    } catch (err) {
+      onError(err);
+      const code = toApiLikeError(err).response?.data?.code;
+      if (code === 'job_active' || code === 'draft_published') {
+        try { await refresh(); } catch (refreshError) { onError(refreshError); }
+      }
+    }
     finally { setOperationBusy(false); }
   }
   async function mutate(action: () => Promise<unknown>) {
@@ -119,7 +147,13 @@ export default function useAuthoringDraft(id: string, pollMs = 3000) {
         setDraft(previous => previous ? { ...previous, status: 'draft', verifiedRevision: null } : null);
         setForm(previous => previous ? { ...previous, status: 'draft', verifiedRevision: null } : null);
       }
-    } catch (err) { onError(err); }
+    } catch (err) {
+      onError(err);
+      const code = toApiLikeError(err).response?.data?.code;
+      if (code === 'job_active' || code === 'draft_published') {
+        try { await refresh(); } catch (refreshError) { onError(refreshError); }
+      }
+    }
     finally { setOperationBusy(false); }
   }
   async function publish() {
@@ -133,5 +167,5 @@ export default function useAuthoringDraft(id: string, pollMs = 3000) {
     finally { setOperationBusy(false); }
   }
   return { draft, form, jobs, busy, dirty, error, conflict, loaded, activeJob, actionsDisabled, canPublish,
-    edit, save, refresh, reload, mutate, runJob, publish, onError, setOperationBusy };
+    edit, restoreStatement, save, refresh, discardAndRefresh, mutate, runJob, publish, onError, setOperationBusy };
 }

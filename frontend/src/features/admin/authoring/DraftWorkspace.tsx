@@ -42,14 +42,14 @@ export default function DraftWorkspace({ id }: { id: string }) {
     <div className={styles.toolbar}>
       <strong>{draft.status === 'published' ? 'Published — read-only' : dirty ? 'Unsaved changes' : 'All changes saved'}</strong>
       <button type="button" disabled={!dirty || editorDisabled || model.conflict || !model.loaded} onClick={() => void model.save()}>Save draft</button>
-      <button type="button" disabled={model.busy} onClick={() => {
-        if (!dirty || window.confirm('Discard unsaved changes and reload the server revision?')) void model.reload();
-      }}>Reload from server</button>
       {model.activeJob && <p role="status">Active job: {model.activeJob.jobType} — {model.activeJob.status}. Actions are locked until it finishes.</p>}
       {dirty && <p>Save before compiling, generating, changing files, verifying or publishing.</p>}
     </div>
     {model.error && <p role="alert">{model.error}</p>}
-    {model.conflict && <p role="alert">Server state changed. Your unsaved text is retained. Copy it if needed, then reload before continuing.</p>}
+    {model.conflict && <div role="alert"><p>Server state changed. Your unsaved text is retained.</p>
+      <button type="button" disabled={model.busy} onClick={() => {
+        if (window.confirm('Discard local changes and sync the latest server revision?')) void model.discardAndRefresh();
+      }}>Discard local changes and sync</button></div>}
     {draft.status === 'published' && <p>Created as hidden. Manage visibility in <Link to="/admin/problems">Problem Management</Link>.</p>}
     <div role="tablist" aria-label="Draft workspace" className={styles.tabs}>{tabs.map(name => <button key={name}
       type="button" role="tab" id={`tab-${name}`} aria-controls="draft-panel" aria-selected={tab === name}
@@ -62,8 +62,8 @@ export default function DraftWorkspace({ id }: { id: string }) {
         <p>Refresh explicitly copies the latest profile and avatar, increments revision and clears readiness.</p>
         <Link to="/admin/authoring">Manage author profiles in the draft list</Link>
       </>}
-      {tab === 'Statement' && <StatementTab draft={draft} html={form.statementHtml} disabled={disabled}
-        onEdit={html => model.edit('statementHtml', html)} onBuild={() => void model.runJob('pdf')} mutate={model.mutate} onError={onError} />}
+      {tab === 'Statement' && <StatementTab draft={draft} disabled={disabled}
+        onBuild={() => void model.runJob('pdf')} mutate={model.mutate} onError={onError} />}
       {tab === 'Solution' && <section><h2>Reference solution</h2><p>Private C++20 source. The author is responsible for algorithm correctness.</p>
         <label>solution.cpp<textarea spellCheck={false} disabled={editorDisabled} value={form.solutionCpp} onChange={e => model.edit('solutionCpp', e.target.value)} /></label>
         <button type="button" disabled={disabled || !form.solutionCpp.trim()} onClick={() => void model.runJob('compile', { target: 'solution' })}>Compile solution</button>

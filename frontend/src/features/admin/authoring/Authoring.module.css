@@ -24,4 +24,38 @@
 .scroll { overflow-x: auto; }
 .confirmation { padding: 1rem; border: 2px solid var(--status-warning); border-radius: 8px; margin: 1rem 0; }
 .summary { display: flex; flex-wrap: wrap; gap: 1rem; color: var(--text-secondary); }
+.primaryLink { display: inline-flex; align-items: center; min-height: 2.25rem; padding: 0 .9rem; border: 1px solid var(--accent-primary); border-radius: 6px; color: var(--accent-primary); text-decoration: none; }
+
+.editorShell { width: 100%; height: 100dvh; overflow: hidden; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; text-align: left; color: var(--text-primary); background: var(--background-primary); }
+.editorHeader { min-height: 3.5rem; display: grid; grid-template-columns: auto minmax(12rem, 1fr) auto auto auto; align-items: center; gap: .75rem; padding: .5rem 1rem; background: #202428; color: #f7f7f7; border-bottom: 1px solid var(--border-color); }
+.editorHeader a { color: #f7f7f7; text-decoration: none; white-space: nowrap; }
+.editorHeader button, .editorAlert button, .editorAssets button { padding: .5rem .75rem; color: var(--text-primary); background: var(--background-secondary); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; }
+.editorHeader button:disabled, .editorAlert button:disabled, .editorAssets button:disabled { opacity: .5; cursor: not-allowed; }
+.editorTitle { min-width: 0; text-align: center; }
+.editorTitle h1 { margin: 0; font-size: 1.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.editorTitle span { color: #c9cdd1; font-size: .8rem; }
+.editorNotices { min-height: 0; }
+.editorAlert { margin: 0; padding: .55rem 1rem; display: flex; align-items: center; justify-content: center; gap: 1rem; color: var(--text-primary); background: var(--status-warning); }
+.editorStatus { margin: 0; padding: .35rem 1rem; text-align: center; background: var(--background-secondary); }
+.editorWorkspace { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.sourcePane, .previewPane { min-width: 0; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.sourcePane { border-right: 1px solid var(--border-color); }
+.sourcePane label { padding: .45rem .75rem; font-size: .85rem; font-weight: 600; background: var(--background-secondary); }
+.sourcePane textarea { flex: 1; min-height: 0; width: 100%; box-sizing: border-box; resize: none; border: 0; border-radius: 0; padding: 1rem; color: var(--text-primary); background: var(--background-primary); font: .9rem/1.55 monospace; tab-size: 4; outline: none; }
+.sourcePane textarea:focus { box-shadow: inset 0 0 0 2px var(--accent-primary); }
+.previewPane { background: #fff; }
+.previewPane iframe { flex: 1; min-height: 0; width: 100%; border: 0; background: #fff; }
+.previewStatus { min-height: 1.75rem; box-sizing: border-box; padding: .3rem .65rem; color: var(--text-secondary); background: var(--background-secondary); font-size: .75rem; text-align: right; }
+.previewEmpty { flex: 1; display: grid; place-items: center; color: #666; }
+.editorAssets { max-height: 40vh; overflow: auto; padding: .5rem 1rem; border-top: 1px solid var(--border-color); background: var(--background-secondary); }
+.editorAssets summary { cursor: pointer; font-weight: 600; }
+.editorAssets section { padding-bottom: .75rem; }
+.editorAssets input { color: var(--text-primary); }
 @media (max-width: 600px) { .authoring { margin: .5rem; } .authoring h1 { font-size: 1.4rem; } .frame { height: 500px; } .tabs button { flex-basis: 40%; } }
+@media (max-width: 800px) {
+  .editorShell { height: auto; min-height: 100dvh; overflow: auto; grid-template-rows: auto auto auto auto; }
+  .editorHeader { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .editorHeader strong { grid-column: 1 / -1; text-align: center; }
+  .editorWorkspace { grid-template-columns: 1fr; grid-template-rows: minmax(50vh, 1fr) minmax(50vh, 1fr); }
+  .sourcePane { border-right: 0; border-bottom: 1px solid var(--border-color); }
+}

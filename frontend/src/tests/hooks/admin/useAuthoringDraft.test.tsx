@@ -27,7 +27,7 @@ test('dirty edits disable actions, explicit Save sends only changed fields and t
   expect(result.current.draft?.revision).toBe(4);
 });
 
-test('a revision conflict keeps unsaved source and requires explicit reload, never auto retries', async () => {
+test('a revision conflict keeps unsaved source and requires explicit discard-and-sync, never auto retries', async () => {
   const { result } = renderHook(() => useAuthoringDraft('d1'));
   await waitFor(() => expect(result.current.draft).not.toBeNull());
   act(() => result.current.edit('statementHtml', '<p>My work</p>'));
@@ -38,6 +38,58 @@ test('a revision conflict keeps unsaved source and requires explicit reload, nev
   expect(result.current.conflict).toBe(true);
   expect(api.patch).toHaveBeenCalledTimes(1);
   expect(result.current.actionsDisabled).toBe(true);
+});
+
+test('window focus automatically syncs a clean draft from the server', async () => {
+  let serverDraft = draft;
+  jest.mocked(api.get).mockImplementation(async url => ({ data: url.endsWith('/jobs') ? [] : serverDraft }));
+  const { result } = renderHook(() => useAuthoringDraft('d1'));
+  await waitFor(() => expect(result.current.draft?.revision).toBe(3));
+  serverDraft = { ...draft, title: 'Changed elsewhere', revision: 4 };
+
+  act(() => window.dispatchEvent(new Event('focus')));
+
+  await waitFor(() => expect(result.current.draft?.revision).toBe(4));
+  expect(result.current.form?.title).toBe('Changed elsewhere');
+});
+
+test('focus sync preserves dirty text and reports a conflict only when the server revision advanced', async () => {
+  let serverDraft = draft;
+  jest.mocked(api.get).mockImplementation(async url => ({ data: url.endsWith('/jobs') ? [] : serverDraft }));
+  const { result } = renderHook(() => useAuthoringDraft('d1'));
+  await waitFor(() => expect(result.current.draft?.revision).toBe(3));
+  act(() => result.current.edit('statementHtml', '# My work'));
+
+  act(() => window.dispatchEvent(new Event('focus')));
+  await waitFor(() => expect(api.get).toHaveBeenCalledTimes(4));
+  expect(result.current.conflict).toBe(false);
+  expect(result.current.form?.statementHtml).toBe('# My work');
+
+  serverDraft = { ...draft, statementHtml: '# Server work', revision: 4 };
+  act(() => window.dispatchEvent(new Event('focus')));
+  await waitFor(() => expect(result.current.conflict).toBe(true));
+  expect(result.current.form?.statementHtml).toBe('# My work');
+
+  await act(async () => { await result.current.discardAndRefresh(); });
+  expect(result.current.form?.statementHtml).toBe('# Server work');
+  expect(result.current.conflict).toBe(false);
+});
+
+test('a raced active job refreshes job state without creating a source conflict', async () => {
+  const active = { id: 'j2', jobType: 'pdf', status: 'queued', draftRevision: 3 };
+  let jobs: any[] = [];
+  jest.mocked(api.get).mockImplementation(async url => ({ data: url.endsWith('/jobs') ? jobs : draft }));
+  jest.mocked(api.post).mockImplementation(async () => {
+    jobs = [active];
+    throw { response: { status: 409, data: { code: 'job_active', message: 'Another job is active' } } };
+  });
+  const { result } = renderHook(() => useAuthoringDraft('d1'));
+  await waitFor(() => expect(result.current.draft).not.toBeNull());
+
+  await act(async () => { await result.current.runJob('pdf'); });
+
+  expect(result.current.conflict).toBe(false);
+  expect(result.current.activeJob?.id).toBe('j2');
 });
 
 test('resuming an active durable job disables mutations and polling refreshes completed artifacts', async () => {

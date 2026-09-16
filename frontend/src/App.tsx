@@ -74,6 +74,7 @@ const Layout = () => {
           <Route path="problems" element={<ProblemManagement />} />
           <Route path="authoring" element={<ProblemAuthoring />} />
           <Route path="authoring/:draftId" element={<ProblemAuthoring />} />
+          <Route path="authoring/:draftId/editor" element={<ProblemAuthoring editorMode />} />
           <Route path="contests" element={<ContestManagement />} />
           <Route path="settings" element={<Settings />} />
         </Route>

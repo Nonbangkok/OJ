@@ -218,6 +218,21 @@ during Markdown parsing, normalizes bounded legacy markup, and then delegates to
 the HTML allowlist sanitizer. Fast Preview and immutable PDF/Verify snapshots call
 this same compiler; the runner re-sanitizes captured HTML at its trust boundary.
 
+The Admin Statement tab links to `/admin/authoring/:draftId/editor`. For this
+exact route `AdminLayout` returns its outlet without the Admin navbar/container,
+while the application-level Admin guard remains active. `StatementEditor.tsx`
+owns the full-viewport split source/preview UI. It debounces unsaved source for
+400 ms before calling the existing preview endpoint and discards responses older
+than the latest request. The returned document is rendered in an opaque-origin
+sandboxed iframe. Saving remains explicit and revision-guarded; clean drafts
+refresh on focus/visibility, while dirty drafts retain local source and surface a
+conflict only when the server revision advances. Dirty statement source is also
+kept in per-draft `sessionStorage` for browser Back/Forward recovery. The stored
+original revision is preserved across further edits; a newer server revision
+therefore restores the text into conflict state rather than making it saveable
+against the newer base. Save, discard and an explicitly confirmed Workspace exit
+remove the recovery copy.
+
 Asset add/delete operations lock and advance the draft through an optimistic revision update in the same database transaction as the asset mutation. Duplicate filenames, missing assets, and the 100 MiB per-draft cap roll back the transaction, so a failed asset action never advances revision or invalidates readiness by itself.
 
 The admin asset API exposes metadata-only listing plus multipart add and revision-guarded delete routes under `/admin/authoring/drafts/:id/assets`. Multer rejects unsupported types and raw files above 10 MiB before decoding; controllers pass accepted bytes through statement asset preparation before calling the transactional query service. Asset binary content is intentionally absent from every API response.
