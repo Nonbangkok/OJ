@@ -58,7 +58,7 @@
   background-color: #c82333;
 }
 
-fieldset {
+.modal-overlay fieldset {
   border-color: var(--border-color);
   border-radius: 6px;
   padding: 1rem;
