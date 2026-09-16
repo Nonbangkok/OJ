@@ -1,15 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import StatusBadge from '../../components/shared/StatusBadge';
 
-// Mock CSS modules
-jest.mock('../../components/shared/StatusBadge.module.css', () => ({
-    badge: 'badge',
-    scheduled: 'scheduled',
-    running: 'running',
-    finishing: 'finishing',
-    finished: 'finished'
-}));
-
 describe('StatusBadge', () => {
     it('renders scheduled status', () => {
         render(<StatusBadge status="scheduled" />);
