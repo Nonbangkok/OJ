@@ -43,7 +43,13 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
       author_aka_name: 'A', author_real_name: 'Author', language: 'Thai', country_code: 'THA',
       time_limit_ms: 1000, memory_limit_mb: 256, created_by: null,
       solution_cpp: '#include <iostream>\nint main(){int n;std::cin>>n;std::cout<<n*2<<"\\n";}',
-      generator_cpp: generator, statement_html: '<h1>Verify</h1><p>$x^2$</p>' }, database);
+      generator_cpp: generator,
+      statement_html: '# Verify\n\n$x^2$\n\n<image src="{{ASSET_BASE}}/verify.png">' }, database);
+    const image = await readFile(path.join(__dirname, '../fixtures/pdf/red-gate-logo-alpha.png'));
+    await pool.query(`INSERT INTO problem_draft_assets
+      (id,draft_id,filename,mime_type,content,checksum_sha256,size_bytes)
+      VALUES ($1,$2,'verify.png','image/png',$3,$4,$5)`,
+    [randomUUID(), d.id, image, createHash('sha256').update(image).digest('hex'), image.length]);
     for (const n of [1, 2]) await pool.query(`INSERT INTO problem_draft_testcases
       (id,draft_id,case_number,original_input_filename,input_data,output_data,source,source_revision)
       VALUES ($1,$2,$3,$4,$5,$6,'uploaded',1)`, [randomUUID(), d.id, n, `${n}.in`, `${n}\n`, `${n*2}\r\n`]);
@@ -66,6 +72,8 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     const snapshot = job.request_snapshot as any;
     expect(snapshot.kind).toBe('verify_all'); expect(snapshot.source).toContain('n*2');
     expect(snapshot.generatorSource).toBe('int main(){return 0;}');
+    expect(snapshot.pdf.document.statementHtml).toContain('<h1>Verify</h1>');
+    expect(snapshot.pdf.document.statementHtml).toContain('<img src="{{ASSET_BASE}}/verify.png">');
     expect(snapshot.expectedOutputs.map((c: any) => c.sizeBytes)).toEqual([3, 3]);
     expect(await cases(d.id)).toEqual(original);
     await updateProblemDraft(d.id, 1, { solution_cpp: 'edited', generator_cpp: null }, database);

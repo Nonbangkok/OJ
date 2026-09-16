@@ -319,7 +319,7 @@ UI behavior and the three workspace APIs are documented in `AUTHORING_UI.md`.
 
 ### Final verification
 
-- Canonical disposable Compose suite: **65 suites /578 tests passed**, zero
+- Canonical disposable Compose suite: **65 suites /580 tests passed**, zero
   failures/skips, exit0. Includes the full real HTTP → PostgreSQL → C++20/PDF
   runner → Verify → hidden Publish fixture, task-pdf-writer source compilation,
   and all previous regressions.
@@ -336,8 +336,11 @@ UI behavior and the three workspace APIs are documented in `AUTHORING_UI.md`.
   Runner build revision6 succeeded. Poppler rendered its A4 PDF as3 pages; all
   pages were visually inspected and retained the profile image, statement image,
   Thai text, math, tables and requested page break.
-- Primary-agent code review completed. A separate reviewer was requested but hit
-  its usage limit before returning findings; no independent-review clearance is claimed.
+- Independent review found an unbounded placeholder-collision scan and ordinary
+  backslash corruption in code/preformatted HTML. The collision search is now a
+  four-attempt random constant-work reservation; non-math source follows the
+  authoritative task-pdf-writer renderer and enters Marked unchanged. Both fixes
+  have RED/GREEN regressions, and Verify now captures hybrid source plus an image.
 - The `oj-authoring-demo` local stack was rebuilt on port18090 for this check while
   preserving its local-only database; the statement source/revision was unchanged
   and only a successful PDF artifact/job was added. Production was not redeployed.

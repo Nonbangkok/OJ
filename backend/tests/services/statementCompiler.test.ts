@@ -35,6 +35,20 @@ $not_math$ <image src="not-an-asset.png">
     expect(html).toContain('&lt;image src="not-an-asset.png"&gt;');
   });
 
+  it('preserves ordinary backslashes in fenced code and legacy preformatted HTML', () => {
+    const html = compileStatementSource(String.raw`~~~cpp
+std::cout << "\n";
+~~~
+
+<pre>std::cout &lt;&lt; "\n";</pre>
+
+<p title="C:\temp">C:\temp</p>`, []);
+
+    expect(html).toContain(String.raw`std::cout &lt;&lt; "\n";`);
+    expect(html).not.toContain(String.raw`std::cout &lt;&lt; "\\n";`);
+    expect(html).toContain(String.raw`<p title="C:\temp">C:\temp</p>`);
+  });
+
   it('supports the Markdown constructs exposed by the task-pdf-writer editor', () => {
     const source = `> **Important** and *emphasized* and ~~removed~~\n\n`
       + `[Reference](https://example.com/task)\n\n`
@@ -78,5 +92,12 @@ $not_math$ <image src="not-an-asset.png">
 
   it('bounds math placeholders before Markdown parsing', () => {
     expect(() => compileStatementSource('$x$ '.repeat(1001), [])).toThrow(StatementError);
+  });
+
+  it('handles long placeholder-like input within a bounded amount of work', () => {
+    const source = `OJMATHTOKEN${'X'.repeat(120_000)} $x$`;
+    const started = Date.now();
+    expect(compileStatementSource(source, [])).toContain('$x$');
+    expect(Date.now() - started).toBeLessThan(750);
   });
 });

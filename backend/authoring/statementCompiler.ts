@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { createContext, Script, Context } from 'node:vm';
 import path from 'node:path';
 import { PDF_TEMPLATE_DIRECTORY } from './pdfTemplate';
@@ -17,8 +18,12 @@ function escapeHtml(value: string): string {
 }
 
 function protectMath(source: string): { markdown: string; restore(html: string): string } {
-  let prefix = 'OJMATHTOKEN';
-  while (source.includes(prefix)) prefix += 'X';
+  let prefix = '';
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const candidate = `OJMATHTOKEN${randomBytes(16).toString('hex')}X`;
+    if (!source.includes(candidate)) { prefix = candidate; break; }
+  }
+  if (!prefix) throw new StatementError('INVALID_STATEMENT', 'Could not reserve a math placeholder');
   const expressions: string[] = [];
   let markdown = '';
   let offset = 0;
@@ -74,9 +79,9 @@ export function compileStatementSource(source: string, assetNames: readonly stri
   }
   const protectedSource = protectMath(source);
   const runtime = context();
-  // task-pdf-writer doubles prose backslashes before Marked. Math is restored afterward so
-  // Marked cannot consume its delimiters or interpret URLs inside TeX as Markdown links.
-  runtime.statementSource = protectedSource.markdown.replaceAll(/\\/g, '\\\\');
+  // The authoritative task-pdf-writer renderer passes non-math source to Marked unchanged.
+  // Math is restored afterward so Marked cannot consume its delimiters or TeX backslashes.
+  runtime.statementSource = protectedSource.markdown;
   let rendered: unknown;
   try {
     rendered = parseMarkdown.runInContext(runtime, { timeout: 1000 });

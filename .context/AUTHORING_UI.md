@@ -69,7 +69,7 @@ single-job detail, PDF, mutation and Publish APIs remain authoritative.
 
 ## Verification
 
-- Canonical disposable backend stack: **65 suites / 578 tests passed**. This
+- Canonical disposable backend stack: **65 suites / 580 tests passed**. This
   includes real PostgreSQL, C++20 runner, wkhtmltopdf and an HTTP workflow that
   creates, edits, generates, builds outputs/PDF, verifies and publishes hidden,
   plus task-pdf-writer Markdown/HTML/LaTeX compatibility regressions.
