@@ -64,17 +64,22 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     } while (Date.now() < deadline);
     throw new Error('Publish did not wait on the competing transaction');
   }
-  async function ready(problemId?: string) {
-    const d = await draft(problemId); const queued = await queueVerifyJob(d.id, 1, database);
+  async function verify(d: Awaited<ReturnType<typeof draft>>, revision: number, artifact = pdf) {
+    const queued = await queueVerifyJob(d.id, revision, database);
     if (queued.kind !== 'queued') throw new Error(queued.kind);
     const captured = queued.job.request_snapshot!;
-    await applyJobResult(queued.job.id, { version: 1, jobId: queued.job.id, draftId: d.id, revision: 1,
+    const bytes = Number((await pool.query(`SELECT COALESCE(SUM(octet_length(input_data) + octet_length(output_data)), 0)::text AS total
+      FROM problem_draft_testcases WHERE draft_id=$1`, [d.id])).rows[0].total);
+    await applyJobResult(queued.job.id, { version: 1, jobId: queued.job.id, draftId: d.id, revision,
       status: 'succeeded', errorCode: null, log: '', durationMs: 1, exitCode: 0,
-      pdf: { sizeBytes: pdf.length, sha256: createHash('sha256').update(pdf).digest('hex'), templateVersion: 'red-gate-v1' },
+      pdf: { sizeBytes: artifact.length, sha256: createHash('sha256').update(artifact).digest('hex'), templateVersion: 'red-gate-v1' },
       verification: { checks: { pdf: 'passed', solution: 'passed', generator: 'passed', execution: 'passed' },
         cases: captured.cases!.map(c => ({ caseId: c.caseId, caseNumber: c.caseNumber, durationMs: 1 })),
-        caseCount: 2, totalTestcaseBytes: 7, memoryLimitMb: 256, peakMemoryBytes: null, warnings: ['Peak RSS unavailable.'] } },
-    database, undefined, async () => pdf);
+        caseCount: captured.cases!.length, totalTestcaseBytes: bytes, memoryLimitMb: 256, peakMemoryBytes: null, warnings: ['Peak RSS unavailable.'] } },
+    database, undefined, async () => artifact);
+  }
+  async function ready(problemId?: string) {
+    const d = await draft(problemId); await verify(d, 1);
     return d;
   }
 
@@ -116,6 +121,65 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     expect((await updateProblemDraft(d.id, 1, { title: 'Edited' }, database)).kind).toBe('published');
     expect((await mutateDraftTestcases(d.id, 1, { kind: 'append', cases: [{ filename: 'new.in', input: '', output: '' }] }, database)).kind).toBe('published');
     expect((await queueVerifyJob(d.id, 1, database)).kind).toBe('published');
+  });
+
+  it('replaces the existing published problem only after the corrected statement verifies', async () => {
+    const d = await ready();
+    expect((await post(d.id)).status).toBe(201);
+    const originallyPublished = await stored(d.id);
+    const contest = (await pool.query(`INSERT INTO contests(title,description,start_time,end_time)
+      VALUES ('Keep association','',NOW(),NOW() + INTERVAL '1 hour') RETURNING id`)).rows[0];
+    await pool.query('UPDATE problems SET is_visible=true,contest_id=$2 WHERE id=$1', [d.problem_id, contest.id]);
+
+    const saved = await updateProblemDraft(d.id, 1, { statement_html: '<h1>Corrected publication</h1>' }, database);
+    expect(saved.kind).toBe('updated');
+    if (saved.kind !== 'updated') throw new Error('Expected statement revision');
+    const cases = await mutateDraftTestcases(d.id, 2, { kind: 'replace', cases: [
+      { filename: 'replacement.in', input: '3\n', output: '6\n' },
+    ] }, database);
+    expect(cases).toEqual({ kind: 'saved', revision: 3 });
+    const revisedPdf = Buffer.from('%PDF-1.4\nrevised\n%%EOF');
+    await verify(d, 3, revisedPdf);
+
+    const response = await post(d.id, 3);
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(expect.objectContaining({ draftId: d.id, problemId: d.problem_id,
+      status: 'published', revision: 3, isVisible: true, caseCount: 1 }));
+    const [problem] = await rows('problems');
+    expect(problem).toEqual(expect.objectContaining({ id: d.problem_id, is_visible: true, contest_id: contest.id }));
+    expect(problem.problem_pdf.equals(revisedPdf)).toBe(true);
+    expect((await rows('testcases')).map(c => [c.case_number, c.input_data, c.output_data])).toEqual([[1, '3\n', '6\n']]);
+    const republished = await stored(d.id);
+    expect(republished).toEqual(expect.objectContaining({ status: 'published', revision: 3 }));
+    expect(republished.published_at.getTime()).toBe(originallyPublished.published_at.getTime());
+  });
+
+  it('refuses to overwrite a legacy row whose immutable publication metadata changed elsewhere', async () => {
+    const d = await ready();
+    expect((await post(d.id)).status).toBe(201);
+    await pool.query("UPDATE problems SET title='Unrelated replacement' WHERE id=$1", [d.problem_id]);
+    const saved = await updateProblemDraft(d.id, 1, { statement_html: '<h1>Correction</h1>' }, database);
+    expect(saved.kind).toBe('updated');
+    await verify(d, 2);
+
+    const response = await post(d.id, 2);
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('published_problem_mismatch');
+    expect((await rows('problems'))[0]).toEqual(expect.objectContaining({ title: 'Unrelated replacement' }));
+    expect((await stored(d.id)).status).toBe('ready');
+  });
+
+  it('updates changed authoring metadata when the original legacy publication is still intact', async () => {
+    const d = await ready();
+    expect((await post(d.id)).status).toBe(201);
+    const statement = await updateProblemDraft(d.id, 1, { statement_html: '<h1>Correction</h1>' }, database);
+    expect(statement.kind).toBe('updated');
+    const metadata = await updateProblemDraft(d.id, 2, { title: 'Corrected title', time_limit_ms: 1500 }, database);
+    expect(metadata.kind).toBe('updated');
+    await verify(d, 3);
+
+    expect((await post(d.id, 3)).status).toBe(200);
+    expect((await rows('problems'))[0]).toEqual(expect.objectContaining({ title: 'Corrected title', time_limit_ms: 1500 }));
   });
 
   it.each(['unverified', 'stale_revision', 'stale_verified_revision', 'stale_pdf', 'missing_pdf', 'corrupt_pdf', 'no_verification_job', 'incomplete_pair', 'empty_cases', 'busy'])(

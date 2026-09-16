@@ -37,15 +37,22 @@
 .editorNotices { min-height: 0; }
 .editorAlert { margin: 0; padding: .55rem 1rem; display: flex; align-items: center; justify-content: center; gap: 1rem; color: var(--text-primary); background: var(--status-warning); }
 .editorStatus { margin: 0; padding: .35rem 1rem; text-align: center; background: var(--background-secondary); }
-.editorWorkspace { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.editorWorkspace { min-height: 0; }
 .sourcePane, .previewPane { min-width: 0; min-height: 0; position: relative; display: flex; flex-direction: column; }
-.sourcePane { border-right: 1px solid var(--border-color); }
 .sourcePane label { padding: .45rem .75rem; font-size: .85rem; font-weight: 600; background: var(--background-secondary); }
 .sourcePane textarea { flex: 1; min-height: 0; width: 100%; box-sizing: border-box; resize: none; border: 0; border-radius: 0; padding: 1rem; color: var(--text-primary); background: var(--background-primary); font: .9rem/1.55 monospace; tab-size: 4; outline: none; }
 .sourcePane textarea:focus { box-shadow: inset 0 0 0 2px var(--accent-primary); }
+.editorResizeHandle { flex: 0 0 8px; position: relative; z-index: 1; background: var(--border-color); cursor: col-resize; }
+.editorResizeHandle:hover, .editorResizeHandle:focus-visible { background: var(--accent-primary); outline: none; }
 .previewPane { background: #fff; }
-.previewPane iframe { flex: 1; min-height: 0; width: 100%; border: 0; background: #fff; }
-.previewStatus { min-height: 1.75rem; box-sizing: border-box; padding: .3rem .65rem; color: var(--text-secondary); background: var(--background-secondary); font-size: .75rem; text-align: right; }
+.previewPane iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+.previewStatus { min-height: 1.75rem; box-sizing: border-box; padding: .3rem .65rem; color: var(--text-secondary); background: var(--background-secondary); font-size: .75rem; display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.previewZoomControls { display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap; }
+.previewZoomControls button { min-width: 1.75rem; padding: .15rem .35rem; color: var(--text-primary); background: var(--background-primary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; }
+.previewZoomControls button:disabled { opacity: .5; cursor: not-allowed; }
+.previewZoomControls output { min-width: 2.75rem; text-align: center; }
+.previewViewport { flex: 1; min-height: 0; overflow: auto; background: #e9edf1; }
+.previewCanvas { min-width: 100%; min-height: 100%; transform-origin: top left; background: #fff; }
 .previewEmpty { flex: 1; display: grid; place-items: center; color: #666; }
 .editorAssets { max-height: 40vh; overflow: auto; padding: .5rem 1rem; border-top: 1px solid var(--border-color); background: var(--background-secondary); }
 .editorAssets summary { cursor: pointer; font-weight: 600; }
@@ -56,6 +63,6 @@
   .editorShell { height: auto; min-height: 100dvh; overflow: auto; grid-template-rows: auto auto auto auto; }
   .editorHeader { grid-template-columns: auto minmax(0, 1fr) auto; }
   .editorHeader strong { grid-column: 1 / -1; text-align: center; }
-  .editorWorkspace { grid-template-columns: 1fr; grid-template-rows: minmax(50vh, 1fr) minmax(50vh, 1fr); }
-  .sourcePane { border-right: 0; border-bottom: 1px solid var(--border-color); }
+  .editorWorkspace { min-height: 100dvh; }
+  .editorResizeHandle { flex-basis: 8px; cursor: row-resize; }
 }

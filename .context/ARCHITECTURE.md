@@ -231,7 +231,12 @@ kept in per-draft `sessionStorage` for browser Back/Forward recovery. The stored
 original revision is preserved across further edits; a newer server revision
 therefore restores the text into conflict state rather than making it saveable
 against the newer base. Save, discard and an explicitly confirmed Workspace exit
-remove the recovery copy.
+remove the recovery copy. Published tasks may be corrected from this editor only:
+a statement-only Save creates a new draft revision while the already-published
+legacy problem remains live. The split is resizable (stored per draft in browser
+storage and resettable to50/50), and the fast HTML preview has a local 50–200%
+zoom. The preview remains non-authoritative; only a later Verify/Publish swaps
+the verified PDF and testcases into the legacy problem transactionally.
 
 Asset add/delete operations lock and advance the draft through an optimistic revision update in the same database transaction as the asset mutation. Duplicate filenames, missing assets, and the 100 MiB per-draft cap roll back the transaction, so a failed asset action never advances revision or invalidates readiness by itself.
 

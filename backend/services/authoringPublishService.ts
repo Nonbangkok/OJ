@@ -7,9 +7,11 @@ import { pdfArtifactSchema, verificationSchema } from '../authoring/protocol';
 import { TESTCASE_LIMITS, validateTestcaseFilename } from '../authoring/testcases';
 
 type PublishFailure = 'not_found' | 'published' | 'revision_conflict' | 'not_ready'
-  | 'pdf_not_verified' | 'invalid_testcases' | 'busy' | 'problem_id_conflict';
+  | 'pdf_not_verified' | 'invalid_testcases' | 'busy' | 'problem_id_conflict'
+  | 'published_problem_missing' | 'published_problem_mismatch' | 'published_problem_provenance_missing';
 export type PublishResult = { kind: PublishFailure; currentRevision?: number }
-  | { kind: 'created'; draftId: string; problemId: string; revision: number; caseCount: number; publishedAt: Date };
+  | { kind: 'created' | 'updated'; draftId: string; problemId: string; revision: number;
+    caseCount: number; publishedAt: Date; isVisible: boolean };
 
 /** Publish only verified artifacts; no source code is copied into the legacy grader tables. */
 export async function publishProblemDraft(draftId: string, expectedRevision: number,
@@ -58,20 +60,58 @@ export async function publishProblemDraft(draftId: string, expectedRevision: num
     }
     if (total > TESTCASE_LIMITS.MAX_TOTAL_BYTES || total !== report.data.totalTestcaseBytes) return await reject('invalid_testcases');
 
-    // ON CONFLICT targets only the Problem ID, including races with the legacy upload path.
-    // Never upsert: another author's published problem must remain untouched.
-    const inserted = await client.query(`INSERT INTO problems
-      (id,title,author,problem_pdf,time_limit_ms,memory_limit_mb,is_visible)
-      VALUES ($1,$2,$3,$4,$5,$6,false) ON CONFLICT (id) DO NOTHING RETURNING id`,
-      [draft.problem_id, draft.title, draft.author_aka_name, draft.latest_pdf, draft.time_limit_ms, draft.memory_limit_mb]);
-    if (!inserted.rows.length) return await reject('problem_id_conflict');
+    const isRepublish = draft.published_at !== null;
+    let isVisible = false;
+    let legacyProblemId = draft.problem_id;
+    if (isRepublish) {
+      const provenance = (await client.query<{ problem_id: string; title: string; author: string | null;
+        time_limit_ms: number; memory_limit_mb: number }>(`SELECT problem_id,title,author,time_limit_ms,memory_limit_mb
+          FROM authoring_published_problems WHERE draft_id=$1 FOR UPDATE`, [draftId])).rows[0];
+      if (!provenance) return await reject('published_problem_provenance_missing');
+      legacyProblemId = provenance.problem_id;
+      // Match the last authoring publication, not the current draft. This permits
+      // authoring metadata edits while refusing to overwrite legacy edits made
+      // outside the authoring workflow.
+      const updated = await client.query<{ is_visible: boolean }>(`UPDATE problems SET
+        title=$2,author=$3,problem_pdf=$4,time_limit_ms=$5,memory_limit_mb=$6
+        WHERE id=$1 AND title=$7 AND author IS NOT DISTINCT FROM $8
+          AND time_limit_ms=$9 AND memory_limit_mb=$10
+        RETURNING is_visible`,
+      [legacyProblemId, draft.title, draft.author_aka_name, draft.latest_pdf, draft.time_limit_ms, draft.memory_limit_mb,
+        provenance.title, provenance.author, provenance.time_limit_ms, provenance.memory_limit_mb]);
+      if (!updated.rows.length) {
+        const existing = await client.query('SELECT 1 FROM problems WHERE id=$1', [legacyProblemId]);
+        return await reject(existing.rows.length ? 'published_problem_mismatch' : 'published_problem_missing');
+      }
+      isVisible = updated.rows[0].is_visible;
+      await client.query('DELETE FROM testcases WHERE problem_id=$1', [legacyProblemId]);
+    } else {
+      // ON CONFLICT targets only the Problem ID, including races with the legacy upload path.
+      // Never upsert: another author's published problem must remain untouched.
+      const inserted = await client.query(`INSERT INTO problems
+        (id,title,author,problem_pdf,time_limit_ms,memory_limit_mb,is_visible)
+        VALUES ($1,$2,$3,$4,$5,$6,false) ON CONFLICT (id) DO NOTHING RETURNING id`,
+        [draft.problem_id, draft.title, draft.author_aka_name, draft.latest_pdf, draft.time_limit_ms, draft.memory_limit_mb]);
+      if (!inserted.rows.length) return await reject('problem_id_conflict');
+    }
     await client.query(`INSERT INTO testcases (problem_id,case_number,input_data,output_data)
-      SELECT $1,case_number,input_data,output_data FROM problem_draft_testcases WHERE draft_id=$2 ORDER BY case_number`, [draft.problem_id, draftId]);
-    const published = (await client.query<{ published_at: Date }>(`UPDATE problem_drafts SET status='published',
-      published_at=NOW(),updated_at=NOW() WHERE id=$1 RETURNING published_at`, [draftId])).rows[0];
+      SELECT $1,case_number,input_data,output_data FROM problem_draft_testcases WHERE draft_id=$2 ORDER BY case_number`, [legacyProblemId, draftId]);
+    if (isRepublish) {
+      await client.query(`UPDATE authoring_published_problems SET title=$2,author=$3,time_limit_ms=$4,memory_limit_mb=$5,
+        updated_at=NOW() WHERE draft_id=$1`, [draftId, draft.title, draft.author_aka_name, draft.time_limit_ms, draft.memory_limit_mb]);
+    } else {
+      await client.query(`INSERT INTO authoring_published_problems
+        (draft_id,problem_id,title,author,time_limit_ms,memory_limit_mb)
+        VALUES ($1,$2,$3,$4,$5,$6)`, [draftId, draft.problem_id, draft.title, draft.author_aka_name,
+        draft.time_limit_ms, draft.memory_limit_mb]);
+    }
+    const published = (await client.query<{ published_at: Date }>(isRepublish
+      ? `UPDATE problem_drafts SET status='published',updated_at=NOW() WHERE id=$1 RETURNING published_at`
+      : `UPDATE problem_drafts SET status='published',published_at=NOW(),updated_at=NOW() WHERE id=$1 RETURNING published_at`,
+    [draftId])).rows[0];
     await client.query('COMMIT');
-    return { kind: 'created', draftId, problemId: draft.problem_id, revision: draft.revision,
-      caseCount: cases.length, publishedAt: published.published_at };
+    return { kind: isRepublish ? 'updated' : 'created', draftId, problemId: legacyProblemId, revision: draft.revision,
+      caseCount: cases.length, publishedAt: published.published_at, isVisible };
   } catch (error) { await client.query('ROLLBACK'); throw error; }
   finally { client.release(); }
 }

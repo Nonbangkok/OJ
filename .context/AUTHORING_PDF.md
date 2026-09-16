@@ -80,7 +80,8 @@ duplicate results or corrupt artifacts preserve the previous PDF. Success sets
   CPU, process count and file size limits apply. PDF artifact maximum64 MiB.
 - Logs capped at64 KiB; live renderer diagnostics capped at10 MiB. Workspaces and
   terminal snapshot rows/transport files are cleaned through normal reconciliation.
-- Deploy backend and runner images together, applying migration0005 before new jobs.
+- Deploy backend and runner images together, applying migrations through
+  `0006_authoring_published_problem_provenance` before enabling published revisions.
   Existing local/production services are not automatically redeployed by tests.
 
 PDF builds are infrastructure validation, not a claim of algorithm or statement

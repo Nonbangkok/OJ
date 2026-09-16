@@ -1,11 +1,12 @@
 import { DraftFields, Profile } from './types';
-export default function MetadataFields({ value, profiles, onEdit, disabled = false }: {
-  value: DraftFields; profiles: Profile[]; disabled?: boolean;
+export default function MetadataFields({ value, profiles, onEdit, disabled = false, problemIdLocked = false }: {
+  value: DraftFields; profiles: Profile[]; disabled?: boolean; problemIdLocked?: boolean;
   onEdit: <K extends keyof DraftFields>(key: K, value: DraftFields[K]) => void;
 }) {
   return <fieldset disabled={disabled}>
     <legend>Problem metadata</legend>
-    <label>Problem ID<input required maxLength={50} value={value.problemId} onChange={e => onEdit('problemId', e.target.value)} /></label>
+    <label>Problem ID<input required maxLength={50} disabled={problemIdLocked} value={value.problemId} onChange={e => onEdit('problemId', e.target.value)} /></label>
+    {problemIdLocked && <p>Problem ID is locked after the first publication to keep the published revision linked to its grader problem.</p>}
     <label>Title<input required maxLength={255} value={value.title} onChange={e => onEdit('title', e.target.value)} /></label>
     <label>Author profile<select value={value.authorProfileId || ''} onChange={e => {
       const profile = profiles.find(p => p.id === e.target.value);

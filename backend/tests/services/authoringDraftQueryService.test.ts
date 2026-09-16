@@ -86,7 +86,27 @@ describe('updateProblemDraft', () => {
     expect(result).toEqual({ kind: 'revision_conflict', draft: current });
   });
 
-  it('keeps a published draft read-only', async () => {
+  it('starts a new draft revision when only the published statement changes', async () => {
+    const current = draftRow({ status: 'published', published_at: new Date('2026-09-13T01:00:00.000Z') });
+    const updated = draftRow({
+      status: 'draft',
+      statement_html: '<p>Corrected statement</p>',
+      revision: 4,
+      verified_revision: null,
+      published_at: current.published_at,
+    });
+    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [updated] });
+
+    const result = await updateProblemDraft(current.id, 3, { statement_html: '<p>Corrected statement</p>' });
+
+    expect(result).toEqual({ kind: 'updated', draft: updated });
+    expect(db.query).toHaveBeenCalledWith(
+      expect.stringContaining("AND (status <> 'published' OR $4::boolean)"),
+      [current.id, 3, '<p>Corrected statement</p>', true],
+    );
+  });
+
+  it('keeps every other published-draft field read-only', async () => {
     const current = draftRow({ status: 'published', published_at: new Date('2026-09-13T01:00:00.000Z') });
     (db.query as jest.Mock)
       .mockResolvedValueOnce({ rows: [] })
@@ -95,6 +115,21 @@ describe('updateProblemDraft', () => {
     const result = await updateProblemDraft(current.id, 3, { title: 'My change' });
 
     expect(result).toEqual({ kind: 'published', draft: current });
+  });
+
+  it('locks the legacy Problem ID after a published statement revision starts', async () => {
+    const current = draftRow({ status: 'draft', published_at: new Date('2026-09-13T01:00:00.000Z') });
+    (db.query as jest.Mock)
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [current] });
+
+    const result = await updateProblemDraft(current.id, 3, { problem_id: 'new-problem-id' });
+
+    expect(result).toEqual({ kind: 'published_problem_id_locked', draft: current });
+    expect(db.query).toHaveBeenCalledWith(
+      expect.stringContaining('AND published_at IS NULL'),
+      [current.id, 3, 'new-problem-id'],
+    );
   });
 
   it('returns not_found when the draft does not exist', async () => {

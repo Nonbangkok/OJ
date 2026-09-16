@@ -20,6 +20,7 @@ function show(path = '/admin/authoring') {
 beforeEach(() => {
   jest.resetAllMocks();
   window.sessionStorage.clear();
+  window.localStorage.clear();
   (useAuth as jest.Mock).mockReturnValue({ user: { role: 'admin' }, isLoading: false });
   jest.mocked(api.get).mockImplementation(async url => ({ data:
     url.endsWith('/drafts') ? [draft] : url.endsWith('/testcases') ? { revision: 3, testcases: [] }
@@ -57,6 +58,16 @@ test('tabs preserve edits and disable job actions until explicit Save succeeds',
   jest.mocked(api.patch).mockResolvedValue({ data: { ...draft, title: 'Edited title', revision: 4, status: 'draft' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Compile solution' })).toBeEnabled());
+});
+test('a revision of a published task keeps its legacy Problem ID locked but leaves metadata editable', async () => {
+  const revision = { ...draft, status: 'draft', publishedAt: '2026-09-16T00:00:00.000Z' };
+  jest.mocked(api.get).mockImplementation(async url => ({ data:
+    url.endsWith('/jobs') || url.endsWith('/author-profiles') || url.endsWith('/assets') ? []
+      : url.endsWith('/testcases') ? { revision: revision.revision, testcases: [] } : revision,
+  }));
+  show('/admin/authoring/d1');
+  expect(await screen.findByLabelText('Problem ID')).toBeDisabled();
+  expect(screen.getByLabelText('Title')).toBeEnabled();
 });
 test('Statement tab opens the dedicated editor instead of embedding a narrow source textarea', async () => {
   show('/admin/authoring/d1');
@@ -152,6 +163,35 @@ test('full-screen editor keeps a stable notices row so the workspace fills the r
   show('/admin/authoring/d1/editor');
   expect(await screen.findByRole('region', { name: 'Editor notices' })).toBeInTheDocument();
   expect(screen.getByRole('region', { name: 'Statement editor' })).toBeInTheDocument();
+});
+test('published statements can begin a new revision in the full-screen editor', async () => {
+  const published = { ...draft, status: 'published', publishedAt: '2026-09-16T00:00:00.000Z' };
+  jest.mocked(api.get).mockImplementation(async url => ({ data: url.endsWith('/jobs') || url.endsWith('/assets') ? [] : published }));
+  jest.mocked(api.post).mockResolvedValue({ data: { html: '<p>Preview</p>' } });
+  jest.mocked(api.patch).mockResolvedValue({ data: { ...published, statementHtml: '<p>Corrected</p>',
+    revision: 4, verifiedRevision: null, status: 'draft' } });
+  show('/admin/authoring/d1/editor');
+
+  const source = await screen.findByLabelText('Statement Markdown / HTML / LaTeX');
+  expect(source).not.toHaveAttribute('readonly');
+  fireEvent.change(source, { target: { value: '<p>Corrected</p>' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+  await waitFor(() => expect(api.patch).toHaveBeenCalledWith('/admin/authoring/drafts/d1', {
+    expectedRevision: 3, statementHtml: '<p>Corrected</p>',
+  }));
+  expect(await screen.findByText('Editing revision — live problem unchanged')).toBeInTheDocument();
+});
+test('full-screen editor exposes a draggable pane divider and persistent preview zoom controls', async () => {
+  jest.mocked(api.post).mockResolvedValue({ data: { html: '<p>Preview</p>' } });
+  show('/admin/authoring/d1/editor');
+  expect(await screen.findByLabelText('Resize source and preview panes')).toBeInTheDocument();
+  expect(screen.getByText('100%')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+  expect(screen.getByText('110%')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Zoom out' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Reset preview zoom' }));
+  expect(screen.getByText('100%')).toBeInTheDocument();
 });
 test('a slower realtime preview response cannot replace the newest preview', async () => {
   let resolveFirst!: (value: any) => void; let resolveSecond!: (value: any) => void;

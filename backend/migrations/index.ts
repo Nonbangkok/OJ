@@ -4,6 +4,7 @@ import { Migration } from './migrationRunner';
 import { authoringJobDeliverySql } from './0003AuthoringJobDelivery';
 import { authoringJobInputsSql } from './0004AuthoringJobInputs';
 import { authoringJobFilesSql } from './0005AuthoringJobFiles';
+import { authoringPublishedProblemProvenanceSql } from './0006AuthoringPublishedProblemProvenance';
 
 export const coreMigrations: readonly Migration[] = Object.freeze([
   {
@@ -21,4 +22,5 @@ export const migrations: readonly Migration[] = Object.freeze([
   { version: '0003_authoring_job_delivery', sql: authoringJobDeliverySql },
   { version: '0004_authoring_job_inputs', sql: authoringJobInputsSql },
   { version: '0005_authoring_job_files', sql: authoringJobFilesSql },
+  { version: '0006_authoring_published_problem_provenance', sql: authoringPublishedProblemProvenanceSql },
 ]);

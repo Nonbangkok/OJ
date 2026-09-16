@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ImperativePanelGroupHandle, Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import api from '../../../services/api';
 import useAuthoringDraft from './useAuthoringDraft';
 import { draftBase } from './types';
@@ -8,6 +9,10 @@ import styles from './Authoring.module.css';
 
 const PREVIEW_DELAY_MS = 400;
 const recoveryKey = (id: string) => `oj-authoring-statement:${id}`;
+const previewZoomKey = (id: string) => `oj-authoring-statement-preview-zoom:${id}`;
+const MIN_PREVIEW_ZOOM = 50;
+const MAX_PREVIEW_ZOOM = 200;
+const PREVIEW_ZOOM_STEP = 10;
 
 type StatementRecovery = { baseRevision: number; statementHtml: string };
 
@@ -25,8 +30,27 @@ function writeRecovery(id: string, recovery: StatementRecovery | null) {
   } catch { /* Browser storage is a recovery aid, never a prerequisite for editing. */ }
 }
 
+function readPreviewZoom(id: string) {
+  try {
+    const zoom = Number(window.localStorage.getItem(previewZoomKey(id)));
+    return Number.isFinite(zoom) && zoom >= MIN_PREVIEW_ZOOM && zoom <= MAX_PREVIEW_ZOOM ? zoom : 100;
+  } catch { return 100; }
+}
+
+function useCompactEditorLayout() {
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia?.('(max-width: 800px)');
+    if (!media) return;
+    const sync = () => setCompact(media.matches);
+    sync(); media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, []);
+  return compact;
+}
+
 export default function StatementEditor({ id }: { id: string }) {
-  const model = useAuthoringDraft(id);
+  const model = useAuthoringDraft(id, 3000, { allowPublishedStatementEdit: true });
   const { draft, form, dirty } = model;
   const [preview, setPreview] = useState('');
   const [previewState, setPreviewState] = useState<'waiting' | 'loading' | 'ready' | 'error'>('waiting');
@@ -36,6 +60,9 @@ export default function StatementEditor({ id }: { id: string }) {
   const recoveryHandled = useRef(false);
   const recoveryBaseRevision = useRef<number | null>(null);
   const wasDirty = useRef(false);
+  const panels = useRef<ImperativePanelGroupHandle>(null);
+  const compactLayout = useCompactEditorLayout();
+  const [previewZoom, setPreviewZoom] = useState(() => readPreviewZoom(id));
   const draftId = draft?.id;
   const draftRevision = draft?.revision;
   const statementSource = form?.statementHtml;
@@ -89,11 +116,19 @@ export default function StatementEditor({ id }: { id: string }) {
     return () => window.removeEventListener('beforeunload', unload);
   }, [dirty]);
 
+  useEffect(() => {
+    try { window.localStorage.setItem(previewZoomKey(id), String(previewZoom)); } catch { /* Preference only. */ }
+  }, [id, previewZoom]);
+
   if (!draft || !form) return <main className={styles.editorShell}>
     {model.error ? <p role="alert">{model.error}</p> : <p role="status">Loading editor…</p>}
   </main>;
 
-  const editorDisabled = model.busy || !!model.activeJob || draft.status === 'published';
+  const editorDisabled = model.busy || !!model.activeJob;
+  const zoomScale = previewZoom / 100;
+  const editorState = draft.status === 'published' ? 'Published — statement revision available'
+    : draft.publishedAt ? 'Editing revision — live problem unchanged'
+      : model.conflict ? 'Server conflict' : dirty ? 'Unsaved changes' : 'Saved';
   return <main className={styles.editorShell}>
     <header className={styles.editorHeader}>
       <Link to={`/admin/authoring/${encodeURIComponent(id)}`} onClick={event => {
@@ -102,7 +137,7 @@ export default function StatementEditor({ id }: { id: string }) {
         else writeRecovery(id, null);
       }}>← Workspace</Link>
       <div className={styles.editorTitle}><h1>Edit Task: {draft.problemId}</h1><span>{draft.title}</span></div>
-      <strong>{draft.status === 'published' ? 'Published — read-only' : model.conflict ? 'Server conflict' : dirty ? 'Unsaved changes' : 'Saved'}</strong>
+      <strong>{editorState}</strong>
       <button type="button" disabled={!dirty || editorDisabled || model.conflict || !model.loaded}
         onClick={() => void model.save()}>Save</button>
       <button type="button" disabled={model.actionsDisabled} onClick={() => void model.runJob('pdf')}>Build PDF</button>
@@ -118,8 +153,9 @@ export default function StatementEditor({ id }: { id: string }) {
       {model.activeJob && <p className={styles.editorStatus} role="status">Active job: {model.activeJob.jobType} — {model.activeJob.status}</p>}
       {recovered && <p className={styles.editorStatus} role="status">Recovered unsaved statement from this browser tab.</p>}
     </section>
-    <section className={styles.editorWorkspace} aria-label="Statement editor">
-      <div className={styles.sourcePane}>
+    <PanelGroup ref={panels} autoSaveId={`oj-authoring-statement-layout:${id}`} direction={compactLayout ? 'vertical' : 'horizontal'}
+      className={styles.editorWorkspace} role="region" aria-label="Statement editor">
+      <Panel defaultSize={50} minSize={25} className={styles.sourcePane}>
         <label htmlFor="statement-source">Statement Markdown / HTML / LaTeX</label>
         <textarea id="statement-source" spellCheck={false} value={form.statementHtml}
           readOnly={editorDisabled} onChange={event => {
@@ -129,16 +165,30 @@ export default function StatementEditor({ id }: { id: string }) {
             writeRecovery(id, { baseRevision, statementHtml });
             model.edit('statementHtml', statementHtml);
           }} />
-      </div>
-      <div className={styles.previewPane}>
+      </Panel>
+      <PanelResizeHandle className={styles.editorResizeHandle} aria-label="Resize source and preview panes"
+        onDoubleClick={() => panels.current?.setLayout([50, 50])} />
+      <Panel defaultSize={50} minSize={25} className={styles.previewPane}>
         <div className={styles.previewStatus} role="status">
-          {previewState === 'waiting' ? 'Waiting for typing to pause…' : previewState === 'loading' ? 'Updating preview…'
-            : previewState === 'error' ? previewError : 'Preview is up to date'}
+          <span>{previewState === 'waiting' ? 'Waiting for typing to pause…' : previewState === 'loading' ? 'Updating preview…'
+            : previewState === 'error' ? previewError : 'Preview is up to date'}</span>
+          <span className={styles.previewZoomControls} aria-label="Preview zoom controls">
+            <button type="button" aria-label="Zoom out" disabled={previewZoom <= MIN_PREVIEW_ZOOM}
+              onClick={() => setPreviewZoom(zoom => Math.max(MIN_PREVIEW_ZOOM, zoom - PREVIEW_ZOOM_STEP))}>−</button>
+            <output aria-label="Preview zoom">{previewZoom}%</output>
+            <button type="button" aria-label="Zoom in" disabled={previewZoom >= MAX_PREVIEW_ZOOM}
+              onClick={() => setPreviewZoom(zoom => Math.min(MAX_PREVIEW_ZOOM, zoom + PREVIEW_ZOOM_STEP))}>+</button>
+            <button type="button" aria-label="Reset preview zoom" disabled={previewZoom === 100}
+              onClick={() => setPreviewZoom(100)}>Reset</button>
+          </span>
         </div>
-        {preview ? <iframe title="Fast statement preview" sandbox="" srcDoc={preview} />
-          : <div className={styles.previewEmpty}>Preview will appear here.</div>}
-      </div>
-    </section>
+        <div className={styles.previewViewport}>
+          {preview ? <div className={styles.previewCanvas} style={{ width: `${100 / zoomScale}%`, height: `${100 / zoomScale}%`, transform: `scale(${zoomScale})` }}>
+            <iframe title="Fast statement preview" sandbox="" srcDoc={preview} />
+          </div> : <div className={styles.previewEmpty}>Preview will appear here.</div>}
+        </div>
+      </Panel>
+    </PanelGroup>
     <details className={styles.editorAssets}>
       <summary>Statement assets & syntax help</summary>
       <p>Images: <code>{'<image src="{{ASSET_BASE}}/image.png">'}</code> or <code>{'![alt]({{ASSET_BASE}}/image.png)'}</code>.</p>

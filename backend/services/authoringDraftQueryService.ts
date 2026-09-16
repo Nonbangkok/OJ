@@ -69,6 +69,7 @@ export type UpdateProblemDraftResult =
   | { kind: 'updated'; draft: ProblemDraftRow }
   | { kind: 'revision_conflict'; draft: ProblemDraftRow }
   | { kind: 'published'; draft: ProblemDraftRow }
+  | { kind: 'published_problem_id_locked'; draft: ProblemDraftRow }
   | { kind: 'not_found' };
 
 const EDITABLE_FIELDS: readonly (keyof EditableProblemDraftFields)[] = [
@@ -175,12 +176,25 @@ export const updateProblemDraft = async (
     throw new Error('At least one editable draft field is required');
   }
 
+  // A published task may begin a new authoring cycle only by correcting its
+  // statement. All other metadata and source changes stay locked until the
+  // draft has returned to the normal editable state.
+  const isPublishedStatementRevision = assignments.length === 1
+    && assignments[0].startsWith('statement_html =');
+  const changesPublishedProblemId = assignments.some(assignment => assignment.startsWith('problem_id ='));
+  let publishedGuard = "status <> 'published'";
+  if (isPublishedStatementRevision) {
+    values.push(true);
+    publishedGuard = `(status <> 'published' OR $${values.length}::boolean)`;
+  }
+
   const updateResult = await database.query<ProblemDraftRow>(`
     UPDATE problem_drafts
     SET ${assignments.join(', ')},
         revision = revision + 1, status = 'draft', verified_revision = NULL,
         updated_at = NOW()
-    WHERE id = $1 AND revision = $2 AND status <> 'published'
+    WHERE id = $1 AND revision = $2 AND ${publishedGuard}
+      ${changesPublishedProblemId ? 'AND published_at IS NULL' : ''}
     RETURNING *
   `, values);
 
@@ -200,6 +214,9 @@ export const updateProblemDraft = async (
   }
   if (currentDraft.status === 'published') {
     return { kind: 'published', draft: currentDraft };
+  }
+  if (changesPublishedProblemId && currentDraft.published_at !== null) {
+    return { kind: 'published_problem_id_locked', draft: currentDraft };
   }
   return { kind: 'revision_conflict', draft: currentDraft };
 };

@@ -365,9 +365,24 @@ UI behavior and the three workspace APIs are documented in `AUTHORING_UI.md`.
   preserving its local-only database; the statement source/revision was unchanged
   and only successful PDF artifacts/jobs were added. Production was not redeployed.
 
+## Post-Slice10 — Published statement revisions
+
+- A published draft may begin a correction cycle only through a statement-only
+  Save in `/admin/authoring/:draftId/editor`. It becomes a normal unverified draft
+  revision while retaining `published_at`; the legacy grader problem remains live.
+- After Verify succeeds, Publish updates that already-published `problems` row
+  and replaces its testcases in one transaction. Existing visibility and contest
+  association remain untouched. Migration0006 records original legacy ID plus a
+  last-publication metadata snapshot, allowing intended authoring metadata edits
+  but rejecting a missing or externally changed original row.
+- The full-screen editor now has persisted, resettable source/preview pane sizing
+  and a persisted 50–200% fast-preview zoom. The preview remains sandboxed HTML;
+  runner-built PDF remains authoritative.
+
 ## Planned slices
 
-Slices0–10 are complete. No additional implementation slice is currently approved.
+Slices0–10 are complete, with the post-Slice10 published-statement revision
+enhancement implemented. No additional implementation slice is currently approved.
 Output generation still trusts the reference algorithm supplied by the author; it
 does not prove algorithm correctness or generator reproducibility. AI integration,
-published-problem revision editing and alternate checkers remain future work.
+alternate checkers and broader published metadata revisions remain future work.

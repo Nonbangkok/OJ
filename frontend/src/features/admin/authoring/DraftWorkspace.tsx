@@ -56,7 +56,8 @@ export default function DraftWorkspace({ id }: { id: string }) {
       onClick={() => setTab(name)}>{name}</button>)}</div>
     <div id="draft-panel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
       {tab === 'Metadata' && <>
-        <MetadataFields value={form} profiles={profiles} disabled={editorDisabled} onEdit={model.edit} />
+        <MetadataFields value={form} profiles={profiles} disabled={editorDisabled}
+          problemIdLocked={draft.publishedAt !== null} onEdit={model.edit} />
         <button type="button" disabled={disabled || !draft.authorProfileId} onClick={() => void model.mutate(() =>
           api.post(`${draftBase(id)}/refresh-author-profile`, { expectedRevision: draft.revision }))}>Refresh from profile</button>
         <p>Refresh explicitly copies the latest profile and avatar, increments revision and clears readiness.</p>

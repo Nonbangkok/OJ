@@ -3,7 +3,9 @@ import api from '../../../services/api';
 import { getErrorMessage, toApiLikeError } from '../../../utils/error';
 import { Draft, DraftFields, draftBase, editableFields, isActive, Job } from './types';
 
-export default function useAuthoringDraft(id: string, pollMs = 3000) {
+type AuthoringDraftOptions = { allowPublishedStatementEdit?: boolean };
+
+export default function useAuthoringDraft(id: string, pollMs = 3000, options: AuthoringDraftOptions = {}) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [form, setForm] = useState<Draft | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -105,7 +107,8 @@ export default function useAuthoringDraft(id: string, pollMs = 3000) {
   }, [id, pollMs, onError, activeJobId]);
 
   function edit<K extends keyof DraftFields>(key: K, value: DraftFields[K]) {
-    if (busyRef.current || activeJob || draft?.status === 'published') return;
+    const canEditPublishedStatement = options.allowPublishedStatementEdit && key === 'statementHtml';
+    if (busyRef.current || activeJob || (draft?.status === 'published' && !canEditPublishedStatement)) return;
     dirtyRef.current = true;
     setForm(previous => previous ? { ...previous, [key]: value } : null);
   }
@@ -116,9 +119,12 @@ export default function useAuthoringDraft(id: string, pollMs = 3000) {
     if (baseRevision !== draft.revision) setConflict(true);
   }
   async function save() {
-    if (!draft || !form || !dirty || busyRef.current || activeJob || conflict || !loaded || draft.status === 'published') return;
-    setOperationBusy(true); setError('');
+    if (!draft || !form || !dirty || busyRef.current || activeJob || conflict || !loaded) return;
     const changes = Object.fromEntries(editableFields.filter(key => draft[key] !== form[key]).map(key => [key, form[key]]));
+    const canSavePublishedStatement = options.allowPublishedStatementEdit && draft.status === 'published'
+      && Object.keys(changes).length === 1 && changes.statementHtml !== undefined;
+    if (draft.status === 'published' && !canSavePublishedStatement) return;
+    setOperationBusy(true); setError('');
     try {
       const result = await api.patch<Draft>(draftBase(id), { expectedRevision: draft.revision, ...changes });
       setDraft(result.data); setForm(result.data); dirtyRef.current = false;

@@ -144,9 +144,9 @@ router.post('/admin/authoring/drafts/:id/publish',
   validateRequest({ params: problemDraftIdParamSchema, body: outputAuthoringJobSchema }),
   asyncHandler(async (req, res) => {
     const result = await publishProblemDraft(String(req.params.id), req.body.expectedRevision);
-    if (result.kind === 'created') {
+    if (result.kind === 'created' || result.kind === 'updated') {
       const { kind: _kind, ...published } = result;
-      res.status(201).json({ ...published, status: 'published', isVisible: false }); return;
+      res.status(result.kind === 'created' ? 201 : 200).json({ ...published, status: 'published' }); return;
     }
     const errors = {
       not_found: ['draft_not_found', 'Problem draft not found'],
@@ -157,10 +157,14 @@ router.post('/admin/authoring/drafts/:id/publish',
       invalid_testcases: ['invalid_testcases', 'Stored testcase pairs do not match successful verification'],
       busy: ['job_active', 'Wait for the active authoring job before publishing'],
       problem_id_conflict: ['problem_id_conflict', 'A problem with this ID already exists; nothing was overwritten'],
+      published_problem_missing: ['published_problem_missing', 'The original published problem is missing; nothing was updated'],
+      published_problem_mismatch: ['published_problem_mismatch', 'The original published problem changed outside authoring; nothing was updated'],
+      published_problem_provenance_missing: ['published_problem_provenance_missing', 'The original publication cannot be matched safely; nothing was updated'],
     } as const;
     const [code, message] = errors[result.kind];
+    const currentRevision = 'currentRevision' in result ? result.currentRevision : undefined;
     res.status(result.kind === 'not_found' ? 404 : 409).json({ code, message,
-      ...(result.currentRevision === undefined ? {} : { currentRevision: result.currentRevision }) });
+      ...(currentRevision === undefined ? {} : { currentRevision }) });
   }));
 
 router.post('/admin/authoring/drafts',
@@ -225,6 +229,14 @@ router.patch('/admin/authoring/drafts/:id',
       res.status(409).json({
         message: 'Published problem drafts are read-only',
         code: 'draft_published',
+        draft: toDraftDetailResponse(result.draft),
+      });
+      return;
+    }
+    if (result.kind === 'published_problem_id_locked') {
+      res.status(409).json({
+        message: 'Problem ID is locked after the first publication',
+        code: 'published_problem_id_locked',
         draft: toDraftDetailResponse(result.draft),
       });
       return;

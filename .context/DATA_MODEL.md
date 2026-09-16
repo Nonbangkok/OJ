@@ -4,13 +4,15 @@
 
 ## Schema Overview
 
-The database contains **19 tables**. The 11 legacy application tables are bootstrapped by `backend/scripts/init_db.js`; `schema_migrations` and the 7 authoring tables are managed by the non-destructive migration runner in `backend/migrations/`. There is no ORM — all schema is defined as raw SQL DDL.
+The database contains **20 tables**. The 11 legacy application tables are bootstrapped by `backend/scripts/init_db.js`; `schema_migrations` and the 8 authoring tables are managed by the non-destructive migration runner in `backend/migrations/`. There is no ORM — all schema is defined as raw SQL DDL.
 
 Schema status for this revision:
 - Migration `0002_problem_authoring_foundation` adds `author_profiles`, `problem_drafts`, `problem_draft_assets`, `problem_draft_testcases`, and `authoring_jobs`.
 - Migration `0003_authoring_job_delivery` adds durable request JSON and the partial unique active-job-per-draft index.
 - Migration `0004_authoring_job_inputs` adds immutable input snapshots for output-generation jobs.
 - Migration `0005_authoring_job_files` adds immutable avatar/asset bytes for PDF jobs.
+- Migration `0006_authoring_published_problem_provenance` records the original
+  legacy problem key and metadata snapshot for safe revision publication.
 - `schema_migrations` serializes and records applied migrations.
 - Backend typing around the schema includes:
   - DB row interfaces remain in `backend/types/models.ts`.
@@ -361,6 +363,15 @@ Internal names are `avatar`, `asset:filename`, or `output:<case UUID>`. No link 
 queueing captures bytes while holding the draft lock. All terminal paths release
 these extra snapshots atomically with job completion. PDF bytes remain in
 `problem_drafts.latest_pdf`, with provenance in `latest_pdf_revision`.
+
+### `authoring_published_problems`
+
+One row per successfully published draft. It stores the immutable legacy Problem
+ID plus the title, author and limits from the last authoring publication. Revision
+publication requires the live legacy row to still match this snapshot before it
+updates PDF/testcases and refreshes the snapshot. This prevents accidental
+overwrite after a legacy Problem Management edit while allowing intended metadata
+changes made in a new authoring revision.
 Slice8 reuses these tables without a migration. A successful current, unexpired
 verification atomically installs PDF and sets `status='ready'` plus
 `verified_revision=revision`. An accepted re-verification clears old readiness.

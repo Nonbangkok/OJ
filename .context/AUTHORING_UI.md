@@ -44,7 +44,10 @@ It bypasses the Admin navigation and normal content container. The desktop view
 places source and preview side-by-side; narrow screens stack them. A compact top
 bar provides Workspace, title/state, Save and Build PDF. Statement assets and
 syntax help remain available in a collapsible footer. The normal Statement tab
-opens this route and retains the authoritative PDF preview.
+opens this route and retains the authoritative PDF preview. The pane divider is
+drag- and keyboard-resizable, persists its layout per draft, and double-click
+resets it to 50/50. The fast preview has local 50–200% zoom controls; it is HTML
+for quick feedback rather than a claim to be the final PDF.
 
 `POST /admin/authoring/drafts/:id/preview` compiles the current unsaved source with
 the pinned task-pdf-writer Marked bundle, sanitizes it, and server-renders the four
@@ -55,6 +58,13 @@ Source changes trigger this preview after a 400 ms pause; stale responses cannot
 replace a newer result, and an error keeps the last good preview and source.
 This is a fast preview only; the runner-built wkhtmltopdf document remains
 authoritative.
+
+While a task is published, normal workspace fields are read-only. Its dedicated
+statement editor may save a statement-only correction, which starts a new draft
+revision and shows that the live grader problem is unchanged. After that save, the
+normal draft fields are editable again except for the permanently locked Problem
+ID. Build/Verify and a subsequent Publish are required before the existing legacy
+problem's PDF and testcases are replaced.
 
 Testcase lists contain metadata only. Inspect fetches one pair and renders at
 most 32 KiB per side (the current detail endpoint still transfers the complete,
@@ -74,8 +84,9 @@ case/byte totals, per-case wall times and the explicit memory/reproducibility
 limitations.
 
 Publish is available only for the exact saved, verified revision with a current
-PDF. Its confirmation states that the legacy problem is created hidden and the
-draft becomes read-only. Visibility is managed later through Problem Management.
+PDF. Its confirmation states whether it creates a hidden legacy problem or updates
+the task's existing one in place. Visibility is managed later through Problem
+Management.
 
 ## Added read APIs
 
@@ -92,7 +103,7 @@ single-job detail, PDF, mutation and Publish APIs remain authoritative.
   includes real PostgreSQL, C++20 runner, wkhtmltopdf and an HTTP workflow that
   creates, edits, generates, builds outputs/PDF, verifies and publishes hidden,
   plus task-pdf-writer Markdown/HTML/LaTeX compatibility regressions.
-- Frontend: **63 suites / 322 tests passed**; production type-check, all-test
+- Frontend: **63 suites / 326 tests passed**; production type-check, all-test
   type-check, ESLint and optimized build passed.
 - Compose policy tests: **5 passed**.
 - A separate localhost browser fixture completed the same author workflow and

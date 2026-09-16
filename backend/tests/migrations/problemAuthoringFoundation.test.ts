@@ -1,5 +1,6 @@
 import { migrations } from '../../migrations';
 import { problemAuthoringFoundationSql } from '../../migrations/0002ProblemAuthoringFoundation';
+import { authoringPublishedProblemProvenanceSql } from '../../migrations/0006AuthoringPublishedProblemProvenance';
 import {
   AUTHORING_DRAFT_STATUSES,
   AUTHORING_JOB_STATUSES,
@@ -15,6 +16,7 @@ describe('problem authoring foundation migration', () => {
       '0003_authoring_job_delivery',
       '0004_authoring_job_inputs',
       '0005_authoring_job_files',
+      '0006_authoring_published_problem_provenance',
     ]);
   });
 
@@ -36,6 +38,16 @@ describe('problem authoring foundation migration', () => {
     expect(sql).toContain('UNIQUE (draft_id, case_number)');
     expect(sql).toContain("CHECK (status IN ('draft', 'generated', 'ready', 'published'))");
     expect(sql).toContain("CHECK (source IN ('uploaded', 'generated'))");
+  });
+
+  it('records the immutable legacy publication binding for revision updates', () => {
+    const sql = authoringPublishedProblemProvenanceSql.replace(/\s+/g, ' ').trim();
+
+    expect(sql).toContain('CREATE TABLE authoring_published_problems');
+    expect(sql).toContain('draft_id UUID PRIMARY KEY REFERENCES problem_drafts(id) ON DELETE CASCADE');
+    expect(sql).toContain('problem_id VARCHAR(50) NOT NULL');
+    expect(sql).toContain('JOIN problems p ON p.id=d.problem_id');
+    expect(sql).toContain('WHERE d.published_at IS NOT NULL');
   });
 });
 

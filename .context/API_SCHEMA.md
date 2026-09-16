@@ -525,6 +525,13 @@ All endpoints in this section require an authenticated `admin`; `staff` is not s
 - A successful update increments revision and invalidates readiness.
 - Selecting a non-null `authorProfileId` copies its current display fields and image snapshot in the same optimistic update.
 - Errors: 404 draft missing; 409 revision conflict or published/read-only draft.
+  The only published-draft exception is a statement-only update from the dedicated
+  statement editor. It increments revision, sets status back to `draft`, retains
+  `publishedAt`, and invalidates readiness; it does not change the live grader
+  problem until Verify and Publish complete.
+- Once a draft has been published, `problemId` is permanently locked to its
+  recorded legacy problem. A request attempting to change it returns 409
+  `published_problem_id_locked`.
 
 ### 58. `POST /admin/authoring/drafts/:id/refresh-author-profile`
 

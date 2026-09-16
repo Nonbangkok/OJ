@@ -135,6 +135,24 @@ test('published and dirty drafts cannot invoke jobs or Publish even through hand
   expect(result.current.actionsDisabled).toBe(true);
 });
 
+test('statement editor can save a statement-only revision from a published draft', async () => {
+  const published = { ...draft, status: 'published', publishedAt: '2026-09-16T00:00:00.000Z' };
+  jest.mocked(api.get).mockImplementation(async url => ({ data: url.endsWith('/jobs') ? [] : published }));
+  const { result } = renderHook(() => useAuthoringDraft('d1', 3000, { allowPublishedStatementEdit: true }));
+  await waitFor(() => expect(result.current.draft?.status).toBe('published'));
+
+  act(() => result.current.edit('statementHtml', '<p>Corrected statement</p>'));
+  expect(result.current.dirty).toBe(true);
+  jest.mocked(api.patch).mockResolvedValue({ data: { ...published, statementHtml: '<p>Corrected statement</p>',
+    revision: 4, verifiedRevision: null, status: 'draft' } });
+  await act(async () => { await result.current.save(); });
+
+  expect(api.patch).toHaveBeenCalledWith('/admin/authoring/drafts/d1', {
+    expectedRevision: 3, statementHtml: '<p>Corrected statement</p>',
+  });
+  expect(result.current.draft).toEqual(expect.objectContaining({ status: 'draft', revision: 4 }));
+});
+
 test('Publish updates the draft to read-only, with no visibility override', async () => {
   const { result } = renderHook(() => useAuthoringDraft('d1'));
   await waitFor(() => expect(result.current.canPublish).toBe(true));
