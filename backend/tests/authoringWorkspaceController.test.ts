@@ -53,7 +53,7 @@ it('validates IDs and accepts only a bounded explicit statementHtml field', asyn
 });
 
 it('renders unsaved sanitized content with escaped metadata and embedded assets without private sources or writes', async () => {
-  const response = await preview('<h1>UNSAVED $x^2$</h1><img src="{{ASSET_BASE}}/diagram.png">');
+  const response = await preview('# UNSAVED $x^2$\n\n<image src="{{ASSET_BASE}}/diagram.png">');
   expect(response.status).toBe(200);
   const html = response.body.html;
   expect(html).toContain('<h1>UNSAVED <span class="katex">');

@@ -167,8 +167,9 @@ verified. Details, limits and API usage are in `AUTHORING_OUTPUTS.md`.
 Versioned generic PDF generation, statement sanitization and immutable image
 snapshots are implemented. Contract and reproduction details: `AUTHORING_PDF.md`.
 
-- Admin-only PDF enqueue and private inline download APIs. HTML fragments retain
-  manual sample tables, Thai text, inline/display KaTeX and explicit page breaks.
+- Admin-only PDF enqueue and private inline download APIs. The saved task-pdf-writer
+  source compiles to HTML while retaining manual sample tables, Thai text,
+  inline/display KaTeX and explicit page breaks.
 - Parser-based allowlist rejects executable HTML, arbitrary CSS, external URLs,
   path traversal, missing assets and excessive nesting/size; worker checks again.
 - Extracted `red-gate-v1` shell with captured author metadata/avatar, original
@@ -299,7 +300,7 @@ UI behavior and the three workspace APIs are documented in `AUTHORING_UI.md`.
   navigation warning and active-job locks prevent accidental overwrites.
 - Reusable author profile editor with optional account link, adjustable square
   image crop/removal and snapshot semantics.
-- Script-free sanitized HTML/KaTeX preview for unsaved source, private assets and
+- Script-free compiled/sanitized Markdown/HTML/KaTeX preview for unsaved source, private assets and
   authoritative runner-built PDF preview.
 - Optional seeded/legacy generator controls, manual or ZIP testcase management,
   missing-versus-empty output handling, destructive confirmations and bounded inspection.
@@ -309,12 +310,19 @@ UI behavior and the three workspace APIs are documented in `AUTHORING_UI.md`.
 - Confirmed Publish creates a hidden legacy problem and makes the draft read-only;
   visibility stays in existing Problem Management.
 - Fast-preview templates are copied into the compiled backend image/runtime.
+- Post-Slice10 compatibility correction: Preview, PDF and Verify snapshot paths
+  compile the original task-pdf-writer hybrid source through the pinned Marked
+  4.0.8 bundle before sanitization. Existing HTML-only drafts remain valid;
+  Markdown headings/tables/lists/code, raw HTML, four LaTeX delimiter forms,
+  Markdown images, legacy `<image>` and bounded legacy table/page-break markup
+  are supported. Historical `statement_html`/`statementHtml` names remain in use.
 
 ### Final verification
 
-- Canonical disposable Compose suite: **64 suites /572 tests passed**, zero
+- Canonical disposable Compose suite: **65 suites /578 tests passed**, zero
   failures/skips, exit0. Includes the full real HTTP → PostgreSQL → C++20/PDF
-  runner → Verify → hidden Publish fixture and all previous regressions.
+  runner → Verify → hidden Publish fixture, task-pdf-writer source compilation,
+  and all previous regressions.
 - Frontend: **62 suites /311 tests passed**, zero failures; application and all-test
   TypeScript checks, ESLint and optimized production build passed.
 - Local/production Compose configuration policy: **5 tests passed**.
@@ -322,9 +330,17 @@ UI behavior and the three workspace APIs are documented in `AUTHORING_UI.md`.
   KaTeX/manual-table preview, solution compile, seeded multi-file generation,
   output generation, PDF, Verify report and hidden read-only publication. The five
   tabs render horizontally at desktop width and an idle page no longer reports429.
+- The saved Red Gate draft that originally failed on `<image>` was rechecked after
+  the compatibility correction without editing its source: fast preview rendered
+  one H1, one private image, two sample tables and19 KaTeX nodes with zero scripts.
+  Runner build revision6 succeeded. Poppler rendered its A4 PDF as3 pages; all
+  pages were visually inspected and retained the profile image, statement image,
+  Thai text, math, tables and requested page break.
 - Primary-agent code review completed. A separate reviewer was requested but hit
   its usage limit before returning findings; no independent-review clearance is claimed.
-- Existing local/production stacks and user databases were not redeployed or changed.
+- The `oj-authoring-demo` local stack was rebuilt on port18090 for this check while
+  preserving its local-only database; the statement source/revision was unchanged
+  and only a successful PDF artifact/job was added. Production was not redeployed.
 
 ## Planned slices
 

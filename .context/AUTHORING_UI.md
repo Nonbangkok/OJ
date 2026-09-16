@@ -11,7 +11,8 @@ The draft list creates drafts, opens saved drafts and manages reusable author
 profiles. A draft has five tabs:
 
 1. **Metadata** — problem ID, title, author snapshot, language/country and limits.
-2. **Statement** — HTML/LaTeX source, statement assets, fast preview and PDF.
+2. **Statement** — task-pdf-writer-compatible Markdown/HTML/LaTeX source,
+   statement assets, fast preview and PDF.
 3. **Solution** — private C++20 reference solution and explicit compilation.
 4. **Testcases** — optional C++20 generator, seed, manual/ZIP files and outputs.
 5. **Verify & Publish** — readiness, reports, diagnostics, PDF and Publish.
@@ -31,8 +32,9 @@ first-character fallback avatar.
 
 ## Preview, files and jobs
 
-`POST /admin/authoring/drafts/:id/preview` sanitizes the current unsaved statement
-and server-renders the four supported KaTeX delimiter forms. It embeds only the
+`POST /admin/authoring/drafts/:id/preview` compiles the current unsaved source with
+the pinned task-pdf-writer Marked bundle, sanitizes it, and server-renders the four
+supported KaTeX delimiter forms. It embeds only the
 saved draft header/avatar/assets and returns a self-contained, script-free HTML
 document with a restrictive CSP. The iframe is also sandboxed. This is a fast
 preview only; the runner-built wkhtmltopdf document remains authoritative.
@@ -67,9 +69,10 @@ single-job detail, PDF, mutation and Publish APIs remain authoritative.
 
 ## Verification
 
-- Canonical disposable backend stack: **64 suites / 572 tests passed**. This
+- Canonical disposable backend stack: **65 suites / 578 tests passed**. This
   includes real PostgreSQL, C++20 runner, wkhtmltopdf and an HTTP workflow that
-  creates, edits, generates, builds outputs/PDF, verifies and publishes hidden.
+  creates, edits, generates, builds outputs/PDF, verifies and publishes hidden,
+  plus task-pdf-writer Markdown/HTML/LaTeX compatibility regressions.
 - Frontend: **62 suites / 311 tests passed**; production type-check, all-test
   type-check, ESLint and optimized build passed.
 - Compose policy tests: **5 passed**.

@@ -638,7 +638,8 @@ Detailed limits, ZIP pairing and runtime isolation: `AUTHORING_TESTCASES.md`.
 
 - Auth: admin. JSON body: `{ expectedRevision: positive integer }`.
 - Response 202: queued job metadata; poll endpoint63. No C++ source or testcases required.
-- Captures sanitized HTML, author metadata/avatar, assets and template version immutably.
+- Compiles the saved task-pdf-writer source and captures sanitized HTML,
+  author metadata/avatar, assets and template version immutably.
 - Errors: 400 invalid body, `unsupported_template`, `invalid_statement`; 404 draft missing;
   409 revision/published/busy; 429 queue full; 503 runner not configured.
 - Success atomically installs PDF at the captured revision and sets `generated`, never Ready.
@@ -696,8 +697,10 @@ Detailed limits, ZIP pairing and runtime isolation: `AUTHORING_TESTCASES.md`.
 
 ### 76. `POST /admin/authoring/drafts/:id/preview`
 
-- Auth: admin. Body: strict `{ statementHtml: string }`, at most2 MiB UTF-8.
-- Response200: `{ html }`, a self-contained sanitized preview using the saved
+- Auth: admin. Body: strict `{ statementHtml: string }`, at most2 MiB UTF-8. The
+  field name is retained for compatibility; its value is task-pdf-writer-compatible
+  Markdown with inline HTML and LaTeX.
+- Response200: `{ html }`, a self-contained compiled and sanitized preview using the saved
   metadata/avatar/assets and the current unsaved statement text.
 - KaTeX is rendered on the server for `$...$`, `$$...$$`, `\(...\)` and `\[...\]`.
   Scripts and remote resources are absent; CSP permits only inline style and

@@ -26,7 +26,7 @@ describe('statement HTML sanitization', () => {
   });
 
   it.each(['script', 'iframe', 'object', 'embed', 'style', 'link', 'meta', 'base',
-    'svg', 'math', 'form', 'input', 'button', 'textarea', 'select', 'a', 'video', 'audio', 'template'])
+    'svg', 'math', 'form', 'input', 'button', 'textarea', 'select', 'video', 'audio', 'template'])
   ('rejects forbidden <%s> elements', (tag) => {
     expect(() => sanitizeStatement(`<${tag}>bad</${tag}>`, [])).toThrow(StatementError);
   });
@@ -45,6 +45,15 @@ describe('statement HTML sanitization', () => {
     '<td colspan="0">bad</td>', '<td rowspan="2evil">bad</td>',
   ])('rejects unsafe or unsupported attributes: %s', (html) => {
     expect(() => sanitizeStatement(html, ['a.png'])).toThrow(StatementError);
+  });
+
+  it('allows web links and rejects active, local or credential-bearing link targets', () => {
+    expect(sanitizeStatement('<a href="https://example.com/task?q=1">task</a>', []))
+      .toBe('<a href="https://example.com/task?q=1">task</a>');
+    for (const href of ['javascript:alert(1)', 'file:///etc/passwd', '/relative', '#fragment',
+      'https://user:secret@example.com/task']) {
+      expect(() => sanitizeStatement(`<a href="${href}">bad</a>`, [])).toThrow(StatementError);
+    }
   });
 
   it.each(['https://evil.test/x.png', '//evil.test/x.png', 'data:image/png;base64,AAAA',

@@ -47,22 +47,22 @@ test('lists resumable drafts and creates a draft with explicit author metadata',
 test('tabs preserve edits and disable job actions until explicit Save succeeds', async () => {
   show('/admin/authoring/d1');
   fireEvent.click(await screen.findByRole('tab', { name: 'Statement' }));
-  fireEvent.change(screen.getByLabelText('Statement HTML / LaTeX'), { target: { value: '<p>Edited</p>' } });
+  fireEvent.change(screen.getByLabelText('Statement Markdown / HTML / LaTeX'), { target: { value: '# Edited' } });
   expect(screen.getByText(/unsaved changes/i)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Build PDF' })).toBeDisabled();
   fireEvent.click(screen.getByRole('tab', { name: 'Solution' }));
   expect(screen.getByRole('button', { name: 'Compile solution' })).toBeDisabled();
-  jest.mocked(api.patch).mockResolvedValue({ data: { ...draft, statementHtml: '<p>Edited</p>', revision: 4, status: 'draft' } });
+  jest.mocked(api.patch).mockResolvedValue({ data: { ...draft, statementHtml: '# Edited', revision: 4, status: 'draft' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Compile solution' })).toBeEnabled());
   fireEvent.click(screen.getByRole('tab', { name: 'Statement' }));
-  expect(screen.getByLabelText('Statement HTML / LaTeX')).toHaveValue('<p>Edited</p>');
+  expect(screen.getByLabelText('Statement Markdown / HTML / LaTeX')).toHaveValue('# Edited');
 });
 test('fast preview uses server-sanitized HTML in an opaque-origin sandbox, not the editor source', async () => {
   show('/admin/authoring/d1');
   fireEvent.click(await screen.findByRole('tab', { name: 'Statement' }));
   jest.mocked(api.post).mockResolvedValue({ data: { html: '<p>Sanitized preview</p>' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Preview HTML' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Preview statement' }));
   const frame = await screen.findByTitle('Fast statement preview');
   expect(frame).toHaveAttribute('sandbox', '');
   expect(frame).toHaveAttribute('srcdoc', '<p>Sanitized preview</p>');

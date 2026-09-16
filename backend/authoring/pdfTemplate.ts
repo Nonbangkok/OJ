@@ -13,7 +13,7 @@ export interface PdfDocument {
   realName: string;
   language: string;
   countryCode: string;
-  /** Must already have passed sanitizeStatement with this packet's asset allowlist. */
+  /** Compiled HTML; must already have passed compileStatementSource with this packet's asset allowlist. */
   statementHtml: string;
 }
 
@@ -42,7 +42,7 @@ function fontFace(baseUrl: string, name: string, file: string, weight: number): 
   return `@font-face{font-family:'${name}';src:local('${name}'),url('${baseUrl}/fonts/${file}') format('truetype');font-weight:${weight};font-style:normal;font-display:block;}`;
 }
 
-/** Builds only the trusted shell; user HTML must be sanitized before calling this function. */
+/** Builds only the trusted shell; author source must be compiled and sanitized before calling this function. */
 export function buildPdfHtml(document: PdfDocument, options: PdfRenderOptions): string {
   if (document.templateVersion !== PDF_TEMPLATE_VERSION) throw new Error('Unsupported PDF template version');
   const baseUrl = localUrl(options.templateBaseUrl);

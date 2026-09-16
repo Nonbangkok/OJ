@@ -17,17 +17,23 @@ revision/published/busy conflicts, global queue cap and disabled-runner errors a
 
 ## Statement contract
 
-Store an HTML **fragment**, not Markdown or a full HTML document. The parser-based
-sanitizer rejects unsafe content instead of silently stripping executable elements.
-It serializes allowed content canonically and checks again inside the worker.
+Store the authored source in the historical `statement_html` column. Its content is
+the `task-pdf-writer` hybrid format: Markdown with inline HTML and LaTeX, not a full
+HTML document. The pinned Marked 4.0.8 bundle compiles it to HTML before the
+parser-based sanitizer rejects unsafe content instead of silently stripping it.
+The worker checks the captured compiled HTML again.
 
-- Standard headings, paragraphs, emphasis, lists, tables, pre/code, div/span and images.
+- Markdown headings, paragraphs, emphasis, links, blockquotes, lists, GFM tables,
+  fenced code and images; compatible inline HTML remains available.
 - Literal math delimiters `$...$`, `$$...$$`, `\(...\)` and `\[...\]`.
 - Sample tables are authored directly in HTML and remain independent of testcases.
-- Images reference `{{ASSET_BASE}}/filename` exactly, using an existing draft asset.
+- Images reference an existing draft asset with `<image src="{{ASSET_BASE}}/filename">`,
+  `<img ...>`, or `![alt]({{ASSET_BASE}}/filename)`. Legacy `<image>` is normalized
+  after Markdown parsing so a code example containing that text stays literal.
 - Fixed classes: `forced-page-break`, `sample-table`, `sample-table-short`,
   `geometry-data`, `input-spec`. Explicit page break: `<div class="forced-page-break"></div>`.
-- Limited numeric dimensions and enumerated text alignment/whitespace styles only;
+- Limited numeric dimensions, links using only HTTP(S), and enumerated legacy
+  table/page-break/alignment/whitespace styles only;
   no arbitrary CSS, positioning, font replacement or stylesheet overrides.
 - Scripts, event handlers, iframe/object/embed, SVG/MathML source, forms, document
   declarations, unknown attributes, remote/data/file URLs and traversal are rejected.
@@ -47,7 +53,7 @@ generic captured data. The template contains no built-in Red Gate statement/logo
 The renderer uses Ubuntu24.04 and wkhtmltopdf0.12.6-2build2, matching the approved
 demo environment. Changes affecting layout require a new template version.
 
-Queue reservation locks the draft and captures sanitized HTML, metadata, template
+Queue reservation locks the draft, compiles/sanitizes its source, and captures HTML, metadata, template
 version, avatar and asset manifests. `0005_authoring_job_files` stores binary
 snapshots separately from JSON, keyed by job UUID plus internal name (`avatar` or
 `asset:filename`). It has no foreign key to live assets, so later edits/deletions

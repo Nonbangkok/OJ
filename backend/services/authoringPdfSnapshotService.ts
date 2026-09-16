@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { PoolClient } from 'pg';
 import { ProblemDraftRow } from '../types/authoring';
 import { pdfSnapshotSchema } from '../authoring/protocol';
-import { sanitizeStatement } from '../authoring/statementSanitizer';
+import { compileStatementSource } from '../authoring/statementCompiler';
 import { createFallbackAuthorAvatar } from './authorProfileImageService';
 
 /** Called only while holding the draft lock. Raw bytes stay outside bounded request JSON. */
@@ -13,7 +13,7 @@ export async function capturePdfSnapshot(client: PoolClient, draft: ProblemDraft
   const snapshot = pdfSnapshotSchema.parse({
     document: { templateVersion: draft.template_version, title: draft.title, taskCode: draft.problem_id,
       akaName: draft.author_aka_name, realName: draft.author_real_name, language: draft.language,
-      countryCode: draft.country_code, statementHtml: sanitizeStatement(draft.statement_html, assets.map(a => a.filename)) },
+      countryCode: draft.country_code, statementHtml: compileStatementSource(draft.statement_html, assets.map(a => a.filename)) },
     assets, avatar: { filename: 'avatar.png', mimeType: 'image/png', sizeBytes: avatar.length,
       sha256: createHash('sha256').update(avatar).digest('hex') },
   });

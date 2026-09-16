@@ -7,7 +7,7 @@ const MAX_DEPTH = 128;
 const ALLOWED_TAGS = new Set([
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'strong', 'i', 'em', 'u', 's',
   'sub', 'sup', 'div', 'span', 'br', 'hr', 'ul', 'ol', 'li', 'table', 'thead',
-  'tbody', 'tfoot', 'tr', 'td', 'th', 'pre', 'code', 'img',
+  'tbody', 'tfoot', 'tr', 'td', 'th', 'pre', 'code', 'img', 'blockquote', 'del', 'a',
 ]);
 const VOID_TAGS = new Set(['br', 'hr', 'img']);
 const ALLOWED_CLASSES = new Set([
@@ -18,6 +18,12 @@ const STYLE_VALUES: Record<string, readonly string[]> = {
   'text-align': ['left', 'right', 'center', 'justify'],
   'vertical-align': ['top', 'middle', 'bottom', 'baseline'],
   'white-space': ['normal', 'pre', 'pre-wrap', 'pre-line', 'nowrap', 'break-spaces'],
+  'page-break-after': ['always'],
+  'border-collapse': ['collapse'],
+  'background-color': ['transparent'],
+  'border': ['0'],
+  'margin': ['0'],
+  'padding': ['0', '1', '5px'],
 };
 
 export class StatementError extends Error {
@@ -66,9 +72,25 @@ function sanitizeStyle(tag: string, style: string): string {
 
 function sanitizeAttribute(tag: string, name: string, value: string, assets: ReadonlySet<string>): string {
   if (name === 'title' || (tag === 'img' && name === 'alt')) return value;
+  if (tag === 'a' && name === 'href') {
+    if (value.length > 2048) unsafe('Unsupported statement link');
+    try {
+      const url = new URL(value);
+      if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password) {
+        unsafe('Unsupported statement link');
+      }
+    } catch (error) {
+      if (error instanceof StatementError) throw error;
+      unsafe('Unsupported statement link');
+    }
+    return value;
+  }
   if (name === 'class') {
     const classes = value.trim().split(/\s+/).filter(Boolean);
-    if (classes.some(className => !ALLOWED_CLASSES.has(className))) unsafe('Unsupported statement class');
+    if (classes.some(className => !ALLOWED_CLASSES.has(className)
+      && !(tag === 'code' && /^language-[A-Za-z0-9_+-]{1,32}$/.test(className)))) {
+      unsafe('Unsupported statement class');
+    }
     return [...new Set(classes)].sort().join(' ');
   }
   if (name === 'style') return sanitizeStyle(tag, value);
@@ -82,8 +104,13 @@ function sanitizeAttribute(tag: string, name: string, value: string, assets: Rea
     }
     return value;
   }
+  if (tag === 'table' && (name === 'cellspacing' || name === 'cellpadding') && value === '0') return value;
+  if (tag === 'tr' && name === 'align' && value.toLowerCase() === 'center') return 'center';
   if (DIMENSION_TAGS.has(tag) && (name === 'width' || name === 'height')) {
-    if (!/^[1-9][0-9]{0,4}$/.test(value) || Number(value) > 10_000) unsafe('Unsupported statement dimension');
+    const percent = name === 'width' ? /^([1-9][0-9]?)%$|^(100)%$/.exec(value) : null;
+    if (!percent && (!/^[1-9][0-9]{0,4}$/.test(value) || Number(value) > 10_000)) {
+      unsafe('Unsupported statement dimension');
+    }
     return value;
   }
   if ((tag === 'td' || tag === 'th') && (name === 'colspan' || name === 'rowspan')) {

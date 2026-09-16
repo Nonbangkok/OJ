@@ -324,7 +324,7 @@ Private authoring workspace state. Author display fields and image are snapshots
 |---|---|
 | Identity | UUID `id`, proposed `problem_id`, `title` |
 | Author snapshot | nullable `author_profile_id`; AKA, real name, language, country and nullable PNG snapshot. Selecting/refreshing a profile copies its canonical image or a generated fallback PNG; manual authors receive a generated fallback at creation. |
-| Problem content | limits, statement HTML, private C++ solution, nullable private C++ generator |
+| Problem content | limits, task-pdf-writer Markdown/HTML/LaTeX source (historical `statement_html` name), private C++ solution, nullable private C++ generator |
 | Generated state | nullable PDF and source revision, template version, revision and verified revision |
 | Lifecycle | `draft`, `generated`, `ready`, or `published`; creator and timestamps |
 

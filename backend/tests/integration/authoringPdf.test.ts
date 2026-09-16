@@ -46,7 +46,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     const d = await createProblemDraft({ problem_id: 'pdf-test', title: 'PDF test', author_profile_id: null,
       author_aka_name: 'ผู้เขียน', author_real_name: 'Author', language: 'Thai', country_code: 'THA',
       time_limit_ms: 1000, memory_limit_mb: 256, created_by: null, solution_cpp: '',
-      statement_html: '<h1>โจทย์ใหม่</h1><p>สมการ $x^2$</p><img src="{{ASSET_BASE}}/diagram.png" style="width:80%">' }, database);
+      statement_html: '# โจทย์ใหม่\n\nสมการ $x^2$\n\n<image src="{{ASSET_BASE}}/diagram.png" style="width:80%">' }, database);
     await pool.query('UPDATE problem_drafts SET author_profile_image_png=$1 WHERE id=$2', [avatar, d.id]);
     await pool.query(`INSERT INTO problem_draft_assets (id,draft_id,filename,mime_type,content,checksum_sha256,size_bytes)
       VALUES ($1,$2,'diagram.png','image/png',$3,$4,$5)`, [randomUUID(), d.id, avatar, createHash('sha256').update(avatar).digest('hex'), avatar.length]);

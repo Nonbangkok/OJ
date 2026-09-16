@@ -4,7 +4,8 @@ import { Parser } from 'htmlparser2';
 import path from 'node:path';
 import * as db from '../db';
 import { buildPdfHtml, PDF_TEMPLATE_DIRECTORY, PDF_TEMPLATE_VERSION } from '../authoring/pdfTemplate';
-import { sanitizeStatement, StatementError } from '../authoring/statementSanitizer';
+import { compileStatementSource } from '../authoring/statementCompiler';
+import { StatementError } from '../authoring/statementSanitizer';
 import { AuthoringJobRow, ProblemDraftAssetRow, ProblemDraftRow } from '../types/authoring';
 import { createFallbackAuthorAvatar } from './authorProfileImageService';
 
@@ -126,7 +127,7 @@ export async function previewWorkspaceStatement(id: string, statementHtml: strin
   if (!draft) return null;
   if (draft.template_version !== PDF_TEMPLATE_VERSION) throw new StatementError('unsupported_template', 'This template version is not supported');
   const names = (await database.query<{ filename: string }>('SELECT filename FROM problem_draft_assets WHERE draft_id=$1', [id])).rows;
-  let statement = sanitizeStatement(statementHtml, names.map(asset => asset.filename));
+  let statement = compileStatementSource(statementHtml, names.map(asset => asset.filename));
   statement = renderStatementMath(statement);
   const references = [...statement.matchAll(/ src="\{\{ASSET_BASE\}\}\/([A-Za-z0-9._-]+)"/g)];
   const assets = references.length ? (await database.query<RasterAsset>(`SELECT filename,mime_type,content

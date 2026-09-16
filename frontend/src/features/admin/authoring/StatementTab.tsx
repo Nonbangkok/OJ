@@ -34,10 +34,10 @@ export default function StatementTab({ draft, html, disabled, onEdit, onBuild, m
   useEffect(() => () => { request.current++; }, []);
   return <section>
     <h2>Statement</h2>
-    <p>HTML fragment with LaTeX math. Write sample tables directly in the statement; they are independent of hidden testcases.</p>
-    <label>Statement HTML / LaTeX<textarea spellCheck={false} value={html} readOnly={draft.status === 'published'}
+    <p>task-pdf-writer format: Markdown with inline HTML and LaTeX math. Write sample tables directly in HTML; they are independent of hidden testcases.</p>
+    <label>Statement Markdown / HTML / LaTeX<textarea spellCheck={false} value={html} readOnly={draft.status === 'published'}
       onChange={e => onEdit(e.target.value)} /></label>
-    <p>Images: <code>{'{{ASSET_BASE}}/image.png'}</code>. Page break: <code>{'<div class="forced-page-break"></div>'}</code>.</p>
+    <p>Images: <code>{'<image src="{{ASSET_BASE}}/image.png">'}</code> (legacy) or <code>{'![alt]({{ASSET_BASE}}/image.png)'}</code>. Page break: <code>{'<div class="forced-page-break"></div>'}</code>.</p>
     <div className={styles.actions}>
       <button type="button" disabled={previewBusy} onClick={async () => {
         const current = ++request.current; setPreviewBusy(true);
@@ -45,7 +45,7 @@ export default function StatementTab({ draft, html, disabled, onEdit, onBuild, m
           if (current === request.current) setPreview(response.data.html);
         } catch (err) { if (current === request.current) { setPreview(''); onError(err); } }
         finally { if (current === request.current) setPreviewBusy(false); }
-      }}>Preview HTML</button>
+      }}>Preview statement</button>
       <button type="button" disabled={disabled} onClick={onBuild}>Build PDF</button>
     </div>
     <p>Fast preview uses the current statement with saved header/images. Only the runner-built PDF is authoritative.</p>
