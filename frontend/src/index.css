@@ -42,6 +42,7 @@
 
   --status-success: #28a745;
   --status-danger: #dc3545;
+  --error-text: var(--status-danger);
   --status-warning: #ffc107;
   --status-info: #17a2b8;
 
@@ -97,7 +98,8 @@
   /* Slightly brighter for dark mode hover */
 
   --status-success: #198754;
-  --status-danger: #ff6b7a;
+  --status-danger: #dc3545;
+  --error-text: #ff6b7a;
   --status-warning: #ffc107;
   --status-info: #0dcaf0;
 
@@ -134,7 +136,7 @@ code {
 
 /* Global error message styling */
 .error-message {
-  color: var(--status-danger);
+  color: var(--error-text);
   background-color: rgba(220, 53, 69, 0.1);
   border: 1px solid rgba(220, 53, 69, 0.2);
   padding: 0.75rem 1rem;

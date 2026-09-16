@@ -102,11 +102,15 @@ describe('action theme contrast', () => {
     )).toBeGreaterThanOrEqual(3);
   });
 
+  it('keeps white control text at AA contrast on the dark danger background', () => {
+    expect(contrastRatio('#ffffff', resolveToken(dark, 'status-danger'))).toBeGreaterThanOrEqual(4.5);
+  });
+
   it.each([
     ['text-muted', 'background-primary'],
     ['text-muted', 'surface-elevated'],
-    ['status-danger', 'background-primary'],
-    ['status-danger', 'surface-elevated'],
+    ['error-text', 'background-primary'],
+    ['error-text', 'surface-elevated'],
   ])('keeps dark %s text at AA contrast on %s', (textToken, surface) => {
     expect(contrastRatio(
       resolveToken(dark, textToken),

@@ -12,7 +12,7 @@
 }
 
 .required {
-  color: var(--status-danger);
+  color: var(--error-text);
 }
 
 .control {
@@ -44,7 +44,7 @@
 }
 
 .error {
-  color: var(--status-danger);
+  color: var(--error-text);
   font-size: 0.875rem;
   margin: 0;
 }
