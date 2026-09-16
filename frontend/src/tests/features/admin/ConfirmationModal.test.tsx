@@ -49,4 +49,39 @@ describe('ConfirmationModal', () => {
 
     expect(screen.getByRole('button', { name: 'Confirm' })).toBeEnabled();
   });
+
+  it('blocks every dismissal path while confirmation is pending and restores closing afterward', async () => {
+    let resolveConfirmation: (() => void) | undefined;
+    const confirmation = new Promise<void>((resolve) => {
+      resolveConfirmation = resolve;
+    });
+    const onClose = jest.fn();
+
+    render(
+      <ConfirmationModal
+        isOpen
+        onClose={onClose}
+        onConfirm={() => confirmation}
+        title="Confirm Deletion"
+        message="Are you sure you want to delete this item?"
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(dialog.parentElement as HTMLElement);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onClose).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveConfirmation?.();
+      await confirmation;
+    });
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

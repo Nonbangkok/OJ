@@ -67,6 +67,38 @@ describe('Dialog', () => {
     expect(continueButton).toHaveFocus();
   });
 
+  it('returns forward Tab to the first dialog control when focus is outside', () => {
+    render(
+      <>
+        <button>Outside action</button>
+        <Dialog open title="Contained dialog" onClose={jest.fn()}>
+          <button>Continue</button>
+        </Dialog>
+      </>
+    );
+
+    screen.getByRole('button', { name: 'Outside action' }).focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+
+    expect(screen.getByRole('button', { name: 'Close dialog' })).toHaveFocus();
+  });
+
+  it('returns Shift+Tab to the last dialog control when focus is outside', () => {
+    render(
+      <>
+        <button>Outside action</button>
+        <Dialog open title="Contained dialog" onClose={jest.fn()}>
+          <button>Continue</button>
+        </Dialog>
+      </>
+    );
+
+    screen.getByRole('button', { name: 'Outside action' }).focus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+
+    expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus();
+  });
+
   it('closes on Escape unless Escape closing is disabled', () => {
     const onClose = jest.fn();
     const { rerender } = render(

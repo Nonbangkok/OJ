@@ -91,7 +91,10 @@ export function Dialog({
       if (event.shiftKey && (activeElement === firstElement || !dialog.contains(activeElement))) {
         event.preventDefault();
         lastElement.focus();
-      } else if (!event.shiftKey && activeElement === lastElement) {
+      } else if (
+        !event.shiftKey &&
+        (activeElement === lastElement || !dialog.contains(activeElement))
+      ) {
         event.preventDefault();
         firstElement.focus();
       }

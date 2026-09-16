@@ -54,6 +54,12 @@ const ConfirmationModal = ({
     }
   };
 
+  const handleClose = () => {
+    if (!pendingRef.current) {
+      onClose();
+    }
+  };
+
   const captureCancelButton = (container: HTMLSpanElement | null) => {
     cancelRef.current = container?.querySelector('button') ?? null;
   };
@@ -63,12 +69,12 @@ const ConfirmationModal = ({
       open={isOpen}
       title={title}
       description={message}
-      onClose={onClose}
+      onClose={handleClose}
       initialFocusRef={cancelRef}
       footer={
         <>
           <span ref={captureCancelButton}>
-            <Button variant="secondary" onClick={onClose} disabled={isPending}>
+            <Button variant="secondary" onClick={handleClose} disabled={isPending}>
               Cancel
             </Button>
           </span>
