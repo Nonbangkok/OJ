@@ -105,3 +105,13 @@
   font-size: 1rem;
   color: var(--text-muted);
 }
+
+@media (max-width: 768px) {
+  .problems-page-container {
+    padding: 0 1rem;
+  }
+
+  .problems-search {
+    max-width: none;
+  }
+}
