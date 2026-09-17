@@ -8,15 +8,15 @@ Grader System — an online judge for competitive programming. Users submit **C+
 
 ## Commands
 
-Everything runs through Docker Compose from the repo root. The DB schema is **not** auto-created — you must initialize it after the first `up`.
+Everything runs through Docker Compose from the repo root. Schema migrations are applied automatically before the backend starts (via the `migrate` service / `npm start` running `dist/scripts/migrate.js`), so a fresh database needs no manual schema step.
 
 ```bash
 docker-compose up --build -d                          # build & start all services (app at http://localhost)
-docker-compose exec backend node dist/scripts/init_db.js     # create tables + default settings (DROPS existing tables)
-docker-compose exec backend node dist/scripts/create_admin.js # interactive: create an admin account
+docker-compose exec backend node dist/scripts/create_admin.js # interactive: create an admin account (after the stack is healthy)
+cd backend && npm run db:migrate                      # apply pending migrations from the host
 ```
 
-> Note: `README.md` still references `node init_db.js` / `node create_admin.js`. Those scripts are now TypeScript (`backend/scripts/*.ts`) and run from the compiled output under `dist/scripts/` after `npm run build` (the Docker image builds on container start). Verify the path inside the container if a command fails.
+> `backend/scripts/init_db.ts` is a **destructive development reset** (drops all tables). Never use it to upgrade an existing database — use migrations. Health checks: `/api/health/live` (process) and `/api/health/ready` (DB + schema readiness).
 
 ### Backend (`backend/`)
 
@@ -40,6 +40,8 @@ npm test -- src/tests/foo.test.tsx         # single test file
 npm run validate                           # type-check + lint:check + test:ci (run before pushing)
 npm run lint                               # eslint --fix
 npm run type-check                         # tsc --noEmit
+npm run test:visual                        # Playwright visual regression (admin shell + authoring profiles, desktop/mobile)
+npm run test:visual:update                 # regenerate visual baselines after an intentional UI change
 ```
 
 ### Full suite
@@ -85,7 +87,7 @@ Submission statuses and judge tuning (buffers, timeout slack) live in `SUBMISSIO
 
 ### Database
 
-Schema is defined imperatively in `backend/scripts/init_db.ts` (raw `CREATE TABLE` strings) — there are no migration files. Core tables: `users`, `system_settings`, `problems`, `testcases`, `submissions`, `user_sessions`, and the `contest_*` family (`contests`, `contest_participants`, `contest_submissions`, `contest_problems`, `contest_scoreboards`). Changing the schema means editing `init_db.ts` and re-running it (which **drops all tables**).
+Schema changes go through versioned, non-destructive migrations in `backend/migrations/` (`0001CoreSchema.ts`, …) applied by `backend/scripts/migrate.ts` under a Postgres advisory lock; applied versions are recorded in `schema_migrations`. Production `npm start` runs migrations before the API starts. Core tables: `users`, `system_settings`, `problems`, `testcases`, `submissions`, `user_sessions`, the `contest_*` family, and the authoring family (`author_profiles`, `problem_drafts`, `problem_draft_assets`, `problem_draft_testcases`, `authoring_jobs`, `authoring_job_inputs`, `authoring_job_files`, `authoring_published_problems`). To change the schema, add a new numbered migration — do not edit an applied one. `backend/scripts/init_db.ts` remains only as a destructive dev reset (drops all tables).
 
 ### Frontend structure (`frontend/src/`)
 
