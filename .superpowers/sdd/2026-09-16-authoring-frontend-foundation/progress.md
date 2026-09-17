@@ -87,3 +87,5 @@
 - Task 8: fix round 1/5 (1 Important focus-visibility coverage gap addressed, 0 open — keyboard focus is asserted and captured for shell/profile desktop and mobile; commits `2a53bdd..3dc4200`).
 - Task 8: complete (commits `b8c2956..3dc4200`, review clean with 2 deferred minors).
 - Task 9: complete — all static checks, 75 unit/component suites (392 tests), production build, and 4 Playwright visual tests pass after a focused accessibility/lint and formatting correction; commit message `fix: complete authoring foundation verification`.
+- Final whole-branch review: minor 1 (loadingLabel coverage) — resolved by direct tests for the explicit-label precedence and generic fallback branches (commit `f229e3c`).
+- Final whole-branch review: minor 2 (mobile long-profile baseline clip) — resolved. The old `scrollIntoViewIfNeeded()` on the Edit button was a no-op (button already in view), leaving the row's attribution text 69px past the 844px fold. The spec now scrolls the whole row into view (`block: 'end'`); measured row bottom = 844 = fully captured. Mobile baselines regenerated; full visual suite 4/4 green.

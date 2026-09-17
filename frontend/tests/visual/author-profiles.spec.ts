@@ -42,7 +42,15 @@ test('author profiles stay readable across viewports and themes', async ({ page 
   const longProfileEdit = page.getByRole('button', {
     name: /Edit Precision Scheduling Collective With Deliberately Long Attribution/,
   });
-  if (testInfo.project.name === 'mobile') await longProfileEdit.scrollIntoViewIfNeeded();
+  if (testInfo.project.name === 'mobile') {
+    // The Edit button can already sit fully inside the viewport while the long row's
+    // attribution text extends past the 844px fold; scroll the whole row into view so
+    // the capture covers it end to end.
+    await longProfileEdit.locator('xpath=ancestor::li[1]').evaluate((row) =>
+      row.scrollIntoView({ block: 'end', inline: 'nearest' })
+    );
+    await waitForStableUi(page);
+  }
 
   await expect(page).toHaveScreenshot('author-profiles.png', { animations: 'disabled' });
 
