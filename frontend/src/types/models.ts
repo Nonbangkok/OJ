@@ -41,6 +41,7 @@ export interface ProblemBase {
   id: string;
   title: string;
   author: string | null;
+  category?: string | null;
 }
 
 export interface ContestProblem extends ProblemBase {

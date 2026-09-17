@@ -80,6 +80,19 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
           </div>
 
           <div className={formStyles['form-group']}>
+            <label htmlFor="category">Category</label>
+            <input
+              type="text"
+              id="category"
+              name="category"
+              value={formData.category}
+              onChange={handleChange}
+              maxLength={50}
+              placeholder="e.g. Dynamic Programming (optional)"
+            />
+          </div>
+
+          <div className={formStyles['form-group']}>
             <label htmlFor="time_limit_ms">Time Limit (ms)</label>
             <input
               type="number"

@@ -45,6 +45,7 @@ export interface CreateProblemRequest {
   id: string;
   title: string;
   author: string;
+  category?: string;
   time_limit_ms: number;
   memory_limit_mb: number;
 }
