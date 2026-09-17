@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import authService from '../services/authService';
 import type { AuthUser } from '../types';
@@ -65,7 +73,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const value = useMemo<AuthContextValue>(
     () => ({ user, isLoading, login, logout }),
-    [user, isLoading, login, logout],
+    [user, isLoading, login, logout]
   );
 
   return <AuthContext.Provider value={value}>{!isLoading && children}</AuthContext.Provider>;

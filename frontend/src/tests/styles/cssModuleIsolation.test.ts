@@ -17,7 +17,7 @@ const htmlElements = new Set([
 ]);
 
 function startsWithBareHtmlElement(selector: string): boolean {
-  const [element] = selector.match(/^([a-z][a-z0-9-]*)(?=[:.#\[\s>+~]|$)/i) ?? [];
+  const [element] = selector.match(/^([a-z][a-z0-9-]*)(?=[:.#[\s>+~]|$)/i) ?? [];
   return element !== undefined && htmlElements.has(element.toLowerCase());
 }
 

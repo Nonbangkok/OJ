@@ -22,16 +22,18 @@ const submissionService = {
 
   getById: async (
     submissionId: string | number,
-    contestId: string | number | null = null,
+    contestId: string | number | null = null
   ): Promise<SubmissionDetailResponse> => {
     const params = contestId !== null ? { contestId } : {};
-    const response = await api.get<SubmissionDetailResponse>(`/submissions/${submissionId}`, { params });
+    const response = await api.get<SubmissionDetailResponse>(`/submissions/${submissionId}`, {
+      params,
+    });
     return response.data;
   },
 
   searchProblems: async (
     query: string,
-    contestId: string | number | null = null,
+    contestId: string | number | null = null
   ): Promise<ProblemSearchResponse> => {
     const params = new URLSearchParams({ q: query });
     if (contestId !== null) {
@@ -44,7 +46,7 @@ const submissionService = {
 
   searchUsers: async (
     query: string,
-    contestId: string | number | null = null,
+    contestId: string | number | null = null
   ): Promise<UserSearchResponse> => {
     const params = new URLSearchParams({ q: query });
     if (contestId !== null) {

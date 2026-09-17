@@ -19,10 +19,10 @@ const problemService = {
 
   getContestProblemDetails: async (
     contestId: string | number,
-    problemId: string,
+    problemId: string
   ): Promise<ContestProblemDetailResponse> => {
     const response = await api.get<ContestProblemDetailResponse>(
-      `/contests/${contestId}/problems/${problemId}`,
+      `/contests/${contestId}/problems/${problemId}`
     );
     return response.data;
   },

@@ -69,7 +69,7 @@ export function Button({
   return (
     <span className={styles.reasonWrapper}>
       {button}
-      <span id={reasonId} className={styles.reason} tabIndex={0}>
+      <span id={reasonId} className={styles.reason}>
         {disabledReason}
       </span>
     </span>

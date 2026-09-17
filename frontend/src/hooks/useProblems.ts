@@ -17,10 +17,7 @@ interface UseProblemsResult {
   refresh: () => Promise<void>;
 }
 
-export const useProblems = (
-  contestId: string | null = null,
-  enabled = true,
-): UseProblemsResult => {
+export const useProblems = (contestId: string | null = null, enabled = true): UseProblemsResult => {
   const [problems, setProblems] = useState<ProblemsList>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

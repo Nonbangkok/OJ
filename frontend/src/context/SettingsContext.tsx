@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import authService from '../services/authService';
 import { getErrorMessage } from '../utils/error';
@@ -58,7 +66,7 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
       isLoading,
       refreshSettings: fetchSettings,
     }),
-    [settings, isLoading, fetchSettings],
+    [settings, isLoading, fetchSettings]
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

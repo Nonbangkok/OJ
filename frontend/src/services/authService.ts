@@ -14,7 +14,10 @@ const authService = {
     return response.data;
   },
 
-  login: async (username: LoginRequest['username'], password: LoginRequest['password']): Promise<LoginResponse> => {
+  login: async (
+    username: LoginRequest['username'],
+    password: LoginRequest['password']
+  ): Promise<LoginResponse> => {
     const response = await api.post<LoginResponse>('/login', { username, password });
     return response.data;
   },
@@ -25,7 +28,7 @@ const authService = {
 
   register: async (
     username: RegisterRequest['username'],
-    password: RegisterRequest['password'],
+    password: RegisterRequest['password']
   ): Promise<RegisterResponse> => {
     const response = await api.post<RegisterResponse>('/register', { username, password });
     return response.data;

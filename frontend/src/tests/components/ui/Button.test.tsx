@@ -46,7 +46,7 @@ describe('Button', () => {
     expect(button).toHaveAttribute('aria-busy', 'true');
   });
 
-  it('describes a disabled action with focusable reason text', () => {
+  it('describes a disabled action without adding a redundant tab stop', () => {
     render(
       <Button disabled disabledReason="Build the PDF first">
         Publish
@@ -55,7 +55,9 @@ describe('Button', () => {
 
     const reason = screen.getByText('Build the PDF first');
     expect(reason).toHaveAttribute('id');
-    expect(reason).toHaveAttribute('tabindex', '0');
+    expect(reason).not.toHaveAttribute('tabindex');
+    reason.focus();
+    expect(reason).not.toHaveFocus();
     expect(screen.getByRole('button', { name: 'Publish' })).toHaveAttribute(
       'aria-describedby',
       reason.id,
