@@ -5,7 +5,7 @@ import path from 'node:path';
 import { runOutputProcess } from '../../authoring/outputProcess';
 import { generateOutputs } from '../../authoring/outputs';
 import { AuthoringSpool } from '../../authoring/spool';
-import { JobSnapshot } from '../../authoring/protocol';
+import { AUTHORING_RUNNER, JobSnapshot } from '../../authoring/protocol';
 
 describe('bounded solution output transport', () => {
   let root: string;
@@ -89,6 +89,11 @@ describeRunner('reference solution execution', () => {
     expect(await spool.readInput(j.jobId, 1, result.outputs![1])).toBe('16\n');
     expect(result.outputs!.every(o => Number.isInteger(o.durationMs) && o.durationMs >= 0)).toBe(true);
     expect((await readdir(root)).filter(name => name.startsWith('compile-'))).toEqual([]);
+    // Compile time is added once (by compileJob) on top of the execution phase; the
+    // sum must stay within the job timeout bound that jobResultSchema enforces.
+    expect(Number.isInteger(result.durationMs)).toBe(true);
+    expect(result.durationMs).toBeGreaterThanOrEqual(0);
+    expect(result.durationMs).toBeLessThanOrEqual(AUTHORING_RUNNER.JOB_TIMEOUT_MS);
   });
 
   it('cannot read host files, write its jail, open sockets, or escape the process group', async () => {

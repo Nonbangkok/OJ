@@ -11,7 +11,6 @@ import { TESTCASE_LIMITS, TestcaseError, decodeTestcaseText, readTestcaseFile } 
 export async function generateOutputs(jobInput: JobSnapshot, workRoot: string, spool: AuthoringSpool,
   options: { signal?: AbortSignal; timeoutMs?: number;
     verification?: Verification; beforeExecution?: () => Promise<JobResult | undefined> } = {}): Promise<JobResult> {
-  const started = performance.now();
   const job = jobSnapshotSchema.parse(jobInput);
   if (job.kind !== 'generate_outputs' && !(job.kind === 'verify_all' && options.verification)) {
     throw new Error('Expected an output-generation or verification job');
@@ -35,6 +34,7 @@ export async function generateOutputs(jobInput: JobSnapshot, workRoot: string, s
       const outputs: OutputArtifact[] = [];
       let total = job.cases!.reduce((sum, input) => sum + input.sizeBytes, 0);
       let log = options.verification ? '\n[execution]\n' : '';
+      const executionStarted = performance.now();
       const cleanLog = (text: string) => Buffer.from(text.replaceAll(cwd, '[workspace]')
         .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '')).subarray(0, AUTHORING_RUNNER.MAX_LOG_BYTES - 3).toString('utf8');
       try {
@@ -102,10 +102,14 @@ export async function generateOutputs(jobInput: JobSnapshot, workRoot: string, s
         if (Date.now() >= deadline) return failedResult(job, 'job_expired');
         if (!options.verification) await spool.finishOutputArtifacts(job.jobId, stage);
         return { ...failedResult(job, 'runner_error'), status: 'succeeded', errorCode: null, exitCode: 0, log,
+          durationMs: Math.max(0, Math.round(performance.now() - executionStarted)),
           ...(!options.verification ? { outputs } : {}) };
       } finally { await spool.discardOutputArtifacts(stage); }
     },
   });
-  result.durationMs = Math.min(AUTHORING_RUNNER.JOB_TIMEOUT_MS, Math.max(0, Math.round(performance.now() - started)));
+  // The callback reports only the execution phase; compileJob adds the compile
+  // phase, so the total is counted once and stays within the schema bound. The
+  // cap is applied after the sum, keeping near-deadline jobs valid.
+  result.durationMs = Math.min(AUTHORING_RUNNER.JOB_TIMEOUT_MS, result.durationMs);
   return result;
 }

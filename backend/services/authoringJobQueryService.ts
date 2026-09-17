@@ -44,7 +44,14 @@ export async function queueVerifyJob(draftId: string, revision: number, database
 
 export async function readQueuedFile(jobId: string, name: string, database: JobDatabase = db): Promise<Buffer> {
   const row = (await database.query('SELECT content FROM authoring_job_files WHERE job_id=$1 AND name=$2', [jobId, name])).rows[0];
-  if (!row) throw new TestcaseError('invalid_pdf_inputs', 'Captured PDF file is missing');
+  if (!row) {
+    // 'output:' rows are expected-output captures, not PDF images; report the right failure.
+    const expectedOutput = name.startsWith('output:');
+    throw new TestcaseError(
+      expectedOutput ? 'invalid_expected_outputs' : 'invalid_pdf_inputs',
+      expectedOutput ? 'Captured expected output is missing' : 'Captured PDF file is missing',
+    );
+  }
   return row.content;
 }
 

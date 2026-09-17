@@ -109,7 +109,7 @@ describeWithDatabase('database backup and restore', () => {
     `);
     expect(setting.rows).toEqual([{ setting_value: 'false' }]);
 
-    const migrations = await pool.query('SELECT version FROM schema_migrations ORDER BY version');
-    expect(migrations.rows).toEqual([{ version: '0001_core_schema' }]);
+    const appliedMigrations = await pool.query('SELECT version FROM schema_migrations ORDER BY version');
+    expect(appliedMigrations.rows).toEqual([{ version: '0001_core_schema' }]);
   });
 });
