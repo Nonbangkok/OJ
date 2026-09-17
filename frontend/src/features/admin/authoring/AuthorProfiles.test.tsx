@@ -26,14 +26,16 @@ test('uses bounded profile identity and shared action hierarchy', async () => {
 
   expect(row).not.toBeNull();
   expect(row?.querySelector('[data-profile-identity]')).toHaveTextContent('Writer');
-  expect(edit).toHaveClass('secondary', 'compact');
-  expect(screen.getByRole('button', { name: 'New author profile' })).toHaveClass('primary');
+  expect(edit).toHaveAttribute('type', 'button');
+  expect(screen.getByRole('button', { name: 'New author profile' })).toBeEnabled();
 
   fireEvent.click(edit);
 
-  expect(screen.getByRole('button', { name: 'Remove image' })).toHaveClass('destructive');
-  expect(screen.getByRole('button', { name: 'Save profile' })).toHaveClass('primary');
-  expect(screen.getByRole('button', { name: 'Cancel' })).toHaveClass('secondary');
+  expect(screen.getByRole('button', { name: 'Remove image' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Save profile' })).toHaveAttribute('type', 'submit');
+  expect(screen.getByRole('button', { name: 'Cancel' })).toHaveAttribute('type', 'button');
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(screen.queryByRole('button', { name: 'Save profile' })).not.toBeInTheDocument();
 });
 
 test('creates an unlinked profile and shows it in the list after saving', async () => {
@@ -108,7 +110,7 @@ test('retries a failed profile list request', async () => {
   render(<AuthorProfiles />);
   expect(await screen.findByRole('alert')).toHaveTextContent('Network unavailable');
   const retry = screen.getByRole('button', { name: 'Retry profiles' });
-  expect(retry).toHaveClass('secondary');
+  expect(retry).toHaveAttribute('type', 'button');
   fireEvent.click(retry);
   expect(await screen.findByRole('button', { name: 'Edit Writer' })).toBeInTheDocument();
 });

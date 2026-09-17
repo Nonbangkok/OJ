@@ -96,6 +96,11 @@
   font-weight: 600;
   padding: 1rem 0;
 }
+.scroll {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
 .authoring pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;

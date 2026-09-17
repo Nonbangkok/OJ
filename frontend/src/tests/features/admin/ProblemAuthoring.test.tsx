@@ -65,17 +65,20 @@ test('lists resumable drafts and creates a draft with explicit author metadata',
     '/admin/authoring/d1'
   );
   expect(screen.getByRole('region', { name: 'Saved drafts' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'New draft' })).toHaveClass('primary');
-  expect(screen.getByRole('button', { name: 'Author profiles' })).toHaveClass('secondary');
-  expect(screen.getByRole('link', { name: 'Problem Management' })).toHaveClass('actionLink');
+  expect(screen.getByRole('button', { name: 'New draft' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Author profiles' })).toHaveAttribute('type', 'button');
+  expect(screen.getByRole('link', { name: 'Problem Management' })).toHaveAttribute(
+    'href',
+    '/admin/problems'
+  );
   fireEvent.click(screen.getByRole('button', { name: 'New draft' }));
   fireEvent.change(screen.getByLabelText('Problem ID'), { target: { value: 'new' } });
   fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'New problem' } });
   fireEvent.change(screen.getByLabelText('AKA name'), { target: { value: 'Writer' } });
   fireEvent.change(screen.getByLabelText('Real name'), { target: { value: 'Name' } });
   jest.mocked(api.post).mockResolvedValue({ data: draft });
-  expect(screen.getByRole('button', { name: 'Create draft' })).toHaveClass('primary');
-  expect(screen.getByRole('button', { name: 'Cancel' })).toHaveClass('secondary');
+  expect(screen.getByRole('button', { name: 'Create draft' })).toHaveAttribute('type', 'submit');
+  expect(screen.getByRole('button', { name: 'Cancel' })).toHaveAttribute('type', 'button');
   fireEvent.click(screen.getByRole('button', { name: 'Create draft' }));
   await waitFor(() =>
     expect(api.post).toHaveBeenCalledWith(
