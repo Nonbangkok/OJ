@@ -91,3 +91,15 @@
 - Final whole-branch review: minor 2 (mobile long-profile baseline clip) — resolved. The old `scrollIntoViewIfNeeded()` on the Edit button was a no-op (button already in view), leaving the row's attribution text 69px past the 844px fold. The spec now scrolls the whole row into view (`block: 'end'`); measured row bottom = 844 = fully captured. Mobile baselines regenerated; full visual suite 4/4 green.
 - Final whole-branch review: minor 3 (darwin-only snapshot baselines) — deferred with rationale. The repo has no CI pipeline at all (no .github/workflows), so a Linux baseline would have no runner to consume it. The -darwin suffix is Playwright's platform isolation working as designed; when Linux CI is introduced, that change owns generating and committing -linux baselines (or adopting a cross-platform snapshot policy). Not a merge blocker.
 - Final whole-branch review: doc debt — CLAUDE.md still described the pre-migration world ("no migration files, schema in init_db.ts") and did not document `test:visual`. Updated to describe the migration system, the destructive-reset role of init_db, and the visual test commands.
+
+## Final whole-branch review — code-review findings (wave 1, verified)
+
+No correctness or security defects found. Verified findings, triaged:
+
+- Convention: authoring frontend bypasses the `services/` layer (40 raw `api.*` calls with inline URLs in `features/admin/authoring/`) — follow-up refactor to a typed `authoringAdminService`.
+- Duplication: `authorProfileImageService` re-implements the `statementAssetService` MIME/sharp pipeline; HTML-escape helpers exist in 4 copies; 2 MiB limit defined 4×; CSP header copy-pasted in 4 nginx locations; runner compose definition duplicated between `docker-compose.yml` and `tests/authoring/compose.yml`.
+- Dead code: `Drawer` primitive exported+tested but unused (built as foundation for upcoming navigation work); `loadingLabels` auto-derivation has no production consumer (all callers pass explicit `loadingLabel`).
+- Efficiency (bounded, single-admin tool): `applyJobResult` inserts testcases row-by-row; coordinator reconcile `SELECT *`s each active job every second (snapshot JSONB up to 16 MiB); frontend job poll re-fetches the full draft (statement+solution text) every 3 s.
+- Style: ad-hoc Zod in `authoringTestcaseController`/`authoringWorkspaceController` instead of `schemas/requestSchemas.ts`; runner limits hardcoded in `MetadataFields.tsx` and one error message instead of constants.
+
+Ruling: none block merge. All are recorded for follow-up branches.
