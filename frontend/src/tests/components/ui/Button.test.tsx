@@ -46,6 +46,26 @@ describe('Button', () => {
     expect(button).toHaveAttribute('aria-busy', 'true');
   });
 
+  it('prefers an explicit loading label over the derived action label', () => {
+    render(
+      <Button loading loadingLabel="Verifying testcase…">
+        Delete testcase
+      </Button>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Verifying testcase…' })).toBeDisabled();
+  });
+
+  it('falls back to the generic loading label for non-text children', () => {
+    render(
+      <Button loading>
+        <em>Styled</em>
+      </Button>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Loading…' })).toBeDisabled();
+  });
+
   it('describes a disabled action without adding a redundant tab stop', () => {
     render(
       <Button disabled disabledReason="Build the PDF first">
