@@ -20,7 +20,7 @@ const AdminLayout = () => {
   return (
     <>
       <AdminNavbar />
-      <main className="container">
+      <main className="container admin-main">
         <Outlet />
       </main>
     </>

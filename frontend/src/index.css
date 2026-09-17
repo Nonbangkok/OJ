@@ -111,6 +111,16 @@
 }
 
 /* Global styles reset and base */
+html {
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
 body {
   margin: 0;
   font-family: var(--font-family-sans-serif);
@@ -132,6 +142,10 @@ code {
   max-width: 1200px;
   margin: 0 auto;
   padding: 1rem 2rem;
+}
+
+.admin-main {
+  min-width: 0;
 }
 
 /* Global error message styling */
