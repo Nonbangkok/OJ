@@ -108,3 +108,13 @@ Ruling: none block merge. All are recorded for follow-up branches.
 
 - REAL, FIXED (commit 3a910c2): submit button in CodeSubmissionForm referenced a nonexistent class and lost all styling after the Task 1 button-rule scoping; ProblemModal fieldset under `.modal-backdrop` no longer matched the `.modal-overlay fieldset` rule; `dropAllTablesForImport` omitted the authoring table family, stranding orphaned tables when importing a pre-authoring backup.
 - Intentional hardening, documented: production.conf hardcoded cert paths (README documents the `/etc/letsencrypt/live/nonbangkokgrader.com/` requirement; deploy.sh health gate fails loudly without them); backend healthcheck now uses `/health/ready` (schema-aware readiness; import window marks backend unhealthy — startup-gating only, already-running nginx keeps serving); removal of `TSC_COMPILE_ON_ERROR` (masks type errors in prod builds; removal is a win).
+
+## Final whole-branch review — consolidated verdict (all angles reported)
+
+10 verified findings from the review orchestrator (9 angles + direct verification):
+- FIXED: dropAllTablesForImport authoring tables (3a910c2); Form.module.css `.submit-button` covering CodeSubmissionForm AND BatchUserCreation (3a910c2); ModalLayout `.modal-backdrop fieldset` (3a910c2); readQueuedFile expected-output error code (68e36f2).
+- FALSE POSITIVES (verified against existing tests): PATCH profile-snapshot precedence (tested contract "Caller must not win"); positional input/output directory pairing (tested legacy format); generateOutputs durationMs (overwritten post-sum — original correct, my change reverted in 7c30781).
+- INTENTIONAL, documented: /health/ready during import window (startup-gating only).
+- Follow-up quality items (not blockers): per-row testcase inserts under lock; useAuthoringDraft triple-duplicated fetch-and-apply; inlined poll interval/runner limits vs constants; four copies of HTML-escape helpers; duplicated MIME/sharp pipeline; CSP ×4; runner compose ×2; authoring frontend bypasses services/ layer.
+
+Final gates: backend 51 suites / 460 tests green; frontend 75 / 394 green; Playwright visual 4/4 green; all DB integration suites pass sequentially (INTEGRATION_DATABASE_URL + pg client tools required); migration E2E verified idempotent on fresh Postgres 16.
