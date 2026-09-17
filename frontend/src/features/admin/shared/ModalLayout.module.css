@@ -43,7 +43,8 @@
   background-color: #218838;
 }
 
-.modal-overlay fieldset {
+.modal-overlay fieldset,
+.modal-backdrop fieldset {
   border-color: var(--border-color);
   border-radius: 6px;
   padding: 1rem;

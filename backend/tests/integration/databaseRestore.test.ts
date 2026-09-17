@@ -1,7 +1,7 @@
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 import pg from 'pg';
-import { coreMigrations } from '../../migrations';
+import { migrations, coreMigrations } from '../../migrations';
 import { runMigrationsFromPool } from '../../scripts/migrate';
 import { dropAllTablesForImport } from '../../services/adminQueryService';
 
@@ -73,6 +73,21 @@ describeWithDatabase('database backup and restore', () => {
       WHERE table_schema = 'public'
     `);
     expect(tablesAfterDrop.rows).toEqual([]);
+
+    // A pre-authoring backup restored over an authoring-era database must not leave
+    // orphaned authoring tables behind.
+    await runMigrationsFromPool(pool, migrations);
+    await pool.query(`
+      INSERT INTO author_profiles (aka_name, real_name, default_language, country_code)
+      VALUES ('stale-author', 'Stale Author', 'English', 'THA')
+    `);
+    await dropAllTablesForImport({ query: async (text) => pool.query(text) });
+    const tablesAfterSecondDrop = await pool.query(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+    `);
+    expect(tablesAfterSecondDrop.rows).toEqual([]);
 
     const restore = spawnSync('psql', [...commonArgs, '-f', dumpPath, '-v', 'ON_ERROR_STOP=1'], {
       encoding: 'utf8',

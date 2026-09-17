@@ -71,6 +71,7 @@
 /* General Button Style */
 .form-container button,
 .form-button,
+.submit-button,
 .button {
   display: inline-block;
   box-sizing: border-box;
@@ -91,12 +92,14 @@
 
 .form-container button:hover,
 .form-button:hover,
+.submit-button:hover,
 .button:hover {
   background-color: var(--accent-primary-hover);
 }
 
 .form-container button:disabled,
 .form-button:disabled,
+.submit-button:disabled,
 .button:disabled {
   background-color: var(--background-tertiary);
   color: var(--text-muted);

@@ -157,6 +157,14 @@ export const dropAllTablesForImport = async (database: ImportDatabase = db): Pro
   await database.query('DROP TABLE IF EXISTS submissions CASCADE;');
   await database.query('DROP TABLE IF EXISTS testcases CASCADE;');
   await database.query('DROP TABLE IF EXISTS problems CASCADE;');
+  await database.query('DROP TABLE IF EXISTS authoring_published_problems CASCADE;');
+  await database.query('DROP TABLE IF EXISTS authoring_job_files CASCADE;');
+  await database.query('DROP TABLE IF EXISTS authoring_job_inputs CASCADE;');
+  await database.query('DROP TABLE IF EXISTS authoring_jobs CASCADE;');
+  await database.query('DROP TABLE IF EXISTS problem_draft_testcases CASCADE;');
+  await database.query('DROP TABLE IF EXISTS problem_draft_assets CASCADE;');
+  await database.query('DROP TABLE IF EXISTS problem_drafts CASCADE;');
+  await database.query('DROP TABLE IF EXISTS author_profiles CASCADE;');
   await database.query('DROP TABLE IF EXISTS users CASCADE;');
   await database.query('DROP TABLE IF EXISTS user_sessions CASCADE;');
   await database.query('DROP TABLE IF EXISTS system_settings CASCADE;');
