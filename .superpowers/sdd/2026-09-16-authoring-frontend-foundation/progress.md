@@ -103,3 +103,8 @@ No correctness or security defects found. Verified findings, triaged:
 - Style: ad-hoc Zod in `authoringTestcaseController`/`authoringWorkspaceController` instead of `schemas/requestSchemas.ts`; runner limits hardcoded in `MetadataFields.tsx` and one error message instead of constants.
 
 Ruling: none block merge. All are recorded for follow-up branches.
+
+## Final whole-branch review — removed-behavior audit rulings
+
+- REAL, FIXED (commit 3a910c2): submit button in CodeSubmissionForm referenced a nonexistent class and lost all styling after the Task 1 button-rule scoping; ProblemModal fieldset under `.modal-backdrop` no longer matched the `.modal-overlay fieldset` rule; `dropAllTablesForImport` omitted the authoring table family, stranding orphaned tables when importing a pre-authoring backup.
+- Intentional hardening, documented: production.conf hardcoded cert paths (README documents the `/etc/letsencrypt/live/nonbangkokgrader.com/` requirement; deploy.sh health gate fails loudly without them); backend healthcheck now uses `/health/ready` (schema-aware readiness; import window marks backend unhealthy — startup-gating only, already-running nginx keeps serving); removal of `TSC_COMPILE_ON_ERROR` (masks type errors in prod builds; removal is a win).
