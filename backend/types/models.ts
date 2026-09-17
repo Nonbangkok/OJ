@@ -85,6 +85,7 @@ export interface ProblemRow {
     id: string;
     title: string;
     author: string | null;
+    category: string | null;
     problem_pdf: Buffer | null;
     time_limit_ms: number;
     memory_limit_mb: number;
@@ -107,7 +108,7 @@ export type ProblemDetailDTO = Pick<
 /** `problems` row augmented with contest status for the admin index. */
 export interface AdminProblemRow extends Pick<
     ProblemRow,
-    'id' | 'title' | 'author' | 'is_visible' | 'contest_id'
+    'id' | 'title' | 'author' | 'category' | 'is_visible' | 'contest_id'
 > {
     contest_status: ContestStatus | null;
 }

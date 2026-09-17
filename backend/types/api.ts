@@ -131,11 +131,19 @@ export interface CreateProblemRequestBody {
     id: string;
     title: string;
     author: string;
+    category?: string | null;
     time_limit_ms: number;
     memory_limit_mb: number;
 }
 
-export interface UpdateProblemRequestBody extends CreateProblemRequestBody {}
+export interface UpdateProblemRequestBody {
+    id: string;
+    title?: string;
+    author?: string;
+    category?: string | null;
+    time_limit_ms?: number;
+    memory_limit_mb?: number;
+}
 
 export interface UpdateProblemVisibilityRequestBody {
     isVisible: boolean;

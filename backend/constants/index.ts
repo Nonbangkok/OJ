@@ -40,6 +40,7 @@ export const USER_VALIDATION = {
 export const PROBLEM_VALIDATION = {
     MIN_TITLE_LENGTH: 1,
     MIN_AUTHOR_LENGTH: 1,
+    MAX_CATEGORY_LENGTH: 50,
     MIN_TIME_LIMIT_MS: 100,
     MIN_MEMORY_LIMIT_MB: 1,
 } as const;

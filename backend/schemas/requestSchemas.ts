@@ -106,6 +106,7 @@ export const createProblemSchema = z.object({
   id: nonEmptyString,
   title: z.string().trim().min(PROBLEM_VALIDATION.MIN_TITLE_LENGTH).max(STRING_LIMITS.TITLE),
   author: z.string().trim().min(PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH).max(STRING_LIMITS.AUTHOR),
+  category: z.string().trim().max(PROBLEM_VALIDATION.MAX_CATEGORY_LENGTH).optional(),
   time_limit_ms: z.number().int().min(PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS),
   memory_limit_mb: z.number().int().min(PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB),
 });
@@ -114,6 +115,7 @@ export const updateProblemSchema = z.object({
   id: nonEmptyString,
   title: z.string().trim().min(PROBLEM_VALIDATION.MIN_TITLE_LENGTH).max(STRING_LIMITS.TITLE).optional(),
   author: z.string().trim().min(PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH).max(STRING_LIMITS.AUTHOR).optional(),
+  category: z.string().trim().max(PROBLEM_VALIDATION.MAX_CATEGORY_LENGTH).nullable().optional(),
   time_limit_ms: z.number().int().min(PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS).optional(),
   memory_limit_mb: z.number().int().min(PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB).optional(),
 });
