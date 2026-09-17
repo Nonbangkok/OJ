@@ -33,6 +33,21 @@ describe('ProblemDetail Page', () => {
         });
     });
 
+    it('shows a back control that navigates back to the list', async () => {
+        const mockProblem = {
+            id: '1', title: 'Test Problem', author: null,
+            time_limit_ms: 1000, memory_limit_mb: 256
+        };
+        const mockStats = [{ id: '1', title: 'Test Problem', author: null, time_limit_ms: 1000, memory_limit_mb: 256, best_score: 0 }];
+        (jest.mocked(problemService.getDetails) as jest.Mock).mockResolvedValueOnce(mockProblem);
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(mockStats);
+
+        render(<BrowserRouter><ProblemDetail /></BrowserRouter>);
+
+        const back = await screen.findByRole('button', { name: 'Back to problem list' });
+        expect(back).toBeInTheDocument();
+    });
+
     it('displays error if problem fetch fails', async () => {
         (jest.mocked(problemService.getDetails) as jest.Mock).mockRejectedValueOnce(new Error('Fetch failed'));
 

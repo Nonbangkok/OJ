@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import styles from './Problems.module.css';
 import { useProblems } from '../../hooks/useProblems';
+import { useScrollRestore } from '../../hooks/useScrollRestore';
 import ProblemCard from '../../features/problem/ProblemCard';
 
 import LoadingPage from '../../components/shared/LoadingPage';
@@ -25,6 +26,9 @@ const Problems = () => {
   const { problems, loading, error } = useProblems();
   const [activeCategory, setActiveCategory] = useState(ALL_CATEGORIES);
   const [search, setSearch] = useState('');
+
+  // Coming back from a problem detail page restores the previous scroll spot.
+  useScrollRestore(!loading && !error);
 
   const categories = useMemo(() => {
     const counts = new Map<string, number>();

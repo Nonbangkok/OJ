@@ -102,6 +102,26 @@
   background: var(--card-bg);
 }
 
+.back-btn {
+  align-self: flex-start;
+  margin: 0 0 0.75rem 0;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--background-secondary);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.back-btn:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
 .problem-info h2 {
   margin: 0 0 0.5rem 0;
   color: var(--text-primary);
