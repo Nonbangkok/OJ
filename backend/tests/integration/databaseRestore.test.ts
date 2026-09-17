@@ -78,8 +78,8 @@ describeWithDatabase('database backup and restore', () => {
     // orphaned authoring tables behind.
     await runMigrationsFromPool(pool, migrations);
     await pool.query(`
-      INSERT INTO author_profiles (aka_name, real_name, default_language, country_code)
-      VALUES ('stale-author', 'Stale Author', 'English', 'THA')
+      INSERT INTO author_profiles (id, aka_name, real_name, default_language, country_code)
+      VALUES (gen_random_uuid(), 'stale-author', 'Stale Author', 'English', 'THA')
     `);
     await dropAllTablesForImport({ query: async (text) => pool.query(text) });
     const tablesAfterSecondDrop = await pool.query(`
