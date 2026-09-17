@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockAdminApi, waitForStableUi } from './fixtures';
+import { expectVisibleFocus, focusByKeyboard, mockAdminApi, waitForStableUi } from './fixtures';
 
 test('authoring shell is responsive and visually stable', async ({ page }, testInfo) => {
   await mockAdminApi(page);
@@ -51,4 +51,9 @@ test('authoring shell is responsive and visually stable', async ({ page }, testI
   }
 
   await expect(page).toHaveScreenshot('admin-authoring-shell.png', { animations: 'disabled' });
+
+  const focusTarget = testInfo.project.name === 'mobile' ? menu : logout;
+  await focusByKeyboard(page, focusTarget);
+  await expectVisibleFocus(focusTarget);
+  await expect(page).toHaveScreenshot('admin-authoring-shell-focus.png', { animations: 'disabled' });
 });

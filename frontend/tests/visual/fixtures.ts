@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 const fixedTime = new Date('2026-09-16T09:00:00+07:00');
 
@@ -120,4 +120,28 @@ export async function waitForStableUi(page: Page): Promise<void> {
       }
     `,
   });
+}
+
+export async function focusByKeyboard(page: Page, target: Locator): Promise<void> {
+  for (let index = 0; index < 80; index += 1) {
+    if (await target.evaluate((element) => element === document.activeElement)) return;
+    await page.keyboard.press('Tab');
+  }
+  throw new Error('Keyboard navigation did not reach the expected target');
+}
+
+export async function expectVisibleFocus(target: Locator): Promise<void> {
+  await expect(target).toBeFocused();
+  const indication = await target.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      outlineStyle: style.outlineStyle,
+      outlineWidth: style.outlineWidth,
+      boxShadow: style.boxShadow,
+    };
+  });
+  expect(
+    (indication.outlineStyle !== 'none' && indication.outlineWidth !== '0px') ||
+      indication.boxShadow !== 'none'
+  ).toBe(true);
 }

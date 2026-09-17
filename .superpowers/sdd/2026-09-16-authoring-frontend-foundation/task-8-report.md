@@ -119,3 +119,45 @@ PASS — no whitespace errors.
 ## Concerns
 
 No blocking concerns. Playwright snapshot filenames include the current macOS platform suffix (`-darwin`), which is Playwright's standard platform-specific baseline behavior. CRA emits existing webpack-dev-server deprecation warnings during the visual runs; they do not affect the results.
+
+## Fix Round 1
+
+### RED
+
+Updated the visual specs first to use real Tab navigation to focus the desktop Logout button/mobile Menu button in the authoring shell and the long-profile Edit button in Author Profiles. Each focused target asserts `toBeFocused()` plus a computed non-zero outline or non-`none` box-shadow before capturing a dedicated focus baseline. The mobile profile spec also calls `scrollIntoViewIfNeeded()` on the deliberately long second profile before its captures.
+
+```bash
+cd frontend && npm run test:visual -- --reporter=list
+```
+
+Result: expected failure (4 failed). The profile focus assertions passed and failed only on missing focus snapshots; the shell run additionally exposed that the desktop Authoring link has no explicit focus ring, so the shell target was corrected to the shared Button-based Logout/Menu controls. No production code was changed.
+
+### GREEN
+
+```bash
+cd frontend && npm run test:visual:update
+cd frontend && npm run test:visual
+```
+
+Result: baseline update PASS (4 passed) and verification PASS (4 passed). Four new focus-state PNGs were generated, covering desktop/mobile shell and desktop/mobile author profiles.
+
+### Visual Inspection
+
+Opened and reviewed each changed PNG individually:
+
+- `admin-authoring-shell-focus-desktop-darwin.png` — visible blue focus ring around Logout.
+- `admin-authoring-shell-focus-mobile-darwin.png` — visible blue focus ring around Menu.
+- `author-profiles-focus-desktop-darwin.png` — visible blue focus ring around the second profile’s Edit control.
+- `author-profiles-focus-mobile-darwin.png` — visible blue focus ring around the second profile’s Edit control, with the long profile scrolled into the captured viewport.
+
+No clipped focus ring, overlap, or unreadable content was observed. The existing `-darwin` platform suffix policy is retained: including the project name already separates desktop/mobile baselines, while removing the platform token would make future OS-specific rendering share a filename and risk cross-platform baseline collisions; no duplicate baselines are introduced.
+
+### Verification
+
+```bash
+cd frontend && npm run type-check
+cd frontend && CI=true npm test -- --watchAll=false src/tests/styles/cssModuleIsolation.test.ts
+git diff --check
+```
+
+Result: all PASS.

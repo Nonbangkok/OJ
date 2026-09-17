@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { mockAdminApi, waitForStableUi } from './fixtures';
+import {
+  expectVisibleFocus,
+  focusByKeyboard,
+  mockAdminApi,
+  waitForStableUi,
+} from './fixtures';
 
 test('author profiles stay readable across viewports and themes', async ({ page }, testInfo) => {
   await mockAdminApi(page);
@@ -34,7 +39,16 @@ test('author profiles stay readable across viewports and themes', async ({ page 
   expect(metrics.identityWidth).toBeGreaterThan(120);
   if (testInfo.project.name === 'mobile') expect(metrics.rowWidth).toBeLessThanOrEqual(390);
 
+  const longProfileEdit = page.getByRole('button', {
+    name: /Edit Precision Scheduling Collective With Deliberately Long Attribution/,
+  });
+  if (testInfo.project.name === 'mobile') await longProfileEdit.scrollIntoViewIfNeeded();
+
   await expect(page).toHaveScreenshot('author-profiles.png', { animations: 'disabled' });
+
+  await focusByKeyboard(page, longProfileEdit);
+  await expectVisibleFocus(longProfileEdit);
+  await expect(page).toHaveScreenshot('author-profiles-focus.png', { animations: 'disabled' });
 
   if (testInfo.project.name === 'desktop') {
     await page.getByRole('button', { name: 'Switch to dark mode' }).click();
