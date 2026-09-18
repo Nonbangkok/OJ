@@ -329,7 +329,7 @@
 .navBtnActive,
 .navBtnActive:hover {
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--action-primary-foreground);
 }
 .workspaceMain {
   flex: 1;
@@ -378,7 +378,7 @@
   width: 100%;
   height: 750px;
   border: 1px solid var(--border-color);
-  background: white;
+  background: var(--statement-paper);
   margin-top: 1rem;
 }
 .confirmation {
@@ -420,15 +420,15 @@
   align-items: center;
   gap: 0.6rem;
   padding: 0.5rem 1rem;
-  background: #202428;
-  color: #f7f7f7;
+  background: var(--editor-chrome-bg);
+  color: var(--editor-chrome-text);
   border-bottom: 1px solid var(--border-color);
 }
 .headerSpacer {
   flex: 1;
 }
 .previewStatusChip {
-  color: #c9cdd1;
+  color: var(--editor-chrome-muted);
   font-size: 0.8rem;
   white-space: nowrap;
   overflow: hidden;
@@ -436,7 +436,7 @@
   max-width: 18ch;
 }
 .editorHeader a {
-  color: #f7f7f7;
+  color: var(--editor-chrome-text);
   text-decoration: none;
   white-space: nowrap;
 }
@@ -468,7 +468,7 @@
   text-overflow: ellipsis;
 }
 .editorTitle span {
-  color: #c9cdd1;
+  color: var(--editor-chrome-muted);
   font-size: 0.8rem;
 }
 .editorNotices {
@@ -532,13 +532,13 @@
   outline: none;
 }
 .previewPane {
-  background: #fff;
+  background: var(--statement-paper);
 }
 .previewPane iframe {
   width: 100%;
   height: 100%;
   border: 0;
-  background: #fff;
+  background: var(--statement-paper);
 }
 .previewStatus {
   min-height: 1.75rem;
@@ -559,12 +559,12 @@
   white-space: nowrap;
 }
 .editorHeader .previewZoomControls button {
-  background: #3a4048;
-  color: #f7f7f7;
-  border-color: #4a525c;
+  background: var(--editor-chrome-button-bg);
+  color: var(--editor-chrome-text);
+  border-color: var(--editor-chrome-button-border);
 }
 .editorHeader .previewZoomControls output {
-  color: #f7f7f7;
+  color: var(--editor-chrome-text);
 }
 .previewZoomControls button {
   min-width: 1.75rem;
@@ -587,19 +587,19 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  background: #e9edf1;
+  background: var(--statement-desk);
 }
 .previewCanvas {
   min-width: 100%;
   min-height: 100%;
   transform-origin: top left;
-  background: #fff;
+  background: var(--statement-paper);
 }
 .previewEmpty {
   flex: 1;
   display: grid;
   place-items: center;
-  color: #666;
+  color: var(--statement-empty);
 }
 /* Paged preview: each frame is a fixed A4-aspect "page" with a visible
    boundary and page number, so page breaks are obvious while typing. */
@@ -613,12 +613,12 @@
   position: relative;
 }
 .previewPageWrapper + .previewPageWrapper {
-  border-top: 2px dashed #b6bfc9;
+  border-top: 2px dashed var(--statement-separator);
   padding-top: 1rem;
 }
 .previewPageNumber {
   font-size: 0.72rem;
-  color: #55606b;
+  color: var(--statement-page-number);
   text-align: right;
   padding-bottom: 0.25rem;
 }
@@ -630,15 +630,21 @@
   width: 100%;
   height: 100%;
   border: 0;
-  background: #fff;
+  background: var(--statement-paper);
 }
 .previewContinued {
   min-height: 100%;
   display: grid;
   place-items: center;
-  color: #8a949e;
+  color: var(--statement-continued);
   font-size: 0.85rem;
-  background: repeating-linear-gradient(45deg, #f4f6f8, #f4f6f8 12px, #eef1f4 12px, #eef1f4 24px);
+  background: repeating-linear-gradient(
+    45deg,
+    var(--statement-stripe-a),
+    var(--statement-stripe-a) 12px,
+    var(--statement-stripe-b) 12px,
+    var(--statement-stripe-b) 24px
+  );
 }
 @media (max-width: 600px) {
   .authoring {
@@ -781,15 +787,15 @@
   border: 1px solid var(--border-color);
 }
 .checkDone {
-  background: rgba(25, 135, 84, 0.08);
-  border-color: rgba(25, 135, 84, 0.35);
+  background: var(--success-tint-bg);
+  border-color: var(--success-tint-border);
 }
 .checkMark {
   font-size: 1.05rem;
   line-height: 1.4;
 }
 .checkDone .checkMark {
-  color: #198754;
+  color: var(--text-success);
 }
 .checkBody {
   display: flex;
@@ -814,15 +820,15 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   overflow: hidden;
-  background: #282c34;
+  background: var(--editor-bg);
 }
 .codeLabel {
   padding: 0.4rem 0.9rem;
   font-family: monospace;
   font-size: 0.8rem;
-  color: #abb2bf;
-  background: #21252b;
-  border-bottom: 1px solid #181b20;
+  color: var(--editor-text);
+  background: var(--editor-surface);
+  border-bottom: 1px solid var(--editor-border);
 }
 .codeWrap {
   display: flex;
@@ -833,13 +839,13 @@
   flex: 0 0 auto;
   padding: 14px 8px 14px 12px;
   text-align: right;
-  color: #565c66;
+  color: var(--editor-gutter-text);
   font:
     13px/1.55 'Fira code',
     'Fira Mono',
     monospace;
   user-select: none;
-  background: #282c34;
+  background: var(--editor-bg);
 }
 .codeInput {
   flex: 1;

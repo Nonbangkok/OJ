@@ -145,3 +145,12 @@ export const FILE_CONFIG = {
     CLEANUP_DELAY_MS: 200,
     MAX_UPLOAD_SIZE_BYTES: 2 * 1024 * 1024 * 1024, // 2 GiB
 } as const;
+
+// --- Archive safety limits (zip-slip / zip-bomb protection) ---
+// Caps on the *uncompressed* contents of an uploaded archive. These guard
+// against decompression bombs (a tiny zip that expands to gigabytes / millions
+// of files) before we extract anything to disk.
+export const ARCHIVE_LIMITS = {
+    MAX_UNCOMPRESSED_BYTES: 500 * 1024 * 1024, // 500 MB total
+    MAX_ENTRIES: 5000, // file count
+} as const;

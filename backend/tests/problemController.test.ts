@@ -65,6 +65,14 @@ describe('Problem Controller', () => {
         });
         app.use('/', problemRouter);
         jest.resetAllMocks();
+        // resetAllMocks() wipes the global setup's pool.connect stub. Re-wire
+        // it: transactional services (updateProblem/deleteProblem/replaceProblemTestcasesFromZip)
+        // query through a pool client, so forward client statements to the
+        // db.query mock this suite stubs per-test.
+        (db.pool.connect as unknown as jest.Mock).mockImplementation(async () => ({
+            query: (...args: unknown[]) => (db.query as unknown as jest.Mock)(...(args as [])),
+            release: jest.fn(),
+        }));
     });
 
     afterAll(() => {
@@ -353,18 +361,15 @@ describe('Problem Controller', () => {
 
     describe('DELETE /admin/problems/:id', () => {
         it('should delete a problem and its related data', async () => {
-            // The route makes 5 sequential queries:
-            // 1. DELETE FROM submissions
-            // 2. DELETE FROM testcases
-            // 3. DELETE FROM contest_problems
-            // 4. DELETE FROM contest_submissions
-            // 5. DELETE FROM problems RETURNING id
-            (db.query as jest.Mock)
-                .mockResolvedValueOnce({ rowCount: 1 }) // submissions
-                .mockResolvedValueOnce({ rowCount: 1 }) // testcases
-                .mockResolvedValueOnce({ rowCount: 1 }) // contest_problems
-                .mockResolvedValueOnce({ rowCount: 1 }) // contest_submissions
-                .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'P1' }] }); // problems
+            // deleteProblem runs inside a transaction (BEGIN/COMMIT bracket the
+            // DELETEs on a pool client that the mock forwards to db.query).
+            // Respond by SQL shape so the transaction statements resolve too.
+            (db.query as jest.Mock).mockImplementation(async (text: string) => {
+                if (text.includes('DELETE FROM problems')) {
+                    return { rowCount: 1, rows: [{ id: 'P1' }] };
+                }
+                return { rowCount: 1, rows: [] };
+            });
 
             const res = await request(app).delete('/admin/problems/P1');
 

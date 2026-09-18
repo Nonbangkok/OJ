@@ -91,6 +91,39 @@
   --warning-color: #f57c00;
   --background-error: rgba(220, 53, 69, 0.1);
   --background-success: rgba(40, 167, 69, 0.1);
+
+  /* Code-editor palette — deliberately dark in both themes, mirroring the
+     highlight.js theme used for syntax coloring. */
+  --editor-bg: #282c34;
+  --editor-surface: #21252b;
+  --editor-border: #181b20;
+  --editor-border-strong: #3a3f4b;
+  --editor-text: #abb2bf;
+  --editor-gutter-text: #565c66;
+  --editor-gutter-muted: #636d83;
+  --editor-focus: #61afef;
+
+  /* Statement-editor chrome — dark toolbar by design, constant per theme. */
+  --editor-chrome-bg: #202428;
+  --editor-chrome-text: #f7f7f7;
+  --editor-chrome-muted: #c9cdd1;
+  --editor-chrome-button-bg: #3a4048;
+  --editor-chrome-button-border: #4a525c;
+
+  /* Statement paper preview — pages stay white like printed paper in both
+     themes; the desk around the pages follows the theme. */
+  --statement-paper: #ffffff;
+  --statement-desk: #e9edf1;
+  --statement-stripe-a: #f4f6f8;
+  --statement-stripe-b: #eef1f4;
+  --statement-page-number: #55606b;
+  --statement-separator: #b6bfc9;
+  --statement-empty: #666666;
+  --statement-continued: #8a949e;
+
+  /* Success tint for the verify checklist. */
+  --success-tint-bg: rgba(25, 135, 84, 0.08);
+  --success-tint-border: rgba(25, 135, 84, 0.35);
 }
 
 [data-theme='dark'] {
@@ -154,6 +187,10 @@
   --error-bg: rgba(255, 107, 122, 0.12);
   --background-error: rgba(255, 107, 122, 0.12);
   --background-success: rgba(46, 204, 113, 0.12);
+
+  /* Dark-mode overrides: the desk around statement pages darkens; the paper
+     itself and the editor palettes intentionally stay constant. */
+  --statement-desk: #1a1d21;
 }
 
 /* Global styles reset and base */

@@ -508,7 +508,19 @@ export const deleteContest = async (contestId: string): Promise<'deleted' | 'not
         return 'running';
     }
 
-    await db.query('UPDATE problems SET contest_id = NULL WHERE contest_id = $1', [contestId]);
-    await db.query('DELETE FROM contests WHERE id = $1', [contestId]);
+    // Detaching problems and deleting the contest must be atomic: a crash in
+    // between would leave problems pointing at a contest that no longer exists.
+    const client = await db.pool.connect();
+    try {
+        await client.query('BEGIN');
+        await client.query('UPDATE problems SET contest_id = NULL WHERE contest_id = $1', [contestId]);
+        await client.query('DELETE FROM contests WHERE id = $1', [contestId]);
+        await client.query('COMMIT');
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
+    }
     return 'deleted';
 };
