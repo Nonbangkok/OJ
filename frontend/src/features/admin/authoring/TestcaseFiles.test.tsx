@@ -55,7 +55,7 @@ test('lists metadata without fetching contents and inspects bounded text on dema
   expect(get).toHaveBeenCalledTimes(1);
   get.mockResolvedValueOnce({ data: { ...metadata, input: 'é'.repeat(20000), output: null } });
   fireEvent.click(screen.getByRole('button', { name: 'Inspect sample.in' }));
-  const preview = await screen.findByRole('region', { name: 'Testcase preview' });
+  const preview = await screen.findByRole('dialog');
   expect(within(preview).getByLabelText('Input preview').textContent).toHaveLength(16384);
   expect(within(preview).getByText(/truncated/i)).toBeInTheDocument();
   expect(within(preview).getByText('Missing output')).toBeInTheDocument();
@@ -98,11 +98,11 @@ test('ZIP replacement requires explicit confirmation and cancellation preserves 
   selectFile('Testcase ZIP archive', archive);
   fireEvent.click(screen.getByRole('button', { name: 'Replace all from ZIP' }));
   expect(post).not.toHaveBeenCalled();
-  let dialog = screen.getByRole('alertdialog');
+  let dialog = screen.getByRole('dialog');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Replace all from ZIP' }));
-  dialog = screen.getByRole('alertdialog');
+  dialog = screen.getByRole('dialog');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm replacement' }));
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
   expect((post.mock.calls[0][1] as FormData).get('archive')).toBe(archive);
@@ -129,7 +129,7 @@ test('deletion confirms the filename and sends revision in the JSON body', async
   await screen.findByText('sample.in');
   fireEvent.click(screen.getByRole('button', { name: 'Delete sample.in' }));
   expect(remove).not.toHaveBeenCalled();
-  const dialog = screen.getByRole('alertdialog');
+  const dialog = screen.getByRole('dialog');
   expect(within(dialog).getByText(/sample.in/)).toBeInTheDocument();
   get.mockResolvedValue({ data: { revision: 8, testcases: [] } });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm deletion' }));

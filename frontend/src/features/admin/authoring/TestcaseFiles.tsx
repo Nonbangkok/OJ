@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Button, Dialog } from '../../../components/ui';
 import api from '../../../services/api';
 import styles from './TestcaseFiles.module.css';
 
@@ -80,7 +81,6 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
   const inspectionRequest = useRef(0);
   const errorHandler = useRef(onError);
   errorHandler.current = onError;
-  const confirmationCancel = useRef<HTMLButtonElement>(null);
   const locked = disabled || busy || loading || !loaded || savedRevision > revision;
 
   const reportError = useCallback((error: unknown) => {
@@ -118,9 +118,6 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
     setConfirmation(null);
     void refreshList().catch(reportError);
   }, [revision, artifactVersion, refreshList, reportError]);
-  useEffect(() => {
-    confirmationCancel.current?.focus();
-  }, [confirmation]);
 
   async function inspect(testcase: TestcaseMetadata) {
     if (inspecting || busy) return;
@@ -329,13 +326,16 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
         Previews show up to 32 KiB per file. Opening a preview downloads the complete testcase.
       </p>
       {preview && (
-        <section aria-label="Testcase preview" className={styles.panel}>
-          <div className={styles.heading}>
-            <h4>Preview: {preview.filename}</h4>
-            <button type="button" onClick={() => setPreview(null)}>
+        <Dialog
+          open
+          title={`Preview: ${preview.filename}`}
+          onClose={() => setPreview(null)}
+          footer={
+            <Button variant="secondary" onClick={() => setPreview(null)}>
               Close preview
-            </button>
-          </div>
+            </Button>
+          }
+        >
           <h5>Input</h5>
           <pre aria-label="Input preview">{preview.input.text || '(Empty input)'}</pre>
           {preview.input.truncated && <p>Input preview truncated at 32 KiB.</p>}
@@ -348,13 +348,13 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
               {preview.output.truncated && <p>Output preview truncated at 32 KiB.</p>}
             </>
           )}
-        </section>
+        </Dialog>
       )}
 
       {editing && (
         <form
           key={`edit-${editing.id}-${replacementVersion}`}
-          className={styles.panel}
+          id="replace-testcase-form"
           onSubmit={(event) => {
             event.preventDefault();
             if (replacementInput || replacementOutput)
@@ -366,35 +366,43 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
               );
           }}
         >
-          <fieldset disabled={locked}>
-            <legend>Replace files: {editing.filename}</legend>
-            <p>
-              Replacing input clears the existing output unless you also supply a replacement
-              output. An output alone keeps the input.
-            </p>
-            <label>
-              Replacement input (optional)
-              <input
-                type="file"
-                onChange={(event) => setReplacementInput(event.target.files?.[0] ?? null)}
-              />
-            </label>
-            <label>
-              Replacement output (optional)
-              <input
-                type="file"
-                onChange={(event) => setReplacementOutput(event.target.files?.[0] ?? null)}
-              />
-            </label>
-            <div className={styles.actions}>
-              <button type="submit" disabled={!replacementInput && !replacementOutput}>
-                Save replacement files
-              </button>
-              <button type="button" onClick={() => setEditing(null)}>
-                Cancel replacement
-              </button>
-            </div>
-          </fieldset>
+          <Dialog
+            open
+            title={`Replace files: ${editing.filename}`}
+            description="Replacing input clears the existing output unless you also supply a replacement output. An output alone keeps the input."
+            onClose={() => setEditing(null)}
+            footer={
+              <>
+                <Button
+                  form="replace-testcase-form"
+                  type="submit"
+                  disabled={locked || (!replacementInput && !replacementOutput)}
+                >
+                  Save replacement files
+                </Button>
+                <Button variant="secondary" onClick={() => setEditing(null)}>
+                  Cancel replacement
+                </Button>
+              </>
+            }
+          >
+            <fieldset disabled={locked} className={styles.dialogFields}>
+              <label>
+                Replacement input (optional)
+                <input
+                  type="file"
+                  onChange={(event) => setReplacementInput(event.target.files?.[0] ?? null)}
+                />
+              </label>
+              <label>
+                Replacement output (optional)
+                <input
+                  type="file"
+                  onChange={(event) => setReplacementOutput(event.target.files?.[0] ?? null)}
+                />
+              </label>
+            </fieldset>
+          </Dialog>
         </form>
       )}
 
@@ -458,37 +466,36 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
         </form>
       </div>
       {confirmation && (
-        <div
-          role="alertdialog"
-          aria-labelledby="testcase-confirm-title"
-          aria-describedby="testcase-confirm-description"
-          className={styles.confirmation}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape' && !busy) setConfirmation(null);
-          }}
-        >
-          <h4 id="testcase-confirm-title">
-            {confirmation.kind === 'zip' ? 'Replace every testcase?' : 'Delete testcase?'}
-          </h4>
-          <p id="testcase-confirm-description">
-            {confirmation.kind === 'zip'
+        <Dialog
+          open
+          title={confirmation.kind === 'zip' ? 'Replace every testcase?' : 'Delete testcase?'}
+          description={
+            confirmation.kind === 'zip'
               ? `The archive ${archive?.name} will replace all ${testcases.length} existing testcases. This cannot be undone.`
-              : `Delete ${confirmation.testcase.filename}? This cannot be undone.`}
-          </p>
-          <div className={styles.actions}>
-            <button
-              type="button"
-              ref={confirmationCancel}
-              disabled={busy}
-              onClick={() => setConfirmation(null)}
-            >
-              Cancel
-            </button>
-            <button type="button" disabled={locked} onClick={confirmMutation}>
-              {confirmation.kind === 'zip' ? 'Confirm replacement' : 'Confirm deletion'}
-            </button>
-          </div>
-        </div>
+              : `Delete ${confirmation.testcase.filename}? This cannot be undone.`
+          }
+          onClose={() => {
+            if (!busy) setConfirmation(null);
+          }}
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() => setConfirmation(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={locked}
+                onClick={confirmMutation}
+              >
+                {confirmation.kind === 'zip' ? 'Confirm replacement' : 'Confirm deletion'}
+              </Button>
+            </>
+          }
+        />
       )}
     </section>
   );

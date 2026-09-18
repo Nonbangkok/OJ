@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button } from '../../../components/ui';
+import { Button, Dialog } from '../../../components/ui';
 import api from '../../../services/api';
 import { drawProfileCrop, loadProfileImage, profileCropToPng } from './profileImage';
 import styles from './AuthorProfiles.module.css';
@@ -234,11 +234,43 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
         </ul>
       )}
       {editing && (
-        <form className={styles.editor} onSubmit={save}>
-          <h4>{editing === 'new' ? 'New author profile' : `Edit profile: ${editing.akaName}`}</h4>
-          {error && <p role="alert">{error}</p>}
-          <fieldset disabled={saving}>
-            <legend className={styles.legend}>Author details</legend>
+        <form id="author-profile-form" onSubmit={save}>
+          <Dialog
+            open
+            title={editing === 'new' ? 'New author profile' : `Edit profile: ${editing.akaName}`}
+            onClose={() => {
+              if (!saving && !imageLoading) {
+                setEditing(null);
+                resetImage();
+              }
+            }}
+            footer={
+              <>
+                <Button
+                  form="author-profile-form"
+                  type="submit"
+                  disabled={imageLoading}
+                  loading={saving}
+                  loadingLabel="Saving profile…"
+                >
+                  {editing === 'new' ? 'Create profile' : 'Save profile'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={saving || imageLoading}
+                  onClick={() => {
+                    setEditing(null);
+                    resetImage();
+                  }}
+                >
+                  Cancel
+                </Button>
+              </>
+            }
+          >
+            {error && <p role="alert">{error}</p>}
+            <fieldset disabled={saving} className={`${styles.root} ${styles.dialogFields}`}>
+              <legend className={styles.legend}>Author details</legend>
             <div className={styles.fields}>
               <label>
                 AKA name
@@ -386,26 +418,8 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
                 Remove image
               </Button>
             )}
-            <div className={styles.actions}>
-              <Button
-                type="submit"
-                disabled={imageLoading}
-                loading={saving}
-                loadingLabel="Saving profile…"
-              >
-                {editing === 'new' ? 'Create profile' : 'Save profile'}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setEditing(null);
-                  resetImage();
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
           </fieldset>
+        </Dialog>
         </form>
       )}
     </section>

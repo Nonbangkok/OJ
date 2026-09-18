@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, StatusBadge } from '../../../components/ui';
+import { Button, Dialog, StatusBadge } from '../../../components/ui';
 import api from '../../../services/api';
 import { Job } from './types';
 import { jobLabel, jobStatus } from './status';
@@ -18,7 +18,9 @@ export default function JobHistory({ jobs, onError }: { jobs: Job[]; onError: (e
           catch (err) { onError(err); } finally { setLoading(false); }
         }}>Inspect {jobLabel(job.jobType)} r{job.draftRevision}</Button></td></tr>; })}</tbody></table></div>
     {!jobs.length && <p>No builds yet.</p>}
-    {detail && <section aria-label="Job report"><h3>{jobLabel(detail.jobType)}: {detail.status} (revision {detail.draftRevision})</h3>
+    {detail && <Dialog open title={`${jobLabel(detail.jobType)}: ${detail.status} (revision ${detail.draftRevision})`}
+      onClose={() => setDetail(null)}
+      footer={<Button variant="secondary" onClick={() => setDetail(null)}>Close</Button>}>
       {(detail.errorCode || detail.errorMessage) && <p role="alert">{detail.errorCode}: {detail.errorMessage}</p>}
       {report && <>
         <ul>{Object.entries(report.checks).map(([key, status]) => <li key={key}>{key}: {status}</li>)}</ul>
@@ -31,6 +33,6 @@ export default function JobHistory({ jobs, onError }: { jobs: Job[]; onError: (e
       </>}
       <details><summary>Structured result</summary><pre>{JSON.stringify(detail.resultSummary, null, 2)}</pre></details>
       <h4>Diagnostics</h4><pre>{detail.log || 'No log output.'}</pre>
-    </section>}
+    </Dialog>}
   </section>;
 }

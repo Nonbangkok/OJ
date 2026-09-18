@@ -138,3 +138,8 @@
     align-items: stretch;
   }
 }
+.dialogFields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}

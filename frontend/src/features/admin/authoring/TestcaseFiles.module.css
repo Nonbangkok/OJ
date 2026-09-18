@@ -104,3 +104,25 @@
   border: 1px solid var(--border-color);
   background: var(--background-primary);
 }
+.dialogFields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.dialogFields label {
+  display: block;
+  margin: 0.8rem 0;
+  font-weight: 500;
+}
+.dialogFields input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.65rem;
+  margin-top: 0.35rem;
+  color: var(--text-primary);
+  background: var(--background-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+}
