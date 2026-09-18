@@ -34,6 +34,17 @@
   margin: 0;
 }
 
+.problem-category {
+  display: inline-block;
+  margin-left: 0.6rem;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
 .submission-status-placeholder {
   min-height: 28px; /* Reserve space for the status line */
 }
@@ -140,4 +151,23 @@
 .problem-action-btn.new:hover,
 .problem-action-btn.edit:hover {
   background-color: var(--accent-primary-hover);
+}
+
+@media (max-width: 768px) {
+  .problem-list-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .problem-info,
+  .problem-score-placeholder,
+  .problem-score-details {
+    width: 100%;
+  }
+
+  .problem-action-btn {
+    align-self: flex-end;
+  }
 }

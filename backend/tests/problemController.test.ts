@@ -106,7 +106,7 @@ describe('Problem Controller', () => {
             expect(res.status).toBe(200);
             expect(res.body).toEqual(mockProblems);
             expect(db.query).toHaveBeenCalledWith(
-                'SELECT id, title, author FROM problems WHERE is_visible = true AND contest_id IS NULL ORDER BY id'
+                'SELECT id, title, author, category FROM problems WHERE is_visible = true AND contest_id IS NULL ORDER BY id'
             );
         });
     });
@@ -286,6 +286,46 @@ describe('Problem Controller', () => {
                 expect.stringContaining('INSERT INTO problems'),
                 expect.arrayContaining(['P3', 'Problem 3'])
             );
+        });
+
+        it('should create a problem with a category', async () => {
+            const newProblem = {
+                id: 'P4',
+                title: 'Problem 4',
+                author: 'Author 4',
+                category: 'Dynamic Programming',
+                time_limit_ms: 1000,
+                memory_limit_mb: 256
+            };
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [newProblem] });
+
+            const res = await request(app)
+                .post('/admin/problems')
+                .send(newProblem);
+
+            expect(res.status).toBe(201);
+            expect(db.query).toHaveBeenCalledWith(
+                expect.stringContaining('INSERT INTO problems'),
+                expect.arrayContaining(['Dynamic Programming'])
+            );
+        });
+
+        it('should reject a category longer than the limit', async () => {
+            const invalidProblem = {
+                id: 'P5',
+                title: 'Problem 5',
+                author: 'Author 5',
+                category: 'x'.repeat(51),
+                time_limit_ms: 1000,
+                memory_limit_mb: 256
+            };
+
+            const res = await request(app)
+                .post('/admin/problems')
+                .send(invalidProblem);
+
+            expect(res.status).toBe(400);
+            expect(res.body.errors).toBeDefined();
         });
 
         it('should return 400 for invalid input', async () => {

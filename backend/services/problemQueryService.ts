@@ -40,6 +40,7 @@ export const getProblemsWithStatsForUser = async (userId: number): Promise<Probl
         p.id,
         p.title,
         p.author,
+        p.category,
         ups.best_score,
         ups.submission_count,
         latest.submitted_at AS latest_submission_at,
@@ -60,14 +61,14 @@ export const getProblemsWithStatsForUser = async (userId: number): Promise<Probl
 
 export const getVisibleProblems = async (): Promise<Array<Pick<ProblemRow, 'id' | 'title' | 'author'>>> => {
   const result = await db.query<Pick<ProblemRow, 'id' | 'title' | 'author'>>(
-    'SELECT id, title, author FROM problems WHERE is_visible = true AND contest_id IS NULL ORDER BY id'
+    'SELECT id, title, author, category FROM problems WHERE is_visible = true AND contest_id IS NULL ORDER BY id'
   );
   return result.rows;
 };
 
 export const getProblemDetail = async (problemId: string): Promise<ProblemDetailDTO | null> => {
   const result = await db.query<ProblemDetailDTO>(
-    'SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible, contest_id FROM problems WHERE id = $1',
+    'SELECT id, title, author, category, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible, contest_id FROM problems WHERE id = $1',
     [problemId]
   );
   return result.rows[0] ?? null;
@@ -80,8 +81,8 @@ export const getProblemPdf = async (problemId: string): Promise<Buffer | null> =
 
 export const createProblem = async (payload: CreateProblemRequestBody): Promise<ProblemRow> => {
   const result = await db.query<ProblemRow>(
-    'INSERT INTO problems (id, title, author, time_limit_ms, memory_limit_mb) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-    [payload.id, payload.title, payload.author, payload.time_limit_ms, payload.memory_limit_mb]
+    'INSERT INTO problems (id, title, author, category, time_limit_ms, memory_limit_mb) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+    [payload.id, payload.title, payload.author, payload.category ?? null, payload.time_limit_ms, payload.memory_limit_mb]
   );
   return result.rows[0];
 };
@@ -98,8 +99,8 @@ export const updateProblem = async (
   }
 
   const result = await db.query<ProblemRow>(
-    'UPDATE problems SET id = $1, title = $2, author = $3, time_limit_ms = $4, memory_limit_mb = $5 WHERE id = $6 RETURNING *',
-    [payload.id, payload.title, payload.author, payload.time_limit_ms, payload.memory_limit_mb, oldId]
+    'UPDATE problems SET id = $1, title = COALESCE($2, title), author = COALESCE($3, author), category = COALESCE($4, category), time_limit_ms = COALESCE($5, time_limit_ms), memory_limit_mb = COALESCE($6, memory_limit_mb) WHERE id = $7 RETURNING *',
+    [payload.id, payload.title ?? null, payload.author ?? null, payload.category ?? null, payload.time_limit_ms ?? null, payload.memory_limit_mb ?? null, oldId]
   );
 
   if (result.rows.length === 0) {
@@ -125,7 +126,7 @@ export const deleteProblem = async (problemId: string): Promise<boolean> => {
 
 export const getAdminProblems = async (): Promise<AdminProblemRow[]> => {
   const result = await db.query<AdminProblemRow>(
-    'SELECT p.id, p.title, p.author, p.is_visible, p.contest_id, c.status AS contest_status FROM problems p LEFT JOIN contests c ON p.contest_id = c.id ORDER BY p.id'
+    'SELECT p.id, p.title, p.author, p.category, p.is_visible, p.contest_id, c.status AS contest_status FROM problems p LEFT JOIN contests c ON p.contest_id = c.id ORDER BY p.id'
   );
   return result.rows;
 };

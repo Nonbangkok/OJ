@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Problems from '../../pages/problem/Problems';
 import problemService from '../../services/problemService';
@@ -12,6 +12,13 @@ jest.mock('../../context/ThemeContext', () => ({
 
 // Mock LoadingPage to control the loading text
 jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading Problems...</div>);
+
+const categorizedProblems = [
+    { id: 'dp-1', title: 'Knapsack', author: null, category: 'Dynamic Programming', best_score: 100 },
+    { id: 'dp-2', title: 'LIS', author: null, category: 'Dynamic Programming', best_score: 50 },
+    { id: 'gr-1', title: 'Greedy Slots', author: null, category: 'Greedy', best_score: null },
+    { id: 'pl-1', title: 'Plain Problem', author: null, category: null, best_score: null },
+];
 
 describe('Problems Page', () => {
     beforeEach(() => {
@@ -45,5 +52,48 @@ describe('Problems Page', () => {
         await waitFor(() => {
             expect(screen.getByText(/failed to fetch problems/i)).toBeInTheDocument();
         });
+    });
+
+    it('shows a category tab per category with counts and an Uncategorized bucket', async () => {
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(categorizedProblems);
+
+        render(<BrowserRouter><Problems /></BrowserRouter>);
+
+        await waitFor(() => {
+            expect(screen.getByRole('tab', { name: /All 4/ })).toBeInTheDocument();
+        });
+        expect(screen.getByRole('tab', { name: /Dynamic Programming 2/ })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: /Greedy 1/ })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: /Uncategorized 1/ })).toBeInTheDocument();
+    });
+
+    it('filters the list to the selected category', async () => {
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(categorizedProblems);
+
+        render(<BrowserRouter><Problems /></BrowserRouter>);
+
+        await waitFor(() => {
+            expect(screen.getByText('Knapsack')).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByRole('tab', { name: /Greedy/ }));
+
+        expect(screen.queryByText('Knapsack')).not.toBeInTheDocument();
+        expect(screen.getByText('Greedy Slots')).toBeInTheDocument();
+    });
+
+    it('filters the list by search text across title and id', async () => {
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(categorizedProblems);
+
+        render(<BrowserRouter><Problems /></BrowserRouter>);
+
+        await waitFor(() => {
+            expect(screen.getByText('Knapsack')).toBeInTheDocument();
+        });
+
+        fireEvent.change(screen.getByLabelText('Search problems'), { target: { value: 'lis' } });
+
+        expect(screen.queryByText('Knapsack')).not.toBeInTheDocument();
+        expect(screen.getByText('LIS')).toBeInTheDocument();
     });
 });

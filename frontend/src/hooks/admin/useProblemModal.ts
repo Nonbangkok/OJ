@@ -6,6 +6,7 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
         id: '',
         title: '',
         author: '',
+        category: '',
         time_limit_ms: 2000,
         memory_limit_mb: 512,
     });
@@ -36,6 +37,7 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
                 id: problem.id,
                 title: problem.title ?? '',
                 author: problem.author ?? '',
+                category: problem.category ?? '',
                 time_limit_ms: problem.time_limit_ms ?? 3000,
                 memory_limit_mb: problem.memory_limit_mb ?? 256,
             });
@@ -45,6 +47,7 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
                 id: '',
                 title: '',
                 author: currentUser?.username ?? '',
+                category: '',
                 time_limit_ms: 1000,
                 memory_limit_mb: 256,
             });

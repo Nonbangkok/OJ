@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styles from './ProblemDetail.module.css';
 import CodeSubmissionForm from '../../features/problem/submission/CodeSubmissionForm';
 import Submissions from '../submission/Submissions';
@@ -9,6 +10,7 @@ import { generateResultString, getStatusClass } from '../../utils/formatters';
 import LoadingPage from '../../components/shared/LoadingPage';
 
 const ProblemDetail = () => {
+  const navigate = useNavigate();
   const {
     problemId,
     contestId,
@@ -99,6 +101,14 @@ const ProblemDetail = () => {
       <div className={styles['content-wrapper']}>
         <div className={styles['left-nav']}>
           <div className={styles['problem-info']}>
+            <button
+              type="button"
+              className={styles['back-btn']}
+              onClick={() => navigate(-1)}
+              aria-label="Back to problem list"
+            >
+              ← Back
+            </button>
             <h2>{problem.title}</h2>
             <p className={styles['problem-id']}>{problem.id}</p>
             {problem.author && <p className={styles['problem-author']}>Author: {problem.author}</p>}
