@@ -1,4 +1,5 @@
 import { USER_ROLES, SUBMISSION_STATUS } from './constants';
+import type { TestCaseResult, UserRole } from '../types';
 
 /**
  * Shared utility functions for formatting dates, statuses, and results.
@@ -10,7 +11,7 @@ import { USER_ROLES, SUBMISSION_STATUS } from './constants';
  * @param {string} dateString - ISO date string
  * @returns {string} Relative time string (e.g., "5 minutes ago")
  */
-export const formatTimeAgo = (dateString) => {
+export const formatTimeAgo = (dateString: string | null | undefined): string => {
   if (!dateString) return '';
   const date = new Date(dateString);
   const now = new Date();
@@ -34,10 +35,10 @@ export const formatTimeAgo = (dateString) => {
  * @param {string} dateString - ISO date string
  * @returns {string} Formatted date (e.g., "01/03/69 09:15:30")
  */
-export const formatDateAbsolute = (dateString) => {
+export const formatDateAbsolute = (dateString: string | null | undefined): string => {
   if (!dateString) return '';
   const d = new Date(dateString);
-  const pad = (num) => num.toString().padStart(2, '0');
+  const pad = (num: number) => num.toString().padStart(2, '0');
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${(d.getFullYear() + 543) % 100} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
@@ -47,14 +48,21 @@ export const formatDateAbsolute = (dateString) => {
  * @param {Array} results - Array of test case results
  * @returns {string} Result string (e.g., "[PP-TS]")
  */
-export const generateResultString = (status, results) => {
+export const generateResultString = (
+  status: string | null | undefined,
+  results: TestCaseResult[] | string | null | undefined
+): string => {
   if (status === SUBMISSION_STATUS.COMPILATION_ERROR) {
     return SUBMISSION_STATUS.COMPILATION_ERROR;
   }
   if (!results || results.length === 0) {
     return '';
   }
-  const charMap = {
+  const parsed = typeof results === 'string' ? parseResults(results) : results;
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    return '';
+  }
+  const charMap: Record<string, string> = {
     [SUBMISSION_STATUS.ACCEPTED]: 'P',
     [SUBMISSION_STATUS.WRONG_ANSWER]: '-',
     [SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED]: 'T',
@@ -62,8 +70,18 @@ export const generateResultString = (status, results) => {
     [SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED]: 'M',
     [SUBMISSION_STATUS.SKIPPED]: 'S',
   };
-  const resultChars = results.map((r) => charMap[r.status] || '?').join('');
+  const resultChars = parsed.map((r) => charMap[r.status] || '?').join('');
   return `[${resultChars}]`;
+};
+
+/** Parses a JSON string of testcase results; returns null when unparseable. */
+const parseResults = (results: string): TestCaseResult[] | null => {
+  try {
+    const parsed = JSON.parse(results);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
 };
 
 /**
@@ -71,7 +89,7 @@ export const generateResultString = (status, results) => {
  * @param {string} status - Submission status string
  * @returns {string} CSS class name (e.g., "status-accepted")
  */
-export const getStatusClass = (status) => {
+export const getStatusClass = (status: string | null | undefined): string => {
   if (!status) return '';
   return `status-${status.split(' ')[0].toLowerCase()}`;
 };
@@ -81,7 +99,8 @@ export const getStatusClass = (status) => {
  * @param {string} dateTime - ISO date string
  * @returns {string} Formatted date (e.g., "Mar 1, 2026, 09:15 AM")
  */
-export const formatDateTime = (dateTime) => {
+export const formatDateTime = (dateTime: string | null | undefined): string => {
+  if (!dateTime) return '';
   return new Date(dateTime).toLocaleString('en-US', {
     year: 'numeric',
     month: 'short',
@@ -96,7 +115,8 @@ export const formatDateTime = (dateTime) => {
  * @param {string} endTime - ISO date string for the end time
  * @returns {string} Human-readable remaining time (e.g., "2h 30m remaining")
  */
-export const getRemainingTime = (endTime) => {
+export const getRemainingTime = (endTime: string | null | undefined): string => {
+  if (!endTime) return '';
   const now = new Date();
   const end = new Date(endTime);
   const diff = end.getTime() - now.getTime();
@@ -116,14 +136,26 @@ export const getRemainingTime = (endTime) => {
   }
 };
 
+interface SubmissionWithUsername {
+  username: string;
+}
+
+interface UserWithRole {
+  role: UserRole;
+  username?: string;
+}
+
 /**
  * Checks if a user can view the code of a given submission.
  * @param {object} submission - Submission object with `username` field
  * @param {object} user - Current user object with `role` and `username` fields
  * @returns {boolean}
  */
-export const canViewCode = (submission, user) => {
+export const canViewCode = (
+  submission: SubmissionWithUsername,
+  user: UserWithRole | null | undefined
+): boolean => {
   if (!user) return false;
   if (user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.STAFF) return true;
-  return submission.username === user.username;
+  return user.username !== undefined && submission.username === user.username;
 };

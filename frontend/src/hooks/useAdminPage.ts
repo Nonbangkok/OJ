@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react';
 import authService from '../services/authService';
+import type { AuthUser } from '../types';
 
-const useAdminPage = () => {
-  const [user, setUser] = useState(null);
+interface UseAdminPageResult {
+  user: AuthUser | null;
+  loading: boolean;
+}
+
+const useAdminPage = (): UseAdminPageResult => {
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

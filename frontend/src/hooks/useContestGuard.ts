@@ -2,6 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import contestService from '../services/contestService';
 import { POLLING_INTERVALS } from '../config/constants';
+import type { Contest } from '../types';
+
+interface UseContestGuardResult {
+  contest: Contest | null;
+  isAccessible: boolean;
+  loading: boolean;
+  error: string;
+  refetch: () => Promise<void>;
+}
 
 /**
  * Hook that manages contest access checks and auto-redirects.
@@ -9,14 +18,17 @@ import { POLLING_INTERVALS } from '../config/constants';
  * @param {string} contestId - Contest ID from URL params
  * @returns {{ contest, isAccessible, loading, error }}
  */
-export const useContestGuard = (contestId) => {
+export const useContestGuard = (
+  contestId: string | undefined
+): UseContestGuardResult => {
   const navigate = useNavigate();
-  const [contest, setContest] = useState(null);
+  const [contest, setContest] = useState<Contest | null>(null);
   const [isAccessible, setIsAccessible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const checkAccess = useCallback(async () => {
+    if (!contestId) return;
     try {
       const fetchedContest = await contestService.getById(contestId);
       setContest(fetchedContest);

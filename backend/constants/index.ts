@@ -16,6 +16,9 @@ export const CONTEST_STATUS = {
 
 export const SUBMISSION_STATUS = {
     PENDING: 'Pending',
+    COMPILING: 'Compiling',
+    COMPILATION_ERROR: 'Compilation Error',
+    RUNNING: 'Running',
     ACCEPTED: 'Accepted',
     WRONG_ANSWER: 'Wrong Answer',
     TIME_LIMIT_EXCEEDED: 'Time Limit Exceeded',

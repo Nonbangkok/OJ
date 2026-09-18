@@ -46,6 +46,16 @@
   --status-warning: #ffc107;
   --status-info: #17a2b8;
 
+  /* Verdict colors shared by the global .status-* classes and the
+     SubmissionModal detail values */
+  --verdict-accepted: #48bb78;
+  --verdict-wrong: #f56565;
+  --verdict-time: #f6ad55;
+  --verdict-compilation: #a0aec0;
+  --verdict-runtime: #ed8936;
+  --verdict-memory: #ed64a6;
+  --verdict-pending: #718096;
+
   --status-success-bg: #48bb78;
   --status-error-bg: #dc3545;
   --status-warning-bg: #ffc107;
@@ -58,6 +68,29 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --shadow-hover: 0 4px 10px rgba(0, 0, 0, 0.1);
+  --box-shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.15), 0 3px 6px rgba(0, 0, 0, 0.1);
+
+  /* Semantic aliases — legacy names kept working; map onto the tokens above */
+  --card-bg: var(--surface-elevated);
+  --primary-color: var(--accent-primary);
+  --primary-dark: var(--accent-primary-hover);
+  --accent-hover: var(--accent-primary-hover);
+  --text-color: var(--text-primary);
+  --text-color-primary: var(--text-primary);
+  --bg-secondary: var(--background-secondary);
+  --background-hover: var(--background-tertiary);
+  --background-darker: var(--background-tertiary);
+  --background-light: var(--background-tertiary);
+  --input-bg: var(--background-primary);
+  --border-color-light: var(--border-color);
+  --error-color: var(--status-danger);
+  --error-bg: rgba(220, 53, 69, 0.1);
+  --text-error: var(--error-text);
+  --text-success: #198754;
+  --text-warning: #b8860b;
+  --warning-color: #f57c00;
+  --background-error: rgba(220, 53, 69, 0.1);
+  --background-success: rgba(40, 167, 69, 0.1);
 }
 
 [data-theme='dark'] {
@@ -108,6 +141,19 @@
   --status-success-bg: #198754;
   --status-warning-bg: #d39e00;
   --shadow-hover: 0 4px 10px rgba(0, 0, 0, 0.4);
+
+  /* Dark-mode overrides for the semantic aliases */
+  --card-bg: var(--surface-elevated);
+  --background-hover: var(--background-tertiary);
+  --background-darker: var(--background-tertiary);
+  --background-light: var(--background-tertiary);
+  --input-bg: var(--background-secondary);
+  --text-success: #2fbf71;
+  --text-warning: #f6c344;
+  --warning-color: #ffa040;
+  --error-bg: rgba(255, 107, 122, 0.12);
+  --background-error: rgba(255, 107, 122, 0.12);
+  --background-success: rgba(46, 204, 113, 0.12);
 }
 
 /* Global styles reset and base */
@@ -141,7 +187,7 @@ code {
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 1rem 2rem;
+  padding: 20px;
 }
 
 .admin-main {
@@ -164,40 +210,40 @@ code {
 
 /* Status colors for table cells and other UI elements */
 .status-accepted {
-  color: #48bb78 !important;
+  color: var(--verdict-accepted) !important;
   /* Green */
   font-weight: bold;
 }
 
 .status-wrong {
-  color: #f56565 !important;
+  color: var(--verdict-wrong) !important;
   /* Red */
   font-weight: bold;
 }
 
 .status-time {
-  color: #f6ad55 !important;
+  color: var(--verdict-time) !important;
   /* Orange */
 }
 
 .status-compilation {
-  color: #a0aec0 !important;
+  color: var(--verdict-compilation) !important;
   /* Gray */
 }
 
 .status-runtime {
-  color: #ed8936 !important;
+  color: var(--verdict-runtime) !important;
   /* Orange */
 }
 
 .status-memory {
-  color: #ed64a6 !important;
+  color: var(--verdict-memory) !important;
   /* Pink */
 }
 
 .status-pending,
 .status-compiling,
 .status-running {
-  color: #718096 !important;
+  color: var(--verdict-pending) !important;
   /* Gray */
 }

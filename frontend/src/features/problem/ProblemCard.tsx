@@ -1,14 +1,16 @@
 import { Link } from 'react-router-dom';
 import { formatTimeAgo, formatDateAbsolute, generateResultString } from '../../utils/formatters';
+import type { ProblemSummary } from '../../types';
 import styles from './ProblemCard.module.css';
 
 interface ProblemCardProps {
-    problem: any;
+    problem: ProblemSummary;
     contestId?: string | null;
 }
 
 const ProblemCard = ({ problem, contestId = null }: ProblemCardProps) => {
-    const hasSubmitted = problem.submission_count > 0;
+    const submissionCount = Number(problem.submission_count ?? 0);
+    const hasSubmitted = submissionCount > 0;
     const linkPath = contestId
         ? `/contests/${contestId}/problems/${problem.id}`
         : `/problems/${problem.id}`;
@@ -28,7 +30,7 @@ const ProblemCard = ({ problem, contestId = null }: ProblemCardProps) => {
                                 Submitted {formatTimeAgo(problem.latest_submission_at)} ({formatDateAbsolute(problem.latest_submission_at)})
                             </span>
                             <span className={styles['submission-tries']}>
-                                {problem.submission_count} {problem.submission_count > 1 ? 'tries' : 'try'}
+                                {submissionCount} {submissionCount > 1 ? 'tries' : 'try'}
                             </span>
                         </div>
                     )}

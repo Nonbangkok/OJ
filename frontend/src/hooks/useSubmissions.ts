@@ -4,21 +4,33 @@ import authService from '../services/authService';
 import { useAutocomplete } from './useAutocomplete';
 import { USER_ROLES, SUBMISSION_STATUS } from '../utils/constants';
 import { POLLING_INTERVALS } from '../config/constants';
-import type { SubmissionQueryParams } from '../types';
+import type { SubmissionDetail, SubmissionSummary, SubmissionQueryParams, AuthUser } from '../types';
 
-export const useSubmissions = (problemId, contestId) => {
-  const [submissions, setSubmissions] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
+type SubmissionFilter = 'all' | 'mine';
+
+interface AppliedFilters {
+  problemId: string;
+  userId: string;
+}
+
+export const useSubmissions = (
+  problemId: string | number | null | undefined,
+  contestId: string | number | null | undefined
+) => {
+  const [submissions, setSubmissions] = useState<SubmissionSummary[]>([]);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [filter, setFilter] = useState('all');
-  const [selectedSubmission, setSelectedSubmission] = useState(null);
+  const [filter, setFilter] = useState<SubmissionFilter>('all');
+  const [selectedSubmission, setSelectedSubmission] = useState<SubmissionDetail | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const problemAutocomplete = useAutocomplete(submissionService.searchProblems, { contestId });
   const userAutocomplete = useAutocomplete(submissionService.searchUsers, { contestId });
 
-  const [appliedFilters, setAppliedFilters] = useState({ problemId: '', userId: '' });
+  const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>({ problemId: '', userId: '' });
+  // Monotonic request id: two fetches started in the same millisecond must not
+  // collide the way Date.now() did, or a stale response could win.
   const lastRequestIdRef = useRef(0);
 
   // 1. Initial User Fetch
@@ -36,8 +48,7 @@ export const useSubmissions = (problemId, contestId) => {
 
   // 2. Data Fetching Logic
   const fetchData = useCallback(async () => {
-    const currentRequestId = Date.now();
-    lastRequestIdRef.current = currentRequestId;
+    const currentRequestId = ++lastRequestIdRef.current;
 
     try {
       const params: SubmissionQueryParams = {};
@@ -84,10 +95,13 @@ export const useSubmissions = (problemId, contestId) => {
 
   // 3. Polling for Pending Submissions
   useEffect(() => {
+    const processingStatuses: string[] = [
+      SUBMISSION_STATUS.PENDING,
+      SUBMISSION_STATUS.COMPILING,
+      SUBMISSION_STATUS.RUNNING,
+    ];
     const isProcessing = submissions.some((s) =>
-      [SUBMISSION_STATUS.PENDING, SUBMISSION_STATUS.COMPILING, SUBMISSION_STATUS.RUNNING].includes(
-        s.overall_status
-      )
+      processingStatuses.includes(s.overall_status)
     );
 
     if (isProcessing) {
@@ -106,9 +120,11 @@ export const useSubmissions = (problemId, contestId) => {
     });
   };
 
-  const handleViewCode = async (submissionId) => {
+  const handleViewCode = async (submissionId: string | number) => {
     try {
-      const data = await submissionService.getById(submissionId, contestId);
+      // Keep the original call shape: pass contestId through untouched so the
+      // service default (null) applies exactly as before.
+      const data = await submissionService.getById(submissionId, contestId ?? undefined);
       setSelectedSubmission(data);
       setIsModalOpen(true);
     } catch (err) {

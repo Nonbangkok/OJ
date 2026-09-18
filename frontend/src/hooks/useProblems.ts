@@ -1,24 +1,24 @@
 import { useCallback, useEffect, useState } from 'react';
 import problemService from '../services/problemService';
 import contestService from '../services/contestService';
-import type { ProblemBase, ProblemDetail } from '../types';
+import type { ProblemBase, ProblemSummary } from '../types';
 
 /**
  * Fetches problem list with stats. If contestId is provided,
  * fetches contest-specific problems instead.
  * @param {string} [contestId] - Optional contest ID for contest problems
+ * @param {boolean} [enabled] - Whether to fetch (used to wait on a guard)
  */
-type ProblemsList = ProblemBase[] | ProblemDetail[];
 
 interface UseProblemsResult {
-  problems: ProblemsList;
+  problems: ProblemSummary[] | ProblemBase[];
   loading: boolean;
   error: string;
   refresh: () => Promise<void>;
 }
 
 export const useProblems = (contestId: string | null = null, enabled = true): UseProblemsResult => {
-  const [problems, setProblems] = useState<ProblemsList>([]);
+  const [problems, setProblems] = useState<ProblemSummary[] | ProblemBase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 

@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, useLocation, Outlet } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
-import './App.css';
 
 // Components
 import Navbar from './components/navbar/Navbar';
