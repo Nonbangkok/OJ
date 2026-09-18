@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ImperativePanelGroupHandle, Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import { Button, Dialog } from '../../../components/ui';
 import api from '../../../services/api';
 import useAuthoringDraft from './useAuthoringDraft';
 import { draftBase } from './types';
@@ -14,6 +15,8 @@ const previewZoomKey = (id: string) => `oj-authoring-statement-preview-zoom:${id
 const MIN_PREVIEW_ZOOM = 50;
 const MAX_PREVIEW_ZOOM = 200;
 const PREVIEW_ZOOM_STEP = 10;
+// Preview pagination: fixed A4-ish aspect slices keep page boundaries visible.
+const PREVIEW_PAGE_ASPECT = 297 / 210; // height / width of A4
 
 type StatementRecovery = { baseRevision: number; statementHtml: string };
 
@@ -50,6 +53,40 @@ function useCompactEditorLayout() {
   return compact;
 }
 
+/** Slices the preview content into fixed-aspect page frames so the author can
+ *  see where page boundaries fall while typing. Purely visual: the runner-built
+ *  PDF remains authoritative. */
+function PagedPreview({ preview, zoomScale }: { preview: string; zoomScale: number }) {
+  const [pages, setPages] = useState(1);
+  // Measure rendered content height inside the iframe to compute the page count.
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  useEffect(() => {
+    setPages(1);
+  }, [preview]);
+  const measure = () => {
+    try {
+      const doc = frameRef.current?.contentDocument;
+      if (!doc?.body) return;
+      const inner = Math.ceil(doc.documentElement.scrollHeight);
+      const frameHeight = frameRef.current?.clientHeight ?? 0;
+      if (frameHeight > 0 && inner > 0) setPages(Math.max(1, Math.ceil(inner / frameHeight)));
+    } catch { /* sandboxed frame content is same-origin via srcdoc; ignore */ }
+  };
+  return <div className={styles.previewPages}>
+    {Array.from({ length: pages }, (_, index) => <div key={index} className={styles.previewPageWrapper}>
+      <div className={styles.previewPageNumber} aria-hidden="true">Page {index + 1} / {pages}</div>
+      <div className={styles.previewCanvas}
+        style={{ width: `${100 / zoomScale}%`, height: `${100 / zoomScale}%`, transform: `scale(${zoomScale})` }}>
+        {index === 0 && <iframe title="Fast statement preview" sandbox="allow-same-origin" srcDoc={preview}
+          ref={frameRef} onLoad={measure} />}
+        {index > 0 && <div className={styles.previewContinued} aria-hidden="true">
+          Continued on this page — the actual PDF paginates at print time.
+        </div>}
+      </div>
+    </div>)}
+  </div>;
+}
+
 export default function StatementEditor({ id }: { id: string }) {
   const model = useAuthoringDraft(id, 3000, { allowPublishedStatementEdit: true });
   const { draft, form, dirty } = model;
@@ -57,6 +94,7 @@ export default function StatementEditor({ id }: { id: string }) {
   const [previewState, setPreviewState] = useState<'waiting' | 'loading' | 'ready' | 'error'>('waiting');
   const [previewError, setPreviewError] = useState('');
   const [recovered, setRecovered] = useState(false);
+  const [showAssets, setShowAssets] = useState(false);
   const request = useRef(0);
   const recoveryHandled = useRef(false);
   const recoveryBaseRevision = useRef<number | null>(null);
@@ -150,11 +188,25 @@ export default function StatementEditor({ id }: { id: string }) {
     : draft.publishedAt ? 'Editing revision — live problem unchanged'
       : model.conflict ? 'Server conflict'
         : dirty ? (model.saveState === 'saving' ? 'Saving…' : 'Unsaved changes') : 'Saved';
+  const previewStatusText = previewState === 'waiting' ? 'Waiting for typing to pause…' : previewState === 'loading' ? 'Updating preview…'
+    : previewState === 'error' ? previewError : 'Preview is up to date';
   return <main className={styles.editorShell}>
     <header className={styles.editorHeader}>
       <Link to={`/admin/authoring/${encodeURIComponent(id)}`}>← Workspace</Link>
       <div className={styles.editorTitle}><h1>Edit Task: {draft.problemId}</h1><span>{draft.title}</span></div>
       <strong>{editorState}</strong>
+      <span className={styles.headerSpacer} />
+      <span className={styles.previewStatusChip} role="status">{previewStatusText}</span>
+      <span className={styles.previewZoomControls} aria-label="Preview zoom controls">
+        <button type="button" aria-label="Zoom out" disabled={previewZoom <= MIN_PREVIEW_ZOOM}
+          onClick={() => setPreviewZoom(zoom => Math.max(MIN_PREVIEW_ZOOM, zoom - PREVIEW_ZOOM_STEP))}>−</button>
+        <output aria-label="Preview zoom">{previewZoom}%</output>
+        <button type="button" aria-label="Zoom in" disabled={previewZoom >= MAX_PREVIEW_ZOOM}
+          onClick={() => setPreviewZoom(zoom => Math.min(MAX_PREVIEW_ZOOM, zoom + PREVIEW_ZOOM_STEP))}>+</button>
+        <button type="button" aria-label="Reset preview zoom" disabled={previewZoom === 100}
+          onClick={() => setPreviewZoom(100)}>Reset</button>
+      </span>
+      <Button variant="secondary" size="compact" onClick={() => setShowAssets(true)}>Assets &amp; help</Button>
       <button type="button" disabled={!dirty || editorDisabled || model.conflict || !model.loaded}
         onClick={() => void model.save()}>Save now</button>
       <button type="button" disabled={model.actionsDisabled} onClick={() => void model.runJob('pdf')}>Build PDF</button>
@@ -173,8 +225,7 @@ export default function StatementEditor({ id }: { id: string }) {
     <PanelGroup ref={panels} autoSaveId={`oj-authoring-statement-layout:${id}`} direction={compactLayout ? 'vertical' : 'horizontal'}
       className={styles.editorWorkspace} role="region" aria-label="Statement editor">
       <Panel defaultSize={50} minSize={25} className={styles.sourcePane}>
-        <label htmlFor="statement-source">Statement Markdown / HTML / LaTeX</label>
-        <textarea id="statement-source" spellCheck={false} value={form.statementHtml}
+        <textarea id="statement-source" aria-label="Statement source" spellCheck={false} value={form.statementHtml}
           readOnly={editorDisabled} onChange={event => {
             const statementHtml = event.target.value;
             const baseRevision = dirty ? recoveryBaseRevision.current ?? draft.revision : draft.revision;
@@ -186,31 +237,17 @@ export default function StatementEditor({ id }: { id: string }) {
       <PanelResizeHandle className={styles.editorResizeHandle} aria-label="Resize source and preview panes"
         onDoubleClick={() => panels.current?.setLayout([50, 50])} />
       <Panel defaultSize={50} minSize={25} className={styles.previewPane}>
-        <div className={styles.previewStatus} role="status">
-          <span>{previewState === 'waiting' ? 'Waiting for typing to pause…' : previewState === 'loading' ? 'Updating preview…'
-            : previewState === 'error' ? previewError : 'Preview is up to date'}</span>
-          <span className={styles.previewZoomControls} aria-label="Preview zoom controls">
-            <button type="button" aria-label="Zoom out" disabled={previewZoom <= MIN_PREVIEW_ZOOM}
-              onClick={() => setPreviewZoom(zoom => Math.max(MIN_PREVIEW_ZOOM, zoom - PREVIEW_ZOOM_STEP))}>−</button>
-            <output aria-label="Preview zoom">{previewZoom}%</output>
-            <button type="button" aria-label="Zoom in" disabled={previewZoom >= MAX_PREVIEW_ZOOM}
-              onClick={() => setPreviewZoom(zoom => Math.min(MAX_PREVIEW_ZOOM, zoom + PREVIEW_ZOOM_STEP))}>+</button>
-            <button type="button" aria-label="Reset preview zoom" disabled={previewZoom === 100}
-              onClick={() => setPreviewZoom(100)}>Reset</button>
-          </span>
-        </div>
         <div className={styles.previewViewport}>
-          {preview ? <div className={styles.previewCanvas} style={{ width: `${100 / zoomScale}%`, height: `${100 / zoomScale}%`, transform: `scale(${zoomScale})` }}>
-            <iframe title="Fast statement preview" sandbox="" srcDoc={preview} />
-          </div> : <div className={styles.previewEmpty}>Preview will appear here.</div>}
+          {preview ? <PagedPreview preview={preview} zoomScale={zoomScale} />
+            : <div className={styles.previewEmpty}>Preview will appear here.</div>}
         </div>
       </Panel>
     </PanelGroup>
-    <details className={styles.editorAssets}>
-      <summary>Statement assets & syntax help</summary>
-      <p>Images: <code>{'<image src="{{ASSET_BASE}}/image.png">'}</code> or <code>{'![alt]({{ASSET_BASE}}/image.png)'}</code>.</p>
-      <p>Page break: <code>{'<div class="forced-page-break"></div>'}</code>. The runner-built PDF remains authoritative.</p>
+    {showAssets && <Dialog open title="Statement assets & syntax help"
+      description={'Images: <image src="{{ASSET_BASE}}/image.png"> or ![alt]({{ASSET_BASE}}/image.png). Page break: <div class="forced-page-break"></div>. The runner-built PDF remains authoritative.'}
+      onClose={() => setShowAssets(false)}
+      footer={<Button variant="secondary" onClick={() => setShowAssets(false)}>Close</Button>}>
       <StatementAssets draft={draft} disabled={model.actionsDisabled} mutate={model.mutate} onError={model.onError} />
-    </details>
+    </Dialog>}
   </main>;
 }

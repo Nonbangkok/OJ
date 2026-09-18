@@ -149,7 +149,7 @@ test('Statement tab opens the dedicated editor instead of embedding a narrow sou
     'href',
     '/admin/authoring/d1/editor'
   );
-  expect(screen.queryByLabelText('Statement Markdown / HTML / LaTeX')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Statement source')).not.toBeInTheDocument();
 });
 test('opening the dedicated editor keeps unsaved workspace fields recoverable via session storage', async () => {
   show('/admin/authoring/d1');
@@ -159,12 +159,12 @@ test('opening the dedicated editor keeps unsaved workspace fields recoverable vi
   // Auto-save captures unsaved edits; opening the editor no longer needs a blocking confirm.
   expect(window.sessionStorage.getItem('oj-authoring-draft:d1')).toContain('Unsaved title');
   fireEvent.click(screen.getByRole('link', { name: 'Open full-screen editor' }));
-  expect(screen.queryByLabelText('Statement Markdown / HTML / LaTeX')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Statement source')).not.toBeInTheDocument();
 });
 test('unsaved statement source survives an editor route unmount such as browser Back and Forward', async () => {
   jest.mocked(api.post).mockResolvedValue({ data: { html: '<p>Preview</p>' } });
   const view = show('/admin/authoring/d1/editor');
-  fireEvent.change(await screen.findByLabelText('Statement Markdown / HTML / LaTeX'), {
+  fireEvent.change(await screen.findByLabelText('Statement source'), {
     target: { value: '# Recovered work' },
   });
 
@@ -172,7 +172,7 @@ test('unsaved statement source survives an editor route unmount such as browser 
   show('/admin/authoring/d1/editor');
 
   await waitFor(() =>
-    expect(screen.getByLabelText('Statement Markdown / HTML / LaTeX')).toHaveValue(
+    expect(screen.getByLabelText('Statement source')).toHaveValue(
       '# Recovered work'
     )
   );
@@ -190,7 +190,7 @@ test('editing recovered source preserves its old base revision across another ro
   }));
   jest.mocked(api.post).mockResolvedValue({ data: { html: '<p>Preview</p>' } });
   const first = show('/admin/authoring/d1/editor');
-  fireEvent.change(await screen.findByLabelText('Statement Markdown / HTML / LaTeX'), {
+  fireEvent.change(await screen.findByLabelText('Statement source'), {
     target: { value: '# Revision 3 work' },
   });
   first.unmount();
@@ -198,14 +198,14 @@ test('editing recovered source preserves its old base revision across another ro
   serverDraft = { ...draft, revision: 4, statementHtml: '# Server revision 4' };
   const second = show('/admin/authoring/d1/editor');
   await waitFor(() => expect(screen.getByText(/server state changed/i)).toBeInTheDocument());
-  fireEvent.change(screen.getByLabelText('Statement Markdown / HTML / LaTeX'), {
+  fireEvent.change(screen.getByLabelText('Statement source'), {
     target: { value: '# Revision 3 work continued' },
   });
   second.unmount();
 
   show('/admin/authoring/d1/editor');
   await waitFor(() =>
-    expect(screen.getByLabelText('Statement Markdown / HTML / LaTeX')).toHaveValue(
+    expect(screen.getByLabelText('Statement source')).toHaveValue(
       '# Revision 3 work continued'
     )
   );
@@ -218,22 +218,22 @@ test('a new edit after clean auto-sync uses the refreshed server revision as its
   }));
   jest.mocked(api.post).mockResolvedValue({ data: { html: '<p>Preview</p>' } });
   const first = show('/admin/authoring/d1/editor');
-  await screen.findByLabelText('Statement Markdown / HTML / LaTeX');
+  await screen.findByLabelText('Statement source');
   serverDraft = { ...draft, revision: 4, statementHtml: '# Server revision 4' };
   fireEvent(window, new Event('focus'));
   await waitFor(() =>
-    expect(screen.getByLabelText('Statement Markdown / HTML / LaTeX')).toHaveValue(
+    expect(screen.getByLabelText('Statement source')).toHaveValue(
       '# Server revision 4'
     )
   );
-  fireEvent.change(screen.getByLabelText('Statement Markdown / HTML / LaTeX'), {
+  fireEvent.change(screen.getByLabelText('Statement source'), {
     target: { value: '# New work based on revision 4' },
   });
   first.unmount();
 
   show('/admin/authoring/d1/editor');
   await waitFor(() =>
-    expect(screen.getByLabelText('Statement Markdown / HTML / LaTeX')).toHaveValue(
+    expect(screen.getByLabelText('Statement source')).toHaveValue(
       '# New work based on revision 4'
     )
   );
@@ -242,10 +242,10 @@ test('a new edit after clean auto-sync uses the refreshed server revision as its
 test('full-screen editor previews the current unsaved source automatically in a sandbox', async () => {
   jest.mocked(api.post).mockResolvedValue({ data: { html: '<p>Sanitized preview</p>' } });
   show('/admin/authoring/d1/editor');
-  const source = await screen.findByLabelText('Statement Markdown / HTML / LaTeX');
+  const source = await screen.findByLabelText('Statement source');
   expect(screen.queryByRole('button', { name: 'Preview statement' })).not.toBeInTheDocument();
   const frame = await screen.findByTitle('Fast statement preview');
-  expect(frame).toHaveAttribute('sandbox', '');
+  expect(frame).toHaveAttribute('sandbox', 'allow-same-origin');
   expect(frame).toHaveAttribute('srcdoc', '<p>Sanitized preview</p>');
   fireEvent.change(source, { target: { value: '# Live edit' } });
   expect(api.post).not.toHaveBeenCalledWith('/admin/authoring/drafts/d1/preview', {
@@ -282,7 +282,7 @@ test('published statements can begin a new revision in the full-screen editor', 
   });
   show('/admin/authoring/d1/editor');
 
-  const source = await screen.findByLabelText('Statement Markdown / HTML / LaTeX');
+  const source = await screen.findByLabelText('Statement source');
   expect(source).not.toHaveAttribute('readonly');
   fireEvent.change(source, { target: { value: '<p>Corrected</p>' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save now' }));
@@ -311,7 +311,7 @@ test('a slower realtime preview response cannot replace the newest preview', asy
   let resolveSecond!: (value: any) => void;
   jest.mocked(api.post).mockResolvedValueOnce({ data: { html: '<p>Initial</p>' } });
   show('/admin/authoring/d1/editor');
-  const source = await screen.findByLabelText('Statement Markdown / HTML / LaTeX');
+  const source = await screen.findByLabelText('Statement source');
   const frame = await screen.findByTitle('Fast statement preview');
   jest
     .mocked(api.post)

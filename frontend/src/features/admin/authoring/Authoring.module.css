@@ -416,14 +416,24 @@
 }
 .editorHeader {
   min-height: 3.5rem;
-  display: grid;
-  grid-template-columns: auto minmax(12rem, 1fr) auto auto auto;
+  display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
   padding: 0.5rem 1rem;
   background: #202428;
   color: #f7f7f7;
   border-bottom: 1px solid var(--border-color);
+}
+.headerSpacer {
+  flex: 1;
+}
+.previewStatusChip {
+  color: #c9cdd1;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 18ch;
 }
 .editorHeader a {
   color: #f7f7f7;
@@ -491,12 +501,6 @@
   display: flex;
   flex-direction: column;
 }
-.sourcePane label {
-  padding: 0.45rem 0.75rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  background: var(--background-secondary);
-}
 .sourcePane textarea {
   flex: 1;
   min-height: 0;
@@ -554,6 +558,14 @@
   gap: 0.3rem;
   white-space: nowrap;
 }
+.editorHeader .previewZoomControls button {
+  background: #3a4048;
+  color: #f7f7f7;
+  border-color: #4a525c;
+}
+.editorHeader .previewZoomControls output {
+  color: #f7f7f7;
+}
 .previewZoomControls button {
   min-width: 1.75rem;
   padding: 0.15rem 0.35rem;
@@ -589,22 +601,44 @@
   place-items: center;
   color: #666;
 }
-.editorAssets {
-  max-height: 40vh;
-  overflow: auto;
-  padding: 0.5rem 1rem;
-  border-top: 1px solid var(--border-color);
-  background: var(--background-secondary);
+/* Paged preview: each frame is a fixed A4-aspect "page" with a visible
+   boundary and page number, so page breaks are obvious while typing. */
+.previewPages {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
 }
-.editorAssets summary {
-  cursor: pointer;
-  font-weight: 600;
+.previewPageWrapper {
+  position: relative;
 }
-.editorAssets section {
-  padding-bottom: 0.75rem;
+.previewPageWrapper + .previewPageWrapper {
+  border-top: 2px dashed #b6bfc9;
+  padding-top: 1rem;
 }
-.editorAssets input {
-  color: var(--text-primary);
+.previewPageNumber {
+  font-size: 0.72rem;
+  color: #55606b;
+  text-align: right;
+  padding-bottom: 0.25rem;
+}
+.previewPageWrapper .previewCanvas {
+  aspect-ratio: 210 / 297;
+  overflow: hidden;
+}
+.previewPageWrapper iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+.previewContinued {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  color: #8a949e;
+  font-size: 0.85rem;
+  background: repeating-linear-gradient(45deg, #f4f6f8, #f4f6f8 12px, #eef1f4 12px, #eef1f4 24px);
 }
 @media (max-width: 600px) {
   .authoring {
