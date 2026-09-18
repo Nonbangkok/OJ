@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Button, OverflowTable, StatusBadge } from '../../../components/ui';
+import { Button, Dialog, OverflowTable, StatusBadge } from '../../../components/ui';
 import { useAuth } from '../../../context/AuthContext';
 import api from '../../../services/api';
 import { getErrorMessage } from '../../../utils/error';
@@ -37,6 +37,7 @@ function DraftList() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [createError, setCreateError] = useState('');
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -68,7 +69,7 @@ function DraftList() {
       </p>
       {error && <p role="alert">{error}</p>}
       <div className={`${styles.actions} ${styles.topActions}`}>
-        <Button onClick={() => setCreating(true)}>New draft</Button>
+        <Button onClick={() => { setCreateError(''); setCreating(true); }}>New draft</Button>
         <Link className={styles.actionLink} to="/admin/authoring/profiles">
           Author profiles
         </Link>
@@ -78,36 +79,35 @@ function DraftList() {
       </div>
       {creating && (
         <form
+          id="new-draft-form"
           onSubmit={async (e) => {
             e.preventDefault();
             if (busy) return;
             setBusy(true);
-            setError('');
+            setCreateError('');
             try {
               const result = await api.post<Draft>('/admin/authoring/drafts', form);
               navigate(`/admin/authoring/${result.data.id}`);
             } catch (err) {
-              setError(getErrorMessage(err, 'Could not create draft'));
+              setCreateError(getErrorMessage(err, 'Could not create draft'));
             } finally {
               setBusy(false);
             }
           }}
         >
-          <h2>New draft</h2>
-          <MetadataFields
-            value={form}
-            profiles={profiles}
-            disabled={busy}
-            onEdit={(key, value) => setForm((p) => ({ ...p, [key]: value }))}
-          />
-          <div className={styles.actions}>
-            <Button disabled={busy} type="submit">
-              Create draft
-            </Button>
-            <Button variant="secondary" disabled={busy} onClick={() => setCreating(false)}>
-              Cancel
-            </Button>
-          </div>
+          <Dialog open title="New draft" onClose={() => { if (!busy) setCreating(false); }}
+            footer={<>
+              <Button form="new-draft-form" disabled={busy} type="submit" loading={busy} loadingLabel="Creating…">Create draft</Button>
+              <Button variant="secondary" disabled={busy} onClick={() => setCreating(false)}>Cancel</Button>
+            </>}>
+            {createError && <p role="alert">{createError}</p>}
+            <MetadataFields
+              value={form}
+              profiles={profiles}
+              disabled={busy}
+              onEdit={(key, value) => setForm((p) => ({ ...p, [key]: value }))}
+            />
+          </Dialog>
         </form>
       )}
       {loading ? (
