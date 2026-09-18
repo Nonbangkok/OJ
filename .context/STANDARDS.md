@@ -130,7 +130,10 @@ Three global contexts wrap the entire app in this order:
 - **`requireAdmin`** — checks role is `'admin'`.
 - **`validateRequest`** — zod-powered runtime validation middleware.
 - **`errorHandler` / `notFoundHandler`** — centralized API error formatting.
-- **`upload`** — Multer configuration for file uploads.
+- **`upload`** — Multer configuration for file uploads, with dedicated 10 MiB in-memory policies for author profile images and statement assets.
+- Author profile image processing belongs in `authorProfileImageService.ts`, not controllers. Only JPEG, PNG, and WebP inputs are accepted; persisted profile and draft snapshot images must be normalized 512×512 PNG buffers.
+- A non-null `authorProfileId` is authoritative: create/select/explicit-refresh operations copy profile display fields into the draft snapshot and never trust duplicate display fields supplied by the client.
+- Statement asset filenames use ASCII letters, digits, dots, underscores, and hyphens only; no path separators, leading dots, or `..` sequences. The extension must match a validated JPEG/PNG/WebP MIME type.
 
 ### Authentication
 
@@ -160,8 +163,11 @@ Three global contexts wrap the entire app in this order:
 6. **Environment variables** — never commit `.env`, use `.env.example` as template. All secrets via env vars.
    - Runtime env access must go through `backend/config/env.ts` (validated once with zod).
    - `backend/types/env.d.ts` defines required env variable types for compile-time safety.
-7. **File upload limits** — configured via Multer, up to 2GB for problem PDFs and test case ZIPs.
+7. **File upload limits** — configured via Multer per workflow: up to 2 GiB for legacy problem PDFs/testcase ZIPs and 10 MiB for raw author profile images or statement assets.
 8. **Session security** — `httpOnly: true`, `sameSite: 'lax'`, `secure: false` (set to `true` in production).
+9. **Author image safety** — verify decoded image format rather than trusting upload MIME metadata; reject corrupt/animated images and apply a pixel-count limit before normalization.
+10. **Statement asset safety** — re-encode validated images to remove metadata, hash normalized bytes with SHA-256, and enforce the 10 MiB limit after normalization.
+11. **Asset/revision atomicity** — add or delete an authoring asset in the same transaction that optimistically advances its draft revision; every rejected asset mutation must roll back that revision change.
 
 ---
 
@@ -174,6 +180,13 @@ Three global contexts wrap the entire app in this order:
 - Use `supertest` to make HTTP requests against the Express app.
 - Test files named by domain: e.g., `auth.test.ts`, `submissions.test.ts`.
 - Run with `npm test` (uses `cross-env NODE_ENV=test`).
+- Slice 3 HTTP/PostgreSQL coverage lives in `tests/integration/authoringProfilesAndAssets.test.ts`.
+  Only DB transport is redirected; controllers, image decoding, services, and transactions run for real.
+  It uses a unique schema per suite and cleans that schema up afterwards.
+- Set `INTEGRATION_DATABASE_URL` to a disposable database when running integration tests.
+  Older migration/restore suites reset `public`; never point the full suite at a working stack.
+- Run final authoring checks inside the backend Docker image to exercise Node 20,
+  native sharp, PostgreSQL client tools, and Thai/Latin avatar fonts. See README commands.
 
 ### Frontend (Jest + React Testing Library)
 

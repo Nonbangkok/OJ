@@ -5,14 +5,19 @@
   "main": "index.js",
   "scripts": {
     "test": "cross-env NODE_ENV=test jest",
-    "build": "tsc",
-    "start": "npm run build && node dist/server.js",
+    "build": "tsc && node scripts/copyAuthoringTemplates.cjs",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "migrate": "npm run build && node dist/scripts/migrate.js",
+    "start": "npm run build && node dist/scripts/migrate.js && node dist/server.js",
     "dev": "tsx watch server.ts"
   },
   "keywords": [],
   "author": "",
   "license": "GPL-3.0-or-later",
   "type": "commonjs",
+  "engines": {
+    "node": "20.x"
+  },
   "dependencies": {
     "archiver": "^7.0.1",
     "bcrypt": "^6.0.0",
@@ -23,9 +28,11 @@
     "express-rate-limit": "^8.5.2",
     "express-session": "^1.18.0",
     "express-sse": "^0.5.3",
+    "htmlparser2": "10.0.0",
     "multer": "^2.0.2",
     "node-cron": "^3.0.3",
     "pg": "^8.16.3",
+    "sharp": "^0.34.5",
     "unzipper": "^0.12.3",
     "uuid": "^9.0.1",
     "zod": "^4.3.6"
@@ -49,6 +56,7 @@
     "jest": "^30.2.0",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

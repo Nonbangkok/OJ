@@ -1,0 +1,33 @@
+import { useState } from 'react';
+import api from '../../../services/api';
+import { Job } from './types';
+import styles from './Authoring.module.css';
+
+export default function JobHistory({ jobs, onError }: { jobs: Job[]; onError: (error: unknown) => void }) {
+  const [detail, setDetail] = useState<Job | null>(null);
+  const [loading, setLoading] = useState(false);
+  const report = detail?.resultSummary?.verification;
+  return <section><h2>Build history & logs</h2><p>Latest 100 jobs. Reloading this page preserves job history on the server.</p>
+    <div className={styles.scroll}><table><thead><tr><th>Action</th><th>Revision</th><th>Status</th><th>Created</th><th>Report</th></tr></thead>
+      <tbody>{jobs.map(job => <tr key={job.id}><td>{job.jobType}</td><td>{job.draftRevision}</td><td>{job.status}</td>
+        <td>{job.createdAt ? new Date(job.createdAt).toLocaleString() : '—'}</td><td><button type="button" disabled={loading} onClick={async () => {
+          setLoading(true); try { setDetail((await api.get<Job>(`/admin/authoring/jobs/${job.id}`)).data); }
+          catch (err) { onError(err); } finally { setLoading(false); }
+        }}>Inspect {job.jobType} r{job.draftRevision}</button></td></tr>)}</tbody></table></div>
+    {!jobs.length && <p>No builds yet.</p>}
+    {detail && <section aria-label="Job report"><h3>{detail.jobType}: {detail.status} (revision {detail.draftRevision})</h3>
+      {(detail.errorCode || detail.errorMessage) && <p role="alert">{detail.errorCode}: {detail.errorMessage}</p>}
+      {report && <>
+        <ul>{Object.entries(report.checks).map(([key, status]) => <li key={key}>{key}: {status}</li>)}</ul>
+        <p>{report.caseCount} cases / {report.totalTestcaseBytes} testcase bytes. Memory limit: {report.memoryLimitMb} MiB.</p>
+        <p>Peak memory is unavailable; execution is bounded by runner limits. This is not a proof of algorithm correctness.</p>
+        <ul>{report.warnings.map((warning, i) => <li key={i}>{warning}</li>)}</ul>
+        <div className={styles.scroll}><table><thead><tr><th>Case</th><th>Wall time (ms)</th></tr></thead><tbody>
+          {report.cases.map(c => <tr key={c.caseId}><td>{c.caseNumber}</td><td>{c.durationMs}</td></tr>)}
+        </tbody></table></div>
+      </>}
+      <details><summary>Structured result</summary><pre>{JSON.stringify(detail.resultSummary, null, 2)}</pre></details>
+      <h4>Diagnostics</h4><pre>{detail.log || 'No log output.'}</pre>
+    </section>}
+  </section>;
+}

@@ -1,25 +1,23 @@
-import styles from './StatusBadge.module.css';
+import { StatusBadge as UiStatusBadge } from '../ui/StatusBadge';
+import type { ContestStatus } from '../../types/models';
 
-const StatusBadge = ({ status }) => {
-    const statusClasses = {
-        'scheduled': `${styles.badge} ${styles.scheduled}`,
-        'running': `${styles.badge} ${styles.running}`,
-        'finishing': `${styles.badge} ${styles.finishing}`,
-        'finished': `${styles.badge} ${styles.finished}`
-    };
+type StatusBadgeTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
 
-    const statusText = {
-        'scheduled': 'Scheduled',
-        'running': 'Running',
-        'finishing': 'Finishing',
-        'finished': 'Finished'
-    };
+interface ContestStatusBadgeProps {
+    status: ContestStatus | string;
+}
 
-    return (
-        <span className={statusClasses[status] || styles.badge}>
-            {statusText[status] || status}
-        </span>
-    );
+const contestStatuses: Record<ContestStatus, { label: string; tone: StatusBadgeTone }> = {
+    scheduled: { label: 'Scheduled', tone: 'info' },
+    running: { label: 'Running', tone: 'success' },
+    finishing: { label: 'Finishing', tone: 'warning' },
+    finished: { label: 'Finished', tone: 'neutral' },
+};
+
+const StatusBadge = ({ status }: ContestStatusBadgeProps) => {
+    const contestStatus = contestStatuses[status as ContestStatus];
+
+    return <UiStatusBadge tone={contestStatus?.tone}>{contestStatus?.label ?? status}</UiStatusBadge>;
 };
 
 export default StatusBadge;

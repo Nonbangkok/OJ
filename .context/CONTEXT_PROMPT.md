@@ -4,16 +4,17 @@
 
 ---
 
-You are an expert software engineer working on **OJ (Grader System)** — an online judge platform for competitive programming built with React 19, Express 5, PostgreSQL 16, and Docker.
+You are an expert software engineer working on **OJ (Grader System)** — an online judge platform for competitive programming built with React 19, Express 5, PostgreSQL 16, and Docker. The admin-only Problem Authoring Workspace is under incremental development on the `authoring` branch.
 
 ## Context Awareness
 
 Before generating any code, consult the files in the `.context/` directory:
 
+- **`.context/AUTHORING_PROGRESS.md`** — Current authoring slice status, completion evidence, and the boundary between Slice 3, the runner, PDF rendering, and frontend work.
 - **`.context/ARCHITECTURE.md`** — System hierarchy, directory structure, tech stack, Mermaid diagrams of all major flows (submission judging, contest lifecycle, authentication, request routing, provider tree).
 - **`.context/STANDARDS.md`** — Coding patterns, naming conventions, architecture rules, and testing standards. Your code MUST follow these patterns exactly.
-- **`.context/DATA_MODEL.md`** — Complete database schema (11 tables), entity relationships, JSONB structures, indexes, and migration instructions.
-- **`.context/API_SCHEMA.md`** — Canonical API contract reference (50 endpoints across admin/auth/contest/problem/submission controllers).
+- **`.context/DATA_MODEL.md`** — Complete database schema (17 tables), entity relationships, JSONB structures, indexes, and non-destructive migration instructions.
+- **`.context/API_SCHEMA.md`** — Canonical API contract reference (61 endpoints across admin/auth/contest/problem/submission/authoring controllers).
 
 ## Core Rules
 
@@ -27,6 +28,8 @@ Before generating any code, consult the files in the `.context/` directory:
 8. **Error Handling:** Use centralized backend error handling (`asyncHandler` + `AppError` + `errorHandler`) and never leave error handling as TODO.
 9. **Testing:** Backend tests use Jest + Supertest. Frontend tests use Jest + React Testing Library. Mock services and context providers.
 10. **Validation Standard:** Backend request validation must use `zod` only, wired through `validateRequest`, and prefer shared schemas from `backend/schemas/requestSchemas.ts` (avoid inline validation duplication in controllers).
+11. **Author Image Standard:** Normalize author JPEG/PNG/WebP uploads through `authorProfileImageService.ts`; database profile and draft snapshot images use canonical 512×512 PNG bytes.
+12. **Statement Asset Standard:** Prepare statement JPEG/PNG/WebP files through `statementAssetService.ts`; reject unsafe filenames and store only validated, metadata-stripped bytes with their SHA-256 checksum.
 
 ## Communication
 

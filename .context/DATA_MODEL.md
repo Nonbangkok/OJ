@@ -4,11 +4,17 @@
 
 ## Schema Overview
 
-The database contains **11 tables** managed via `backend/scripts/init_db.js`. There is no ORM — all schema is defined as raw SQL DDL.
+The database contains **20 tables**. The 11 legacy application tables are bootstrapped by `backend/scripts/init_db.js`; `schema_migrations` and the 8 authoring tables are managed by the non-destructive migration runner in `backend/migrations/`. There is no ORM — all schema is defined as raw SQL DDL.
 
 Schema status for this revision:
-- No table/column/index changes were introduced.
-- Backend typing around this schema was strengthened:
+- Migration `0002_problem_authoring_foundation` adds `author_profiles`, `problem_drafts`, `problem_draft_assets`, `problem_draft_testcases`, and `authoring_jobs`.
+- Migration `0003_authoring_job_delivery` adds durable request JSON and the partial unique active-job-per-draft index.
+- Migration `0004_authoring_job_inputs` adds immutable input snapshots for output-generation jobs.
+- Migration `0005_authoring_job_files` adds immutable avatar/asset bytes for PDF jobs.
+- Migration `0006_authoring_published_problem_provenance` records the original
+  legacy problem key and metadata snapshot for safe revision publication.
+- `schema_migrations` serializes and records applied migrations.
+- Backend typing around the schema includes:
   - DB row interfaces remain in `backend/types/models.ts`.
   - API DTO contracts were expanded in `backend/types/api.ts`.
   - Runtime request validation schemas were centralized in `backend/schemas/requestSchemas.ts` and reused across all controllers.
@@ -22,6 +28,8 @@ erDiagram
     users ||--o{ contest_submissions : "submits in contest"
     users ||--o{ contest_scoreboards : "has score in"
     users ||--o{ contests : "creates"
+    users ||--o| author_profiles : "optionally owns"
+    users ||--o{ problem_drafts : "creates"
 
     problems ||--o{ testcases : "has"
     problems ||--o{ submissions : "receives"
@@ -31,6 +39,12 @@ erDiagram
     contests ||--o{ contest_submissions : "receives"
     contests ||--o{ contest_scoreboards : "has"
     contests ||--o{ contest_problems : "snapshots"
+    author_profiles ||--o{ problem_drafts : "snapshotted into"
+    problem_drafts ||--o{ problem_draft_assets : "contains"
+    problem_drafts ||--o{ problem_draft_testcases : "contains"
+    problem_drafts ||--o{ authoring_jobs : "runs"
+    authoring_jobs ||--o{ authoring_job_inputs : "captures"
+    authoring_jobs ||--o{ authoring_job_files : "captures images"
 
     users {
         SERIAL id PK
@@ -279,6 +293,99 @@ Aggregated scores per user per contest.
 | `memory_limit_mb` | `INT` | DEFAULT `256` |
 | `created_at` | `TIMESTAMPTZ` | DEFAULT `NOW()` |
 
+### `schema_migrations`
+
+Tracks non-destructive migrations that have completed. Migration execution is protected by a PostgreSQL advisory lock.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `name` | `TEXT` | PK |
+| `applied_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()` |
+
+### `author_profiles`
+
+Reusable author identity, independent from login accounts. Profile image bytes are either NULL or canonical 512×512 PNG data.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | `UUID` | PK, application-generated |
+| `user_id` | `INT` | UNIQUE, nullable FK → `users(id)` ON DELETE SET NULL |
+| `aka_name` | `VARCHAR(100)` | NOT NULL |
+| `real_name` | `VARCHAR(255)` | NOT NULL |
+| `default_language` | `VARCHAR(50)` | NOT NULL |
+| `country_code` | `VARCHAR(3)` | NOT NULL |
+| `profile_image_png` | `BYTEA` | NULLABLE, normalized PNG only |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()` |
+| `updated_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()` |
+
+### `problem_drafts`
+
+Private authoring workspace state. Author display fields and image are snapshots, so later profile edits do not silently change a draft.
+
+| Column group | Notes |
+|---|---|
+| Identity | UUID `id`, proposed `problem_id`, `title` |
+| Author snapshot | nullable `author_profile_id`; AKA, real name, language, country and nullable PNG snapshot. Selecting/refreshing a profile copies its canonical image or a generated fallback PNG; manual authors receive a generated fallback at creation. |
+| Problem content | limits, task-pdf-writer Markdown/HTML/LaTeX source (historical `statement_html` name), private C++ solution, nullable private C++ generator |
+| Generated state | nullable PDF and source revision, template version, revision and verified revision |
+| Lifecycle | `draft`, `generated`, `ready`, or `published`; creator and timestamps |
+
+### `problem_draft_assets`
+
+Statement assets keyed by UUID, with a filename unique within each draft. Stores MIME type, normalized bytes, SHA-256 checksum, byte size, and timestamps. Deleting a draft cascades to its assets. Each asset is capped at 10 MiB after normalization and each draft at 100 MiB total; the total is checked while the draft row is locked by the same revision-advancing transaction.
+
+### `problem_draft_testcases`
+
+Draft input/output pairs keyed by UUID and unique `(draft_id, case_number)`. Records original input filename, source (`uploaded` or `generated`), source revision, and timestamps. Output may be NULL while authoring is incomplete.
+
+### `authoring_jobs`
+
+Durable job record for solution/generator compilation, generator execution, output generation, PDF builds, and full verification. Each job captures a draft revision and transitions through the constrained authoring job statuses.
+
+`request_snapshot` is private JSONB containing source, identity, deadline and job-specific
+seed, input manifest/limits, or sanitized PDF document/image manifests. Terminal import clears it while preserving the bounded
+log and result summary. Only one queued/compiling/running job may exist per draft.
+
+### `authoring_job_inputs`
+
+Durable output/verification-job input bytes, keyed by `(job_id, case_id)`, with unique
+`(job_id, case_number)`. Columns: job UUID (FK to `authoring_jobs`, cascade delete),
+captured case UUID, positive case number, and UTF-8 `input_data` text. No live-case
+foreign key: snapshots survive live testcase changes/deletion. Queueing copies
+inputs under the draft lock. Every terminal job path releases snapshot rows;
+completed history retains only metadata/hashes, not this extra copy of input text.
+
+### `authoring_job_files`
+
+Durable PDF-job images and verification expected-output bytes keyed by `(job_id, name)`. Columns: `job_id` UUID
+(FK to `authoring_jobs`, cascade delete), `name` TEXT and `content` BYTEA NOT NULL.
+Internal names are `avatar`, `asset:filename`, or `output:<case UUID>`. No link to mutable draft assets/testcases;
+queueing captures bytes while holding the draft lock. All terminal paths release
+these extra snapshots atomically with job completion. PDF bytes remain in
+`problem_drafts.latest_pdf`, with provenance in `latest_pdf_revision`.
+
+### `authoring_published_problems`
+
+One row per successfully published draft. It stores the immutable legacy Problem
+ID plus the title, author and limits from the last authoring publication. Revision
+publication requires the live legacy row to still match this snapshot before it
+updates PDF/testcases and refreshes the snapshot. This prevents accidental
+overwrite after a legacy Problem Management edit while allowing intended metadata
+changes made in a new authoring revision.
+Slice8 reuses these tables without a migration. A successful current, unexpired
+verification atomically installs PDF and sets `status='ready'` plus
+`verified_revision=revision`. An accepted re-verification clears old readiness.
+
+### Publication (Slice9)
+
+No schema change. The Publish service locks a current ready draft, validates its
+latest successful verification/PDF/case metadata and absence of active jobs, then
+inserts a new hidden `problems` row plus exact `testcases` in one transaction.
+`author_aka_name` maps to legacy `author`; private C++ source stays in the draft.
+Problem ID primary-key conflicts never overwrite existing rows. On success the
+draft becomes `published` with `published_at`, retaining its revision/provenance.
+All failures roll back the three-table write. See `AUTHORING_PUBLISH.md`.
+
 ---
 
 ## Key Relationships
@@ -294,6 +401,13 @@ Aggregated scores per user per contest.
 | Contest → Contest Submissions | 1 : N | Separate from global submissions |
 | Contest → Contest Scoreboards | 1 : N | One row per (contest, user) pair |
 | Contest → Contest Participants | 1 : N | Tracks join time |
+| User → Author Profile | 1 : 0..1 | Optional account link; profile may exist without an account |
+| Author Profile → Problem Drafts | 1 : N | Draft stores a point-in-time author snapshot |
+| Problem Draft → Assets | 1 : N | `ON DELETE CASCADE` |
+| Problem Draft → Draft Testcases | 1 : N | `ON DELETE CASCADE` |
+| Problem Draft → Authoring Jobs | 1 : N | Each job captures one draft revision |
+| Authoring Job → Captured Inputs | 1 : N | `ON DELETE CASCADE`; no link back to mutable testcase rows |
+| Authoring Job → Captured Images | 1 : N | `ON DELETE CASCADE`; no link back to mutable avatar/assets |
 
 ---
 
@@ -341,14 +455,12 @@ Maps `problem_id` to the user's best score for that problem in the contest.
 
 ## Migration Instructions
 
-This project uses a **destructive migration** pattern (no incremental migrations):
+Legacy initialization remains destructive, but normal backend startup now uses a **non-destructive migration registry**:
 
-1. **Schema is defined** in `backend/scripts/init_db.js`.
-2. **Running `init_db.js`** drops ALL tables (`DROP ... CASCADE`) and recreates them from scratch.
-3. **To add a new table or column:**
-   - Add the DDL to `init_db.js` in the appropriate position (respecting FK dependencies).
-   - Run `docker-compose exec backend node scripts/init_db.js` (⚠️ destroys all data).
-4. **For production changes:** Use manual `ALTER TABLE` statements directly, or export/import the database via the Admin Panel.
-5. **No migration framework** (e.g., Knex, Flyway) is currently in use.
+1. `backend/scripts/init_db.js` is only for explicitly rebuilding a development database and still drops legacy tables.
+2. `backend/scripts/migrate.ts` creates `schema_migrations`, takes an advisory lock, and applies pending entries from `backend/migrations/index.ts` in order.
+3. Backend `start` runs compiled migrations before starting the HTTP server.
+4. Every production schema change must be a new immutable migration. Never edit an already-applied migration.
+5. Migrations must be idempotent at the registry level and must preserve existing production data.
 
-> ⚠️ **CAUTION:** Running `init_db.js` on a populated database will irreversibly delete ALL data. Always export a backup first via the Admin Panel's "Export Database" feature.
+> ⚠️ **CAUTION:** Running `init_db.js` on a populated database will irreversibly delete data. Use the migration runner for normal local and production upgrades.

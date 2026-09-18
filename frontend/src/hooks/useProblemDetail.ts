@@ -41,7 +41,10 @@ export const useProblemDetail = () => {
         }
       } catch (err) {
         const apiError = toApiLikeError(err);
-        if (getErrorStatus(err) === 403 && apiError.response?.data?.message === 'Problem is hidden') {
+        if (
+          getErrorStatus(err) === 403 &&
+          apiError.response?.data?.message === 'Problem is hidden'
+        ) {
           setHiddenProblemInfo({
             problemId: String(apiError.response?.data?.problemId ?? ''),
             title: String(apiError.response?.data?.title ?? ''),
@@ -54,7 +57,7 @@ export const useProblemDetail = () => {
           setError(
             typeof responseMessage === 'string' && responseMessage
               ? responseMessage
-              : `Failed to fetch problem ${problemId}.`,
+              : `Failed to fetch problem ${problemId}.`
           );
         }
         console.error(err);

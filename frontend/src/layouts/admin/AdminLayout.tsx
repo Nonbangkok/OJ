@@ -1,10 +1,11 @@
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import AdminNavbar from './AdminNavbar';
 import { useAuth } from '../../context/AuthContext';
 import { USER_ROLES } from '../../utils/constants';
 
 const AdminLayout = () => {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
 
   if (isLoading) {
     return <div>Loading admin layout...</div>;
@@ -14,14 +15,16 @@ const AdminLayout = () => {
     return <Navigate to="/" replace />;
   }
 
+  if (/^\/admin\/authoring\/[^/]+\/editor\/?$/.test(location.pathname)) return <Outlet />;
+
   return (
     <>
       <AdminNavbar />
-      <main className="container">
+      <main className="container admin-main">
         <Outlet />
       </main>
     </>
   );
 };
 
-export default AdminLayout; 
+export default AdminLayout;

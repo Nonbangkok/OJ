@@ -186,7 +186,10 @@ const useProblemManagement = () => {
 
     try {
       const response = await adminService.exportProblems(selectedProblems);
-      const blob = new Blob([response.data], { type: response.headers['content-type'] });
+      const contentType = response.headers['content-type'];
+      const blob = new Blob([response.data], {
+        type: typeof contentType === 'string' ? contentType : 'application/zip',
+      });
       const downloadUrl = window.URL.createObjectURL(blob);
       const filename = getFilenameFromDisposition(response.headers['content-disposition']);
 

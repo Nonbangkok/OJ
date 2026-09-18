@@ -45,14 +45,14 @@
   padding: 8px 12px;
 }
 
-a {
+.submissions-container a {
   text-decoration: underline;
   color: var(--text-primary);
   font-weight: 500;
   transition: all 0.2s ease;
 }
 
-a:hover {
+.submissions-container a:hover {
   color: var(--text-secondary);
 }
 

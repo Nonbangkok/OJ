@@ -1,0 +1,106 @@
+.root {
+  color: var(--text-primary);
+}
+.heading,
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+.heading {
+  justify-content: space-between;
+}
+.root h3,
+.root h4 {
+  margin: 0.5rem 0;
+}
+.root p {
+  line-height: 1.5;
+}
+.hint {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+.tableWrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.root table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.root caption {
+  text-align: left;
+  padding-bottom: 0.5rem;
+  font-weight: 600;
+}
+.root th,
+.root td {
+  padding: 0.65rem;
+  border-bottom: 1px solid var(--border-color);
+  overflow-wrap: anywhere;
+}
+.forms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 1rem;
+}
+.panel,
+.confirmation {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-secondary);
+}
+.confirmation {
+  border-color: var(--status-danger);
+}
+.root fieldset {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+.root legend {
+  font-weight: 600;
+  padding: 0;
+}
+.root label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.root input {
+  max-width: 100%;
+  color: var(--text-primary);
+}
+.root button {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--background-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.root button:disabled,
+.root fieldset:disabled button {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.root button:focus-visible,
+.root input:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+.root pre {
+  max-height: 20rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  background: var(--background-primary);
+}

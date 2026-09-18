@@ -27,7 +27,7 @@ const LoginForm = ({ formData, error, onSubmit, onChange, registrationEnabled })
                         required
                     />
                 </div>
-                <button type="submit">Login</button>
+                <button type="submit" className={styles['form-button']}>Login</button>
             </form>
             {registrationEnabled && (
                 <p className={styles['form-footer-link']}>

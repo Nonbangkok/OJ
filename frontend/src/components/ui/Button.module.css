@@ -1,0 +1,92 @@
+.button {
+  align-items: center;
+  appearance: none;
+  background: var(--action-primary-background);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  box-sizing: border-box;
+  color: var(--action-primary-foreground);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 600;
+  gap: 0.5rem;
+  justify-content: center;
+  line-height: 1.25;
+  padding: 0.625rem 1rem;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--action-primary-hover-background);
+}
+
+.button:focus-visible {
+  outline: 3px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.primary {
+  background: var(--action-primary-background);
+  color: var(--action-primary-foreground);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--action-primary-hover-background);
+}
+
+.secondary {
+  background: var(--action-secondary-background);
+  border-color: var(--border-color);
+  box-shadow: var(--surface-elevation);
+  color: var(--action-secondary-foreground);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--action-secondary-hover-background);
+}
+
+.neutral {
+  background: var(--action-neutral-background);
+  color: var(--action-neutral-foreground);
+}
+
+.neutral:hover:not(:disabled) {
+  background: var(--action-neutral-hover-background);
+}
+
+.destructive {
+  background: var(--action-destructive-background);
+  color: var(--action-destructive-foreground);
+}
+
+.destructive:hover:not(:disabled) {
+  background: var(--action-destructive-hover-background);
+}
+
+.compact {
+  padding: 0.375rem 0.625rem;
+}
+
+.default {
+  min-height: 2.5rem;
+}
+
+.reasonWrapper {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.reason {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}

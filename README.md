@@ -75,6 +75,8 @@ To get the Grader System up and running, you only need to install a few essentia
 
 *   **[Docker](https://www.docker.com/):** Essential for containerizing, building, running, and managing the application's services.
 *   **[Git](https://git-scm.com/downloads):** Required to clone the project repository for local development and version control.
+*   **Node.js 20 (optional):** Required only for running npm and root-level smoke
+    tests directly on the host. Docker remains the primary runtime.
 
 ## Installation & Setup
 
@@ -84,12 +86,12 @@ To get the Grader System up and running, you only need to install a few essentia
     cd OJ
     ```
 
-2.  **Create the environment file:**
-    -   Copy the example environment file to create your own local configuration.
-        ```bash
-        cp .env.example .env
-        ```
-    -   Open the `.env` file and change all of them and the `POSTGRES_PASSWORD` and `SECRET_KEY` to your own strong, secret values.
+2.  **Create the local environment file:**
+    ```bash
+    cp .env.example .env
+    ```
+    Change `POSTGRES_PASSWORD` and `SECRET_KEY` before sharing the environment
+    with anyone. The remaining defaults are suitable for plain HTTP on localhost.
 
 ## Running the Project
 
@@ -98,7 +100,7 @@ Once the installation and setup are complete, you can start the application:
 1.  **Build and Run Docker Containers:**
     Navigate to the root directory of the project (where `docker-compose.yml` is located) and execute the following command:
     ```bash
-    docker-compose up --build -d
+    docker compose up --build -d
     ```
     *   The first time you run this command, it might take several minutes as Docker downloads the PostgreSQL image and builds the frontend and backend images.
 2.  **Access the Application:**
@@ -108,22 +110,54 @@ Once the installation and setup are complete, you can start the application:
 
 ## Database Initialization
 
-After successfully running the Docker containers for the first time, you need to initialize the PostgreSQL database and create an administrative user. This is a crucial step as the database tables are **not automatically created** when the containers start.
+The `migrate` service applies versioned, non-destructive migrations before the
+backend starts. A fresh database therefore needs no manual schema command, and
+restarting the stack does not erase existing data.
 
-1.  **Create Database Tables:**
-    Execute the following command from the project's root directory to set up all necessary database tables and default system settings:
-    ```bash
-    docker-compose exec backend node init_db.js
-    ```
-    *   This script connects to the `oj_database` container and runs the database schema initialization.
-2.  **Create an Admin User:**
-    After creating the tables, you must create an initial administrator account. Run this command and follow the interactive prompts in your terminal to set up your admin username and password:
-    ```bash
-    docker-compose exec backend node create_admin.js
-    ```
-    *   This command will guide you through creating an admin user, which is essential for accessing the administrative functionalities of the system.
+To create the first administrator account, run the interactive script after the
+stack is healthy:
 
-Your Grader System is now fully set up and ready for use!
+    ```bash
+    docker compose exec backend node dist/scripts/create_admin.js
+    ```
+
+Runtime checks are available at `/api/health/live` (process) and
+`/api/health/ready` (database and schema readiness).
+
+### Database migrations
+
+Apply pending non-destructive schema migrations from the host:
+
+```bash
+cd backend
+npm run db:migrate
+```
+
+Production `npm start` applies the same migrations after compilation and before
+the API starts. Applied versions are recorded in `schema_migrations`; rerunning
+the command is safe.
+
+`backend/scripts/init_db.ts` is a destructive development reset that drops
+existing tables. Do not use it to upgrade an existing database.
+
+## Production Configuration
+
+Production uses the same base Compose file plus a production-only overlay. This
+keeps local HTTP, cookies, and ports separate from the public domain, secure
+cookies, allowed origins, certificates, and Cloudflare tunnel.
+
+```bash
+cp .env.production.example .env
+# Replace every placeholder in .env before continuing.
+docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
+./deploy.sh
+```
+
+The production overlay sets `NODE_ENV=production`, enables secure cookies, mounts
+the production Nginx configuration and certificate directories, publishes HTTPS
+for the DNS-only large-upload hostname, and starts the Cloudflare tunnel. The
+certificate at `/etc/letsencrypt/live/nonbangkokgrader.com/` must cover the main, `www`,
+and `upload` hostnames. Do not use this overlay as the localhost configuration.
 
 ## Testing
 
@@ -138,7 +172,119 @@ From the project root, execute the unified test script to run both backend and f
 ```
 
 *   This script runs backend tests first, then frontend tests. It exits with status code 0 if all tests pass, or 1 if any test fails.
-*   **Note:** Ensure Docker containers (including the database) are running before executing this script, as backend tests may require a database connection.
+*   Most backend tests mock PostgreSQL. The migration integration test requires a
+    PostgreSQL test URL and is skipped unless `INTEGRATION_DATABASE_URL` is provided.
+
+### Authoring integration tests
+
+To run the complete backend suite including Slices 4–10 HTTP → PostgreSQL → isolated
+C++/PDF runner and end-to-end authoring checks, use the dedicated disposable stack
+from the repository root:
+
+```bash
+docker compose -p oj-authoring-tests -f tests/authoring/compose.yml up --build --abort-on-container-exit --exit-code-from tests
+docker compose -p oj-authoring-tests -f tests/authoring/compose.yml down -v
+```
+
+This stack publishes no ports, uses a temporary database, and shares only its own
+job volume with the network-disabled runner. The cleanup command deletes only this
+test project's containers/network/job volume. Do not reuse its project name for
+a stack containing real data. Protocol, limits, recovery, and configuration are
+documented in [`.context/AUTHORING_RUNNER.md`](.context/AUTHORING_RUNNER.md).
+Slice 5 generator/seed and manual testcase API conventions are documented in
+[`.context/AUTHORING_TESTCASES.md`](.context/AUTHORING_TESTCASES.md).
+Slice 6 output generation and Slice 7 statement/PDF contracts are documented in
+[`.context/AUTHORING_OUTPUTS.md`](.context/AUTHORING_OUTPUTS.md) and
+[`.context/AUTHORING_PDF.md`](.context/AUTHORING_PDF.md).
+
+After building the runner image above, verify the actual PDF runtime and approved
+three-page Red Gate layout (Poppler `pdftoppm` must be on PATH for the last command):
+
+```bash
+mkdir -p output/pdf
+docker run --rm --network none --read-only --init \
+  --label com.docker.compose.project=oj-pdf-runtime-tests \
+  --security-opt no-new-privileges:true --cap-drop ALL \
+  --cap-add SETUID --cap-add SETGID --cap-add KILL --cap-add SYS_CHROOT --cap-add DAC_OVERRIDE \
+  --pids-limit 256 --memory 1g --cpus 1 \
+  --tmpfs /work:rw,exec,nosuid,nodev,size=768m,mode=0755 \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=32m \
+  -v "$PWD/tests/authoring/pdf-runtime.mjs:/tests/pdf-runtime.mjs:ro" \
+  -v "$PWD/backend/tests/fixtures/pdf:/fixtures:ro" \
+  -v "$PWD/output/pdf:/qa" -e PDF_QA_OUTPUT=/qa \
+  --entrypoint node oj-authoring-tests-authoring-runner --test /tests/pdf-runtime.mjs
+node tests/authoring/pdf-visual.mjs
+```
+
+The visual check ignores PDF timestamps by comparing rasterized pages. A difference
+fails explicitly; inspect the pages instead of automatically replacing the baseline.
+
+Slice8 Verify All is documented in [`.context/AUTHORING_VERIFY.md`](.context/AUTHORING_VERIFY.md).
+Slice9 Publish, hidden legacy-record mapping, privacy and transactional conflicts
+are documented in [`.context/AUTHORING_PUBLISH.md`](.context/AUTHORING_PUBLISH.md).
+Slice10 Admin UI, fast preview, history polling and browser workflow are documented
+in [`.context/AUTHORING_UI.md`](.context/AUTHORING_UI.md).
+The full Compose suite includes real Verify→Publish and rollback/concurrency tests.
+The standalone runtime matrix checks exact output matching, compile-only generators,
+runtime failures, resource bounds and expected-output isolation with the same worker image:
+
+```bash
+docker run --rm --network none --read-only --init \
+  --label com.docker.compose.project=oj-verify-runtime-tests \
+  --security-opt no-new-privileges:true --cap-drop ALL \
+  --cap-add SETUID --cap-add SETGID --cap-add KILL --cap-add SYS_CHROOT --cap-add DAC_OVERRIDE \
+  --pids-limit 256 --memory 1g --cpus 1 \
+  --tmpfs /work:rw,exec,nosuid,nodev,size=768m,mode=0755 \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=32m \
+  -v "$PWD/tests/authoring/verify-runtime.mjs:/tests/verify-runtime.mjs:ro" \
+  -v "$PWD/backend/tests/fixtures/pdf:/fixtures:ro" \
+  --entrypoint node oj-authoring-tests-authoring-runner --test /tests/verify-runtime.mjs
+```
+
+The commands below run integration tests without the separate runner; the
+HTTP-to-runner cases are skipped when `INTEGRATION_RUNNER_SPOOL` is unset.
+
+The Slice 3 integration suite sends HTTP requests through real image processing and
+PostgreSQL transactions. It creates a randomly named schema and removes only that
+schema when finished. The older migration/restore tests reset the `public` schema,
+so run the complete integration suite only on a disposable database.
+
+From the repository root, build the backend and start a dedicated test database:
+
+```bash
+docker build -t oj-authoring-test-backend backend
+docker run --rm -d --name oj-authoring-test-db \
+  -e POSTGRES_USER=oj_test -e POSTGRES_PASSWORD=oj_test -e POSTGRES_DB=oj_test \
+  postgres:16-alpine
+docker exec oj-authoring-test-db pg_isready -U oj_test -d oj_test
+```
+
+Once `pg_isready` reports accepting connections, run the suite in Node 20 with the
+same native dependencies and fonts as the deployed backend:
+
+```bash
+docker run --rm --network container:oj-authoring-test-db \
+  -e INTEGRATION_DATABASE_URL=postgres://oj_test:oj_test@127.0.0.1:5432/oj_test \
+  oj-authoring-test-backend npm test -- --runInBand --verbose=false
+docker stop oj-authoring-test-db
+```
+
+No production/local-stack database or persistent volume is used by these commands.
+For host-only tests, provide a disposable `INTEGRATION_DATABASE_URL`. On Linux,
+install `fontconfig`, `fonts-dejavu-core`, and `fonts-tlwg-garuda` for fallback-avatar
+Thai/Latin coverage. The font-registry check runs on Linux and is skipped on macOS.
+
+### Local Compose and Session Smoke Tests
+
+With the stack running on the default port:
+
+```bash
+node --test tests/composeConfig.test.mjs
+BASE_URL=http://127.0.0.1 node --test tests/localSessionSmoke.test.mjs
+```
+
+The session smoke test creates a uniquely named local test user, verifies the cookie,
+reads the authenticated session, logs out, and confirms that the session is gone.
 
 ### Run Backend Tests Only
 

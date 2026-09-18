@@ -1,0 +1,10 @@
+.container {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.container:focus-visible {
+  outline: 3px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}

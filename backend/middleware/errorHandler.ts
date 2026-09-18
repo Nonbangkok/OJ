@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
+import { AUTHOR_PROFILE_IMAGE, STATEMENT_ASSET } from '../constants';
 
 export class AppError extends Error {
     statusCode: number;
@@ -34,7 +35,29 @@ export const errorHandler = (
     res: Response,
     _next: NextFunction,
 ): void => {
+    if (
+        typeof err === 'object'
+        && err !== null
+        && 'type' in err
+        && err.type === 'entity.too.large'
+    ) {
+        res.status(413).json({ message: 'JSON request body is too large' });
+        return;
+    }
+
     if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE' && err.field === AUTHOR_PROFILE_IMAGE.FIELD_NAME) {
+            res.status(413).json({
+                message: `Author profile image must not exceed ${AUTHOR_PROFILE_IMAGE.MAX_UPLOAD_MIB} MiB`,
+            });
+            return;
+        }
+        if (err.code === 'LIMIT_FILE_SIZE' && err.field === STATEMENT_ASSET.FIELD_NAME) {
+            res.status(413).json({
+                message: `Statement asset must not exceed ${STATEMENT_ASSET.MAX_FILE_MIB} MiB`,
+            });
+            return;
+        }
         const message = err.code === 'LIMIT_FILE_SIZE'
             ? 'Uploaded file is too large. Maximum allowed size is 2GB.'
             : err.message;

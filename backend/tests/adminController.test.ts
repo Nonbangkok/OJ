@@ -4,9 +4,13 @@ import session from 'express-session';
 import { EventEmitter } from 'events';
 import adminRouter from '../controllers/adminController';
 import * as db from '../db';
+import { runMigrationsFromPool } from '../scripts/migrate';
 
 // Mock Dependencies
 jest.mock('../db');
+jest.mock('../scripts/migrate', () => ({
+    runMigrationsFromPool: jest.fn().mockResolvedValue([]),
+}));
 jest.mock('../middleware/auth', () => ({
     requireStaffOrAdmin: (req: Request, res: Response, next: NextFunction) => {
         if (req.session) {
@@ -71,7 +75,7 @@ describe('Admin Controller', () => {
             next();
         });
         app.use('/', adminRouter);
-        jest.resetAllMocks();
+        jest.clearAllMocks();
     });
 
     afterAll(() => {
@@ -187,6 +191,20 @@ describe('Admin Controller', () => {
 
             expect(res.status).toBe(200);
             expect(res.body.token).toBeUndefined();
+        });
+
+        it('should run migrations after a successful database restore', async () => {
+            const start = await startImport();
+
+            await new Promise<void>((resolve) => setImmediate(resolve));
+            await new Promise<void>((resolve) => setImmediate(resolve));
+
+            expect(runMigrationsFromPool).toHaveBeenCalledWith(db.pool);
+
+            const progress = await request(app)
+                .get(`/admin/database/import-progress/${start.body.jobId}`)
+                .set('x-import-token', start.body.token);
+            expect(progress.body.status).toBe('completed');
         });
     });
 });

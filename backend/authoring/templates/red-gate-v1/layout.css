@@ -1,0 +1,21 @@
+@page{size:A4;margin:0.62in 0.75in 1in;}
+*{box-sizing:border-box}html,body{margin:0;padding:0;color:#000;background:#fff}
+body{font-family:'Sarabun',Arial,sans-serif;font-size:16px;line-height:1.5;text-align:justify}
+.document{width:100%}.document-header{font-size:16px;letter-spacing:-.04em;font-weight:400}
+.header-logo{display:inline-block;float:left;margin-top:-2px}
+.header-logo img{display:inline;width:70px;height:70px;object-fit:cover;margin-top:1px;margin-right:15px}
+.header-title{float:left;padding-top:5px;line-height:1.4}.header-title div:first-child{font-weight:500;font-size:1.1em;letter-spacing:-.03em;margin-bottom:3px}
+.header-title .aka-name{position:relative;top:-1px}.header-title .author-name{position:relative;top:-3px}
+.header-meta{float:right;text-align:right;margin-top:28px;font-size:12px}.header-meta div:first-child{font-family:'Inconsolata','Courier New',monospace;font-weight:700;font-size:18px;letter-spacing:-.03em;line-height:25px}
+.document-header hr{position:relative;top:-1px;margin:11px 0 5px;border:0;border-top:1px solid #666;height:1px}
+.statement{font-size:16px}.statement h1,.statement h2,.statement h3{font-weight:500;page-break-after:avoid;text-align:left}
+.statement h1{font-size:2em;margin:.67em 0 .5em}.statement h2{font-size:1.5em;margin:.83em 0}.statement h3{font-size:1.17em;margin:1em 0}
+.statement p{margin:1em 0}.statement img{display:block;margin:10px auto;height:auto;max-width:100%;page-break-inside:avoid}
+.statement table{border-collapse:collapse;border-spacing:0;border:1px solid gray;margin:1.5em auto;width:100%;page-break-inside:avoid}
+.statement th,.statement td{border:1px solid #d6d6d6;padding:.3em .6em;vertical-align:top;text-align:left;width:50%}.statement th{font-weight:700;text-align:center;color:#333;background:#eee}
+.statement pre{font-family:'DejaVu Sans Mono','Courier New',monospace;font-size:16px;line-height:1.5;background:transparent;border:0;margin:0;padding:0;white-space:pre-wrap}
+.statement .sample-table-short pre{padding-bottom:.85px}
+.statement .sample-table:not(.sample-table-short){position:relative;top:-.4px}
+.statement .katex{font-size:1.15em}.statement .geometry-data .katex,.statement .input-spec .katex,.forced-page-break ~ * .katex{font-size:1.15005em!important}.forced-page-break{break-after:page;page-break-after:always;height:0}
+@media screen{body{background:#e9edf1;padding:24px}.document{background:#fff;width:210mm;min-height:297mm;margin:0 auto;padding:.62in .75in 1in;box-shadow:0 8px 30px rgba(0,0,0,.15)}.header-meta div:first-child{font-family:'RedGatePreviewInconsolata',monospace}}
+@media print{body{zoom:1.2}.document{padding:0}}

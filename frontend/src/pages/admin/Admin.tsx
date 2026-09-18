@@ -6,6 +6,7 @@ import Settings from '../../features/admin/settings/Settings';
 import styles from './Admin.module.css';
 import LoadingPage from '../../components/shared/LoadingPage';
 import { USER_ROLES } from '../../utils/constants';
+import { Link } from 'react-router-dom';
 
 const Admin = () => {
   const { user, loading } = useAdminPage();
@@ -15,6 +16,11 @@ const Admin = () => {
   return (
     <div className={styles['admin-container']}>
       <h1>Admin Panel</h1>
+      {user?.role === USER_ROLES.ADMIN && <section className={styles['admin-section']}>
+        <h2>Problem Authoring</h2>
+        <p>Create drafts, build PDFs and testcases, verify C++ solutions and publish hidden problems.</p>
+        <Link to="/admin/authoring">Open Problem Authoring</Link>
+      </section>}
 
       {user?.role === USER_ROLES.ADMIN && (
         <div className={styles['admin-section']}>

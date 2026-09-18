@@ -17,6 +17,7 @@
 | Auth (passwords) | bcrypt | 6.0 |
 | Validation | zod | 4.x |
 | File Upload | multer | 2.0 |
+| Image Processing | sharp | 0.34 |
 | ZIP Processing | unzipper | 0.12 |
 | Scheduling | node-cron | 3.0 |
 | Reverse Proxy | Nginx | 1.25 |
@@ -47,8 +48,15 @@ OJ/
 │   │   ├── adminController.ts
 │   │   ├── problemController.ts
 │   │   ├── submissionController.ts
-│   │   └── contestController.ts
+│   │   ├── contestController.ts
+│   │   ├── authorProfileController.ts # Admin author identity API
+│   │   └── authoringDraftController.ts # Admin draft CRUD API
 │   ├── services/           # Business logic & external processes
+│   │   ├── authorProfileImageService.ts # Canonical profile PNGs and fallback avatars
+│   │   ├── authorProfileQueryService.ts # Author profile persistence
+│   │   ├── authorProfileSnapshotService.ts # Immutable draft author snapshots
+│   │   ├── authoringAssetQueryService.ts # Transactional draft asset persistence
+│   │   ├── statementAssetService.ts # Safe statement image preparation
 │   │   ├── judgeService.ts       # Compile & judge C++ in sandbox
 │   │   ├── submissionService.ts  # Submission processing
 │   │   ├── submissionQueryService.ts # Submission read/write query orchestration
@@ -179,6 +187,60 @@ Backend runtime request pipeline (high-level):
 3. Route-level middleware validates payload (`zod` via shared schemas + `validateRequest`).
 4. Controllers call services for DB-heavy logic.
 5. Errors propagate via `asyncHandler` to centralized `errorHandler`.
+
+### Author Profile Image Flow
+
+`authorProfileImageService.ts` owns the canonical PDF-author image format:
+
+1. Accept JPEG, PNG, or WebP bytes and verify that decoded content matches the declared MIME type.
+2. Reject corrupt, animated, or excessively large pixel inputs.
+3. Apply EXIF orientation, center-crop to a square, and encode a 512×512 PNG with `sharp`.
+4. When a profile is copied or refreshed into a draft and has no custom image, create a deterministic 512×512 PNG avatar from the first character of the trimmed AKA name.
+
+Controllers and query services must store only the normalized PNG. Raw profile-image uploads are never persisted.
+
+The backend Docker image supplies DejaVu and Garuda fonts plus Fontconfig for Latin
+and Thai fallback-avatar initials. A Linux runtime test checks both language
+coverages; without Thai fonts, sharp's SVG renderer emits a missing-glyph box even
+though PNG creation succeeds. Fallbacks are deterministic within the same font and
+renderer environment; persisted snapshots retain their original bytes across upgrades.
+
+Draft author refreshes first compare `expectedRevision` with the current draft. Profile fields are then copied into the draft through the existing optimistic update, which increments revision and invalidates any previous readiness result.
+
+### Statement Asset Preparation
+
+The first authoring release accepts JPEG, PNG, and WebP statement images. `statementAssetService.ts` rejects unsafe filenames, path traversal, MIME/content mismatches, corrupt or animated images, and excessive pixel counts. Valid images are auto-oriented, re-encoded in their declared format to remove metadata, capped at 10 MiB after normalization, and assigned a SHA-256 checksum before persistence.
+
+Statement text uses the task-pdf-writer hybrid format: Markdown, inline HTML and
+LaTeX stored under the historical `statement_html` name. `statementCompiler.ts`
+uses the Marked 4.0.8 code pinned inside `red-gate-v1`, protects math delimiters
+during Markdown parsing, normalizes bounded legacy markup, and then delegates to
+the HTML allowlist sanitizer. Fast Preview and immutable PDF/Verify snapshots call
+this same compiler; the runner re-sanitizes captured HTML at its trust boundary.
+
+The Admin Statement tab links to `/admin/authoring/:draftId/editor`. For this
+exact route `AdminLayout` returns its outlet without the Admin navbar/container,
+while the application-level Admin guard remains active. `StatementEditor.tsx`
+owns the full-viewport split source/preview UI. It debounces unsaved source for
+400 ms before calling the existing preview endpoint and discards responses older
+than the latest request. The returned document is rendered in an opaque-origin
+sandboxed iframe. Saving remains explicit and revision-guarded; clean drafts
+refresh on focus/visibility, while dirty drafts retain local source and surface a
+conflict only when the server revision advances. Dirty statement source is also
+kept in per-draft `sessionStorage` for browser Back/Forward recovery. The stored
+original revision is preserved across further edits; a newer server revision
+therefore restores the text into conflict state rather than making it saveable
+against the newer base. Save, discard and an explicitly confirmed Workspace exit
+remove the recovery copy. Published tasks may be corrected from this editor only:
+a statement-only Save creates a new draft revision while the already-published
+legacy problem remains live. The split is resizable (stored per draft in browser
+storage and resettable to50/50), and the fast HTML preview has a local 50–200%
+zoom. The preview remains non-authoritative; only a later Verify/Publish swaps
+the verified PDF and testcases into the legacy problem transactionally.
+
+Asset add/delete operations lock and advance the draft through an optimistic revision update in the same database transaction as the asset mutation. Duplicate filenames, missing assets, and the 100 MiB per-draft cap roll back the transaction, so a failed asset action never advances revision or invalidates readiness by itself.
+
+The admin asset API exposes metadata-only listing plus multipart add and revision-guarded delete routes under `/admin/authoring/drafts/:id/assets`. Multer rejects unsupported types and raw files above 10 MiB before decoding; controllers pass accepted bytes through statement asset preparation before calling the transactional query service. Asset binary content is intentionally absent from every API response.
 
 ### Authentication Flow
 

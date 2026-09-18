@@ -1,0 +1,40 @@
+.badge {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.25;
+  padding: 0.5rem 1rem;
+  white-space: nowrap;
+}
+
+.neutral {
+  background: var(--background-tertiary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.info {
+  background: color-mix(in srgb, var(--status-info) 15%, transparent);
+  border-color: color-mix(in srgb, var(--status-info) 40%, transparent);
+  color: var(--text-primary);
+}
+
+.success {
+  background: color-mix(in srgb, var(--status-success) 15%, transparent);
+  border-color: color-mix(in srgb, var(--status-success) 40%, transparent);
+  color: var(--text-primary);
+}
+
+.warning {
+  background: color-mix(in srgb, var(--status-warning) 15%, transparent);
+  border-color: color-mix(in srgb, var(--status-warning) 40%, transparent);
+  color: var(--text-primary);
+}
+
+.danger {
+  background: color-mix(in srgb, var(--status-danger) 15%, transparent);
+  border-color: color-mix(in srgb, var(--status-danger) 40%, transparent);
+  color: var(--text-primary);
+}

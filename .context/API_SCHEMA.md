@@ -1,13 +1,14 @@
-# API Schema — WOI Grader Backend (50 APIs)
+# API Schema — WOI Grader Backend (77 APIs)
 
-เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 50 APIs** ตามรายการด้านล่าง
+เอกสารนี้สรุป API ของ backend ตาม controller ทั้งหมด **ครบ 77 APIs** ตามรายการด้านล่าง
 - `adminController.ts` = 10 APIs
 - `authController.ts` = 5 APIs
 - `contestController.ts` = 15 APIs
 - `problemController.ts` = 14 APIs
 - `submissionController.ts` = 6 APIs
+- Problem authoring/profile/asset/job/testcase/workspace controllers = 27 APIs
 
-รวมทั้งหมด: **50 APIs**
+รวมทั้งหมด: **77 APIs**
 
 ## Global Conventions
 
@@ -462,6 +463,267 @@
 
 ---
 
+## 6) Problem Authoring Controller (20 APIs)
+
+All endpoints in this section require an authenticated `admin`; `staff` is not sufficient.
+
+### 51. `POST /admin/author-profiles`
+
+- Purpose: Create a reusable author identity, optionally linked to one OJ account.
+- Accepts JSON metadata, or multipart form data when uploading an image.
+- Metadata:
+  - `userId: number | null` (optional, defaults to `null`)
+  - `akaName: string`
+  - `realName: string`
+  - `defaultLanguage: string`
+  - `countryCode: string` (three uppercase letters)
+- Optional multipart file: `profileImage` (JPEG/PNG/WebP, maximum 10 MiB).
+- The backend verifies decoded format and stores only a normalized 512×512 PNG.
+- Response 201: camel-case profile metadata with `hasProfileImage`; image bytes are omitted.
+- Errors: 400 validation/image error, 409 account already linked, 413 image too large.
+
+### 52. `GET /admin/author-profiles`
+
+- Purpose: List author profile metadata ordered by AKA name.
+- Response 200: camel-case rows including `hasProfileImage`; image BYTEA is never loaded into this list query.
+
+### 53. `PATCH /admin/author-profiles/:id`
+
+- Purpose: Update profile metadata, replace its image, or remove its image.
+- Params: UUID `id`.
+- Accepts JSON or multipart form data. Metadata fields are optional.
+- Optional multipart file: `profileImage`.
+- Optional body field: `removeProfileImage: boolean`; it cannot be true in the same request as a new image.
+- Response 200: updated camel-case profile metadata.
+- Errors: 400 empty/invalid update, 404 profile missing, 409 account already linked, 413 image too large.
+
+### 54. `POST /admin/authoring/drafts`
+
+- Purpose: Create a private problem draft at revision 1.
+- Body: `problemId`, `title`, `authorProfileId`, time/memory limits, plus optional statement/C++/template fields.
+- When `authorProfileId` is non-null, display fields and canonical/fallback PNG are copied from that profile; caller-supplied author display fields cannot override it.
+- When `authorProfileId` is null, `authorAkaName`, `authorRealName`, `language`, and `countryCode` are required and a fallback PNG is generated.
+- Response 201: complete camel-case draft data, excluding PDF and profile-image bytes.
+
+### 55. `GET /admin/authoring/drafts`
+
+- Purpose: List draft summaries without private C++ source or binary artifacts.
+- Response 200: draft summaries ordered by most recently updated.
+
+### 56. `GET /admin/authoring/drafts/:id`
+
+- Purpose: Load a complete private draft for editing.
+- Params: UUID `id`.
+- Response 200: draft detail with binary presence flags.
+- Error 404: draft missing.
+
+### 57. `PATCH /admin/authoring/drafts/:id`
+
+- Purpose: Optimistically update editable draft content.
+- Params: UUID `id`.
+- Body: positive `expectedRevision` plus at least one editable field.
+- A successful update increments revision and invalidates readiness.
+- Selecting a non-null `authorProfileId` copies its current display fields and image snapshot in the same optimistic update.
+- Errors: 404 draft missing; 409 revision conflict or published/read-only draft.
+  The only published-draft exception is a statement-only update from the dedicated
+  statement editor. It increments revision, sets status back to `draft`, retains
+  `publishedAt`, and invalidates readiness; it does not change the live grader
+  problem until Verify and Publish complete.
+- Once a draft has been published, `problemId` is permanently locked to its
+  recorded legacy problem. A request attempting to change it returns 409
+  `published_problem_id_locked`.
+
+### 58. `POST /admin/authoring/drafts/:id/refresh-author-profile`
+
+- Purpose: Explicitly replace the draft author snapshot with current values from its linked profile.
+- Params: UUID `id`.
+- Body: `{ expectedRevision: positive integer }`.
+- Success increments draft revision and invalidates readiness through the normal optimistic update.
+- Errors: 404 draft missing; 409 revision conflict, published draft, no linked profile, or linked profile removed during the operation.
+
+### 59. `GET /admin/authoring/drafts/:id/assets`
+
+- Purpose: List statement image metadata without loading or returning binary content.
+- Params: UUID `id` of an existing draft.
+- Response 200: array of `{ id, draftId, filename, mimeType, checksumSha256, sizeBytes, createdAt, updatedAt }`, ordered by filename.
+- Error 404: draft missing. An existing draft with no assets returns an empty array.
+
+### 60. `POST /admin/authoring/drafts/:id/assets`
+
+- Purpose: Validate, normalize, and add one statement image while atomically advancing draft revision.
+- Params: UUID `id`.
+- Content type: `multipart/form-data`.
+- Fields:
+  - `asset`: required JPEG/PNG/WebP file, maximum 10 MiB raw upload.
+  - `expectedRevision`: required positive integer.
+  - `filename`: optional override; otherwise the uploaded filename is used.
+- Filename must use safe ASCII characters and an extension matching the verified media type. The backend decodes and re-encodes the image before persistence.
+- Response 201: `{ asset: assetMetadata, draftRevision: number }`.
+- Errors: 400 invalid request/image/filename; 404 draft missing; 409 revision conflict, published draft, or duplicate filename; 413 raw upload too large or draft asset total above 100 MiB.
+
+### 61. `DELETE /admin/authoring/drafts/:id/assets/:assetId`
+
+- Purpose: Delete one statement image while atomically advancing draft revision.
+- Params: UUID `id` and UUID `assetId`.
+- Query: required positive integer `expectedRevision`.
+- Response 200: `{ asset: deletedAssetMetadata, draftRevision: number }`.
+- Errors: 400 invalid params/query; 404 draft or asset missing; 409 revision conflict or published draft.
+
+---
+
+### 62. `POST /admin/authoring/drafts/:id/jobs/compile`
+
+- Auth: admin. Params: UUID draft `id`.
+- Body: `{ expectedRevision: positive integer, target?: "solution" | "generator" }`; target defaults to solution.
+- Response 202: queued job metadata including ID, captured revision, type and status; never the private request snapshot.
+- Errors: 400 empty source/validation; 404 missing draft; 409 revision conflict, published draft, or existing active job; 429 global queue full; 503 runner not configured.
+- Compiles a captured C++20 source asynchronously. It does not execute the binary, change draft revision, or mark the draft Ready.
+
+### 63. `GET /admin/authoring/jobs/:id`
+
+- Auth: admin. Params: UUID job `id`.
+- Response 200: job metadata, bounded compiler log, result summary and error/timestamps. No source snapshot or binary artifacts.
+- Error 404: job missing.
+- Poll until a terminal status (`succeeded`, `failed`, `timed_out`, `stale`). A result for an edited draft becomes stale even when compilation succeeded.
+- Existing history remains readable when queue submission is disabled.
+
+---
+
+### 64. `POST /admin/authoring/drafts/:id/jobs/generate`
+
+- Auth: admin. Body: `{ expectedRevision: positive integer, seed: unsigned-64-bit decimal string }`.
+- Response 202: job metadata; poll endpoint 63 for completion. Same queue/conflict/disabled errors as compilation.
+- Uses saved generator source once to create multiple files in `./input/`; missing generator returns 400 `source_missing`.
+- Successful current-revision results replace the entire testcase set atomically, clear outputs/readiness, and set draft status to `generated` without incrementing revision.
+- Result summary includes seed, input hashes/sizes/names, case count, and an unverified-reproducibility warning. Failed/stale jobs preserve prior data.
+
+### 65. `GET /admin/authoring/drafts/:id/testcases`
+
+- Auth: admin. Response 200: `{ revision, testcases: [...] }`, metadata only, sorted by case number.
+- Metadata includes ID, filename, case number, input/output byte sizes, `hasOutput`, source/source revision and timestamps.
+- Error 404: draft missing. Existing empty drafts return an empty array.
+
+### 66. `GET /admin/authoring/drafts/:id/testcases/:caseId`
+
+- Auth: admin. Response 200: one case's metadata plus exact `input` and nullable `output` strings.
+- Error 404: case missing or belongs to another draft.
+
+### 67. `POST /admin/authoring/drafts/:id/testcases`
+
+- Auth: admin. Multipart fields: `expectedRevision`, either `input` plus optional `output`, OR `archive` ZIP.
+- Individual files append one case. A ZIP replaces the entire set atomically using existing grader pairing conventions; missing outputs are allowed.
+- Response 201: `{ revision }`; successful upload advances revision and invalidates readiness.
+- Errors: 400 invalid text/paths/pairing/request; 404 draft missing; 409 stale revision/published; 413 count/file/total limits.
+
+### 68. `PATCH /admin/authoring/drafts/:id/testcases/:caseId`
+
+- Auth: admin. Multipart fields: `expectedRevision` and `input` and/or `output`.
+- Output-only updates attach a missing answer. Replacing only input clears the old output. Empty output is retained as an empty string.
+- Response 200: `{ revision }`. Same validation/revision/size rules as POST; cross-draft cases return 404.
+
+### 69. `DELETE /admin/authoring/drafts/:id/testcases/:caseId`
+
+- Auth: admin. JSON body: `{ expectedRevision: positive integer }`.
+- Response 200: `{ revision }`; advances revision, clears readiness, preserves remaining case numbers.
+- Errors: 400 invalid request; 404 missing draft/case; 409 stale revision/published.
+
+Detailed limits, ZIP pairing and runtime isolation: `AUTHORING_TESTCASES.md`.
+
+### 70. `POST /admin/authoring/drafts/:id/jobs/outputs`
+
+- Auth: admin. JSON body: `{ expectedRevision: positive integer }` (no seed or generator required).
+- Response 202: queued job metadata; poll `GET /admin/authoring/jobs/:id`.
+- Captures immutable solution, ordered inputs and execution limits. Compiles once and runs once per input.
+- Replaces all outputs only after every execution and artifact validation succeeds. Failed/stale/incomplete results preserve previous outputs.
+- Success summary: `caseCount`, output case IDs/names/sizes/hashes/wall durations. Runtime failures include `failedCase`.
+- Errors: 400 invalid body, `source_missing`, `inputs_missing`, `unsupported_resource_limits`; 404 missing draft; 409 busy/revision/published; 429 queue full; 503 runner unavailable.
+- Current supported limits: requested memory up to 736 MiB, per-case time up to 900000ms, total job 15min. See `AUTHORING_OUTPUTS.md`.
+
+---
+
+### 71. `POST /admin/authoring/drafts/:id/jobs/pdf`
+
+- Auth: admin. JSON body: `{ expectedRevision: positive integer }`.
+- Response 202: queued job metadata; poll endpoint63. No C++ source or testcases required.
+- Compiles the saved task-pdf-writer source and captures sanitized HTML,
+  author metadata/avatar, assets and template version immutably.
+- Errors: 400 invalid body, `unsupported_template`, `invalid_statement`; 404 draft missing;
+  409 revision/published/busy; 429 queue full; 503 runner not configured.
+- Success atomically installs PDF at the captured revision and sets `generated`, never Ready.
+  Failed, stale or corrupt results preserve the last successful PDF.
+
+### 72. `GET /admin/authoring/drafts/:id/pdf`
+
+- Auth: admin. Response200: last successful PDF, `application/pdf`, inline disposition.
+- `Cache-Control: private, no-store`, `X-Content-Type-Options: nosniff`, same-origin framing.
+- `X-PDF-Revision` / `X-Draft-Revision` allow the editor to label an outdated preview.
+- Error404: missing draft or `pdf_missing`. Editing a draft does not erase its previous PDF.
+- Full statement/security/runtime contract: `AUTHORING_PDF.md`.
+
+---
+
+### 73. `POST /admin/authoring/drafts/:id/jobs/verify`
+
+- Auth: admin. Body: `{ expectedRevision: positive integer }`. Response202 job metadata.
+- Revalidates saved metadata, statement/assets, source, resource limits and complete
+  testcase pairs; captures immutable solution, optional generator, PDF inputs and
+  expected outputs. Existing queue/revision/published guards apply.
+- Additional400 codes: `invalid_metadata`, `outputs_missing`, `invalid_testcases`.
+- Accepted requests clear previous readiness; old PDF and all testcase bytes remain.
+- Renders PDF, compiles solution + optional generator (never runs the generator),
+  runs solution and compares outputs using current judge trim/CRLF/exact semantics.
+- Poll endpoint63 for per-stage checks, attempted-case wall durations, first failure,
+  sizes, PDF manifest, warnings and verified revision. No peak-RSS claim.
+- Only a complete, current, unexpired result atomically installs PDF and sets `ready`.
+  Does not generate/replace testcase outputs or Publish. See `AUTHORING_VERIFY.md`.
+
+---
+
+### 74. `POST /admin/authoring/drafts/:id/publish`
+
+- Auth: admin. Body: `{ expectedRevision: positive integer }`; no visibility/source overrides.
+- Response201: `{ draftId, problemId, revision, caseCount, publishedAt, status: "published", isVisible: false }`.
+- Requires current ready/verified revision, no active job, matching successful
+  Verify All report/PDF and complete testcase pairs. Runs synchronously in one DB transaction.
+- Inserts new hidden legacy problem + exact cases with stable numbers and marks
+  draft published atomically. Never copies private C++ sources into grader records/export.
+- Errors:400 invalid request;404 `draft_not_found`;409 `draft_published`,
+  `revision_conflict`, `job_active`, `draft_not_ready`, `pdf_not_verified`,
+  `invalid_testcases`, `problem_id_conflict`. All failures preserve existing records.
+- Does not require an online runner or automatically expose the problem to contestants.
+  See `AUTHORING_PUBLISH.md` for mapping, retry and concurrency details.
+
+### 75. `GET /admin/authoring/drafts/:id/jobs`
+
+- Auth: admin. Params: UUID draft `id`.
+- Response200: latest100 jobs ordered by creation time and ID descending.
+- List rows contain only IDs, revision/type/status, bounded error text and timestamps.
+  Full result reports and logs are intentionally omitted; fetch endpoint63 only
+  when an admin selects one job. Source snapshots are never returned.
+- Error404: missing draft. Response is private and not cacheable.
+
+### 76. `POST /admin/authoring/drafts/:id/preview`
+
+- Auth: admin. Body: strict `{ statementHtml: string }`, at most2 MiB UTF-8. The
+  field name is retained for compatibility; its value is task-pdf-writer-compatible
+  Markdown with inline HTML and LaTeX.
+- Response200: `{ html }`, a self-contained compiled and sanitized preview using the saved
+  metadata/avatar/assets and the current unsaved statement text.
+- KaTeX is rendered on the server for `$...$`, `$$...$$`, `\(...\)` and `\[...\]`.
+  Scripts and remote resources are absent; CSP permits only inline style and
+  embedded image/font data. This endpoint creates no runner job and writes no data.
+- Errors:400 unsafe/invalid/oversized content, math, asset or template;404 missing draft.
+
+### 77. `GET /admin/authoring/drafts/:id/assets/:assetId`
+
+- Auth: admin. Params: draft and asset UUIDs.
+- Response200: exact stored normalized PNG/JPEG/WebP bytes with private/no-store,
+  nosniff and sandbox CSP headers.
+- Errors:400 unsupported stored media type;404 missing/cross-draft asset.
+- Used only for private authoring inspection. Public statement/PDF APIs never expose it.
+
+---
+
 ## Frontend Implementation Notes (สำคัญ)
 
 - ใช้ axios instance แบบ `withCredentials: true` ทุก request ที่ต้องใช้ session
@@ -470,6 +732,7 @@
   - `/contests/:id/problems/:problemId/pdf`
   - `/admin/problems/export`
   - `/admin/database/export`
+  - `/admin/authoring/drafts/:id/pdf`
 - SSE endpoint:
   - `/admin/problems/batch-upload-progress/:progressId`
   - ใช้ `EventSource` แล้ว parse payload ตาม event name

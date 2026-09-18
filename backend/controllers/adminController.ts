@@ -23,6 +23,8 @@ import {
   updateRegistrationSettingSchema,
 } from '../schemas/requestSchemas';
 import { getErrorMessage } from '../utils/errorMessage';
+import { pool } from '../db';
+import { runMigrationsFromPool } from '../scripts/migrate';
 import {
   buildDatabaseExportCommand,
   buildDatabaseExportFilePath,
@@ -227,6 +229,9 @@ router.post('/admin/database/import', requireAuth, requireAdmin, diskUpload.sing
 
       setProgress('uploading', 'Importing database dump. This may take several minutes.');
       await runImportCommand(importCommandResult);
+
+      setProgress('migrating', 'Applying database migrations to the restored data.');
+      await runMigrationsFromPool(pool);
 
       setProgress('completed', 'Database imported successfully.');
     } catch (error: unknown) {

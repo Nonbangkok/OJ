@@ -146,6 +146,55 @@ export interface ProblemExportRequestBody {
 }
 
 // ---------------------------------------------------------------------------
+// Problem Authoring
+// ---------------------------------------------------------------------------
+
+export interface CreateAuthorProfileRequestBody {
+    userId: number | null;
+    akaName: string;
+    realName: string;
+    defaultLanguage: string;
+    countryCode: string;
+}
+
+export type UpdateAuthorProfileRequestBody = Partial<CreateAuthorProfileRequestBody> & {
+    removeProfileImage?: boolean;
+};
+
+export interface CreateProblemDraftRequestBody {
+    problemId: string;
+    title: string;
+    authorProfileId: string | null;
+    authorAkaName?: string;
+    authorRealName?: string;
+    language?: string;
+    countryCode?: string;
+    timeLimitMs: number;
+    memoryLimitMb: number;
+    statementHtml: string;
+    solutionCpp: string;
+    generatorCpp: string | null;
+    templateVersion: string;
+}
+
+export type UpdateProblemDraftRequestBody = {
+    expectedRevision: number;
+} & Partial<CreateProblemDraftRequestBody>;
+
+export interface RefreshProblemDraftAuthorRequestBody {
+    expectedRevision: number;
+}
+
+export interface CreateStatementAssetRequestBody {
+    expectedRevision: number;
+    filename?: string;
+}
+
+export interface DeleteStatementAssetQuery {
+    expectedRevision: string;
+}
+
+// ---------------------------------------------------------------------------
 // Submission
 // ---------------------------------------------------------------------------
 

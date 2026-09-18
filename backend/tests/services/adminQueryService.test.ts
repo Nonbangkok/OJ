@@ -5,6 +5,7 @@ import {
   createAdminUser,
   createBatchUsers,
   deleteAdminUser,
+  dropAllTablesForImport,
   getAuthors,
   getAdminUsers,
   getRegistrationEnabled,
@@ -214,5 +215,13 @@ describe('adminQueryService', () => {
       "UPDATE system_settings SET setting_value = $1 WHERE setting_key = 'registration_enabled'",
       ['true']
     );
+  });
+
+  it('dropAllTablesForImport removes migration metadata before restoring a dump', async () => {
+    (db.query as jest.Mock).mockResolvedValue({});
+
+    await dropAllTablesForImport();
+
+    expect(db.query).toHaveBeenCalledWith('DROP TABLE IF EXISTS schema_migrations CASCADE;');
   });
 });

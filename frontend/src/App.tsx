@@ -29,6 +29,7 @@ import UserManagement from './features/admin/users/UserManagement';
 import ProblemManagement from './features/admin/problems/ProblemManagement';
 import ContestManagement from './features/admin/contests/ContestManagement';
 import Settings from './features/admin/settings/Settings';
+import ProblemAuthoring from './features/admin/authoring/ProblemAuthoring';
 
 // New layout for standard pages
 const MainLayout = () => (
@@ -71,6 +72,9 @@ const Layout = () => {
           <Route index element={<Admin />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="problems" element={<ProblemManagement />} />
+          <Route path="authoring" element={<ProblemAuthoring />} />
+          <Route path="authoring/:draftId" element={<ProblemAuthoring />} />
+          <Route path="authoring/:draftId/editor" element={<ProblemAuthoring editorMode />} />
           <Route path="contests" element={<ContestManagement />} />
           <Route path="settings" element={<Settings />} />
         </Route>

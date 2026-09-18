@@ -1,81 +1,20 @@
-import express, { Request, Response } from 'express';
-import session from 'express-session';
-import pgSession from 'connect-pg-simple';
-import { pool } from './db';
-import { attachRequestUser } from './middleware/requestContext';
-import { errorHandler, notFoundHandler } from './middleware/errorHandler';
-import { generalApiLimiter } from './middleware/rateLimit';
+import { createApp } from './app';
 import { env } from './config/env';
-import cors from 'cors';
-
-// Import routes (Assuming they will be converted or handled by TS)
-import adminRoutes from './controllers/adminController';
-import authRoutes from './controllers/authController';
-import problemRoutes from './controllers/problemController';
-import submissionRoutes from './controllers/submissionController';
-import contestRoutes from './controllers/contestController';
 import contestScheduler from './services/contestScheduler';
+import { startAuthoringCoordinator } from './services/authoringJobCoordinator';
 
-const app = express();
-const PgStore = pgSession(session);
-const sessionMiddleware = session({
-  store: new PgStore({
-    pool: pool, // Use the existing pg pool from db.ts
-    tableName: 'user_sessions', // Name of the table to store sessions
-  }),
-  secret: process.env.SECRET_KEY,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    domain: 'woi-grader.com',
-    secure: true, // Set to true for production
-    sameSite: 'lax',
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
-});
-
-app.set('trust proxy', 1);
+const app = createApp();
 const port = Number(env.PORT) || 5000;
-
-app.use(express.json());
-app.use(cors({
-  origin: ['https://www.woi-grader.com', 'https://woi-grader.com', 'https://upload.woi-grader.com'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
-
-// Database import progress must remain readable while the import temporarily
-// drops the session table.
-app.use((req, res, next) => {
-  if (req.path.startsWith('/admin/database/import-progress/')) {
-    next();
-    return;
-  }
-  sessionMiddleware(req, res, next);
-});
-
-app.use(attachRequestUser);
-
-// General API rate limiter — mounted before routes. Stricter per-route limiters
-// (auth, submit) are applied inside their controllers. `trust proxy` (set above)
-// ensures the real client IP is used behind the nginx reverse proxy.
-app.use(generalApiLimiter);
-
-app.use('/', authRoutes);
-app.use('/', adminRoutes);
-app.use('/', problemRoutes);
-app.use('/', submissionRoutes);
-app.use('/', contestRoutes);
-
-app.get('/', (req: Request, res: Response) => {
-  res.send('Grader System API is running!');
-});
-
-app.use(notFoundHandler);
-app.use(errorHandler);
-
+if (env.AUTHORING_JOBS_DIR) {
+  startAuthoringCoordinator(env.AUTHORING_JOBS_DIR).then(stop => {
+    for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+      process.once(signal, () => { stop(); process.exit(0); });
+    }
+  }).catch(() => {
+    console.error('Unable to initialize authoring transport');
+    process.exit(1);
+  });
+}
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
 

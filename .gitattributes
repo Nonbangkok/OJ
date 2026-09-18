@@ -1,2 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Preserve upstream bytes and whitespace in vendored renderer assets and fixtures.
+backend/authoring/templates/red-gate-v1/vendor/** -text -whitespace
+backend/authoring/templates/red-gate-v1/licenses/** -text -whitespace
+backend/tests/fixtures/pdf/red-gate-statement.html -text -whitespace

@@ -16,7 +16,7 @@ The first version supports:
 - New problems only.
 - Admin-only authoring inside the existing OJ frontend and backend.
 - Drafts that can be saved and resumed.
-- HTML statement source with inline LaTeX rendered by KaTeX.
+- task-pdf-writer-compatible Markdown statement source with inline HTML and LaTeX rendered by KaTeX.
 - Versioned, fixed PDF templates rendered by Docker and wkhtmltopdf 0.12.6.
 - Author profiles with profile images.
 - Private C++20 reference solutions.
@@ -97,7 +97,8 @@ Add a `Problem Authoring` section alongside the existing `Problem Management` se
 A draft workspace contains five tabs:
 
 1. **Metadata** — problem ID, title, author profile, PDF header metadata, time limit, and memory limit.
-2. **Statement** — HTML/LaTeX editor, asset management, fast HTML preview, and actual PDF preview.
+2. **Statement** — task-pdf-writer Markdown/HTML/LaTeX editor, asset management,
+   fast compiled preview, and actual PDF preview.
 3. **Solution** — private `solution.cpp` editor and an explicit Compile action.
 4. **Testcases** — optional `generator.cpp`, manual input/output upload, generator execution, output generation, and paired testcase inspection.
 5. **Verify & Publish** — checklist, build history, logs, testcase summary, resource measurements, PDF preview, and Publish action.
@@ -123,15 +124,17 @@ Selecting an author profile copies its display data and normalized image into th
 
 ## 8. Statement and PDF rendering
 
-The statement is stored as an HTML fragment, not Markdown or a complete HTML document. KaTeX recognizes `$...$`, `$$...$$`, `\(...\)`, and `\[...\]` math delimiters.
+The statement is stored as authored task-pdf-writer-compatible source: Markdown with inline HTML and LaTeX, not a complete HTML document. The historical `statement_html` database/API naming remains unchanged to avoid a destructive migration. A pinned Marked parser compiles the source before allowlist sanitization. KaTeX recognizes `$...$`, `$$...$$`, `\(...\)`, and `\[...\]` math delimiters.
 
 The fixed template supplies the document shell, CSS, Sarabun/Inconsolata/KaTeX fonts, header, profile image, author metadata, task code, language, and country code. Each draft records `template_version`; rebuilding an older draft uses the same template version.
 
 Statement conventions include:
 
-- Standard headings, paragraphs, lists, tables, preformatted blocks, and images.
+- Markdown headings, paragraphs, emphasis, links, blockquotes, lists, GFM tables,
+  fenced code and images, plus compatible inline HTML.
 - Free-form sample tables authored directly in HTML. Samples are intentionally not synchronized with hidden testcases.
-- `{{ASSET_BASE}}/filename` for draft assets.
+- `<image src="{{ASSET_BASE}}/filename">`, `<img ...>`, or
+  `![alt]({{ASSET_BASE}}/filename)` for draft assets.
 - `<div class="forced-page-break"></div>` for explicit page breaks.
 - Restricted inline styles needed for layout, such as image width.
 

@@ -62,15 +62,15 @@
   transition: 0.4s;
 }
 
-input:checked + .slider {
+.toggle-switch input:checked + .slider {
   background-color: var(--accent-primary);
 }
 
-input:focus + .slider {
+.toggle-switch input:focus + .slider {
   box-shadow: 0 0 1px var(--accent-primary);
 }
 
-input:checked + .slider:before {
+.toggle-switch input:checked + .slider:before {
   -webkit-transform: translateX(22px);
   -ms-transform: translateX(22px);
   transform: translateX(22px);

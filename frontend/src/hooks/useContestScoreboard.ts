@@ -19,7 +19,10 @@ interface UseContestScoreboardResult {
   error: string;
   lastUpdate: Date | null;
   formatDateTime: (dateTime: Date | string) => string;
-  getProblemScore: (userScores: Record<string, unknown> | null | undefined, problemId: string) => ScoreValue;
+  getProblemScore: (
+    userScores: Record<string, unknown> | null | undefined,
+    problemId: string
+  ) => ScoreValue;
 }
 
 const useContestScoreboard = (contestId?: string | number): UseContestScoreboardResult => {
@@ -108,7 +111,7 @@ const useContestScoreboard = (contestId?: string | number): UseContestScoreboard
 
   const getProblemScore = (
     userScores: Record<string, unknown> | null | undefined,
-    problemId: string,
+    problemId: string
   ): ScoreValue => {
     if (!userScores || typeof userScores !== 'object') return null;
 

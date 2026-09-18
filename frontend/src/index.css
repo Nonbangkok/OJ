@@ -19,6 +19,22 @@
   --accent-primary: #007bff;
   --accent-primary-hover: #0056b3;
 
+  --action-primary-foreground: #ffffff;
+  --action-primary-background: #0069d9;
+  --action-primary-hover-background: var(--accent-primary-hover);
+  --action-secondary-foreground: var(--text-primary);
+  --action-secondary-background: var(--surface-elevated);
+  --action-secondary-hover-background: var(--background-secondary);
+  --action-neutral-foreground: var(--text-primary);
+  --action-neutral-background: var(--background-tertiary);
+  --action-neutral-hover-background: var(--border-color);
+  --action-destructive-foreground: #ffffff;
+  --action-destructive-background: var(--button-danger-bg);
+  --action-destructive-hover-background: var(--button-danger-hover);
+  --action-focus-ring: #005fcc;
+  --surface-elevated: #ffffff;
+  --surface-elevation: var(--box-shadow);
+
   --button-danger-bg: #dc3545;
   /* Red color for danger buttons */
   --button-danger-hover: #c82333;
@@ -26,6 +42,7 @@
 
   --status-success: #28a745;
   --status-danger: #dc3545;
+  --error-text: var(--status-danger);
   --status-warning: #ffc107;
   --status-info: #17a2b8;
 
@@ -52,12 +69,28 @@
 
   --text-primary: #e0e0e0;
   --text-secondary: #a0a0a0;
-  --text-muted: #757575;
+  --text-muted: #a0a0a0;
 
   --border-color: #424242;
 
   --accent-primary: #0d6efd;
   --accent-primary-hover: #3d8bfd;
+
+  --action-primary-foreground: #ffffff;
+  --action-primary-background: #0b5ed7;
+  --action-primary-hover-background: var(--accent-primary-hover);
+  --action-secondary-foreground: var(--text-primary);
+  --action-secondary-background: var(--surface-elevated);
+  --action-secondary-hover-background: var(--background-tertiary);
+  --action-neutral-foreground: var(--text-primary);
+  --action-neutral-background: var(--background-tertiary);
+  --action-neutral-hover-background: var(--navbar-slider-background);
+  --action-destructive-foreground: #ffffff;
+  --action-destructive-background: var(--button-danger-bg);
+  --action-destructive-hover-background: var(--button-danger-hover);
+  --action-focus-ring: #6ea8fe;
+  --surface-elevated: #1e1e1e;
+  --surface-elevation: var(--box-shadow);
 
   --button-danger-bg: #dc3545;
   /* Ensure consistent danger color in dark mode */
@@ -66,6 +99,7 @@
 
   --status-success: #198754;
   --status-danger: #dc3545;
+  --error-text: #ff6b7a;
   --status-warning: #ffc107;
   --status-info: #0dcaf0;
 
@@ -77,6 +111,16 @@
 }
 
 /* Global styles reset and base */
+html {
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
 body {
   margin: 0;
   font-family: var(--font-family-sans-serif);
@@ -100,9 +144,13 @@ code {
   padding: 1rem 2rem;
 }
 
+.admin-main {
+  min-width: 0;
+}
+
 /* Global error message styling */
 .error-message {
-  color: var(--status-danger);
+  color: var(--error-text);
   background-color: rgba(220, 53, 69, 0.1);
   border: 1px solid rgba(220, 53, 69, 0.2);
   padding: 0.75rem 1rem;
