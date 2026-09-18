@@ -1,9 +1,11 @@
 import { DraftFields, Profile } from './types';
+import styles from './Authoring.module.css';
+
 export default function MetadataFields({ value, profiles, onEdit, disabled = false, problemIdLocked = false }: {
   value: DraftFields; profiles: Profile[]; disabled?: boolean; problemIdLocked?: boolean;
   onEdit: <K extends keyof DraftFields>(key: K, value: DraftFields[K]) => void;
 }) {
-  return <fieldset disabled={disabled}>
+  return <fieldset className={styles.metadataFields} disabled={disabled}>
     <legend>Problem metadata</legend>
     <label>Problem ID<input required maxLength={50} disabled={problemIdLocked} value={value.problemId} onChange={e => onEdit('problemId', e.target.value)} /></label>
     {problemIdLocked && <p>Problem ID is locked after the first publication to keep the published revision linked to its grader problem.</p>}
