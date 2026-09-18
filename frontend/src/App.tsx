@@ -30,6 +30,13 @@ import ProblemManagement from './features/admin/problems/ProblemManagement';
 import ContestManagement from './features/admin/contests/ContestManagement';
 import Settings from './features/admin/settings/Settings';
 import ProblemAuthoring from './features/admin/authoring/ProblemAuthoring';
+import {
+  DraftMetadata,
+  DraftStatement,
+  DraftSolution,
+  DraftTestcases,
+  DraftVerify,
+} from './features/admin/authoring/DraftWorkspace';
 
 // New layout for standard pages
 const MainLayout = () => (
@@ -73,7 +80,15 @@ const Layout = () => {
           <Route path="users" element={<UserManagement />} />
           <Route path="problems" element={<ProblemManagement />} />
           <Route path="authoring" element={<ProblemAuthoring />} />
-          <Route path="authoring/:draftId" element={<ProblemAuthoring />} />
+          <Route path="authoring/profiles" element={<ProblemAuthoring />} />
+          <Route path="authoring/:draftId" element={<ProblemAuthoring />}>
+            <Route index element={<DraftMetadata />} />
+            <Route path="metadata" element={<DraftMetadata />} />
+            <Route path="statement" element={<DraftStatement />} />
+            <Route path="solution" element={<DraftSolution />} />
+            <Route path="testcases" element={<DraftTestcases />} />
+            <Route path="verify" element={<DraftVerify />} />
+          </Route>
           <Route path="authoring/:draftId/editor" element={<ProblemAuthoring editorMode />} />
           <Route path="contests" element={<ContestManagement />} />
           <Route path="settings" element={<Settings />} />

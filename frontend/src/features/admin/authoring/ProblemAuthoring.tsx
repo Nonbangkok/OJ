@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button, OverflowTable, StatusBadge } from '../../../components/ui';
 import { useAuth } from '../../../context/AuthContext';
 import api from '../../../services/api';
@@ -33,14 +33,10 @@ function DraftList() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [creating, setCreating] = useState(false);
-  const [showProfiles, setShowProfiles] = useState(false);
   const [form, setForm] = useState(initialFields);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  async function loadProfiles() {
-    setProfiles((await api.get<Profile[]>('/admin/author-profiles')).data);
-  }
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -73,22 +69,13 @@ function DraftList() {
       {error && <p role="alert">{error}</p>}
       <div className={`${styles.actions} ${styles.topActions}`}>
         <Button onClick={() => setCreating(true)}>New draft</Button>
-        <Button variant="secondary" onClick={() => setShowProfiles((p) => !p)}>
+        <Link className={styles.actionLink} to="/admin/authoring/profiles">
           Author profiles
-        </Button>
+        </Link>
         <Link className={styles.actionLink} to="/admin/problems">
           Problem Management
         </Link>
       </div>
-      {showProfiles && (
-        <AuthorProfiles
-          onChanged={() => {
-            void loadProfiles().catch((e) =>
-              setError(getErrorMessage(e, 'Could not load profiles'))
-            );
-          }}
-        />
-      )}
       {creating && (
         <form
           onSubmit={async (e) => {
@@ -166,19 +153,31 @@ function DraftList() {
   );
 }
 
+function ProfilesPage() {
+  return (
+    <section className={styles.authoring}>
+      <Link to="/admin/authoring" className={styles.backLink}>← All drafts</Link>
+      <h1>Author profiles</h1>
+      <p>
+        Reusable author identities shared across drafts. Profile edits do not change existing drafts
+        or published PDFs — use Refresh from profile in a draft to update its snapshot.
+      </p>
+      <AuthorProfiles />
+    </section>
+  );
+}
+
 export default function ProblemAuthoring({ editorMode = false }: { editorMode?: boolean }) {
   const { user, isLoading } = useAuth();
   const { draftId } = useParams();
+  const location = useLocation();
   if (isLoading) return <p role="status">Loading authoring…</p>;
   if (user?.role !== 'admin')
     return <p role="alert">Admin access required for Problem Authoring.</p>;
-  return draftId ? (
-    editorMode ? (
-      <StatementEditor key={draftId} id={draftId} />
-    ) : (
-      <DraftWorkspace key={draftId} id={draftId} />
-    )
-  ) : (
-    <DraftList />
-  );
+  if (editorMode) {
+    return draftId ? <StatementEditor key={draftId} id={draftId} /> : <DraftList />;
+  }
+  if (location.pathname === '/admin/authoring/profiles') return <ProfilesPage />;
+  if (draftId) return <DraftWorkspace key={draftId} id={draftId} />;
+  return <DraftList />;
 }

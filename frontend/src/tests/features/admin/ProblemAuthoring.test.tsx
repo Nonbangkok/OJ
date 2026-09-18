@@ -3,6 +3,13 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import api from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
 import ProblemAuthoring from '../../../features/admin/authoring/ProblemAuthoring';
+import {
+  DraftMetadata,
+  DraftStatement,
+  DraftSolution,
+  DraftTestcases,
+  DraftVerify,
+} from '../../../features/admin/authoring/DraftWorkspace';
 jest.mock('../../../services/api');
 jest.mock('../../../context/AuthContext', () => ({ useAuth: jest.fn() }));
 const draft = {
@@ -31,7 +38,15 @@ function show(path = '/admin/authoring') {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/admin/authoring" element={<ProblemAuthoring />} />
-        <Route path="/admin/authoring/:draftId" element={<ProblemAuthoring />} />
+        <Route path="/admin/authoring/profiles" element={<ProblemAuthoring />} />
+        <Route path="/admin/authoring/:draftId" element={<ProblemAuthoring />}>
+          <Route index element={<DraftMetadata />} />
+          <Route path="metadata" element={<DraftMetadata />} />
+          <Route path="statement" element={<DraftStatement />} />
+          <Route path="solution" element={<DraftSolution />} />
+          <Route path="testcases" element={<DraftTestcases />} />
+          <Route path="verify" element={<DraftVerify />} />
+        </Route>
         <Route path="/admin/authoring/:draftId/editor" element={<ProblemAuthoring editorMode />} />
       </Routes>
     </MemoryRouter>
@@ -66,7 +81,10 @@ test('lists resumable drafts and creates a draft with explicit author metadata',
   );
   expect(screen.getByRole('region', { name: 'Saved drafts' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'New draft' })).toBeEnabled();
-  expect(screen.getByRole('button', { name: 'Author profiles' })).toHaveAttribute('type', 'button');
+  expect(screen.getByRole('link', { name: 'Author profiles' })).toHaveAttribute(
+    'href',
+    '/admin/authoring/profiles'
+  );
   expect(screen.getByRole('link', { name: 'Problem Management' })).toHaveAttribute(
     'href',
     '/admin/problems'
@@ -92,15 +110,15 @@ test('lists resumable drafts and creates a draft with explicit author metadata',
       })
     )
   );
-  expect(await screen.findByRole('tab', { name: 'Statement' })).toBeInTheDocument();
+  expect(await screen.findByRole('link', { name: 'Statement' })).toBeInTheDocument();
 });
 test('tabs preserve edits and disable job actions until explicit Save succeeds', async () => {
   show('/admin/authoring/d1');
   fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Edited title' } });
   expect(screen.getByText(/saving/i)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('tab', { name: 'Statement' }));
+  fireEvent.click(screen.getByRole('link', { name: 'Statement' }));
   expect(screen.getByRole('button', { name: 'Build PDF' })).toBeDisabled();
-  fireEvent.click(screen.getByRole('tab', { name: 'Solution' }));
+  fireEvent.click(screen.getByRole('link', { name: 'Solution' }));
   expect(screen.getByRole('button', { name: 'Compile solution' })).toBeDisabled();
   jest
     .mocked(api.patch)
@@ -126,7 +144,7 @@ test('a revision of a published task keeps its legacy Problem ID locked but leav
 });
 test('Statement tab opens the dedicated editor instead of embedding a narrow source textarea', async () => {
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('tab', { name: 'Statement' }));
+  fireEvent.click(await screen.findByRole('link', { name: 'Statement' }));
   expect(screen.getByRole('link', { name: 'Open full-screen editor' })).toHaveAttribute(
     'href',
     '/admin/authoring/d1/editor'
@@ -136,7 +154,7 @@ test('Statement tab opens the dedicated editor instead of embedding a narrow sou
 test('opening the dedicated editor keeps unsaved workspace fields recoverable via session storage', async () => {
   show('/admin/authoring/d1');
   fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Unsaved title' } });
-  fireEvent.click(screen.getByRole('tab', { name: 'Statement' }));
+  fireEvent.click(screen.getByRole('link', { name: 'Statement' }));
 
   // Auto-save captures unsaved edits; opening the editor no longer needs a blocking confirm.
   expect(window.sessionStorage.getItem('oj-authoring-draft:d1')).toContain('Unsaved title');
@@ -323,7 +341,7 @@ test('Publish requires explicit confirmation and explains hidden visibility', as
     data: url.endsWith('/d1') ? { ...draft, hasLatestPdf: true, latestPdfRevision: 3 } : [],
   }));
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('tab', { name: 'Verify & Publish' }));
+  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
   fireEvent.click(screen.getByRole('button', { name: 'Publish problem' }));
   expect(api.post).not.toHaveBeenCalled();
   expect(screen.getByText(/created as hidden/i)).toBeInTheDocument();

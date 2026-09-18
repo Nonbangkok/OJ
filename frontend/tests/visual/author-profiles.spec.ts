@@ -10,7 +10,8 @@ test('author profiles stay readable across viewports and themes', async ({ page 
   await mockAdminApi(page);
   await page.goto('/admin/authoring');
   await expect(page.getByRole('heading', { name: 'Problem Authoring' })).toBeVisible();
-  await page.getByRole('button', { name: 'Author profiles', exact: true }).click();
+  await page.getByRole('link', { name: 'Author profiles', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Author profiles', level: 1 })).toBeVisible();
   await expect(
     page.getByRole('button', { name: /Edit International Algorithmic Marathon Author/ })
   ).toBeVisible();
