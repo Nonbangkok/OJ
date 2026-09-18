@@ -8,6 +8,7 @@ import {
   DraftStatement,
   DraftSolution,
   DraftTestcases,
+  DraftGenerator,
   DraftVerify,
 } from '../../../features/admin/authoring/DraftWorkspace';
 jest.mock('../../../services/api');
@@ -45,6 +46,7 @@ function show(path = '/admin/authoring') {
           <Route path="statement" element={<DraftStatement />} />
           <Route path="solution" element={<DraftSolution />} />
           <Route path="testcases" element={<DraftTestcases />} />
+          <Route path="generator" element={<DraftGenerator />} />
           <Route path="verify" element={<DraftVerify />} />
         </Route>
         <Route path="/admin/authoring/:draftId/editor" element={<ProblemAuthoring editorMode />} />

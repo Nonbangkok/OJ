@@ -264,7 +264,6 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
                 <th scope="col">Input filename</th>
                 <th scope="col">Input</th>
                 <th scope="col">Output</th>
-                <th scope="col">Source</th>
                 <th scope="col">Actions</th>
               </tr>
             </thead>
@@ -278,9 +277,6 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
                     {testcase.hasOutput
                       ? `${(testcase.outputBytes ?? 0).toLocaleString()} bytes`
                       : 'Missing output'}
-                  </td>
-                  <td>
-                    {testcase.source} · revision {testcase.sourceRevision}
                   </td>
                   <td>
                     <div className={styles.actions}>
@@ -322,9 +318,7 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
         </div>
       )}
 
-      <p className={styles.hint}>
-        Previews show up to 32 KiB per file. Opening a preview downloads the complete testcase.
-      </p>
+      <p className={styles.hint}>Previews show up to 32 KiB per file.</p>
       {preview && (
         <Dialog
           open
@@ -412,19 +406,18 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
         </form>
       )}
 
-      <div className={styles.forms}>
+      <div className={styles.uploadBar}>
         <form
           key={`append-${formVersion}`}
-          className={styles.panel}
+          className={styles.uploadForm}
           onSubmit={(event) => {
             event.preventDefault();
             if (input) void mutate(() => api.post(base, multipart({ input, output })));
           }}
         >
           <fieldset disabled={locked}>
-            <legend>Append a testcase</legend>
             <label>
-              New testcase input
+              Input file
               <input
                 type="file"
                 required
@@ -432,7 +425,7 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
               />
             </label>
             <label>
-              New testcase output (optional)
+              Output file (optional)
               <input type="file" onChange={(event) => setOutput(event.target.files?.[0] ?? null)} />
             </label>
             <button type="submit" disabled={!input}>
@@ -442,19 +435,15 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
         </form>
         <form
           key={`zip-${formVersion}`}
-          className={styles.panel}
+          className={styles.uploadForm}
           onSubmit={(event) => {
             event.preventDefault();
             if (!locked && archive) setConfirmation({ kind: 'zip', revision });
           }}
         >
           <fieldset disabled={locked}>
-            <legend>Replace all testcases from ZIP</legend>
-            <p>
-              This removes every existing testcase and replaces the set with the archive contents.
-            </p>
             <label>
-              Testcase ZIP archive
+              ZIP archive (replaces all)
               <input
                 type="file"
                 accept=".zip,application/zip"

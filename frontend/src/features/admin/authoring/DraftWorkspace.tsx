@@ -13,7 +13,7 @@ import CodeEditor from './CodeEditor';
 import styles from './Authoring.module.css';
 
 const saveStateText: Record<string, string> = {
-  saved: 'Saved automatically',
+  saved: 'Saved',
   dirty: 'Saving…',
   saving: 'Saving…',
   error: 'Save failed — will retry after you edit again',
@@ -26,6 +26,7 @@ const sections = [
   { path: 'statement', label: 'Statement' },
   { path: 'solution', label: 'Solution' },
   { path: 'testcases', label: 'Testcases' },
+  { path: 'generator', label: 'Generator' },
   { path: 'verify', label: 'Verify & Publish' },
   { path: 'jobs', label: 'History & Logs' },
 ] as const;
@@ -138,6 +139,7 @@ export const DraftMetadata = MetadataSection;
 export const DraftStatement = StatementSection;
 export const DraftSolution = SolutionSection;
 export const DraftTestcases = TestcasesSection;
+export const DraftGenerator = GeneratorSection;
 export const DraftVerify = VerifySection;
 export const DraftJobs = JobsSection;
 
@@ -190,33 +192,34 @@ function SolutionSection() {
 }
 
 function TestcasesSection() {
+  const { model, draft, form, setConfirm } = useOutletContext<WorkspaceContext>();
+  return <section className={styles.authoring}>
+    <h2>Testcases</h2>
+    <div className={styles.columnHead}>
+      <h3>Files</h3>
+      <Button disabled={model.actionsDisabled || !form.solutionCpp.trim()} onClick={() => setConfirm({ action: 'outputs', revision: draft.revision })}>Generate outputs</Button>
+    </div>
+    <TestcaseFiles draftId={draft.id} revision={draft.revision} artifactVersion={draft.updatedAt} disabled={model.actionsDisabled} onMutated={model.refresh} onError={model.onError} onBusyChange={model.setOperationBusy} />
+  </section>;
+}
+
+function GeneratorSection() {
   const { model, draft, form, editorDisabled, setConfirm } = useOutletContext<WorkspaceContext>();
   const [seed, setSeed] = useState('12345');
   return <section className={styles.authoring}>
-    <h2>Testcases</h2>
-    <div className={styles.twoColumns}>
-      <div className={styles.column}>
-        <div className={styles.columnHead}>
-          <h3>Files</h3>
-          <Button disabled={model.actionsDisabled || !form.solutionCpp.trim()} onClick={() => setConfirm({ action: 'outputs', revision: draft.revision })}>Generate outputs</Button>
-        </div>
-        <TestcaseFiles draftId={draft.id} revision={draft.revision} artifactVersion={draft.updatedAt} disabled={model.actionsDisabled} onMutated={model.refresh} onError={model.onError} onBusyChange={model.setOperationBusy} />
-      </div>
-      <div className={styles.column}>
-        <div className={styles.columnHead}>
-          <h3>Generator <span className={styles.optionalTag}>optional</span></h3>
-          <div className={styles.actions}>
-            <Button variant="secondary" size="compact" disabled={model.actionsDisabled || !form.generatorCpp?.trim()} onClick={() => void model.runJob('compile', { target: 'generator' })}>Compile</Button>
-            <Button size="compact" disabled={model.actionsDisabled || !form.generatorCpp?.trim() || !/^(0|[1-9][0-9]{0,19})$/.test(seed)
-              || (seed.length === 20 && seed > '18446744073709551615')} onClick={() => setConfirm({ action: 'generate', revision: draft.revision })}>Generate inputs</Button>
-          </div>
-        </div>
-        <CodeEditor label="generator.cpp" value={form.generatorCpp || ''} disabled={editorDisabled}
-          onChange={value => model.edit('generatorCpp', value || null)} />
-        <label className={styles.seedRow}>Generator seed<input value={seed} disabled={model.actionsDisabled} inputMode="numeric" onChange={e => setSeed(e.target.value)} /></label>
-        <p className={styles.caution}>Legacy multi-file generators may ignore the seed and write to ./input/ instead of reading OJ_SEED or argv[1].</p>
+    <h2>Generator <span className={styles.optionalTag}>optional</span></h2>
+    <div className={styles.columnHead}>
+      <h3>generator.cpp</h3>
+      <div className={styles.actions}>
+        <Button variant="secondary" size="compact" disabled={model.actionsDisabled || !form.generatorCpp?.trim()} onClick={() => void model.runJob('compile', { target: 'generator' })}>Compile</Button>
+        <Button size="compact" disabled={model.actionsDisabled || !form.generatorCpp?.trim() || !/^(0|[1-9][0-9]{0,19})$/.test(seed)
+          || (seed.length === 20 && seed > '18446744073709551615')} onClick={() => setConfirm({ action: 'generate', revision: draft.revision })}>Generate inputs</Button>
       </div>
     </div>
+    <CodeEditor label="generator.cpp" value={form.generatorCpp || ''} disabled={editorDisabled}
+      onChange={value => model.edit('generatorCpp', value || null)} minLines={18} />
+    <label className={styles.seedRow}>Generator seed<input value={seed} disabled={model.actionsDisabled} inputMode="numeric" onChange={e => setSeed(e.target.value)} /></label>
+    <p className={styles.caution}>Legacy multi-file generators may ignore the seed and write to ./input/ instead of reading OJ_SEED or argv[1].</p>
   </section>;
 }
 

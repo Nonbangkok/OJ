@@ -27,7 +27,5 @@ export default function MetadataFields({ value, profiles, onEdit, disabled = fal
     <label>Country code<input required pattern="[A-Z]{3}" maxLength={3} value={value.countryCode} onChange={e => onEdit('countryCode', e.target.value.toUpperCase())} /></label>
     <label>Time limit (ms)<input required type="number" min={1} max={900000} value={value.timeLimitMs || ''} onChange={e => onEdit('timeLimitMs', Number(e.target.value))} /></label>
     <label>Memory limit (MiB)<input required type="number" min={1} max={736} value={value.memoryLimitMb || ''} onChange={e => onEdit('memoryLimitMb', Number(e.target.value))} /></label>
-    <p>Template: {value.templateVersion}. Runner supports up to 900000 ms / 736 MiB.</p>
-    <p>Author information and avatar are saved as a snapshot. Profile edits do not silently update this draft.</p>
   </fieldset>;
 }

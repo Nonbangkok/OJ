@@ -35,6 +35,7 @@ import {
   DraftStatement,
   DraftSolution,
   DraftTestcases,
+  DraftGenerator,
   DraftVerify,
   DraftJobs,
 } from './features/admin/authoring/DraftWorkspace';
@@ -88,6 +89,7 @@ const Layout = () => {
             <Route path="statement" element={<DraftStatement />} />
             <Route path="solution" element={<DraftSolution />} />
             <Route path="testcases" element={<DraftTestcases />} />
+            <Route path="generator" element={<DraftGenerator />} />
             <Route path="verify" element={<DraftVerify />} />
             <Route path="jobs" element={<DraftJobs />} />
           </Route>
