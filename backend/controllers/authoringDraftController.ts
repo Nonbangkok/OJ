@@ -21,6 +21,7 @@ import {
   listProblemDrafts,
   ProblemDraftListRow,
   ProblemDraftUpdates,
+  startProblemDraftRevision,
   updateProblemDraft,
 } from '../services/authoringDraftQueryService';
 import {
@@ -290,6 +291,26 @@ router.post('/admin/authoring/drafts/:id/refresh-author-profile',
         message: 'Problem draft revision conflict',
         code: 'revision_conflict',
         currentRevision: result.draft.revision,
+        draft: toDraftDetailResponse(result.draft),
+      });
+      return;
+    }
+    res.json(toDraftDetailResponse(result.draft));
+  }));
+
+router.post('/admin/authoring/drafts/:id/new-revision',
+  validateRequest({ params: problemDraftIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const result = await startProblemDraftRevision(String(req.params.id));
+
+    if (result.kind === 'not_found') {
+      res.status(404).json({ message: 'Problem draft not found' });
+      return;
+    }
+    if (result.kind === 'not_published') {
+      res.status(409).json({
+        message: 'Only published drafts can start a new revision',
+        code: 'draft_not_published',
         draft: toDraftDetailResponse(result.draft),
       });
       return;

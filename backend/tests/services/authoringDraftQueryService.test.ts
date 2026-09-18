@@ -4,6 +4,7 @@ import {
   createProblemDraft,
   getProblemDraft,
   listProblemDrafts,
+  startProblemDraftRevision,
   updateProblemDraft,
 } from '../../services/authoringDraftQueryService';
 import { ProblemDraftRow } from '../../types/authoring';
@@ -142,6 +143,74 @@ describe('updateProblemDraft', () => {
       1,
       { title: 'My change' },
     );
+
+    expect(result).toEqual({ kind: 'not_found' });
+  });
+});
+
+describe('startProblemDraftRevision', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns an editable draft while keeping the publication linkage', async () => {
+    const publishedAt = new Date('2026-09-13T01:00:00.000Z');
+    const updated = draftRow({
+      status: 'draft',
+      revision: 4,
+      verified_revision: null,
+      published_at: publishedAt,
+    });
+    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [updated] });
+
+    const result = await startProblemDraftRevision(updated.id);
+
+    expect(result).toEqual({ kind: 'updated', draft: updated });
+    expect(db.query).toHaveBeenCalledWith(
+      expect.stringContaining("WHERE id = $1 AND status = 'published'"),
+      [updated.id],
+    );
+    expect(db.query).toHaveBeenCalledWith(
+      expect.stringContaining("status = 'draft',"),
+      [updated.id],
+    );
+    expect(db.query).toHaveBeenCalledWith(
+      expect.stringContaining('revision = revision + 1'),
+      [updated.id],
+    );
+    expect(db.query).toHaveBeenCalledWith(
+      expect.stringContaining('verified_revision = NULL'),
+      [updated.id],
+    );
+  });
+
+  it('does not clear published_at so the Problem ID stays locked', async () => {
+    const updated = draftRow({ status: 'draft', published_at: new Date('2026-09-13T01:00:00.000Z') });
+    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [updated] });
+
+    await startProblemDraftRevision(updated.id);
+
+    const sql = (db.query as jest.Mock).mock.calls[0][0] as string;
+    expect(sql).not.toContain('published_at =');
+  });
+
+  it('refuses to start a revision for a draft that is not published', async () => {
+    const current = draftRow({ status: 'draft' });
+    (db.query as jest.Mock)
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [current] });
+
+    const result = await startProblemDraftRevision(current.id);
+
+    expect(result).toEqual({ kind: 'not_published', draft: current });
+  });
+
+  it('returns not_found when the draft does not exist', async () => {
+    (db.query as jest.Mock)
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await startProblemDraftRevision('22222222-2222-4222-8222-222222222222');
 
     expect(result).toEqual({ kind: 'not_found' });
   });

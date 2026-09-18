@@ -72,6 +72,11 @@ export type UpdateProblemDraftResult =
   | { kind: 'published_problem_id_locked'; draft: ProblemDraftRow }
   | { kind: 'not_found' };
 
+export type StartProblemDraftRevisionResult =
+  | { kind: 'updated'; draft: ProblemDraftRow }
+  | { kind: 'not_published'; draft: ProblemDraftRow }
+  | { kind: 'not_found' };
+
 const EDITABLE_FIELDS: readonly (keyof EditableProblemDraftFields)[] = [
   'problem_id',
   'title',
@@ -219,4 +224,41 @@ export const updateProblemDraft = async (
     return { kind: 'published_problem_id_locked', draft: currentDraft };
   }
   return { kind: 'revision_conflict', draft: currentDraft };
+};
+
+/**
+ * Transition a published draft back into the editable state so a new
+ * authoring cycle can begin. `published_at` stays set so the legacy Problem
+ * ID remains locked to the live grader problem, while the revision counter
+ * advances and the verified revision is cleared (the stored PDF and
+ * verification now describe an older revision).
+ */
+export const startProblemDraftRevision = async (
+  draftId: string,
+  database: AuthoringDraftDatabase = db,
+): Promise<StartProblemDraftRevisionResult> => {
+  const updateResult = await database.query<ProblemDraftRow>(`
+    UPDATE problem_drafts
+    SET status = 'draft',
+        revision = revision + 1,
+        verified_revision = NULL,
+        updated_at = NOW()
+    WHERE id = $1 AND status = 'published'
+    RETURNING *
+  `, [draftId]);
+
+  const updatedDraft = updateResult.rows[0];
+  if (updatedDraft) {
+    return { kind: 'updated', draft: updatedDraft };
+  }
+
+  const currentResult = await database.query<ProblemDraftRow>(
+    'SELECT * FROM problem_drafts WHERE id = $1',
+    [draftId],
+  );
+  const currentDraft = currentResult.rows[0];
+  if (!currentDraft) {
+    return { kind: 'not_found' };
+  }
+  return { kind: 'not_published', draft: currentDraft };
 };

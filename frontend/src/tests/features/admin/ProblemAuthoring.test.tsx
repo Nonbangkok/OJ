@@ -33,6 +33,7 @@ const draft = {
   hasLatestPdf: false,
   latestPdfRevision: null,
   status: 'ready',
+  publishedAt: null,
 };
 function show(path = '/admin/authoring') {
   return render(
@@ -351,4 +352,82 @@ test('Publish requires explicit confirmation and explains hidden visibility', as
   jest.mocked(api.post).mockResolvedValue({ data: { status: 'published' } });
   fireEvent.click(screen.getByRole('button', { name: 'Confirm publish' }));
   expect(await screen.findByText(/published — read-only/i)).toBeInTheDocument();
+});
+
+test('a changed linked profile syncs into the draft exactly once without disabling the form', async () => {
+  const profile = { id: 'p1', akaName: 'New Aka', realName: 'New Real', defaultLanguage: 'English', countryCode: 'USA' };
+  const linkedDraft = { ...draft, authorProfileId: 'p1', authorAkaName: 'Old Aka', authorRealName: 'Old Real', language: 'Thai', countryCode: 'THA' };
+  // The server reflects the refresh after the POST: the next GET returns the synced snapshot.
+  let serverDraft = linkedDraft;
+  jest.mocked(api.get).mockImplementation(async (url) => ({
+    data: url.endsWith('/drafts')
+      ? [serverDraft]
+      : url.endsWith('/jobs') || url.endsWith('/assets')
+        ? []
+        : url.endsWith('/author-profiles')
+          ? [profile]
+          : url.endsWith('/testcases')
+            ? { revision: serverDraft.revision, testcases: [] }
+            : serverDraft,
+  }));
+  jest.mocked(api.post).mockImplementation(async (url) => {
+    if (String(url).includes('refresh-author-profile')) {
+      serverDraft = { ...serverDraft, authorAkaName: profile.akaName, authorRealName: profile.realName,
+        language: profile.defaultLanguage, countryCode: profile.countryCode, revision: serverDraft.revision + 1 };
+    }
+    return { data: serverDraft };
+  });
+  show('/admin/authoring/d1');
+  expect(await screen.findByLabelText('Problem ID')).toBeEnabled();
+  await waitFor(() => expect(api.post).toHaveBeenCalledWith(
+    '/admin/authoring/drafts/d1/refresh-author-profile',
+    { expectedRevision: 3 }
+  ));
+  // The synced snapshot arrives and the form stays enabled, not stuck busy.
+  await waitFor(() => expect(screen.getByLabelText('AKA name')).toHaveValue('New Aka'));
+  expect(screen.getByLabelText('Problem ID')).toBeEnabled();
+  // The refresh must not repeat endlessly while the page stays open.
+  await new Promise(r => setTimeout(r, 300));
+  const refreshCalls = () => jest.mocked(api.post).mock.calls.filter(c => String(c[0]).includes('refresh-author-profile')).length;
+  expect(refreshCalls()).toBe(1);
+});
+
+test('a profile edit made elsewhere syncs when the draft tab regains focus, exactly once', async () => {
+  const profile = { id: 'p1', akaName: 'Old Aka', realName: 'Old Real', defaultLanguage: 'Thai', countryCode: 'THA' };
+  const linkedDraft = { ...draft, authorProfileId: 'p1' };
+  let currentProfile = profile;
+  let serverDraft = linkedDraft;
+  jest.mocked(api.get).mockImplementation(async (url) => ({
+    data: url.endsWith('/jobs') || url.endsWith('/assets') || url.endsWith('/testcases')
+      ? []
+      : url.endsWith('/author-profiles')
+        ? [currentProfile]
+        : serverDraft,
+  }));
+  jest.mocked(api.post).mockImplementation(async (url) => {
+    if (String(url).includes('refresh-author-profile')) {
+      serverDraft = { ...serverDraft, authorAkaName: currentProfile.akaName, authorRealName: currentProfile.realName,
+        language: currentProfile.defaultLanguage, countryCode: currentProfile.countryCode, revision: serverDraft.revision + 1 };
+    }
+    return { data: serverDraft };
+  });
+  show('/admin/authoring/d1');
+  await screen.findByLabelText('Problem ID');
+  const refreshCalls = () => jest.mocked(api.post).mock.calls.filter(c => String(c[0]).includes('refresh-author-profile')).length;
+  expect(refreshCalls()).toBe(0); // snapshot matches the profile — nothing to sync
+
+  // The profile is edited on the profiles page; coming back refetches and syncs once.
+  currentProfile = { ...profile, realName: 'Edited Real Name' };
+  fireEvent(window, new Event('focus'));
+  await waitFor(() => expect(refreshCalls()).toBe(1));
+  await waitFor(() => expect(screen.getByLabelText('Real name')).toHaveValue('Edited Real Name'));
+  await new Promise(r => setTimeout(r, 300));
+  expect(refreshCalls()).toBe(1); // no loop afterwards
+});
+
+test('a draft without a linked profile keeps its metadata inputs enabled', async () => {
+  show('/admin/authoring/d1');
+  for (const label of ['Problem ID', 'Title', 'AKA name', 'Real name', 'Language', 'Country code']) {
+    expect(await screen.findByLabelText(label)).toBeEnabled();
+  }
 });

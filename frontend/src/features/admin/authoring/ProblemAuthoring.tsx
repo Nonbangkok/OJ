@@ -122,6 +122,7 @@ function DraftList() {
                 <th>Author</th>
                 <th>Status</th>
                 <th>Revision</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -141,6 +142,29 @@ function DraftList() {
                       </StatusBadge>
                     </td>
                     <td>{d.revision}</td>
+                    <td>
+                      {d.status === 'published' && (
+                        <Button
+                          size="compact"
+                          variant="secondary"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            setError('');
+                            try {
+                              await api.post(`/admin/authoring/drafts/${d.id}/new-revision`, {});
+                              navigate(`/admin/authoring/${d.id}`);
+                            } catch (err) {
+                              setError(getErrorMessage(err, 'Could not start a new revision'));
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Start new revision
+                        </Button>
+                      )}
+                    </td>
                   </tr>
                 );
               })}

@@ -278,6 +278,79 @@ describe('Problem Authoring draft controller', () => {
     );
   });
 
+  it('keeps the Problem ID locked in PATCH after a published draft starts a new revision', async () => {
+    const publishedAt = new Date('2026-09-13T01:00:00.000Z').toISOString();
+    const reopened = draftRow({
+      status: 'draft',
+      revision: 4,
+      published_at: new Date('2026-09-13T01:00:00.000Z'),
+    });
+    (authoringDraftService.updateProblemDraft as jest.Mock).mockResolvedValueOnce({
+      kind: 'published_problem_id_locked',
+      draft: reopened,
+    });
+
+    const response = await request(createTestApp('admin'))
+      .patch(`/admin/authoring/drafts/${reopened.id}`)
+      .send({ expectedRevision: 4, problemId: 'new-problem-id' });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual(expect.objectContaining({
+      code: 'published_problem_id_locked',
+      draft: expect.objectContaining({ problemId: 'redgate', publishedAt: publishedAt }),
+    }));
+  });
+
+  it('starts a new revision on a published draft', async () => {
+    const publishedAt = new Date('2026-09-13T01:00:00.000Z').toISOString();
+    const reopened = draftRow({
+      status: 'draft',
+      revision: 4,
+      verified_revision: null,
+      published_at: new Date('2026-09-13T01:00:00.000Z'),
+    });
+    (authoringDraftService.startProblemDraftRevision as jest.Mock)
+      .mockResolvedValueOnce({ kind: 'updated', draft: reopened });
+
+    const response = await request(createTestApp('admin'))
+      .post(`/admin/authoring/drafts/${reopened.id}/new-revision`);
+
+    expect(response.status).toBe(200);
+    expect(authoringDraftService.startProblemDraftRevision).toHaveBeenCalledWith(reopened.id);
+    expect(response.body).toEqual(expect.objectContaining({
+      status: 'draft',
+      revision: 4,
+      verifiedRevision: null,
+      publishedAt: publishedAt,
+    }));
+  });
+
+  it('rejects a new revision for a draft that is not published', async () => {
+    const current = draftRow({ status: 'draft' });
+    (authoringDraftService.startProblemDraftRevision as jest.Mock)
+      .mockResolvedValueOnce({ kind: 'not_published', draft: current });
+
+    const response = await request(createTestApp('admin'))
+      .post(`/admin/authoring/drafts/${current.id}/new-revision`);
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual(expect.objectContaining({
+      code: 'draft_not_published',
+      message: 'Only published drafts can start a new revision',
+    }));
+  });
+
+  it('returns 404 when starting a revision for a missing draft', async () => {
+    (authoringDraftService.startProblemDraftRevision as jest.Mock)
+      .mockResolvedValueOnce({ kind: 'not_found' });
+
+    const response = await request(createTestApp('admin'))
+      .post('/admin/authoring/drafts/22222222-2222-4222-8222-222222222222/new-revision');
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ message: 'Problem draft not found' });
+  });
+
   it('refreshes the linked author profile using expectedRevision', async () => {
     const refreshed = draftRow({ revision: 2, author_aka_name: 'Refreshed AKA' });
     (authorSnapshotService.refreshProblemDraftAuthor as jest.Mock).mockResolvedValueOnce({

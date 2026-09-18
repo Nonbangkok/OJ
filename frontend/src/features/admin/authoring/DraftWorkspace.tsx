@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate, useOutletContext } from 'react-router-dom';
 import { Button, Dialog, StatusBadge } from '../../../components/ui';
 import api from '../../../services/api';
@@ -146,23 +146,56 @@ export const DraftJobs = JobsSection;
 function MetadataSection() {
   const { model, draft, form, editorDisabled } = useOutletContext<WorkspaceContext>();
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const { onError } = model;
-  useEffect(() => { let cancelled = false;
-    api.get<Profile[]>('/admin/author-profiles').then(r => { if (!cancelled) setProfiles(r.data); }).catch(onError);
-    return () => { cancelled = true; };
+  const { onError, mutate } = model;
+  // Profiles are refetched when the tab regains focus — the same trigger the
+  // draft hook uses — so profile edits made elsewhere (the profiles page,
+  // another tab) reach an already-open draft page and re-run the comparison.
+  // A sequence guard keeps a slow earlier response from clobbering a newer one.
+  const profileSeq = useRef(0);
+  const loadProfiles = useCallback(() => {
+    const seq = ++profileSeq.current;
+    api.get<Profile[]>('/admin/author-profiles').then(r => { if (seq === profileSeq.current) setProfiles(r.data); }).catch(onError);
   }, [onError]);
+  useEffect(() => { loadProfiles(); }, [loadProfiles]);
+  useEffect(() => {
+    const sync = () => { if (document.visibilityState === 'visible') loadProfiles(); };
+    window.addEventListener('focus', sync);
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      window.removeEventListener('focus', sync);
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }, [loadProfiles]);
   // The author snapshot refreshes automatically when its linked profile changes,
   // so profile edits on the profiles page propagate without a manual button.
+  // Keyed on the compared values (not the whole model, whose identity changes
+  // every render) and deduped with a ref, so one real profile change produces
+  // exactly one POST — never a loop that pins busy=true and disables the form.
+  const linked = draft.authorProfileId ? profiles.find(p => p.id === draft.authorProfileId) : undefined;
+  const syncKey = linked
+    ? [draft.id, linked.akaName, linked.realName, linked.defaultLanguage, linked.countryCode,
+      draft.authorAkaName, draft.authorRealName, draft.language, draft.countryCode].join(' ')
+    : '';
+  const modelRef = useRef(model); modelRef.current = model;
+  const syncAttemptedKey = useRef('');
   useEffect(() => {
-    if (model.actionsDisabled || !draft.authorProfileId || draft.publishedAt !== null) return;
-    const linked = profiles.find(p => p.id === draft.authorProfileId);
-    if (!linked) return;
-    const snapshot = { akaName: linked.akaName, realName: linked.realName, language: linked.defaultLanguage, countryCode: linked.countryCode };
-    const current = { akaName: draft.authorAkaName, realName: draft.authorRealName, language: draft.language, countryCode: draft.countryCode };
-    if (JSON.stringify(snapshot) === JSON.stringify(current)) return;
-    void model.mutate(() => api.post(`/admin/authoring/drafts/${draft.id}/refresh-author-profile`,
+    // Never sync a published draft; unsaved edits / conflicts / jobs leave the
+    // sync for after autosave resolves rather than fighting it. A skip does
+    // NOT mark the key as attempted, so it retries once the blocker clears.
+    if (!linked || draft.status === 'published' || modelRef.current.actionsDisabled) return;
+    if (JSON.stringify([linked.akaName, linked.realName, linked.defaultLanguage, linked.countryCode])
+      === JSON.stringify([draft.authorAkaName, draft.authorRealName, draft.language, draft.countryCode])) return;
+    if (syncAttemptedKey.current === syncKey) return; // already tried this exact mismatch
+    syncAttemptedKey.current = syncKey;
+    // One attempt per mismatch: a failed POST surfaces via model.error and is
+    // not auto-retried, so a persistently failing sync can never loop.
+    void modelRef.current.mutate(() => api.post(`/admin/authoring/drafts/${draft.id}/refresh-author-profile`,
       { expectedRevision: draft.revision }));
-  }, [draft, profiles, model]);
+    // syncKey covers draft.id plus every compared value, so this re-runs when a
+    // real profile edit (or a successful refresh) changes them — once each time;
+    // actionsDisabled (a plain boolean) re-runs a sync skipped mid-autosave.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncKey, draft.status, model.actionsDisabled]);
   return <section className={styles.authoring}>
     <h2>Metadata</h2>
     <MetadataFields value={form} profiles={profiles} disabled={editorDisabled}
