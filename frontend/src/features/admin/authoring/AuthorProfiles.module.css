@@ -42,9 +42,26 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+/* Every text line truncates with an ellipsis on one line so rows stay
+   evenly sized no matter how long the names or attributions are. */
+.identity > strong,
 .identity > span {
   display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.identity > strong {
+  line-height: 1.3;
+}
+.identity > span {
   margin-top: 0.2rem;
+  line-height: 1.4;
+}
+.identity > strong:hover,
+.identity > span:hover {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .avatar {
   display: inline-flex;

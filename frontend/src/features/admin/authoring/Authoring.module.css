@@ -130,6 +130,18 @@
   padding: 0.7rem;
   overflow-wrap: anywhere;
 }
+/* Long draft titles and IDs clamp to one line so table rows stay even. */
+.authoring td a {
+  display: inline-block;
+  max-width: 34ch;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+.authoring td a:hover {
+  white-space: normal;
+}
 .authoring caption {
   text-align: left;
   font-weight: 600;
