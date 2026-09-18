@@ -115,12 +115,12 @@
 
 /* Dark text for better contrast on orange bar */
 .score-bar.partial span {
-  color: #fff;
+  color: var(--action-button-foreground);
 }
 
 /* White text for green bar */
 .score-bar.full span {
-  color: #fff;
+  color: var(--action-button-foreground);
 }
 
 .score-text {
@@ -140,7 +140,7 @@
   text-align: center;
   transition: background-color 0.2s ease;
   flex-shrink: 0;
-  color: #fff;
+  color: var(--action-button-foreground);
 }
 
 .problem-action-btn.new,

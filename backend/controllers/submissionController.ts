@@ -46,16 +46,7 @@ router.post(
     }
 
     const submissionPayload = req.body as SubmitRequestBody;
-    let queueResult: { submissionId: number; isContestSubmission: boolean };
-    try {
-      queueResult = await validateAndQueueSubmission(submissionPayload, userId);
-    } catch (error: unknown) {
-      if (error instanceof AppError) {
-        res.status(error.statusCode).json({ message: error.message });
-        return;
-      }
-      throw error;
-    }
+    const queueResult = await validateAndQueueSubmission(submissionPayload, userId);
 
     res.status(202).json({
       message: queueResult.isContestSubmission

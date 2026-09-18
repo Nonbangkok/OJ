@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import hljs from 'highlight.js/lib/core';
 import { UI_TIMEOUTS } from '../config/constants';
+import { getStatusClass } from '../utils/formatters';
 import type { SubmissionDetail, TestCaseResult } from '../types';
 
 type ParsedResults = TestCaseResult[] | 'error' | null;
@@ -112,15 +113,6 @@ const useSubmissionModal = (submission: SubmissionModalInput) => {
     }
   };
 
-  const getStatusClass = (status: string | null | undefined): string => {
-    if (!status) return '';
-    return `status-${status.split(' ')[0].toLowerCase()}`;
-  };
-
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleString();
-  };
-
   const parseResults = (): ParsedResults => {
     if (!submission?.results) return null;
     let results: unknown;
@@ -153,5 +145,7 @@ const useSubmissionModal = (submission: SubmissionModalInput) => {
     parsedResults,
   };
 };
+
+const formatDate = (dateString: string): string => new Date(dateString).toLocaleString();
 
 export default useSubmissionModal;

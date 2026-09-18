@@ -8,7 +8,6 @@ import { ContestSubmissionRow, SubmissionRow } from '../types/models';
 import { CompileCommandError } from '../types/service';
 import { JUDGE_CONFIG, SUBMISSION_STATUS } from '../constants';
 import { findForbiddenInclude } from '../utils/compileGuard';
-export { findForbiddenInclude } from '../utils/compileGuard';
 
 const execPromise = promisify(exec);
 

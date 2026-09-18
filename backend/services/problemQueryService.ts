@@ -106,6 +106,17 @@ export const getProblemPdf = async (problemId: string): Promise<Buffer | null> =
   return result.rows[0]?.problem_pdf ?? null;
 };
 
+/** Single query for the PDF route: the PDF bytes plus the visibility context. */
+export const getProblemPdfWithAccess = async (
+  problemId: string,
+): Promise<Pick<ProblemRow, 'problem_pdf' | 'is_visible' | 'contest_id' | 'title'> | null> => {
+  const result = await db.query<Pick<ProblemRow, 'problem_pdf' | 'is_visible' | 'contest_id' | 'title'>>(
+    'SELECT problem_pdf, is_visible, contest_id, title FROM problems WHERE id = $1',
+    [problemId],
+  );
+  return result.rows[0] ?? null;
+};
+
 export const createProblem = async (payload: CreateProblemRequestBody): Promise<ProblemRow> => {
   const result = await db.query<ProblemRow>(
     'INSERT INTO problems (id, title, author, category, time_limit_ms, memory_limit_mb) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',

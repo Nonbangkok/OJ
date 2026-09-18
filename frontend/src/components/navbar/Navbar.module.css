@@ -113,5 +113,5 @@
 .logout-btn:hover {
   background-color: var(--status-danger);
   border-color: var(--status-danger);
-  color: #fff;
+  color: var(--action-button-foreground);
 }

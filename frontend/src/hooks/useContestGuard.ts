@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import contestService from '../services/contestService';
 import { POLLING_INTERVALS } from '../config/constants';
+import { fetchContestOutcome, finishedContestRedirectPath } from './contestStatusFetch';
 import type { Contest } from '../types';
 
 interface UseContestGuardResult {
@@ -30,38 +31,36 @@ export const useContestGuard = (
   const checkAccess = useCallback(async () => {
     if (!contestId) return;
     try {
-      const fetchedContest = await contestService.getById(contestId);
-      setContest(fetchedContest);
-
-      // Redirect if contest is finished
-      if (fetchedContest.status === 'finished') {
-        const redirectPath = fetchedContest.is_participant
-          ? `/contests/${contestId}/scoreboard`
-          : '/contests';
-        navigate(redirectPath);
+      const outcome = await fetchContestOutcome(contestId);
+      if (outcome.kind === 'finished') {
+        setContest(outcome.contest);
+        navigate(outcome.redirectPath);
         return;
       }
-
-      setIsAccessible(true);
-    } catch (err) {
-      console.error('Error checking contest access:', err);
-      if (err.response?.status === 403) {
+      if (outcome.kind === 'loaded') {
+        setContest(outcome.contest);
+        setIsAccessible(true);
+        return;
+      }
+      if (outcome.kind === 'forbidden') {
         // Re-check if contest finished while user got 403
         try {
           const statusCheck = await contestService.getById(contestId);
           if (statusCheck.status === 'finished') {
-            navigate('/contests');
+            navigate(finishedContestRedirectPath(contestId, Boolean(statusCheck.is_participant)));
             return;
           }
         } catch (innerErr) {
           console.error('Failed to re-check contest status:', innerErr);
         }
         setError('You may not have access to this contest.');
-      } else if (err.response?.status === 404) {
-        setError('Contest not found.');
-      } else {
-        setError('Failed to load contest data.');
+        return;
       }
+      if (outcome.kind === 'not-found') {
+        setError('Contest not found.');
+        return;
+      }
+      setError('Failed to load contest data.');
     } finally {
       setLoading(false);
     }

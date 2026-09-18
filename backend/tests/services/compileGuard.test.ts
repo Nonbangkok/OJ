@@ -1,4 +1,5 @@
-import { findForbiddenInclude, sanitizeCompilerStderr } from '../../services/submissionService';
+import { findForbiddenInclude } from '../../utils/compileGuard';
+import { sanitizeCompilerStderr } from '../../services/submissionService';
 
 /**
  * Unit tests for the compile-time hardening (security item N1):

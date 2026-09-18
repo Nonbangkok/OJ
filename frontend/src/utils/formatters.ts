@@ -96,10 +96,14 @@ export const getStatusClass = (status: string | null | undefined): string => {
 
 /**
  * Formats a datetime into a localized short format.
- * @param {string} dateTime - ISO date string
+ * @param {string | Date} dateTime - ISO date string or Date
+ * @param {object} options - Optional Intl.DateTimeFormat options overriding the defaults
  * @returns {string} Formatted date (e.g., "Mar 1, 2026, 09:15 AM")
  */
-export const formatDateTime = (dateTime: string | null | undefined): string => {
+export const formatDateTime = (
+  dateTime: string | Date | null | undefined,
+  options?: Intl.DateTimeFormatOptions
+): string => {
   if (!dateTime) return '';
   return new Date(dateTime).toLocaleString('en-US', {
     year: 'numeric',
@@ -107,6 +111,7 @@ export const formatDateTime = (dateTime: string | null | undefined): string => {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    ...options,
   });
 };
 

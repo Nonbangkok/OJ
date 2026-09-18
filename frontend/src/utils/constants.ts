@@ -1,5 +1,8 @@
 /**
- * Application-wide constants.
+ * Application-wide constants: domain values that mirror the backend
+ * (roles, submission statuses) plus app-level limits.
+ * Tunable UI timing (polling intervals, message timeouts) lives in
+ * config/constants.ts — keep that split when adding new constants.
  */
 export const APP_CONSTANTS = {
   SYSTEM_ADMIN_USERNAME: 'Nonbangkok',

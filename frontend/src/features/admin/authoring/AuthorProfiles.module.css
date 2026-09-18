@@ -142,7 +142,7 @@
 .root [role='alert'] {
   overflow-wrap: anywhere;
 }
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .profiles li {
     display: grid;
     grid-template-columns: 2.5rem minmax(0, 1fr) auto;

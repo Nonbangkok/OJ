@@ -106,6 +106,43 @@ Three global contexts wrap the entire app in this order:
 
 ---
 
+## CSS & Styling Standards
+
+### Token Contract
+
+All colors, shadows, and radii live as CSS custom properties in `frontend/src/index.css`:
+
+- **Primitive/semantic tokens** — `--background-*`, `--text-*`, `--border-color`, `--accent-*`, `--status-*`, `--surface-*`, `--radius-*`, `--box-shadow*`.
+- **Component families** — `--action-*` (buttons), `--verdict-*` (submission verdicts), `--contest-badge-*` (contest status badges), `--feedback-*` (upload feedback boxes), `--contest-action-*` (ContestCard gradient buttons).
+- **Deliberately theme-constant palettes** — `--editor-*` and `--statement-*` (code editor and statement paper preview are dark/white by design in both themes).
+- **Legacy aliases** — `--card-bg`, `--primary-color`, `--text-color-primary`, etc. map onto the tokens above; prefer the real token names in new code.
+
+**Rules:**
+
+1. Never hardcode hex/rgb values in components — reference a token, or add a new one to `index.css` if no existing token fits.
+2. Dark mode works by overriding token values under `[data-theme='dark']` in `index.css` (set on `<html>` by `ThemeContext`). Any new token that should change between themes needs both a `:root` and a `[data-theme='dark']` value.
+3. Guard tests enforce the contract (run via `CI=true npm test`):
+   - `src/tests/styles/cssVariableDefinitions.test.ts` — every `var(--x)` referenced anywhere must be defined in `index.css` (no fallback-only vars).
+   - `src/tests/styles/cssModuleIsolation.test.ts` — CSS modules must not leak bare element selectors.
+   - `src/tests/styles/actionTokenContrast.test.ts` / `statusBadgeContrast.test.ts` — action and status token colors must meet AA contrast.
+
+### Responsive Breakpoints
+
+Standard `max-width` breakpoints (documented at the top of `index.css`):
+
+- **480px** — small mobile (tighten padding, hide secondary chrome, single column).
+- **768px** — the standard mobile/tablet stacking breakpoint.
+- **900/901px** — admin surfaces only (AdminNavbar collapse, authoring workspace).
+- Others in use: 800px (authoring full-screen editor), 1200px (SubmissionModal wide layout), 390px (Drawer full-bleed).
+
+New rules use 480 or 768 unless there is a concrete reason not to.
+
+### Visual Regression
+
+Playwright visual baselines cover the admin authoring shell and author profiles (desktop 1280×720 + mobile 390×844, focus states, one dark variant). Changes to those DOM trees or their CSS must keep pixels stable or consciously regenerate baselines with `npm run test:visual:update` and re-verify with `npm run test:visual`.
+
+---
+
 ## Backend Patterns
 
 ### Controllers

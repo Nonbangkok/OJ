@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button, Dialog, StatusBadge } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
+import { formatDateTime } from '../../../utils/formatters';
 import { Job } from './types';
 import { jobLabel, jobStatus } from './status';
 import styles from './Authoring.module.css';
@@ -13,7 +14,7 @@ export default function JobHistory({ jobs, onError }: { jobs: Job[]; onError: (e
     <div className={styles.scroll}><table><thead><tr><th>Action</th><th>Revision</th><th>Status</th><th>Created</th><th>Report</th></tr></thead>
       <tbody>{jobs.map(job => { const status = jobStatus(job.status); return <tr key={job.id}><td>{jobLabel(job.jobType)}</td>
         <td>{job.draftRevision}</td><td><StatusBadge tone={status.tone}>{status.label}</StatusBadge></td>
-        <td>{job.createdAt ? new Date(job.createdAt).toLocaleString() : '—'}</td><td><Button size="compact" variant="secondary" disabled={loading} onClick={async () => {
+        <td>{job.createdAt ? formatDateTime(job.createdAt) : '—'}</td><td><Button size="compact" variant="secondary" disabled={loading} onClick={async () => {
           setLoading(true); try { setDetail(await authoringService.getJob(job.id)); }
           catch (err) { onError(err); } finally { setLoading(false); }
         }}>Inspect {jobLabel(job.jobType)} r{job.draftRevision}</Button></td></tr>; })}</tbody></table></div>

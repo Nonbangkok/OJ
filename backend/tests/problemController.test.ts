@@ -1,7 +1,9 @@
 import request from 'supertest';
 import express, { Express, Request, Response, NextFunction } from 'express';
 import session from 'express-session';
-import problemRouter, { selectProgressResponseOrigin } from '../controllers/problemController';
+import problemRouter from '../controllers/problemController';
+import { errorHandler } from '../middleware/errorHandler';
+import { selectProgressResponseOrigin } from '../services/batchUploadProgress';
 import * as db from '../db';
 import { processBatchUpload } from '../services/batchUploadService';
 
@@ -64,6 +66,7 @@ describe('Problem Controller', () => {
             next();
         });
         app.use('/', problemRouter);
+        app.use(errorHandler);
         jest.resetAllMocks();
         // resetAllMocks() wipes the global setup's pool.connect stub. Re-wire
         // it: transactional services (updateProblem/deleteProblem/replaceProblemTestcasesFromZip)
@@ -163,6 +166,7 @@ describe('Problem Controller', () => {
                 next();
             });
             appAsUser.use('/', problemRouter);
+            appAsUser.use(errorHandler);
 
             (db.query as jest.Mock).mockResolvedValueOnce({
                 rows: [{
@@ -187,12 +191,9 @@ describe('Problem Controller', () => {
         const visibleProblemRow = {
             id: 'P1',
             title: 'Problem 1',
-            author: 'Author 1',
-            time_limit_ms: 1000,
-            memory_limit_mb: 256,
-            has_pdf: true,
             is_visible: true,
             contest_id: null,
+            problem_pdf: Buffer.from('%PDF-1.4 mock'),
         };
 
         // Helper to build an app where the session role can be controlled per test.
@@ -212,6 +213,7 @@ describe('Problem Controller', () => {
                 next();
             });
             roleApp.use('/', problemRouter);
+            roleApp.use(errorHandler);
             return roleApp;
         };
 
@@ -225,15 +227,14 @@ describe('Problem Controller', () => {
         });
 
         it('should return the PDF for a visible problem', async () => {
-            // 1. getProblemDetail
+            // Single query returns the PDF bytes plus the visibility context.
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [visibleProblemRow] });
-            // 2. getProblemPdf
-            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ problem_pdf: Buffer.from('%PDF-1.4 mock') }] });
 
             const res = await request(app).get('/problems/P1/pdf');
 
             expect(res.status).toBe(200);
             expect(res.headers['content-type']).toContain('application/pdf');
+            expect(db.query).toHaveBeenCalledTimes(1);
         });
 
         it('should return 403 when a regular user requests a hidden problem PDF', async () => {
@@ -245,7 +246,6 @@ describe('Problem Controller', () => {
 
             expect(res.status).toBe(403);
             expect(res.body.message).toBe('Problem is hidden');
-            // Must not fall through to fetching the PDF buffer.
             expect(db.query).toHaveBeenCalledTimes(1);
         });
 
@@ -264,12 +264,23 @@ describe('Problem Controller', () => {
             (db.query as jest.Mock).mockResolvedValueOnce({
                 rows: [{ ...visibleProblemRow, id: 'P3', is_visible: false, contest_id: 42 }]
             });
-            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ problem_pdf: Buffer.from('%PDF-1.4 mock') }] });
 
             const res = await request(buildAppAsRole('staff', 3)).get('/problems/P3/pdf');
 
             expect(res.status).toBe(200);
             expect(res.headers['content-type']).toContain('application/pdf');
+            expect(db.query).toHaveBeenCalledTimes(1);
+        });
+
+        it('should return 404 when the problem exists but has no PDF', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ ...visibleProblemRow, problem_pdf: null }]
+            });
+
+            const res = await request(app).get('/problems/P1/pdf');
+
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Problem PDF not found.');
         });
     });
 

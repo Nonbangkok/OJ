@@ -4,6 +4,7 @@ import hljs from 'highlight.js/lib/core';
 import cpp from 'highlight.js/lib/languages/cpp';
 import 'highlight.js/styles/atom-one-dark.css';
 import submissionService from '../services/submissionService';
+import { APP_CONSTANTS } from '../utils/constants';
 import type { SubmitRequest } from '../types';
 import type { FormEvent, MutableRefObject } from 'react';
 
@@ -53,10 +54,9 @@ const useCodeSubmission = (
     const problemCache = cachedSubmission[problemId];
 
     if (problemCache && problemCache.code) {
-      const CACHE_TIMEOUT = 30 * 60 * 1000;
       const timeDiff = new Date().getTime() - problemCache.timestamp;
 
-      if (timeDiff < CACHE_TIMEOUT) {
+      if (timeDiff < APP_CONSTANTS.SUBMISSION_CACHE_EXPIRY) {
         setCode(problemCache.code);
       } else {
         // Clear expired cache for this problem

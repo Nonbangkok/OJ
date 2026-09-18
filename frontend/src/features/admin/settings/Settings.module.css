@@ -45,7 +45,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #ccc;
+  background-color: var(--action-disabled-bg);
   -webkit-transition: 0.4s;
   transition: 0.4s;
 }
@@ -140,7 +140,7 @@
 }
 
 .action-button:disabled {
-  background-color: #cccccc;
+  background-color: var(--action-disabled-bg);
   cursor: not-allowed;
 }
 

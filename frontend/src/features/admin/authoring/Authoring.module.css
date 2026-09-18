@@ -189,13 +189,6 @@
   outline: 3px solid var(--action-focus-ring);
   outline-offset: 2px;
 }
-.toolbar {
-  padding: 0.75rem;
-  border: 1px solid var(--border-color);
-  background: var(--background-secondary);
-  border-radius: 8px;
-  margin: 1rem 0;
-}
 .saveState {
   font-size: 0.875rem;
   color: var(--text-secondary);
@@ -231,17 +224,6 @@
   color: var(--text-muted);
   cursor: default;
   text-decoration: none;
-}
-.generatorBox {
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background: var(--background-secondary);
-  padding: 0.75rem;
-  margin: 1rem 0;
-}
-.generatorBox summary {
-  cursor: pointer;
-  font-weight: 600;
 }
 .workspaceShell {
   display: flex;
@@ -293,11 +275,6 @@
 .navJob {
   margin: 0;
   font-size: 0.875rem;
-}
-.navHint {
-  margin: 0;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
 }
 .sectionNav {
   display: flex;
@@ -441,8 +418,7 @@
   white-space: nowrap;
 }
 .editorHeader button,
-.editorAlert button,
-.editorAssets button {
+.editorAlert button {
   padding: 0.5rem 0.75rem;
   color: var(--text-primary);
   background: var(--background-secondary);
@@ -451,8 +427,7 @@
   cursor: pointer;
 }
 .editorHeader button:disabled,
-.editorAlert button:disabled,
-.editorAssets button:disabled {
+.editorAlert button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -646,7 +621,7 @@
     var(--statement-stripe-b) 24px
   );
 }
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .authoring {
     margin: 0.5rem auto;
     padding: 0 0.75rem;
@@ -693,12 +668,6 @@
 }
 
 /* Two-column layout for the testcases section. */
-.twoColumns {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 1.5rem;
-  align-items: start;
-}
 .column {
   min-width: 0;
 }
@@ -850,9 +819,4 @@
 .codeInput {
   flex: 1;
   min-width: 0;
-}
-@media (max-width: 1100px) {
-  .twoColumns {
-    grid-template-columns: 1fr;
-  }
 }

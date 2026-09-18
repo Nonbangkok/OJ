@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAdmin, requireAuth } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
-import { compileAuthoringJobSchema, generateAuthoringJobSchema, outputAuthoringJobSchema, problemDraftIdParamSchema } from '../schemas/requestSchemas';
+import { compileAuthoringJobSchema, generateAuthoringJobSchema, expectedRevisionSchema, problemDraftIdParamSchema } from '../schemas/requestSchemas';
 import { DurableJob, getAuthoringJob, getDraftPdf, queueCompileJob, queueGeneratorJob, queueOutputJob, queuePdfJob, queueVerifyJob } from '../services/authoringJobQueryService';
 
 const projectJob = (job: DurableJob) => ({
@@ -17,7 +17,7 @@ export function createAuthoringJobRouter(enabled: boolean): Router {
   const router = Router();
   for (const action of ['compile', 'generate', 'outputs', 'pdf', 'verify'] as const) router.post(`/admin/authoring/drafts/:id/jobs/${action}`, requireAuth, requireAdmin,
     validateRequest({ params: problemDraftIdParamSchema, body: action === 'compile' ? compileAuthoringJobSchema
-      : action === 'generate' ? generateAuthoringJobSchema : outputAuthoringJobSchema }),
+      : action === 'generate' ? generateAuthoringJobSchema : expectedRevisionSchema }),
     asyncHandler(async (req, res) => {
       if (!enabled) { res.status(503).json({ code: 'runner_unavailable', message: 'Authoring runner is not configured' }); return; }
       const result = action === 'compile'

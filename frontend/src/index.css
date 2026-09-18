@@ -2,6 +2,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Inconsolata:wght@200..900&display=swap');
 
+/*
+ * Responsive breakpoint scale (max-width queries):
+ *   480px  — small mobile: tighten padding, hide secondary chrome,
+ *            collapse multi-column grids to one column
+ *   768px  — mobile/tablet switch: the standard "stack everything"
+ *            breakpoint used by most pages
+ *   800px  — authoring full-screen editor only (grid-rows switch)
+ *   900px  — admin surfaces: AdminNavbar collapse and the authoring
+ *            workspace left-nav stacking (900px max / 901px min pair)
+ *  1200px  — SubmissionModal wide-layout fallback
+ *   390px  — Drawer full-bleed on very small phones (iPhone SE class)
+ * Use 480/768 for new rules; other values need a concrete reason.
+ */
+
 /* Define CSS variables for theming */
 :root {
   --background-primary: #ffffff;
