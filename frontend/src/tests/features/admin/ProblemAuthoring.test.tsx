@@ -97,7 +97,7 @@ test('lists resumable drafts and creates a draft with explicit author metadata',
 test('tabs preserve edits and disable job actions until explicit Save succeeds', async () => {
   show('/admin/authoring/d1');
   fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Edited title' } });
-  expect(screen.getByText(/unsaved changes/i)).toBeInTheDocument();
+  expect(screen.getByText(/saving/i)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('tab', { name: 'Statement' }));
   expect(screen.getByRole('button', { name: 'Build PDF' })).toBeDisabled();
   fireEvent.click(screen.getByRole('tab', { name: 'Solution' }));
@@ -105,7 +105,7 @@ test('tabs preserve edits and disable job actions until explicit Save succeeds',
   jest
     .mocked(api.patch)
     .mockResolvedValue({ data: { ...draft, title: 'Edited title', revision: 4, status: 'draft' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save now' }));
   await waitFor(() =>
     expect(screen.getByRole('button', { name: 'Compile solution' })).toBeEnabled()
   );
@@ -133,17 +133,15 @@ test('Statement tab opens the dedicated editor instead of embedding a narrow sou
   );
   expect(screen.queryByLabelText('Statement Markdown / HTML / LaTeX')).not.toBeInTheDocument();
 });
-test('opening the dedicated editor cannot silently discard unsaved workspace fields', async () => {
+test('opening the dedicated editor keeps unsaved workspace fields recoverable via session storage', async () => {
   show('/admin/authoring/d1');
   fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Unsaved title' } });
   fireEvent.click(screen.getByRole('tab', { name: 'Statement' }));
-  const confirm = jest.spyOn(window, 'confirm').mockReturnValue(false);
 
+  // Auto-save captures unsaved edits; opening the editor no longer needs a blocking confirm.
+  expect(window.sessionStorage.getItem('oj-authoring-draft:d1')).toContain('Unsaved title');
   fireEvent.click(screen.getByRole('link', { name: 'Open full-screen editor' }));
-
-  expect(confirm).toHaveBeenCalledWith('Leave without saving your draft changes?');
   expect(screen.queryByLabelText('Statement Markdown / HTML / LaTeX')).not.toBeInTheDocument();
-  confirm.mockRestore();
 });
 test('unsaved statement source survives an editor route unmount such as browser Back and Forward', async () => {
   jest.mocked(api.post).mockResolvedValue({ data: { html: '<p>Preview</p>' } });
@@ -269,7 +267,7 @@ test('published statements can begin a new revision in the full-screen editor', 
   const source = await screen.findByLabelText('Statement Markdown / HTML / LaTeX');
   expect(source).not.toHaveAttribute('readonly');
   fireEvent.change(source, { target: { value: '<p>Corrected</p>' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save now' }));
 
   await waitFor(() =>
     expect(api.patch).toHaveBeenCalledWith('/admin/authoring/drafts/d1', {
@@ -330,6 +328,6 @@ test('Publish requires explicit confirmation and explains hidden visibility', as
   expect(api.post).not.toHaveBeenCalled();
   expect(screen.getByText(/created as hidden/i)).toBeInTheDocument();
   jest.mocked(api.post).mockResolvedValue({ data: { status: 'published' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Confirm Publish' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm publish' }));
   expect(await screen.findByText(/published — read-only/i)).toBeInTheDocument();
 });

@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { Button, StatusBadge } from '../../../components/ui';
 import api from '../../../services/api';
 import { Job } from './types';
+import { jobLabel, jobStatus } from './status';
 import styles from './Authoring.module.css';
 
 export default function JobHistory({ jobs, onError }: { jobs: Job[]; onError: (error: unknown) => void }) {
@@ -9,13 +11,14 @@ export default function JobHistory({ jobs, onError }: { jobs: Job[]; onError: (e
   const report = detail?.resultSummary?.verification;
   return <section><h2>Build history & logs</h2><p>Latest 100 jobs. Reloading this page preserves job history on the server.</p>
     <div className={styles.scroll}><table><thead><tr><th>Action</th><th>Revision</th><th>Status</th><th>Created</th><th>Report</th></tr></thead>
-      <tbody>{jobs.map(job => <tr key={job.id}><td>{job.jobType}</td><td>{job.draftRevision}</td><td>{job.status}</td>
-        <td>{job.createdAt ? new Date(job.createdAt).toLocaleString() : '—'}</td><td><button type="button" disabled={loading} onClick={async () => {
+      <tbody>{jobs.map(job => { const status = jobStatus(job.status); return <tr key={job.id}><td>{jobLabel(job.jobType)}</td>
+        <td>{job.draftRevision}</td><td><StatusBadge tone={status.tone}>{status.label}</StatusBadge></td>
+        <td>{job.createdAt ? new Date(job.createdAt).toLocaleString() : '—'}</td><td><Button size="compact" variant="secondary" disabled={loading} onClick={async () => {
           setLoading(true); try { setDetail((await api.get<Job>(`/admin/authoring/jobs/${job.id}`)).data); }
           catch (err) { onError(err); } finally { setLoading(false); }
-        }}>Inspect {job.jobType} r{job.draftRevision}</button></td></tr>)}</tbody></table></div>
+        }}>Inspect {jobLabel(job.jobType)} r{job.draftRevision}</Button></td></tr>; })}</tbody></table></div>
     {!jobs.length && <p>No builds yet.</p>}
-    {detail && <section aria-label="Job report"><h3>{detail.jobType}: {detail.status} (revision {detail.draftRevision})</h3>
+    {detail && <section aria-label="Job report"><h3>{jobLabel(detail.jobType)}: {detail.status} (revision {detail.draftRevision})</h3>
       {(detail.errorCode || detail.errorMessage) && <p role="alert">{detail.errorCode}: {detail.errorMessage}</p>}
       {report && <>
         <ul>{Object.entries(report.checks).map(([key, status]) => <li key={key}>{key}: {status}</li>)}</ul>

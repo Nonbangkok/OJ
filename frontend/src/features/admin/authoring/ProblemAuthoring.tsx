@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Button, OverflowTable } from '../../../components/ui';
+import { Button, OverflowTable, StatusBadge } from '../../../components/ui';
 import { useAuth } from '../../../context/AuthContext';
 import api from '../../../services/api';
 import { getErrorMessage } from '../../../utils/error';
 import { Draft, DraftFields, Profile } from './types';
+import { draftStatus } from './status';
 import MetadataFields from './MetadataFields';
 import DraftWorkspace from './DraftWorkspace';
 import StatementEditor from './StatementEditor';
@@ -137,18 +138,25 @@ function DraftList() {
               </tr>
             </thead>
             <tbody>
-              {drafts.map((d) => (
-                <tr key={d.id}>
-                  <td>
-                    <Link to={`/admin/authoring/${d.id}`}>
-                      {d.problemId} — {d.title}
-                    </Link>
-                  </td>
-                  <td>{d.authorAkaName}</td>
-                  <td>{d.status}</td>
-                  <td>{d.revision}</td>
-                </tr>
-              ))}
+              {drafts.map((d) => {
+                const status = draftStatus(d.status);
+                return (
+                  <tr key={d.id}>
+                    <td>
+                      <Link to={`/admin/authoring/${d.id}`}>
+                        {d.problemId} — {d.title}
+                      </Link>
+                    </td>
+                    <td>{d.authorAkaName}</td>
+                    <td>
+                      <StatusBadge tone={status.tone} title={status.hint}>
+                        {status.label}
+                      </StatusBadge>
+                    </td>
+                    <td>{d.revision}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           {!drafts.length && <p>No drafts yet. Create your first draft above.</p>}

@@ -4,6 +4,7 @@ import { ImperativePanelGroupHandle, Panel, PanelGroup, PanelResizeHandle } from
 import api from '../../../services/api';
 import useAuthoringDraft from './useAuthoringDraft';
 import { draftBase } from './types';
+import { jobLabel } from './status';
 import { StatementAssets } from './StatementTab';
 import styles from './Authoring.module.css';
 
@@ -71,12 +72,17 @@ export default function StatementEditor({ id }: { id: string }) {
     if (recoveryHandled.current || !draft || !form) return;
     recoveryHandled.current = true;
     const recovery = readRecovery(id);
-    if (!recovery || recovery.statementHtml === form.statementHtml) {
+    if (!recovery) {
       recoveryBaseRevision.current = draft.revision;
+      return;
+    }
+    // Adopt the recovery's base revision even when the hook-level draft recovery
+    // already restored the same text, so continued edits keep the original base.
+    recoveryBaseRevision.current = recovery.baseRevision;
+    if (recovery.statementHtml === form.statementHtml) {
       writeRecovery(id, null);
       return;
     }
-    recoveryBaseRevision.current = recovery.baseRevision;
     model.restoreStatement(recovery.statementHtml, recovery.baseRevision);
     setRecovered(true);
   }, [draft, form, id, model]);
@@ -128,18 +134,15 @@ export default function StatementEditor({ id }: { id: string }) {
   const zoomScale = previewZoom / 100;
   const editorState = draft.status === 'published' ? 'Published — statement revision available'
     : draft.publishedAt ? 'Editing revision — live problem unchanged'
-      : model.conflict ? 'Server conflict' : dirty ? 'Unsaved changes' : 'Saved';
+      : model.conflict ? 'Server conflict'
+        : dirty ? (model.saveState === 'saving' ? 'Saving…' : 'Unsaved changes') : 'Saved';
   return <main className={styles.editorShell}>
     <header className={styles.editorHeader}>
-      <Link to={`/admin/authoring/${encodeURIComponent(id)}`} onClick={event => {
-        if (!dirty) return;
-        if (!window.confirm('Leave the editor without saving your changes?')) event.preventDefault();
-        else writeRecovery(id, null);
-      }}>← Workspace</Link>
+      <Link to={`/admin/authoring/${encodeURIComponent(id)}`}>← Workspace</Link>
       <div className={styles.editorTitle}><h1>Edit Task: {draft.problemId}</h1><span>{draft.title}</span></div>
       <strong>{editorState}</strong>
       <button type="button" disabled={!dirty || editorDisabled || model.conflict || !model.loaded}
-        onClick={() => void model.save()}>Save</button>
+        onClick={() => void model.save()}>Save now</button>
       <button type="button" disabled={model.actionsDisabled} onClick={() => void model.runJob('pdf')}>Build PDF</button>
     </header>
     <section className={styles.editorNotices} aria-label="Editor notices">
@@ -150,7 +153,7 @@ export default function StatementEditor({ id }: { id: string }) {
           if (window.confirm('Discard local changes and sync the latest server revision?')) void model.discardAndRefresh();
         }}>Discard local changes and sync</button>
       </div>}
-      {model.activeJob && <p className={styles.editorStatus} role="status">Active job: {model.activeJob.jobType} — {model.activeJob.status}</p>}
+      {model.activeJob && <p className={styles.editorStatus} role="status">Active job: {jobLabel(model.activeJob.jobType)} — {model.activeJob.status}</p>}
       {recovered && <p className={styles.editorStatus} role="status">Recovered unsaved statement from this browser tab.</p>}
     </section>
     <PanelGroup ref={panels} autoSaveId={`oj-authoring-statement-layout:${id}`} direction={compactLayout ? 'vertical' : 'horizontal'}

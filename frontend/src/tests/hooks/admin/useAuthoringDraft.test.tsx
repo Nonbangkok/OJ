@@ -11,6 +11,7 @@ const draft = { id: 'd1', problemId: 'sum', title: 'Sum', authorProfileId: null,
 const job = { id: 'j1', draftId: 'd1', draftRevision: 3, jobType: 'verify_all', status: 'queued' };
 beforeEach(() => {
   jest.resetAllMocks();
+  window.sessionStorage.clear();
   jest.mocked(api.get).mockImplementation(async url => ({ data: url.endsWith('/jobs') ? [] : draft }));
 });
 
