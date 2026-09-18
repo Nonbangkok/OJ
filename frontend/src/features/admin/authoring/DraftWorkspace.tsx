@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Dialog, StatusBadge } from '../../../components/ui';
 import api from '../../../services/api';
@@ -9,6 +9,7 @@ import MetadataFields from './MetadataFields';
 import StatementTab, { PdfPreview } from './StatementTab';
 import TestcaseFiles from './TestcaseFiles';
 import JobHistory from './JobHistory';
+import AuthorProfiles from './AuthorProfiles';
 import styles from './Authoring.module.css';
 
 const tabs = ['Metadata', 'Statement', 'Solution', 'Testcases', 'Verify & Publish'] as const;
@@ -28,6 +29,7 @@ export default function DraftWorkspace({ id }: { id: string }) {
   const [seed, setSeed] = useState('12345');
   const [confirm, setConfirm] = useState<{ action: 'generate' | 'outputs' | 'publish'; revision: number } | null>(null);
   const [leaveGuard, setLeaveGuard] = useState(false);
+  const [showProfiles, setShowProfiles] = useState(false);
   useEffect(() => { let cancelled = false;
     api.get<Profile[]>('/admin/author-profiles').then(r => { if (!cancelled) setProfiles(r.data); }).catch(onError);
     return () => { cancelled = true; };
@@ -38,6 +40,19 @@ export default function DraftWorkspace({ id }: { id: string }) {
     window.addEventListener('beforeunload', unload);
     return () => window.removeEventListener('beforeunload', unload);
   }, [dirty]);
+  // Ctrl/Cmd+S saves the draft from anywhere in the workspace.
+  const saveRef = useRef(model.save);
+  saveRef.current = model.save;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void saveRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
   if (!draft || !form) return <section className={styles.authoring}><Link to="/admin/authoring">All drafts</Link>
     {model.error ? <p role="alert">{model.error}</p> : <p role="status">Loading draft…</p>}</section>;
   const disabled = model.actionsDisabled;
@@ -72,10 +87,17 @@ export default function DraftWorkspace({ id }: { id: string }) {
       {tab === 'Metadata' && <>
         <MetadataFields value={form} profiles={profiles} disabled={editorDisabled}
           problemIdLocked={draft.publishedAt !== null} onEdit={model.edit} />
-        <Button variant="secondary" disabled={disabled || !draft.authorProfileId} onClick={() => void model.mutate(() =>
-          api.post(`${draftBase(id)}/refresh-author-profile`, { expectedRevision: draft.revision }))}>Refresh from profile</Button>
+        <div className={styles.actions}>
+          <Button variant="secondary" disabled={disabled || !draft.authorProfileId} onClick={() => void model.mutate(() =>
+            api.post(`${draftBase(id)}/refresh-author-profile`, { expectedRevision: draft.revision }))}>Refresh from profile</Button>
+          <Button variant="secondary" onClick={() => setShowProfiles(p => !p)}>
+            {showProfiles ? 'Hide author profiles' : 'Manage author profiles'}
+          </Button>
+        </div>
         <p>Refresh explicitly copies the latest profile and avatar, increments revision and clears readiness.</p>
-        <Link to="/admin/authoring">Manage author profiles in the draft list</Link>
+        {showProfiles && <AuthorProfiles onChanged={() => {
+          api.get<Profile[]>('/admin/author-profiles').then(r => setProfiles(r.data)).catch(onError);
+        }} />}
       </>}
       {tab === 'Statement' && <StatementTab draft={draft} disabled={disabled}
         onBuild={() => void model.runJob('pdf')} mutate={model.mutate} onError={onError} />}
@@ -84,16 +106,22 @@ export default function DraftWorkspace({ id }: { id: string }) {
         <Button disabled={disabled || !form.solutionCpp.trim()} onClick={() => void model.runJob('compile', { target: 'solution' })}>Compile solution</Button>
       </section>}
       {tab === 'Testcases' && <section><h2>Generator & testcases</h2>
-        <p>generator.cpp is optional. Without a generator, upload inputs and optional outputs below.</p>
-        <label>generator.cpp<textarea spellCheck={false} disabled={editorDisabled} value={form.generatorCpp || ''}
-          onChange={e => model.edit('generatorCpp', e.target.value || null)} /></label>
-        <p>Legacy multi-file generators may write to ./input/. New generators should read OJ_SEED or argv[1].</p>
-        <p>Reproducibility has not been demonstrated. Passing a seed does not guarantee that a legacy generator uses it.</p>
-        <label>Generator seed<input value={seed} disabled={disabled} inputMode="numeric" onChange={e => setSeed(e.target.value)} /></label>
-        <Button variant="secondary" disabled={disabled || !form.generatorCpp?.trim()} onClick={() => void model.runJob('compile', { target: 'generator' })}>Compile generator</Button>
-        <Button disabled={disabled || !form.generatorCpp?.trim() || !/^(0|[1-9][0-9]{0,19})$/.test(seed)
-          || (seed.length === 20 && seed > '18446744073709551615')} onClick={() => setConfirm({ action: 'generate', revision: draft.revision })}>Generate inputs</Button>
-        <Button disabled={disabled || !form.solutionCpp.trim()} onClick={() => setConfirm({ action: 'outputs', revision: draft.revision })}>Generate outputs</Button>
+        <div className={styles.actions}>
+          <Button disabled={disabled || !form.solutionCpp.trim()} onClick={() => setConfirm({ action: 'outputs', revision: draft.revision })}>Generate outputs</Button>
+        </div>
+        <p>Generate outputs runs the reference solution over every stored input. Upload inputs below; a generator is optional.</p>
+        <details className={styles.generatorBox} open={!!form.generatorCpp?.trim()}>
+          <summary>Optional generator (generator.cpp)</summary>
+          <label>generator.cpp<textarea spellCheck={false} disabled={editorDisabled} value={form.generatorCpp || ''}
+            onChange={e => model.edit('generatorCpp', e.target.value || null)} /></label>
+          <p>New generators should read OJ_SEED or argv[1]. Legacy multi-file generators may write to ./input/ instead; passing a seed does not guarantee a legacy generator uses it.</p>
+          <label>Generator seed<input value={seed} disabled={disabled} inputMode="numeric" onChange={e => setSeed(e.target.value)} /></label>
+          <div className={styles.actions}>
+            <Button variant="secondary" disabled={disabled || !form.generatorCpp?.trim()} onClick={() => void model.runJob('compile', { target: 'generator' })}>Compile generator</Button>
+            <Button disabled={disabled || !form.generatorCpp?.trim() || !/^(0|[1-9][0-9]{0,19})$/.test(seed)
+              || (seed.length === 20 && seed > '18446744073709551615')} onClick={() => setConfirm({ action: 'generate', revision: draft.revision })}>Generate inputs</Button>
+          </div>
+        </details>
         <TestcaseFiles draftId={id} revision={draft.revision} artifactVersion={draft.updatedAt} disabled={disabled} onMutated={model.refresh} onError={onError} onBusyChange={model.setOperationBusy} />
       </section>}
       {tab === 'Verify & Publish' && <section><h2>Verify & Publish</h2>

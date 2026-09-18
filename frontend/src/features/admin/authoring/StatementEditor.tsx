@@ -122,6 +122,20 @@ export default function StatementEditor({ id }: { id: string }) {
     return () => window.removeEventListener('beforeunload', unload);
   }, [dirty]);
 
+  // Ctrl/Cmd+S saves the statement from the editor.
+  const saveRef = useRef(model.save);
+  saveRef.current = model.save;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void saveRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   useEffect(() => {
     try { window.localStorage.setItem(previewZoomKey(id), String(previewZoom)); } catch { /* Preference only. */ }
   }, [id, previewZoom]);
