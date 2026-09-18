@@ -182,3 +182,15 @@ export const updateAuthorProfile = async (
     throw error;
   }
 };
+
+/** Returns the canonical square PNG for a profile, or null when it has no image. */
+export const readAuthorProfileImage = async (
+  id: string,
+  database: AuthorProfileDatabase = db,
+): Promise<Buffer | null> => {
+  const result = await database.query<{ profile_image_png: Buffer | null }>(
+    'SELECT profile_image_png FROM author_profiles WHERE id = $1',
+    [id],
+  );
+  return result.rows[0]?.profile_image_png ?? null;
+};

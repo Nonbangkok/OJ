@@ -15,6 +15,7 @@ import {
   AuthorProfileUpdates,
   createAuthorProfile,
   listAuthorProfiles,
+  readAuthorProfileImage,
   updateAuthorProfile,
 } from '../services/authorProfileQueryService';
 import {
@@ -89,6 +90,23 @@ router.get('/admin/author-profiles', asyncHandler(async (_req: Request, res: Res
   const profiles = await listAuthorProfiles();
   res.json(profiles.map(toProfileResponse));
 }));
+
+router.get('/admin/author-profiles/:id/image',
+  validateRequest({ params: authorProfileIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const image = await readAuthorProfileImage(String(req.params.id));
+    if (!image) {
+      res.status(404).json({ message: 'This author profile has no image' });
+      return;
+    }
+    res.set({
+      'Content-Type': 'image/png',
+      'Content-Length': String(image.length),
+      'Cache-Control': 'private, max-age=60',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    res.send(image);
+  }));
 
 router.patch('/admin/author-profiles/:id',
   authorProfileImageUpload.single(AUTHOR_PROFILE_IMAGE.FIELD_NAME),

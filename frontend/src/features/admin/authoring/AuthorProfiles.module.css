@@ -143,3 +143,10 @@
   padding: 0;
   margin: 0;
 }
+.avatarImage {
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}

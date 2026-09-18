@@ -207,9 +207,17 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
         <ul className={styles.profiles}>
           {profiles.map((profile) => (
             <li key={profile.id}>
-              <span className={styles.avatar} aria-hidden="true">
-                {Array.from(profile.akaName.trim())[0] || '?'}
-              </span>
+              {profile.hasProfileImage ? (
+                <img
+                  className={styles.avatarImage}
+                  src={`/api/admin/author-profiles/${profile.id}/image`}
+                  alt=""
+                />
+              ) : (
+                <span className={styles.avatar} aria-hidden="true">
+                  {Array.from(profile.akaName.trim())[0] || '?'}
+                </span>
+              )}
               <div className={styles.identity} data-profile-identity>
                 <strong>{profile.akaName}</strong>
                 <span className={styles.hint}>
