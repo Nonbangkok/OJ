@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../../../services/api';
-import { Draft, draftBase } from './types';
+import authoringService from '../../../services/admin/authoringService';
+import { Asset, Draft } from './types';
 import styles from './Authoring.module.css';
 
-interface Asset { id: string; filename: string; sizeBytes: number }
 export function PdfPreview({ draft }: { draft: Draft }) {
   const [open, setOpen] = useState(false);
-  const url = `${(api.defaults?.baseURL || '').replace(/\/$/, '')}${draftBase(draft.id)}/pdf?revision=${draft.latestPdfRevision}`;
+  const url = authoringService.draftPdfUrl(draft.id, draft.latestPdfRevision);
   if (!draft.hasLatestPdf) return <p>No PDF yet. Build PDF or run Verify All.</p>;
   return <section>
     <p>PDF revision {draft.latestPdfRevision} {draft.latestPdfRevision !== draft.revision ? '— outdated; rebuild for the current revision.' : '— current revision.'}</p>
@@ -25,7 +24,7 @@ export function StatementAssets({ draft, disabled, mutate, onError }: {
   const [file, setFile] = useState<File | null>(null);
   useEffect(() => {
     let cancelled = false;
-    api.get<Asset[]>(`${draftBase(draft.id)}/assets`).then(r => { if (!cancelled) setAssets(r.data); }).catch(onError);
+    authoringService.listAssets(draft.id).then(list => { if (!cancelled) setAssets(list); }).catch(onError);
     return () => { cancelled = true; };
   }, [draft.id, draft.revision, onError]);
   return <section>
@@ -38,13 +37,13 @@ export function StatementAssets({ draft, disabled, mutate, onError }: {
       if (!selectedFile) return;
       void mutate(async () => {
         const data = new FormData(); data.append('expectedRevision', String(draft.revision)); data.append('asset', selectedFile);
-        await api.post(`${draftBase(draft.id)}/assets`, data); setFile(null);
+        await authoringService.uploadAsset(draft.id, data); setFile(null);
       });
     }}>Upload asset</button>
     <ul>{assets.map(asset => <li key={asset.id}><code>{`{{ASSET_BASE}}/${asset.filename}`}</code> ({asset.sizeBytes} bytes)
       <button type="button" disabled={disabled} onClick={() => {
         if (window.confirm(`Delete ${asset.filename}? Update any statement references afterward.`)) void mutate(() =>
-          api.delete(`${draftBase(draft.id)}/assets/${asset.id}`, { params: { expectedRevision: draft.revision } }));
+          authoringService.deleteAsset(draft.id, asset.id, draft.revision));
       }}>Delete {asset.filename}</button></li>)}</ul>
   </section>;
 }

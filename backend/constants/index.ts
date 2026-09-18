@@ -9,9 +9,10 @@ export const USER_ROLES = {
 } as const;
 
 export const CONTEST_STATUS = {
+    SCHEDULED: 'scheduled',
     RUNNING: 'running',
-    FINISHED: 'finished',
     FINISHING: 'finishing',
+    FINISHED: 'finished',
 } as const;
 
 export const SUBMISSION_STATUS = {

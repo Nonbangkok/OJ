@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import api from '../../../services/api';
+import authoringService from '../../../services/admin/authoringService';
 import { getErrorMessage, toApiLikeError } from '../../../utils/error';
-import { Draft, DraftFields, draftBase, editableFields, isActive, Job } from './types';
+import { Draft, DraftFields, editableFields, isActive, Job } from './types';
 
 type AuthoringDraftOptions = { allowPublishedStatementEdit?: boolean };
 
@@ -61,13 +61,13 @@ export default function useAuthoringDraft(id: string, pollMs = 3000, options: Au
 
   const refresh = useCallback(async (discard = false) => {
     const current = ++epoch.current;
-    const [detail, history] = await Promise.all([api.get<Draft>(draftBase(id)), api.get<Job[]>(`${draftBase(id)}/jobs`)]);
+    const [detail, history] = await Promise.all([authoringService.getDraft(id), authoringService.getJobs(id)]);
     if (current !== epoch.current) return;
-    setJobs(history.data); setLoaded(true);
+    setJobs(history); setLoaded(true);
     if (discard || !dirtyRef.current) {
-      setDraft(detail.data); setForm(detail.data); setConflict(false); setError(''); dirtyRef.current = false;
+      setDraft(detail); setForm(detail); setConflict(false); setError(''); dirtyRef.current = false;
     } else setDraft(previous => {
-      if (previous && previous.revision !== detail.data.revision) setConflict(true);
+      if (previous && previous.revision !== detail.revision) setConflict(true);
       return previous;
     });
   }, [id]);
@@ -84,9 +84,9 @@ export default function useAuthoringDraft(id: string, pollMs = 3000, options: Au
     const load = async () => {
       try {
         const current = epoch.current;
-        const [detail, history] = await Promise.all([api.get<Draft>(draftBase(id)), api.get<Job[]>(`${draftBase(id)}/jobs`)]);
+        const [detail, history] = await Promise.all([authoringService.getDraft(id), authoringService.getJobs(id)]);
         if (!cancelled && !busyRef.current && current === epoch.current) {
-          setJobs(history.data); setLoaded(true); setError('');
+          setJobs(history); setLoaded(true); setError('');
           // One-time crash recovery: restore unsaved edits captured before the tab closed.
           // A recovery captured against an older server revision raises the same
           // conflict state as restoreStatement, so the user keeps editing and decides.
@@ -96,20 +96,20 @@ export default function useAuthoringDraft(id: string, pollMs = 3000, options: Au
           const statementOwnedByEditor = !!options.allowPublishedStatementEdit;
           const recovery = recoveryHandled.current ? null : readRecovery(id);
           recoveryHandled.current = true;
-          const restorable = recovery && detail.data.status !== 'published'
+          const restorable = recovery && detail.status !== 'published'
             ? Object.fromEntries(Object.entries(recovery.fields)
               .filter(([key]) => key !== 'statementHtml' || !statementOwnedByEditor)) : null;
           if (recovery && restorable && Object.keys(restorable).some(key =>
-            restorable[key as keyof DraftFields] !== detail.data[key as keyof DraftFields])) {
+            restorable[key as keyof DraftFields] !== detail[key as keyof DraftFields])) {
             dirtyRef.current = true;
-            setDraft(detail.data);
-            setForm({ ...detail.data, ...restorable });
+            setDraft(detail);
+            setForm({ ...detail, ...restorable });
             setRecovered(true);
-            if (recovery.baseRevision !== detail.data.revision) setConflict(true);
+            if (recovery.baseRevision !== detail.revision) setConflict(true);
             return;
           }
           writeRecovery(id, null);
-          setDraft(detail.data); setForm(detail.data);
+          setDraft(detail); setForm(detail);
         }
       } catch (err) { if (!cancelled) { onError(err); setLoaded(false); } }
     };
@@ -138,13 +138,13 @@ export default function useAuthoringDraft(id: string, pollMs = 3000, options: Au
       try {
         if (!busyRef.current) {
           const current = epoch.current;
-          const [detail, history] = await Promise.all([api.get<Draft>(draftBase(id)), api.get<Job[]>(`${draftBase(id)}/jobs`)]);
+          const [detail, history] = await Promise.all([authoringService.getDraft(id), authoringService.getJobs(id)]);
           if (!cancelled && !busyRef.current && current === epoch.current) {
-            setJobs(history.data); setLoaded(true); setError('');
+            setJobs(history); setLoaded(true); setError('');
             // An in-flight poll must never replace text typed while the request was pending.
-            if (!dirtyRef.current) { setDraft(detail.data); setForm(detail.data); }
+            if (!dirtyRef.current) { setDraft(detail); setForm(detail); }
             else setDraft(previous => {
-              if (previous && previous.revision !== detail.data.revision) setConflict(true);
+              if (previous && previous.revision !== detail.revision) setConflict(true);
               return previous;
             });
           }
@@ -183,8 +183,8 @@ export default function useAuthoringDraft(id: string, pollMs = 3000, options: Au
     if (draft.status === 'published' && !canSavePublishedStatement) return;
     setOperationBusy(true); setError(''); setSaveState('saving');
     try {
-      const result = await api.patch<Draft>(draftBase(id), { expectedRevision: draft.revision, ...changes });
-      setDraft(result.data); setForm(result.data); dirtyRef.current = false; setSaveState('saved');
+      const result = await authoringService.saveDraft(id, { expectedRevision: draft.revision, ...changes });
+      setDraft(result); setForm(result); dirtyRef.current = false; setSaveState('saved');
       writeRecovery(id, null);
     } catch (err) {
       onError(err); setSaveState('error');
@@ -205,10 +205,10 @@ export default function useAuthoringDraft(id: string, pollMs = 3000, options: Au
     if (actionsDisabled || busyRef.current || !draft) return;
     setOperationBusy(true); setError('');
     try {
-      const result = await api.post<Job>(`${draftBase(id)}/jobs/${action}`, { expectedRevision: draft.revision, ...extra });
+      const result = await authoringService.startJob(id, action, { expectedRevision: draft.revision, ...extra });
       // Optimistic job state: show the queued job immediately instead of waiting for the next poll,
       // so action buttons lock right away and no stale-revision click can slip through the gap.
-      setJobs(previous => [result.data, ...previous.filter(j => j.id !== result.data.id)]);
+      setJobs(previous => [result, ...previous.filter(j => j.id !== result.id)]);
       if (action === 'verify') {
         setDraft(previous => previous ? { ...previous, status: 'draft', verifiedRevision: null } : null);
         setForm(previous => previous ? { ...previous, status: 'draft', verifiedRevision: null } : null);
@@ -228,7 +228,7 @@ export default function useAuthoringDraft(id: string, pollMs = 3000, options: Au
     if (!canPublish || !draft || busyRef.current) return;
     setOperationBusy(true); setError('');
     try {
-      await api.post(`${draftBase(id)}/publish`, { expectedRevision: draft.revision });
+      await authoringService.publishDraft(id, draft.revision);
       setDraft(previous => previous ? { ...previous, status: 'published' } : null);
       setForm(previous => previous ? { ...previous, status: 'published' } : null);
     } catch (err) { onError(err); }

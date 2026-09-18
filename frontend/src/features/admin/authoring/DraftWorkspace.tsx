@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate, useOutletContext } from 'react-router-dom';
 import { Button, Dialog, StatusBadge } from '../../../components/ui';
-import api from '../../../services/api';
+import authoringService from '../../../services/admin/authoringService';
 import useAuthoringDraft from './useAuthoringDraft';
 import { Profile } from './types';
 import { draftStatus } from './status';
@@ -154,7 +154,7 @@ function MetadataSection() {
   const profileSeq = useRef(0);
   const loadProfiles = useCallback(() => {
     const seq = ++profileSeq.current;
-    api.get<Profile[]>('/admin/author-profiles').then(r => { if (seq === profileSeq.current) setProfiles(r.data); }).catch(onError);
+    authoringService.listProfiles().then(list => { if (seq === profileSeq.current) setProfiles(list); }).catch(onError);
   }, [onError]);
   useEffect(() => { loadProfiles(); }, [loadProfiles]);
   useEffect(() => {
@@ -189,8 +189,7 @@ function MetadataSection() {
     syncAttemptedKey.current = syncKey;
     // One attempt per mismatch: a failed POST surfaces via model.error and is
     // not auto-retried, so a persistently failing sync can never loop.
-    void modelRef.current.mutate(() => api.post(`/admin/authoring/drafts/${draft.id}/refresh-author-profile`,
-      { expectedRevision: draft.revision }));
+    void modelRef.current.mutate(() => authoringService.refreshAuthorProfile(draft.id, draft.revision));
     // syncKey covers draft.id plus every compared value, so this re-runs when a
     // real profile edit (or a successful refresh) changes them — once each time;
     // actionsDisabled (a plain boolean) re-runs a sync skipped mid-autosave.

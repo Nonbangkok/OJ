@@ -1,20 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Dialog } from '../../../components/ui';
-import api from '../../../services/api';
+import authoringService from '../../../services/admin/authoringService';
+import { getErrorMessage } from '../../../utils/error';
+import { Profile } from './types';
 import { drawProfileCrop, loadProfileImage, profileCropToPng } from './profileImage';
 import styles from './AuthorProfiles.module.css';
 
-interface Profile {
-  id: string;
-  userId: number | null;
-  akaName: string;
-  realName: string;
-  defaultLanguage: string;
-  countryCode: string;
-  hasProfileImage: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
 interface Fields {
   akaName: string;
   realName: string;
@@ -29,13 +20,8 @@ const emptyFields: Fields = {
   countryCode: 'THA',
   userId: '',
 };
-function errorMessage(error: unknown): string {
-  const response = error as { response?: { data?: { message?: unknown } }; message?: unknown };
-  if (typeof response?.response?.data?.message === 'string') return response.response.data.message;
-  return typeof response?.message === 'string'
-    ? response.message
-    : 'Unable to save or load author profiles. Please try again.';
-}
+const profileErrorMessage = (error: unknown): string =>
+  getErrorMessage(error, 'Unable to save or load author profiles. Please try again.');
 
 export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -61,10 +47,10 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
     setLoading(true);
     setListError('');
     try {
-      const { data } = await api.get<Profile[]>('/admin/author-profiles');
+      const data = await authoringService.listProfiles();
       if (request === listRequest.current) setProfiles(data);
     } catch (failure) {
-      if (request === listRequest.current) setListError(errorMessage(failure));
+      if (request === listRequest.current) setListError(profileErrorMessage(failure));
     } finally {
       if (request === listRequest.current) setLoading(false);
     }
@@ -81,7 +67,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
     try {
       drawProfileCrop(canvas.current, image, zoom, x, y);
     } catch (failure) {
-      setError(errorMessage(failure));
+      setError(profileErrorMessage(failure));
     }
   }, [image, zoom, x, y]);
 
@@ -125,7 +111,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
       setX(50);
       setY(50);
     } catch (failure) {
-      if (request === imageRequest.current) setError(errorMessage(failure));
+      if (request === imageRequest.current) setError(profileErrorMessage(failure));
     } finally {
       if (request === imageRequest.current) setImageLoading(false);
     }
@@ -154,10 +140,10 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
       if (image)
         body.append('profileImage', await profileCropToPng(image, zoom, x, y), 'profile.png');
       else if (editing !== 'new' && removeImage) body.append('removeProfileImage', 'true');
-      const { data } =
+      const data =
         editing === 'new'
-          ? await api.post<Profile>('/admin/author-profiles', body)
-          : await api.patch<Profile>(`/admin/author-profiles/${editing.id}`, body);
+          ? await authoringService.createProfile(body)
+          : await authoringService.updateProfile(editing.id, body);
       setProfiles((current) =>
         current.some((profile) => profile.id === data.id)
           ? current.map((profile) => (profile.id === data.id ? data : profile))
@@ -168,7 +154,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
       setNotice('Author profile saved.');
       onChanged?.();
     } catch (failure) {
-      setError(errorMessage(failure));
+      setError(profileErrorMessage(failure));
     } finally {
       setSaving(false);
     }
@@ -210,7 +196,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
               {profile.hasProfileImage ? (
                 <img
                   className={styles.avatarImage}
-                  src={`/api/admin/author-profiles/${profile.id}/image`}
+                  src={`/api${authoringService.profileImageUrl(profile.id)}`}
                   alt=""
                 />
               ) : (
@@ -277,7 +263,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
             }
           >
             {error && <p role="alert">{error}</p>}
-            <fieldset disabled={saving} className={`${styles.root} ${styles.dialogFields}`}>
+            <fieldset disabled={saving} className={styles.dialogFields}>
               <legend className={styles.legend}>Author details</legend>
             <div className={styles.fields}>
               <label>

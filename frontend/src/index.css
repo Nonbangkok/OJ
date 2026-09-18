@@ -124,6 +124,63 @@
   /* Success tint for the verify checklist. */
   --success-tint-bg: rgba(25, 135, 84, 0.08);
   --success-tint-border: rgba(25, 135, 84, 0.35);
+
+  /* Management-page action buttons (legacy composes: btn family). */
+  --action-create-bg: #28a745;
+  --action-create-hover: #218838;
+  --action-edit-bg: #17a2b8;
+  --action-edit-hover: #138496;
+  --action-problems-bg: #007bff;
+  --action-problems-hover: #0069d9;
+  --action-neutral-button-bg: #6c757d;
+  --action-neutral-button-hover: #545b62;
+  --action-disabled-bg: #adb5bd;
+  --action-button-foreground: #ffffff;
+
+  /* Contest-status badges — shared by Management badges, the contest-status
+     badge on the problems table, and ContestCard's joined status. */
+  --contest-badge-scheduled-bg: #e3f2fd;
+  --contest-badge-scheduled-fg: #1976d2;
+  --contest-badge-scheduled-border: #bbdefb;
+  --contest-badge-running-bg: #e8f5e8;
+  --contest-badge-running-fg: #2e7d32;
+  --contest-badge-running-border: #c8e6c9;
+  --contest-badge-finishing-bg: #fff3e0;
+  --contest-badge-finishing-fg: #f57c00;
+  --contest-badge-finishing-border: #ffcc02;
+  --contest-badge-finished-bg: #f3e5f5;
+  --contest-badge-finished-fg: #7b1fa2;
+  --contest-badge-finished-border: #ce93d8;
+
+  /* Batch-upload feedback boxes. */
+  --feedback-info-bg: #e7f3fe;
+  --feedback-info-border: #2196f3;
+  --feedback-info-fg: #1a78c2;
+  --feedback-success-bg: #e8f5e9;
+  --feedback-success-border: #4caf50;
+  --feedback-success-fg: #2e7d32;
+  --feedback-error-bg: #ffebee;
+  --feedback-error-border: #f44336;
+  --feedback-error-fg: #c62828;
+
+  /* ContestCard action buttons (gradient pairs). */
+  --contest-action-join-from: #4caf50;
+  --contest-action-join-to: #45a049;
+  --contest-action-join-hover-from: #45a049;
+  --contest-action-join-hover-to: #3d8b40;
+  --contest-action-enter-from: #2196f3;
+  --contest-action-enter-to: #1976d2;
+  --contest-action-enter-hover-from: #1976d2;
+  --contest-action-enter-hover-to: #1565c0;
+  --contest-action-scoreboard-from: #ff9800;
+  --contest-action-scoreboard-to: #f57c00;
+  --contest-action-scoreboard-hover-from: #f57c00;
+  --contest-action-scoreboard-hover-to: #ef6c00;
+  --contest-action-login-from: #9c27b0;
+  --contest-action-login-to: #7b1fa2;
+  --contest-action-login-hover-from: #7b1fa2;
+  --contest-action-login-hover-to: #6a1b9a;
+  --contest-action-foreground: #ffffff;
 }
 
 [data-theme='dark'] {

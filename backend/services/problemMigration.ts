@@ -45,7 +45,7 @@ export const moveProblemsToContest = async (contestId: number, problemIds: strin
     }
 
     const contest = contestResult.rows[0];
-    if (contest.status !== 'scheduled' && contest.status !== CONTEST_STATUS.RUNNING) {
+    if (contest.status !== CONTEST_STATUS.SCHEDULED && contest.status !== CONTEST_STATUS.RUNNING) {
       throw new Error('Can only move problems to scheduled or running contests');
     }
 
@@ -223,7 +223,7 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
     // Update contest status to finished
     await client.query(
       'UPDATE contests SET status = $1 WHERE id = $2',
-      ['finished', contestId]
+      [CONTEST_STATUS.FINISHED, contestId]
     );
 
     await client.query('COMMIT');

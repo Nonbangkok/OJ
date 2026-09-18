@@ -1,20 +1,24 @@
 import * as db from '../db';
-import { ACTIVE_CONTEST_STATUSES, ContestDetailRow, ContestProblemRow, ContestRow, ContestScoreboardDetailRow, ProblemRow } from '../types/models';
+import { ContestDetailRow, ContestRow, ProblemRow } from '../types/models';
 import { CONTEST_STATUS } from '../constants';
+import { getContestById, isContestParticipant } from './contestAccess';
 import {
     ContestListRow,
-    ContestProblemDetailRow,
-    ContestProblemDetailResult,
-    ContestProblemPdfResult,
     ContestProblemsSummaryRow,
-    ContestProblemsForParticipantResult,
-    ContestProblemStatsRow,
-    ContestScoreboardResponse,
-    ContestScoreboardRow,
     ContestWritePayload,
-    ExistsRow,
     MoveSingleProblemToMainResult,
 } from '../types/service';
+
+// Scoreboard and participant-facing reads were split into their own modules;
+// re-exported here so existing importers keep working.
+export {
+    getContestScoreboard,
+} from './contestScoreboardQueryService';
+export {
+    getContestProblemsForParticipant,
+    getContestProblemDetailForParticipant,
+    getContestProblemPdfForParticipant,
+} from './contestParticipantQueryService';
 
 export const listContests = async (userId?: number): Promise<ContestListRow[]> => {
     if (userId) {
@@ -107,11 +111,7 @@ export const getContestDetail = async (id: string, userId?: number): Promise<(Co
 
     let isParticipant = false;
     if (userId) {
-        const participantResult = await db.query<ExistsRow>(
-            'SELECT 1 AS exists FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
-            [id, userId],
-        );
-        isParticipant = participantResult.rows.length > 0;
+        isParticipant = await isContestParticipant(id, userId);
     }
 
     let problems: ContestProblemsSummaryRow[] = [];
@@ -144,133 +144,16 @@ export const getContestDetail = async (id: string, userId?: number): Promise<(Co
     };
 };
 
-export const getContestScoreboard = async (id: string): Promise<ContestScoreboardResponse | null> => {
-    const contestResult = await db.query<ContestRow>('SELECT * FROM contests WHERE id = $1', [id]);
-    if (contestResult.rows.length === 0) {
-        return null;
-    }
-    const contest = contestResult.rows[0];
-
-    if (contest.status === CONTEST_STATUS.FINISHED) {
-        const [scoreboardResult, problemsResult] = await Promise.all([
-            db.query<ContestScoreboardDetailRow>(
-                `SELECT cs.*, u.username
-                 FROM contest_scoreboards cs
-                 JOIN users u ON cs.user_id = u.id
-                 WHERE cs.contest_id = $1
-                 ORDER BY cs.total_score DESC, cs.last_score_improvement_time ASC`,
-                [id],
-            ),
-            db.query<{ problem_id: string; title: string }>(
-                `SELECT problem_id, title
-                 FROM contest_problems
-                 WHERE contest_id = $1
-                 ORDER BY problem_id`,
-                [id],
-            ),
-        ]);
-
-        return {
-            scoreboard: scoreboardResult.rows,
-            problems: problemsResult.rows,
-        };
-    }
-
-    if (contest.status === CONTEST_STATUS.RUNNING || contest.status === CONTEST_STATUS.FINISHING) {
-        const [scoreboardResult, problemsResult] = await Promise.all([
-            db.query<ContestScoreboardRow>(
-                `
-                WITH UserBestScores AS (
-                  SELECT
-                    cs.user_id,
-                    cs.problem_id,
-                    MAX(cs.score) AS best_score,
-                    MAX(cs.submitted_at) AS latest_score_time
-                  FROM contest_submissions cs
-                  WHERE cs.contest_id = $1
-                  GROUP BY cs.user_id, cs.problem_id
-                ),
-                UserTotalScores AS (
-                  SELECT
-                    ubs.user_id,
-                    SUM(ubs.best_score) AS total_score,
-                    jsonb_object_agg(ubs.problem_id, jsonb_build_object('score', ubs.best_score)) AS detailed_scores,
-                    MAX(ubs.latest_score_time) AS last_score_improvement_time
-                  FROM UserBestScores ubs
-                  GROUP BY ubs.user_id
-                ),
-                AllParticipants AS (
-                  SELECT
-                    cp.user_id,
-                    u.username,
-                    COALESCE(uts.total_score, 0) AS total_score,
-                    COALESCE(uts.detailed_scores, '{}'::jsonb) AS detailed_scores,
-                    COALESCE(uts.last_score_improvement_time, cp.joined_at) AS last_score_improvement_time
-                  FROM contest_participants cp
-                  JOIN users u ON cp.user_id = u.id
-                  LEFT JOIN UserTotalScores uts ON uts.user_id = cp.user_id
-                  WHERE cp.contest_id = $1
-                )
-                SELECT *
-                FROM AllParticipants
-                ORDER BY total_score DESC, last_score_improvement_time ASC
-                `,
-                [id],
-            ),
-            db.query<{ problem_id: string; title: string }>(
-                `SELECT id AS problem_id, title
-                 FROM problems
-                 WHERE contest_id = $1
-                 ORDER BY id`,
-                [id],
-            ),
-        ]);
-
-        return {
-            scoreboard: scoreboardResult.rows,
-            problems: problemsResult.rows,
-        };
-    }
-
-    const [participantsResult, problemsResult] = await Promise.all([
-        db.query<ContestScoreboardRow>(
-            `SELECT
-              cp.user_id,
-              u.username,
-              0 AS total_score,
-              '{}'::jsonb AS detailed_scores
-             FROM contest_participants cp
-             JOIN users u ON cp.user_id = u.id
-             WHERE cp.contest_id = $1
-             ORDER BY u.username ASC`,
-            [id],
-        ),
-        db.query<{ problem_id: string; title: string }>(
-            `SELECT id AS problem_id, title
-             FROM problems
-             WHERE contest_id = $1
-             ORDER BY id`,
-            [id],
-        ),
-    ]);
-
-    return {
-        scoreboard: participantsResult.rows,
-        problems: problemsResult.rows,
-    };
-};
-
 export const moveSingleProblemToMainSystem = async (
     contestId: string,
     problemId: string,
 ): Promise<MoveSingleProblemToMainResult> => {
-    const contestResult = await db.query<ContestRow>('SELECT * FROM contests WHERE id = $1', [contestId]);
-    if (contestResult.rows.length === 0) {
+    const contest = await getContestById(contestId);
+    if (!contest) {
         return { kind: 'not_found_contest' };
     }
 
-    const contest = contestResult.rows[0];
-    if (contest.status !== 'scheduled' && contest.status !== CONTEST_STATUS.RUNNING) {
+    if (contest.status !== CONTEST_STATUS.SCHEDULED && contest.status !== CONTEST_STATUS.RUNNING) {
         return { kind: 'invalid_status' };
     }
 
@@ -285,181 +168,12 @@ export const moveSingleProblemToMainSystem = async (
     return { kind: 'ok', data: updateResult.rows[0] };
 };
 
-export const getContestProblemsForParticipant = async (
-    contestId: string,
-    userId: number,
-): Promise<ContestProblemsForParticipantResult> => {
-    const contestResult = await db.query<ContestRow>('SELECT * FROM contests WHERE id = $1', [contestId]);
-    if (contestResult.rows.length === 0) {
-        return { kind: 'not_found' };
-    }
-
-    const contest = contestResult.rows[0];
-    const participantResult = await db.query<ExistsRow>(
-        'SELECT 1 AS exists FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
-        [contestId, userId],
-    );
-    if (participantResult.rows.length === 0) {
-        return { kind: 'not_participant' };
-    }
-
-    if (!ACTIVE_CONTEST_STATUSES.includes(contest.status)) {
-        return { kind: 'inactive', data: [] };
-    }
-
-    const baseQuery = `
-      WITH RankedSubmissions AS (
-        SELECT
-          cs.id, cs.user_id, cs.problem_id, cs.score, cs.overall_status,
-          cs.results, cs.submitted_at,
-          ROW_NUMBER() OVER(PARTITION BY cs.user_id, cs.problem_id ORDER BY cs.score DESC, cs.id DESC) as rn_best,
-          ROW_NUMBER() OVER(PARTITION BY cs.user_id, cs.problem_id ORDER BY cs.id DESC) as rn_latest
-        FROM contest_submissions cs
-        WHERE cs.user_id = $1 AND cs.contest_id = $2
-      ),
-      UserProblemStats AS (
-        SELECT
-          problem_id,
-          MAX(score) AS best_score,
-          COUNT(*) AS submission_count
-        FROM contest_submissions
-        WHERE user_id = $1 AND contest_id = $2
-        GROUP BY problem_id
-      )
-    `;
-
-    if (contest.status === CONTEST_STATUS.FINISHED) {
-        const result = await db.query<ContestProblemStatsRow>(
-            baseQuery + `
-            SELECT
-              cp.problem_id as id, cp.title, cp.author,
-              ups.best_score, ups.submission_count,
-              latest.submitted_at AS latest_submission_at,
-              latest.overall_status AS latest_submission_status,
-              best.overall_status AS best_submission_status,
-              best.results AS best_submission_results
-            FROM contest_problems cp
-            LEFT JOIN UserProblemStats ups ON cp.problem_id = ups.problem_id
-            LEFT JOIN RankedSubmissions latest ON cp.problem_id = latest.problem_id AND latest.rn_latest = 1
-            LEFT JOIN RankedSubmissions best ON cp.problem_id = best.problem_id AND best.rn_best = 1
-            WHERE cp.contest_id = $2
-            ORDER BY cp.problem_id
-        `,
-            [userId, contestId],
-        );
-        return { kind: 'ok', data: result.rows };
-    }
-
-    const result = await db.query<ContestProblemStatsRow>(
-        baseQuery + `
-        SELECT
-          p.id, p.title, p.author, p.time_limit_ms, p.memory_limit_mb,
-          ups.best_score, ups.submission_count,
-          latest.submitted_at AS latest_submission_at,
-          latest.overall_status AS latest_submission_status,
-          best.overall_status AS best_submission_status,
-          best.results AS best_submission_results
-        FROM problems p
-        LEFT JOIN UserProblemStats ups ON p.id = ups.problem_id
-        LEFT JOIN RankedSubmissions latest ON p.id = latest.problem_id AND latest.rn_latest = 1
-        LEFT JOIN RankedSubmissions best ON p.id = best.problem_id AND best.rn_best = 1
-        WHERE p.contest_id = $2
-        ORDER BY p.id
-      `,
-        [userId, contestId],
-    );
-    return { kind: 'ok', data: result.rows };
-};
-
-export const getContestProblemDetailForParticipant = async (
-    contestId: string,
-    problemId: string,
-    userId: number,
-): Promise<ContestProblemDetailResult> => {
-    const contestResult = await db.query<Pick<ContestRow, 'status'>>('SELECT status FROM contests WHERE id = $1', [contestId]);
-    if (contestResult.rows.length === 0) {
-        return { kind: 'not_found_contest' };
-    }
-
-    const contestStatus = contestResult.rows[0].status;
-    if (!ACTIVE_CONTEST_STATUSES.includes(contestStatus)) {
-        return { kind: 'inactive' };
-    }
-
-    const participantResult = await db.query<ExistsRow>(
-        'SELECT 1 AS exists FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
-        [contestId, userId],
-    );
-    if (participantResult.rows.length === 0) {
-        return { kind: 'not_participant' };
-    }
-
-    if (contestStatus === CONTEST_STATUS.FINISHED) {
-        const result = await db.query<ContestProblemDetailRow>(
-            'SELECT problem_id AS id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) AS has_pdf FROM contest_problems WHERE contest_id = $1 AND problem_id = $2',
-            [contestId, problemId],
-        );
-        if (!result.rows[0]) {
-            return { kind: 'not_found_problem' };
-        }
-        return { kind: 'ok', data: result.rows[0] };
-    }
-
-    const result = await db.query<ContestProblemDetailRow>(
-        'SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) AS has_pdf FROM problems WHERE id = $1 AND contest_id = $2',
-        [problemId, contestId],
-    );
-    if (!result.rows[0]) {
-        return { kind: 'not_found_problem' };
-    }
-    return { kind: 'ok', data: result.rows[0] };
-};
-
-export const getContestProblemPdfForParticipant = async (
-    contestId: string,
-    problemId: string,
-    userId: number,
-): Promise<ContestProblemPdfResult> => {
-    const contestResult = await db.query<Pick<ContestRow, 'status'>>('SELECT status FROM contests WHERE id = $1', [contestId]);
-    if (contestResult.rows.length === 0) {
-        return { kind: 'not_found_contest' };
-    }
-
-    const contestStatus = contestResult.rows[0].status;
-    if (!ACTIVE_CONTEST_STATUSES.includes(contestStatus)) {
-        return { kind: 'inactive' };
-    }
-
-    const participantResult = await db.query<ExistsRow>(
-        'SELECT 1 AS exists FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
-        [contestId, userId],
-    );
-    if (participantResult.rows.length === 0) {
-        return { kind: 'not_participant' };
-    }
-
-    const queryText = contestStatus === CONTEST_STATUS.FINISHED
-        ? 'SELECT problem_pdf FROM contest_problems WHERE contest_id = $1 AND problem_id = $2'
-        : 'SELECT problem_pdf FROM problems WHERE id = $1 AND contest_id = $2';
-    const queryParams = contestStatus === CONTEST_STATUS.FINISHED
-        ? [contestId, problemId]
-        : [problemId, contestId];
-
-    const result = await db.query<{ problem_pdf: Buffer | null }>(queryText, queryParams);
-    const pdf = result.rows[0]?.problem_pdf ?? null;
-    if (!pdf) {
-        return { kind: 'not_found_pdf' };
-    }
-    return { kind: 'ok', data: pdf };
-};
-
 export const joinContest = async (contestId: string, userId: number): Promise<'joined' | 'already_joined' | 'not_found' | 'ended'> => {
-    const contestResult = await db.query<ContestRow>('SELECT * FROM contests WHERE id = $1', [contestId]);
-    if (contestResult.rows.length === 0) {
+    const contest = await getContestById(contestId);
+    if (!contest) {
         return 'not_found';
     }
 
-    const contest = contestResult.rows[0];
     if (new Date() >= new Date(contest.end_time)) {
         return 'ended';
     }
@@ -498,12 +212,11 @@ export const updateContest = async (contestId: string, payload: ContestWritePayl
 };
 
 export const deleteContest = async (contestId: string): Promise<'deleted' | 'not_found' | 'running'> => {
-    const contestResult = await db.query<ContestRow>('SELECT * FROM contests WHERE id = $1', [contestId]);
-    if (contestResult.rows.length === 0) {
+    const contest = await getContestById(contestId);
+    if (!contest) {
         return 'not_found';
     }
 
-    const contest = contestResult.rows[0];
     if (contest.status === CONTEST_STATUS.RUNNING) {
         return 'running';
     }

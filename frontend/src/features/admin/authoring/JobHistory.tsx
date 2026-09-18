@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Dialog, StatusBadge } from '../../../components/ui';
-import api from '../../../services/api';
+import authoringService from '../../../services/admin/authoringService';
 import { Job } from './types';
 import { jobLabel, jobStatus } from './status';
 import styles from './Authoring.module.css';
@@ -14,7 +14,7 @@ export default function JobHistory({ jobs, onError }: { jobs: Job[]; onError: (e
       <tbody>{jobs.map(job => { const status = jobStatus(job.status); return <tr key={job.id}><td>{jobLabel(job.jobType)}</td>
         <td>{job.draftRevision}</td><td><StatusBadge tone={status.tone}>{status.label}</StatusBadge></td>
         <td>{job.createdAt ? new Date(job.createdAt).toLocaleString() : '—'}</td><td><Button size="compact" variant="secondary" disabled={loading} onClick={async () => {
-          setLoading(true); try { setDetail((await api.get<Job>(`/admin/authoring/jobs/${job.id}`)).data); }
+          setLoading(true); try { setDetail(await authoringService.getJob(job.id)); }
           catch (err) { onError(err); } finally { setLoading(false); }
         }}>Inspect {jobLabel(job.jobType)} r{job.draftRevision}</Button></td></tr>; })}</tbody></table></div>
     {!jobs.length && <p>No builds yet.</p>}

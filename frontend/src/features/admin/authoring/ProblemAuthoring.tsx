@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button, Dialog, OverflowTable, StatusBadge } from '../../../components/ui';
 import { useAuth } from '../../../context/AuthContext';
-import api from '../../../services/api';
+import authoringService from '../../../services/admin/authoringService';
 import { getErrorMessage } from '../../../utils/error';
 import { Draft, DraftFields, Profile } from './types';
 import { draftStatus } from './status';
@@ -40,14 +40,11 @@ function DraftList() {
   const [createError, setCreateError] = useState('');
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      api.get<Draft[]>('/admin/authoring/drafts'),
-      api.get<Profile[]>('/admin/author-profiles'),
-    ])
-      .then(([d, p]) => {
+    Promise.all([authoringService.listDrafts(), authoringService.listProfiles()])
+      .then(([draftList, profileList]) => {
         if (!cancelled) {
-          setDrafts(d.data);
-          setProfiles(p.data);
+          setDrafts(draftList);
+          setProfiles(profileList);
         }
       })
       .catch((e) => {
@@ -86,8 +83,8 @@ function DraftList() {
             setBusy(true);
             setCreateError('');
             try {
-              const result = await api.post<Draft>('/admin/authoring/drafts', form);
-              navigate(`/admin/authoring/${result.data.id}`);
+              const draft = await authoringService.createDraft(form);
+              navigate(`/admin/authoring/${draft.id}`);
             } catch (err) {
               setCreateError(getErrorMessage(err, 'Could not create draft'));
             } finally {
@@ -152,7 +149,7 @@ function DraftList() {
                             setBusy(true);
                             setError('');
                             try {
-                              await api.post(`/admin/authoring/drafts/${d.id}/new-revision`, {});
+                              await authoringService.startNewRevision(d.id);
                               navigate(`/admin/authoring/${d.id}`);
                             } catch (err) {
                               setError(getErrorMessage(err, 'Could not start a new revision'));

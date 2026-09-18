@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ImperativePanelGroupHandle, Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { Button, Dialog } from '../../../components/ui';
-import api from '../../../services/api';
+import authoringService from '../../../services/admin/authoringService';
 import useAuthoringDraft from './useAuthoringDraft';
-import { draftBase } from './types';
 import { jobLabel } from './status';
 import { StatementAssets } from './StatementTab';
 import styles from './Authoring.module.css';
@@ -141,9 +140,8 @@ export default function StatementEditor({ id }: { id: string }) {
     const timer = window.setTimeout(async () => {
       setPreviewState('loading');
       try {
-        const response = await api.post<{ html: string }>(`${draftBase(draftId)}/preview`,
-          { statementHtml: statementSource });
-        if (current === request.current) { setPreview(response.data.html); setPreviewState('ready'); }
+        const response = await authoringService.previewStatement(draftId, statementSource);
+        if (current === request.current) { setPreview(response.html); setPreviewState('ready'); }
       } catch {
         if (current === request.current) {
           setPreviewState('error'); setPreviewError('Preview could not be updated. Your source is unchanged.');
