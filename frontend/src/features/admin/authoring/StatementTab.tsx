@@ -55,7 +55,6 @@ export default function StatementTab({ draft, disabled, onBuild, mutate, onError
 }) {
   return <section>
     <h2>Statement</h2>
-    <p>Edit task-pdf-writer Markdown, inline HTML and LaTeX in the dedicated two-pane editor.</p>
     <div className={styles.actions}>
       <Link className={styles.primaryLink} to={`/admin/authoring/${encodeURIComponent(draft.id)}/editor`}>Open full-screen editor</Link>
       <button type="button" disabled={disabled} onClick={onBuild}>Build PDF</button>

@@ -126,3 +126,50 @@
   border: 1px solid var(--border-color);
   border-radius: 5px;
 }
+
+/* Side-by-side input/output comparison inside the preview modal. */
+.previewColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.previewColumn {
+  min-width: 0;
+}
+.previewColumn h5 {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.previewColumn pre {
+  margin: 0;
+  padding: 0.75rem;
+  max-height: 22rem;
+  overflow: auto;
+  background: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.previewTruncated {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.previewMissing {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+@media (max-width: 700px) {
+  .previewColumns {
+    grid-template-columns: 1fr;
+  }
+}

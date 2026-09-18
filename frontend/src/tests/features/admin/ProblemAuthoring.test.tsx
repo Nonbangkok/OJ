@@ -123,9 +123,10 @@ test('tabs preserve edits and disable job actions until explicit Save succeeds',
   jest
     .mocked(api.patch)
     .mockResolvedValue({ data: { ...draft, title: 'Edited title', revision: 4, status: 'draft' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Save now' }));
-  await waitFor(() =>
-    expect(screen.getByRole('button', { name: 'Compile solution' })).toBeEnabled()
+  // The Save now button is gone: autosave fires shortly after the edit.
+  await waitFor(
+    () => expect(screen.getByRole('button', { name: 'Compile solution' })).toBeEnabled(),
+    { timeout: 4000 }
   );
 });
 test('a revision of a published task keeps its legacy Problem ID locked but leaves metadata editable', async () => {

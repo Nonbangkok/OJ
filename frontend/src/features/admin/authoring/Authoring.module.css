@@ -685,3 +685,168 @@
     cursor: row-resize;
   }
 }
+
+/* Two-column layout for the testcases section. */
+.twoColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+.column {
+  min-width: 0;
+}
+.columnHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.columnHead h3 {
+  margin: 0;
+}
+.optionalTag {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+  vertical-align: middle;
+}
+.seedRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+  font-weight: 500;
+}
+.seedRow input {
+  width: 11rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--background-primary);
+  color: var(--text-primary);
+}
+.caution {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  border-left: 3px solid var(--status-warning);
+  padding: 0.35rem 0.75rem;
+  margin: 0.75rem 0;
+  background: var(--background-secondary);
+}
+.sectionActions {
+  margin-top: 0.75rem;
+}
+/* Verify page hero + checklist panel. */
+.verifyHero {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-secondary);
+  margin-bottom: 1.25rem;
+}
+.verifyHeroText {
+  color: var(--text-secondary);
+  font-size: 0.925rem;
+}
+.verifyPanel {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  background: var(--background-primary);
+}
+.checklist {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.checkDone,
+.checkTodo {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+.checkDone {
+  background: rgba(25, 135, 84, 0.08);
+  border-color: rgba(25, 135, 84, 0.35);
+}
+.checkMark {
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+.checkDone .checkMark {
+  color: #198754;
+}
+.checkBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.checkLabel {
+  font-weight: 600;
+}
+.checkDetail {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.verifyActions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+/* Shared highlighted code editor. */
+.codeEditor {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #282c34;
+}
+.codeLabel {
+  padding: 0.4rem 0.9rem;
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #abb2bf;
+  background: #21252b;
+  border-bottom: 1px solid #181b20;
+}
+.codeWrap {
+  display: flex;
+  overflow: auto;
+  max-height: 30rem;
+}
+.lineNumbers {
+  flex: 0 0 auto;
+  padding: 14px 8px 14px 12px;
+  text-align: right;
+  color: #565c66;
+  font:
+    13px/1.55 'Fira code',
+    'Fira Mono',
+    monospace;
+  user-select: none;
+  background: #282c34;
+}
+.codeInput {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 1100px) {
+  .twoColumns {
+    grid-template-columns: 1fr;
+  }
+}

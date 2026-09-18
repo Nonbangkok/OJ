@@ -36,6 +36,7 @@ import {
   DraftSolution,
   DraftTestcases,
   DraftVerify,
+  DraftJobs,
 } from './features/admin/authoring/DraftWorkspace';
 
 // New layout for standard pages
@@ -88,6 +89,7 @@ const Layout = () => {
             <Route path="solution" element={<DraftSolution />} />
             <Route path="testcases" element={<DraftTestcases />} />
             <Route path="verify" element={<DraftVerify />} />
+            <Route path="jobs" element={<DraftJobs />} />
           </Route>
           <Route path="authoring/:draftId/editor" element={<ProblemAuthoring editorMode />} />
           <Route path="contests" element={<ContestManagement />} />

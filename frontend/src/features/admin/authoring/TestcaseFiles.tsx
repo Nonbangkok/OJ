@@ -336,18 +336,24 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
             </Button>
           }
         >
-          <h5>Input</h5>
-          <pre aria-label="Input preview">{preview.input.text || '(Empty input)'}</pre>
-          {preview.input.truncated && <p>Input preview truncated at 32 KiB.</p>}
-          <h5>Output</h5>
-          {preview.output === null ? (
-            <p>Missing output</p>
-          ) : (
-            <>
-              <pre aria-label="Output preview">{preview.output.text || '(Empty output)'}</pre>
-              {preview.output.truncated && <p>Output preview truncated at 32 KiB.</p>}
-            </>
-          )}
+          <div className={styles.previewColumns}>
+            <div className={styles.previewColumn}>
+              <h5>Input</h5>
+              <pre aria-label="Input preview">{preview.input.text || '(Empty input)'}</pre>
+              {preview.input.truncated && <p className={styles.previewTruncated}>Truncated at 32 KiB</p>}
+            </div>
+            <div className={styles.previewColumn}>
+              <h5>Output</h5>
+              {preview.output === null ? (
+                <p className={styles.previewMissing}>Missing output</p>
+              ) : (
+                <>
+                  <pre aria-label="Output preview">{preview.output.text || '(Empty output)'}</pre>
+                  {preview.output.truncated && <p className={styles.previewTruncated}>Truncated at 32 KiB</p>}
+                </>
+              )}
+            </div>
+          </div>
         </Dialog>
       )}
 

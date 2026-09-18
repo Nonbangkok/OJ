@@ -3,16 +3,17 @@ import { Link, NavLink, Outlet, useNavigate, useOutletContext } from 'react-rout
 import { Button, Dialog, StatusBadge } from '../../../components/ui';
 import api from '../../../services/api';
 import useAuthoringDraft from './useAuthoringDraft';
-import { draftBase, Profile } from './types';
+import { Profile } from './types';
 import { draftStatus } from './status';
 import JobHistory from './JobHistory';
 import MetadataFields from './MetadataFields';
 import StatementTab, { PdfPreview } from './StatementTab';
 import TestcaseFiles from './TestcaseFiles';
+import CodeEditor from './CodeEditor';
 import styles from './Authoring.module.css';
 
 const saveStateText: Record<string, string> = {
-  saved: 'All changes saved',
+  saved: 'Saved automatically',
   dirty: 'Saving…',
   saving: 'Saving…',
   error: 'Save failed — will retry after you edit again',
@@ -26,6 +27,7 @@ const sections = [
   { path: 'solution', label: 'Solution' },
   { path: 'testcases', label: 'Testcases' },
   { path: 'verify', label: 'Verify & Publish' },
+  { path: 'jobs', label: 'History & Logs' },
 ] as const;
 
 export default function DraftWorkspace({ id }: { id: string }) {
@@ -77,10 +79,7 @@ export default function DraftWorkspace({ id }: { id: string }) {
             : model.conflict ? 'Server state changed'
               : saveStateText[model.saveState] ?? ''}
         </strong>
-        <Button size="compact" disabled={!model.dirty || editorDisabled || model.conflict || !model.loaded}
-          onClick={() => void model.save()}>Save now</Button>
         {model.activeJob && <p role="status" className={styles.navJob}><StatusBadge tone="info">Running</StatusBadge> {model.activeJob.jobType}</p>}
-        {model.dirty && <p className={styles.navHint}>Edits save themselves after you stop typing.</p>}
       </div>
       <nav className={styles.sectionNav} aria-label="Draft sections">
         {sections.map(section => <NavLink key={section.path} to={section.path} relative="path"
@@ -96,7 +95,6 @@ export default function DraftWorkspace({ id }: { id: string }) {
         <Button variant="secondary" disabled={model.busy} onClick={() => setLeaveGuard(true)}>Discard local changes and sync</Button></div>}
       {draft.status === 'published' && <p>Created as hidden. Manage visibility in <Link to="/admin/problems">Problem Management</Link>.</p>}
       <Outlet context={workspace} />
-      <JobHistory jobs={model.jobs} onError={onError} />
     </div>
     {confirm && <Dialog open title={confirm.action === 'publish' ? 'Publish this problem?' : 'Replace stored files?'}
       description={confirm.action === 'publish' ? 'The problem will be created as hidden. The draft becomes read-only.'
@@ -141,6 +139,7 @@ export const DraftStatement = StatementSection;
 export const DraftSolution = SolutionSection;
 export const DraftTestcases = TestcasesSection;
 export const DraftVerify = VerifySection;
+export const DraftJobs = JobsSection;
 
 function MetadataSection() {
   const { model, draft, form, editorDisabled } = useOutletContext<WorkspaceContext>();
@@ -150,16 +149,22 @@ function MetadataSection() {
     api.get<Profile[]>('/admin/author-profiles').then(r => { if (!cancelled) setProfiles(r.data); }).catch(onError);
     return () => { cancelled = true; };
   }, [onError]);
+  // The author snapshot refreshes automatically when its linked profile changes,
+  // so profile edits on the profiles page propagate without a manual button.
+  useEffect(() => {
+    if (model.actionsDisabled || !draft.authorProfileId || draft.publishedAt !== null) return;
+    const linked = profiles.find(p => p.id === draft.authorProfileId);
+    if (!linked) return;
+    const snapshot = { akaName: linked.akaName, realName: linked.realName, language: linked.defaultLanguage, countryCode: linked.countryCode };
+    const current = { akaName: draft.authorAkaName, realName: draft.authorRealName, language: draft.language, countryCode: draft.countryCode };
+    if (JSON.stringify(snapshot) === JSON.stringify(current)) return;
+    void model.mutate(() => api.post(`/admin/authoring/drafts/${draft.id}/refresh-author-profile`,
+      { expectedRevision: draft.revision }));
+  }, [draft, profiles, model]);
   return <section className={styles.authoring}>
     <h2>Metadata</h2>
     <MetadataFields value={form} profiles={profiles} disabled={editorDisabled}
       problemIdLocked={draft.publishedAt !== null} onEdit={model.edit} />
-    <div className={styles.actions}>
-      <Button variant="secondary" disabled={model.actionsDisabled || !draft.authorProfileId} onClick={() => void model.mutate(() =>
-        api.post(`${draftBase(draft.id)}/refresh-author-profile`, { expectedRevision: draft.revision }))}>Refresh from profile</Button>
-      <Link className={styles.actionLink} to="/admin/authoring/profiles">Manage author profiles</Link>
-    </div>
-    <p>Refresh explicitly copies the latest profile and avatar, increments revision and clears readiness.</p>
   </section>;
 }
 
@@ -176,9 +181,11 @@ function SolutionSection() {
   const { model, form, editorDisabled } = useOutletContext<WorkspaceContext>();
   return <section className={styles.authoring}>
     <h2>Reference solution</h2>
-    <p>Private C++20 source. The author is responsible for algorithm correctness.</p>
-    <label>solution.cpp<textarea spellCheck={false} disabled={editorDisabled} value={form.solutionCpp} onChange={e => model.edit('solutionCpp', e.target.value)} /></label>
-    <Button disabled={model.actionsDisabled || !form.solutionCpp.trim()} onClick={() => void model.runJob('compile', { target: 'solution' })}>Compile solution</Button>
+    <CodeEditor label="solution.cpp" value={form.solutionCpp} disabled={editorDisabled}
+      onChange={value => model.edit('solutionCpp', value)} />
+    <div className={styles.sectionActions}>
+      <Button disabled={model.actionsDisabled || !form.solutionCpp.trim()} onClick={() => void model.runJob('compile', { target: 'solution' })}>Compile solution</Button>
+    </div>
   </section>;
 }
 
@@ -186,35 +193,53 @@ function TestcasesSection() {
   const { model, draft, form, editorDisabled, setConfirm } = useOutletContext<WorkspaceContext>();
   const [seed, setSeed] = useState('12345');
   return <section className={styles.authoring}>
-    <h2>Generator & testcases</h2>
-    <div className={styles.actions}>
-      <Button disabled={model.actionsDisabled || !form.solutionCpp.trim()} onClick={() => setConfirm({ action: 'outputs', revision: draft.revision })}>Generate outputs</Button>
-    </div>
-    <p>Generate outputs runs the reference solution over every stored input. Upload inputs below; a generator is optional.</p>
-    <details className={styles.generatorBox} open={!!form.generatorCpp?.trim()}>
-      <summary>Optional generator (generator.cpp)</summary>
-      <label>generator.cpp<textarea spellCheck={false} disabled={editorDisabled} value={form.generatorCpp || ''}
-        onChange={e => model.edit('generatorCpp', e.target.value || null)} /></label>
-      <p>New generators should read OJ_SEED or argv[1]. Legacy multi-file generators may write to ./input/ instead; passing a seed does not guarantee a legacy generator uses it.</p>
-      <label>Generator seed<input value={seed} disabled={model.actionsDisabled} inputMode="numeric" onChange={e => setSeed(e.target.value)} /></label>
-      <div className={styles.actions}>
-        <Button variant="secondary" disabled={model.actionsDisabled || !form.generatorCpp?.trim()} onClick={() => void model.runJob('compile', { target: 'generator' })}>Compile generator</Button>
-        <Button disabled={model.actionsDisabled || !form.generatorCpp?.trim() || !/^(0|[1-9][0-9]{0,19})$/.test(seed)
-          || (seed.length === 20 && seed > '18446744073709551615')} onClick={() => setConfirm({ action: 'generate', revision: draft.revision })}>Generate inputs</Button>
+    <h2>Testcases</h2>
+    <div className={styles.twoColumns}>
+      <div className={styles.column}>
+        <div className={styles.columnHead}>
+          <h3>Files</h3>
+          <Button disabled={model.actionsDisabled || !form.solutionCpp.trim()} onClick={() => setConfirm({ action: 'outputs', revision: draft.revision })}>Generate outputs</Button>
+        </div>
+        <TestcaseFiles draftId={draft.id} revision={draft.revision} artifactVersion={draft.updatedAt} disabled={model.actionsDisabled} onMutated={model.refresh} onError={model.onError} onBusyChange={model.setOperationBusy} />
       </div>
-    </details>
-    <TestcaseFiles draftId={draft.id} revision={draft.revision} artifactVersion={draft.updatedAt} disabled={model.actionsDisabled} onMutated={model.refresh} onError={model.onError} onBusyChange={model.setOperationBusy} />
+      <div className={styles.column}>
+        <div className={styles.columnHead}>
+          <h3>Generator <span className={styles.optionalTag}>optional</span></h3>
+          <div className={styles.actions}>
+            <Button variant="secondary" size="compact" disabled={model.actionsDisabled || !form.generatorCpp?.trim()} onClick={() => void model.runJob('compile', { target: 'generator' })}>Compile</Button>
+            <Button size="compact" disabled={model.actionsDisabled || !form.generatorCpp?.trim() || !/^(0|[1-9][0-9]{0,19})$/.test(seed)
+              || (seed.length === 20 && seed > '18446744073709551615')} onClick={() => setConfirm({ action: 'generate', revision: draft.revision })}>Generate inputs</Button>
+          </div>
+        </div>
+        <CodeEditor label="generator.cpp" value={form.generatorCpp || ''} disabled={editorDisabled}
+          onChange={value => model.edit('generatorCpp', value || null)} />
+        <label className={styles.seedRow}>Generator seed<input value={seed} disabled={model.actionsDisabled} inputMode="numeric" onChange={e => setSeed(e.target.value)} /></label>
+        <p className={styles.caution}>Legacy multi-file generators may ignore the seed and write to ./input/ instead of reading OJ_SEED or argv[1].</p>
+      </div>
+    </div>
   </section>;
 }
 
 function VerifySection() {
   const { model, draft, setConfirm, navigate } = useOutletContext<WorkspaceContext>();
+  const status = draftStatus(draft.status);
   return <section className={styles.authoring}>
     <h2>Verify & Publish</h2>
+    <div className={styles.verifyHero}>
+      <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+      <span className={styles.verifyHeroText}>{status.hint}</span>
+    </div>
     <PublishChecklist draft={draft} dirty={model.dirty} canPublish={model.canPublish} disabled={model.actionsDisabled}
       onVerify={() => void model.runJob('verify')} onPublish={() => setConfirm({ action: 'publish', revision: draft.revision })}
       onBuildPdf={() => void model.runJob('pdf')} onGoToTestcases={() => navigate('testcases', { relative: 'path' })} />
     <PdfPreview draft={draft} />
+  </section>;
+}
+
+function JobsSection() {
+  const { model } = useOutletContext<WorkspaceContext>();
+  return <section className={styles.authoring}>
+    <JobHistory jobs={model.jobs} onError={model.onError} />
   </section>;
 }
 
@@ -226,24 +251,30 @@ function PublishChecklist({ draft, dirty, canPublish, disabled, onVerify, onPubl
   const pdfCurrent = draft.hasLatestPdf && draft.latestPdfRevision === draft.revision;
   const verified = draft.verifiedRevision === draft.revision;
   const hasOutputs = draft.status === 'generated' || draft.status === 'ready' || draft.status === 'published';
-  const item = (done: boolean, label: string, action?: React.ReactNode) =>
+  const item = (done: boolean, label: string, detail: string, action?: React.ReactNode) =>
     <li className={done ? styles.checkDone : styles.checkTodo} key={label}>
-      <span aria-hidden>{done ? '✓' : '○'}</span> {label} {!done && action}
+      <span className={styles.checkMark} aria-hidden>{done ? '✓' : '○'}</span>
+      <span className={styles.checkBody}>
+        <span className={styles.checkLabel}>{label}</span>
+        <span className={styles.checkDetail}>{done ? 'Done' : detail} {!done && action}</span>
+      </span>
     </li>;
-  return <>
+  return <div className={styles.verifyPanel}>
     <ul className={styles.checklist} aria-label="Publish readiness">
-      {item(!!draft.solutionCpp.trim(), 'Reference solution provided',
-        <>— paste it in the <button type="button" className={styles.linkButton} onClick={onGoToTestcases}>Solution</button> section</>)}
-      {item(hasOutputs, 'Testcase outputs generated',
-        <>— run <button type="button" className={styles.linkButton} onClick={onGoToTestcases}>Generate outputs</button> in the Testcases section</>)}
-      {item(pdfCurrent, `PDF built for revision ${draft.revision}`,
-        <>— <button type="button" className={styles.linkButton} disabled={disabled} onClick={onBuildPdf}>Build PDF now</button></>)}
-      {item(verified, `Verified at revision ${draft.revision}`,
-        <>— <button type="button" className={styles.linkButton} disabled={disabled || !draft.solutionCpp.trim()} onClick={onVerify}>Verify All now</button></>)}
+      {item(!!draft.solutionCpp.trim(), 'Reference solution', 'missing',
+        <>— <button type="button" className={styles.linkButton} onClick={() => onGoToTestcases()}>add it</button></>)}
+      {item(hasOutputs, 'Testcase outputs', 'not generated',
+        <>— <button type="button" className={styles.linkButton} onClick={() => onGoToTestcases()}>generate</button></>)}
+      {item(pdfCurrent, `PDF (revision ${draft.revision})`, draft.hasLatestPdf ? 'outdated' : 'not built',
+        <>— <button type="button" className={styles.linkButton} disabled={disabled} onClick={onBuildPdf}>build now</button></>)}
+      {item(verified, 'Verified', draft.verifiedRevision === null ? 'never verified' : `verified at revision ${draft.verifiedRevision}`,
+        <>— <button type="button" className={styles.linkButton} disabled={disabled || !draft.solutionCpp.trim()} onClick={onVerify}>verify now</button></>)}
     </ul>
-    {dirty && <p>Unsaved edits exist — they save automatically, then this checklist re-evaluates.</p>}
-    <Button disabled={disabled || !draft.solutionCpp.trim()} onClick={onVerify}>Verify All</Button>
-    <Button variant="primary" disabled={!canPublish} onClick={onPublish}>Publish problem</Button>
-    <p>Verify renders the PDF, compiles C++, and compares the solution against stored outputs. It does not regenerate inputs or prove correctness.</p>
-  </>;
+    {dirty && <p className={styles.caution}>Unsaved edits exist — saving automatically.</p>}
+    <div className={styles.verifyActions}>
+      <Button disabled={disabled || !draft.solutionCpp.trim()} onClick={onVerify}>Verify All</Button>
+      <Button variant="primary" disabled={!canPublish} onClick={onPublish}>Publish problem</Button>
+    </div>
+    <p className={styles.caution}>Verify does not prove algorithm correctness.</p>
+  </div>;
 }
