@@ -79,6 +79,7 @@ export interface SubmissionFilters {
 export interface SubmissionListRow {
   id: number;
   source: 'main' | 'contest';
+  contestId: number | null;
   problemId: string;
   problemTitle: string;
   userId: number;

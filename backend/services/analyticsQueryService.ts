@@ -902,6 +902,8 @@ export interface SubmissionFilters {
 export interface SubmissionListRow {
   id: number;
   source: 'main' | 'contest';
+  /** Contest id for contest rows; needed to fetch the code via /submissions/:id. */
+  contestId: number | null;
   problemId: string;
   problemTitle: string;
   userId: number;
@@ -917,6 +919,7 @@ export interface SubmissionListRow {
 interface SubmissionQueryRow {
   id: number;
   source: 'main' | 'contest';
+  contest_id: number | null;
   problem_id: string;
   problem_title: string;
   user_id: number | null;
@@ -972,6 +975,7 @@ export const listSubmissionsForAnalytics = async (
       SELECT
         s.id,
         'main' AS source,
+        NULL::int AS contest_id,
         s.problem_id,
         p.title AS problem_title,
         s.user_id,
@@ -987,6 +991,7 @@ export const listSubmissionsForAnalytics = async (
       SELECT
         cs.id,
         'contest' AS source,
+        cs.contest_id,
         cs.problem_id,
         COALESCE(cpt.title, cp.title, cs.problem_id) AS problem_title,
         cs.user_id,
@@ -1013,6 +1018,7 @@ export const listSubmissionsForAnalytics = async (
   return result.rows.map((r) => ({
     id: r.id,
     source: r.source,
+    contestId: r.contest_id,
     problemId: r.problem_id,
     problemTitle: r.problem_title,
     userId: r.user_id ?? 0,

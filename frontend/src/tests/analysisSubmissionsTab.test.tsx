@@ -8,15 +8,18 @@ jest.mock('../services/analyticsService');
 jest.mock('../services/submissionService', () => ({
     searchProblems: jest.fn(),
     searchUsers: jest.fn(),
+    getById: jest.fn(),
 }));
 
 const mockFetchSubmissions = analyticsService.fetchAnalyticsSubmissions as jest.MockedFunction<typeof analyticsService.fetchAnalyticsSubmissions>;
 const mockSearchProblems = submissionService.searchProblems as jest.MockedFunction<typeof submissionService.searchProblems>;
 const mockSearchUsers = submissionService.searchUsers as jest.MockedFunction<typeof submissionService.searchUsers>;
+const mockGetById = submissionService.getById as jest.MockedFunction<typeof submissionService.getById>;
 
 const mockSubmission = {
     id: 42,
     source: 'main' as const,
+    contestId: null,
     problemId: 'aplusb',
     problemTitle: 'A Plus B',
     userId: 2,
@@ -180,6 +183,32 @@ describe('SubmissionsTab', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Problem' }));
         expect(onSelectProblem).toHaveBeenCalledWith('aplusb');
+    });
+
+    it('opens the code modal when View is clicked', async () => {
+        mockFetchSubmissions.mockResolvedValue({ submissions: [mockSubmission] });
+        mockGetById.mockResolvedValueOnce({
+            id: 42,
+            code: 'int main() { return 0; }',
+            problem_name: 'A Plus B',
+            username: 'bob',
+            overall_status: 'Accepted',
+            score: 100,
+            language: 'cpp',
+            submitted_at: '2026-09-19T05:00:00+00:00',
+        } as never);
+
+        render(
+            <BrowserRouter>
+                <SubmissionsTab onSelectUser={jest.fn()} onSelectProblem={jest.fn()} />
+            </BrowserRouter>
+        );
+
+        await waitFor(() => expect(screen.getByRole('button', { name: 'View' })).toBeInTheDocument());
+
+        fireEvent.click(screen.getByRole('button', { name: 'View' }));
+
+        await waitFor(() => expect(mockGetById).toHaveBeenCalledWith(42, null));
     });
 
     it('renders an error when the fetch fails', async () => {

@@ -6,6 +6,8 @@ import {
 } from '../../../services/analyticsService';
 import submissionService from '../../../services/submissionService';
 import { useAutocomplete } from '../../../hooks/useAutocomplete';
+import type { SubmissionDetail } from '../../../types';
+import SubmissionModal from '../../problem/submission/SubmissionModal';
 import VerdictBadge from './components/VerdictBadge';
 import styles from './SubmissionsTab.module.css';
 
@@ -37,6 +39,8 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedSubmission, setSelectedSubmission] = useState<SubmissionDetail | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Typed filter with autocomplete suggestions, same pattern as the main
   // submissions page (useAutocomplete + submissionService.search*).
@@ -105,6 +109,23 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
   const clearUser = () => {
     setSelectedUser(null);
     userAutocomplete.setQuery('');
+  };
+
+  // Same flow as the main submissions page: fetch the full detail (with code)
+  // and open the shared read-only modal.
+  const handleViewCode = async (submission: SubmissionListRow) => {
+    try {
+      const data = await submissionService.getById(submission.id, submission.contestId);
+      setSelectedSubmission(data);
+      setIsModalOpen(true);
+    } catch {
+      setError(`Failed to fetch submission #${submission.id}.`);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedSubmission(null);
   };
 
   if (error) return <p className={styles.error}>{error}</p>;
@@ -181,6 +202,7 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
                 <th>Score</th>
                 <th>Time</th>
                 <th>Memory</th>
+                <th>Code</th>
                 <th />
               </tr>
             </thead>
@@ -196,6 +218,15 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
                   <td>{s.score}</td>
                   <td>{formatMs(s.timeMs)}</td>
                   <td>{formatKb(s.memoryKb)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className={styles['link-button']}
+                      onClick={() => handleViewCode(s)}
+                    >
+                      View
+                    </button>
+                  </td>
                   <td className={styles.actions}>
                     <button
                       type="button"
@@ -215,7 +246,7 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
                 </tr>
               ))}
               {submissions.length === 0 && (
-                <tr><td colSpan={8} className={styles.empty}>No submissions match these filters.</td></tr>
+                <tr><td colSpan={9} className={styles.empty}>No submissions match these filters.</td></tr>
               )}
             </tbody>
           </table>
@@ -239,6 +270,10 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
           Next
         </button>
       </div>
+
+      {isModalOpen && (
+        <SubmissionModal submission={selectedSubmission} onClose={handleCloseModal} />
+      )}
     </div>
   );
 };
