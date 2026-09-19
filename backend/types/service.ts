@@ -158,6 +158,7 @@ export interface SearchUserRow {
 
 export interface GlobalScoreboardRow {
   username: string;
+  has_avatar: boolean;
   total_score: string;
   problems_solved: string;
   last_score_improvement_time: Date | null;
@@ -278,6 +279,7 @@ export interface ContestProblemsSummaryRow extends IdTitlePair {
 export interface ContestScoreboardRow {
   user_id: number;
   username: string;
+  has_avatar?: boolean;
   total_score: number;
   detailed_scores: Record<string, number> | Record<string, { score: number }>;
   last_score_improvement_time?: Date | null;

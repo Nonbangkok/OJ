@@ -142,3 +142,9 @@
   color: var(--text-primary);
   word-break: break-word;
 }
+
+.user-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}

@@ -45,7 +45,10 @@ describe('ContestScoreboard Page', () => {
             status: 'running' as const
         };
         const mockScoreboardData = {
-            scoreboard: [{ user_id: 1, username: 'user1', total_score: 100, detailed_scores: {}, last_score_improvement_time: null }],
+            scoreboard: [
+                { user_id: 1, username: 'user1', has_avatar: true, total_score: 100, detailed_scores: {}, last_score_improvement_time: null },
+                { user_id: 2, username: 'user2', has_avatar: false, total_score: 50, detailed_scores: {}, last_score_improvement_time: null },
+            ],
             problems: [{ id: 'P1', title: 'Problem 1', author: null, problem_id: 'P1' }],
         };
 
@@ -63,6 +66,11 @@ describe('ContestScoreboard Page', () => {
             expect(screen.getByText('user1')).toBeInTheDocument();
             expect(screen.getByText('100')).toBeInTheDocument();
         });
+
+        // Avatars: image for user1, fallback initial for user2
+        expect(screen.getByAltText("user1's avatar")).toBeInTheDocument();
+        expect(screen.queryByAltText("user2's avatar")).not.toBeInTheDocument();
+        expect(screen.getByText('U')).toBeInTheDocument();
 
         expect(contestService.getById).toHaveBeenCalledWith('contest-1');
         expect(contestService.getScoreboard).toHaveBeenCalledWith('contest-1');

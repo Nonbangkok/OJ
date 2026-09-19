@@ -154,7 +154,7 @@ export const getContestScoreboard = async (id: string): Promise<ContestScoreboar
     if (contest.status === CONTEST_STATUS.FINISHED) {
         const [scoreboardResult, problemsResult] = await Promise.all([
             db.query<ContestScoreboardDetailRow>(
-                `SELECT cs.*, u.username
+                `SELECT cs.*, u.username, (u.avatar_png IS NOT NULL) AS has_avatar
                  FROM contest_scoreboards cs
                  JOIN users u ON cs.user_id = u.id
                  WHERE cs.contest_id = $1
@@ -203,6 +203,7 @@ export const getContestScoreboard = async (id: string): Promise<ContestScoreboar
                   SELECT
                     cp.user_id,
                     u.username,
+                    (u.avatar_png IS NOT NULL) AS has_avatar,
                     COALESCE(uts.total_score, 0) AS total_score,
                     COALESCE(uts.detailed_scores, '{}'::jsonb) AS detailed_scores,
                     COALESCE(uts.last_score_improvement_time, cp.joined_at) AS last_score_improvement_time

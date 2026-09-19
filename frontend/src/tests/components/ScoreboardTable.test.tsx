@@ -14,10 +14,10 @@ jest.mock('../../features/scoreboard/ScoreboardTable.module.css', () => ({
 }));
 
 const mockScoreboard = [
-    { username: 'alice', problems_solved: 10, total_score: 1000 },
-    { username: 'bob', problems_solved: 8, total_score: 800 },
-    { username: 'charlie', problems_solved: 6, total_score: 600 },
-    { username: 'dave', problems_solved: 4, total_score: 400 }
+    { username: 'alice', has_avatar: true, problems_solved: 10, total_score: 1000 },
+    { username: 'bob', has_avatar: false, problems_solved: 8, total_score: 800 },
+    { username: 'charlie', has_avatar: false, problems_solved: 6, total_score: 600 },
+    { username: 'dave', has_avatar: false, problems_solved: 4, total_score: 400 }
 ];
 
 describe('ScoreboardTable', () => {
@@ -59,5 +59,13 @@ describe('ScoreboardTable', () => {
 
         expect(screen.getByText('Rank')).toBeInTheDocument();
         expect(screen.queryByText(/alice/)).not.toBeInTheDocument();
+    });
+
+    it('renders an avatar image for users with one and an initial for the rest', () => {
+        render(<MemoryRouter><ScoreboardTable scoreboard={mockScoreboard} /></MemoryRouter>);
+
+        expect(screen.getByAltText("alice's avatar")).toBeInTheDocument();
+        expect(screen.queryByAltText("bob's avatar")).not.toBeInTheDocument();
+        expect(screen.getByText('B')).toBeInTheDocument(); // fallback initial
     });
 });

@@ -104,6 +104,7 @@ export interface SubmissionDetail extends SubmissionSummary {
 
 export interface GlobalScoreboardEntry {
   username: string;
+  has_avatar?: boolean;
   total_score: number | string;
   problems_solved: number | string;
   last_score_improvement_time?: string | null;
@@ -120,6 +121,7 @@ export type ContestDetailedScore = Record<string, number | ContestProblemScore>;
 export interface ContestScoreboardEntry {
   user_id?: number | string;
   username: string;
+  has_avatar?: boolean;
   total_score: number;
   detailed_scores: ContestDetailedScore;
   last_score_improvement_time: string | null;

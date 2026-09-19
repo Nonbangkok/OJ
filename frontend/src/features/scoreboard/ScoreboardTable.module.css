@@ -1,3 +1,9 @@
+.user-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 :global([data-theme='dark']) .rank-1,
 .rank-1 {
   background-color: rgba(255, 215, 0, 0.1); /* Gold/Yellow tint */

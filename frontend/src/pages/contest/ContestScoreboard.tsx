@@ -1,5 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import useContestScoreboard from '../../hooks/useContestScoreboard';
+import UserAvatar from '../../components/user/UserAvatar';
 import styles from './ContestScoreboard.module.css';
 import tableStyles from '../../components/styles/Table.module.css';
 import LoadingPage from '../../components/shared/LoadingPage';
@@ -73,7 +74,16 @@ const ContestScoreboard = () => {
                     className={rank <= 3 ? `rank-${rank}` : ''}
                   >
                     <td>{rank}</td>
-                    <td>{participant.username}</td>
+                    <td>
+                      <span className={styles['user-cell']}>
+                        <UserAvatar
+                          username={participant.username}
+                          hasAvatar={participant.has_avatar}
+                          size={28}
+                        />
+                        {participant.username}
+                      </span>
+                    </td>
                     <td>{participant.total_score}</td>
                     {problems.map((problem) => {
                       const problemId = problem.problem_id ?? problem.id;

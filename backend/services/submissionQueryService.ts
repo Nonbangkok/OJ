@@ -266,12 +266,13 @@ export const getGlobalScoreboard = async (): Promise<GlobalScoreboardRow[]> => {
       )
       SELECT
         u.username,
+        (u.avatar_png IS NOT NULL) AS has_avatar,
         SUM(ubs.best_score) AS total_score,
         COUNT(CASE WHEN ubs.best_score = 100 THEN 1 END) AS problems_solved,
         MAX(ubs.latest_score_time) AS last_score_improvement_time
       FROM UserBestScores ubs
       JOIN users u ON ubs.user_id = u.id
-      GROUP BY u.username
+      GROUP BY u.username, u.avatar_png
       ORDER BY total_score DESC, last_score_improvement_time ASC
     `);
     return result.rows;
