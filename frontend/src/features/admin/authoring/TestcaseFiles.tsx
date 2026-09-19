@@ -82,7 +82,6 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
         />
       )}
 
-      <p className={styles.hint}>Previews show up to 32 KiB per file.</p>
       {preview && <TestcasePreviewDialog preview={preview} onClose={() => model.setPreview(null)} />}
 
       {model.editing && (
