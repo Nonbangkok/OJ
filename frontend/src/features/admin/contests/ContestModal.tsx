@@ -72,7 +72,7 @@ const ContestModal = ({ contest, onClose, onSuccess }) => {
             <div className={formStyles['form-time']}>
               <DatePicker
                 selected={formData.start_time}
-                onChange={(date) => handleDateChange(date, 'start_time')}
+                onChange={(date: Date | null) => handleDateChange(date, 'start_time')}
                 showTimeSelect
                 dateFormat="MMM dd, yyyy, h:mm aa"
                 timeFormat="HH:mm"
@@ -91,7 +91,7 @@ const ContestModal = ({ contest, onClose, onSuccess }) => {
             <div className={formStyles['form-time']}>
               <DatePicker
                 selected={formData.end_time}
-                onChange={(date) => handleDateChange(date, 'end_time')}
+                onChange={(date: Date | null) => handleDateChange(date, 'end_time')}
                 showTimeSelect
                 dateFormat="MMM dd, yyyy, h:mm aa"
                 timeFormat="HH:mm"
