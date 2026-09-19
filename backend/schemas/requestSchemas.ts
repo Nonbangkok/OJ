@@ -11,7 +11,7 @@ import {
 } from '../constants';
 
 const nonEmptyString = z.string().trim().min(1);
-export const outputAuthoringJobSchema = z.object({
+export const expectedRevisionSchema = z.object({
   expectedRevision: z.number().int().positive().max(2147483647),
 }).strict();
 export const generateAuthoringJobSchema = z.object({
@@ -179,6 +179,9 @@ export const updateAuthorProfileSchema = z.object({
   defaultLanguage: authorProfileFields.defaultLanguage.optional(),
   countryCode: authorProfileFields.countryCode.optional(),
   removeProfileImage: optionalBooleanFromForm,
+  // Confirmation gate for the profile auto-sync cascade: set after the client
+  // has shown the affected-draft/published-problem counts to the admin.
+  confirmed: optionalBooleanFromForm,
 }).strict();
 
 const editableProblemDraftFields = {

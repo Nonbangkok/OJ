@@ -1,20 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button } from '../../../components/ui';
-import api from '../../../services/api';
+import { Button, Dialog } from '../../../components/ui';
+import authoringService from '../../../services/admin/authoringService';
+import { getErrorMessage } from '../../../utils/error';
+import { Profile, ProfileUpdateConfirmation } from './types';
 import { drawProfileCrop, loadProfileImage, profileCropToPng } from './profileImage';
 import styles from './AuthorProfiles.module.css';
 
-interface Profile {
-  id: string;
-  userId: number | null;
-  akaName: string;
-  realName: string;
-  defaultLanguage: string;
-  countryCode: string;
-  hasProfileImage: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
 interface Fields {
   akaName: string;
   realName: string;
@@ -29,12 +20,18 @@ const emptyFields: Fields = {
   countryCode: 'THA',
   userId: '',
 };
-function errorMessage(error: unknown): string {
-  const response = error as { response?: { data?: { message?: unknown } }; message?: unknown };
-  if (typeof response?.response?.data?.message === 'string') return response.response.data.message;
-  return typeof response?.message === 'string'
-    ? response.message
-    : 'Unable to save or load author profiles. Please try again.';
+const profileErrorMessage = (error: unknown): string =>
+  getErrorMessage(error, 'Unable to save or load author profiles. Please try again.');
+
+const isConfirmation = (
+  result: Profile | ProfileUpdateConfirmation
+): result is ProfileUpdateConfirmation =>
+  (result as ProfileUpdateConfirmation).confirmationRequired === true;
+
+/** Pending cascade impact from the server's confirmation gate. */
+interface PendingSync {
+  affectedDrafts: number;
+  affectedPublishedProblems: number;
 }
 
 export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }) {
@@ -46,6 +43,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [pendingSync, setPendingSync] = useState<PendingSync | null>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [removeImage, setRemoveImage] = useState(false);
@@ -61,10 +59,10 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
     setLoading(true);
     setListError('');
     try {
-      const { data } = await api.get<Profile[]>('/admin/author-profiles');
+      const data = await authoringService.listProfiles();
       if (request === listRequest.current) setProfiles(data);
     } catch (failure) {
-      if (request === listRequest.current) setListError(errorMessage(failure));
+      if (request === listRequest.current) setListError(profileErrorMessage(failure));
     } finally {
       if (request === listRequest.current) setLoading(false);
     }
@@ -81,7 +79,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
     try {
       drawProfileCrop(canvas.current, image, zoom, x, y);
     } catch (failure) {
-      setError(errorMessage(failure));
+      setError(profileErrorMessage(failure));
     }
   }, [image, zoom, x, y]);
 
@@ -98,6 +96,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
     setEditing(profile);
     setError('');
     setNotice('');
+    setPendingSync(null);
     resetImage();
     setFields(
       profile === 'new'
@@ -125,7 +124,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
       setX(50);
       setY(50);
     } catch (failure) {
-      if (request === imageRequest.current) setError(errorMessage(failure));
+      if (request === imageRequest.current) setError(profileErrorMessage(failure));
     } finally {
       if (request === imageRequest.current) setImageLoading(false);
     }
@@ -154,24 +153,54 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
       if (image)
         body.append('profileImage', await profileCropToPng(image, zoom, x, y), 'profile.png');
       else if (editing !== 'new' && removeImage) body.append('removeProfileImage', 'true');
-      const { data } =
-        editing === 'new'
-          ? await api.post<Profile>('/admin/author-profiles', body)
-          : await api.patch<Profile>(`/admin/author-profiles/${editing.id}`, body);
-      setProfiles((current) =>
-        current.some((profile) => profile.id === data.id)
-          ? current.map((profile) => (profile.id === data.id ? data : profile))
-          : [...current, data]
-      );
-      setEditing(null);
-      resetImage();
-      setNotice('Author profile saved.');
-      onChanged?.();
+      // New profiles have nothing to cascade; existing ones go through the
+      // confirmation gate — the first submit reports impact, the confirmed
+      // resubmit saves and starts the cascade.
+      if (editing === 'new') {
+        applySavedProfile(await authoringService.createProfile(body));
+      } else if (pendingSync) {
+        const confirmedResult = await authoringService.updateProfileWithGate(editing.id, body, true);
+        if (isConfirmation(confirmedResult)) {
+          // The server re-reported impact (e.g. drafts appeared since the gate
+          // probe); show the fresh counts instead of saving.
+          setPendingSync({
+            affectedDrafts: confirmedResult.affectedDrafts,
+            affectedPublishedProblems: confirmedResult.affectedPublishedProblems,
+          });
+          setSaving(false);
+          return;
+        }
+        applySavedProfile(confirmedResult);
+        setPendingSync(null);
+        setNotice('Author profile saved. Linked drafts are syncing their PDFs — see the Jobs tab.');
+      } else {
+        const result = await authoringService.updateProfileWithGate(editing.id, body, false);
+        if (isConfirmation(result)) {
+          setPendingSync({
+            affectedDrafts: result.affectedDrafts,
+            affectedPublishedProblems: result.affectedPublishedProblems,
+          });
+          setSaving(false);
+          return;
+        }
+        applySavedProfile(result);
+      }
     } catch (failure) {
-      setError(errorMessage(failure));
+      setError(profileErrorMessage(failure));
     } finally {
       setSaving(false);
     }
+  }
+  function applySavedProfile(data: Profile) {
+    setProfiles((current) =>
+      current.some((profile) => profile.id === data.id)
+        ? current.map((profile) => (profile.id === data.id ? data : profile))
+        : [...current, data]
+    );
+    setEditing(null);
+    resetImage();
+    setNotice('Author profile saved.');
+    onChanged?.();
   }
   function update(key: keyof Fields, value: string) {
     setFields((current) => ({ ...current, [key]: value }));
@@ -187,8 +216,8 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
         </Button>
       </div>
       <p className={styles.hint}>
-        Profile changes do not change existing drafts or published PDFs. Use Refresh from profile in
-        a draft to update its snapshot.
+        Author-relevant changes ask for confirmation, then cascade to every linked draft and
+        republish its published problems.
       </p>
       {loading && <p role="status">Loading author profiles…</p>}
       {listError && (
@@ -207,9 +236,17 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
         <ul className={styles.profiles}>
           {profiles.map((profile) => (
             <li key={profile.id}>
-              <span className={styles.avatar} aria-hidden="true">
-                {Array.from(profile.akaName.trim())[0] || '?'}
-              </span>
+              {profile.hasProfileImage ? (
+                <img
+                  className={styles.avatarImage}
+                  src={`/api${authoringService.profileImageUrl(profile.id)}`}
+                  alt=""
+                />
+              ) : (
+                <span className={styles.avatar} aria-hidden="true">
+                  {Array.from(profile.akaName.trim())[0] || '?'}
+                </span>
+              )}
               <div className={styles.identity} data-profile-identity>
                 <strong>{profile.akaName}</strong>
                 <span className={styles.hint}>
@@ -234,11 +271,64 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
         </ul>
       )}
       {editing && (
-        <form className={styles.editor} onSubmit={save}>
-          <h4>{editing === 'new' ? 'New author profile' : `Edit profile: ${editing.akaName}`}</h4>
-          {error && <p role="alert">{error}</p>}
-          <fieldset disabled={saving}>
-            <legend className={styles.legend}>Author details</legend>
+        <form id="author-profile-form" onSubmit={save}>
+          <Dialog
+            open
+            title={editing === 'new' ? 'New author profile' : `Edit profile: ${editing.akaName}`}
+            onClose={() => {
+              if (!saving && !imageLoading) {
+                setEditing(null);
+                setPendingSync(null);
+                resetImage();
+              }
+            }}
+            footer={
+              <>
+                <Button
+                  form="author-profile-form"
+                  type="submit"
+                  disabled={imageLoading}
+                  loading={saving}
+                  loadingLabel="Saving profile…"
+                >
+                  {editing === 'new'
+                    ? 'Create profile'
+                    : pendingSync
+                      ? 'Save and sync linked problems'
+                      : 'Save profile'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={saving || imageLoading}
+                  onClick={() => {
+                    setEditing(null);
+                    setPendingSync(null);
+                    resetImage();
+                  }}
+                >
+                  Cancel
+                </Button>
+              </>
+            }
+          >
+            {error && <p role="alert">{error}</p>}
+            {pendingSync && (
+              <div role="alertdialog" aria-label="Confirm profile sync" className={styles.syncConfirm}>
+                <strong>Saving will update linked problems.</strong>
+                <p>
+                  This change will update {pendingSync.affectedDrafts}{' '}
+                  {pendingSync.affectedDrafts === 1 ? 'draft' : 'drafts'}
+                  {pendingSync.affectedPublishedProblems > 0 &&
+                    ` — including ${pendingSync.affectedPublishedProblems} published ${
+                      pendingSync.affectedPublishedProblems === 1 ? 'problem' : 'problems'
+                    }`}{' '}
+                  with the new author metadata and PDF.
+                </p>
+                <p>Save and sync now?</p>
+              </div>
+            )}
+            <fieldset disabled={saving} className={`${styles.root} ${styles.dialogFields}`}>
+              <legend className={styles.legend}>Author details</legend>
             <div className={styles.fields}>
               <label>
                 AKA name
@@ -386,26 +476,8 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
                 Remove image
               </Button>
             )}
-            <div className={styles.actions}>
-              <Button
-                type="submit"
-                disabled={imageLoading}
-                loading={saving}
-                loadingLabel="Saving profile…"
-              >
-                {editing === 'new' ? 'Create profile' : 'Save profile'}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setEditing(null);
-                  resetImage();
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
           </fieldset>
+        </Dialog>
         </form>
       )}
     </section>

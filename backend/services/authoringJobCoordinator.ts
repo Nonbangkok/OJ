@@ -3,6 +3,7 @@ import { AUTHORING_RUNNER, jobSnapshotSchema } from '../authoring/protocol';
 import { AuthoringSpool } from '../authoring/spool';
 import { TestcaseError } from '../authoring/testcases';
 import { ACTIVE_JOB_STATUSES, AUTHORING_COORDINATOR_LOCK, applyJobResult, DurableJob, failAuthoringJob, getAuthoringJob, JobDatabase, readQueuedInput, readQueuedFile } from './authoringJobQueryService';
+import { reconcileProfileSyncs } from './authoringProfileSyncService';
 
 /** Reconciles durable queue entries with disk, including both crash windows around result import. */
 export async function reconcileAuthoringJobs(spool: AuthoringSpool, database: JobDatabase = db, now = Date.now()): Promise<void> {
@@ -58,6 +59,9 @@ export async function reconcileAuthoringJobs(spool: AuthoringSpool, database: Jo
       if (!job || !ACTIVE_JOB_STATUSES.includes(job.status)) await spool.cleanup(id);
     }
     await spool.cleanupStaging(now);
+    // Run after result import so items that just became terminal finalize their
+    // sync run in the same tick.
+    await reconcileProfileSyncs(database, now);
   } finally {
     try {
       if (locked) await lock.query('SELECT pg_advisory_unlock($1)', [AUTHORING_COORDINATOR_LOCK]);

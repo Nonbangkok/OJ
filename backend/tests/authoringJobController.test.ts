@@ -4,8 +4,10 @@ import request from 'supertest';
 import { createAuthoringJobRouter } from '../controllers/authoringJobController';
 import { errorHandler } from '../middleware/errorHandler';
 import * as jobs from '../services/authoringJobQueryService';
+import * as profileSyncService from '../services/authoringProfileSyncService';
 
 jest.mock('../services/authoringJobQueryService');
+jest.mock('../services/authoringProfileSyncService');
 const id = '11111111-1111-4111-8111-111111111111';
 const app = (role?: string, enabled = true) => {
   const a = express();
@@ -105,4 +107,46 @@ it('returns terminal job diagnostics, and reports a missing job', async () => {
   expect(response.body).toEqual(expect.objectContaining({ status: 'failed', log: 'compile error', errorCode: 'compile_error' }));
   expect(response.body.request_snapshot).toBeUndefined();
   expect((await request(app('admin')).get(`/admin/authoring/jobs/${id}`)).status).toBe(404);
+});
+
+it('lists profile sync cascades for admins only', async () => {
+  for (const [role, status] of [[undefined, 401], ['staff', 403]] as const) {
+    expect((await request(app(role)).get('/admin/authoring/profile-syncs')).status).toBe(status);
+  }
+  (profileSyncService.listProfileSyncs as jest.Mock).mockResolvedValueOnce([{
+    id, profileId: id, profileAkaName: 'An author', status: 'succeeded',
+    resultSummary: { synced: 2, failed: 0, deferred: 1 },
+    createdAt: '2026-09-19T00:00:00Z', finishedAt: '2026-09-19T00:01:00Z',
+    progress: { total: 3, synced: 2, failed: 1 },
+  }]);
+  const response = await request(app('admin')).get('/admin/authoring/profile-syncs');
+  expect(response.status).toBe(200);
+  expect(response.body).toEqual([expect.objectContaining({
+    id, profileAkaName: 'An author', status: 'succeeded', progress: { total: 3, synced: 2, failed: 1 },
+  })]);
+  // Readable even when the runner transport is disabled, like job history.
+  expect((await request(app('admin', false)).get('/admin/authoring/profile-syncs')).status).toBe(200);
+});
+
+it('returns one profile sync with per-draft items, and reports a missing run', async () => {
+  for (const [role, status] of [[undefined, 401], ['staff', 403]] as const) {
+    expect((await request(app(role)).get(`/admin/authoring/profile-syncs/${id}`)).status).toBe(status);
+  }
+  expect((await request(app('admin')).get('/admin/authoring/profile-syncs/not-a-uuid')).status).toBe(400);
+  (profileSyncService.getProfileSync as jest.Mock).mockResolvedValueOnce({
+    id, profileId: id, status: 'running', resultSummary: null,
+    createdAt: '2026-09-19T00:00:00Z', startedAt: '2026-09-19T00:00:05Z', finishedAt: null,
+    progress: { total: 2, synced: 1, failed: 0 },
+    items: [
+      { draftId: id, problemId: 'ABC', title: 'A problem', status: 'synced', attempts: 1, errorMessage: null, draftStatus: 'published', published: true },
+      { draftId: '22222222-2222-4222-8222-222222222222', problemId: 'DEF', title: 'Busy draft', status: 'deferred', attempts: 5, errorMessage: 'draft busy with another authoring job', draftStatus: 'draft', published: false },
+    ],
+  }).mockResolvedValueOnce(null);
+  const response = await request(app('admin')).get(`/admin/authoring/profile-syncs/${id}`);
+  expect(response.status).toBe(200);
+  expect(response.body.items).toHaveLength(2);
+  expect(response.body.items[1]).toEqual(expect.objectContaining({ status: 'deferred', errorMessage: 'draft busy with another authoring job' }));
+  const missing = await request(app('admin')).get(`/admin/authoring/profile-syncs/${id}`);
+  expect(missing.status).toBe(404);
+  expect(missing.body.code).toBe('profile_sync_not_found');
 });

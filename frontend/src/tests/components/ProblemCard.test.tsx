@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import ProblemCard from '../../features/problem/ProblemCard';
+import type { ProblemSummary } from '../../types';
 
 // Mock CSS modules
 jest.mock('../../features/problem/ProblemCard.module.css', () => new Proxy({}, {
@@ -13,20 +14,22 @@ jest.mock('../../utils/formatters', () => ({
     generateResultString: jest.fn(() => 'PPPP')
 }));
 
-const mockProblem = {
+const mockProblem: ProblemSummary = {
     id: 'prob-1',
     title: 'Two Sum',
-    submission_count: 3,
+    author: null,
+    submission_count: '3',
     latest_submission_at: '2026-03-07T12:00:00Z',
     best_score: 75,
     best_submission_status: 'Partial',
-    best_submission_results: 'PPPP'
+    best_submission_results: [{ status: 'Accepted' }, { status: 'Accepted' }]
 };
 
-const mockProblemNoSubmission = {
+const mockProblemNoSubmission: ProblemSummary = {
     id: 'prob-2',
     title: 'Hello World',
-    submission_count: 0
+    author: null,
+    submission_count: '0'
 };
 
 describe('ProblemCard', () => {

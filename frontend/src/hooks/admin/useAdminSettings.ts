@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import adminService from '../../services/adminService';
 import { useSettings } from '../../context/SettingsContext';
 import { APP_CONSTANTS } from '../../utils/constants';
+import { UI_TIMEOUTS } from '../../config/constants';
 
 const useAdminSettings = () => {
     const [isRegistrationEnabled, setIsRegistrationEnabled] = useState(true);
@@ -41,7 +42,7 @@ const useAdminSettings = () => {
             setIsRegistrationEnabled(newStatus);
             setRegistrationSuccess(`Registration has been ${newStatus ? 'enabled' : 'disabled'}.`);
             await refreshSettings();
-            setTimeout(() => setRegistrationSuccess(''), 3000);
+            setTimeout(() => setRegistrationSuccess(''), UI_TIMEOUTS.SUCCESS_MESSAGE_SHORT);
         } catch (err) {
             setRegistrationError('Failed to update registration settings.');
         }
@@ -65,7 +66,7 @@ const useAdminSettings = () => {
             window.URL.revokeObjectURL(url);
 
             setDatabaseSuccess('Database exported successfully!');
-            setTimeout(() => setDatabaseSuccess(''), 3000);
+            setTimeout(() => setDatabaseSuccess(''), UI_TIMEOUTS.SUCCESS_MESSAGE_SHORT);
         } catch (err) {
             console.error('Export error:', err);
             setDatabaseError('Failed to export database.');
@@ -126,7 +127,7 @@ const useAdminSettings = () => {
                     setDatabaseSuccess(progress.message || 'Database imported successfully! You may need to refresh or re-login.');
                     setDatabaseFile(null);
                     setIsImporting(false);
-                    setTimeout(() => setDatabaseSuccess(''), 5000);
+                    setTimeout(() => setDatabaseSuccess(''), UI_TIMEOUTS.SUCCESS_MESSAGE_LONG);
                     return;
                 }
 

@@ -8,6 +8,7 @@ import type {
   ContestScoreboardEntry,
 } from '../types';
 import { getErrorStatus } from '../utils/error';
+import { formatDateTime as formatDateTimeShared } from '../utils/formatters';
 
 type ScoreValue = ContestProblemScore | null;
 
@@ -101,13 +102,8 @@ const useContestScoreboard = (contestId?: string | number): UseContestScoreboard
     };
   }, [contest?.status, fetchScoreboard]);
 
-  const formatDateTime = (dateTime: Date | string) => {
-    return new Date(dateTime).toLocaleString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  };
+  const formatDateTime = (dateTime: Date | string) =>
+    formatDateTimeShared(dateTime, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   const getProblemScore = (
     userScores: Record<string, unknown> | null | undefined,

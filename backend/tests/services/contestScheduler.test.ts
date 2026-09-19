@@ -55,7 +55,7 @@ describe('Contest Scheduler Service', () => {
             await contestScheduler.checkContestStatus();
 
             expect(db.query).toHaveBeenNthCalledWith(1, expect.stringContaining('SELECT id, title, start_time'), [mockNow]);
-            expect(db.query).toHaveBeenNthCalledWith(2, expect.stringContaining('UPDATE contests \n          SET status = \'running\''), [1]);
+            expect(db.query).toHaveBeenNthCalledWith(2, expect.stringContaining('UPDATE contests\n          SET status = \'running\''), [1]);
 
             jest.useRealTimers();
         });
@@ -73,7 +73,7 @@ describe('Contest Scheduler Service', () => {
 
             await contestScheduler.checkContestStatus();
 
-            expect(db.query).toHaveBeenNthCalledWith(3, expect.stringContaining('UPDATE contests \n          SET status = \'finishing\''), [2]);
+            expect(db.query).toHaveBeenNthCalledWith(3, expect.stringContaining('UPDATE contests\n          SET status = \'finishing\''), [2]);
             expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(2);
 
             jest.useRealTimers();
@@ -95,7 +95,45 @@ describe('Contest Scheduler Service', () => {
             await contestScheduler.checkContestStatus();
 
             expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Error migrating'), error);
-            expect(db.query).toHaveBeenNthCalledWith(4, expect.stringContaining('UPDATE contests \n            SET status = \'finished\''), [3]);
+            expect(db.query).toHaveBeenNthCalledWith(4, expect.stringContaining('UPDATE contests\n            SET status = \'finished\''), [3]);
+
+            jest.useRealTimers();
+        });
+
+        it('should skip a tick while a previous tick is still in progress', async () => {
+            const mockNow = new Date('2025-01-01T12:00:00Z');
+            jest.useFakeTimers().setSystemTime(mockNow);
+
+            // First tick: hold the migration "in flight" until we release it.
+            let releaseFirstTick!: () => void;
+            const firstTickGate = new Promise<void>((resolve) => { releaseFirstTick = resolve; });
+            (migrateSubmissionsAfterContest as jest.Mock).mockImplementationOnce(() => firstTickGate);
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [] }) // start scheduled (none)
+                .mockResolvedValueOnce({ rows: [{ id: 7, title: 'Slow Contest' }] }) // end running
+                .mockResolvedValueOnce({}); // UPDATE to finishing
+
+            const firstTick = contestScheduler.checkContestStatus();
+
+            // Drain the microtask queue so the first tick runs up to the
+            // gated migration call (fake timers make setImmediate unusable).
+            for (let i = 0; i < 20 && (migrateSubmissionsAfterContest as jest.Mock).mock.calls.length === 0; i++) {
+                await Promise.resolve();
+            }
+            expect((migrateSubmissionsAfterContest as jest.Mock).mock.calls.length).toBe(1);
+
+            // Overlapping tick while the first is still migrating: must be skipped.
+            await contestScheduler.checkContestStatus();
+            expect(console.log).toHaveBeenCalledWith('Contest scheduler tick already in progress - skipping this tick');
+            expect(migrateSubmissionsAfterContest).toHaveBeenCalledTimes(1);
+
+            // Release the first tick; it completes its normal three queries
+            // (start-check, end-check, finishing update) — no extra queries
+            // may have been added by the skipped tick.
+            releaseFirstTick();
+            await firstTick;
+            expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(7);
+            expect(db.query).toHaveBeenCalledTimes(3);
 
             jest.useRealTimers();
         });

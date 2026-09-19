@@ -12,7 +12,7 @@ import {
   problemDraftIdParamSchema,
   refreshProblemDraftAuthorSchema,
   updateProblemDraftSchema,
-  outputAuthoringJobSchema,
+  expectedRevisionSchema,
 } from '../schemas/requestSchemas';
 import { publishProblemDraft } from '../services/authoringPublishService';
 import {
@@ -21,6 +21,7 @@ import {
   listProblemDrafts,
   ProblemDraftListRow,
   ProblemDraftUpdates,
+  startProblemDraftRevision,
   updateProblemDraft,
 } from '../services/authoringDraftQueryService';
 import {
@@ -140,8 +141,51 @@ const resolveCreateAuthorSnapshot = async (
 
 router.use('/admin/authoring/drafts', requireAuth, requireAdmin);
 
+/**
+ * Shared result-kind → response mapping for draft mutations. Each entry maps a
+ * service result kind to [status, message, responseCode]; the response is
+ * augmented with the draft/currentRevision context the service result carries.
+ * Returns true (and responds) when the result's kind has a mapping, so callers
+ * can `return` immediately and treat the remainder as their success kind.
+ */
+const DRAFT_NOT_FOUND: readonly [number, string, string] = [404, 'Problem draft not found', ''];
+const DRAFT_PUBLISHED: readonly [number, string, string] = [409, 'Published problem drafts are read-only', 'draft_published'];
+const DRAFT_REVISION_CONFLICT: readonly [number, string, string] = [409, 'Problem draft revision conflict', 'revision_conflict'];
+
+const sendDraftResult = (
+  res: Response,
+  result: { kind: string; draft?: ProblemDraftRow },
+  mappings: Record<string, readonly [number, string, string] | undefined>,
+): boolean => {
+  const mapping = mappings[result.kind];
+  if (!mapping) {
+    return false;
+  }
+  const [status, message, code] = mapping;
+  const draft = result.draft ? toDraftDetailResponse(result.draft) : undefined;
+  const currentRevision = result.draft?.revision;
+  if (code === 'draft_published') {
+    res.status(status).json({ message, code, ...(draft === undefined ? {} : { draft }) });
+    return true;
+  }
+  if (code === 'revision_conflict') {
+    res.status(status).json({ message, code, currentRevision, ...(draft === undefined ? {} : { draft }) });
+    return true;
+  }
+  res.status(status).json({ message });
+  return true;
+};
+
+/**
+ * After sendDraftResult and the route's kind-specific failures, the remainder
+ * is by construction the single success kind; cast it once here instead of at
+ * every call site.
+ */
+const draftSuccess = <T extends { kind: string; draft: ProblemDraftRow }>(result: unknown): T =>
+  result as T;
+
 router.post('/admin/authoring/drafts/:id/publish',
-  validateRequest({ params: problemDraftIdParamSchema, body: outputAuthoringJobSchema }),
+  validateRequest({ params: problemDraftIdParamSchema, body: expectedRevisionSchema }),
   asyncHandler(async (req, res) => {
     const result = await publishProblemDraft(String(req.params.id), req.body.expectedRevision);
     if (result.kind === 'created' || result.kind === 'updated') {
@@ -221,16 +265,11 @@ router.patch('/admin/authoring/drafts/:id',
       updates,
     );
 
-    if (result.kind === 'not_found') {
-      res.status(404).json({ message: 'Problem draft not found' });
-      return;
-    }
-    if (result.kind === 'published') {
-      res.status(409).json({
-        message: 'Published problem drafts are read-only',
-        code: 'draft_published',
-        draft: toDraftDetailResponse(result.draft),
-      });
+    if (sendDraftResult(res, result, {
+      not_found: DRAFT_NOT_FOUND,
+      published: DRAFT_PUBLISHED,
+      revision_conflict: DRAFT_REVISION_CONFLICT,
+    })) {
       return;
     }
     if (result.kind === 'published_problem_id_locked') {
@@ -241,16 +280,8 @@ router.patch('/admin/authoring/drafts/:id',
       });
       return;
     }
-    if (result.kind === 'revision_conflict') {
-      res.status(409).json({
-        message: 'Problem draft revision conflict',
-        code: 'revision_conflict',
-        currentRevision: result.draft.revision,
-        draft: toDraftDetailResponse(result.draft),
-      });
-      return;
-    }
-    res.json(toDraftDetailResponse(result.draft));
+    const updated = draftSuccess<{ kind: 'updated'; draft: ProblemDraftRow }>(result);
+    res.json(toDraftDetailResponse(updated.draft));
   }));
 
 router.post('/admin/authoring/drafts/:id/refresh-author-profile',
@@ -259,8 +290,11 @@ router.post('/admin/authoring/drafts/:id/refresh-author-profile',
     const { expectedRevision } = req.body as RefreshProblemDraftAuthorRequestBody;
     const result = await refreshProblemDraftAuthor(String(req.params.id), expectedRevision);
 
-    if (result.kind === 'not_found') {
-      res.status(404).json({ message: 'Problem draft not found' });
+    if (sendDraftResult(res, result, {
+      not_found: DRAFT_NOT_FOUND,
+      published: DRAFT_PUBLISHED,
+      revision_conflict: DRAFT_REVISION_CONFLICT,
+    })) {
       return;
     }
     if (result.kind === 'profile_not_selected') {
@@ -277,24 +311,30 @@ router.post('/admin/authoring/drafts/:id/refresh-author-profile',
       });
       return;
     }
-    if (result.kind === 'published') {
+    const refreshed = draftSuccess<{ kind: 'updated'; draft: ProblemDraftRow }>(result);
+    res.json(toDraftDetailResponse(refreshed.draft));
+  }));
+
+router.post('/admin/authoring/drafts/:id/new-revision',
+  validateRequest({ params: problemDraftIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const result = await startProblemDraftRevision(String(req.params.id));
+
+    if (sendDraftResult(res, result, {
+      not_found: DRAFT_NOT_FOUND,
+    })) {
+      return;
+    }
+    if (result.kind === 'not_published') {
       res.status(409).json({
-        message: 'Published problem drafts are read-only',
-        code: 'draft_published',
+        message: 'Only published drafts can start a new revision',
+        code: 'draft_not_published',
         draft: toDraftDetailResponse(result.draft),
       });
       return;
     }
-    if (result.kind === 'revision_conflict') {
-      res.status(409).json({
-        message: 'Problem draft revision conflict',
-        code: 'revision_conflict',
-        currentRevision: result.draft.revision,
-        draft: toDraftDetailResponse(result.draft),
-      });
-      return;
-    }
-    res.json(toDraftDetailResponse(result.draft));
+    const reopened = draftSuccess<{ kind: 'updated'; draft: ProblemDraftRow }>(result);
+    res.json(toDraftDetailResponse(reopened.draft));
   }));
 
 router.get('/admin/authoring/drafts/:id/assets',
@@ -335,25 +375,11 @@ router.post('/admin/authoring/drafts/:id/assets',
       body.expectedRevision,
       preparedAsset,
     );
-    if (result.kind === 'not_found') {
-      res.status(404).json({ message: 'Problem draft not found' });
-      return;
-    }
-    if (result.kind === 'published') {
-      res.status(409).json({
-        message: 'Published problem drafts are read-only',
-        code: 'draft_published',
-        draft: toDraftDetailResponse(result.draft),
-      });
-      return;
-    }
-    if (result.kind === 'revision_conflict') {
-      res.status(409).json({
-        message: 'Problem draft revision conflict',
-        code: 'revision_conflict',
-        currentRevision: result.draft.revision,
-        draft: toDraftDetailResponse(result.draft),
-      });
+    if (sendDraftResult(res, result, {
+      not_found: DRAFT_NOT_FOUND,
+      published: DRAFT_PUBLISHED,
+      revision_conflict: DRAFT_REVISION_CONFLICT,
+    })) {
       return;
     }
     if (result.kind === 'duplicate_filename') {
@@ -370,9 +396,10 @@ router.post('/admin/authoring/drafts/:id/assets',
       });
       return;
     }
+    const added = draftSuccess<{ kind: 'added'; draft: ProblemDraftRow; asset: StatementAssetMetadataRow }>(result);
     res.status(201).json({
-      asset: toAssetResponse(result.asset),
-      draftRevision: result.draft.revision,
+      asset: toAssetResponse(added.asset),
+      draftRevision: added.draft.revision,
     });
   }));
 
@@ -385,34 +412,21 @@ router.delete('/admin/authoring/drafts/:id/assets/:assetId',
       String(req.params.assetId),
       Number(query.expectedRevision),
     );
-    if (result.kind === 'not_found') {
-      res.status(404).json({ message: 'Problem draft not found' });
+    if (sendDraftResult(res, result, {
+      not_found: DRAFT_NOT_FOUND,
+      published: DRAFT_PUBLISHED,
+      revision_conflict: DRAFT_REVISION_CONFLICT,
+    })) {
       return;
     }
     if (result.kind === 'asset_not_found') {
       res.status(404).json({ message: 'Statement asset not found' });
       return;
     }
-    if (result.kind === 'published') {
-      res.status(409).json({
-        message: 'Published problem drafts are read-only',
-        code: 'draft_published',
-        draft: toDraftDetailResponse(result.draft),
-      });
-      return;
-    }
-    if (result.kind === 'revision_conflict') {
-      res.status(409).json({
-        message: 'Problem draft revision conflict',
-        code: 'revision_conflict',
-        currentRevision: result.draft.revision,
-        draft: toDraftDetailResponse(result.draft),
-      });
-      return;
-    }
+    const deleted = draftSuccess<{ kind: 'deleted'; draft: ProblemDraftRow; asset: StatementAssetMetadataRow }>(result);
     res.json({
-      asset: toAssetResponse(result.asset),
-      draftRevision: result.draft.revision,
+      asset: toAssetResponse(deleted.asset),
+      draftRevision: deleted.draft.revision,
     });
   }));
 

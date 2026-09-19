@@ -61,7 +61,7 @@
 .category-tab.active {
   background: var(--accent-primary);
   border-color: var(--accent-primary);
-  color: #ffffff;
+  color: var(--action-button-foreground);
 }
 
 .category-count {

@@ -5,6 +5,7 @@ import {
   createProblemDraft,
   getProblemDraft,
   listProblemDrafts,
+  startProblemDraftRevision,
   updateProblemDraft,
 } from '../../services/authoringDraftQueryService';
 
@@ -96,6 +97,47 @@ describeWithDatabase('problem authoring draft persistence', () => {
       title: 'Red Gate',
       revision: 1,
       status: 'published',
+    }));
+  });
+
+  it('starts a new revision on a published draft but keeps the Problem ID locked', async () => {
+    const created = await createDraft();
+    const publishedAt = new Date();
+    await pool.query(
+      "UPDATE problem_drafts SET status = 'published', published_at = $2, verified_revision = revision WHERE id = $1",
+      [created.id, publishedAt],
+    );
+
+    const result = await startProblemDraftRevision(created.id, database);
+
+    expect(result.kind).toBe('updated');
+    expect(result.kind === 'updated' && result.draft).toEqual(expect.objectContaining({
+      status: 'draft',
+      revision: 2,
+      verified_revision: null,
+      published_at: expect.any(Date),
+    }));
+
+    const titleEdit = await updateProblemDraft(created.id, 2, { title: 'Reopened title' }, database);
+    expect(titleEdit.kind).toBe('updated');
+    const problemIdEdit = await updateProblemDraft(created.id, 3, { problem_id: 'new-problem-id' }, database);
+    expect(problemIdEdit.kind).toBe('published_problem_id_locked');
+    await expect(getProblemDraft(created.id, database)).resolves.toEqual(expect.objectContaining({
+      problem_id: 'redgate',
+      title: 'Reopened title',
+      status: 'draft',
+    }));
+  });
+
+  it('refuses to start a new revision on a draft that is not published', async () => {
+    const created = await createDraft();
+
+    const result = await startProblemDraftRevision(created.id, database);
+
+    expect(result.kind).toBe('not_published');
+    await expect(getProblemDraft(created.id, database)).resolves.toEqual(expect.objectContaining({
+      revision: 1,
+      status: 'draft',
     }));
   });
 });

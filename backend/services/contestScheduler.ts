@@ -1,15 +1,21 @@
 import cron, { ScheduledTask } from 'node-cron';
 import * as db from '../db';
 import { migrateSubmissionsAfterContest } from './problemMigration';
+import { CONTEST_STATUS } from '../constants';
 import { ContestSchedulerStatus, ContestTimingRow } from '../types/service';
 
 class ContestScheduler {
   private isRunning: boolean;
   private checkInterval: ScheduledTask | null;
+  // Guards the tick body itself: a slow migration must not let an overlapping
+  // per-minute tick double-process the same contest. `isRunning` only guards
+  // start(), not the tick.
+  private tickInProgress: boolean;
 
   constructor() {
     this.isRunning = false;
     this.checkInterval = null;
+    this.tickInProgress = false;
   }
 
   // Start the scheduler
@@ -49,7 +55,13 @@ class ContestScheduler {
 
   // Main function to check and update contest statuses
   async checkContestStatus(): Promise<void> {
+    if (this.tickInProgress) {
+      console.log('Contest scheduler tick already in progress - skipping this tick');
+      return;
+    }
+
     const now = new Date();
+    this.tickInProgress = true;
 
     try {
       // 1. Start scheduled contests
@@ -61,6 +73,8 @@ class ContestScheduler {
     } catch (error) {
       console.error('Error checking contest status:', error);
       throw error;
+    } finally {
+      this.tickInProgress = false;
     }
   }
 
@@ -70,7 +84,7 @@ class ContestScheduler {
       const result = await db.query<ContestTimingRow>(`
         SELECT id, title, start_time 
         FROM contests 
-        WHERE status = 'scheduled' 
+        WHERE status = '${CONTEST_STATUS.SCHEDULED}'
         AND start_time <= $1
         ORDER BY start_time ASC
       `, [now]);
@@ -79,8 +93,8 @@ class ContestScheduler {
         console.log(`🚀 Starting contest: ${contest.title} (ID: ${contest.id})`);
 
         await db.query(`
-          UPDATE contests 
-          SET status = 'running' 
+          UPDATE contests
+          SET status = '${CONTEST_STATUS.RUNNING}'
           WHERE id = $1
         `, [contest.id]);
 
@@ -102,7 +116,7 @@ class ContestScheduler {
       const result = await db.query<ContestTimingRow>(`
         SELECT id, title, end_time 
         FROM contests 
-        WHERE status = 'running' 
+        WHERE status = '${CONTEST_STATUS.RUNNING}'
         AND end_time <= $1
         ORDER BY end_time ASC
       `, [now]);
@@ -112,8 +126,8 @@ class ContestScheduler {
 
         // Set status to 'finishing' to prevent new submissions
         await db.query(`
-          UPDATE contests 
-          SET status = 'finishing' 
+          UPDATE contests
+          SET status = '${CONTEST_STATUS.FINISHING}'
           WHERE id = $1
         `, [contest.id]);
 
@@ -129,8 +143,8 @@ class ContestScheduler {
 
           // Even if migration fails, update status to prevent infinite loops
           await db.query(`
-            UPDATE contests 
-            SET status = 'finished' 
+            UPDATE contests
+            SET status = '${CONTEST_STATUS.FINISHED}'
             WHERE id = $1
           `, [contest.id]);
 

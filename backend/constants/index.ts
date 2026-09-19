@@ -9,13 +9,17 @@ export const USER_ROLES = {
 } as const;
 
 export const CONTEST_STATUS = {
+    SCHEDULED: 'scheduled',
     RUNNING: 'running',
-    FINISHED: 'finished',
     FINISHING: 'finishing',
+    FINISHED: 'finished',
 } as const;
 
 export const SUBMISSION_STATUS = {
     PENDING: 'Pending',
+    COMPILING: 'Compiling',
+    COMPILATION_ERROR: 'Compilation Error',
+    RUNNING: 'Running',
     ACCEPTED: 'Accepted',
     WRONG_ANSWER: 'Wrong Answer',
     TIME_LIMIT_EXCEEDED: 'Time Limit Exceeded',
@@ -130,9 +134,13 @@ export const STATEMENT_ASSET = {
 } as const;
 
 export const RATE_LIMIT_CONFIG = {
-    // General API limiter.
+    // General API limiter. Budget set for real app behavior: every page load
+    // costs ~2 requests (/me + /settings/registration) before any data fetch,
+    // and an authoring session polls drafts/jobs continuously — observed
+    // normal usage is ~350 requests per 15min, so 1000 leaves headroom for
+    // bursts while still bounding scripted abuse.
     GENERAL_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
-    GENERAL_MAX: 300,
+    GENERAL_MAX: 1000,
     // Auth endpoints (login/register) — protect against brute force.
     AUTH_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
     AUTH_MAX: 10,
@@ -154,4 +162,13 @@ export const STRING_LIMITS = {
 export const FILE_CONFIG = {
     CLEANUP_DELAY_MS: 200,
     MAX_UPLOAD_SIZE_BYTES: 2 * 1024 * 1024 * 1024, // 2 GiB
+} as const;
+
+// --- Archive safety limits (zip-slip / zip-bomb protection) ---
+// Caps on the *uncompressed* contents of an uploaded archive. These guard
+// against decompression bombs (a tiny zip that expands to gigabytes / millions
+// of files) before we extract anything to disk.
+export const ARCHIVE_LIMITS = {
+    MAX_UNCOMPRESSED_BYTES: 500 * 1024 * 1024, // 500 MB total
+    MAX_ENTRIES: 5000, // file count
 } as const;

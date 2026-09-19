@@ -1,7 +1,4 @@
 import express, { Request, Response, Router } from 'express';
-import { spawn } from 'child_process';
-import crypto from 'crypto';
-import fs from 'fs';
 import { requireAuth, requireAdmin, requireStaffOrAdmin } from '../middleware/auth';
 import { USER_VALIDATION, SECURITY_CONFIG } from '../constants';
 import { diskUpload } from '../middleware/upload';
@@ -12,7 +9,6 @@ import {
   UpdateAdminUserRequestBody,
   UpdateRegistrationSettingRequestBody,
 } from '../types/api';
-import { env } from '../config/env';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
 import {
@@ -23,18 +19,17 @@ import {
   updateRegistrationSettingSchema,
 } from '../schemas/requestSchemas';
 import { getErrorMessage } from '../utils/errorMessage';
-import { pool } from '../db';
-import { runMigrationsFromPool } from '../scripts/migrate';
 import {
-  buildDatabaseExportCommand,
-  buildDatabaseExportFilePath,
-  buildDatabaseImportCommand,
-} from '../services/adminSystemService';
+  buildDatabaseExportRequest,
+  getDatabaseImportProgress,
+  runCommand,
+  startDatabaseImport,
+  unlinkIfExists,
+} from '../services/adminDatabaseService';
 import {
   createAdminUser,
   createBatchUsers,
   deleteAdminUser,
-  dropAllTablesForImport,
   getAdminUsers,
   getAuthors,
   getRegistrationEnabled,
@@ -43,63 +38,6 @@ import {
 } from '../services/adminQueryService';
 
 const router: Router = express.Router();
-const importProgressMap = new Map<string, { status: string; message: string; token: string }>();
-
-// The import-progress endpoint cannot use session auth because the import drops
-// the session table mid-run (see server.ts). Use a constant-time comparison of a
-// per-job token instead so the endpoint authenticates without a session.
-const isValidImportToken = (expected: string, provided: unknown): boolean => {
-  if (typeof provided !== 'string' || provided.length === 0) {
-    return false;
-  }
-  const expectedBuffer = Buffer.from(expected);
-  const providedBuffer = Buffer.from(provided);
-  if (expectedBuffer.length !== providedBuffer.length) {
-    return false;
-  }
-  return crypto.timingSafeEqual(expectedBuffer, providedBuffer);
-};
-
-const runImportCommand = async (command: Exclude<ReturnType<typeof buildDatabaseImportCommand>, { kind: 'unsupported_extension' }>): Promise<void> => {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(command.executable, command.args, {
-      env: {
-        ...process.env,
-        ...command.env,
-      },
-      stdio: ['ignore', 'ignore', 'pipe'],
-    });
-
-    let stderrTail = '';
-
-    child.stderr.on('data', (chunk: Buffer | string) => {
-      stderrTail = `${stderrTail}${chunk.toString()}`;
-      if (stderrTail.length > 8192) {
-        stderrTail = stderrTail.slice(-8192);
-      }
-    });
-
-    child.on('error', (error) => reject(error));
-    child.on('close', (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-      reject(new Error(stderrTail.trim() || `${command.executable} exited with code ${code}`));
-    });
-  });
-};
-
-const unlinkIfExists = async (filePath: string): Promise<void> => {
-  if (!fs.existsSync(filePath)) {
-    return;
-  }
-  try {
-    await fs.promises.unlink(filePath);
-  } catch (unlinkError: unknown) {
-    console.error(`Error deleting temporary file (${filePath}):`, unlinkError);
-  }
-};
 
 // Admin API Endpoints
 router.get('/admin/users', requireAuth, requireAdmin, asyncHandler(async (_req: Request, res: Response) => {
@@ -187,130 +125,41 @@ router.post('/admin/database/import', requireAuth, requireAdmin, diskUpload.sing
     return res.status(400).json({ message: 'No database dump file uploaded.' });
   }
 
-  const dumpFilePath = req.file.path;
-  const dbName = env.PGDATABASE;
-  const dbUser = env.PGUSER;
-  const dbHost = env.PGHOST;
-  const dbPort = env.PGPORT;
-
-  const importCommandResult = buildDatabaseImportCommand(
-    req.file.originalname,
-    dumpFilePath,
-    dbName,
-    dbUser,
-    dbHost,
-    dbPort,
-    env.PGPASSWORD,
-  );
-  if (importCommandResult.kind === 'unsupported_extension') {
-    await unlinkIfExists(dumpFilePath);
+  const startResult = await startDatabaseImport(req.file.originalname, req.file.path);
+  if ('kind' in startResult) {
     return res.status(400).json({ message: 'Unsupported file type. Only .sql, .dump, or .tar files are allowed.' });
   }
 
-  const jobId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-  const token = crypto.randomBytes(32).toString('hex');
-  importProgressMap.set(jobId, { status: 'pending', message: 'Database import queued.', token });
-
-  const setProgress = (status: string, message: string): void => {
-    importProgressMap.set(jobId, { status, message, token });
-  };
-
   res.status(202).json({
     message: 'Database import started. Check progress endpoint for status updates.',
-    jobId,
-    token,
+    jobId: startResult.jobId,
+    token: startResult.token,
   });
-
-  void (async () => {
-    try {
-      setProgress('uploading', 'Preparing database import.');
-      console.log('Dropping existing tables before import...');
-      await dropAllTablesForImport();
-
-      setProgress('uploading', 'Importing database dump. This may take several minutes.');
-      await runImportCommand(importCommandResult);
-
-      setProgress('migrating', 'Applying database migrations to the restored data.');
-      await runMigrationsFromPool(pool);
-
-      setProgress('completed', 'Database imported successfully.');
-    } catch (error: unknown) {
-      console.error('Error during database import:', error);
-      setProgress('failed', `Failed to import database: ${getErrorMessage(error)}`);
-    } finally {
-      await unlinkIfExists(dumpFilePath);
-    }
-  })();
 });
 
 // No session middleware runs for this path (server.ts skips it because the import
 // drops the session table). Authenticate with the per-job token returned by the
 // import start endpoint instead of being fully open.
-router.get('/admin/database/import-progress/:jobId', async (req: Request, res: Response) => {
-  const jobId = String(req.params.jobId);
-  const progress = importProgressMap.get(jobId);
+router.get('/admin/database/import-progress/:jobId', (req: Request, res: Response) => {
+  const progress = getDatabaseImportProgress(String(req.params.jobId), req.query.token ?? req.headers['x-import-token']);
 
-  if (!progress) {
+  if (progress === null) {
     return res.status(404).json({ message: 'Import job not found.' });
   }
-
-  const providedToken = req.query.token ?? req.headers['x-import-token'];
-  if (!isValidImportToken(progress.token, providedToken)) {
+  if (progress === 'unauthorized') {
     return res.status(401).json({ message: 'Invalid or missing import token.' });
   }
-
-  const { token: _token, ...publicProgress } = progress;
-  res.json(publicProgress);
+  res.json(progress);
 });
 
 router.post('/admin/database/export', requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const dbName = env.PGDATABASE;
-    const dbUser = env.PGUSER;
-    const dbHost = env.PGHOST;
-    const dbPort = env.PGPORT;
+    const { command, dumpFilePath, downloadName } = buildDatabaseExportRequest();
 
-    const timestamp = Date.now();
-    const dumpFilePath = buildDatabaseExportFilePath(timestamp);
-    const exportCommand = buildDatabaseExportCommand(
-      dumpFilePath,
-      dbName,
-      dbUser,
-      dbHost,
-      dbPort,
-      env.PGPASSWORD,
-    );
-
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn(exportCommand.executable, exportCommand.args, {
-        env: {
-          ...process.env,
-          ...exportCommand.env,
-        },
-        stdio: ['ignore', 'ignore', 'pipe'],
-      });
-
-      let stderrTail = '';
-
-      child.stderr.on('data', (chunk: Buffer | string) => {
-        stderrTail = `${stderrTail}${chunk.toString()}`;
-        if (stderrTail.length > 8192) {
-          stderrTail = stderrTail.slice(-8192);
-        }
-      });
-
-      child.on('error', (spawnError) => reject(spawnError));
-      child.on('close', (code) => {
-        if (code === 0) {
-          resolve();
-          return;
-        }
-        reject(new Error(stderrTail.trim() || `${exportCommand.executable} exited with code ${code}`));
-      });
-    });
+    await runCommand(command);
 
     // Send the file as a download
-    res.download(dumpFilePath, `oj_backup_${timestamp}.sql`, (err) => {
+    res.download(dumpFilePath, downloadName, (err) => {
       if (err) {
         console.error('Error sending file:', err);
         if (!res.headersSent) {

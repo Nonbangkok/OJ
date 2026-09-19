@@ -11,6 +11,7 @@ const draft = { id: 'd1', problemId: 'sum', title: 'Sum', authorProfileId: null,
 const job = { id: 'j1', draftId: 'd1', draftRevision: 3, jobType: 'verify_all', status: 'queued' };
 beforeEach(() => {
   jest.resetAllMocks();
+  window.sessionStorage.clear();
   jest.mocked(api.get).mockImplementation(async url => ({ data: url.endsWith('/jobs') ? [] : draft }));
 });
 
@@ -114,6 +115,44 @@ test('an idle draft stops polling after its initial snapshot', async () => {
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 80)); });
 
   expect(api.get).toHaveBeenCalledTimes(2);
+});
+
+test('a profile-sync revision bump while editing raises the conflict notice, and the same path works when idle', async () => {
+  // The sync bumps the draft's revision server-side without touching the
+  // statement source. An admin editing the draft must keep their text and see
+  // the same conflict banner any other external change produces.
+  let serverDraft = draft;
+  jest.mocked(api.get).mockImplementation(async url => ({ data: url.endsWith('/jobs') ? [] : serverDraft }));
+  const { result } = renderHook(() => useAuthoringDraft('d1'));
+  await waitFor(() => expect(result.current.draft?.revision).toBe(3));
+  act(() => result.current.edit('statementHtml', '# Mid-edit when the sync lands'));
+
+  // The sync bumps the revision and refreshes author metadata only.
+  serverDraft = {
+    ...draft,
+    revision: 4,
+    authorAkaName: 'Synced AKA',
+    statementHtml: draft.statementHtml,
+  };
+  act(() => window.dispatchEvent(new Event('focus')));
+
+  await waitFor(() => expect(result.current.conflict).toBe(true));
+  // Local text is retained for the admin to decide (discard-and-sync or copy out).
+  expect(result.current.form?.statementHtml).toBe('# Mid-edit when the sync lands');
+  expect(result.current.dirty).toBe(true);
+
+  await act(async () => { await result.current.discardAndRefresh(); });
+  expect(result.current.conflict).toBe(false);
+  expect(result.current.draft?.revision).toBe(4);
+  expect(result.current.draft?.authorAkaName).toBe('Synced AKA');
+
+  // An idle draft (no unsaved edits) adopts the synced revision silently —
+  // the sync is author-metadata-only and nothing is lost.
+  serverDraft = { ...draft, revision: 5, authorAkaName: 'Synced again' };
+  act(() => window.dispatchEvent(new Event('focus')));
+  await waitFor(() => expect(result.current.draft?.revision).toBe(5));
+  expect(result.current.conflict).toBe(false);
+  expect(result.current.form?.authorAkaName).toBe('Synced again');
 });
 
 test('queued Verify immediately disables Publish and sends exact revision without source overrides', async () => {

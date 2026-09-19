@@ -4,40 +4,65 @@ import hljs from 'highlight.js/lib/core';
 import cpp from 'highlight.js/lib/languages/cpp';
 import 'highlight.js/styles/atom-one-dark.css';
 import submissionService from '../services/submissionService';
+import { APP_CONSTANTS } from '../utils/constants';
 import type { SubmitRequest } from '../types';
+import type { FormEvent, MutableRefObject } from 'react';
 
 // Register C++ language
 hljs.registerLanguage('cpp', cpp);
 
-const useCodeSubmission = (problemId, contestId) => {
+const SUBMISSION_CACHE_KEY = 'oj-submission-cache';
+
+interface CachedSubmission {
+  code: string;
+  timestamp: number;
+}
+
+type SubmissionCache = Record<string, CachedSubmission>;
+
+const readSubmissionCache = (): SubmissionCache => {
+  try {
+    return JSON.parse(localStorage.getItem(SUBMISSION_CACHE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+};
+
+const writeSubmissionCache = (cache: SubmissionCache): void => {
+  try {
+    localStorage.setItem(SUBMISSION_CACHE_KEY, JSON.stringify(cache));
+  } catch (error) {
+    console.error('Failed to write to localStorage:', error);
+  }
+};
+
+const useCodeSubmission = (
+  problemId: string,
+  contestId: string | null | undefined
+) => {
   const [language, setLanguage] = useState('cpp');
   const [code, setCode] = useState(``);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const editorWrapperRef = useRef(null);
-  const lineNumbersRef = useRef(null);
+  const editorWrapperRef = useRef<HTMLDivElement | null>(null);
+  const lineNumbersRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    try {
-      const cachedSubmission = JSON.parse(localStorage.getItem('oj-submission-cache') || '{}');
-      const problemCache = cachedSubmission[problemId];
+    const cachedSubmission = readSubmissionCache();
+    const problemCache = cachedSubmission[problemId];
 
-      if (problemCache && problemCache.code) {
-        const CACHE_TIMEOUT = 30 * 60 * 1000;
-        const timeDiff = new Date().getTime() - problemCache.timestamp;
+    if (problemCache && problemCache.code) {
+      const timeDiff = new Date().getTime() - problemCache.timestamp;
 
-        if (timeDiff < CACHE_TIMEOUT) {
-          setCode(problemCache.code);
-        } else {
-          // Clear expired cache for this problem
-          delete cachedSubmission[problemId];
-          localStorage.setItem('oj-submission-cache', JSON.stringify(cachedSubmission));
-        }
+      if (timeDiff < APP_CONSTANTS.SUBMISSION_CACHE_EXPIRY) {
+        setCode(problemCache.code);
+      } else {
+        // Clear expired cache for this problem
+        delete cachedSubmission[problemId];
+        writeSubmissionCache(cachedSubmission);
       }
-    } catch (error) {
-      console.error('Failed to read from localStorage:', error);
     }
   }, [problemId]);
 
@@ -71,7 +96,7 @@ const useCodeSubmission = (problemId, contestId) => {
     };
   }, []); // Run only once to attach the listener
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError('');
@@ -90,16 +115,12 @@ const useCodeSubmission = (problemId, contestId) => {
 
       await submissionService.submit(submitData);
 
-      try {
-        const submissionCache = JSON.parse(localStorage.getItem('oj-submission-cache') || '{}');
-        submissionCache[problemId] = {
-          code: code,
-          timestamp: new Date().getTime(),
-        };
-        localStorage.setItem('oj-submission-cache', JSON.stringify(submissionCache));
-      } catch (error) {
-        console.error('Failed to write to localStorage:', error);
-      }
+      const submissionCache = readSubmissionCache();
+      submissionCache[problemId] = {
+        code: code,
+        timestamp: new Date().getTime(),
+      };
+      writeSubmissionCache(submissionCache);
 
       // Navigate to appropriate submissions page
       if (contestId) {
@@ -115,12 +136,12 @@ const useCodeSubmission = (problemId, contestId) => {
     }
   };
 
-  const highlightCode = (code) => {
+  const highlightCode = (source: string): string => {
     try {
-      return hljs.highlight(code, { language: 'cpp' }).value;
+      return hljs.highlight(source, { language: 'cpp' }).value;
     } catch (e) {
       console.warn('Highlighting error:', e);
-      return code;
+      return source;
     }
   };
 

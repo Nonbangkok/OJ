@@ -6,19 +6,6 @@ import ProblemCard from '../../features/problem/ProblemCard';
 
 import LoadingPage from '../../components/shared/LoadingPage';
 
-type Problem = {
-  id: string;
-  title: string;
-  author: string | null;
-  category?: string | null;
-  submission_count?: string | null;
-  latest_submission_at?: string | null;
-  best_score?: number | null;
-  latest_submission_status?: string | null;
-  best_submission_status?: string | null;
-  best_submission_results?: unknown;
-};
-
 const ALL_CATEGORIES = 'All';
 const UNCATEGORIZED = 'Uncategorized';
 
@@ -32,7 +19,7 @@ const Problems = () => {
 
   const categories = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const problem of problems as Problem[]) {
+    for (const problem of problems) {
       const key = problem.category?.trim() || UNCATEGORIZED;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
@@ -42,7 +29,7 @@ const Problems = () => {
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return (problems as Problem[]).filter(problem => {
+    return problems.filter(problem => {
       const matchesCategory = activeCategory === ALL_CATEGORIES
         || (problem.category?.trim() || UNCATEGORIZED) === activeCategory;
       if (!matchesCategory) return false;

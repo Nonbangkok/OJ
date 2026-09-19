@@ -2,7 +2,7 @@
 .editorWrapper {
   display: flex;
   position: relative;
-  background-color: #282c34; /* Same as hljs background */
+  background-color: var(--editor-bg); /* Same as hljs background */
   border: 1px solid var(--border-color);
   border-radius: 6px;
   font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
@@ -25,8 +25,8 @@
 
 /* Gutter for line numbers */
 .lineNumbersGutter {
-  background-color: #282c34; /* Slightly darker than editor */
-  color: #636d83; /* Muted color for line numbers */
+  background-color: var(--editor-bg); /* Slightly darker than editor */
+  color: var(--editor-gutter-muted); /* Muted color for line numbers */
   padding: 1rem 0.75rem;
   font-size: 1rem;
   line-height: 1.5; /* MUST match editor line height */
@@ -65,5 +65,5 @@
 /* Override highlight.js styles for better integration */
 :global(.hljs) {
   background: none !important; /* The wrapper handles the background */
-  color: #abb2bf !important;
+  color: var(--editor-text) !important;
 }

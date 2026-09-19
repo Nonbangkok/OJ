@@ -20,8 +20,40 @@ export const AUTHORING_JOB_TYPES = [
   'generate_outputs',
   'build_pdf',
   'verify_all',
+  'sync_pdf',
 ] as const;
 export type AuthoringJobType = typeof AUTHORING_JOB_TYPES[number];
+
+export const AUTHORING_PROFILE_SYNC_STATUSES = ['queued', 'running', 'succeeded', 'failed'] as const;
+export type AuthoringProfileSyncStatus = typeof AUTHORING_PROFILE_SYNC_STATUSES[number];
+
+export const AUTHORING_PROFILE_SYNC_ITEM_STATUSES = ['pending', 'syncing', 'synced', 'failed', 'deferred'] as const;
+export type AuthoringProfileSyncItemStatus = typeof AUTHORING_PROFILE_SYNC_ITEM_STATUSES[number];
+
+export interface AuthoringProfileSyncRow {
+  id: string;
+  profile_id: string;
+  status: AuthoringProfileSyncStatus;
+  result_summary: Record<string, unknown> | null;
+  error_message: string | null;
+  created_at: Date;
+  started_at: Date | null;
+  finished_at: Date | null;
+}
+
+export interface AuthoringProfileSyncItemRow {
+  id: string;
+  sync_id: string;
+  draft_id: string;
+  status: AuthoringProfileSyncItemStatus;
+  attempts: number;
+  next_attempt_at: Date | null;
+  sync_revision: number | null;
+  sync_pdf_job_id: string | null;
+  error_message: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
 
 export const DRAFT_TESTCASE_SOURCES = ['uploaded', 'generated'] as const;
 export type DraftTestcaseSource = typeof DRAFT_TESTCASE_SOURCES[number];

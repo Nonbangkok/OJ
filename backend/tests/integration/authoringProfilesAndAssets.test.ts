@@ -100,10 +100,20 @@ describeWithDatabase('author profiles and statement assets through HTTP and Post
     expect(await sharp(original.author_profile_image_png).metadata())
       .toEqual(expect.objectContaining({ format: 'png', width: 512, height: 512 }));
 
-    const changed = await request(app).patch(`/admin/author-profiles/${profileId}`)
+    // Author-relevant edits are gated: unconfirmed requests report the cascade
+    // impact instead of saving.
+    const gate = await request(app).patch(`/admin/author-profiles/${profileId}`)
       .send({ akaName: 'Updated Author', removeProfileImage: true });
+    expect(gate.status).toBe(200);
+    expect(gate.body).toEqual(expect.objectContaining({
+      confirmationRequired: true, affectedDrafts: 1, affectedPublishedProblems: 0,
+    }));
+
+    const changed = await request(app).patch(`/admin/author-profiles/${profileId}`)
+      .send({ akaName: 'Updated Author', removeProfileImage: true, confirmed: true });
     expect(changed.status).toBe(200);
     expect(changed.body.hasProfileImage).toBe(false);
+    // The queued cascade has not run yet: the draft snapshot is still frozen.
     expect(await storedDraft(draftId)).toEqual(original);
 
     const refresh = await request(app)

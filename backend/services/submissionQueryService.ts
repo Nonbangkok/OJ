@@ -7,6 +7,7 @@ import {
 } from '../types/models';
 import { SubmissionListQuery, SubmitRequestBody } from '../types/api';
 import { AppError } from '../middleware/errorHandler';
+import { isContestParticipant } from './contestAccess';
 import {
     ExistsRow,
     GlobalScoreboardRow,
@@ -44,11 +45,7 @@ export const validateAndQueueSubmission = async (
             throw new AppError(`Contest is not running. Current status: ${contest.status}`, 400);
         }
 
-        const participantResult = await db.query<ExistsRow>(
-            'SELECT 1 AS exists FROM contest_participants WHERE contest_id = $1 AND user_id = $2',
-            [contestId, userId],
-        );
-        if (participantResult.rows.length === 0) {
+        if (!(await isContestParticipant(contestId, userId))) {
             throw new AppError('You must join the contest before submitting.', 403);
         }
 

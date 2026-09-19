@@ -18,7 +18,9 @@ describe('scoreboard avatar exposure', () => {
   });
 
   it('contest scoreboard selects has_avatar in both branches', () => {
-    const source = readSource('services/contestQueryService.ts');
+    // The scoreboard SQL was split into contestScoreboardQueryService (see the
+    // contest service split); the avatar contract follows the split module.
+    const source = readSource('services/contestScoreboardQueryService.ts');
     const occurrences = source.split('(u.avatar_png IS NOT NULL) AS has_avatar').length - 1;
     expect(occurrences).toBeGreaterThanOrEqual(2);
   });

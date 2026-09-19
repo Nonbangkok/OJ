@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ImperativePanelGroupHandle, Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
-import api from '../../../services/api';
+import { Button, Dialog } from '../../../components/ui';
+import authoringService from '../../../services/admin/authoringService';
 import useAuthoringDraft from './useAuthoringDraft';
-import { draftBase } from './types';
+import { jobLabel } from './status';
 import { StatementAssets } from './StatementTab';
 import styles from './Authoring.module.css';
 
@@ -13,6 +14,8 @@ const previewZoomKey = (id: string) => `oj-authoring-statement-preview-zoom:${id
 const MIN_PREVIEW_ZOOM = 50;
 const MAX_PREVIEW_ZOOM = 200;
 const PREVIEW_ZOOM_STEP = 10;
+// Preview pagination: fixed A4-ish aspect slices keep page boundaries visible.
+const PREVIEW_PAGE_ASPECT = 297 / 210; // height / width of A4
 
 type StatementRecovery = { baseRevision: number; statementHtml: string };
 
@@ -49,6 +52,53 @@ function useCompactEditorLayout() {
   return compact;
 }
 
+/** Live HTML preview: the sanitized statement rendered in a sandboxed frame
+ *  that fills the pane — continuous flow, no page slicing. The iframe is
+ *  sized to the document's full rendered height (measured after load), so the
+ *  whole statement paints at every zoom level and the pane scrolls instead of
+ *  clipping content inside the frame. The outer box reserves layout space at
+ *  the SCALED size (height × zoom) while the inner box zooms visually — a
+ *  bare transform reserves the unscaled height, letting the pane scroll past
+ *  the end of the shrunken content. The Actual PDF tab is where exact
+ *  pagination lives (the runner-built file itself). */
+function LivePreview({ preview, zoomScale }: { preview: string; zoomScale: number }) {
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const [docHeight, setDocHeight] = useState(0);
+  useEffect(() => { setDocHeight(0); }, [preview]);
+  const measure = () => {
+    try {
+      const doc = frameRef.current?.contentDocument;
+      if (doc?.body) setDocHeight(Math.ceil(doc.documentElement.scrollHeight));
+    } catch { /* same-origin srcdoc; ignore transient access errors */ }
+  };
+  return <div className={styles.previewLive}
+    style={{ width: `${100 / zoomScale}%`, height: docHeight ? `${Math.ceil(docHeight * zoomScale)}px` : undefined }}>
+    <div className={styles.previewLiveZoom} style={{ transform: `scale(${zoomScale})` }}>
+      <iframe title="Live statement preview" sandbox="allow-same-origin" srcDoc={preview}
+        ref={frameRef} onLoad={measure} className={styles.previewLiveFrame}
+        style={docHeight ? { height: `${docHeight}px` } : undefined} />
+    </div>
+  </div>;
+}
+
+/** Embeds the runner-built PDF. While a build job runs, the currently loaded
+ *  file stays put (switching src mid-load aborts the request and can leave
+ *  Chrome's viewer blank); the new revision swaps in once, after the job
+ *  finishes and the refreshed draft reports it. */
+function PdfEmbed({ draftId, revision, buildRunning }: { draftId: string; revision: number | null; buildRunning: boolean }) {
+  // The revision actually loaded in the iframe; lags `revision` while a job runs.
+  const [loadedRevision, setLoadedRevision] = useState(revision);
+  useEffect(() => {
+    if (!buildRunning && revision !== null && revision !== loadedRevision) {
+      setLoadedRevision(revision);
+    }
+  }, [buildRunning, revision, loadedRevision]);
+  if (loadedRevision === null) return <div className={styles.previewEmpty}>No PDF built yet.</div>;
+  return <iframe title="Latest runner-built PDF" className={styles.previewPdfEmbed}
+    key={loadedRevision}
+    src={`${authoringService.draftPdfUrl(draftId, loadedRevision)}#view=FitH`} />;
+}
+
 export default function StatementEditor({ id }: { id: string }) {
   const model = useAuthoringDraft(id, 3000, { allowPublishedStatementEdit: true });
   const { draft, form, dirty } = model;
@@ -56,6 +106,26 @@ export default function StatementEditor({ id }: { id: string }) {
   const [previewState, setPreviewState] = useState<'waiting' | 'loading' | 'ready' | 'error'>('waiting');
   const [previewError, setPreviewError] = useState('');
   const [recovered, setRecovered] = useState(false);
+  const [showAssets, setShowAssets] = useState(false);
+  // Live HTML shows unsaved edits instantly; the Actual PDF tab shows the
+  // runner-built file, whose pagination is exact by construction.
+  const [pdfMode, setPdfMode] = useState(false);
+  // The PDF is stale when no build exists yet, or the draft revision moved
+  // past the built one (unsaved edits count too — they are one autosave away
+  // from a new revision).
+  const pdfStale = !!draft && (!draft.hasLatestPdf || draft.latestPdfRevision !== draft.revision || dirty);
+  const buildPdf = useCallback(() => model.runJob('pdf'), [model]);
+  // Switching to the Actual PDF tab with a stale PDF builds it automatically —
+  // one job at a time; the guard inside runJob prevents double submission.
+  const autoBuiltRef = useRef('');
+  useEffect(() => {
+    if (!pdfMode || !pdfStale || model.activeJob || model.actionsDisabled) return;
+    const key = `${draft?.revision}:${draft?.latestPdfRevision}`;
+    if (autoBuiltRef.current === key) return; // one auto-build per stale state
+    autoBuiltRef.current = key;
+    void buildPdf();
+  }, [pdfMode, pdfStale, model.activeJob, model.actionsDisabled, draft?.revision, draft?.latestPdfRevision, buildPdf]);
+  useEffect(() => { if (!pdfStale) autoBuiltRef.current = ''; }, [pdfStale]);
   const request = useRef(0);
   const recoveryHandled = useRef(false);
   const recoveryBaseRevision = useRef<number | null>(null);
@@ -71,12 +141,17 @@ export default function StatementEditor({ id }: { id: string }) {
     if (recoveryHandled.current || !draft || !form) return;
     recoveryHandled.current = true;
     const recovery = readRecovery(id);
-    if (!recovery || recovery.statementHtml === form.statementHtml) {
+    if (!recovery) {
       recoveryBaseRevision.current = draft.revision;
+      return;
+    }
+    // Adopt the recovery's base revision even when the hook-level draft recovery
+    // already restored the same text, so continued edits keep the original base.
+    recoveryBaseRevision.current = recovery.baseRevision;
+    if (recovery.statementHtml === form.statementHtml) {
       writeRecovery(id, null);
       return;
     }
-    recoveryBaseRevision.current = recovery.baseRevision;
     model.restoreStatement(recovery.statementHtml, recovery.baseRevision);
     setRecovered(true);
   }, [draft, form, id, model]);
@@ -97,9 +172,8 @@ export default function StatementEditor({ id }: { id: string }) {
     const timer = window.setTimeout(async () => {
       setPreviewState('loading');
       try {
-        const response = await api.post<{ html: string }>(`${draftBase(draftId)}/preview`,
-          { statementHtml: statementSource });
-        if (current === request.current) { setPreview(response.data.html); setPreviewState('ready'); }
+        const response = await authoringService.previewStatement(draftId, statementSource);
+        if (current === request.current) { setPreview(response.html); setPreviewState('ready'); }
       } catch {
         if (current === request.current) {
           setPreviewState('error'); setPreviewError('Preview could not be updated. Your source is unchanged.');
@@ -116,6 +190,20 @@ export default function StatementEditor({ id }: { id: string }) {
     return () => window.removeEventListener('beforeunload', unload);
   }, [dirty]);
 
+  // Ctrl/Cmd+S saves the statement from the editor.
+  const saveRef = useRef(model.save);
+  saveRef.current = model.save;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void saveRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   useEffect(() => {
     try { window.localStorage.setItem(previewZoomKey(id), String(previewZoom)); } catch { /* Preference only. */ }
   }, [id, previewZoom]);
@@ -128,19 +216,30 @@ export default function StatementEditor({ id }: { id: string }) {
   const zoomScale = previewZoom / 100;
   const editorState = draft.status === 'published' ? 'Published — statement revision available'
     : draft.publishedAt ? 'Editing revision — live problem unchanged'
-      : model.conflict ? 'Server conflict' : dirty ? 'Unsaved changes' : 'Saved';
+      : model.conflict ? 'Server conflict'
+        : dirty ? (model.saveState === 'saving' ? 'Saving…' : 'Unsaved changes') : 'Saved';
+  const previewStatusText = previewState === 'waiting' ? 'Waiting for typing to pause…' : previewState === 'loading' ? 'Updating preview…'
+    : previewState === 'error' ? previewError : 'Preview is up to date';
   return <main className={styles.editorShell}>
     <header className={styles.editorHeader}>
-      <Link to={`/admin/authoring/${encodeURIComponent(id)}`} onClick={event => {
-        if (!dirty) return;
-        if (!window.confirm('Leave the editor without saving your changes?')) event.preventDefault();
-        else writeRecovery(id, null);
-      }}>← Workspace</Link>
-      <div className={styles.editorTitle}><h1>Edit Task: {draft.problemId}</h1><span>{draft.title}</span></div>
-      <strong>{editorState}</strong>
-      <button type="button" disabled={!dirty || editorDisabled || model.conflict || !model.loaded}
-        onClick={() => void model.save()}>Save</button>
-      <button type="button" disabled={model.actionsDisabled} onClick={() => void model.runJob('pdf')}>Build PDF</button>
+      <div className={styles.editorHeaderLeft}>
+        <Link to={`/admin/authoring/${encodeURIComponent(id)}`}>← Workspace</Link>
+        <div className={styles.editorTitle}><h1>Edit Task: {draft.problemId}</h1></div>
+      </div>
+      <strong className={styles.editorStateCenter}>{editorState}</strong>
+      <div className={styles.editorHeaderRight}>
+        <span className={styles.previewStatusChip} role="status">{previewStatusText}</span>
+        <span className={styles.previewZoomControls} aria-label="Preview zoom controls">
+          <button type="button" aria-label="Zoom out" disabled={previewZoom <= MIN_PREVIEW_ZOOM}
+            onClick={() => setPreviewZoom(zoom => Math.max(MIN_PREVIEW_ZOOM, zoom - PREVIEW_ZOOM_STEP))}>−</button>
+          <output aria-label="Preview zoom">{previewZoom}%</output>
+          <button type="button" aria-label="Zoom in" disabled={previewZoom >= MAX_PREVIEW_ZOOM}
+            onClick={() => setPreviewZoom(zoom => Math.min(MAX_PREVIEW_ZOOM, zoom + PREVIEW_ZOOM_STEP))}>+</button>
+          <button type="button" aria-label="Reset preview zoom" disabled={previewZoom === 100}
+            onClick={() => setPreviewZoom(100)}>Reset</button>
+        </span>
+        <Button variant="secondary" size="compact" onClick={() => setShowAssets(true)}>Assets &amp; help</Button>
+      </div>
     </header>
     <section className={styles.editorNotices} aria-label="Editor notices">
       {model.error && <p className={styles.editorAlert} role="alert">{model.error}</p>}
@@ -150,14 +249,13 @@ export default function StatementEditor({ id }: { id: string }) {
           if (window.confirm('Discard local changes and sync the latest server revision?')) void model.discardAndRefresh();
         }}>Discard local changes and sync</button>
       </div>}
-      {model.activeJob && <p className={styles.editorStatus} role="status">Active job: {model.activeJob.jobType} — {model.activeJob.status}</p>}
+      {model.activeJob && <p className={styles.editorStatus} role="status">Active job: {jobLabel(model.activeJob.jobType)} — {model.activeJob.status}</p>}
       {recovered && <p className={styles.editorStatus} role="status">Recovered unsaved statement from this browser tab.</p>}
     </section>
     <PanelGroup ref={panels} autoSaveId={`oj-authoring-statement-layout:${id}`} direction={compactLayout ? 'vertical' : 'horizontal'}
       className={styles.editorWorkspace} role="region" aria-label="Statement editor">
       <Panel defaultSize={50} minSize={25} className={styles.sourcePane}>
-        <label htmlFor="statement-source">Statement Markdown / HTML / LaTeX</label>
-        <textarea id="statement-source" spellCheck={false} value={form.statementHtml}
+        <textarea id="statement-source" aria-label="Statement source" spellCheck={false} value={form.statementHtml}
           readOnly={editorDisabled} onChange={event => {
             const statementHtml = event.target.value;
             const baseRevision = dirty ? recoveryBaseRevision.current ?? draft.revision : draft.revision;
@@ -169,31 +267,43 @@ export default function StatementEditor({ id }: { id: string }) {
       <PanelResizeHandle className={styles.editorResizeHandle} aria-label="Resize source and preview panes"
         onDoubleClick={() => panels.current?.setLayout([50, 50])} />
       <Panel defaultSize={50} minSize={25} className={styles.previewPane}>
-        <div className={styles.previewStatus} role="status">
-          <span>{previewState === 'waiting' ? 'Waiting for typing to pause…' : previewState === 'loading' ? 'Updating preview…'
-            : previewState === 'error' ? previewError : 'Preview is up to date'}</span>
-          <span className={styles.previewZoomControls} aria-label="Preview zoom controls">
-            <button type="button" aria-label="Zoom out" disabled={previewZoom <= MIN_PREVIEW_ZOOM}
-              onClick={() => setPreviewZoom(zoom => Math.max(MIN_PREVIEW_ZOOM, zoom - PREVIEW_ZOOM_STEP))}>−</button>
-            <output aria-label="Preview zoom">{previewZoom}%</output>
-            <button type="button" aria-label="Zoom in" disabled={previewZoom >= MAX_PREVIEW_ZOOM}
-              onClick={() => setPreviewZoom(zoom => Math.min(MAX_PREVIEW_ZOOM, zoom + PREVIEW_ZOOM_STEP))}>+</button>
-            <button type="button" aria-label="Reset preview zoom" disabled={previewZoom === 100}
-              onClick={() => setPreviewZoom(100)}>Reset</button>
-          </span>
+        <div className={styles.previewModeBar} role="tablist" aria-label="Preview mode">
+          <button type="button" role="tab" aria-selected={pdfMode === false}
+            className={pdfMode ? '' : styles.previewModeActive}
+            onClick={() => setPdfMode(false)}>Live HTML</button>
+          <button type="button" role="tab" aria-selected={pdfMode === true}
+            className={pdfMode ? styles.previewModeActive : ''}
+            onClick={() => setPdfMode(true)}>
+            Actual PDF
+            {pdfStale && <span className={styles.previewStaleDot} aria-label="PDF is outdated" title="Statement changed since the last build" />}
+          </button>
         </div>
         <div className={styles.previewViewport}>
-          {preview ? <div className={styles.previewCanvas} style={{ width: `${100 / zoomScale}%`, height: `${100 / zoomScale}%`, transform: `scale(${zoomScale})` }}>
-            <iframe title="Fast statement preview" sandbox="" srcDoc={preview} />
-          </div> : <div className={styles.previewEmpty}>Preview will appear here.</div>}
+          {pdfMode
+            ? (draft.hasLatestPdf
+              ? <PdfEmbed draftId={draft.id} revision={draft.latestPdfRevision}
+                buildRunning={!!model.activeJob} />
+              : <div className={styles.previewEmpty}>No PDF built yet.</div>)
+            : (preview ? <LivePreview preview={preview} zoomScale={zoomScale} />
+              : <div className={styles.previewEmpty}>Preview will appear here.</div>)}
         </div>
+        {pdfMode && pdfStale && !model.activeJob && (
+          <div className={styles.pdfStaleBar} role="status">
+            <span>{draft.hasLatestPdf ? 'Statement changed since this PDF was built.' : 'No PDF yet.'}</span>
+            <Button disabled={model.actionsDisabled} onClick={() => void buildPdf()}>Build PDF now</Button>
+          </div>
+        )}
       </Panel>
     </PanelGroup>
-    <details className={styles.editorAssets}>
-      <summary>Statement assets & syntax help</summary>
-      <p>Images: <code>{'<image src="{{ASSET_BASE}}/image.png">'}</code> or <code>{'![alt]({{ASSET_BASE}}/image.png)'}</code>.</p>
-      <p>Page break: <code>{'<div class="forced-page-break"></div>'}</code>. The runner-built PDF remains authoritative.</p>
+    {showAssets && <Dialog open wide title="Statement assets & syntax help"
+      description={'The runner-built PDF remains authoritative.'}
+      onClose={() => setShowAssets(false)}
+      footer={<Button variant="secondary" onClick={() => setShowAssets(false)}>Close</Button>}>
+      <div className={styles.helpList}>
+        <p><strong>Image</strong> — <code>&lt;image src=&quot;&#123;&#123;ASSET_BASE&#125;&#125;/image.png&quot;&gt;</code> or <code>![alt](&#123;&#123;ASSET_BASE&#125;&#125;/image.png)</code></p>
+        <p><strong>Page break</strong> — <code>&lt;div class=&quot;forced-page-break&quot;&gt;&lt;/div&gt;</code></p>
+      </div>
       <StatementAssets draft={draft} disabled={model.actionsDisabled} mutate={model.mutate} onError={model.onError} />
-    </details>
+    </Dialog>}
   </main>;
 }

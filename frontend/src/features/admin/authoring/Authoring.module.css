@@ -11,6 +11,45 @@
   min-width: 0;
   max-width: 100%;
 }
+/* Self-contained styling so the metadata form looks right inside modal
+   portals (rendered at document.body, outside .authoring) too. */
+.metadataFields {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+  min-width: 0;
+  text-align: left;
+  color: var(--text-primary);
+}
+.metadataFields legend {
+  font-weight: 600;
+  padding: 0 0.35rem;
+}
+.metadataFields label {
+  display: block;
+  margin: 0.7rem 0;
+  font-weight: 500;
+}
+.metadataFields input:not([type='checkbox']),
+.metadataFields select,
+.metadataFields textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.65rem;
+  margin-top: 0.35rem;
+  color: var(--text-primary);
+  background: var(--background-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+}
+.metadataFields p {
+  line-height: 1.6;
+  margin: 0.7rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
 .authoring h1 {
   font-size: 1.8rem;
   margin-bottom: 0.5rem;
@@ -91,6 +130,18 @@
   padding: 0.7rem;
   overflow-wrap: anywhere;
 }
+/* Long draft titles and IDs clamp to one line so table rows stay even. */
+.authoring td a {
+  display: inline-block;
+  max-width: 34ch;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+.authoring td a:hover {
+  white-space: normal;
+}
 .authoring caption {
   text-align: left;
   font-weight: 600;
@@ -100,6 +151,110 @@
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
+}
+/* Testcases Generate row: seed pinned left, actions pinned right. */
+.generateRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+/* Draft list page: title row and the problem-cell link stack (ID over title). */
+.listHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+.listHead h1 {
+  margin: 0;
+}
+.draftIdLink {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--accent-primary);
+  text-decoration: none;
+  max-width: 18ch;
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+.draftIdLink:hover {
+  text-decoration: underline;
+}
+.draftTitleLink {
+  color: var(--text-primary);
+  text-decoration: none;
+  max-width: 40ch;
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+.draftTitleLink:hover {
+  text-decoration: underline;
+}
+.draftAuthor {
+  color: var(--text-secondary);
+}
+/* Bordered panel system for sectioned pages (jobs, testcases): each concern
+   gets a titled box so the page reads as distinct blocks, not one stream. */
+.panel {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  margin: 1rem 0;
+  overflow: hidden;
+}
+.panelHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--background-secondary);
+}
+.panelHead h3,
+.panelHead h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+.panelHead p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+.panelBody {
+  padding: 1rem;
+}
+.panelBody > :last-child {
+  margin-bottom: 0;
+}
+/* Table refinements inside panels: subtle header strip + hover row feedback.
+   Scoped to thead so row-header cells (th scope="row") keep normal styling. */
+.panel table thead th {
+  background: var(--background-tertiary);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+.panel table tbody tr:hover td,
+.panel table tbody tr:hover th[scope='row'] {
+  background: var(--background-hover);
+}
+.panel table td,
+.panel table th {
+  padding: 0.55rem 0.7rem;
+  vertical-align: middle;
 }
 .authoring pre {
   white-space: pre-wrap;
@@ -138,12 +293,153 @@
   outline: 3px solid var(--action-focus-ring);
   outline-offset: 2px;
 }
-.toolbar {
-  padding: 0.75rem;
-  border: 1px solid var(--border-color);
-  background: var(--background-secondary);
-  border-radius: 8px;
+.saveState {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+.checklist {
+  list-style: none;
   margin: 1rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.checkDone,
+.checkTodo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.checkDone {
+  color: var(--text-secondary);
+}
+.linkButton {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent-primary);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+  line-height: inherit;
+}
+.linkButton:disabled {
+  color: var(--text-muted);
+  cursor: default;
+  text-decoration: none;
+}
+.workspaceShell {
+  display: flex;
+  align-items: stretch;
+  gap: 1.5rem;
+  width: 100%;
+}
+.leftNav {
+  width: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+.navInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+.navInfo h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.navProblemId {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+.navMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.875rem;
+}
+.backLink {
+  font-size: 0.875rem;
+  text-decoration: none;
+  color: var(--text-secondary);
+}
+.backLink:hover {
+  color: var(--accent-primary);
+}
+.navJob {
+  margin: 0;
+  font-size: 0.875rem;
+}
+.sectionNav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  border-top: 1px solid var(--border-color);
+  padding-top: 1rem;
+}
+.navBtn {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  text-align: left;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.navBtn:hover {
+  background: var(--background-primary);
+  color: var(--text-primary);
+}
+.navBtnActive,
+.navBtnActive:hover {
+  background: var(--accent-primary);
+  color: var(--action-primary-foreground);
+}
+.workspaceMain {
+  flex: 1;
+  min-width: 0;
+}
+.conflictBanner {
+  border: 1px solid var(--status-danger, #dc3545);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  margin: 1rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+@media (max-width: 900px) {
+  .workspaceShell {
+    flex-direction: column;
+  }
+  .leftNav {
+    width: 100%;
+  }
+  .sectionNav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .navBtn {
+    width: auto;
+  }
 }
 .tabs {
   display: flex;
@@ -163,8 +459,77 @@
   width: 100%;
   height: 750px;
   border: 1px solid var(--border-color);
-  background: white;
+  background: var(--statement-paper);
   margin-top: 1rem;
+}
+/* Statement tab: the built-PDF panel and the asset manager are separate
+   concerns from editing the statement source — bordered boxes make that
+   separation visible. */
+.pdfPanel,
+.assetsPanel {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  margin: 1rem 0;
+  background: var(--surface-elevated);
+}
+.assetsPanel {
+  border-left: 4px solid var(--accent-primary);
+}
+.assetsPanel h3 {
+  margin: 0 0 0.35rem;
+}
+.pdfPanelHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+.pdfPanelText {
+  margin: 0;
+}
+.pdfPanelActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pdfOpenLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--accent-primary);
+  border-radius: 6px;
+  color: var(--accent-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+.pdfOpenLink:hover {
+  background: var(--accent-primary-hover);
+  color: var(--action-primary-foreground);
+}
+.pdfPanelEmpty {
+  margin: 1rem 0;
+  color: var(--text-secondary);
+}
+/* Assets & help dialog: syntax reference as a scannable list. */
+.helpList {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+}
+.helpList p {
+  margin: 0;
+}
+.helpList code {
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--background-tertiary);
+  font-size: 0.95em;
+  word-break: break-all;
 }
 .confirmation {
   padding: 1rem;
@@ -199,25 +564,53 @@
   color: var(--text-primary);
   background: var(--background-primary);
 }
+/* Three-zone header: left (back link + title), center (editing state),
+   right (status chip, zoom, assets). Grid centers the middle column on the
+   header itself; spacers are gone. */
 .editorHeader {
   min-height: 3.5rem;
   display: grid;
-  grid-template-columns: auto minmax(12rem, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
   padding: 0.5rem 1rem;
-  background: #202428;
-  color: #f7f7f7;
+  background: var(--editor-chrome-bg);
+  color: var(--editor-chrome-text);
   border-bottom: 1px solid var(--border-color);
 }
+.editorHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.editorHeaderRight {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  min-width: 0;
+}
+/* The editing-state label occupies the header's true center column. */
+.editorStateCenter {
+  text-align: center;
+  white-space: nowrap;
+}
+.previewStatusChip {
+  color: var(--editor-chrome-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 18ch;
+}
 .editorHeader a {
-  color: #f7f7f7;
+  color: var(--editor-chrome-text);
   text-decoration: none;
   white-space: nowrap;
 }
 .editorHeader button,
-.editorAlert button,
-.editorAssets button {
+.editorAlert button {
   padding: 0.5rem 0.75rem;
   color: var(--text-primary);
   background: var(--background-secondary);
@@ -226,8 +619,7 @@
   cursor: pointer;
 }
 .editorHeader button:disabled,
-.editorAlert button:disabled,
-.editorAssets button:disabled {
+.editorAlert button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -241,10 +633,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.editorTitle span {
-  color: #c9cdd1;
-  font-size: 0.8rem;
 }
 .editorNotices {
   min-height: 0;
@@ -275,12 +663,6 @@
   position: relative;
   display: flex;
   flex-direction: column;
-}
-.sourcePane label {
-  padding: 0.45rem 0.75rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  background: var(--background-secondary);
 }
 .sourcePane textarea {
   flex: 1;
@@ -313,13 +695,58 @@
   outline: none;
 }
 .previewPane {
-  background: #fff;
+  background: var(--statement-paper);
+  display: flex;
+  flex-direction: column;
+}
+/* Live HTML vs Actual PDF switch above the preview viewport. */
+.previewModeBar {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.35rem 0.5rem 0;
+  background: var(--statement-desk);
+}
+.previewModeBar button {
+  padding: 0.3rem 0.9rem;
+  border: 1px solid var(--statement-separator);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--background-secondary);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+/* Hover must stay readable in both themes: accent-tinted background with
+   primary text, never a gray-on-gray blend. The tint is strong enough that
+   the accent color itself carries the text — same foreground as primary
+   buttons, readable on light (blue on light blue) and dark alike. */
+.previewModeBar button:hover {
+  background: color-mix(in srgb, var(--accent-primary) 82%, var(--background-primary));
+  color: var(--action-primary-foreground);
+  border-color: var(--accent-primary);
+}
+.previewModeBar .previewModeActive,
+.previewModeBar .previewModeActive:hover,
+.previewModeBar .previewModeActive:active,
+.previewModeBar .previewModeActive:focus-visible {
+  background: var(--statement-paper);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.previewModeBar .previewModeActive:hover {
+  border-color: var(--accent-primary);
+}
+.previewPdfEmbed {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: var(--statement-paper);
 }
 .previewPane iframe {
   width: 100%;
   height: 100%;
   border: 0;
-  background: #fff;
+  background: var(--statement-paper);
 }
 .previewStatus {
   min-height: 1.75rem;
@@ -338,6 +765,14 @@
   align-items: center;
   gap: 0.3rem;
   white-space: nowrap;
+}
+.editorHeader .previewZoomControls button {
+  background: var(--editor-chrome-button-bg);
+  color: var(--editor-chrome-text);
+  border-color: var(--editor-chrome-button-border);
+}
+.editorHeader .previewZoomControls output {
+  color: var(--editor-chrome-text);
 }
 .previewZoomControls button {
   min-width: 1.75rem;
@@ -360,38 +795,61 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  background: #e9edf1;
-}
-.previewCanvas {
-  min-width: 100%;
-  min-height: 100%;
-  transform-origin: top left;
-  background: #fff;
+  background: var(--statement-desk);
 }
 .previewEmpty {
   flex: 1;
   display: grid;
   place-items: center;
-  color: #666;
+  color: var(--statement-empty);
 }
-.editorAssets {
-  max-height: 40vh;
-  overflow: auto;
-  padding: 0.5rem 1rem;
-  border-top: 1px solid var(--border-color);
+/* Live HTML preview: the outer box reserves layout space at the scaled size
+   (set inline as docHeight × zoom); the inner box scales visually from the
+   top-left so the shrunken content never leaves scrollable blank space. */
+.previewLive {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+  background: var(--statement-paper);
+}
+.previewLiveZoom {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  transform-origin: top left;
+}
+.previewLiveFrame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 40rem;
+  border: 0;
+  background: var(--statement-paper);
+}
+/* Stale indicator on the Actual PDF tab + the action bar under it. */
+.previewStaleDot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-left: 0.4rem;
+  border-radius: 50%;
+  background: var(--status-warning);
+  vertical-align: middle;
+}
+.pdfStaleBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0.9rem;
+  border-top: 1px solid var(--statement-separator);
   background: var(--background-secondary);
-}
-.editorAssets summary {
-  cursor: pointer;
-  font-weight: 600;
-}
-.editorAssets section {
-  padding-bottom: 0.75rem;
-}
-.editorAssets input {
   color: var(--text-primary);
+  font-size: 0.85rem;
 }
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .authoring {
     margin: 0.5rem auto;
     padding: 0 0.75rem;
@@ -421,12 +879,18 @@
     overflow: auto;
     grid-template-rows: auto auto auto auto;
   }
+  /* Narrow screens: stack left/center/right into rows; the state label
+     spans the middle row, centered. */
   .editorHeader {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
-  .editorHeader strong {
+  .editorStateCenter {
     grid-column: 1 / -1;
+    grid-row: 2;
     text-align: center;
+  }
+  .editorHeaderRight {
+    justify-content: flex-end;
   }
   .editorWorkspace {
     min-height: 100dvh;
@@ -435,4 +899,184 @@
     flex-basis: 8px;
     cursor: row-resize;
   }
+}
+
+/* Two-column layout for the testcases section. */
+.column {
+  min-width: 0;
+}
+.columnHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.columnHead h3 {
+  margin: 0;
+}
+.optionalTag {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+  vertical-align: middle;
+}
+.seedRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+  font-weight: 500;
+}
+.seedRow input {
+  width: 11rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--background-primary);
+  color: var(--text-primary);
+}
+.caution {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  border-left: 3px solid var(--status-warning);
+  padding: 0.35rem 0.75rem;
+  margin: 0.75rem 0;
+  background: var(--background-secondary);
+}
+.sectionActions {
+  margin-top: 0.75rem;
+}
+/* Verify page hero + checklist panel. */
+.verifyHero {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-secondary);
+  margin-bottom: 1.25rem;
+}
+.verifyHeroText {
+  color: var(--text-secondary);
+  font-size: 0.925rem;
+}
+.verifyPanel {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  background: var(--background-primary);
+}
+.checklist {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.checkDone,
+.checkTodo {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+.checkDone {
+  background: var(--success-tint-bg);
+  border-color: var(--success-tint-border);
+}
+.checkMark {
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+.checkDone .checkMark {
+  color: var(--text-success);
+}
+.checkBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.checkLabel {
+  font-weight: 600;
+}
+.checkDetail {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.verifyActions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+/* Shared highlighted code editor — same scroll model as the submission page:
+   the wrapper never scrolls; the textarea inside is the single scroller and
+   JS syncs it onto the gutter and the highlighted <pre>. */
+.codeEditor {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--editor-bg);
+}
+.codeLabel {
+  padding: 0.4rem 0.9rem;
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--editor-text);
+  background: var(--editor-surface);
+  border-bottom: 1px solid var(--editor-border);
+}
+.codeWrap {
+  display: flex;
+  overflow: hidden; /* children handle their own scrolling */
+  max-height: 30rem;
+  min-height: 10rem;
+}
+.lineNumbers {
+  flex: 0 0 auto;
+  padding: 14px 8px 14px 12px;
+  text-align: right;
+  color: var(--editor-gutter-text);
+  font:
+    13px/1.55 'Fira code',
+    'Fira Mono',
+    monospace;
+  user-select: none;
+  background: var(--editor-bg);
+  overflow: hidden; /* scrollTop is synced via JS */
+}
+.codeScroll {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+/* Height parity is the crux: if the textarea grows with content while the
+   pre stays container-sized, the overflow lands on the pre (invisible
+   cut-off) and the two stop scrolling together. Both fill the container,
+   so the textarea is the single scroller — same trick as the submission
+   page's editor. */
+.codeScroll > div,
+.codeScroll textarea,
+.codeScroll pre {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+.codeScroll textarea,
+.codeScroll pre {
+  overflow: auto !important; /* the single scroller */
+  white-space: pre !important;
+  word-wrap: normal !important;
+  overflow-wrap: normal !important;
 }

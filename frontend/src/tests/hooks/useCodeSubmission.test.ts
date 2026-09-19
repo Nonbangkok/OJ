@@ -85,7 +85,7 @@ describe('useCodeSubmission', () => {
             result.current.setCode('print("hello")');
         });
 
-        const mockEvent = { preventDefault: jest.fn() };
+        const mockEvent = { preventDefault: jest.fn() } as unknown as React.FormEvent<Element>;
 
         await act(async () => {
             await result.current.handleSubmit(mockEvent);

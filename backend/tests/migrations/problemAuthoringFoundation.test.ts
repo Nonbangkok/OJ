@@ -19,6 +19,7 @@ describe('problem authoring foundation migration', () => {
       '0006_authoring_published_problem_provenance',
       '0007_problem_category',
       '0008_user_profile',
+      '0009_profile_sync',
     ]);
   });
 
@@ -73,6 +74,7 @@ describe('authoring runtime values', () => {
       'generate_outputs',
       'build_pdf',
       'verify_all',
+      'sync_pdf',
     ]);
     expect(DRAFT_TESTCASE_SOURCES).toEqual(['uploaded', 'generated']);
   });

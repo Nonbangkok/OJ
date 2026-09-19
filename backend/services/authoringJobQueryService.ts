@@ -166,7 +166,8 @@ export async function applyJobResult(id: string, input: unknown, database: JobDa
     const generating = job.job_type === 'run_generator';
     const outputting = job.job_type === 'generate_outputs';
     const verifying = job.job_type === 'verify_all';
-    const buildingPdf = job.job_type === 'build_pdf' || verifying;
+    const syncing = job.job_type === 'sync_pdf';
+    const buildingPdf = job.job_type === 'build_pdf' || verifying || syncing;
     if (verifying) validateVerificationReport(job.request_snapshot, result);
     else if (result.verification) throw new TestcaseError('invalid_verification_result', 'Unexpected verification report');
     if (result.status === 'succeeded' && (buildingPdf ? !result.pdf || !readPdf
@@ -191,7 +192,9 @@ export async function applyJobResult(id: string, input: unknown, database: JobDa
     const draft = (await client.query<ProblemDraftRow>('SELECT * FROM problem_drafts WHERE id=$1 FOR UPDATE', [job.draft_id])).rows[0];
     if (!draft) { await client.query('ROLLBACK'); return false; }
     const expired = verifying && Date.parse(job.request_snapshot!.deadline) <= Date.now();
-    const status = draft.revision !== result.revision || draft.status === 'published' ? 'stale' : expired ? 'timed_out' : result.status;
+    // sync_pdf is the only job kind that legitimately runs on a published draft;
+    // its revision was produced by the sync itself and stays authoritative.
+    const status = draft.revision !== result.revision || (draft.status === 'published' && !syncing) ? 'stale' : expired ? 'timed_out' : result.status;
     // Locking the draft serializes duplicate imports and all manual testcase changes.
     const current = (await client.query('SELECT status FROM authoring_jobs WHERE id=$1', [id])).rows[0];
     if (!current || !ACTIVE_JOB_STATUSES.includes(current.status)) { await client.query('ROLLBACK'); return false; }
@@ -217,9 +220,31 @@ export async function applyJobResult(id: string, input: unknown, database: JobDa
     }
     if (buildingPdf && status === 'succeeded') {
       const content = await readPdf!(result.pdf!);
+      // A sync on a published draft keeps it published — published_at is the
+      // durable fact; the status lifecycle must not demote it, and the republish
+      // decision keys off published_at, not the (mutable) status value.
+      const syncKeepsPublished = syncing && draft.published_at !== null;
       await client.query(`UPDATE problem_drafts SET latest_pdf=$1,latest_pdf_revision=$2,
-        status='generated',verified_revision=NULL,updated_at=NOW() WHERE id=$3`, [content, result.revision, job.draft_id]);
+        status=${syncKeepsPublished ? "'published'" : "'generated'"},verified_revision=NULL,updated_at=NOW() WHERE id=$3`, [content, result.revision, job.draft_id]);
       if (verifying) await client.query("UPDATE problem_drafts SET status='ready',verified_revision=$1 WHERE id=$2", [result.revision, job.draft_id]);
+      if (syncing) {
+        // Refresh the legacy problem's author metadata and PDF in the same
+        // transaction, guarded by provenance like the publish path so legacy
+        // edits made outside authoring are never silently overwritten.
+        // Testcases are untouched (statement unchanged).
+        if (syncKeepsPublished) {
+          const republished = await republishSyncedProblem(client, job.draft_id, draft, content);
+          if (!republished) throw new TestcaseError('sync_republish_failed',
+            'The published problem changed outside authoring; the PDF was not republished');
+        }
+        await client.query(`UPDATE authoring_profile_sync_items SET status='synced',
+          error_message=NULL, updated_at=NOW() WHERE sync_pdf_job_id=$1`, [job.id]);
+      }
+    }
+    if (syncing && status !== 'succeeded') {
+      await client.query(`UPDATE authoring_profile_sync_items SET status='failed',
+        error_message=$2, updated_at=NOW() WHERE sync_pdf_job_id=$1`,
+        [job.id, `PDF rebuild failed (${status}${result.errorCode ? `: ${result.errorCode}` : ''})`]);
     }
     const updated = await client.query(`
       UPDATE authoring_jobs SET status=$2, result_summary=$3::jsonb, log=$4,
@@ -266,4 +291,41 @@ export async function failAuthoringJob(id: string, code: string, timedOut: boole
     , inputs AS (DELETE FROM authoring_job_inputs WHERE job_id IN (SELECT id FROM terminal))
     DELETE FROM authoring_job_files WHERE job_id IN (SELECT id FROM terminal)`,
   [id, timedOut ? 'timed_out' : 'failed', code, ACTIVE_JOB_STATUSES]);
+  // A failed sync_pdf job also fails its cascade item so the run can finish.
+  await database.query(`UPDATE authoring_profile_sync_items SET status='failed',
+    error_message=$2, updated_at=NOW()
+    WHERE sync_pdf_job_id=$1 AND status='syncing'`,
+  [id, `PDF rebuild failed (${code})`]);
+}
+
+type PoolClientLike = { query: (sql: string, values?: unknown[]) => Promise<{ rows: any[] }> };
+
+/**
+ * Refreshes a published problem's author metadata and PDF after a sync, using
+ * the same provenance matching as the publish path so external legacy edits
+ * refuse to be overwritten. Runs on a locked client inside applyJobResult's
+ * transaction. Returns false when the legacy row no longer matches the last
+ * authoring publication.
+ */
+async function republishSyncedProblem(client: PoolClientLike,
+  draftId: string, draft: ProblemDraftRow, pdf: Buffer): Promise<boolean> {
+  const provenance = (await client.query(`SELECT problem_id,title,author,time_limit_ms,memory_limit_mb
+      FROM authoring_published_problems WHERE draft_id=$1`, [draftId])).rows[0] as
+    { problem_id: string; title: string; author: string | null; time_limit_ms: number; memory_limit_mb: number } | undefined;
+  if (!provenance) return false;
+  const updated = await client.query(`UPDATE problems SET
+    title=$2, author=$3, problem_pdf=$4
+    WHERE id=$1 AND title=$5 AND author IS NOT DISTINCT FROM $6
+      AND time_limit_ms=$7 AND memory_limit_mb=$8
+    RETURNING id`,
+  [provenance.problem_id, draft.title, draft.author_aka_name, pdf,
+    provenance.title, provenance.author, provenance.time_limit_ms, provenance.memory_limit_mb]);
+  if (!updated.rows.length) {
+    const existing = await client.query('SELECT 1 FROM problems WHERE id=$1', [provenance.problem_id]);
+    if (!existing.rows.length) return false;
+    return false;
+  }
+  await client.query(`UPDATE authoring_published_problems SET title=$2,author=$3,updated_at=NOW() WHERE draft_id=$1`,
+    [draftId, draft.title, draft.author_aka_name]);
+  return true;
 }

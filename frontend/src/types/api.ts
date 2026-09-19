@@ -9,6 +9,7 @@ import type {
   ProblemBase,
   ProblemDetail,
   ProblemSuggestion,
+  ProblemSummary,
   RegistrationSettings,
   SubmissionDetail,
   SubmissionSummary,
@@ -44,7 +45,7 @@ export interface RegisterResponse extends ApiMessageResponse {
   user: Pick<AuthUser, 'id' | 'username'>;
 }
 
-export type ProblemsWithStatsResponse = ProblemDetail[];
+export type ProblemsWithStatsResponse = ProblemSummary[];
 export type ProblemDetailResponse = ProblemDetail;
 export type ContestProblemDetailResponse = ProblemDetail;
 

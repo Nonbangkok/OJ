@@ -32,7 +32,7 @@ export interface UserSuggestion {
 }
 
 export interface TestCaseResult {
-  testCase: number;
+  testCase?: number;
   status: string;
   timeMs?: number;
   memoryKb?: number;
@@ -99,7 +99,7 @@ export interface SubmissionDetail extends SubmissionSummary {
   code: string;
   max_time_ms: number | null;
   max_memory_kb: number | null;
-  results: TestCaseResult[] | null;
+  results: TestCaseResult[] | string | null;
   problem_name?: string;
 }
 

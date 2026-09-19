@@ -12,7 +12,7 @@ import { TestcaseError } from './testcases';
 export async function buildPdf(input: JobSnapshot, workRoot: string, spool: AuthoringSpool,
   options: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<JobResult> {
   const job = jobSnapshotSchema.parse(input);
-  if (job.kind !== 'build_pdf') throw new Error('Expected a PDF build job');
+  if (job.kind !== 'build_pdf' && job.kind !== 'sync_pdf') throw new Error('Expected a PDF build job');
   if (Date.parse(job.deadline) <= Date.now()) return failedResult(job, 'job_expired');
   if (options.signal?.aborted) return failedResult(job, 'runner_interrupted');
   const result = failedResult(job, 'pdf_render_error');

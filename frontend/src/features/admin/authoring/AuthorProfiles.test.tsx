@@ -89,7 +89,7 @@ test('edits metadata, unlinks user and removes image through the profile API', a
   expect((body as FormData).get('userId')).toBe('');
   expect((body as FormData).get('profileImage')).toBeNull();
   expect(onChanged).toHaveBeenCalledTimes(1);
-  expect(screen.getByText(/existing drafts.*Refresh from profile/i)).toBeInTheDocument();
+  expect(screen.getByText(/cascade to every linked draft/i)).toBeInTheDocument();
 });
 
 test('retains edits and presents server error on conflicting user link', async () => {
@@ -179,4 +179,80 @@ test('uploads the adjusted square crop as PNG using a CSP-compatible source imag
     contextSpy.mockRestore();
     blobSpy.mockRestore();
   }
+});
+
+test('author-relevant edit shows the cascade confirm step, then saves with confirmed', async () => {
+  render(<AuthorProfiles />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit Writer' }));
+  fireEvent.change(screen.getByLabelText('AKA name'), { target: { value: 'Renamed writer' } });
+
+  // First submit: the server reports cascade impact instead of saving.
+  jest.mocked(api.patch).mockResolvedValueOnce({
+    data: {
+      confirmationRequired: true,
+      affectedDrafts: 3,
+      affectedPublishedProblems: 12,
+      profile,
+    },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+
+  const confirmBox = await screen.findByRole('alertdialog', { name: 'Confirm profile sync' });
+  expect(confirmBox).toHaveTextContent('3 drafts');
+  expect(confirmBox).toHaveTextContent('12 published problems');
+  expect(screen.getByRole('button', { name: 'Save and sync linked problems' })).toBeInTheDocument();
+  // Nothing was saved yet, and the first request carried no confirmation.
+  expect((jest.mocked(api.patch).mock.calls[0][1] as FormData).get('confirmed')).toBeNull();
+
+  // Confirmed resubmit saves and starts the cascade.
+  jest.mocked(api.patch).mockResolvedValueOnce({
+    data: { ...profile, akaName: 'Renamed writer' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Save and sync linked problems' }));
+
+  expect(await screen.findByRole('button', { name: 'Edit Renamed writer' })).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent(/Linked drafts are syncing/i);
+  const confirmedBody = jest.mocked(api.patch).mock.calls[1][1] as FormData;
+  expect(confirmedBody.get('confirmed')).toBe('true');
+  expect(confirmedBody.get('akaName')).toBe('Renamed writer');
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+});
+
+test('cancel from the confirm step discards the pending cascade without a confirmed request', async () => {
+  render(<AuthorProfiles />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit Writer' }));
+  fireEvent.change(screen.getByLabelText('Real name'), { target: { value: 'Gate me' } });
+  jest.mocked(api.patch).mockResolvedValueOnce({
+    data: {
+      confirmationRequired: true,
+      affectedDrafts: 1,
+      affectedPublishedProblems: 0,
+      profile,
+    },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+  await screen.findByRole('alertdialog', { name: 'Confirm profile sync' });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Save profile' })).not.toBeInTheDocument();
+  expect(api.patch).toHaveBeenCalledTimes(1); // only the gate probe — never a confirmed save
+  expect((jest.mocked(api.patch).mock.calls[0][1] as FormData).get('confirmed')).toBeNull();
+});
+
+test('no-impact edit (no linked drafts) saves directly with no confirm step', async () => {
+  render(<AuthorProfiles />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit Writer' }));
+  fireEvent.change(screen.getByLabelText('AKA name'), { target: { value: 'Direct save' } });
+  jest.mocked(api.patch).mockResolvedValueOnce({
+    data: { ...profile, akaName: 'Direct save' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+
+  expect(await screen.findByRole('button', { name: 'Edit Direct save' })).toBeInTheDocument();
+  // A single save request that carried no confirmation flag (server decided no cascade).
+  expect(api.patch).toHaveBeenCalledTimes(1);
+  expect((jest.mocked(api.patch).mock.calls[0][1] as FormData).get('confirmed')).toBeNull();
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
 });

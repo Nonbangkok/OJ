@@ -6,10 +6,17 @@ import authorProfileRouter from '../controllers/authorProfileController';
 import { errorHandler } from '../middleware/errorHandler';
 import * as imageService from '../services/authorProfileImageService';
 import * as profileService from '../services/authorProfileQueryService';
+import * as profileSyncService from '../services/authoringProfileSyncService';
+import { changesAuthorSnapshot } from '../services/authoringProfileSyncService';
 import { AuthorProfileRow } from '../types/authoring';
 
 jest.mock('../services/authorProfileImageService');
 jest.mock('../services/authorProfileQueryService');
+// Keep the pure snapshot-diff logic real; stub only the DB-bound cascade calls.
+jest.mock('../services/authoringProfileSyncService', () => {
+  const actual = jest.requireActual('../services/authoringProfileSyncService');
+  return { ...actual, getProfileSyncImpact: jest.fn(), createProfileSync: jest.fn() };
+});
 
 const profileRow = (overrides: Partial<AuthorProfileRow> = {}): AuthorProfileRow => ({
   id: '11111111-1111-4111-8111-111111111111',
@@ -134,8 +141,58 @@ describe('Author Profile controller', () => {
     expect(response.body[0].profileImagePng).toBeUndefined();
   });
 
-  it('updates metadata and can remove a stored image', async () => {
-    const updated = profileRow({ aka_name: 'Redgate' });
+  it('updates metadata and can remove a stored image once confirmed', async () => {
+    const current = profileRow({ profile_image_png: Buffer.from('current png') });
+    const updated = profileRow({ aka_name: 'Redgate', profile_image_png: null });
+    (profileService.getAuthorProfile as jest.Mock).mockResolvedValueOnce(current);
+    (profileService.updateAuthorProfile as jest.Mock).mockResolvedValueOnce({
+      kind: 'updated',
+      profile: updated,
+    });
+    (profileSyncService.createProfileSync as jest.Mock).mockResolvedValueOnce({
+      syncId: '99999999-9999-4999-8999-999999999999',
+      affectedDrafts: 3,
+    });
+
+    const response = await request(createTestApp('admin'))
+      .patch(`/admin/author-profiles/${updated.id}`)
+      .send({ akaName: 'Redgate', removeProfileImage: true, confirmed: true });
+
+    expect(response.status).toBe(200);
+    expect(profileService.updateAuthorProfile).toHaveBeenCalledWith(updated.id, {
+      aka_name: 'Redgate',
+      profile_image_png: null,
+    });
+    expect(profileSyncService.createProfileSync).toHaveBeenCalledWith(updated.id);
+  });
+
+  it('reports cascade impact instead of saving an unconfirmed author-relevant edit', async () => {
+    const current = profileRow({ aka_name: 'Nonbangkok' });
+    (profileService.getAuthorProfile as jest.Mock).mockResolvedValueOnce(current);
+    (profileSyncService.getProfileSyncImpact as jest.Mock).mockResolvedValueOnce({
+      affectedDrafts: 12,
+      affectedPublishedProblems: 5,
+    });
+
+    const response = await request(createTestApp('admin'))
+      .patch(`/admin/author-profiles/${current.id}`)
+      .send({ akaName: 'New Aka' });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      confirmationRequired: true,
+      affectedDrafts: 12,
+      affectedPublishedProblems: 5,
+      profile: expect.objectContaining({ akaName: 'Nonbangkok' }),
+    });
+    expect(profileService.updateAuthorProfile).not.toHaveBeenCalled();
+    expect(profileSyncService.createProfileSync).not.toHaveBeenCalled();
+  });
+
+  it('saves non-author changes (account link) without confirmation or cascade', async () => {
+    const current = profileRow({ user_id: null });
+    const updated = profileRow({ user_id: 8 });
+    (profileService.getAuthorProfile as jest.Mock).mockResolvedValueOnce(current);
     (profileService.updateAuthorProfile as jest.Mock).mockResolvedValueOnce({
       kind: 'updated',
       profile: updated,
@@ -143,18 +200,36 @@ describe('Author Profile controller', () => {
 
     const response = await request(createTestApp('admin'))
       .patch(`/admin/author-profiles/${updated.id}`)
-      .send({ akaName: 'Redgate', removeProfileImage: true });
+      .send({ userId: 8 });
 
     expect(response.status).toBe(200);
-    expect(profileService.updateAuthorProfile).toHaveBeenCalledWith(updated.id, {
-      aka_name: 'Redgate',
-      profile_image_png: null,
+    expect(profileSyncService.getProfileSyncImpact).not.toHaveBeenCalled();
+    expect(profileSyncService.createProfileSync).not.toHaveBeenCalled();
+    expect(response.body.userId).toBe(8);
+  });
+
+  it('saves a no-op author edit without confirmation and without cascading', async () => {
+    const current = profileRow({ aka_name: 'Nonbangkok' });
+    (profileService.getAuthorProfile as jest.Mock).mockResolvedValueOnce(current);
+    (profileService.updateAuthorProfile as jest.Mock).mockResolvedValueOnce({
+      kind: 'updated',
+      profile: current,
     });
+
+    const response = await request(createTestApp('admin'))
+      .patch(`/admin/author-profiles/${current.id}`)
+      .send({ akaName: 'Nonbangkok' });
+
+    expect(response.status).toBe(200);
+    expect(profileSyncService.getProfileSyncImpact).not.toHaveBeenCalled();
+    expect(profileSyncService.createProfileSync).not.toHaveBeenCalled();
   });
 
   it('maps missing profiles and duplicate account links to API errors', async () => {
+    (profileService.getAuthorProfile as jest.Mock)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(profileRow());
     (profileService.updateAuthorProfile as jest.Mock)
-      .mockResolvedValueOnce({ kind: 'not_found' })
       .mockResolvedValueOnce({ kind: 'duplicate_user_link' });
 
     const missing = await request(createTestApp('admin'))
@@ -167,6 +242,8 @@ describe('Author Profile controller', () => {
     expect(missing.status).toBe(404);
     expect(duplicate.status).toBe(409);
     expect(duplicate.body.code).toBe('author_profile_user_conflict');
+    // Only the duplicate request reaches the save; missing short-circuits at the gate.
+    expect(profileService.updateAuthorProfile).toHaveBeenCalledTimes(1);
   });
 
   it('rejects profile image uploads larger than 10 MiB', async () => {

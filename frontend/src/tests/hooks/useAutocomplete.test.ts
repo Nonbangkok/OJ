@@ -1,4 +1,8 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
+import type { ChangeEvent } from 'react';
+
+const changeEvent = (value: string) =>
+    ({ target: { value } }) as unknown as ChangeEvent<HTMLInputElement>;
 import { useAutocomplete } from '../../hooks/useAutocomplete';
 
 describe('useAutocomplete', () => {
@@ -22,7 +26,7 @@ describe('useAutocomplete', () => {
         const { result } = renderHook(() => useAutocomplete(fetchFn));
 
         await act(async () => {
-            result.current.handleChange({ target: { value: 'prob' } });
+            result.current.handleChange(changeEvent('prob'));
         });
 
         expect(result.current.query).toBe('prob');
@@ -40,12 +44,12 @@ describe('useAutocomplete', () => {
         const { result } = renderHook(() => useAutocomplete(fetchFn));
 
         await act(async () => {
-            result.current.handleChange({ target: { value: 'a' } });
+            result.current.handleChange(changeEvent('a'));
         });
         await waitFor(() => expect(result.current.showSuggestions).toBe(true));
 
         await act(async () => {
-            result.current.handleChange({ target: { value: '' } });
+            result.current.handleChange(changeEvent(''));
         });
 
         expect(result.current.query).toBe('');
@@ -92,7 +96,7 @@ describe('useAutocomplete', () => {
         const { result } = renderHook(() => useAutocomplete(fetchFn));
 
         await act(async () => {
-            result.current.handleChange({ target: { value: 'error' } });
+            result.current.handleChange(changeEvent('error'));
         });
 
         expect(result.current.query).toBe('error');

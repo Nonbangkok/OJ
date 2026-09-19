@@ -14,6 +14,8 @@ export interface DialogProps {
   onClose: () => void;
   initialFocusRef?: React.RefObject<HTMLElement | null>;
   closeOnEscape?: boolean;
+  /** Renders a wider, taller variant for content-heavy dialogs (help, galleries). */
+  wide?: boolean;
 }
 
 export function Dialog({
@@ -25,6 +27,7 @@ export function Dialog({
   onClose,
   initialFocusRef,
   closeOnEscape = true,
+  wide = false,
 }: DialogProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -90,7 +93,7 @@ export function Dialog({
     >
       <div
         ref={dialogRef}
-        className={styles.dialog}
+        className={`${styles.dialog}${wide ? ` ${styles.dialogWide}` : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
