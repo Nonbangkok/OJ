@@ -2,6 +2,8 @@ import { useState } from 'react';
 import OverviewTab from './OverviewTab';
 import UsersTab from './UsersTab';
 import UserDetail from './UserDetail';
+import ProblemsTab from './ProblemsTab';
+import ProblemDetail from './ProblemDetail';
 import styles from './AnalysisPage.module.css';
 
 type AnalysisTab = 'overview' | 'users' | 'problems';
@@ -15,6 +17,7 @@ const TABS: Array<{ key: AnalysisTab; label: string }> = [
 const AnalysisPage = () => {
   const [tab, setTab] = useState<AnalysisTab>('overview');
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
 
   const handleSelectUser = (userId: number) => {
     setSelectedUserId(userId);
@@ -22,6 +25,20 @@ const AnalysisPage = () => {
 
   const handleBackToUsers = () => {
     setSelectedUserId(null);
+  };
+
+  const handleSelectProblem = (problemId: string) => {
+    setSelectedProblemId(problemId);
+  };
+
+  const handleBackToProblems = () => {
+    setSelectedProblemId(null);
+  };
+
+  const switchTab = (key: AnalysisTab) => {
+    setTab(key);
+    setSelectedUserId(null);
+    setSelectedProblemId(null);
   };
 
   return (
@@ -35,10 +52,7 @@ const AnalysisPage = () => {
             role="tab"
             aria-selected={tab === key}
             className={tab === key ? styles['tab-active'] : styles.tab}
-            onClick={() => {
-              setTab(key);
-              setSelectedUserId(null);
-            }}
+            onClick={() => switchTab(key)}
           >
             {label}
           </button>
@@ -50,8 +64,14 @@ const AnalysisPage = () => {
           ? <UsersTab onSelectUser={handleSelectUser} />
           : <UserDetail userId={selectedUserId} onBack={handleBackToUsers} />
       )}
+      {tab === 'problems' && (
+        selectedProblemId === null
+          ? <ProblemsTab onSelectProblem={handleSelectProblem} />
+          : <ProblemDetail problemId={selectedProblemId} onBack={handleBackToProblems} />
+      )}
     </div>
   );
 };
 
 export default AnalysisPage;
+
