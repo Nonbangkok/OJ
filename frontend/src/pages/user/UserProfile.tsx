@@ -5,7 +5,6 @@ import ActivityHeatmap from '../../components/user/ActivityHeatmap';
 import LoadingPage from '../../components/shared/LoadingPage';
 import { useAuth } from '../../context/AuthContext';
 import userService from '../../services/userService';
-import { USER_ROLES } from '../../utils/constants';
 
 import styles from './UserProfile.module.css';
 
@@ -83,10 +82,7 @@ const UserProfile = () => {
         <div className={styles['profile-title']}>
           <h1>{profile.username}</h1>
           <span className={styles['profile-joined']}>
-            {profile.role === USER_ROLES.ADMIN ? 'Administrator'
-              : profile.role === USER_ROLES.STAFF ? 'Staff'
-                : 'Member'}{' '}
-            · joined {formatDate(profile.createdAt)}
+            Joined {formatDate(profile.createdAt)}
           </span>
         </div>
         {isOwnProfile && (
