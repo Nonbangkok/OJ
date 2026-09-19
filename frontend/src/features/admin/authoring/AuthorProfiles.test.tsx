@@ -89,7 +89,8 @@ test('edits metadata, unlinks user and removes image through the profile API', a
   expect((body as FormData).get('userId')).toBe('');
   expect((body as FormData).get('profileImage')).toBeNull();
   expect(onChanged).toHaveBeenCalledTimes(1);
-  expect(screen.getByText(/cascade to every linked draft/i)).toBeInTheDocument();
+  // The intro hint was removed by design; the list is the page body now.
+  expect(screen.queryByText(/cascade to every linked draft/i)).not.toBeInTheDocument();
 });
 
 test('retains edits and presents server error on conflicting user link', async () => {
@@ -197,7 +198,7 @@ test('author-relevant edit shows the cascade confirm step, then saves with confi
   });
   fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
 
-  const confirmBox = await screen.findByRole('alertdialog', { name: 'Confirm profile sync' });
+  const confirmBox = await screen.findByRole('dialog', { name: 'Update linked problems?' });
   expect(confirmBox).toHaveTextContent('3 drafts');
   expect(confirmBox).toHaveTextContent('12 published problems');
   expect(screen.getByRole('button', { name: 'Save and sync linked problems' })).toBeInTheDocument();
@@ -215,7 +216,7 @@ test('author-relevant edit shows the cascade confirm step, then saves with confi
   const confirmedBody = jest.mocked(api.patch).mock.calls[1][1] as FormData;
   expect(confirmedBody.get('confirmed')).toBe('true');
   expect(confirmedBody.get('akaName')).toBe('Renamed writer');
-  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  expect(screen.queryByRole('dialog', { name: 'Update linked problems?' })).not.toBeInTheDocument();
 });
 
 test('cancel from the confirm step discards the pending cascade without a confirmed request', async () => {
@@ -231,12 +232,13 @@ test('cancel from the confirm step discards the pending cascade without a confir
     },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
-  await screen.findByRole('alertdialog', { name: 'Confirm profile sync' });
+  await screen.findByRole('dialog', { name: 'Update linked problems?' });
 
-  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  // Keep editing closes the modal; the edit dialog stays open with the form intact.
+  fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
 
-  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Save profile' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('dialog', { name: 'Update linked problems?' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Save profile' })).toBeInTheDocument();
   expect(api.patch).toHaveBeenCalledTimes(1); // only the gate probe — never a confirmed save
   expect((jest.mocked(api.patch).mock.calls[0][1] as FormData).get('confirmed')).toBeNull();
 });

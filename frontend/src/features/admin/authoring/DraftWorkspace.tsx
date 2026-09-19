@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate, useOutletContext } from 'react-router-dom';
 import { Button, Dialog, StatusBadge } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
 import useAuthoringDraft from './useAuthoringDraft';
 import { Profile } from './types';
-import { draftStatus } from './status';
+import { draftStatus, jobLabel, jobStatus } from './status';
 import JobHistory from './JobHistory';
 import MetadataFields from './MetadataFields';
 import StatementTab, { PdfPreview } from './StatementTab';
@@ -58,6 +58,14 @@ export default function DraftWorkspace({ id }: { id: string }) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  // The most recent finished job's outcome stays pinned in the left nav until
+  // another job starts, so compile/generate/PDF results are visible from any tab.
+  const latestResult = useMemo(() => {
+    const terminal = model.jobs.find(job => job.status === 'succeeded' || job.status === 'failed' || job.status === 'timed_out');
+    if (!terminal) return null;
+    return { name: jobLabel(terminal.jobType), ...jobStatus(terminal.status) };
+  }, [model.jobs]);
+
   if (!draft || !form) return <section className={styles.authoring}><Link to="/admin/authoring">All drafts</Link>
     {model.error ? <p role="alert">{model.error}</p> : <p role="status">Loading draft…</p>}</section>;
   const editorDisabled = model.busy || !!model.activeJob || draft.status === 'published';
@@ -80,7 +88,10 @@ export default function DraftWorkspace({ id }: { id: string }) {
             : model.conflict ? 'Server state changed'
               : saveStateText[model.saveState] ?? ''}
         </strong>
-        {model.activeJob && <p role="status" className={styles.navJob}><StatusBadge tone="info">Running</StatusBadge> {model.activeJob.jobType}</p>}
+        {model.activeJob && <p role="status" className={styles.navJob}><StatusBadge tone="info">Running</StatusBadge> {jobLabel(model.activeJob.jobType)}</p>}
+        {!model.activeJob && latestResult && <p role="status" className={styles.navJob}>
+          <StatusBadge tone={latestResult.tone}>{latestResult.label}</StatusBadge> {latestResult.name}
+        </p>}
       </div>
       <nav className={styles.sectionNav} aria-label="Draft sections">
         {sections.map(section => <NavLink key={section.path} to={section.path} relative="path"
@@ -261,7 +272,7 @@ function GeneratorSection() {
     <details className={styles.generatorTemplate}>
       <summary>Reference template — the runner contract</summary>
       <ul>
-        <li>Write 1–1000 <code>.txt</code> files into <code>input/</code> — the runner collects them as the draft's testcases.</li>
+        <li>Write 1–10 <code>.txt</code> files into <code>input/</code> — the runner collects them as the draft's testcases.</li>
         <li>The seed arrives as <code>argv[1]</code>; using it makes generation reproducible.</li>
         <li>Opening a file whose folder doesn't exist fails <em>silently</em> — check the stream before writing.</li>
         <li>Exit 0; keep total runtime within the generator timeout.</li>

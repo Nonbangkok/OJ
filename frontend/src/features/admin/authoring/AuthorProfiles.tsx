@@ -129,8 +129,8 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
       if (request === imageRequest.current) setImageLoading(false);
     }
   }
-  async function save(event: React.FormEvent) {
-    event.preventDefault();
+  async function save(event?: React.FormEvent) {
+    event?.preventDefault();
     if (!editing || saving || imageLoading) return;
     setError('');
     if (!fields.akaName.trim() || !fields.realName.trim() || !fields.defaultLanguage.trim()) {
@@ -210,15 +210,10 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
   return (
     <section className={styles.root} aria-label="Author profiles">
       <div className={styles.heading}>
-        <h3>Author profiles</h3>
         <Button disabled={saving || imageLoading} onClick={() => edit('new')}>
           New author profile
         </Button>
       </div>
-      <p className={styles.hint}>
-        Author-relevant changes ask for confirmation, then cascade to every linked draft and
-        republish its published problems.
-      </p>
       {loading && <p role="status">Loading author profiles…</p>}
       {listError && (
         <div role="alert">
@@ -276,7 +271,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
             open
             title={editing === 'new' ? 'New author profile' : `Edit profile: ${editing.akaName}`}
             onClose={() => {
-              if (!saving && !imageLoading) {
+              if (!saving && !imageLoading && !pendingSync) {
                 setEditing(null);
                 setPendingSync(null);
                 resetImage();
@@ -291,11 +286,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
                   loading={saving}
                   loadingLabel="Saving profile…"
                 >
-                  {editing === 'new'
-                    ? 'Create profile'
-                    : pendingSync
-                      ? 'Save and sync linked problems'
-                      : 'Save profile'}
+                  {editing === 'new' ? 'Create profile' : 'Save profile'}
                 </Button>
                 <Button
                   variant="secondary"
@@ -312,22 +303,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
             }
           >
             {error && <p role="alert">{error}</p>}
-            {pendingSync && (
-              <div role="alertdialog" aria-label="Confirm profile sync" className={styles.syncConfirm}>
-                <strong>Saving will update linked problems.</strong>
-                <p>
-                  This change will update {pendingSync.affectedDrafts}{' '}
-                  {pendingSync.affectedDrafts === 1 ? 'draft' : 'drafts'}
-                  {pendingSync.affectedPublishedProblems > 0 &&
-                    ` — including ${pendingSync.affectedPublishedProblems} published ${
-                      pendingSync.affectedPublishedProblems === 1 ? 'problem' : 'problems'
-                    }`}{' '}
-                  with the new author metadata and PDF.
-                </p>
-                <p>Save and sync now?</p>
-              </div>
-            )}
-            <fieldset disabled={saving} className={`${styles.root} ${styles.dialogFields}`}>
+            <fieldset disabled={saving || !!pendingSync} className={`${styles.root} ${styles.dialogFields}`}>
               <legend className={styles.legend}>Author details</legend>
             <div className={styles.fields}>
               <label>
@@ -479,6 +455,36 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
           </fieldset>
         </Dialog>
         </form>
+      )}
+      {editing && editing !== 'new' && pendingSync && (
+        <Dialog
+          open
+          title="Update linked problems?"
+          description={`This change will update ${pendingSync.affectedDrafts} ${
+            pendingSync.affectedDrafts === 1 ? 'draft' : 'drafts'
+          }${
+            pendingSync.affectedPublishedProblems > 0
+              ? ` — including ${pendingSync.affectedPublishedProblems} published ${
+                  pendingSync.affectedPublishedProblems === 1 ? 'problem' : 'problems'
+                }`
+              : ''
+          } with the new author metadata and PDF.`}
+          onClose={() => setPendingSync(null)}
+          footer={
+            <>
+              <Button
+                loading={saving}
+                loadingLabel="Saving profile…"
+                onClick={() => void save()}
+              >
+                Save and sync linked problems
+              </Button>
+              <Button variant="secondary" disabled={saving} onClick={() => setPendingSync(null)}>
+                Keep editing
+              </Button>
+            </>
+          }
+        />
       )}
     </section>
   );

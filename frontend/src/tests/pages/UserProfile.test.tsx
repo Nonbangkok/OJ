@@ -76,8 +76,15 @@ describe('User Profile Page', () => {
         renderPage();
 
         await waitFor(() => {
+            // Cells for days that have already happened carry a title; the window
+            // ends on the current week's Saturday, so a few trailing future cells
+            // are intentionally title-less. Count by how many days remain today.
             const cells = screen.getAllByTitle(/20\d\d-\d\d-\d\d/);
-            expect(cells.length).toBe(365);
+            const today = new Date();
+            const end = new Date(today);
+            end.setDate(end.getDate() + (6 - end.getDay()));
+            const futureDays = Math.max(0, Math.ceil((end.getTime() - today.getTime()) / (24 * 60 * 60 * 1000)));
+            expect(cells.length).toBe(365 - futureDays);
             const active = screen.getByTitle('2026-09-18: 2 submissions');
             expect(active).toBeInTheDocument();
         });

@@ -183,11 +183,6 @@ function ProfilesPage() {
     <section className={styles.authoring}>
       <Link to="/admin/authoring" className={styles.backLink}>← All drafts</Link>
       <h1>Author profiles</h1>
-      <p>
-        Reusable author identities shared across drafts. Saving an author-relevant edit asks for
-        confirmation, then automatically refreshes every linked draft's metadata, rebuilds its PDF,
-        and republishes published problems. Follow the runs in a draft's History &amp; Logs tab.
-      </p>
       <AuthorProfiles />
     </section>
   );
