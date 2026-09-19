@@ -7,14 +7,24 @@
 .root > :first-child {
   margin-top: 0;
 }
-.root table th {
+/* Header strip applies to thead only — a row-header th (scope="row") must
+   stay transparent like its sibling cells. */
+.root table thead th {
   background: var(--background-tertiary);
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
 }
-.root table tbody tr:hover td {
+.root table tbody th[scope='row'] {
+  background: transparent;
+  font-size: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text-primary);
+}
+.root table tbody tr:hover td,
+.root table tbody tr:hover th[scope='row'] {
   background: var(--background-hover);
 }
 .heading,

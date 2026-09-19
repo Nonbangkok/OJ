@@ -195,8 +195,9 @@
 .panelBody > :last-child {
   margin-bottom: 0;
 }
-/* Table refinements inside panels: subtle header strip + hover row feedback. */
-.panel table th {
+/* Table refinements inside panels: subtle header strip + hover row feedback.
+   Scoped to thead so row-header cells (th scope="row") keep normal styling. */
+.panel table thead th {
   background: var(--background-tertiary);
   font-size: 0.8rem;
   text-transform: uppercase;
@@ -204,7 +205,8 @@
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-color);
 }
-.panel table tbody tr:hover td {
+.panel table tbody tr:hover td,
+.panel table tbody tr:hover th[scope='row'] {
   background: var(--background-hover);
 }
 .panel table td,
