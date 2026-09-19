@@ -20,6 +20,7 @@ describe('problem authoring foundation migration', () => {
       '0007_problem_category',
       '0008_user_profile',
       '0009_profile_sync',
+      '0010_submission_indexes',
     ]);
   });
 
