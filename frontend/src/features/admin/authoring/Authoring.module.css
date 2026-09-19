@@ -773,58 +773,42 @@
   place-items: center;
   color: var(--statement-empty);
 }
-/* Paged preview: fixed 794×1123px A4 pages (the PDF template's real metrics,
-   16px font) with the template's page margins as white edges, so breaks line
-   up with the runner-built PDF. Pages stay paper-width regardless of pane
-   width; zoom scales the whole sheet. */
-.previewPages {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.25rem;
-  padding: 1rem;
-}
-.previewMeasure {
-  position: absolute;
-  left: -9999px;
-  width: 794px; /* A4 at 96dpi — same metrics as the real PDF */
-  height: 0;
-  border: 0;
-  visibility: hidden;
-}
-.previewPageWrapper {
-  width: 794px;
-  max-width: 100%;
+/* Live HTML preview: continuous flow, fills the pane at the zoom level. */
+.previewLive {
   position: relative;
-  flex-shrink: 0;
-}
-.previewPageNumber {
-  font-size: 0.72rem;
-  color: var(--statement-page-number);
-  text-align: right;
-  padding-bottom: 0.25rem;
-}
-.previewPageFrame {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 210 / 297;
-  overflow: hidden;
-  background: var(--statement-paper);
-  border: 1px solid var(--statement-separator);
-  border-radius: 2px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
-}
-.previewPageZoom {
-  position: absolute;
-  inset: 0;
+  min-width: 100%;
+  min-height: 100%;
   transform-origin: top left;
+  background: var(--statement-paper);
 }
-.previewPageContent {
-  position: absolute;
-  left: 0;
-  width: 794px;
+.previewLiveFrame {
+  width: 100%;
+  height: 100%;
+  min-height: 60rem;
   border: 0;
   background: var(--statement-paper);
+}
+/* Stale indicator on the Actual PDF tab + the action bar under it. */
+.previewStaleDot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-left: 0.4rem;
+  border-radius: 50%;
+  background: var(--status-warning);
+  vertical-align: middle;
+}
+.pdfStaleBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0.9rem;
+  border-top: 1px solid var(--statement-separator);
+  background: var(--background-secondary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
 }
 @media (max-width: 480px) {
   .authoring {

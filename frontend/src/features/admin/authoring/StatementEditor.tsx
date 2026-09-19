@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ImperativePanelGroupHandle, Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { Button, Dialog } from '../../../components/ui';
@@ -52,78 +52,14 @@ function useCompactEditorLayout() {
   return compact;
 }
 
-/** Matches the red-gate-v1 PDF template: A4 at 16px body font. An A4 sheet is
- *  210×297mm = 794×1123px at 96dpi, with the template's page margins
- *  (@page margin: 0.62in 0.75in 1in) baked in as padded page boxes so the
- *  preview's page breaks line up with the runner-built PDF. */
-const A4_WIDTH_PX = 794;
-const A4_HEIGHT_PX = 1123;
-const PAGE_MARGIN_TOP_PX = Math.round(0.62 * 96);   // 60
-const PAGE_MARGIN_BOTTOM_PX = Math.round(1 * 96);   // 96
-const PAGE_MARGIN_SIDE_PX = Math.round(0.75 * 96);  // 72
-
-/** Injects the PDF template's @page margins into the preview document so it
- *  lays out on screen exactly as it prints: body gets the printable width
- *  (A4 minus side margins) and padding for the top/bottom margins. Screen
- *  rendering ignores @page, so without this the preview wraps lines wider
- *  than the real PDF and the page count drifts. */
-const pagedSrcDoc = (preview: string): string => preview.replace('</head>',
-  `<style>
-    html { width: ${A4_WIDTH_PX}px; }
-    body {
-      width: ${A4_WIDTH_PX - PAGE_MARGIN_SIDE_PX * 2}px;
-      margin: 0 ${PAGE_MARGIN_SIDE_PX}px;
-      padding-top: ${PAGE_MARGIN_TOP_PX}px;
-    }
-  </style></head>`);
-
-/** Slices the preview content into fixed A4 page frames so the author can see
- *  where page boundaries fall while typing. Every page renders the same
- *  document, translated up by one page-height per page index: page N shows
- *  exactly the lines that land on page N. Purely visual: the runner-built
- *  PDF remains authoritative. */
-function PagedPreview({ preview, zoomScale }: { preview: string; zoomScale: number }) {
-  const [pages, setPages] = useState(1);
-  const [docHeight, setDocHeight] = useState(0);
-  const measureRef = useRef<HTMLIFrameElement>(null);
-  useEffect(() => {
-    setPages(1);
-    setDocHeight(0);
-  }, [preview]);
-  const measure = () => {
-    try {
-      const doc = measureRef.current?.contentDocument;
-      if (!doc?.body) return;
-      const inner = Math.ceil(doc.documentElement.scrollHeight);
-      // Content flows inside the margins; each printable page holds
-      // printable-height worth of it, starting below the top margin.
-      if (inner > 0) {
-        const printable = A4_HEIGHT_PX - PAGE_MARGIN_TOP_PX - PAGE_MARGIN_BOTTOM_PX;
-        setDocHeight(inner);
-        setPages(Math.max(1, Math.ceil((inner - PAGE_MARGIN_TOP_PX) / printable)));
-      }
-    } catch { /* sandboxed frame content is same-origin via srcdoc; ignore */ }
-  };
-  const srcDoc = pagedSrcDoc(preview);
-  return <div className={styles.previewPages}>
-    {/* Hidden measuring frame at the exact PDF page width and margins: the
-        document renders at the same metrics as the real PDF, so page count
-        and break positions match the runner output. */}
-    <iframe title="Statement preview measurement" sandbox="allow-same-origin" srcDoc={srcDoc}
-      ref={measureRef} onLoad={measure} className={styles.previewMeasure} aria-hidden="true" />
-    {Array.from({ length: pages }, (_, index) => <div key={index} className={styles.previewPageWrapper}>
-      <div className={styles.previewPageNumber} aria-hidden="true">Page {index + 1} / {pages}</div>
-      <div className={styles.previewPageFrame}>
-        <div className={styles.previewPageZoom} style={{ transform: `scale(${zoomScale})` }}>
-          <iframe title={`Statement preview page ${index + 1}`} sandbox="allow-same-origin" srcDoc={srcDoc}
-            className={styles.previewPageContent}
-            style={docHeight
-              ? { height: `${docHeight}px`,
-                  top: `${-index * (A4_HEIGHT_PX - PAGE_MARGIN_TOP_PX - PAGE_MARGIN_BOTTOM_PX)}px` }
-              : undefined} />
-        </div>
-      </div>
-    </div>)}
+/** Live HTML preview: the sanitized statement rendered in a sandboxed frame
+ *  that fills the pane — continuous flow, no page slicing. The Actual PDF tab
+ *  is where exact pagination lives (the runner-built file itself). */
+function LivePreview({ preview, zoomScale }: { preview: string; zoomScale: number }) {
+  return <div className={styles.previewLive}
+    style={{ width: `${100 / zoomScale}%`, transform: `scale(${zoomScale})` }}>
+    <iframe title="Live statement preview" sandbox="allow-same-origin" srcDoc={preview}
+      className={styles.previewLiveFrame} />
   </div>;
 }
 
@@ -138,6 +74,22 @@ export default function StatementEditor({ id }: { id: string }) {
   // Live HTML shows unsaved edits instantly; the Actual PDF tab shows the
   // runner-built file, whose pagination is exact by construction.
   const [pdfMode, setPdfMode] = useState(false);
+  // The PDF is stale when no build exists yet, or the draft revision moved
+  // past the built one (unsaved edits count too — they are one autosave away
+  // from a new revision).
+  const pdfStale = !!draft && (!draft.hasLatestPdf || draft.latestPdfRevision !== draft.revision || dirty);
+  const buildPdf = useCallback(() => model.runJob('pdf'), [model]);
+  // Switching to the Actual PDF tab with a stale PDF builds it automatically —
+  // one job at a time; the guard inside runJob prevents double submission.
+  const autoBuiltRef = useRef('');
+  useEffect(() => {
+    if (!pdfMode || !pdfStale || model.activeJob || model.actionsDisabled) return;
+    const key = `${draft?.revision}:${draft?.latestPdfRevision}`;
+    if (autoBuiltRef.current === key) return; // one auto-build per stale state
+    autoBuiltRef.current = key;
+    void buildPdf();
+  }, [pdfMode, pdfStale, model.activeJob, model.actionsDisabled, draft?.revision, draft?.latestPdfRevision, buildPdf]);
+  useEffect(() => { if (!pdfStale) autoBuiltRef.current = ''; }, [pdfStale]);
   const request = useRef(0);
   const recoveryHandled = useRef(false);
   const recoveryBaseRevision = useRef<number | null>(null);
@@ -282,17 +234,27 @@ export default function StatementEditor({ id }: { id: string }) {
             onClick={() => setPdfMode(false)}>Live HTML</button>
           <button type="button" role="tab" aria-selected={pdfMode === true}
             className={pdfMode ? styles.previewModeActive : ''}
-            onClick={() => setPdfMode(true)}>Actual PDF</button>
+            onClick={() => setPdfMode(true)}>
+            Actual PDF
+            {pdfStale && <span className={styles.previewStaleDot} aria-label="PDF is outdated" title="Statement changed since the last build" />}
+          </button>
         </div>
         <div className={styles.previewViewport}>
           {pdfMode
             ? (draft.hasLatestPdf
               ? <iframe title="Latest runner-built PDF" className={styles.previewPdfEmbed}
+                key={draft.latestPdfRevision}
                 src={`${authoringService.draftPdfUrl(draft.id, draft.latestPdfRevision)}#view=FitH`} />
-              : <div className={styles.previewEmpty}>No PDF built yet. Build PDF from Verify &amp; Publish.</div>)
-            : (preview ? <PagedPreview preview={preview} zoomScale={zoomScale} />
+              : <div className={styles.previewEmpty}>No PDF built yet.</div>)
+            : (preview ? <LivePreview preview={preview} zoomScale={zoomScale} />
               : <div className={styles.previewEmpty}>Preview will appear here.</div>)}
         </div>
+        {pdfMode && pdfStale && !model.activeJob && (
+          <div className={styles.pdfStaleBar} role="status">
+            <span>{draft.hasLatestPdf ? 'Statement changed since this PDF was built.' : 'No PDF yet.'}</span>
+            <Button disabled={model.actionsDisabled} onClick={() => void buildPdf()}>Build PDF now</Button>
+          </div>
+        )}
       </Panel>
     </PanelGroup>
     {showAssets && <Dialog open wide title="Statement assets & syntax help"

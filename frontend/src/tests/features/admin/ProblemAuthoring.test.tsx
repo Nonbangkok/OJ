@@ -253,7 +253,7 @@ test('full-screen editor previews the current unsaved source automatically in a 
   show('/admin/authoring/d1/editor');
   const source = await screen.findByLabelText('Statement source');
   expect(screen.queryByRole('button', { name: 'Preview statement' })).not.toBeInTheDocument();
-  const frame = await screen.findByTitle('Statement preview page 1');
+  const frame = await screen.findByTitle('Live statement preview');
   expect(frame).toHaveAttribute('sandbox', 'allow-same-origin');
   expect(frame).toHaveAttribute('srcdoc', '<p>Sanitized preview</p>');
   fireEvent.change(source, { target: { value: '# Live edit' } });
@@ -320,7 +320,7 @@ test('a slower realtime preview response cannot replace the newest preview', asy
   jest.mocked(api.post).mockResolvedValueOnce({ data: { html: '<p>Initial</p>' } });
   show('/admin/authoring/d1/editor');
   const source = await screen.findByLabelText('Statement source');
-  const frame = await screen.findByTitle('Statement preview page 1');
+  const frame = await screen.findByTitle('Live statement preview');
   jest
     .mocked(api.post)
     .mockImplementationOnce(
