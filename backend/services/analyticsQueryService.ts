@@ -172,20 +172,14 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
       SELECT user_id, problem_id, overall_status FROM submissions
       UNION ALL
       SELECT user_id, problem_id, overall_status FROM contest_submissions
-    ),
-    best AS (
-      SELECT user_id, problem_id, MAX((overall_status = 'Accepted')::int) AS solved
-      FROM all_submissions
-      GROUP BY user_id, problem_id
     )
     SELECT
       u.id AS user_id,
       u.username,
-      COUNT(*) AS submissions,
-      COALESCE(SUM(b.solved), 0) AS solved
+      COUNT(s.problem_id) AS submissions,
+      COUNT(DISTINCT s.problem_id) FILTER (WHERE s.overall_status = 'Accepted') AS solved
     FROM all_submissions s
     JOIN users u ON u.id = s.user_id
-    LEFT JOIN best b ON b.user_id = s.user_id AND b.problem_id = s.problem_id
     GROUP BY u.id, u.username
     ORDER BY submissions DESC
     LIMIT 10`,
@@ -196,13 +190,10 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
       c.id AS contest_id,
       c.title,
       c.status,
-      COUNT(cs.id) AS submissions,
-      COUNT(DISTINCT cs.user_id) AS participants,
-      AVG(sb.total_score) AS avg_score
+      (SELECT COUNT(*) FROM contest_submissions cs WHERE cs.contest_id = c.id) AS submissions,
+      (SELECT COUNT(*) FROM contest_scoreboards sb WHERE sb.contest_id = c.id) AS participants,
+      (SELECT AVG(sb.total_score) FROM contest_scoreboards sb WHERE sb.contest_id = c.id) AS avg_score
     FROM contests c
-    LEFT JOIN contest_submissions cs ON cs.contest_id = c.id
-    LEFT JOIN contest_scoreboards sb ON sb.contest_id = c.id
-    GROUP BY c.id, c.title, c.status
     ORDER BY c.start_time DESC
     LIMIT 10`,
     []);
@@ -297,18 +288,13 @@ export const listUsersForAnalytics = async (search: string, limit: number, offse
       SELECT user_id, problem_id, overall_status, submitted_at FROM submissions
       UNION ALL
       SELECT user_id, problem_id, overall_status, submitted_at FROM contest_submissions
-    ),
-    best AS (
-      SELECT user_id, problem_id, MAX((overall_status = 'Accepted')::int) AS solved
-      FROM all_submissions
-      GROUP BY user_id, problem_id
     )
     SELECT
       u.id AS user_id,
       u.username,
       u.role,
       COUNT(s.user_id) AS submissions,
-      COALESCE(SUM(b.solved), 0) AS solved,
+      COUNT(DISTINCT s.problem_id) FILTER (WHERE s.overall_status = 'Accepted') AS solved,
       COALESCE(
         (COUNT(*) FILTER (WHERE s.overall_status = 'Accepted'))::float / NULLIF(COUNT(s.user_id), 0),
         0
@@ -316,7 +302,6 @@ export const listUsersForAnalytics = async (search: string, limit: number, offse
       to_char(MAX(s.submitted_at), 'YYYY-MM-DD"T"HH24:MI:SSTZH:TZM') AS last_active
     FROM users u
     LEFT JOIN all_submissions s ON s.user_id = u.id
-    LEFT JOIN best b ON b.user_id = u.id AND b.problem_id = s.problem_id
     WHERE u.username ILIKE '%' || $1 || '%'
     GROUP BY u.id, u.username, u.role
     ORDER BY submissions DESC
@@ -345,6 +330,11 @@ export const getUserAnalytics = async (userId: number): Promise<UserAnalytics | 
       SELECT problem_id, overall_status, score FROM submissions WHERE user_id = $1
       UNION ALL
       SELECT problem_id, overall_status, score FROM contest_submissions WHERE user_id = $1
+    ),
+    best_scores AS (
+      SELECT problem_id, MAX(score) AS best_score
+      FROM user_submissions
+      GROUP BY problem_id
     )
     SELECT
       COUNT(*) AS submissions,
@@ -354,7 +344,7 @@ export const getUserAnalytics = async (userId: number): Promise<UserAnalytics | 
         (COUNT(*) FILTER (WHERE overall_status = 'Accepted'))::float / NULLIF(COUNT(*), 0),
         0
       ) AS ac_rate,
-      COALESCE(SUM(score), 0) AS total_score
+      COALESCE((SELECT SUM(best_score) FROM best_scores), 0) AS total_score
     FROM user_submissions`,
     [userId]);
 
@@ -543,6 +533,9 @@ export const getProblemAnalytics = async (problemId: string): Promise<ProblemAna
              (elem->>'status') AS status
       FROM all_results r,
            jsonb_array_elements(r.results) AS elem
+      -- Elements without a testCase number (e.g. compile-error placeholders)
+      -- are not real testcase results; skip them.
+      WHERE elem ? 'testCase'
     )
     SELECT
       case_number,
