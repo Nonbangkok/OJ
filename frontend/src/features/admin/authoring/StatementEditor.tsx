@@ -72,10 +72,10 @@ function PreviewModeTab({ selected, onSelect, children }: {
     borderBottom: 0,
   };
   const style: CSSProperties = selected
-    ? { ...base, background: '#212529', color: '#ffffff', fontWeight: 600 }
+    ? { ...base, background: '#6c757d', color: '#ffffff', fontWeight: 600 }
     : hovered
       ? { ...base, background: '#0d6efd', color: '#ffffff' }
-      : { ...base, background: '#6c757d', color: '#ffffff' };
+      : { ...base, background: '#212529', color: '#ffffff' };
   return <button type="button" role="tab" aria-selected={selected}
     style={style} onClick={onSelect}
     onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
