@@ -915,7 +915,9 @@
   gap: 0.75rem;
   flex-wrap: wrap;
 }
-/* Shared highlighted code editor. */
+/* Shared highlighted code editor — same scroll model as the submission page:
+   the wrapper never scrolls; the textarea inside is the single scroller and
+   JS syncs it onto the gutter and the highlighted <pre>. */
 .codeEditor {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
@@ -932,8 +934,9 @@
 }
 .codeWrap {
   display: flex;
-  overflow: auto;
+  overflow: hidden; /* children handle their own scrolling */
   max-height: 30rem;
+  min-height: 10rem;
 }
 .lineNumbers {
   flex: 0 0 auto;
@@ -946,8 +949,31 @@
     monospace;
   user-select: none;
   background: var(--editor-bg);
+  overflow: hidden; /* scrollTop is synced via JS */
 }
-.codeInput {
+.codeScroll {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+/* Height parity is the crux: if the textarea grows with content while the
+   pre stays container-sized, the overflow lands on the pre (invisible
+   cut-off) and the two stop scrolling together. Both fill the container,
+   so the textarea is the single scroller — same trick as the submission
+   page's editor. */
+.codeScroll > div,
+.codeScroll textarea,
+.codeScroll pre {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+.codeScroll textarea,
+.codeScroll pre {
+  overflow: auto !important; /* the single scroller */
+  white-space: pre !important;
+  word-wrap: normal !important;
+  overflow-wrap: normal !important;
 }
