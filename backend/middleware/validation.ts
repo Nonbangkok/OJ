@@ -23,7 +23,18 @@ export const validateRequest = (schemas: ValidateRequestSchemas) => {
             }
 
             if (schemas.query) {
-                schemas.query.parse(req.query);
+                // Express 5 exposes req.query through a getter that re-parses
+                // on every access, so mutating it in place is a no-op. Redefine
+                // it as a plain value property so Zod defaults and coercions
+                // are visible to downstream handlers instead of every
+                // controller re-declaring them.
+                const parsed = schemas.query.parse(req.query);
+                Object.defineProperty(req, 'query', {
+                    value: parsed,
+                    writable: true,
+                    configurable: true,
+                    enumerable: true,
+                });
             }
 
             next();

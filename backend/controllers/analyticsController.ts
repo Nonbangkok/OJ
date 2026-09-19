@@ -29,7 +29,8 @@ const router: Router = express.Router();
 interface OverviewQuery { days?: number }
 interface UsersQuery { search: string; limit: number; offset: number; sortBy: string; sortDir: string }
 interface ProblemsQuery { search: string; limit: number; offset: number; sortBy: string; sortDir: string }
-interface SubmissionsQuery { problemId?: string; userId?: string; verdict?: string; limit?: string; offset?: string }
+/** Shape after Zod coercion + defaults (validateRequest writes them back). */
+interface SubmissionsQuery { problemId?: string; userId?: number; verdict?: string; limit: number; offset: number }
 interface UserIdParams { userId: number }
 interface ProblemIdParams { problemId: string }
 interface ContestIdParams { contestId: number }
@@ -44,19 +45,14 @@ router.get('/analytics/overview', requireStaffOrAdmin,
 router.get('/analytics/users', requireStaffOrAdmin,
   validateRequest({ query: analyticsUsersQuerySchema }),
   asyncHandler(async (req: Request, res: Response) => {
-    // Zod defaults are not written back to req.query by validateRequest, so
-    // apply the same defaults here (schema values: search '', limit 50, offset 0,
+    // validateRequest writes Zod defaults back into req.query, so the raw
+    // cast carries the schema defaults (search '', limit 50, offset 0,
     // sortBy 'submissions', sortDir 'desc').
-    const raw = req.query as Partial<Record<keyof UsersQuery, string>>;
-    const search = raw.search ?? '';
-    const limit = raw.limit !== undefined ? Number(raw.limit) : 50;
-    const offset = raw.offset !== undefined ? Number(raw.offset) : 0;
-    const sortBy = raw.sortBy ?? 'submissions';
-    const sortDir = raw.sortDir ?? 'desc';
+    const raw = req.query as unknown as UsersQuery;
     const users = await listUsersForAnalytics(
-      search, limit, offset,
-      sortBy as Parameters<typeof listUsersForAnalytics>[3],
-      sortDir as 'asc' | 'desc',
+      raw.search, raw.limit, raw.offset,
+      raw.sortBy as Parameters<typeof listUsersForAnalytics>[3],
+      raw.sortDir as 'asc' | 'desc',
     );
     res.json({ users });
   }));
@@ -64,16 +60,11 @@ router.get('/analytics/users', requireStaffOrAdmin,
 router.get('/analytics/problems', requireStaffOrAdmin,
   validateRequest({ query: analyticsProblemsQuerySchema }),
   asyncHandler(async (req: Request, res: Response) => {
-    const raw = req.query as Partial<Record<keyof ProblemsQuery, string>>;
-    const search = raw.search ?? '';
-    const limit = raw.limit !== undefined ? Number(raw.limit) : 50;
-    const offset = raw.offset !== undefined ? Number(raw.offset) : 0;
-    const sortBy = raw.sortBy ?? 'submissions';
-    const sortDir = raw.sortDir ?? 'desc';
+    const raw = req.query as unknown as ProblemsQuery;
     const problems = await listProblemsForAnalytics(
-      search, limit, offset,
-      sortBy as Parameters<typeof listProblemsForAnalytics>[3],
-      sortDir as 'asc' | 'desc',
+      raw.search, raw.limit, raw.offset,
+      raw.sortBy as Parameters<typeof listProblemsForAnalytics>[3],
+      raw.sortDir as 'asc' | 'desc',
     );
     res.json({ problems });
   }));
@@ -92,17 +83,15 @@ router.get('/analytics/users/:userId', requireStaffOrAdmin,
 router.get('/analytics/submissions', requireStaffOrAdmin,
   validateRequest({ query: analyticsSubmissionsQuerySchema }),
   asyncHandler(async (req: Request, res: Response) => {
-    const raw = req.query as Partial<Record<keyof SubmissionsQuery, string>>;
-    const limit = raw.limit !== undefined ? Number(raw.limit) : 50;
-    const offset = raw.offset !== undefined ? Number(raw.offset) : 0;
+    const raw = req.query as unknown as SubmissionsQuery;
     const submissions = await listSubmissionsForAnalytics(
       {
         problemId: raw.problemId,
-        userId: raw.userId !== undefined ? Number(raw.userId) : undefined,
+        userId: raw.userId,
         verdict: raw.verdict,
       },
-      limit,
-      offset,
+      raw.limit,
+      raw.offset,
     );
     res.json({ submissions });
   }));
