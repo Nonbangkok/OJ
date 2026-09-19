@@ -9,6 +9,7 @@ import {
   analyticsUserIdParamSchema,
   analyticsUsersQuerySchema,
   analyticsContestIdParamSchema,
+  analyticsSubmissionsQuerySchema,
 } from '../schemas/requestSchemas';
 import {
   getContestAnalytics,
@@ -16,6 +17,7 @@ import {
   getProblemAnalytics,
   getUserAnalytics,
   listProblemsForAnalytics,
+  listSubmissionsForAnalytics,
   listUsersForAnalytics,
 } from '../services/analyticsQueryService';
 
@@ -24,6 +26,7 @@ const router: Router = express.Router();
 interface OverviewQuery { days?: number }
 interface UsersQuery { search: string; limit: number; offset: number; sortBy: string; sortDir: string }
 interface ProblemsQuery { search: string; limit: number; offset: number; sortBy: string; sortDir: string }
+interface SubmissionsQuery { problemId?: string; userId?: string; verdict?: string; limit?: string; offset?: string }
 interface UserIdParams { userId: number }
 interface ProblemIdParams { problemId: string }
 interface ContestIdParams { contestId: number }
@@ -81,6 +84,24 @@ router.get('/analytics/users/:userId', requireStaffOrAdmin,
       throw new AppError('User not found', 404);
     }
     res.json(analytics);
+  }));
+
+router.get('/analytics/submissions', requireStaffOrAdmin,
+  validateRequest({ query: analyticsSubmissionsQuerySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const raw = req.query as Partial<Record<keyof SubmissionsQuery, string>>;
+    const limit = raw.limit !== undefined ? Number(raw.limit) : 50;
+    const offset = raw.offset !== undefined ? Number(raw.offset) : 0;
+    const submissions = await listSubmissionsForAnalytics(
+      {
+        problemId: raw.problemId,
+        userId: raw.userId !== undefined ? Number(raw.userId) : undefined,
+        verdict: raw.verdict,
+      },
+      limit,
+      offset,
+    );
+    res.json({ submissions });
   }));
 
 router.get('/analytics/contests/:contestId', requireStaffOrAdmin,

@@ -13,6 +13,7 @@ jest.mock('../services/analyticsQueryService', () => ({
     getUserAnalytics: jest.fn().mockResolvedValue(null),
     getProblemAnalytics: jest.fn().mockResolvedValue(null),
     getContestAnalytics: jest.fn().mockResolvedValue(null),
+    listSubmissionsForAnalytics: jest.fn().mockResolvedValue([]),
 }));
 
 const mockGetOverviewAnalytics = analyticsService.getOverviewAnalytics as jest.MockedFunction<typeof analyticsService.getOverviewAnalytics>;
@@ -21,6 +22,7 @@ const mockGetUserAnalytics = analyticsService.getUserAnalytics as jest.MockedFun
 const mockGetProblemAnalytics = analyticsService.getProblemAnalytics as jest.MockedFunction<typeof analyticsService.getProblemAnalytics>;
 const mockGetContestAnalytics = analyticsService.getContestAnalytics as jest.MockedFunction<typeof analyticsService.getContestAnalytics>;
 const mockListProblemsForAnalytics = analyticsService.listProblemsForAnalytics as jest.MockedFunction<typeof analyticsService.listProblemsForAnalytics>;
+const mockListSubmissionsForAnalytics = analyticsService.listSubmissionsForAnalytics as jest.MockedFunction<typeof analyticsService.listSubmissionsForAnalytics>;
 
 const buildApp = (forbidden = false): Express => {
     const app = express();
@@ -144,6 +146,42 @@ describe('Analytics Controller', () => {
 
             expect(res.status).toBe(400);
             expect(mockListProblemsForAnalytics).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('GET /analytics/submissions', () => {
+        it('passes problem/user/verdict filters to the service', async () => {
+            mockListSubmissionsForAnalytics.mockResolvedValueOnce([{
+                id: 1, source: 'main', problemId: 'aplusb', problemTitle: 'A Plus B',
+                userId: 2, username: 'bob', verdict: 'Accepted', score: 100,
+                language: 'cpp', timeMs: 12, memoryKb: 4096, submittedAt: '2026-09-19T05:00:00+00:00',
+            }] as never);
+
+            const res = await request(buildApp()).get('/analytics/submissions?problemId=aplusb&userId=2&verdict=Accepted&limit=25&offset=50');
+
+            expect(res.status).toBe(200);
+            expect(mockListSubmissionsForAnalytics).toHaveBeenCalledWith(
+                { problemId: 'aplusb', userId: 2, verdict: 'Accepted' },
+                25,
+                50,
+            );
+            expect(res.body.submissions[0].problemId).toBe('aplusb');
+        });
+
+        it('sends empty filters when no query params are present', async () => {
+            mockListSubmissionsForAnalytics.mockResolvedValueOnce([] as never);
+
+            const res = await request(buildApp()).get('/analytics/submissions');
+
+            expect(res.status).toBe(200);
+            expect(mockListSubmissionsForAnalytics).toHaveBeenCalledWith({}, 50, 0);
+        });
+
+        it('rejects an invalid userId with 400', async () => {
+            const res = await request(buildApp()).get('/analytics/submissions?userId=-3');
+
+            expect(res.status).toBe(400);
+            expect(mockListSubmissionsForAnalytics).not.toHaveBeenCalled();
         });
     });
 

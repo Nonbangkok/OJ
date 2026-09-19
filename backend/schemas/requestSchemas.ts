@@ -320,3 +320,11 @@ export const analyticsProblemIdParamSchema = z.object({
 export const analyticsContestIdParamSchema = z.object({
   contestId: z.coerce.number().int().positive(),
 });
+
+export const analyticsSubmissionsQuerySchema = z.object({
+  problemId: z.string().trim().max(50).optional(),
+  userId: z.coerce.number().int().positive().optional(),
+  verdict: z.string().trim().max(50).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});

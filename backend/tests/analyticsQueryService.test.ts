@@ -346,3 +346,84 @@ describe('analyticsQueryService.listProblemsForAnalytics', () => {
         expect(String(mockQuery.mock.calls[0][0])).toContain('ac_rate ASC');
     });
 });
+
+// ---------------------------------------------------------------------------
+// Submission list with filters
+// ---------------------------------------------------------------------------
+
+import { listSubmissionsForAnalytics, SubmissionFilters } from '../services/analyticsQueryService';
+
+describe('analyticsQueryService.listSubmissionsForAnalytics', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it('returns submissions mapped to camelCase', async () => {
+        mockQuery.mockResolvedValueOnce({
+            rows: [{
+                id: 42,
+                source: 'main',
+                problem_id: 'aplusb',
+                problem_title: 'A Plus B',
+                user_id: 2,
+                username: 'bob',
+                overall_status: 'Accepted',
+                score: 100,
+                language: 'cpp',
+                max_time_ms: 12,
+                max_memory_kb: 4096,
+                submitted_at: '2026-09-19T05:00:00+00:00',
+            }],
+        } as never);
+
+        const rows = await listSubmissionsForAnalytics({}, 50, 0);
+
+        expect(rows).toEqual([{
+            id: 42,
+            source: 'main',
+            problemId: 'aplusb',
+            problemTitle: 'A Plus B',
+            userId: 2,
+            username: 'bob',
+            verdict: 'Accepted',
+            score: 100,
+            language: 'cpp',
+            timeMs: 12,
+            memoryKb: 4096,
+            submittedAt: '2026-09-19T05:00:00+00:00',
+        }]);
+    });
+
+    it('applies problem and user filters as parameters', async () => {
+        mockQuery.mockResolvedValue({ rows: [] } as never);
+
+        const filters: SubmissionFilters = { problemId: 'aplusb', userId: 2 };
+        await listSubmissionsForAnalytics(filters, 25, 50);
+
+        const [sql, params] = mockQuery.mock.calls[0];
+        expect(params).toEqual(['aplusb', 2, 25, 50]);
+        expect(String(sql)).toContain('problem_id = $1');
+        expect(String(sql)).toContain('user_id = $2');
+    });
+
+    it('omits absent filters from the WHERE clause', async () => {
+        mockQuery.mockResolvedValue({ rows: [] } as never);
+
+        await listSubmissionsForAnalytics({}, 50, 0);
+
+        const [sql, params] = mockQuery.mock.calls[0];
+        expect(params).toEqual([50, 0]);
+        expect(String(sql)).not.toContain('problem_id = $');
+        expect(String(sql)).not.toContain('user_id = $');
+    });
+
+    it('filters by verdict when provided', async () => {
+        mockQuery.mockResolvedValue({ rows: [] } as never);
+
+        await listSubmissionsForAnalytics({ verdict: 'Accepted' }, 50, 0);
+
+        const [sql, params] = mockQuery.mock.calls[0];
+        expect(params).toEqual(['Accepted', 50, 0]);
+        expect(String(sql)).toContain('overall_status = $1');
+    });
+});

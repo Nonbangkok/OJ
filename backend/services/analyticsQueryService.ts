@@ -888,3 +888,140 @@ export const listProblemsForAnalytics = async (
     solvers: toNum(r.solvers),
   }));
 };
+
+// ---------------------------------------------------------------------------
+// Submission list with filters (analysis tab)
+// ---------------------------------------------------------------------------
+
+export interface SubmissionFilters {
+  problemId?: string;
+  userId?: number;
+  verdict?: string;
+}
+
+export interface SubmissionListRow {
+  id: number;
+  source: 'main' | 'contest';
+  problemId: string;
+  problemTitle: string;
+  userId: number;
+  username: string;
+  verdict: string;
+  score: number;
+  language: string;
+  timeMs: number | null;
+  memoryKb: number | null;
+  submittedAt: string;
+}
+
+interface SubmissionQueryRow {
+  id: number;
+  source: 'main' | 'contest';
+  problem_id: string;
+  problem_title: string;
+  user_id: number | null;
+  username: string | null;
+  overall_status: string;
+  score: number;
+  language: string;
+  max_time_ms: number | null;
+  max_memory_kb: number | null;
+  submitted_at: string;
+}
+
+/**
+ * Submissions across both pools, newest first, filterable by problem, user,
+ * and verdict. contest rows resolve the problem title via contest_problems
+ * (falling back to the main problems table).
+ */
+export const listSubmissionsForAnalytics = async (
+  filters: SubmissionFilters,
+  limit: number,
+  offset: number,
+): Promise<SubmissionListRow[]> => {
+  const conditions: string[] = [];
+  const params: Array<string | number> = [];
+
+  if (filters.problemId !== undefined && filters.problemId !== '') {
+    params.push(filters.problemId);
+    conditions.push(`s.problem_id = $${params.length}`);
+  }
+  if (filters.userId !== undefined) {
+    params.push(filters.userId);
+    conditions.push(`s.user_id = $${params.length}`);
+  }
+  if (filters.verdict !== undefined && filters.verdict !== '') {
+    params.push(filters.verdict);
+    conditions.push(`s.overall_status = $${params.length}`);
+  }
+
+  params.push(limit);
+  const limitIdx = `$${params.length}`;
+  params.push(offset);
+  const offsetIdx = `$${params.length}`;
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const result = await query<SubmissionQueryRow>(`
+    WITH contest_problem_titles AS (
+      SELECT problem_id, MAX(title) AS title
+      FROM contest_problems
+      GROUP BY problem_id
+    ),
+    all_submissions AS (
+      SELECT
+        s.id,
+        'main' AS source,
+        s.problem_id,
+        p.title AS problem_title,
+        s.user_id,
+        s.overall_status,
+        s.score,
+        s.language,
+        s.max_time_ms,
+        s.max_memory_kb,
+        s.submitted_at
+      FROM submissions s
+      JOIN problems p ON p.id = s.problem_id
+      UNION ALL
+      SELECT
+        cs.id,
+        'contest' AS source,
+        cs.problem_id,
+        COALESCE(cpt.title, cp.title, cs.problem_id) AS problem_title,
+        cs.user_id,
+        cs.overall_status,
+        cs.score,
+        cs.language,
+        cs.max_time_ms,
+        cs.max_memory_kb,
+        cs.submitted_at
+      FROM contest_submissions cs
+      LEFT JOIN contest_problem_titles cpt ON cpt.problem_id = cs.problem_id
+      LEFT JOIN problems cp ON cp.id = cs.problem_id
+    )
+    SELECT
+      s.*,
+      u.username
+    FROM all_submissions s
+    LEFT JOIN users u ON u.id = s.user_id
+    ${whereClause}
+    ORDER BY s.submitted_at DESC
+    LIMIT ${limitIdx} OFFSET ${offsetIdx}`,
+    params);
+
+  return result.rows.map((r) => ({
+    id: r.id,
+    source: r.source,
+    problemId: r.problem_id,
+    problemTitle: r.problem_title,
+    userId: r.user_id ?? 0,
+    username: r.username ?? '—',
+    verdict: r.overall_status,
+    score: r.score,
+    language: r.language,
+    timeMs: r.max_time_ms,
+    memoryKb: r.max_memory_kb,
+    submittedAt: r.submitted_at,
+  }));
+};
