@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import OverviewTab from './OverviewTab';
+import UsersTab from './UsersTab';
+import UserDetail from './UserDetail';
 import styles from './AnalysisPage.module.css';
 
 type AnalysisTab = 'overview' | 'users' | 'problems';
@@ -12,6 +14,15 @@ const TABS: Array<{ key: AnalysisTab; label: string }> = [
 
 const AnalysisPage = () => {
   const [tab, setTab] = useState<AnalysisTab>('overview');
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+
+  const handleSelectUser = (userId: number) => {
+    setSelectedUserId(userId);
+  };
+
+  const handleBackToUsers = () => {
+    setSelectedUserId(null);
+  };
 
   return (
     <div className={styles.container}>
@@ -24,13 +35,21 @@ const AnalysisPage = () => {
             role="tab"
             aria-selected={tab === key}
             className={tab === key ? styles['tab-active'] : styles.tab}
-            onClick={() => setTab(key)}
+            onClick={() => {
+              setTab(key);
+              setSelectedUserId(null);
+            }}
           >
             {label}
           </button>
         ))}
       </div>
       {tab === 'overview' && <OverviewTab />}
+      {tab === 'users' && (
+        selectedUserId === null
+          ? <UsersTab onSelectUser={handleSelectUser} />
+          : <UserDetail userId={selectedUserId} onBack={handleBackToUsers} />
+      )}
     </div>
   );
 };

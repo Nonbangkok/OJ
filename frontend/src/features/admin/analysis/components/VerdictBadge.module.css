@@ -1,0 +1,53 @@
+.badge {
+  display: inline-block;
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.accepted {
+  background-color: rgba(25, 135, 84, 0.15);
+  color: #198754;
+}
+
+.wrong-answer {
+  background-color: rgba(220, 53, 69, 0.15);
+  color: #dc3545;
+}
+
+.time-limit-exceeded {
+  background-color: rgba(255, 193, 7, 0.18);
+  color: #b58200;
+}
+
+.memory-limit-exceeded {
+  background-color: rgba(253, 126, 20, 0.15);
+  color: #d9690a;
+}
+
+.runtime-error {
+  background-color: rgba(111, 66, 201, 0.15);
+  color: #6f42c1;
+}
+
+.compilation-error {
+  background-color: rgba(73, 80, 87, 0.15);
+  color: #495057;
+}
+
+.system-error {
+  background-color: rgba(108, 117, 125, 0.18);
+  color: #5c636a;
+}
+
+.skipped {
+  background-color: rgba(206, 212, 218, 0.25);
+  color: #6c757d;
+}
+
+.default {
+  background-color: rgba(108, 117, 125, 0.15);
+  color: var(--text-color-secondary);
+}
