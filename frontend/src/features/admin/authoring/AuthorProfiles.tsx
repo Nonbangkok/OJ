@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Dialog } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
 import { getErrorMessage } from '../../../utils/error';
-import { Profile } from './types';
+import { Profile, ProfileUpdateConfirmation } from './types';
 import { drawProfileCrop, loadProfileImage, profileCropToPng } from './profileImage';
 import styles from './AuthorProfiles.module.css';
 
@@ -23,6 +23,17 @@ const emptyFields: Fields = {
 const profileErrorMessage = (error: unknown): string =>
   getErrorMessage(error, 'Unable to save or load author profiles. Please try again.');
 
+const isConfirmation = (
+  result: Profile | ProfileUpdateConfirmation
+): result is ProfileUpdateConfirmation =>
+  (result as ProfileUpdateConfirmation).confirmationRequired === true;
+
+/** Pending cascade impact from the server's confirmation gate. */
+interface PendingSync {
+  affectedDrafts: number;
+  affectedPublishedProblems: number;
+}
+
 export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +43,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [pendingSync, setPendingSync] = useState<PendingSync | null>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [removeImage, setRemoveImage] = useState(false);
@@ -84,6 +96,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
     setEditing(profile);
     setError('');
     setNotice('');
+    setPendingSync(null);
     resetImage();
     setFields(
       profile === 'new'
@@ -140,24 +153,54 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
       if (image)
         body.append('profileImage', await profileCropToPng(image, zoom, x, y), 'profile.png');
       else if (editing !== 'new' && removeImage) body.append('removeProfileImage', 'true');
-      const data =
-        editing === 'new'
-          ? await authoringService.createProfile(body)
-          : await authoringService.updateProfile(editing.id, body);
-      setProfiles((current) =>
-        current.some((profile) => profile.id === data.id)
-          ? current.map((profile) => (profile.id === data.id ? data : profile))
-          : [...current, data]
-      );
-      setEditing(null);
-      resetImage();
-      setNotice('Author profile saved.');
-      onChanged?.();
+      // New profiles have nothing to cascade; existing ones go through the
+      // confirmation gate — the first submit reports impact, the confirmed
+      // resubmit saves and starts the cascade.
+      if (editing === 'new') {
+        applySavedProfile(await authoringService.createProfile(body));
+      } else if (pendingSync) {
+        const confirmedResult = await authoringService.updateProfileWithGate(editing.id, body, true);
+        if (isConfirmation(confirmedResult)) {
+          // The server re-reported impact (e.g. drafts appeared since the gate
+          // probe); show the fresh counts instead of saving.
+          setPendingSync({
+            affectedDrafts: confirmedResult.affectedDrafts,
+            affectedPublishedProblems: confirmedResult.affectedPublishedProblems,
+          });
+          setSaving(false);
+          return;
+        }
+        applySavedProfile(confirmedResult);
+        setPendingSync(null);
+        setNotice('Author profile saved. Linked drafts are syncing their PDFs — see the Jobs tab.');
+      } else {
+        const result = await authoringService.updateProfileWithGate(editing.id, body, false);
+        if (isConfirmation(result)) {
+          setPendingSync({
+            affectedDrafts: result.affectedDrafts,
+            affectedPublishedProblems: result.affectedPublishedProblems,
+          });
+          setSaving(false);
+          return;
+        }
+        applySavedProfile(result);
+      }
     } catch (failure) {
       setError(profileErrorMessage(failure));
     } finally {
       setSaving(false);
     }
+  }
+  function applySavedProfile(data: Profile) {
+    setProfiles((current) =>
+      current.some((profile) => profile.id === data.id)
+        ? current.map((profile) => (profile.id === data.id ? data : profile))
+        : [...current, data]
+    );
+    setEditing(null);
+    resetImage();
+    setNotice('Author profile saved.');
+    onChanged?.();
   }
   function update(key: keyof Fields, value: string) {
     setFields((current) => ({ ...current, [key]: value }));
@@ -173,8 +216,8 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
         </Button>
       </div>
       <p className={styles.hint}>
-        Profile changes do not change existing drafts or published PDFs. Use Refresh from profile in
-        a draft to update its snapshot.
+        Author-relevant changes ask for confirmation, then cascade to every linked draft and
+        republish its published problems.
       </p>
       {loading && <p role="status">Loading author profiles…</p>}
       {listError && (
@@ -235,6 +278,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
             onClose={() => {
               if (!saving && !imageLoading) {
                 setEditing(null);
+                setPendingSync(null);
                 resetImage();
               }
             }}
@@ -247,13 +291,18 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
                   loading={saving}
                   loadingLabel="Saving profile…"
                 >
-                  {editing === 'new' ? 'Create profile' : 'Save profile'}
+                  {editing === 'new'
+                    ? 'Create profile'
+                    : pendingSync
+                      ? 'Save and sync linked problems'
+                      : 'Save profile'}
                 </Button>
                 <Button
                   variant="secondary"
                   disabled={saving || imageLoading}
                   onClick={() => {
                     setEditing(null);
+                    setPendingSync(null);
                     resetImage();
                   }}
                 >
@@ -263,6 +312,21 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
             }
           >
             {error && <p role="alert">{error}</p>}
+            {pendingSync && (
+              <div role="alertdialog" aria-label="Confirm profile sync" className={styles.syncConfirm}>
+                <strong>Saving will update linked problems.</strong>
+                <p>
+                  This change will update {pendingSync.affectedDrafts}{' '}
+                  {pendingSync.affectedDrafts === 1 ? 'draft' : 'drafts'}
+                  {pendingSync.affectedPublishedProblems > 0 &&
+                    ` — including ${pendingSync.affectedPublishedProblems} published ${
+                      pendingSync.affectedPublishedProblems === 1 ? 'problem' : 'problems'
+                    }`}{' '}
+                  with the new author metadata and PDF.
+                </p>
+                <p>Save and sync now?</p>
+              </div>
+            )}
             <fieldset disabled={saving} className={styles.dialogFields}>
               <legend className={styles.legend}>Author details</legend>
             <div className={styles.fields}>

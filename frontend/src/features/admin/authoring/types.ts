@@ -22,6 +22,13 @@ export interface Profile {
   updatedAt: string;
 }
 export interface Asset { id: string; filename: string; sizeBytes: number }
+/** Gate response when an author-relevant profile edit would cascade to drafts. */
+export interface ProfileUpdateConfirmation {
+  confirmationRequired: true;
+  affectedDrafts: number;
+  affectedPublishedProblems: number;
+  profile: Profile;
+}
 export interface TestcaseMetadata {
   id: string;
   caseNumber: number;
@@ -47,6 +54,22 @@ export interface Job {
   } | null;
 }
 export const draftBase = (id: string) => `/admin/authoring/drafts/${encodeURIComponent(id)}`;export const isActive = (job: Job) => ['queued', 'compiling', 'running'].includes(job.status);
+/** One draft inside a profile-sync cascade (GET /admin/authoring/profile-syncs/:id). */
+export interface ProfileSyncItem {
+  draftId: string; problemId: string; title: string;
+  status: 'pending' | 'syncing' | 'synced' | 'failed' | 'deferred';
+  attempts: number; errorMessage: string | null;
+  draftStatus: Draft['status']; published: boolean;
+}
+/** A profile-sync cascade run (list rows omit items). */
+export interface ProfileSyncRun {
+  id: string; profileId: string; profileAkaName?: string;
+  status: 'queued' | 'running' | 'succeeded' | 'failed';
+  resultSummary: { synced: number; failed: number; deferred: number; warnings?: string[] } | null;
+  createdAt: string; startedAt?: string | null; finishedAt: string | null;
+  progress: { total: number; synced: number; failed: number };
+  items?: ProfileSyncItem[];
+}
 export const editableFields: (keyof DraftFields)[] = ['problemId', 'title', 'authorProfileId', 'authorAkaName',
   'authorRealName', 'language', 'countryCode', 'timeLimitMs', 'memoryLimitMb', 'statementHtml',
   'solutionCpp', 'generatorCpp', 'templateVersion'];

@@ -5,6 +5,8 @@ import type {
   DraftFields,
   Job,
   Profile,
+  ProfileSyncRun,
+  ProfileUpdateConfirmation,
   TestcaseMetadata,
 } from '../../features/admin/authoring/types';
 
@@ -91,6 +93,16 @@ const authoringService = {
     return response.data;
   },
 
+  // Profile sync cascades
+  listProfileSyncs: async (): Promise<ProfileSyncRun[]> => {
+    const response = await api.get<ProfileSyncRun[]>('/admin/authoring/profile-syncs');
+    return response.data;
+  },
+  getProfileSync: async (syncId: string): Promise<ProfileSyncRun> => {
+    const response = await api.get<ProfileSyncRun>(`/admin/authoring/profile-syncs/${encodeURIComponent(syncId)}`);
+    return response.data;
+  },
+
   // Statement assets
   listAssets: async (id: string): Promise<Asset[]> => {
     const response = await api.get<Asset[]>(`${draftBase(id)}/assets`);
@@ -154,6 +166,23 @@ const authoringService = {
   },
   updateProfile: async (id: string, data: FormData): Promise<Profile> => {
     const response = await api.patch<Profile>(
+      `${profilesBase}/${encodeURIComponent(id)}`,
+      data
+    );
+    return response.data;
+  },
+  /**
+   * Profile update with the confirmation gate: an author-relevant change
+   * without `confirmed` returns the cascade impact instead of saving, so the
+   * caller can ask the admin before cascading to drafts and published problems.
+   */
+  updateProfileWithGate: async (
+    id: string,
+    data: FormData,
+    confirmed = false
+  ): Promise<Profile | ProfileUpdateConfirmation> => {
+    if (confirmed) data.append('confirmed', 'true');
+    const response = await api.patch<Profile | ProfileUpdateConfirmation>(
       `${profilesBase}/${encodeURIComponent(id)}`,
       data
     );

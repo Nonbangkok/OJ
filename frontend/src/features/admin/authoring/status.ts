@@ -22,6 +22,7 @@ const JOB_TYPES: Record<string, string> = {
   generate_outputs: 'Generate outputs',
   build_pdf: 'Build PDF',
   verify_all: 'Verify All',
+  sync_pdf: 'Profile sync PDF',
 };
 
 export const jobLabel = (jobType: string) => JOB_TYPES[jobType] ?? jobType;

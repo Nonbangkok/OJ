@@ -160,6 +160,16 @@
   padding: 0;
   margin: 0;
 }
+.syncConfirm {
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--status-warning);
+  border-radius: var(--radius-sm);
+  background: var(--status-warning-bg);
+}
+.syncConfirm p {
+  margin: 0.25rem 0 0;
+}
 .avatarImage {
   flex: 0 0 auto;
   width: 2.5rem;

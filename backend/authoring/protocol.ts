@@ -67,7 +67,7 @@ export const pdfSnapshotSchema = z.object({
 export const jobSnapshotSchema = z.object({
   version: z.literal(1), jobId: z.string().uuid(), draftId: z.string().uuid(),
   revision: z.number().int().positive(),
-  kind: z.enum(['compile_solution', 'compile_generator', 'run_generator', 'generate_outputs', 'build_pdf', 'verify_all']),
+  kind: z.enum(['compile_solution', 'compile_generator', 'run_generator', 'generate_outputs', 'build_pdf', 'verify_all', 'sync_pdf']),
   pdf: pdfSnapshotSchema.optional(),
   generatorSource: z.string().refine(value => value.trim().length > 0
     && Buffer.byteLength(value) <= AUTHORING_RUNNER.MAX_SOURCE_BYTES).optional(),
@@ -81,7 +81,7 @@ export const jobSnapshotSchema = z.object({
 }).strict().refine(value => value.kind === 'run_generator' ? value.seed !== undefined : value.seed === undefined)
   .refine(value => ['generate_outputs', 'verify_all'].includes(value.kind) ? value.cases !== undefined && value.limits !== undefined
     : value.cases === undefined && value.limits === undefined)
-  .refine(value => value.kind === 'build_pdf' ? value.pdf !== undefined && value.source === ''
+  .refine(value => ['build_pdf', 'sync_pdf'].includes(value.kind) ? value.pdf !== undefined && value.source === ''
     : value.kind === 'verify_all' ? value.pdf !== undefined : value.pdf === undefined)
   .refine(value => value.kind === 'verify_all' ? value.source.trim().length > 0
     && value.expectedOutputs !== undefined && value.cases !== undefined

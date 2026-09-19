@@ -724,6 +724,26 @@ Detailed limits, ZIP pairing and runtime isolation: `AUTHORING_TESTCASES.md`.
 
 ---
 
+### 78. `GET /admin/authoring/profile-syncs`
+
+- Auth: admin. No params. Readable even when the runner transport is disabled
+  (the rows live in the main database, like job history).
+- Response200: the 20 most recent profile-sync cascade runs, newest first.
+  Rows contain run UUID, profile UUID and aka name, run status
+  (`queued`/`running`/`succeeded`/`failed`), result summary, timestamps and
+  progress counters `{ total, synced, failed }` (failed includes deferred).
+
+### 79. `GET /admin/authoring/profile-syncs/:id`
+
+- Auth: admin. Params: UUID sync run `id`.
+- Response200: one run plus `items`, the per-draft rows ordered by creation:
+  draft UUID, problem ID/title, item status (`pending`/`syncing`/`synced`/
+  `failed`/`deferred`), attempts, error message, draft status and whether the
+  draft was published. Metadata only — no statement or PDF bytes.
+- Errors:400 invalid UUID;404 `profile_sync_not_found`.
+
+---
+
 ## Frontend Implementation Notes (สำคัญ)
 
 - ใช้ axios instance แบบ `withCredentials: true` ทุก request ที่ต้องใช้ session

@@ -14,10 +14,16 @@ import {
   AuthorProfileListRow,
   AuthorProfileUpdates,
   createAuthorProfile,
+  getAuthorProfile,
   listAuthorProfiles,
   readAuthorProfileImage,
   updateAuthorProfile,
 } from '../services/authorProfileQueryService';
+import {
+  changesAuthorSnapshot,
+  createProfileSync,
+  getProfileSyncImpact,
+} from '../services/authoringProfileSyncService';
 import {
   CreateAuthorProfileRequestBody,
   UpdateAuthorProfileRequestBody,
@@ -127,6 +133,25 @@ router.patch('/admin/author-profiles/:id',
       throw new AppError('At least one author profile field or image change is required', 400);
     }
 
+    // Confirmation gate: an author-relevant change without `confirmed` reports
+    // the cascade impact instead of saving, so the admin can confirm first.
+    const current = await getAuthorProfile(String(req.params.id));
+    if (!current) {
+      res.status(404).json({ message: 'Author profile not found' });
+      return;
+    }
+    const affectsSnapshot = changesAuthorSnapshot(current, updates);
+    if (affectsSnapshot && !body.confirmed) {
+      const impact = await getProfileSyncImpact(current.id);
+      res.json({
+        confirmationRequired: true,
+        affectedDrafts: impact.affectedDrafts,
+        affectedPublishedProblems: impact.affectedPublishedProblems,
+        profile: toProfileResponse(current),
+      });
+      return;
+    }
+
     const result = await updateAuthorProfile(String(req.params.id), updates);
     if (result.kind === 'not_found') {
       res.status(404).json({ message: 'Author profile not found' });
@@ -138,6 +163,11 @@ router.patch('/admin/author-profiles/:id',
         code: 'author_profile_user_conflict',
       });
       return;
+    }
+
+    // The profile changed author-relevant fields: cascade to linked drafts.
+    if (affectsSnapshot) {
+      await createProfileSync(result.profile.id);
     }
     res.json(toProfileResponse(result.profile));
   }));
