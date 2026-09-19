@@ -115,7 +115,7 @@ export const normalizeSource = (source: string): string => {
 };
 
 /** Length (in tokens) of the shingles compared between two sources. */
-const SHINGLE_SIZE = 8;
+const SHINGLE_SIZE = 5;
 
 /** Build the set of k-token shingles for a normalised source. */
 export const buildShingles = (normalized: string, k = SHINGLE_SIZE): Set<string> => {

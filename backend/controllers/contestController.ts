@@ -294,7 +294,12 @@ router.get('/admin/contests/:id/similarity', requireAuth, requireStaffOrAdmin,
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params as unknown as { id: number };
     const contestId = Number(id);
-    const pairs = await findSimilarContestPairs(contestId);
+    // Optional stricter/looser cutoff, clamped to (0, 1].
+    const requested = Number(req.query.threshold);
+    const threshold = Number.isFinite(requested) && requested > 0 && requested <= 1
+      ? requested
+      : undefined;
+    const pairs = await findSimilarContestPairs(contestId, threshold);
     res.json({ contestId, pairs });
   }));
 

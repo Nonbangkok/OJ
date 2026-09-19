@@ -233,7 +233,7 @@ describe('Contest Controller', () => {
             expect(res.body.contestId).toBe(5);
             expect(res.body.pairs).toHaveLength(1);
             expect(res.body.pairs[0]).toMatchObject({ userA: 'alice', userB: 'bob', similarity: 0.95 });
-            expect(findSimilarContestPairs).toHaveBeenCalledWith(5);
+            expect(findSimilarContestPairs).toHaveBeenCalledWith(5, undefined);
         });
 
         it('rejects a non-numeric contest id with 400', async () => {

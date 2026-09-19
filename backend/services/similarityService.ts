@@ -1,8 +1,8 @@
 import { query } from '../db';
 import { isTooShortForComparison, normalizeSource, similarity } from '../utils/codeSimilarity';
 
-/** Pairs at or above this similarity are reported to staff. */
-export const SIMILARITY_THRESHOLD = 0.8;
+/** Default similarity cutoff reported to staff (tunable per request). */
+export const SIMILARITY_THRESHOLD = 0.6;
 
 /** Cap per-contest pair generation so the endpoint stays bounded. */
 const MAX_SUBMISSIONS_PER_PROBLEM = 200;
