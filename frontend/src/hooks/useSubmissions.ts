@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import submissionService from '../services/submissionService';
-import authService from '../services/authService';
+import { useAuth } from '../context/AuthContext';
 import { useAutocomplete } from './useAutocomplete';
 import { USER_ROLES, SUBMISSION_STATUS } from '../utils/constants';
 import { POLLING_INTERVALS } from '../config/constants';
@@ -18,7 +18,8 @@ export const useSubmissions = (
   contestId: string | number | null | undefined
 ) => {
   const [submissions, setSubmissions] = useState<SubmissionSummary[]>([]);
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  // Session user comes from AuthContext — no extra /me request per page.
+  const { user: currentUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<SubmissionFilter>('all');
@@ -33,20 +34,7 @@ export const useSubmissions = (
   // collide the way Date.now() did, or a stale response could win.
   const lastRequestIdRef = useRef(0);
 
-  // 1. Initial User Fetch
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const data = await authService.checkLogin();
-        if (data.isAuthenticated) setCurrentUser(data.user);
-      } catch (err) {
-        console.error('Error fetching user:', err);
-      }
-    };
-    fetchUser();
-  }, []);
-
-  // 2. Data Fetching Logic
+  // 1. Data Fetching Logic
   const fetchData = useCallback(async () => {
     const currentRequestId = ++lastRequestIdRef.current;
 

@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import authService from '../services/authService';
+import { useAuth } from '../context/AuthContext';
 import type { AuthUser } from '../types';
 
 interface UseAdminPageResult {
@@ -7,27 +6,11 @@ interface UseAdminPageResult {
   loading: boolean;
 }
 
+/** Reads the session user from AuthContext — no extra /me request per page. */
 const useAdminPage = (): UseAdminPageResult => {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, isLoading } = useAuth();
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const data = await authService.checkLogin();
-        if (data.isAuthenticated) {
-          setUser(data.user);
-        }
-      } catch (error) {
-        console.error('Could not fetch user data for admin panel', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUser();
-  }, []);
-
-  return { user, loading };
+  return { user, loading: isLoading };
 };
 
 export default useAdminPage;

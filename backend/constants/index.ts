@@ -121,9 +121,13 @@ export const STATEMENT_ASSET = {
 } as const;
 
 export const RATE_LIMIT_CONFIG = {
-    // General API limiter.
+    // General API limiter. Budget set for real app behavior: every page load
+    // costs ~2 requests (/me + /settings/registration) before any data fetch,
+    // and an authoring session polls drafts/jobs continuously — observed
+    // normal usage is ~350 requests per 15min, so 1000 leaves headroom for
+    // bursts while still bounding scripted abuse.
     GENERAL_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
-    GENERAL_MAX: 300,
+    GENERAL_MAX: 1000,
     // Auth endpoints (login/register) — protect against brute force.
     AUTH_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
     AUTH_MAX: 10,

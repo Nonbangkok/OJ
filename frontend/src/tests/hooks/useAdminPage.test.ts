@@ -1,54 +1,50 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import useAdminPage from '../../hooks/useAdminPage';
+import { useAuth } from '../../context/AuthContext';
 import authService from '../../services/authService';
 
 jest.mock('../../services/authService');
+
+const mockUseAuth = (user: object | null, isLoading: boolean): void => {
+    jest.mocked(useAuth).mockReturnValue({ user, isLoading } as ReturnType<typeof useAuth>);
+};
+
+jest.mock('../../context/AuthContext', () => {
+    const original = jest.requireActual('../../context/AuthContext');
+    return { ...original, useAuth: jest.fn() };
+});
 
 describe('useAdminPage', () => {
     afterEach(() => {
         jest.clearAllMocks();
     });
 
-    it('initializes with loading state and handles successful auth', async () => {
-        const mockUser = { id: 1, username: 'admin', role: 'admin' };
-        (jest.mocked(authService.checkLogin) as jest.Mock).mockResolvedValueOnce({ isAuthenticated: true, user: mockUser });
+    it('exposes the loading session state while auth resolves', () => {
+        mockUseAuth(null, true);
 
         const { result } = renderHook(() => useAdminPage());
 
         expect(result.current.loading).toBe(true);
         expect(result.current.user).toBeNull();
+    });
 
-        await waitFor(() => {
-            expect(result.current.loading).toBe(false);
-        });
+    it('returns the session user from AuthContext (no extra /me request)', () => {
+        const mockUser = { id: 1, username: 'admin', role: 'admin' };
+        mockUseAuth(mockUser, false);
 
+        const { result } = renderHook(() => useAdminPage());
+
+        expect(result.current.loading).toBe(false);
         expect(result.current.user).toEqual(mockUser);
-        expect(authService.checkLogin).toHaveBeenCalledTimes(1);
+        expect(authService.checkLogin).not.toHaveBeenCalled();
     });
 
-    it('handles failed auth (not authenticated)', async () => {
-        (jest.mocked(authService.checkLogin) as jest.Mock).mockResolvedValueOnce({ isAuthenticated: false });
+    it('returns a null user when unauthenticated', () => {
+        mockUseAuth(null, false);
 
         const { result } = renderHook(() => useAdminPage());
 
-        await waitFor(() => {
-            expect(result.current.loading).toBe(false);
-        });
-
+        expect(result.current.loading).toBe(false);
         expect(result.current.user).toBeNull();
-    });
-
-    it('handles auth service error', async () => {
-        (jest.mocked(authService.checkLogin) as jest.Mock).mockRejectedValueOnce(new Error('Network Error'));
-
-        const { result } = renderHook(() => useAdminPage());
-
-        await waitFor(() => {
-            expect(result.current.loading).toBe(false);
-        });
-
-        expect(result.current.user).toBeNull();
-        // console.error is mocked in setupTests.js globally so we don't mock it here
-        expect(console.error).toHaveBeenCalledWith('Could not fetch user data for admin panel', expect.any(Error));
     });
 });

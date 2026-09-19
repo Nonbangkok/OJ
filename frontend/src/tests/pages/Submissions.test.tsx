@@ -2,10 +2,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Submissions from '../../pages/submission/Submissions';
 import submissionService from '../../services/submissionService';
-import authService from '../../services/authService';
+import { useAuth } from '../../context/AuthContext';
 
 jest.mock('../../services/submissionService');
-jest.mock('../../services/authService');
+jest.mock('../../context/AuthContext', () => ({
+    useAuth: jest.fn(() => ({ user: null, isLoading: false })),
+}));
 
 // Mock ThemeContext to prevent useTheme errors from LoadingPage
 jest.mock('../../context/ThemeContext', () => ({
@@ -22,7 +24,7 @@ jest.mock('react-router-dom', () => ({
 describe('Submissions Page', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        jest.mocked(authService.checkLogin).mockResolvedValue({ isAuthenticated: false });
+        jest.mocked(useAuth).mockReturnValue({ user: null, isLoading: false } as ReturnType<typeof useAuth>);
         jest.mocked(submissionService.searchProblems).mockResolvedValue([]);
         jest.mocked(submissionService.searchUsers).mockResolvedValue([]);
     });
