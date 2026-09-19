@@ -73,7 +73,6 @@ export default function DraftWorkspace({ id }: { id: string }) {
         <p className={styles.navProblemId}>{draft.problemId}</p>
         <div className={styles.navMeta}>
           <StatusBadge tone={status.tone} title={status.hint}>{status.label}</StatusBadge>
-          <span>Revision {draft.revision}</span>
         </div>
         <strong className={styles.saveState} role="status">
           {draft.status === 'published' ? 'Published — read-only'

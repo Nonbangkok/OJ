@@ -78,7 +78,12 @@ test('staff cannot load private authoring data even through a direct URL', () =>
 });
 test('lists resumable drafts and creates a draft with explicit author metadata', async () => {
   show();
-  expect(await screen.findByRole('link', { name: /sum/i })).toHaveAttribute(
+  // Problem ID and title are separate links to the same draft.
+  expect(await screen.findByRole('link', { name: 'sum' })).toHaveAttribute(
+    'href',
+    '/admin/authoring/d1'
+  );
+  expect(screen.getByRole('link', { name: 'Sum' })).toHaveAttribute(
     'href',
     '/admin/authoring/d1'
   );

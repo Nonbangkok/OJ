@@ -114,7 +114,8 @@ function DraftList() {
             <table>
               <thead>
                 <tr>
-                  <th>Problem</th>
+                  <th>Problem ID</th>
+                  <th>Title</th>
                   <th>Author</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -126,9 +127,13 @@ function DraftList() {
                   return (
                     <tr key={d.id}>
                       <td>
-                        <Link className={styles.draftLink} to={`/admin/authoring/${d.id}`}>
-                          <span className={styles.draftProblemId}>{d.problemId}</span>
-                          <span className={styles.draftTitle}>{d.title}</span>
+                        <Link className={styles.draftIdLink} to={`/admin/authoring/${d.id}`}>
+                          {d.problemId}
+                        </Link>
+                      </td>
+                      <td>
+                        <Link className={styles.draftTitleLink} to={`/admin/authoring/${d.id}`}>
+                          {d.title}
                         </Link>
                       </td>
                       <td className={styles.draftAuthor}>{d.authorAkaName}</td>

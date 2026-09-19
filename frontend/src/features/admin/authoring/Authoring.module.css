@@ -171,28 +171,33 @@
 .listHead h1 {
   margin: 0;
 }
-.draftLink {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  text-decoration: none;
-  min-width: 0;
-}
-.draftLink:hover .draftTitle {
-  text-decoration: underline;
-}
-.draftProblemId {
+.draftIdLink {
   font-family: monospace;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-.draftTitle {
+  font-size: 0.85rem;
   color: var(--accent-primary);
-  font-weight: 500;
-  max-width: 46ch;
+  text-decoration: none;
+  max-width: 18ch;
+  display: inline-block;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+.draftIdLink:hover {
+  text-decoration: underline;
+}
+.draftTitleLink {
+  color: var(--text-primary);
+  text-decoration: none;
+  max-width: 40ch;
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+.draftTitleLink:hover {
+  text-decoration: underline;
 }
 .draftAuthor {
   color: var(--text-secondary);
