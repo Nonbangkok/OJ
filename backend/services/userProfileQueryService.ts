@@ -51,10 +51,10 @@ export const getUserProfileStats = async (
         (u.avatar_png IS NOT NULL) AS has_avatar,
         u.avatar_updated_at,
         u.created_at,
-        COUNT(DISTINCT us.problem_id) AS problems_attempted,
-        COUNT(DISTINCT CASE WHEN bs.best_score = 100 THEN us.problem_id END) AS problems_solved,
+        (SELECT COUNT(DISTINCT problem_id) FROM user_submissions) AS problems_attempted,
+        (SELECT COUNT(DISTINCT problem_id) FROM best_scores WHERE best_score = 100) AS problems_solved,
         COALESCE((SELECT SUM(best_score) FROM best_scores), 0) AS total_score,
-        COUNT(*) AS submission_count,
+        (SELECT COUNT(*) FROM user_submissions) AS submission_count,
         COALESCE(
           (SELECT jsonb_object_agg(overall_status, status_count)
            FROM (
@@ -84,10 +84,7 @@ export const getUserProfileStats = async (
            '[]'::jsonb
         ) AS daily_activity
       FROM users u
-      LEFT JOIN user_submissions us ON true
-      LEFT JOIN best_scores bs ON bs.problem_id = us.problem_id
       WHERE u.username = $1
-      GROUP BY u.id, u.username, u.role, u.avatar_png, u.avatar_updated_at, u.created_at
     `, [username, PROFILE_ACTIVITY_WINDOW_DAYS]);
 
     return result.rows[0] ?? null;
