@@ -282,3 +282,24 @@ export const searchQuerySchema = z.object({
 export const submissionDetailQuerySchema = z.object({
   contestId: optionalTrimmedString,
 });
+
+// Analytics schemas
+export const analyticsOverviewQuerySchema = z.object({
+  days: z.coerce.number().int().refine((d) => [7, 30, 90].includes(d), {
+    message: 'days must be 7, 30, or 90',
+  }).default(30),
+});
+
+export const analyticsUsersQuerySchema = z.object({
+  search: z.string().trim().max(100).default(''),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export const analyticsUserIdParamSchema = z.object({
+  userId: z.coerce.number().int().positive(),
+});
+
+export const analyticsProblemIdParamSchema = z.object({
+  problemId: nonEmptyString.max(50),
+});
