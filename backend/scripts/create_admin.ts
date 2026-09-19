@@ -3,6 +3,7 @@
 import readline from 'readline';
 import bcrypt from 'bcrypt';
 import * as db from '../db';
+import { SECURITY_CONFIG, USER_ROLES } from '../constants';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -63,15 +64,14 @@ async function createAdmin(): Promise<void> {
   }
 
   try {
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    const hashedPassword = await bcrypt.hash(password, SECURITY_CONFIG.SALT_ROUNDS);
 
     await db.query(
       `INSERT INTO users (username, password_hash, role)
-       VALUES ($1, $2, 'admin')
+       VALUES ($1, $2, ${USER_ROLES.ADMIN})
        ON CONFLICT (username) DO UPDATE SET
          password_hash = EXCLUDED.password_hash,
-         role = 'admin';`,
+         role = ${USER_ROLES.ADMIN};`,
       [username, hashedPassword]
     );
 

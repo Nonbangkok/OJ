@@ -51,6 +51,15 @@ export const PROBLEM_VALIDATION = {
 
 export const SECURITY_CONFIG = {
     SALT_ROUNDS: 10,
+    SESSION_MAX_AGE_MS: 24 * 60 * 60 * 1000, // 24 hours
+} as const;
+
+export const SUBMISSION_QUERY_CONFIG = {
+    // Cap for the submissions list endpoints (main + contest views).
+    LIST_LIMIT: 200,
+    // A problem is counted as solved when the best score reaches the full
+    // per-problem maximum of 100 points.
+    FULL_PROBLEM_SCORE: 100,
 } as const;
 
 export const JUDGE_CONFIG = {

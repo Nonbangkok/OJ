@@ -146,6 +146,7 @@ describe('migration command', () => {
       '0007_problem_category',
       '0008_user_profile',
       '0009_profile_sync',
+      '0010_submission_indexes',
     ]);
     expect(calls).toContainEqual({
       text: expect.stringContaining('CREATE TABLE author_profiles'),

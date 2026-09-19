@@ -1,5 +1,5 @@
 import { query } from '../db';
-import { PROFILE_ACTIVITY_WINDOW_DAYS } from '../constants';
+import { PROFILE_ACTIVITY_WINDOW_DAYS, SUBMISSION_QUERY_CONFIG } from '../constants';
 
 export interface UserProfileStatsRow {
     id: number;
@@ -52,7 +52,7 @@ export const getUserProfileStats = async (
         u.avatar_updated_at,
         u.created_at,
         (SELECT COUNT(DISTINCT problem_id) FROM user_submissions) AS problems_attempted,
-        (SELECT COUNT(DISTINCT problem_id) FROM best_scores WHERE best_score = 100) AS problems_solved,
+        (SELECT COUNT(DISTINCT problem_id) FROM best_scores WHERE best_score = ${SUBMISSION_QUERY_CONFIG.FULL_PROBLEM_SCORE}) AS problems_solved,
         COALESCE((SELECT SUM(best_score) FROM best_scores), 0) AS total_score,
         (SELECT COUNT(*) FROM user_submissions) AS submission_count,
         COALESCE(

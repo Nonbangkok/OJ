@@ -1,4 +1,5 @@
 import { query } from '../db';
+import { SUBMISSION_STATUS } from '../constants';
 
 export interface OverviewKpi {
   current: number;
@@ -101,8 +102,8 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
       COUNT(DISTINCT user_id) FILTER (WHERE submitted_at >= NOW() - ($1 || ' days')::interval) AS current_submitters,
       COUNT(DISTINCT user_id) FILTER (WHERE submitted_at >= NOW() - ($2 || ' days')::interval
                                         AND submitted_at < NOW() - ($1 || ' days')::interval) AS previous_submitters,
-      COUNT(*) FILTER (WHERE overall_status = 'Accepted' AND submitted_at >= NOW() - ($1 || ' days')::interval) AS current_accepted,
-      COUNT(*) FILTER (WHERE overall_status = 'Accepted' AND submitted_at >= NOW() - ($2 || ' days')::interval
+      COUNT(*) FILTER (WHERE overall_status = ${SUBMISSION_STATUS.ACCEPTED} AND submitted_at >= NOW() - ($1 || ' days')::interval) AS current_accepted,
+      COUNT(*) FILTER (WHERE overall_status = ${SUBMISSION_STATUS.ACCEPTED} AND submitted_at >= NOW() - ($2 || ' days')::interval
                          AND submitted_at < NOW() - ($1 || ' days')::interval) AS previous_accepted
     FROM all_submissions`,
     [windowDays, windowDays * 2]);
@@ -137,7 +138,7 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
     SELECT
       to_char(date_trunc('day', submitted_at), 'YYYY-MM-DD') AS day,
       COUNT(*) AS total,
-      COUNT(*) FILTER (WHERE overall_status = 'Accepted') AS accepted
+      COUNT(*) FILTER (WHERE overall_status = ${SUBMISSION_STATUS.ACCEPTED}) AS accepted
     FROM all_submissions
     WHERE submitted_at >= NOW() - ($1 || ' days')::interval
     GROUP BY 1
@@ -167,7 +168,7 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
       p.id AS problem_id,
       p.title,
       COUNT(s.problem_id) AS submissions,
-      COUNT(*) FILTER (WHERE s.overall_status = 'Accepted') AS accepted
+      COUNT(*) FILTER (WHERE s.overall_status = ${SUBMISSION_STATUS.ACCEPTED}) AS accepted
     FROM all_submissions s
     JOIN problems p ON p.id = s.problem_id
     GROUP BY p.id, p.title
@@ -185,7 +186,7 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
       u.id AS user_id,
       u.username,
       COUNT(s.problem_id) AS submissions,
-      COUNT(DISTINCT s.problem_id) FILTER (WHERE s.overall_status = 'Accepted') AS solved
+      COUNT(DISTINCT s.problem_id) FILTER (WHERE s.overall_status = ${SUBMISSION_STATUS.ACCEPTED}) AS solved
     FROM all_submissions s
     JOIN users u ON u.id = s.user_id
     GROUP BY u.id, u.username
@@ -321,9 +322,9 @@ export const listUsersForAnalytics = async (
       u.username,
       u.role,
       COUNT(s.user_id) AS submissions,
-      COUNT(DISTINCT s.problem_id) FILTER (WHERE s.overall_status = 'Accepted') AS solved,
+      COUNT(DISTINCT s.problem_id) FILTER (WHERE s.overall_status = ${SUBMISSION_STATUS.ACCEPTED}) AS solved,
       COALESCE(
-        (COUNT(*) FILTER (WHERE s.overall_status = 'Accepted'))::float / NULLIF(COUNT(s.user_id), 0),
+        (COUNT(*) FILTER (WHERE s.overall_status = ${SUBMISSION_STATUS.ACCEPTED}))::float / NULLIF(COUNT(s.user_id), 0),
         0
       ) AS ac_rate,
       to_char(MAX(s.submitted_at), 'YYYY-MM-DD"T"HH24:MI:SSTZH:TZM') AS last_active
@@ -366,9 +367,9 @@ export const getUserAnalytics = async (userId: number): Promise<UserAnalytics | 
     SELECT
       COUNT(*) AS submissions,
       COUNT(DISTINCT problem_id) AS attempted,
-      COUNT(DISTINCT problem_id) FILTER (WHERE overall_status = 'Accepted') AS solved,
+      COUNT(DISTINCT problem_id) FILTER (WHERE overall_status = ${SUBMISSION_STATUS.ACCEPTED}) AS solved,
       COALESCE(
-        (COUNT(*) FILTER (WHERE overall_status = 'Accepted'))::float / NULLIF(COUNT(*), 0),
+        (COUNT(*) FILTER (WHERE overall_status = ${SUBMISSION_STATUS.ACCEPTED}))::float / NULLIF(COUNT(*), 0),
         0
       ) AS ac_rate,
       COALESCE((SELECT SUM(best_score) FROM best_scores), 0) AS total_score
@@ -428,7 +429,7 @@ export const getUserAnalytics = async (userId: number): Promise<UserAnalytics | 
     first_solves AS (
       SELECT problem_id, MIN(submitted_at) AS first_solved_at
       FROM user_submissions
-      WHERE overall_status = 'Accepted'
+      WHERE overall_status = ${SUBMISSION_STATUS.ACCEPTED}
       GROUP BY problem_id
     )
     SELECT
@@ -447,7 +448,7 @@ export const getUserAnalytics = async (userId: number): Promise<UserAnalytics | 
     )
     SELECT
       COALESCE(p.category, 'uncategorized') AS category,
-      COUNT(DISTINCT us.problem_id) FILTER (WHERE us.overall_status = 'Accepted') AS solved,
+      COUNT(DISTINCT us.problem_id) FILTER (WHERE us.overall_status = ${SUBMISSION_STATUS.ACCEPTED}) AS solved,
       COUNT(DISTINCT us.problem_id) AS attempted
     FROM user_submissions us
     JOIN problems p ON p.id = us.problem_id
@@ -510,9 +511,9 @@ export const getProblemAnalytics = async (problemId: string): Promise<ProblemAna
   const kpiResult = await query<ProblemKpiRow>(`
     SELECT
       COUNT(*) AS submissions,
-      COUNT(*) FILTER (WHERE overall_status = 'Accepted') AS accepted,
+      COUNT(*) FILTER (WHERE overall_status = ${SUBMISSION_STATUS.ACCEPTED}) AS accepted,
       COALESCE(
-        (COUNT(*) FILTER (WHERE overall_status = 'Accepted'))::float / NULLIF(COUNT(*), 0),
+        (COUNT(*) FILTER (WHERE overall_status = ${SUBMISSION_STATUS.ACCEPTED}))::float / NULLIF(COUNT(*), 0),
         0
       ) AS ac_rate,
       COUNT(DISTINCT user_id) AS unique_submitters
@@ -527,7 +528,7 @@ export const getProblemAnalytics = async (problemId: string): Promise<ProblemAna
     SELECT
       to_char(date_trunc('day', submitted_at), 'YYYY-MM-DD') AS day,
       COUNT(*) AS total,
-      COUNT(*) FILTER (WHERE overall_status = 'Accepted') AS accepted
+      COUNT(*) FILTER (WHERE overall_status = ${SUBMISSION_STATUS.ACCEPTED}) AS accepted
     FROM (
       SELECT overall_status, submitted_at FROM submissions WHERE problem_id = $1
       UNION ALL
@@ -567,7 +568,7 @@ export const getProblemAnalytics = async (problemId: string): Promise<ProblemAna
     SELECT
       case_number,
       COUNT(*) AS total,
-      COUNT(*) FILTER (WHERE status = 'Accepted') AS passed
+      COUNT(*) FILTER (WHERE status = ${SUBMISSION_STATUS.ACCEPTED}) AS passed
     FROM cases
     GROUP BY case_number
     ORDER BY case_number`,
@@ -615,9 +616,9 @@ export const getProblemAnalytics = async (problemId: string): Promise<ProblemAna
     FROM (
       SELECT user_id, MIN(submitted_at) AS submitted_at
       FROM (
-        SELECT user_id, submitted_at FROM submissions WHERE problem_id = $1 AND overall_status = 'Accepted'
+        SELECT user_id, submitted_at FROM submissions WHERE problem_id = $1 AND overall_status = ${SUBMISSION_STATUS.ACCEPTED}
         UNION ALL
-        SELECT user_id, submitted_at FROM contest_submissions WHERE problem_id = $1 AND overall_status = 'Accepted'
+        SELECT user_id, submitted_at FROM contest_submissions WHERE problem_id = $1 AND overall_status = ${SUBMISSION_STATUS.ACCEPTED}
       ) s
       GROUP BY user_id
     ) fs
@@ -714,7 +715,7 @@ export const getContestAnalytics = async (contestId: number): Promise<ContestAna
       (SELECT COUNT(*) FROM contest_scoreboards WHERE contest_id = $1) AS participants,
       COUNT(DISTINCT cs.user_id) AS submitters,
       COUNT(cs.id) AS submissions,
-      COUNT(*) FILTER (WHERE cs.overall_status = 'Accepted') AS accepted,
+      COUNT(*) FILTER (WHERE cs.overall_status = ${SUBMISSION_STATUS.ACCEPTED}) AS accepted,
       (SELECT AVG(total_score) FROM contest_scoreboards WHERE contest_id = $1) AS avg_score,
       (SELECT COALESCE(MAX(total_score), 0) FROM contest_scoreboards WHERE contest_id = $1) AS max_score
     FROM contest_submissions cs
@@ -737,12 +738,12 @@ export const getContestAnalytics = async (contestId: number): Promise<ContestAna
       cp.problem_id,
       cp.title,
       COUNT(cs.id) AS submissions,
-      COUNT(*) FILTER (WHERE cs.overall_status = 'Accepted') AS accepted,
+      COUNT(*) FILTER (WHERE cs.overall_status = ${SUBMISSION_STATUS.ACCEPTED}) AS accepted,
       COALESCE(
-        (COUNT(*) FILTER (WHERE cs.overall_status = 'Accepted'))::float / NULLIF(COUNT(cs.id), 0),
+        (COUNT(*) FILTER (WHERE cs.overall_status = ${SUBMISSION_STATUS.ACCEPTED}))::float / NULLIF(COUNT(cs.id), 0),
         0
       ) AS ac_rate,
-      COUNT(DISTINCT cs.user_id) FILTER (WHERE cs.overall_status = 'Accepted') AS solvers
+      COUNT(DISTINCT cs.user_id) FILTER (WHERE cs.overall_status = ${SUBMISSION_STATUS.ACCEPTED}) AS solvers
     FROM contest_problems cp
     LEFT JOIN contest_submissions cs ON cs.contest_id = cp.contest_id AND cs.problem_id = cp.problem_id
     WHERE cp.contest_id = $1
@@ -754,7 +755,7 @@ export const getContestAnalytics = async (contestId: number): Promise<ContestAna
     SELECT
       u.username,
       sb.total_score,
-      COUNT(DISTINCT cs.problem_id) FILTER (WHERE cs.overall_status = 'Accepted') AS solved
+      COUNT(DISTINCT cs.problem_id) FILTER (WHERE cs.overall_status = ${SUBMISSION_STATUS.ACCEPTED}) AS solved
     FROM contest_scoreboards sb
     JOIN users u ON u.id = sb.user_id
     LEFT JOIN contest_submissions cs ON cs.contest_id = sb.contest_id AND cs.user_id = sb.user_id
@@ -854,12 +855,12 @@ export const listProblemsForAnalytics = async (
       SELECT
         problem_id,
         COUNT(*) AS submissions,
-        COUNT(*) FILTER (WHERE overall_status = 'Accepted') AS accepted,
+        COUNT(*) FILTER (WHERE overall_status = ${SUBMISSION_STATUS.ACCEPTED}) AS accepted,
         COALESCE(
-          (COUNT(*) FILTER (WHERE overall_status = 'Accepted'))::float / NULLIF(COUNT(*), 0),
+          (COUNT(*) FILTER (WHERE overall_status = ${SUBMISSION_STATUS.ACCEPTED}))::float / NULLIF(COUNT(*), 0),
           0
         ) AS ac_rate,
-        COUNT(DISTINCT user_id) FILTER (WHERE overall_status = 'Accepted') AS solvers
+        COUNT(DISTINCT user_id) FILTER (WHERE overall_status = ${SUBMISSION_STATUS.ACCEPTED}) AS solvers
       FROM all_submissions
       GROUP BY problem_id
     )

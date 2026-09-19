@@ -1,5 +1,5 @@
 import * as db from '../db';
-import { CONTEST_STATUS, SUBMISSION_STATUS } from '../constants';
+import { CONTEST_STATUS, SUBMISSION_QUERY_CONFIG, SUBMISSION_STATUS } from '../constants';
 import {
     ContestRuntimeRow,
     ContestSubmissionDetailRow,
@@ -150,7 +150,7 @@ export const getSubmissions = async (
         queryText += ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    queryText += ` ORDER BY ${sourceAlias}.submitted_at DESC LIMIT 200`;
+    queryText += ` ORDER BY ${sourceAlias}.submitted_at DESC LIMIT ${SUBMISSION_QUERY_CONFIG.LIST_LIMIT}`;
     const result = await db.query<SubmissionListRow>(queryText, params);
     return result.rows;
 };
@@ -265,7 +265,7 @@ export const getGlobalScoreboard = async (): Promise<GlobalScoreboardRow[]> => {
         u.username,
         (u.avatar_png IS NOT NULL) AS has_avatar,
         SUM(ubs.best_score) AS total_score,
-        COUNT(CASE WHEN ubs.best_score = 100 THEN 1 END) AS problems_solved,
+        COUNT(CASE WHEN ubs.best_score = ${SUBMISSION_QUERY_CONFIG.FULL_PROBLEM_SCORE} THEN 1 END) AS problems_solved,
         MAX(ubs.latest_score_time) AS last_score_improvement_time
       FROM UserBestScores ubs
       JOIN users u ON ubs.user_id = u.id

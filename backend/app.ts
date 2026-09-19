@@ -4,7 +4,7 @@ import session from 'express-session';
 import pgSession from 'connect-pg-simple';
 import { pool } from './db';
 import { env, parseRuntimeEnv } from './config/env';
-import { AUTHORING_VALIDATION } from './constants';
+import { AUTHORING_VALIDATION, SECURITY_CONFIG } from './constants';
 import { attachRequestUser } from './middleware/requestContext';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { generalApiLimiter } from './middleware/rateLimit';
@@ -74,7 +74,7 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
       secure: runtimeEnv.COOKIE_SECURE,
       sameSite: 'lax',
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: SECURITY_CONFIG.SESSION_MAX_AGE_MS,
     },
   });
 
