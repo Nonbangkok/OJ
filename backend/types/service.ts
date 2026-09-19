@@ -153,6 +153,7 @@ export interface SubmissionListRow {
 }
 
 export interface SearchUserRow {
+  id: number;
   username: string;
 }
 

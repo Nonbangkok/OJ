@@ -1,13 +1,18 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import SubmissionsTab from '../features/admin/analysis/SubmissionsTab';
 import * as analyticsService from '../services/analyticsService';
+import submissionService from '../services/submissionService';
 
 jest.mock('../services/analyticsService');
+jest.mock('../services/submissionService', () => ({
+    searchProblems: jest.fn(),
+    searchUsers: jest.fn(),
+}));
 
 const mockFetchSubmissions = analyticsService.fetchAnalyticsSubmissions as jest.MockedFunction<typeof analyticsService.fetchAnalyticsSubmissions>;
-const mockFetchProblems = analyticsService.fetchAnalyticsProblems as jest.MockedFunction<typeof analyticsService.fetchAnalyticsProblems>;
-const mockFetchUsers = analyticsService.fetchAnalyticsUsers as jest.MockedFunction<typeof analyticsService.fetchAnalyticsUsers>;
+const mockSearchProblems = submissionService.searchProblems as jest.MockedFunction<typeof submissionService.searchProblems>;
+const mockSearchUsers = submissionService.searchUsers as jest.MockedFunction<typeof submissionService.searchUsers>;
 
 const mockSubmission = {
     id: 42,
@@ -27,12 +32,14 @@ const mockSubmission = {
 describe('SubmissionsTab', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        mockFetchProblems.mockResolvedValue({
-            problems: [{ problemId: 'aplusb', title: 'A Plus B', category: 'math', submissions: 30, accepted: 20, acRate: 0.667, solvers: 8 }],
-        });
-        mockFetchUsers.mockResolvedValue({
-            users: [{ userId: 2, username: 'bob', role: 'user', submissions: 20, solved: 4, acRate: 0.5, lastActive: null }],
-        });
+        // Reset implementations here: clearAllMocks wipes factory-level
+        // mockResolvedValue, leaving the hooks with undefined suggestions.
+        mockSearchProblems.mockResolvedValue([
+            { id: 'aplusb', title: 'A Plus B' },
+        ]);
+        mockSearchUsers.mockResolvedValue([
+            { id: 2, username: 'bob' },
+        ]);
     });
 
     it('renders the submissions table unfiltered on load', async () => {
@@ -49,13 +56,27 @@ describe('SubmissionsTab', () => {
             if (!el) throw new Error('table not rendered');
             return el;
         });
-        expect(within(table).getByText('bob')).toBeInTheDocument();
-        expect(within(table).getByText('A Plus B')).toBeInTheDocument();
-        expect(within(table).getByText('Accepted')).toBeInTheDocument();
+        expect(table.querySelector('a[href="/profile/bob"]')).not.toBeNull();
+        expect(screen.getByText('A Plus B')).toBeInTheDocument();
         expect(mockFetchSubmissions).toHaveBeenCalledWith(expect.objectContaining({ limit: 50, offset: 0 }));
     });
 
-    it('fetches with the problem filter when one is selected', async () => {
+    it('does not render a source column', async () => {
+        mockFetchSubmissions.mockResolvedValueOnce({ submissions: [mockSubmission] });
+
+        render(
+            <BrowserRouter>
+                <SubmissionsTab onSelectUser={jest.fn()} onSelectProblem={jest.fn()} />
+            </BrowserRouter>
+        );
+
+        await waitFor(() => expect(screen.getByText('A Plus B')).toBeInTheDocument());
+
+        const headers = Array.from(document.querySelectorAll('th')).map((th) => th.textContent);
+        expect(headers).not.toContain('Source');
+    });
+
+    it('shows problem suggestions while typing and filters on selection', async () => {
         mockFetchSubmissions.mockResolvedValue({ submissions: [mockSubmission] });
 
         render(
@@ -64,16 +85,27 @@ describe('SubmissionsTab', () => {
             </BrowserRouter>
         );
 
-        await waitFor(() => expect(screen.getByRole('button', { name: 'User' })).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByText('A Plus B')).toBeInTheDocument());
 
-        fireEvent.change(screen.getByLabelText('Filter by problem'), { target: { value: 'aplusb' } });
+        const problemInput = screen.getByLabelText('Filter by problem');
+        fireEvent.change(problemInput, { target: { value: 'plus' } });
+
+        await waitFor(() => expect(mockSearchProblems).toHaveBeenCalledWith('plus'));
+
+        const suggestion = await waitFor(() => {
+            const el = screen.getByText('aplusb — A Plus B');
+            if (!el) throw new Error('suggestion not shown');
+            return el;
+        });
+        fireEvent.click(suggestion);
 
         await waitFor(() => expect(mockFetchSubmissions).toHaveBeenCalledWith(
             expect.objectContaining({ problemId: 'aplusb' }),
         ));
+        expect(screen.getByLabelText('Clear problem filter')).toBeInTheDocument();
     });
 
-    it('fetches with the user filter when one is selected', async () => {
+    it('shows user suggestions while typing and filters on selection', async () => {
         mockFetchSubmissions.mockResolvedValue({ submissions: [mockSubmission] });
 
         render(
@@ -82,12 +114,51 @@ describe('SubmissionsTab', () => {
             </BrowserRouter>
         );
 
-        await waitFor(() => expect(screen.getByRole('button', { name: 'User' })).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByText('A Plus B')).toBeInTheDocument());
 
-        fireEvent.change(screen.getByLabelText('Filter by user'), { target: { value: '2' } });
+        fireEvent.change(screen.getByLabelText('Filter by user'), { target: { value: 'bo' } });
+
+        await waitFor(() => expect(mockSearchUsers).toHaveBeenCalledWith('bo'));
+
+        const suggestion = await waitFor(() => {
+            const items = document.querySelectorAll('ul li');
+            const el = Array.from(items).find((li) => li.textContent === 'bob');
+            if (!el) throw new Error('user suggestion not shown');
+            return el;
+        });
+        fireEvent.click(suggestion);
 
         await waitFor(() => expect(mockFetchSubmissions).toHaveBeenCalledWith(
             expect.objectContaining({ userId: 2 }),
+        ));
+    });
+
+    it('clears the user filter when the clear button is clicked', async () => {
+        mockFetchSubmissions.mockResolvedValue({ submissions: [mockSubmission] });
+
+        render(
+            <BrowserRouter>
+                <SubmissionsTab onSelectUser={jest.fn()} onSelectProblem={jest.fn()} />
+            </BrowserRouter>
+        );
+
+        await waitFor(() => expect(screen.getByText('A Plus B')).toBeInTheDocument());
+
+        fireEvent.change(screen.getByLabelText('Filter by user'), { target: { value: 'bo' } });
+        await waitFor(() => expect(mockSearchUsers).toHaveBeenCalled());
+        const suggestion = await waitFor(() => {
+            const items = document.querySelectorAll('ul li');
+            const el = Array.from(items).find((li) => li.textContent === 'bob');
+            if (!el) throw new Error('user suggestion not shown');
+            return el;
+        });
+        fireEvent.click(suggestion);
+        await waitFor(() => expect(screen.getByLabelText('Clear user filter')).toBeInTheDocument());
+
+        fireEvent.click(screen.getByLabelText('Clear user filter'));
+
+        await waitFor(() => expect(mockFetchSubmissions).toHaveBeenCalledWith(
+            expect.objectContaining({ userId: undefined }),
         ));
     });
 

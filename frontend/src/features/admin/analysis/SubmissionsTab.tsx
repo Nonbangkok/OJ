@@ -1,13 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  AnalyticsUserRow,
-  fetchAnalyticsProblems,
   fetchAnalyticsSubmissions,
-  fetchAnalyticsUsers,
-  ProblemListRow,
   SubmissionListRow,
 } from '../../../services/analyticsService';
+import submissionService from '../../../services/submissionService';
+import { useAutocomplete } from '../../../hooks/useAutocomplete';
 import VerdictBadge from './components/VerdictBadge';
 import styles from './SubmissionsTab.module.css';
 
@@ -35,35 +33,32 @@ const formatKb = (kb: number | null): string => (kb === null ? '—' : `${Math.r
 
 const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) => {
   const [submissions, setSubmissions] = useState<SubmissionListRow[]>([]);
-  const [problems, setProblems] = useState<ProblemListRow[]>([]);
-  const [users, setUsers] = useState<AnalyticsUserRow[]>([]);
-  const [problemId, setProblemId] = useState('');
-  const [userId, setUserId] = useState('');
   const [verdict, setVerdict] = useState('');
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load picker options once (first page of each list is plenty).
+  // Typed filter with autocomplete suggestions, same pattern as the main
+  // submissions page (useAutocomplete + submissionService.search*).
+  const [selectedProblem, setSelectedProblem] = useState<{ id: string; title: string } | null>(null);
+  const [selectedUser, setSelectedUser] = useState<{ id: number; username: string } | null>(null);
+  const problemAutocomplete = useAutocomplete(submissionService.searchProblems);
+  const userAutocomplete = useAutocomplete(submissionService.searchUsers);
+  const problemInputRef = useRef<HTMLDivElement>(null);
+  const userInputRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const [problemsResult, usersResult] = await Promise.all([
-          fetchAnalyticsProblems({ limit: 100, sortBy: 'title', sortDir: 'asc' }),
-          fetchAnalyticsUsers({ limit: 100, sortBy: 'username', sortDir: 'asc' }),
-        ]);
-        if (!cancelled) {
-          setProblems(problemsResult.problems);
-          setUsers(usersResult.users);
-        }
-      } catch {
-        // Pickers stay empty; the main table still works without them.
+    const handleClickOutside = (event: MouseEvent) => {
+      if (problemInputRef.current && !problemInputRef.current.contains(event.target as Node)) {
+        problemAutocomplete.setShowSuggestions(false);
+      }
+      if (userInputRef.current && !userInputRef.current.contains(event.target as Node)) {
+        userAutocomplete.setShowSuggestions(false);
       }
     };
-    void load();
-    return () => { cancelled = true; };
-  }, []);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [problemAutocomplete, userAutocomplete]);
 
   // Refetch whenever a filter or the page changes.
   useEffect(() => {
@@ -74,8 +69,8 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
       setError(null);
       try {
         const result = await fetchAnalyticsSubmissions({
-          problemId: problemId || undefined,
-          userId: userId ? Number(userId) : undefined,
+          problemId: selectedProblem?.id,
+          userId: selectedUser?.id,
           verdict: verdict || undefined,
           limit: PAGE_SIZE,
           offset,
@@ -90,11 +85,26 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
 
     void load();
     return () => { cancelled = true; };
-  }, [problemId, userId, verdict, offset]);
+  }, [selectedProblem, selectedUser, verdict, offset]);
 
-  const changeFilter = (setter: (value: string) => void) => (value: string) => {
-    setOffset(0);
-    setter(value);
+  const selectProblem = (problem: { id: string; title: string }) => {
+    setSelectedProblem(problem);
+    problemAutocomplete.select(problem.id);
+  };
+
+  const clearProblem = () => {
+    setSelectedProblem(null);
+    problemAutocomplete.setQuery('');
+  };
+
+  const selectUser = (user: { id: number; username: string }) => {
+    setSelectedUser(user);
+    userAutocomplete.select(user.username);
+  };
+
+  const clearUser = () => {
+    setSelectedUser(null);
+    userAutocomplete.setQuery('');
   };
 
   if (error) return <p className={styles.error}>{error}</p>;
@@ -103,99 +113,113 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
   return (
     <div className={styles.container}>
       <div className={styles.filters} role="group" aria-label="Submission filters">
-        <label className={styles.filter}>
-          Problem
-          <select
-            value={problemId}
-            onChange={(e) => changeFilter(setProblemId)(e.target.value)}
+        <div className={styles['filter-wrapper']} ref={problemInputRef}>
+          <input
+            type="text"
+            className={styles['filter-input']}
+            placeholder="Filter by problem"
             aria-label="Filter by problem"
-          >
-            <option value="">All problems</option>
-            {problems.map((p) => (
-              <option key={p.problemId} value={p.problemId}>{p.title}</option>
-            ))}
-          </select>
-        </label>
+            value={problemAutocomplete.query}
+            onChange={problemAutocomplete.handleChange}
+            onFocus={() => problemAutocomplete.query && problemAutocomplete.setShowSuggestions(true)}
+          />
+          {selectedProblem && (
+            <button type="button" className={styles['clear-button']} onClick={clearProblem} aria-label="Clear problem filter">×</button>
+          )}
+          {problemAutocomplete.showSuggestions && problemAutocomplete.suggestions.length > 0 && (
+            <ul className={styles['suggestions-list']}>
+              {problemAutocomplete.suggestions.map((p: { id: string; title: string }) => (
+                <li key={p.id} onClick={() => selectProblem(p)}>{p.id} — {p.title}</li>
+              ))}
+            </ul>
+          )}
+        </div>
 
-        <label className={styles.filter}>
-          User
-          <select
-            value={userId}
-            onChange={(e) => changeFilter(setUserId)(e.target.value)}
+        <div className={styles['filter-wrapper']} ref={userInputRef}>
+          <input
+            type="text"
+            className={styles['filter-input']}
+            placeholder="Filter by user"
             aria-label="Filter by user"
-          >
-            <option value="">All users</option>
-            {users.map((u) => (
-              <option key={u.userId} value={u.userId}>{u.username}</option>
-            ))}
-          </select>
-        </label>
+            value={userAutocomplete.query}
+            onChange={userAutocomplete.handleChange}
+            onFocus={() => userAutocomplete.query && userAutocomplete.setShowSuggestions(true)}
+          />
+          {selectedUser && (
+            <button type="button" className={styles['clear-button']} onClick={clearUser} aria-label="Clear user filter">×</button>
+          )}
+          {userAutocomplete.showSuggestions && userAutocomplete.suggestions.length > 0 && (
+            <ul className={styles['suggestions-list']}>
+              {userAutocomplete.suggestions.map((u: { id: number; username: string }) => (
+                <li key={u.username} onClick={() => selectUser(u)}>{u.username}</li>
+              ))}
+            </ul>
+          )}
+        </div>
 
-        <label className={styles.filter}>
-          Verdict
-          <select
-            value={verdict}
-            onChange={(e) => changeFilter(setVerdict)(e.target.value)}
-            aria-label="Filter by verdict"
-          >
-            {VERDICT_OPTIONS.map((option) => (
-              <option key={option} value={option}>{option === '' ? 'All verdicts' : option}</option>
-            ))}
-          </select>
-        </label>
+        <select
+          className={styles['filter-select']}
+          value={verdict}
+          onChange={(e) => { setOffset(0); setVerdict(e.target.value); }}
+          aria-label="Filter by verdict"
+        >
+          {VERDICT_OPTIONS.map((option) => (
+            <option key={option} value={option}>{option === '' ? 'All verdicts' : option}</option>
+          ))}
+        </select>
       </div>
 
       <div className={styles['table-card']}>
-        <table>
-          <thead>
-            <tr>
-              <th>When</th>
-              <th>User</th>
-              <th>Problem</th>
-              <th>Source</th>
-              <th>Verdict</th>
-              <th>Score</th>
-              <th>Time</th>
-              <th>Memory</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {submissions.map((s) => (
-              <tr key={`${s.source}-${s.id}`}>
-                <td>{formatDateTime(s.submittedAt)}</td>
-                <td>
-                  <Link to={`/profile/${s.username}`}>{s.username}</Link>
-                </td>
-                <td>{s.problemTitle}</td>
-                <td>{s.source}</td>
-                <td><VerdictBadge verdict={s.verdict} /></td>
-                <td>{s.score}</td>
-                <td>{formatMs(s.timeMs)}</td>
-                <td>{formatKb(s.memoryKb)}</td>
-                <td className={styles.actions}>
-                  <button
-                    type="button"
-                    className={styles['link-button']}
-                    onClick={() => onSelectUser(s.userId)}
-                  >
-                    User
-                  </button>
-                  <button
-                    type="button"
-                    className={styles['link-button']}
-                    onClick={() => onSelectProblem(s.problemId)}
-                  >
-                    Problem
-                  </button>
-                </td>
+        <div className={styles['table-scroll']}>
+          <table>
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>User</th>
+                <th>Problem</th>
+                <th>Verdict</th>
+                <th>Score</th>
+                <th>Time</th>
+                <th>Memory</th>
+                <th />
               </tr>
-            ))}
-            {submissions.length === 0 && (
-              <tr><td colSpan={9} className={styles.empty}>No submissions match these filters.</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {submissions.map((s) => (
+                <tr key={`${s.source}-${s.id}`}>
+                  <td>{formatDateTime(s.submittedAt)}</td>
+                  <td>
+                    <Link to={`/profile/${s.username}`}>{s.username}</Link>
+                  </td>
+                  <td>{s.problemTitle}</td>
+                  <td><VerdictBadge verdict={s.verdict} /></td>
+                  <td>{s.score}</td>
+                  <td>{formatMs(s.timeMs)}</td>
+                  <td>{formatKb(s.memoryKb)}</td>
+                  <td className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles['link-button']}
+                      onClick={() => onSelectUser(s.userId)}
+                    >
+                      User
+                    </button>
+                    <button
+                      type="button"
+                      className={styles['link-button']}
+                      onClick={() => onSelectProblem(s.problemId)}
+                    >
+                      Problem
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {submissions.length === 0 && (
+                <tr><td colSpan={8} className={styles.empty}>No submissions match these filters.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className={styles.pagination}>

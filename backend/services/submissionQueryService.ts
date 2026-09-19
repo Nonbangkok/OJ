@@ -208,14 +208,14 @@ export const searchUsers = async (queryText: string, contestId?: string): Promis
 
     if (!contestId) {
         const result = await db.query<SearchUserRow>(
-            'SELECT username FROM users WHERE username ILIKE $1 LIMIT 10',
+            'SELECT id, username FROM users WHERE username ILIKE $1 LIMIT 10',
             [`%${queryText}%`],
         );
         return result.rows;
     }
 
     const result = await db.query<SearchUserRow>(
-        `SELECT u.username
+        `SELECT u.id, u.username
          FROM users u
          JOIN contest_participants cp ON u.id = cp.user_id
          WHERE cp.contest_id = $1 AND u.username ILIKE $2
