@@ -11,12 +11,14 @@ jest.mock('../services/analyticsQueryService', () => ({
     listUsersForAnalytics: jest.fn().mockResolvedValue([]),
     getUserAnalytics: jest.fn().mockResolvedValue(null),
     getProblemAnalytics: jest.fn().mockResolvedValue(null),
+    getContestAnalytics: jest.fn().mockResolvedValue(null),
 }));
 
 const mockGetOverviewAnalytics = analyticsService.getOverviewAnalytics as jest.MockedFunction<typeof analyticsService.getOverviewAnalytics>;
 const mockListUsersForAnalytics = analyticsService.listUsersForAnalytics as jest.MockedFunction<typeof analyticsService.listUsersForAnalytics>;
 const mockGetUserAnalytics = analyticsService.getUserAnalytics as jest.MockedFunction<typeof analyticsService.getUserAnalytics>;
 const mockGetProblemAnalytics = analyticsService.getProblemAnalytics as jest.MockedFunction<typeof analyticsService.getProblemAnalytics>;
+const mockGetContestAnalytics = analyticsService.getContestAnalytics as jest.MockedFunction<typeof analyticsService.getContestAnalytics>;
 
 const buildApp = (forbidden = false): Express => {
     const app = express();
@@ -165,6 +167,38 @@ describe('Analytics Controller', () => {
             expect(res.status).toBe(200);
             expect(res.body.problem.id).toBe('aplusb');
             expect(res.body.kpis.acRate).toBe(0.7);
+        });
+    });
+
+    describe('GET /analytics/contests/:contestId', () => {
+        it('returns 404 when the contest is missing', async () => {
+            mockGetContestAnalytics.mockResolvedValueOnce(null);
+
+            const res = await request(buildApp()).get('/analytics/contests/999');
+
+            expect(res.status).toBe(404);
+        });
+
+        it('returns the contest analytics payload', async () => {
+            mockGetContestAnalytics.mockResolvedValueOnce({
+                contest: { contestId: 1, title: 'Test Contest', status: 'finished', startTime: '2026-09-01T08:00:00+00:00', endTime: '2026-09-01T11:00:00+00:00' },
+                kpis: { participants: 8, submitters: 5, submissions: 40, accepted: 25, avgScore: 250.5, maxScore: 400 },
+                submissionTimeline: [],
+                problemStats: [],
+                scoreboard: [],
+            } as never);
+
+            const res = await request(buildApp()).get('/analytics/contests/1');
+
+            expect(res.status).toBe(200);
+            expect(res.body.contest.title).toBe('Test Contest');
+            expect(res.body.kpis.avgScore).toBe(250.5);
+        });
+
+        it('rejects a non-numeric contestId with 400', async () => {
+            const res = await request(buildApp()).get('/analytics/contests/abc');
+
+            expect(res.status).toBe(400);
         });
     });
 

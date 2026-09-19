@@ -631,3 +631,149 @@ export const getProblemAnalytics = async (problemId: string): Promise<ProblemAna
     })),
   };
 };
+
+// ---------------------------------------------------------------------------
+// Per-contest analytics
+// ---------------------------------------------------------------------------
+
+export interface ContestAnalytics {
+  contest: { contestId: number; title: string; status: string; startTime: string; endTime: string };
+  kpis: {
+    participants: number;   // scoreboard rows (joined the contest)
+    submitters: number;     // distinct users with >= 1 submission
+    submissions: number;
+    accepted: number;
+    avgScore: number;
+    maxScore: number;       // top total_score
+  };
+  submissionTimeline: Array<{ bucket: string; count: number }>;  // submissions per hour since start
+  problemStats: Array<{ problemId: string; title: string; submissions: number; accepted: number; acRate: number; solvers: number }>;
+  scoreboard: Array<{ username: string; totalScore: number; solved: number }>;
+}
+
+interface ContestRow {
+  contest_id: number;
+  title: string;
+  status: string;
+  start_time: string;
+  end_time: string;
+}
+interface ContestKpiRow {
+  participants: string;
+  submitters: string;
+  submissions: string;
+  accepted: string;
+  avg_score: string | null;
+  max_score: string | null;
+}
+interface TimelineRow { bucket: string; count: string }
+interface ContestProblemRow {
+  problem_id: string;
+  title: string;
+  submissions: string;
+  accepted: string;
+  ac_rate: string;
+  solvers: string;
+}
+interface ContestScoreboardRow {
+  username: string;
+  total_score: string;
+  solved: string;
+}
+
+/** Full analytics payload for a single contest, or null when missing. */
+export const getContestAnalytics = async (contestId: number): Promise<ContestAnalytics | null> => {
+  const contestResult = await query<ContestRow>(
+    `SELECT id AS contest_id, title, status, start_time, end_time FROM contests WHERE id = $1`,
+    [contestId]);
+  const contest = firstRow(contestResult.rows);
+  if (!contest) return null;
+
+  const kpiResult = await query<ContestKpiRow>(`
+    SELECT
+      (SELECT COUNT(*) FROM contest_scoreboards WHERE contest_id = $1) AS participants,
+      COUNT(DISTINCT cs.user_id) AS submitters,
+      COUNT(cs.id) AS submissions,
+      COUNT(*) FILTER (WHERE cs.overall_status = 'Accepted') AS accepted,
+      (SELECT AVG(total_score) FROM contest_scoreboards WHERE contest_id = $1) AS avg_score,
+      (SELECT COALESCE(MAX(total_score), 0) FROM contest_scoreboards WHERE contest_id = $1) AS max_score
+    FROM contest_submissions cs
+    WHERE cs.contest_id = $1`,
+    [contestId]);
+
+  const timelineResult = await query<TimelineRow>(`
+    SELECT
+      'H' || (FLOOR(EXTRACT(EPOCH FROM (submitted_at - c.start_time)) / 3600)::int)::text AS bucket,
+      COUNT(*) AS count
+    FROM contest_submissions cs
+    JOIN contests c ON c.id = cs.contest_id
+    WHERE cs.contest_id = $1
+    GROUP BY 1
+    ORDER BY 1`,
+    [contestId]);
+
+  const problemResult = await query<ContestProblemRow>(`
+    SELECT
+      cp.problem_id,
+      cp.title,
+      COUNT(cs.id) AS submissions,
+      COUNT(*) FILTER (WHERE cs.overall_status = 'Accepted') AS accepted,
+      COALESCE(
+        (COUNT(*) FILTER (WHERE cs.overall_status = 'Accepted'))::float / NULLIF(COUNT(cs.id), 0),
+        0
+      ) AS ac_rate,
+      COUNT(DISTINCT cs.user_id) FILTER (WHERE cs.overall_status = 'Accepted') AS solvers
+    FROM contest_problems cp
+    LEFT JOIN contest_submissions cs ON cs.contest_id = cp.contest_id AND cs.problem_id = cp.problem_id
+    WHERE cp.contest_id = $1
+    GROUP BY cp.problem_id, cp.title
+    ORDER BY cp.problem_id`,
+    [contestId]);
+
+  const scoreboardResult = await query<ContestScoreboardRow>(`
+    SELECT
+      u.username,
+      sb.total_score,
+      COUNT(DISTINCT cs.problem_id) FILTER (WHERE cs.overall_status = 'Accepted') AS solved
+    FROM contest_scoreboards sb
+    JOIN users u ON u.id = sb.user_id
+    LEFT JOIN contest_submissions cs ON cs.contest_id = sb.contest_id AND cs.user_id = sb.user_id
+    WHERE sb.contest_id = $1
+    GROUP BY u.username, sb.total_score
+    ORDER BY sb.total_score DESC, u.username`,
+    [contestId]);
+
+  const kpi = firstRow(kpiResult.rows);
+
+  return {
+    contest: {
+      contestId: contest.contest_id,
+      title: contest.title,
+      status: contest.status,
+      startTime: contest.start_time,
+      endTime: contest.end_time,
+    },
+    kpis: {
+      participants: toNum(kpi?.participants),
+      submitters: toNum(kpi?.submitters),
+      submissions: toNum(kpi?.submissions),
+      accepted: toNum(kpi?.accepted),
+      avgScore: toNum(kpi?.avg_score),
+      maxScore: toNum(kpi?.max_score),
+    },
+    submissionTimeline: timelineResult.rows.map((r) => ({ bucket: r.bucket, count: toNum(r.count) })),
+    problemStats: problemResult.rows.map((r) => ({
+      problemId: r.problem_id,
+      title: r.title,
+      submissions: toNum(r.submissions),
+      accepted: toNum(r.accepted),
+      acRate: toNum(r.ac_rate),
+      solvers: toNum(r.solvers),
+    })),
+    scoreboard: scoreboardResult.rows.map((r) => ({
+      username: r.username,
+      totalScore: toNum(r.total_score),
+      solved: toNum(r.solved),
+    })),
+  };
+};

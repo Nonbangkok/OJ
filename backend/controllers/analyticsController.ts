@@ -7,8 +7,10 @@ import {
   analyticsProblemIdParamSchema,
   analyticsUserIdParamSchema,
   analyticsUsersQuerySchema,
+  analyticsContestIdParamSchema,
 } from '../schemas/requestSchemas';
 import {
+  getContestAnalytics,
   getOverviewAnalytics,
   getProblemAnalytics,
   getUserAnalytics,
@@ -21,6 +23,7 @@ interface OverviewQuery { days?: number }
 interface UsersQuery { search: string; limit: number; offset: number }
 interface UserIdParams { userId: number }
 interface ProblemIdParams { problemId: string }
+interface ContestIdParams { contestId: number }
 
 router.get('/analytics/overview', requireStaffOrAdmin,
   validateRequest({ query: analyticsOverviewQuerySchema }),
@@ -49,6 +52,17 @@ router.get('/analytics/users/:userId', requireStaffOrAdmin,
     const analytics = await getUserAnalytics(Number(userId));
     if (!analytics) {
       throw new AppError('User not found', 404);
+    }
+    res.json(analytics);
+  }));
+
+router.get('/analytics/contests/:contestId', requireStaffOrAdmin,
+  validateRequest({ params: analyticsContestIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { contestId } = req.params as unknown as ContestIdParams;
+    const analytics = await getContestAnalytics(Number(contestId));
+    if (!analytics) {
+      throw new AppError('Contest not found', 404);
     }
     res.json(analytics);
   }));

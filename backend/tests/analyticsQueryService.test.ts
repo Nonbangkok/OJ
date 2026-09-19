@@ -222,3 +222,83 @@ describe('analyticsQueryService.getProblemAnalytics', () => {
         expect(result?.firstSolves).toEqual([{ userId: 2, username: 'bob', submittedAt: '2026-02-01T00:00:00Z' }]);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Per-contest analytics
+// ---------------------------------------------------------------------------
+
+import { getContestAnalytics } from '../services/analyticsQueryService';
+
+describe('analyticsQueryService.getContestAnalytics', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it('returns null when the contest does not exist', async () => {
+        mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+        const result = await getContestAnalytics(999);
+
+        expect(result).toBeNull();
+        expect(mockQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it('aggregates the full contest analytics payload', async () => {
+        mockQuery.mockResolvedValueOnce({
+            rows: [{
+                contest_id: 1,
+                title: 'Test Contest',
+                status: 'finished',
+                start_time: '2026-09-01T08:00:00+00:00',
+                end_time: '2026-09-01T11:00:00+00:00',
+            }],
+        } as never)
+            .mockResolvedValueOnce({
+                rows: [{
+                    participants: '8',
+                    submitters: '5',
+                    submissions: '40',
+                    accepted: '25',
+                    avg_score: '250.5',
+                    max_score: '400',
+                }],
+            } as never)
+            .mockResolvedValueOnce({
+                rows: [{ bucket: '0-1h', count: '20' }, { bucket: '1-2h', count: '20' }],
+            } as never)
+            .mockResolvedValueOnce({
+                rows: [{ problem_id: 'aplusb', title: 'A Plus B', submissions: '20', accepted: '15', ac_rate: '0.75', solvers: '4' }],
+            } as never)
+            .mockResolvedValueOnce({
+                rows: [{ username: 'bob', total_score: '300', solved: '3' }],
+            } as never);
+
+        const result = await getContestAnalytics(1);
+
+        expect(result?.contest).toEqual({
+            contestId: 1,
+            title: 'Test Contest',
+            status: 'finished',
+            startTime: '2026-09-01T08:00:00+00:00',
+            endTime: '2026-09-01T11:00:00+00:00',
+        });
+        expect(result?.kpis).toEqual({
+            participants: 8,
+            submitters: 5,
+            submissions: 40,
+            accepted: 25,
+            avgScore: 250.5,
+            maxScore: 400,
+        });
+        expect(result?.submissionTimeline).toEqual([
+            { bucket: '0-1h', count: 20 },
+            { bucket: '1-2h', count: 20 },
+        ]);
+        expect(result?.problemStats).toEqual([
+            { problemId: 'aplusb', title: 'A Plus B', submissions: 20, accepted: 15, acRate: 0.75, solvers: 4 },
+        ]);
+        expect(result?.scoreboard).toEqual([
+            { username: 'bob', totalScore: 300, solved: 3 },
+        ]);
+    });
+});

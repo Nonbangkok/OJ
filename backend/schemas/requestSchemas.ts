@@ -303,3 +303,7 @@ export const analyticsUserIdParamSchema = z.object({
 export const analyticsProblemIdParamSchema = z.object({
   problemId: nonEmptyString.max(50),
 });
+
+export const analyticsContestIdParamSchema = z.object({
+  contestId: z.coerce.number().int().positive(),
+});
