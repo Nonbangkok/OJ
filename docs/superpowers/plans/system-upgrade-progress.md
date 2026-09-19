@@ -145,14 +145,14 @@ not urgent), user-event ^13 (v14 current) 🟡, cors dead dep 🟢.
 | 2 | Magic values → constants ('Accepted' x25, LIMIT 200, score 100, maxAge, saltRounds) | 2 | ✅ done |
 | 3 | asyncHandler for raw try/catch controllers | 2 | ✅ done |
 | 4 | Structured logger + failed-login logging + judge/scheduler wiring | 3 | ✅ done |
-| 5 | import-progress token: drop query-string support (header only) | 3 | ⬜ |
-| 6 | Analysis feature theming (~40 hex → tokens; define or remove --accent-color/--link-color) | 4 | ⬜ |
+| 5 | import-progress token: drop query-string support (header only) | 3 | ✅ done |
+| 6 | Analysis feature theming (~40 hex → tokens; define or remove --accent-color/--link-color) | 4 | ✅ done |
 | 7 | TS 5 + @types/react 19 alignment | 2 | ⬜ (needs care w/ CRA) |
-| 8 | Global ErrorBoundary + 401 session-expiry interceptor | 3/4 | ⬜ |
-| 9 | SubmissionsTab overflow-x + analysis mobile media queries | 4 | ⬜ |
-| 10 | Dark mode: ActivityHeatmap, UserProfile dots, ModalLayout, datepicker | 4 | ⬜ |
-| 11 | Raw modals → ui/Dialog (4 components) | 4 | ⬜ |
-| 12 | Home quote-box keyboard a11y; re-enable jsx-a11y rules incrementally | 4 | ⬜ |
+| 8 | Global ErrorBoundary + 401 session-expiry interceptor | 3/4 | ✅ done |
+| 9 | SubmissionsTab overflow-x + analysis mobile media queries | 4 | ✅ done |
+| 10 | Dark mode: ActivityHeatmap, UserProfile dots, ModalLayout, datepicker | 4 | ✅ done (also medals, ContestScoreboard) |
+| 11 | Raw modals → ui/Dialog (4 components) | 4 | ✅ done |
+| 12 | Home quote-box keyboard a11y; re-enable jsx-a11y rules incrementally | 4 | ✅ quote-box done; jsx-a11y rules ⬜ |
 | 13 | Tests: analysis drill-downs + submission-flow + ActivityHeatmap | 2/4 | ⬜ |
 | 14 | CSV export for analysis data | 5 | ⬜ |
 | 15 | Code-similarity / cheat detection for contests | 5 | ⬜ |
