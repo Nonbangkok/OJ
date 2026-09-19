@@ -153,12 +153,12 @@ not urgent), user-event ^13 (v14 current) 🟡, cors dead dep 🟢.
 | 10 | Dark mode: ActivityHeatmap, UserProfile dots, ModalLayout, datepicker | 4 | ✅ done (also medals, ContestScoreboard) |
 | 11 | Raw modals → ui/Dialog (4 components) | 4 | ✅ done |
 | 12 | Home quote-box keyboard a11y; re-enable jsx-a11y rules incrementally | 4 | ✅ quote-box done; jsx-a11y rules ⬜ |
-| 13 | Tests: analysis drill-downs + submission-flow + ActivityHeatmap | 2/4 | ⬜ |
+| 13 | Tests: analysis drill-downs + submission-flow + ActivityHeatmap | 2/4 | 🟡 drill-downs done |
 | 14 | CSV export for analysis data | 5 | ✅ done (E2E verified on stack at :8080) |
-| 15 | Code-similarity / cheat detection for contests | 5 | ⬜ |
+| 15 | Code-similarity / cheat detection for contests | 5 | ✅ done (E2E verified, tunable threshold) |
 | 16 | Idle users / drop-off analytics | 5 | ⬜ |
 | 17 | Compare 2 contests / 2 users side-by-side | 5 | ⬜ |
-| 18 | analyticsController Zod-defaults dedup | 2 | ⬜ |
+| 18 | analyticsController Zod-defaults dedup | 2 | ✅ done (validateRequest writeback) |
 | 19 | Drop cors from frontend deps; user-event v14 | 2 | ✅ done |
 | 20 | Split AuthorProfiles.tsx (491 lines) | 2 | ✅ done (287 + 3 units) |
 | 21 | Dep majors (node-cron, connect-pg-simple, uuid) | 2 | ⬜ deferred → user decision |
