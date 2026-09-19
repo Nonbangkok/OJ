@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   AnalyticsUserRow,
+  exportAnalyticsCsv,
   fetchAnalyticsUsers,
   SortDir,
   UserSortKey,
@@ -83,13 +84,22 @@ const UsersTab = ({ onSelectUser }: UsersTabProps) => {
 
   return (
     <div className={styles.container}>
-      <input
-        type="text"
-        className={styles.search}
-        placeholder="Search users…"
-        aria-label="Search users"
-        onChange={(e) => handleSearchChange(e.target.value)}
-      />
+      <div className={styles['toolbar-row']}>
+        <input
+          type="text"
+          className={styles.search}
+          placeholder="Search users…"
+          aria-label="Search users"
+          onChange={(e) => handleSearchChange(e.target.value)}
+        />
+        <button
+          type="button"
+          className={styles['export-button']}
+          onClick={() => void exportAnalyticsCsv('users', { search, sortBy, sortDir })}
+        >
+          Export CSV
+        </button>
+      </div>
 
       <div className={styles['table-card']}>
         <table>

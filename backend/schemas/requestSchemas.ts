@@ -331,3 +331,16 @@ export const analyticsSubmissionsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
+
+/** Which analysis dataset a CSV export covers. */
+export const analyticsExportKindSchema = z.enum(['users', 'problems', 'submissions']);
+
+export const analyticsExportQuerySchema = z.object({
+  type: analyticsExportKindSchema,
+  search: z.string().trim().max(100).optional(),
+  problemId: z.string().trim().max(50).optional(),
+  userId: z.coerce.number().int().positive().optional(),
+  verdict: z.string().trim().max(50).optional(),
+  sortBy: z.string().trim().max(30).optional(),
+  sortDir: z.enum(['asc', 'desc']).optional(),
+});

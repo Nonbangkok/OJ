@@ -60,6 +60,8 @@ export const SUBMISSION_QUERY_CONFIG = {
     // A problem is counted as solved when the best score reaches the full
     // per-problem maximum of 100 points.
     FULL_PROBLEM_SCORE: 100,
+    // Upper bound on rows included in one analytics CSV export.
+    EXPORT_MAX_ROWS: 10000,
 } as const;
 
 export const JUDGE_CONFIG = {

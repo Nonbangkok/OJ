@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  exportAnalyticsCsv,
   fetchAnalyticsProblems,
   ProblemListRow,
   ProblemSortKey,
@@ -77,13 +78,22 @@ const ProblemsTab = ({ onSelectProblem }: ProblemsTabProps) => {
 
   return (
     <div className={styles.container}>
-      <input
-        type="text"
-        className={styles.search}
-        placeholder="Search problems…"
-        aria-label="Search problems"
-        onChange={(e) => handleSearchChange(e.target.value)}
-      />
+      <div className={styles['toolbar-row']}>
+        <input
+          type="text"
+          className={styles.search}
+          placeholder="Search problems…"
+          aria-label="Search problems"
+          onChange={(e) => handleSearchChange(e.target.value)}
+        />
+        <button
+          type="button"
+          className={styles['export-button']}
+          onClick={() => void exportAnalyticsCsv('problems', { search, sortBy, sortDir })}
+        >
+          Export CSV
+        </button>
+      </div>
 
       <div className={styles['table-card']}>
         <table>

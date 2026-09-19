@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  exportAnalyticsCsv,
   fetchAnalyticsSubmissions,
   SubmissionListRow,
 } from '../../../services/analyticsService';
@@ -187,6 +188,18 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
             <option key={option} value={option}>{option === '' ? 'All verdicts' : option}</option>
           ))}
         </select>
+
+        <button
+          type="button"
+          className={styles['export-button']}
+          onClick={() => void exportAnalyticsCsv('submissions', {
+            problemId: selectedProblem?.id,
+            userId: selectedUser?.id,
+            verdict: verdict || undefined,
+          })}
+        >
+          Export CSV
+        </button>
       </div>
 
       <div className={styles['table-card']}>

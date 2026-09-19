@@ -155,3 +155,38 @@ export const fetchAnalyticsSubmissions = async (params: {
   const response = await api.get<{ submissions: SubmissionListRow[] }>('/analytics/submissions', { params });
   return response.data;
 };
+
+export type AnalyticsExportType = 'users' | 'problems' | 'submissions';
+
+/**
+ * Download an analysis dataset as a CSV file. The request carries the same
+ * search/filter parameters as the interactive tabs; the response is a
+ * Content-Disposition attachment, so we hand the blob to the browser.
+ */
+export const exportAnalyticsCsv = async (
+  type: AnalyticsExportType,
+  params: {
+    search?: string;
+    problemId?: string;
+    userId?: number;
+    verdict?: string;
+    sortBy?: string;
+    sortDir?: string;
+  } = {},
+): Promise<void> => {
+  const response = await api.get('/analytics/export', {
+    params: { type, ...params },
+    responseType: 'blob',
+  });
+
+  const disposition = response.headers['content-disposition'] as string | undefined;
+  const fileNameMatch = disposition?.match(/filename="([^"]+)"/);
+  const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileNameMatch?.[1] ?? `analytics-${type}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};

@@ -2,6 +2,8 @@ import express, { Request, Response, Router } from 'express';
 import { requireStaffOrAdmin } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
+import { SUBMISSION_QUERY_CONFIG } from '../constants';
+import { buildCsvFileName, toCsv } from '../utils/csv';
 import {
   analyticsOverviewQuerySchema,
   analyticsProblemIdParamSchema,
@@ -10,6 +12,7 @@ import {
   analyticsUsersQuerySchema,
   analyticsContestIdParamSchema,
   analyticsSubmissionsQuerySchema,
+  analyticsExportQuerySchema,
 } from '../schemas/requestSchemas';
 import {
   getContestAnalytics,
@@ -124,6 +127,68 @@ router.get('/analytics/problems/:problemId', requireStaffOrAdmin,
       throw new AppError('Problem not found', 404);
     }
     res.json(analytics);
+  }));
+
+/**
+ * CSV export of the analysis tab datasets (users / problems / submissions).
+ * Applies the same search/filter parameters as the interactive tabs and the
+ * same query services, so the file always matches what staff see on screen.
+ */
+router.get('/analytics/export', requireStaffOrAdmin,
+  validateRequest({ query: analyticsExportQuerySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const raw = req.query as Partial<Record<string, string>> & { type: 'users' | 'problems' | 'submissions' };
+
+    let csv: string;
+    if (raw.type === 'users') {
+      const users = await listUsersForAnalytics(
+        raw.search ?? '',
+        SUBMISSION_QUERY_CONFIG.EXPORT_MAX_ROWS,
+        0,
+        (raw.sortBy ?? 'submissions') as Parameters<typeof listUsersForAnalytics>[3],
+        (raw.sortDir ?? 'desc') as 'asc' | 'desc',
+      );
+      csv = toCsv(
+        ['userId', 'username', 'role', 'submissions', 'solved', 'acRate', 'lastActive'],
+        users.map((u) => [u.userId, u.username, u.role, u.submissions, u.solved, u.acRate, u.lastActive]),
+      );
+    } else if (raw.type === 'problems') {
+      const problems = await listProblemsForAnalytics(
+        raw.search ?? '',
+        SUBMISSION_QUERY_CONFIG.EXPORT_MAX_ROWS,
+        0,
+        (raw.sortBy ?? 'submissions') as Parameters<typeof listProblemsForAnalytics>[3],
+        (raw.sortDir ?? 'desc') as 'asc' | 'desc',
+      );
+      csv = toCsv(
+        ['problemId', 'title', 'category', 'submissions', 'accepted', 'acRate', 'solvers'],
+        problems.map((p) => [p.problemId, p.title, p.category, p.submissions, p.accepted, p.acRate, p.solvers]),
+      );
+    } else {
+      const submissions = await listSubmissionsForAnalytics(
+        {
+          problemId: raw.problemId,
+          userId: raw.userId !== undefined ? Number(raw.userId) : undefined,
+          verdict: raw.verdict,
+        },
+        SUBMISSION_QUERY_CONFIG.EXPORT_MAX_ROWS,
+        0,
+      );
+      csv = toCsv(
+        ['id', 'source', 'problemId', 'problemTitle', 'username', 'verdict', 'score', 'language', 'timeMs', 'memoryKb', 'submittedAt'],
+        submissions.map((s) => [
+          s.id, s.source, s.problemId, s.problemTitle, s.username, s.verdict,
+          s.score, s.language, s.timeMs, s.memoryKb, s.submittedAt,
+        ]),
+      );
+    }
+
+    res.set({
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${buildCsvFileName(raw.type)}"`,
+      'Cache-Control': 'no-store',
+    });
+    res.send(csv);
   }));
 
 export default router;

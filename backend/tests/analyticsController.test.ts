@@ -281,4 +281,88 @@ describe('Analytics Controller', () => {
             expect(mockGetOverviewAnalytics).not.toHaveBeenCalled();
         });
     });
+
+    describe('GET /analytics/export', () => {
+        it('exports the users dataset as CSV with headers', async () => {
+            mockListUsersForAnalytics.mockResolvedValueOnce([{
+                userId: 1, username: 'alice', role: 'user',
+                submissions: 10, solved: 4, acRate: 0.4, lastActive: '2026-09-19T00:00:00+07:00',
+            }] as never);
+
+            const res = await request(buildApp()).get('/analytics/export?type=users');
+
+            expect(res.status).toBe(200);
+            expect(res.headers['content-type']).toContain('text/csv');
+            expect(res.headers['content-disposition']).toMatch(/analytics-users-\d{4}-\d{2}-\d{2}\.csv/);
+            const lines = res.text.split('\r\n');
+            expect(lines[0]).toBe('userId,username,role,submissions,solved,acRate,lastActive');
+            expect(lines[1]).toContain('1,alice,user,10,4,0.4');
+        });
+
+        it('passes search and sort parameters through to the users query', async () => {
+            mockListUsersForAnalytics.mockResolvedValueOnce([] as never);
+
+            const res = await request(buildApp()).get('/analytics/export?type=users&search=al&sortBy=solved&sortDir=asc');
+
+            expect(res.status).toBe(200);
+            expect(mockListUsersForAnalytics).toHaveBeenCalledWith('al', 10000, 0, 'solved', 'asc');
+        });
+
+        it('exports the problems dataset as CSV', async () => {
+            mockListProblemsForAnalytics.mockResolvedValueOnce([{
+                problemId: 'aplusb', title: 'A Plus B', category: 'math',
+                submissions: 30, accepted: 20, acRate: 0.66, solvers: 15,
+            }] as never);
+
+            const res = await request(buildApp()).get('/analytics/export?type=problems');
+
+            expect(res.status).toBe(200);
+            expect(res.text.split('\r\n')[0]).toBe('problemId,title,category,submissions,accepted,acRate,solvers');
+            expect(res.text.split('\r\n')[1]).toContain('aplusb,A Plus B,math');
+        });
+
+        it('exports the submissions dataset with filters applied', async () => {
+            mockListSubmissionsForAnalytics.mockResolvedValueOnce([{
+                id: 5, source: 'main', contestId: null, problemId: 'aplusb',
+                problemTitle: 'A Plus B', userId: 1, username: 'alice', verdict: 'Accepted',
+                score: 100, language: 'cpp', timeMs: 12, memoryKb: 2048,
+                submittedAt: '2026-09-19T10:00:00Z',
+            }] as never);
+
+            const res = await request(buildApp()).get('/analytics/export?type=submissions&problemId=aplusb&verdict=Accepted');
+
+            expect(res.status).toBe(200);
+            expect(mockListSubmissionsForAnalytics).toHaveBeenCalledWith(
+                { problemId: 'aplusb', userId: undefined, verdict: 'Accepted' },
+                10000,
+                0,
+            );
+            expect(res.text.split('\r\n')[0]).toBe('id,source,problemId,problemTitle,username,verdict,score,language,timeMs,memoryKb,submittedAt');
+        });
+
+        it('escapes CSV-hostile cell content', async () => {
+            mockListUsersForAnalytics.mockResolvedValueOnce([{
+                userId: 2, username: 'weird",name', role: 'user',
+                submissions: 1, solved: 0, acRate: 0, lastActive: null,
+            }] as never);
+
+            const res = await request(buildApp()).get('/analytics/export?type=users');
+
+            expect(res.status).toBe(200);
+            expect(res.text).toContain('"weird"",name"');
+        });
+
+        it('rejects an unknown export type with 400', async () => {
+            const res = await request(buildApp()).get('/analytics/export?type=bogus');
+
+            expect(res.status).toBe(400);
+        });
+
+        it('is blocked for plain users', async () => {
+            const res = await request(buildApp(true)).get('/analytics/export?type=users');
+
+            expect(res.status).toBe(403);
+            expect(mockListUsersForAnalytics).not.toHaveBeenCalled();
+        });
+    });
 });

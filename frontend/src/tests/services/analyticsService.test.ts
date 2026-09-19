@@ -5,6 +5,7 @@ import {
     fetchUserAnalytics,
     fetchProblemAnalytics,
     fetchContestAnalytics,
+    exportAnalyticsCsv,
 } from '../../services/analyticsService';
 
 jest.mock('../../services/api');
@@ -78,5 +79,51 @@ describe('Analytics Service', () => {
 
         expect(api.get).toHaveBeenCalledWith('/analytics/contests/1');
         expect(result).toEqual(mockData);
+    });
+
+    describe('exportAnalyticsCsv', () => {
+        const createObjectUrlSpy = jest.fn(() => 'blob:mock-url');
+        const revokeObjectUrlSpy = jest.fn();
+
+        beforeAll(() => {
+            Object.defineProperty(window.URL, 'createObjectURL', { value: createObjectUrlSpy, writable: true });
+            Object.defineProperty(window.URL, 'revokeObjectURL', { value: revokeObjectUrlSpy, writable: true });
+        });
+
+        beforeEach(() => {
+            createObjectUrlSpy.mockClear();
+            revokeObjectUrlSpy.mockClear();
+        });
+
+        it('requests the export endpoint as a blob with the type and filters', async () => {
+            const clickSpy = jest.fn();
+            jest.mocked(api.get).mockResolvedValueOnce({
+                data: new Blob(['csv']),
+                headers: { 'content-disposition': 'attachment; filename="analytics-users-2026-09-20.csv"' },
+            });
+            jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(clickSpy);
+
+            await exportAnalyticsCsv('users', { search: 'al', sortBy: 'solved' });
+
+            expect(api.get).toHaveBeenCalledWith('/analytics/export', {
+                params: { type: 'users', search: 'al', sortBy: 'solved' },
+                responseType: 'blob',
+            });
+            expect(clickSpy).toHaveBeenCalled();
+        });
+
+        it('falls back to a generic filename when the header is missing', async () => {
+            jest.mocked(api.get).mockResolvedValueOnce({ data: new Blob(['csv']), headers: {} });
+            const clickSpy = jest.fn();
+            jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(clickSpy);
+
+            await exportAnalyticsCsv('submissions');
+
+            expect(api.get).toHaveBeenCalledWith('/analytics/export', {
+                params: { type: 'submissions' },
+                responseType: 'blob',
+            });
+            expect(clickSpy).toHaveBeenCalled();
+        });
     });
 });

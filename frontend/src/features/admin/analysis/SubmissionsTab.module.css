@@ -201,3 +201,17 @@
 .table-scroll {
   overflow-x: auto;
 }
+
+.export-button {
+  padding: 0.5rem 0.875rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: var(--background-secondary);
+  color: var(--text-color-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.export-button:hover {
+  background-color: var(--background-hover);
+}
