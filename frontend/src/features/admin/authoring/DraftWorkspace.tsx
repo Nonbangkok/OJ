@@ -94,7 +94,6 @@ export default function DraftWorkspace({ id }: { id: string }) {
       {model.recovered && <p role="status">Recovered unsaved edits from this browser tab.</p>}
       {model.conflict && <div role="alert" className={styles.conflictBanner}><p>Server state changed. Your unsaved text is retained.</p>
         <Button variant="secondary" disabled={model.busy} onClick={() => setLeaveGuard(true)}>Discard local changes and sync</Button></div>}
-      {draft.status === 'published' && <p>Created as hidden. Manage visibility in <Link to="/admin/problems">Problem Management</Link>.</p>}
       <Outlet context={workspace} />
     </div>
     {confirm && <Dialog open title={confirm.action === 'publish' ? 'Publish this problem?' : 'Replace stored files?'}
@@ -205,7 +204,6 @@ function MetadataSection() {
 function StatementSection() {
   const { model, draft } = useOutletContext<WorkspaceContext>();
   return <section className={styles.authoring}>
-    <h2>Statement</h2>
     <StatementTab draft={draft} disabled={model.actionsDisabled}
       onBuild={() => void model.runJob('pdf')} mutate={model.mutate} onError={model.onError} />
   </section>;
@@ -307,6 +305,7 @@ function PublishChecklist({ draft, dirty, canPublish, disabled, onVerify, onPubl
     </ul>
     {dirty && <p className={styles.caution}>Unsaved edits exist — saving automatically.</p>}
     <div className={styles.verifyActions}>
+      <Button disabled={disabled} onClick={onBuildPdf}>Build PDF</Button>
       <Button disabled={disabled || !draft.solutionCpp.trim()} onClick={onVerify}>Verify All</Button>
       <Button variant="primary" disabled={!canPublish} onClick={onPublish}>Publish problem</Button>
     </div>

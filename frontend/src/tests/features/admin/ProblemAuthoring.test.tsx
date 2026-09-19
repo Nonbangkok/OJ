@@ -120,6 +120,7 @@ test('tabs preserve edits and disable job actions until explicit Save succeeds',
   fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Edited title' } });
   expect(screen.getByText(/saving/i)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('link', { name: 'Statement' }));
+  fireEvent.click(screen.getByRole('link', { name: 'Verify & Publish' }));
   expect(screen.getByRole('button', { name: 'Build PDF' })).toBeDisabled();
   fireEvent.click(screen.getByRole('link', { name: 'Solution' }));
   expect(screen.getByRole('button', { name: 'Compile solution' })).toBeDisabled();

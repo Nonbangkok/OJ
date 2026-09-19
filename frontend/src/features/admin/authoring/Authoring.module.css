@@ -358,6 +358,58 @@
   background: var(--statement-paper);
   margin-top: 1rem;
 }
+/* Statement tab: the built-PDF panel and the asset manager are separate
+   concerns from editing the statement source — bordered boxes make that
+   separation visible. */
+.pdfPanel,
+.assetsPanel {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  margin: 1rem 0;
+  background: var(--surface-elevated);
+}
+.assetsPanel {
+  border-left: 4px solid var(--accent-primary);
+}
+.assetsPanel h3 {
+  margin: 0 0 0.35rem;
+}
+.pdfPanelHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+.pdfPanelText {
+  margin: 0;
+}
+.pdfPanelActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pdfOpenLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--accent-primary);
+  border-radius: 6px;
+  color: var(--accent-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+.pdfOpenLink:hover {
+  background: var(--accent-primary-hover);
+  color: var(--action-primary-foreground);
+}
+.pdfPanelEmpty {
+  margin: 1rem 0;
+  color: var(--text-secondary);
+}
 .confirmation {
   padding: 1rem;
   border: 2px solid var(--status-warning);
