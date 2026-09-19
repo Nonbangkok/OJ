@@ -301,7 +301,7 @@ test('published statements can begin a new revision in the full-screen editor', 
       statementHtml: '<p>Corrected</p>',
     })
   , { timeout: 4000 });
-  expect(await screen.findByText('Editing revision — live problem unchanged')).toBeInTheDocument();
+  expect(await screen.findByText('Editing — live problem unchanged')).toBeInTheDocument();
 });
 test('full-screen editor exposes a draggable pane divider and persistent preview zoom controls', async () => {
   jest.mocked(api.post).mockResolvedValue({ data: { html: '<p>Preview</p>' } });

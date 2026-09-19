@@ -173,7 +173,7 @@ export class AuthoringSpool {
       if (names.length > TESTCASE_LIMITS.MAX_CASES) throw new TestcaseError('invalid_case_count', 'Generator exceeds 1000 input files');
     }
     names.sort(naturalFilenameCompare);
-    if (!names.length || names.length > TESTCASE_LIMITS.MAX_CASES) throw new TestcaseError('invalid_case_count', 'Generator must create 1–1000 input files');
+    if (!names.length || names.length > TESTCASE_LIMITS.MAX_CASES) throw new TestcaseError('invalid_case_count', 'Generator must create 1–10 input files');
     const stage = await mkdtemp(path.join(this.root, 'staging', `${uuid.parse(id)}-`));
     const manifest: InputArtifact[] = [];
     let total = 0;
