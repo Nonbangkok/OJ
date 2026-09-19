@@ -138,13 +138,13 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
 
   const verdictResult = await query<VerdictRow>(`
     WITH all_submissions AS (
-      SELECT overall_status FROM submissions
+      SELECT overall_status, submitted_at FROM submissions
       UNION ALL
-      SELECT overall_status FROM contest_submissions
+      SELECT overall_status, submitted_at FROM contest_submissions
     )
     SELECT overall_status AS verdict, COUNT(*) AS count
     FROM all_submissions
-    WHERE submitted_at IS NULL OR submitted_at >= NOW() - ($1 || ' days')::interval
+    WHERE submitted_at >= NOW() - ($1 || ' days')::interval
     GROUP BY 1
     ORDER BY count DESC`,
     [days]);

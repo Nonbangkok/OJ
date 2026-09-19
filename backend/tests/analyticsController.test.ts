@@ -98,6 +98,18 @@ describe('Analytics Controller', () => {
             expect(res.status).toBe(400);
             expect(mockListUsersForAnalytics).not.toHaveBeenCalled();
         });
+
+        it('applies defaults when no query params are sent', async () => {
+            mockListUsersForAnalytics.mockResolvedValueOnce([] as never);
+
+            const res = await request(buildApp()).get('/analytics/users');
+
+            expect(res.status).toBe(200);
+            // Regression: defaults must be concrete values, not undefined —
+            // undefined search previously produced a NULL ILIKE pattern that
+            // matched no users at all.
+            expect(mockListUsersForAnalytics).toHaveBeenCalledWith('', 50, 0);
+        });
     });
 
     describe('GET /analytics/users/:userId', () => {

@@ -32,8 +32,13 @@ router.get('/analytics/overview', requireStaffOrAdmin,
 router.get('/analytics/users', requireStaffOrAdmin,
   validateRequest({ query: analyticsUsersQuerySchema }),
   asyncHandler(async (req: Request, res: Response) => {
-    const { search, limit, offset } = req.query as unknown as UsersQuery;
-    const users = await listUsersForAnalytics(search, Number(limit), Number(offset));
+    // Zod defaults are not written back to req.query by validateRequest, so
+    // apply the same defaults here (schema values: search '', limit 50, offset 0).
+    const raw = req.query as Partial<Record<keyof UsersQuery, string>>;
+    const search = raw.search ?? '';
+    const limit = raw.limit !== undefined ? Number(raw.limit) : 50;
+    const offset = raw.offset !== undefined ? Number(raw.offset) : 0;
+    const users = await listUsersForAnalytics(search, limit, offset);
     res.json({ users });
   }));
 
