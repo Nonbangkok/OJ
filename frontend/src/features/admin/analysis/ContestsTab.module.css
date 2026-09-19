@@ -8,13 +8,13 @@
   padding: 0.5rem 0.875rem;
   border-radius: 6px;
   border: 1px solid var(--border-color);
-  background-color: var(--background-darker);
+  background-color: var(--background-secondary);
   color: var(--text-color-primary);
   max-width: 320px;
 }
 
 .table-card {
-  background-color: var(--background-darker);
+  background-color: var(--background-secondary);
   padding: 1.5rem;
   border-radius: 8px;
   border: 1px solid var(--border-color);

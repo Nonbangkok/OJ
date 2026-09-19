@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   fetchAnalyticsSubmissions,
   SubmissionListRow,
@@ -203,7 +202,6 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
                 <th>Time</th>
                 <th>Memory</th>
                 <th>Code</th>
-                <th />
               </tr>
             </thead>
             <tbody>
@@ -211,9 +209,25 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
                 <tr key={`${s.source}-${s.id}`}>
                   <td>{formatDateTime(s.submittedAt)}</td>
                   <td>
-                    <Link to={`/profile/${s.username}`}>{s.username}</Link>
+                    <button
+                      type="button"
+                      className={styles['cell-link']}
+                      onClick={() => onSelectUser(s.userId)}
+                      title={`View analytics for ${s.username}`}
+                    >
+                      {s.username}
+                    </button>
                   </td>
-                  <td>{s.problemTitle}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className={styles['cell-link']}
+                      onClick={() => onSelectProblem(s.problemId)}
+                      title={`View analytics for ${s.problemTitle}`}
+                    >
+                      {s.problemTitle}
+                    </button>
+                  </td>
                   <td><VerdictBadge verdict={s.verdict} /></td>
                   <td>{s.score}</td>
                   <td>{formatMs(s.timeMs)}</td>
@@ -227,26 +241,10 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
                       View
                     </button>
                   </td>
-                  <td className={styles.actions}>
-                    <button
-                      type="button"
-                      className={styles['link-button']}
-                      onClick={() => onSelectUser(s.userId)}
-                    >
-                      User
-                    </button>
-                    <button
-                      type="button"
-                      className={styles['link-button']}
-                      onClick={() => onSelectProblem(s.problemId)}
-                    >
-                      Problem
-                    </button>
-                  </td>
                 </tr>
               ))}
               {submissions.length === 0 && (
-                <tr><td colSpan={9} className={styles.empty}>No submissions match these filters.</td></tr>
+                <tr><td colSpan={8} className={styles.empty}>No submissions match these filters.</td></tr>
               )}
             </tbody>
           </table>

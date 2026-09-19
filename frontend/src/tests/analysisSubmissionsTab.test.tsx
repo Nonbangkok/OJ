@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import SubmissionsTab from '../features/admin/analysis/SubmissionsTab';
 import * as analyticsService from '../services/analyticsService';
@@ -59,8 +59,8 @@ describe('SubmissionsTab', () => {
             if (!el) throw new Error('table not rendered');
             return el;
         });
-        expect(table.querySelector('a[href="/profile/bob"]')).not.toBeNull();
-        expect(screen.getByText('A Plus B')).toBeInTheDocument();
+        expect(within(table).getByRole('button', { name: 'bob' })).toBeInTheDocument();
+        expect(within(table).getByRole('button', { name: 'A Plus B' })).toBeInTheDocument();
         expect(mockFetchSubmissions).toHaveBeenCalledWith(expect.objectContaining({ limit: 50, offset: 0 }));
     });
 
@@ -165,7 +165,7 @@ describe('SubmissionsTab', () => {
         ));
     });
 
-    it('calls onSelectUser and onSelectProblem from a row', async () => {
+    it('calls onSelectUser and onSelectProblem from the row cells', async () => {
         mockFetchSubmissions.mockResolvedValue({ submissions: [mockSubmission] });
         const onSelectUser = jest.fn();
         const onSelectProblem = jest.fn();
@@ -176,12 +176,12 @@ describe('SubmissionsTab', () => {
             </BrowserRouter>
         );
 
-        await waitFor(() => expect(screen.getByRole('button', { name: 'User' })).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByRole('button', { name: 'bob' })).toBeInTheDocument());
 
-        fireEvent.click(screen.getByRole('button', { name: 'User' }));
+        fireEvent.click(screen.getByRole('button', { name: 'bob' }));
         expect(onSelectUser).toHaveBeenCalledWith(2);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Problem' }));
+        fireEvent.click(screen.getByRole('button', { name: 'A Plus B' }));
         expect(onSelectProblem).toHaveBeenCalledWith('aplusb');
     });
 
