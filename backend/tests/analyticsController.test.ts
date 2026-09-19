@@ -9,6 +9,7 @@ jest.mock('../db');
 jest.mock('../services/analyticsQueryService', () => ({
     getOverviewAnalytics: jest.fn().mockResolvedValue({ kpis: {}, dailySeries: [] }),
     listUsersForAnalytics: jest.fn().mockResolvedValue([]),
+    listProblemsForAnalytics: jest.fn().mockResolvedValue([]),
     getUserAnalytics: jest.fn().mockResolvedValue(null),
     getProblemAnalytics: jest.fn().mockResolvedValue(null),
     getContestAnalytics: jest.fn().mockResolvedValue(null),
@@ -19,6 +20,7 @@ const mockListUsersForAnalytics = analyticsService.listUsersForAnalytics as jest
 const mockGetUserAnalytics = analyticsService.getUserAnalytics as jest.MockedFunction<typeof analyticsService.getUserAnalytics>;
 const mockGetProblemAnalytics = analyticsService.getProblemAnalytics as jest.MockedFunction<typeof analyticsService.getProblemAnalytics>;
 const mockGetContestAnalytics = analyticsService.getContestAnalytics as jest.MockedFunction<typeof analyticsService.getContestAnalytics>;
+const mockListProblemsForAnalytics = analyticsService.listProblemsForAnalytics as jest.MockedFunction<typeof analyticsService.listProblemsForAnalytics>;
 
 const buildApp = (forbidden = false): Express => {
     const app = express();
@@ -73,7 +75,16 @@ describe('Analytics Controller', () => {
             expect(mockGetOverviewAnalytics).toHaveBeenCalledWith(7);
         });
 
-        it('rejects days outside 7/30/90 with 400', async () => {
+        it('accepts days=0 as all-time and passes it through', async () => {
+            mockGetOverviewAnalytics.mockResolvedValueOnce({} as never);
+
+            const res = await request(buildApp()).get('/analytics/overview?days=0');
+
+            expect(res.status).toBe(200);
+            expect(mockGetOverviewAnalytics).toHaveBeenCalledWith(0);
+        });
+
+        it('rejects days outside 0/7/30/90 with 400', async () => {
             const res = await request(buildApp()).get('/analytics/overview?days=45');
 
             expect(res.status).toBe(400);
@@ -90,7 +101,7 @@ describe('Analytics Controller', () => {
             const res = await request(buildApp()).get('/analytics/users?search=bo&limit=25&offset=50');
 
             expect(res.status).toBe(200);
-            expect(mockListUsersForAnalytics).toHaveBeenCalledWith('bo', 25, 50);
+            expect(mockListUsersForAnalytics).toHaveBeenCalledWith('bo', 25, 50, 'submissions', 'desc');
             expect(res.body.users[0].username).toBe('bob');
         });
 
@@ -110,7 +121,29 @@ describe('Analytics Controller', () => {
             // Regression: defaults must be concrete values, not undefined —
             // undefined search previously produced a NULL ILIKE pattern that
             // matched no users at all.
-            expect(mockListUsersForAnalytics).toHaveBeenCalledWith('', 50, 0);
+            expect(mockListUsersForAnalytics).toHaveBeenCalledWith('', 50, 0, 'submissions', 'desc');
+        });
+    });
+
+    describe('GET /analytics/problems', () => {
+        it('passes search/sort to the service and returns rows', async () => {
+            mockListProblemsForAnalytics.mockResolvedValueOnce([{
+                problemId: 'aplusb', title: 'A Plus B', category: 'math',
+                submissions: 30, accepted: 20, acRate: 0.667, solvers: 8,
+            }] as never);
+
+            const res = await request(buildApp()).get('/analytics/problems?search=plus&sortBy=acRate&sortDir=asc');
+
+            expect(res.status).toBe(200);
+            expect(mockListProblemsForAnalytics).toHaveBeenCalledWith('plus', 50, 0, 'acRate', 'asc');
+            expect(res.body.problems[0].problemId).toBe('aplusb');
+        });
+
+        it('rejects an unknown sortBy with 400', async () => {
+            const res = await request(buildApp()).get('/analytics/problems?sortBy=bogus');
+
+            expect(res.status).toBe(400);
+            expect(mockListProblemsForAnalytics).not.toHaveBeenCalled();
         });
     });
 

@@ -284,9 +284,12 @@ export const submissionDetailQuerySchema = z.object({
 });
 
 // Analytics schemas
+// days: 7/30/90 windowed, or 0 for all-time.
+export const ANALYTICS_ALL_TIME_DAYS = 0;
+
 export const analyticsOverviewQuerySchema = z.object({
-  days: z.coerce.number().int().refine((d) => [7, 30, 90].includes(d), {
-    message: 'days must be 7, 30, or 90',
+  days: z.coerce.number().int().refine((d) => [0, 7, 30, 90].includes(d), {
+    message: 'days must be 0, 7, 30, or 90',
   }).default(30),
 });
 
@@ -294,6 +297,16 @@ export const analyticsUsersQuerySchema = z.object({
   search: z.string().trim().max(100).default(''),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
+  sortBy: z.enum(['username', 'submissions', 'solved', 'acRate', 'lastActive']).default('submissions'),
+  sortDir: z.enum(['asc', 'desc']).default('desc'),
+});
+
+export const analyticsProblemsQuerySchema = z.object({
+  search: z.string().trim().max(100).default(''),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+  sortBy: z.enum(['title', 'category', 'submissions', 'accepted', 'acRate', 'solvers']).default('submissions'),
+  sortDir: z.enum(['asc', 'desc']).default('desc'),
 });
 
 export const analyticsUserIdParamSchema = z.object({

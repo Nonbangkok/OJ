@@ -68,6 +68,9 @@ interface ContestStatRow {
   avg_score: string | null;
 }
 
+/** Large enough window standing in for "all time" in day-based intervals. */
+const ALL_TIME_WINDOW_DAYS = 36500;
+
 const toNum = (v: string | number | null | undefined): number => (v === null || v === undefined ? 0 : Number(v));
 
 /** Aggregate rows always return one row, but stay defensive for empty results. */
@@ -80,6 +83,11 @@ const firstRow = <T>(rows: T[]): T | undefined => rows[0];
  * contest pool.
  */
 export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalytics> => {
+  // days === 0 means all-time: use a window large enough to cover every row.
+  // The previous-window comparison is then empty by construction, and the
+  // frontend hides the delta for all-time.
+  const windowDays = days === 0 ? ALL_TIME_WINDOW_DAYS : days;
+
   const kpiResult = await query<KpiRow>(`
     WITH all_submissions AS (
       SELECT user_id, overall_status, submitted_at FROM submissions
@@ -97,7 +105,7 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
       COUNT(*) FILTER (WHERE overall_status = 'Accepted' AND submitted_at >= NOW() - ($2 || ' days')::interval
                          AND submitted_at < NOW() - ($1 || ' days')::interval) AS previous_accepted
     FROM all_submissions`,
-    [days, days * 2]);
+    [windowDays, windowDays * 2]);
   const kpi = firstRow(kpiResult.rows);
 
   const newUsersResult = await query<NewUsersRow>(`
@@ -106,7 +114,7 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
       COUNT(*) FILTER (WHERE created_at >= NOW() - ($2 || ' days')::interval
                          AND created_at < NOW() - ($1 || ' days')::interval) AS previous_users
     FROM users`,
-    [days, days * 2]);
+    [windowDays, windowDays * 2]);
 
   const activeProblemsResult = await query<NewUsersRow>(`
     SELECT
@@ -118,7 +126,7 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
       UNION ALL
       SELECT problem_id, submitted_at FROM contest_submissions
     ) s`,
-    [days, days * 2]);
+    [windowDays, windowDays * 2]);
 
   const dailyResult = await query<DailyRow>(`
     WITH all_submissions AS (
@@ -134,7 +142,7 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
     WHERE submitted_at >= NOW() - ($1 || ' days')::interval
     GROUP BY 1
     ORDER BY 1`,
-    [days]);
+    [windowDays]);
 
   const verdictResult = await query<VerdictRow>(`
     WITH all_submissions AS (
@@ -147,7 +155,7 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
     WHERE submitted_at >= NOW() - ($1 || ' days')::interval
     GROUP BY 1
     ORDER BY count DESC`,
-    [days]);
+    [windowDays]);
 
   const topProblemsResult = await query<TopProblemRow>(`
     WITH all_submissions AS (
@@ -281,8 +289,27 @@ interface LanguageCountRow { language: string; count: string }
 interface CumulativeSolvedRow { day: string; solved: string }
 interface CategorySolvedRow { category: string; solved: string; attempted: string }
 
+/** Sortable columns for the users list, mapped to SQL expressions. */
+const USER_SORT_COLUMNS: Record<string, string> = {
+  username: 'u.username',
+  submissions: 'submissions',
+  solved: 'solved',
+  acRate: 'ac_rate',
+  lastActive: 'last_active',
+};
+
+export type UserSortKey = keyof typeof USER_SORT_COLUMNS;
+
 /** Users with aggregate stats for the analysis tab user list. */
-export const listUsersForAnalytics = async (search: string, limit: number, offset: number): Promise<UserListRow[]> => {
+export const listUsersForAnalytics = async (
+  search: string,
+  limit: number,
+  offset: number,
+  sortBy: UserSortKey = 'submissions',
+  sortDir: 'asc' | 'desc' = 'desc',
+): Promise<UserListRow[]> => {
+  const sortExpr = USER_SORT_COLUMNS[sortBy] ?? USER_SORT_COLUMNS.submissions;
+  const direction = sortDir === 'asc' ? 'ASC' : 'DESC';
   const result = await query<UserListQueryRow>(`
     WITH all_submissions AS (
       SELECT user_id, problem_id, overall_status, submitted_at FROM submissions
@@ -304,7 +331,7 @@ export const listUsersForAnalytics = async (search: string, limit: number, offse
     LEFT JOIN all_submissions s ON s.user_id = u.id
     WHERE u.username ILIKE '%' || $1 || '%'
     GROUP BY u.id, u.username, u.role
-    ORDER BY submissions DESC
+    ORDER BY ${sortExpr} ${direction} NULLS LAST, u.username ASC
     LIMIT $2 OFFSET $3`,
     [search, limit, offset]);
 
@@ -769,4 +796,95 @@ export const getContestAnalytics = async (contestId: number): Promise<ContestAna
       solved: toNum(r.solved),
     })),
   };
+};
+
+// ---------------------------------------------------------------------------
+// Problem list with stats (analysis tab picker)
+// ---------------------------------------------------------------------------
+
+export interface ProblemListRow {
+  problemId: string;
+  title: string;
+  category: string | null;
+  submissions: number;
+  accepted: number;
+  acRate: number;
+  solvers: number;
+}
+
+interface ProblemListQueryRow {
+  problem_id: string;
+  title: string;
+  category: string | null;
+  submissions: string;
+  accepted: string;
+  ac_rate: string;
+  solvers: string;
+}
+
+/** Sortable columns for the problems list, mapped to SQL expressions. */
+const PROBLEM_SORT_COLUMNS: Record<string, string> = {
+  title: 'p.title',
+  category: 'p.category',
+  submissions: 'submissions',
+  accepted: 'accepted',
+  acRate: 'ac_rate',
+  solvers: 'solvers',
+};
+
+export type ProblemSortKey = keyof typeof PROBLEM_SORT_COLUMNS;
+
+/** Problems with aggregate stats for the analysis tab problem list. */
+export const listProblemsForAnalytics = async (
+  search: string,
+  limit: number,
+  offset: number,
+  sortBy: ProblemSortKey = 'submissions',
+  sortDir: 'asc' | 'desc' = 'desc',
+): Promise<ProblemListRow[]> => {
+  const sortExpr = PROBLEM_SORT_COLUMNS[sortBy] ?? PROBLEM_SORT_COLUMNS.submissions;
+  const direction = sortDir === 'asc' ? 'ASC' : 'DESC';
+  const result = await query<ProblemListQueryRow>(`
+    WITH all_submissions AS (
+      SELECT problem_id, user_id, overall_status FROM submissions
+      UNION ALL
+      SELECT problem_id, user_id, overall_status FROM contest_submissions
+    ),
+    per_problem AS (
+      SELECT
+        problem_id,
+        COUNT(*) AS submissions,
+        COUNT(*) FILTER (WHERE overall_status = 'Accepted') AS accepted,
+        COALESCE(
+          (COUNT(*) FILTER (WHERE overall_status = 'Accepted'))::float / NULLIF(COUNT(*), 0),
+          0
+        ) AS ac_rate,
+        COUNT(DISTINCT user_id) FILTER (WHERE overall_status = 'Accepted') AS solvers
+      FROM all_submissions
+      GROUP BY problem_id
+    )
+    SELECT
+      p.id AS problem_id,
+      p.title,
+      p.category,
+      COALESCE(pp.submissions, 0) AS submissions,
+      COALESCE(pp.accepted, 0) AS accepted,
+      COALESCE(pp.ac_rate, 0) AS ac_rate,
+      COALESCE(pp.solvers, 0) AS solvers
+    FROM problems p
+    LEFT JOIN per_problem pp ON pp.problem_id = p.id
+    WHERE p.title ILIKE '%' || $1 || '%' OR p.id ILIKE '%' || $1 || '%'
+    ORDER BY ${sortExpr} ${direction} NULLS LAST, p.id ASC
+    LIMIT $2 OFFSET $3`,
+    [search, limit, offset]);
+
+  return result.rows.map((r) => ({
+    problemId: r.problem_id,
+    title: r.title,
+    category: r.category,
+    submissions: toNum(r.submissions),
+    accepted: toNum(r.accepted),
+    acRate: toNum(r.ac_rate),
+    solvers: toNum(r.solvers),
+  }));
 };

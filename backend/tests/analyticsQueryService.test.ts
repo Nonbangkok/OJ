@@ -96,6 +96,7 @@ describe('analyticsQueryService.getOverviewAnalytics', () => {
 
 import {
     listUsersForAnalytics,
+    listProblemsForAnalytics,
     getUserAnalytics,
     getProblemAnalytics,
 } from '../services/analyticsQueryService';
@@ -105,7 +106,7 @@ describe('analyticsQueryService.listUsersForAnalytics', () => {
         jest.clearAllMocks();
     });
 
-    it('passes search/limit/offset as parameters and maps rows', async () => {
+    it('passes search/limit/offset/sort as parameters and maps rows', async () => {
         mockQuery.mockResolvedValueOnce({
             rows: [{
                 user_id: 2,
@@ -118,9 +119,10 @@ describe('analyticsQueryService.listUsersForAnalytics', () => {
             }],
         } as never);
 
-        const rows = await listUsersForAnalytics('bo', 25, 50);
+        const rows = await listUsersForAnalytics('bo', 25, 50, 'acRate', 'asc');
 
         expect(mockQuery.mock.calls[0][1]).toEqual(['bo', 25, 50]);
+        expect(String(mockQuery.mock.calls[0][0])).toContain('ac_rate ASC');
         expect(rows).toEqual([{
             userId: 2,
             username: 'bob',
@@ -300,5 +302,47 @@ describe('analyticsQueryService.getContestAnalytics', () => {
         expect(result?.scoreboard).toEqual([
             { username: 'bob', totalScore: 300, solved: 3 },
         ]);
+    });
+});
+
+
+describe('analyticsQueryService.listProblemsForAnalytics', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it('returns problems with stats mapped to camelCase', async () => {
+        mockQuery.mockResolvedValueOnce({
+            rows: [{
+                problem_id: 'aplusb',
+                title: 'A Plus B',
+                category: 'math',
+                submissions: '30',
+                accepted: '20',
+                ac_rate: '0.667',
+                solvers: '8',
+            }],
+        } as never);
+
+        const rows = await listProblemsForAnalytics('', 50, 0);
+
+        expect(mockQuery.mock.calls[0][1]).toEqual(['', 50, 0]);
+        expect(rows).toEqual([{
+            problemId: 'aplusb',
+            title: 'A Plus B',
+            category: 'math',
+            submissions: 30,
+            accepted: 20,
+            acRate: 0.667,
+            solvers: 8,
+        }]);
+    });
+
+    it('sorts by the requested column and direction', async () => {
+        mockQuery.mockResolvedValue({ rows: [] } as never);
+
+        await listProblemsForAnalytics('', 50, 0, 'acRate', 'asc');
+
+        expect(String(mockQuery.mock.calls[0][0])).toContain('ac_rate ASC');
     });
 });
