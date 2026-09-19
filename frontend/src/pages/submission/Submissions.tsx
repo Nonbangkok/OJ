@@ -166,7 +166,7 @@ const Submissions = ({ problemId = null, contestId = null, showTitle = true }: S
               {submissions.slice(0, visibleCount).map(sub => (
                 <tr key={sub.id}>
                   <td>{new Date(sub.submitted_at).toLocaleString()}</td>
-                  <td>{sub.username}</td>
+                  <td><Link to={`/profile/${sub.username}`}>{sub.username}</Link></td>
                   {!problemId && (
                     <td><Link to={`/problems/${sub.problem_id}`}>{sub.problem_title}</Link></td>
                   )}

@@ -14,6 +14,7 @@ import Problems from './pages/problem/Problems';
 import ProblemDetail from './pages/problem/ProblemDetail';
 import Scoreboard from './pages/scoreboard/Scoreboard';
 import Submissions from './pages/submission/Submissions';
+import UserProfile from './pages/user/UserProfile';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import Admin from './pages/admin/Admin';
@@ -62,6 +63,7 @@ const Layout = () => {
           <Route path="/problems/:problemId" element={<ProblemDetail />} />
           <Route path="/scoreboard" element={<Scoreboard />} />
           <Route path="/submissions" element={<Submissions />} />
+          <Route path="/profile/:username" element={<UserProfile />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/contests" element={<Contests />} />

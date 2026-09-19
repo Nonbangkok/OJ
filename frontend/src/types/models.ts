@@ -161,3 +161,29 @@ export interface UploadProgress {
   skipped?: string[];
   errors?: Array<{ directory: string; message: string }>;
 }
+
+export interface UserProfileDailyActivity {
+  day: string;
+  count: number;
+}
+
+export interface UserProfileResponse {
+  id: number;
+  username: string;
+  role: UserRole;
+  hasAvatar: boolean;
+  avatarUpdatedAt: string | null;
+  createdAt: string;
+  problemsAttempted: number;
+  problemsSolved: number;
+  totalScore: number;
+  submissionCount: number;
+  verdictCounts: Record<string, number>;
+  languageCounts: Record<string, number>;
+  dailyActivity: UserProfileDailyActivity[];
+}
+
+export interface UpdateAvatarResponse {
+  message: string;
+  avatarUpdatedAt: string;
+}

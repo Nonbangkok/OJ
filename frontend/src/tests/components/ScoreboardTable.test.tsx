@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import ScoreboardTable from '../../features/scoreboard/ScoreboardTable';
 
 // Mock CSS modules
@@ -21,7 +22,7 @@ const mockScoreboard = [
 
 describe('ScoreboardTable', () => {
     it('renders table headers', () => {
-        render(<ScoreboardTable scoreboard={mockScoreboard} />);
+        render(<MemoryRouter><ScoreboardTable scoreboard={mockScoreboard} /></MemoryRouter>);
 
         expect(screen.getByText('Rank')).toBeInTheDocument();
         expect(screen.getByText('User')).toBeInTheDocument();
@@ -30,7 +31,7 @@ describe('ScoreboardTable', () => {
     });
 
     it('renders all users', () => {
-        render(<ScoreboardTable scoreboard={mockScoreboard} />);
+        render(<MemoryRouter><ScoreboardTable scoreboard={mockScoreboard} /></MemoryRouter>);
 
         expect(screen.getByText(/alice/)).toBeInTheDocument();
         expect(screen.getByText(/bob/)).toBeInTheDocument();
@@ -39,7 +40,7 @@ describe('ScoreboardTable', () => {
     });
 
     it('renders medal emojis for top 3', () => {
-        render(<ScoreboardTable scoreboard={mockScoreboard} />);
+        render(<MemoryRouter><ScoreboardTable scoreboard={mockScoreboard} /></MemoryRouter>);
 
         expect(screen.getByText(/🥇/)).toBeInTheDocument();
         expect(screen.getByText(/🥈/)).toBeInTheDocument();
@@ -47,7 +48,7 @@ describe('ScoreboardTable', () => {
     });
 
     it('renders scores correctly', () => {
-        render(<ScoreboardTable scoreboard={mockScoreboard} />);
+        render(<MemoryRouter><ScoreboardTable scoreboard={mockScoreboard} /></MemoryRouter>);
 
         expect(screen.getByText('1000')).toBeInTheDocument();
         expect(screen.getByText('800')).toBeInTheDocument();

@@ -18,6 +18,7 @@ describe('problem authoring foundation migration', () => {
       '0005_authoring_job_files',
       '0006_authoring_published_problem_provenance',
       '0007_problem_category',
+      '0008_user_profile',
     ]);
   });
 

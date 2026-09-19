@@ -88,7 +88,9 @@ const Navbar = () => {
         <div className={styles['nav-actions']}>
           {user ? (
             <>
-              <span className={styles.username}>{user?.username}</span>
+              <NavLink to={`/profile/${user.username}`} className={styles['nav-user']}>
+                <span className={styles.username}>{user?.username}</span>
+              </NavLink>
               <button onClick={handleLogout} className={styles['logout-btn']}>Logout</button>
             </>
           ) : (

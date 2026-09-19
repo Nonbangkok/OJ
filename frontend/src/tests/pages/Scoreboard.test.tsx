@@ -42,9 +42,9 @@ describe('Scoreboard Page', () => {
             expect(screen.getByText(/thirduser/)).toBeInTheDocument();
 
             // Check for emojis (🥇, 🥈, 🥉)
-            expect(screen.getByText(/🥇 topuser/)).toBeInTheDocument();
-            expect(screen.getByText(/🥈 seconduser/)).toBeInTheDocument();
-            expect(screen.getByText(/🥉 thirduser/)).toBeInTheDocument();
+            expect(screen.getByText(/🥇/)).toBeInTheDocument();
+            expect(screen.getByText(/🥈/)).toBeInTheDocument();
+            expect(screen.getByText(/🥉/)).toBeInTheDocument();
         });
     });
 

@@ -1,0 +1,118 @@
+import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import UserProfile from '../../pages/user/UserProfile';
+import userService from '../../services/userService';
+import { useAuth } from '../../context/AuthContext';
+
+jest.mock('../../services/userService');
+jest.mock('../../context/AuthContext');
+
+// Mock LoadingPage to control the loading text
+jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading Profile...</div>);
+
+const profileData = {
+    id: 3,
+    username: 'tester',
+    role: 'user' as const,
+    hasAvatar: false,
+    avatarUpdatedAt: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    problemsAttempted: 4,
+    problemsSolved: 2,
+    totalScore: 250,
+    submissionCount: 9,
+    verdictCounts: { Accepted: 3, 'Wrong Answer': 5 },
+    languageCounts: { cpp: 9 },
+    dailyActivity: [{ day: '2026-09-18', count: 2 }],
+};
+
+const renderPage = () =>
+    render(
+        <MemoryRouter initialEntries={['/profile/tester']}>
+            <Routes>
+                <Route path="/profile/:username" element={<UserProfile />} />
+            </Routes>
+        </MemoryRouter>,
+    );
+
+describe('User Profile Page', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        jest.mocked(useAuth).mockReturnValue({
+            user: null,
+            isLoading: false,
+            login: jest.fn(),
+            logout: jest.fn(),
+        });
+    });
+
+    it('renders loading state initially', () => {
+        jest.mocked(userService.getProfile).mockReturnValue(new Promise(() => { }));
+        renderPage();
+        expect(screen.getByText(/loading profile\.\.\.$/i)).toBeInTheDocument();
+    });
+
+    it('displays profile stats on success', async () => {
+        jest.mocked(userService.getProfile).mockResolvedValueOnce(profileData);
+
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByRole('heading', { name: 'tester' })).toBeInTheDocument();
+            expect(screen.getByText((content, element) =>
+                element?.className.includes('stat-value') === true && content === '2')).toBeInTheDocument(); // solved
+            expect(screen.getByText((content, element) =>
+                element?.className.includes('stat-value') === true && content === '4')).toBeInTheDocument(); // attempted
+            expect(screen.getByText((content, element) =>
+                element?.className.includes('stat-value') === true && content === '250')).toBeInTheDocument(); // total score
+        });
+        expect(userService.getProfile).toHaveBeenCalledWith('tester');
+        expect(jest.mocked(userService.getProfile).mock.calls[0][0]).toBe('tester');
+    });
+
+    it('renders one heatmap cell per day of the activity window', async () => {
+        jest.mocked(userService.getProfile).mockResolvedValueOnce(profileData);
+
+        renderPage();
+
+        await waitFor(() => {
+            const cells = screen.getAllByTitle(/20\d\d-\d\d-\d\d/);
+            expect(cells.length).toBe(365);
+            const active = screen.getByTitle('2026-09-18: 2 submissions');
+            expect(active).toBeInTheDocument();
+        });
+    });
+
+    it('shows the avatar upload button only on your own profile', async () => {
+        jest.mocked(userService.getProfile).mockResolvedValue(profileData);
+
+        jest.mocked(useAuth).mockReturnValue({
+            user: { id: 7, username: 'someoneelse', role: 'user' },
+            isLoading: false,
+            login: jest.fn(),
+            logout: jest.fn(),
+        });
+        renderPage();
+        await waitFor(() => expect(screen.getByRole('heading', { name: /tester/ })).toBeInTheDocument());
+        expect(screen.queryByRole('button', { name: /change avatar/i })).not.toBeInTheDocument();
+
+        jest.mocked(useAuth).mockReturnValue({
+            user: { id: 3, username: 'tester', role: 'user' },
+            isLoading: false,
+            login: jest.fn(),
+            logout: jest.fn(),
+        });
+        renderPage();
+        await waitFor(() => expect(screen.getByRole('button', { name: /change avatar/i })).toBeInTheDocument());
+    });
+
+    it('shows an error message when the profile cannot be loaded', async () => {
+        jest.mocked(userService.getProfile).mockRejectedValueOnce(new Error('Not found'));
+
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByText(/failed to load profile/i)).toBeInTheDocument();
+        });
+    });
+});

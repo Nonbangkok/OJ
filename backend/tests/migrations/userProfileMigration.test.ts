@@ -1,0 +1,30 @@
+import { migrations } from '../../migrations';
+import { userProfileSql } from '../../migrations/0008UserProfile';
+
+describe('user profile migration', () => {
+  it('runs after the problem category migration', () => {
+    expect(migrations.map((migration) => migration.version)).toEqual([
+      '0001_core_schema',
+      '0002_problem_authoring_foundation',
+      '0003_authoring_job_delivery',
+      '0004_authoring_job_inputs',
+      '0005_authoring_job_files',
+      '0006_authoring_published_problem_provenance',
+      '0007_problem_category',
+      '0008_user_profile',
+    ]);
+  });
+
+  it('adds the avatar columns to users without touching existing structure', () => {
+    const sql = userProfileSql.replace(/\s+/g, ' ').trim();
+
+    expect(sql).toContain(
+      'ALTER TABLE users ADD COLUMN avatar_png BYTEA'
+    );
+    expect(sql).toContain(
+      'ALTER TABLE users ADD COLUMN avatar_updated_at TIMESTAMPTZ'
+    );
+    expect(sql).not.toContain('CREATE TABLE');
+    expect(sql).not.toContain('DROP');
+  });
+});

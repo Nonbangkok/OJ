@@ -75,6 +75,10 @@
   gap: 1rem;
 }
 
+.nav-user {
+  text-decoration: none;
+}
+
 .username {
   color: var(--text-secondary);
   font-weight: 500;

@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 import tableStyles from '../../components/styles/Table.module.css';
 import styles from './ScoreboardTable.module.css';
 
@@ -21,7 +23,7 @@ const ScoreboardTable = ({ scoreboard }) => {
                                 {index === 0 && '🥇 '}
                                 {index === 1 && '🥈 '}
                                 {index === 2 && '🥉 '}
-                                {user.username}
+                                <Link to={`/profile/${user.username}`}>{user.username}</Link>
                             </td>
                             <td>{user.problems_solved}</td>
                             <td>{user.total_score}</td>

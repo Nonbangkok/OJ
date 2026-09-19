@@ -102,6 +102,19 @@ export const AUTHOR_PROFILE_IMAGE = {
     ALLOWED_MIME_TYPES: ['image/jpeg', 'image/png', 'image/webp'],
 } as const;
 
+const USER_AVATAR_MAX_UPLOAD_MIB = 10;
+
+export const USER_AVATAR = {
+    SIZE_PX: 256,
+    MAX_INPUT_PIXELS: 25_000_000,
+    FIELD_NAME: 'avatar',
+    MAX_UPLOAD_MIB: USER_AVATAR_MAX_UPLOAD_MIB,
+    MAX_UPLOAD_BYTES: USER_AVATAR_MAX_UPLOAD_MIB * 1024 * 1024,
+    ALLOWED_MIME_TYPES: ['image/jpeg', 'image/png', 'image/webp'],
+} as const;
+
+export const PROFILE_ACTIVITY_WINDOW_DAYS = 365;
+
 const STATEMENT_ASSET_MAX_FILE_MIB = 10;
 const STATEMENT_ASSET_MAX_TOTAL_MIB = 100;
 

@@ -16,6 +16,7 @@ import contestRoutes from './controllers/contestController';
 import healthRoutes from './controllers/healthController';
 import authoringDraftRoutes from './controllers/authoringDraftController';
 import authorProfileRoutes from './controllers/authorProfileController';
+import userProfileRoutes from './controllers/userProfileController';
 import { createAuthoringJobRouter } from './controllers/authoringJobController';
 import authoringTestcaseRoutes from './controllers/authoringTestcaseController';
 import authoringWorkspaceRoutes from './controllers/authoringWorkspaceController';
@@ -99,6 +100,7 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
   app.use('/', contestRoutes);
   app.use('/', authoringDraftRoutes);
   app.use('/', authorProfileRoutes);
+  app.use('/', userProfileRoutes);
 
   app.get('/', (_req: Request, res: Response) => {
     res.send('Grader System API is running!');

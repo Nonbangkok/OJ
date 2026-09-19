@@ -49,6 +49,10 @@ export const idParamSchema = z.object({
   id: nonEmptyString,
 });
 
+export const usernameParamSchema = z.object({
+  username: nonEmptyString.max(STRING_LIMITS.USERNAME),
+});
+
 // Auth schemas
 export const registerSchema = z.object({
   username: z.string().trim().min(USER_VALIDATION.MIN_USERNAME_LENGTH).max(STRING_LIMITS.USERNAME),
