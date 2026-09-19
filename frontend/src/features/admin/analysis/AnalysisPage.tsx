@@ -2,6 +2,7 @@ import { useState } from 'react';
 import OverviewTab from './OverviewTab';
 import UsersTab from './UsersTab';
 import UserDetail from './UserDetail';
+import UserCompare from './UserCompare';
 import ProblemsTab from './ProblemsTab';
 import ProblemDetail from './ProblemDetail';
 import ContestsTab from './ContestsTab';
@@ -22,6 +23,7 @@ const TABS: Array<{ key: AnalysisTab; label: string }> = [
 const AnalysisPage = () => {
   const [tab, setTab] = useState<AnalysisTab>('overview');
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [compareUserIds, setCompareUserIds] = useState<[number, number] | null>(null);
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
   const [selectedContestId, setSelectedContestId] = useState<number | null>(null);
 
@@ -60,9 +62,15 @@ const AnalysisPage = () => {
     setTab('problems');
   };
 
+  const handleCompareUsers = (userIds: [number, number]) => {
+    setCompareUserIds(userIds);
+    setSelectedUserId(null);
+  };
+
   const switchTab = (key: AnalysisTab) => {
     setTab(key);
     setSelectedUserId(null);
+    setCompareUserIds(null);
     setSelectedProblemId(null);
     setSelectedContestId(null);
   };
@@ -86,9 +94,11 @@ const AnalysisPage = () => {
       </div>
       {tab === 'overview' && <OverviewTab />}
       {tab === 'users' && (
-        selectedUserId === null
-          ? <UsersTab onSelectUser={handleSelectUser} />
-          : <UserDetail userId={selectedUserId} onBack={handleBackToUsers} />
+        compareUserIds !== null
+          ? <UserCompare userIds={compareUserIds} onBack={() => setCompareUserIds(null)} />
+          : selectedUserId === null
+            ? <UsersTab onSelectUser={handleSelectUser} onCompareUsers={handleCompareUsers} />
+            : <UserDetail userId={selectedUserId} onBack={handleBackToUsers} />
       )}
       {tab === 'problems' && (
         selectedProblemId === null

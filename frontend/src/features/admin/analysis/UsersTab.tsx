@@ -16,6 +16,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 interface UsersTabProps {
   onSelectUser: (userId: number) => void;
+  onCompareUsers: (userIds: [number, number]) => void;
 }
 
 const formatAcRate = (rate: number): string => `${Math.round(rate * 100)}%`;
@@ -25,8 +26,9 @@ const formatDate = (iso: string | null): string => {
   return new Date(iso).toLocaleDateString();
 };
 
-const UsersTab = ({ onSelectUser }: UsersTabProps) => {
+const UsersTab = ({ onSelectUser, onCompareUsers }: UsersTabProps) => {
   const [retention, setRetention] = useState<RetentionAnalytics | null>(null);
+  const [compareSelection, setCompareSelection] = useState<number[]>([]);
   const [users, setUsers] = useState<AnalyticsUserRow[]>([]);
   const [search, setSearch] = useState('');
   const [offset, setOffset] = useState(0);
@@ -71,6 +73,16 @@ const UsersTab = ({ onSelectUser }: UsersTabProps) => {
     return () => { cancelled = true; };
   }, [search, offset, sortBy, sortDir]);
 
+  const toggleCompare = (userId: number): void => {
+    setCompareSelection((current) => {
+      if (current.includes(userId)) {
+        return current.filter((id) => id !== userId);
+      }
+      // Keep at most two: replace the older pick.
+      return [...current, userId].slice(-2);
+    });
+  };
+
   // Debounce typing so we do not fire a request per keystroke.
   const handleSearchChange = (value: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -111,6 +123,15 @@ const UsersTab = ({ onSelectUser }: UsersTabProps) => {
         >
           Export CSV
         </button>
+        {compareSelection.length === 2 && (
+          <button
+            type="button"
+            className={styles['export-button']}
+            onClick={() => onCompareUsers([compareSelection[0], compareSelection[1]])}
+          >
+            Compare selected
+          </button>
+        )}
       </div>
 
       {retention && (
@@ -131,6 +152,7 @@ const UsersTab = ({ onSelectUser }: UsersTabProps) => {
               <SortableHeader label="Solved" column="solved" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="AC rate" column="acRate" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Last active" column="lastActive" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <th>Compare</th>
               <th />
             </tr>
           </thead>
@@ -143,6 +165,14 @@ const UsersTab = ({ onSelectUser }: UsersTabProps) => {
                 <td>{user.solved}</td>
                 <td>{formatAcRate(user.acRate)}</td>
                 <td>{formatDate(user.lastActive)}</td>
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={`Compare ${user.username}`}
+                    checked={compareSelection.includes(user.userId)}
+                    onChange={() => toggleCompare(user.userId)}
+                  />
+                </td>
                 <td>
                   <button
                     type="button"

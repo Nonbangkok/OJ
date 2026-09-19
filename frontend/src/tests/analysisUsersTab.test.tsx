@@ -61,7 +61,7 @@ describe('UsersTab', () => {
 
         render(
             <BrowserRouter>
-                <UsersTab onSelectUser={jest.fn()} />
+                <UsersTab onSelectUser={jest.fn()} onCompareUsers={jest.fn()} />
             </BrowserRouter>
         );
 
@@ -75,7 +75,7 @@ describe('UsersTab', () => {
 
         render(
             <BrowserRouter>
-                <UsersTab onSelectUser={jest.fn()} />
+                <UsersTab onSelectUser={jest.fn()} onCompareUsers={jest.fn()} />
             </BrowserRouter>
         );
 
@@ -91,7 +91,7 @@ describe('UsersTab', () => {
 
         render(
             <BrowserRouter>
-                <UsersTab onSelectUser={jest.fn()} />
+                <UsersTab onSelectUser={jest.fn()} onCompareUsers={jest.fn()} />
             </BrowserRouter>
         );
 
@@ -110,7 +110,7 @@ describe('UsersTab', () => {
 
         render(
             <BrowserRouter>
-                <UsersTab onSelectUser={onSelectUser} />
+                <UsersTab onSelectUser={onSelectUser} onCompareUsers={jest.fn()} />
             </BrowserRouter>
         );
 
@@ -132,7 +132,7 @@ describe('UsersTab', () => {
 
         render(
             <BrowserRouter>
-                <UsersTab onSelectUser={jest.fn()} />
+                <UsersTab onSelectUser={jest.fn()} onCompareUsers={jest.fn()} />
             </BrowserRouter>
         );
 
@@ -155,7 +155,7 @@ describe('UsersTab', () => {
 
         render(
             <BrowserRouter>
-                <UsersTab onSelectUser={jest.fn()} />
+                <UsersTab onSelectUser={jest.fn()} onCompareUsers={jest.fn()} />
             </BrowserRouter>
         );
 
@@ -172,7 +172,7 @@ describe('UsersTab', () => {
 
         render(
             <BrowserRouter>
-                <UsersTab onSelectUser={jest.fn()} />
+                <UsersTab onSelectUser={jest.fn()} onCompareUsers={jest.fn()} />
             </BrowserRouter>
         );
 
