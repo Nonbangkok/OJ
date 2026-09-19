@@ -290,14 +290,13 @@ test('published statements can begin a new revision in the full-screen editor', 
   const source = await screen.findByLabelText('Statement source');
   expect(source).not.toHaveAttribute('readonly');
   fireEvent.change(source, { target: { value: '<p>Corrected</p>' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Save now' }));
 
   await waitFor(() =>
     expect(api.patch).toHaveBeenCalledWith('/admin/authoring/drafts/d1', {
       expectedRevision: 3,
       statementHtml: '<p>Corrected</p>',
     })
-  );
+  , { timeout: 4000 });
   expect(await screen.findByText('Editing revision — live problem unchanged')).toBeInTheDocument();
 });
 test('full-screen editor exposes a draggable pane divider and persistent preview zoom controls', async () => {

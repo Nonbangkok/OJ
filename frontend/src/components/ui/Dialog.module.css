@@ -28,6 +28,18 @@
   outline-offset: 2px;
 }
 
+/* Content-heavy dialogs (assets & help, galleries): wider and taller with
+   roomier text so reference material reads comfortably. */
+.dialogWide {
+  max-width: min(56rem, calc(100vw - 2rem));
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+.dialogWide .description {
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
 .header {
   align-items: flex-start;
   display: flex;

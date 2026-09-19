@@ -236,11 +236,13 @@ export default function useAuthoringDraft(id: string, pollMs = 3000, options: Au
   }
 
   // Debounced auto-save: unsaved edits persist themselves shortly after typing stops,
-  // so no workflow action is blocked by a forgotten manual save.
+  // so no workflow action is blocked by a forgotten manual save. A published draft
+  // is editable only through the statement editor's new-revision flow, and those
+  // edits must autosave too — the save itself transitions it back to a draft.
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveRef = useRef(save);
   autosaveRef.current = save;
-  const autosaveEnabled = !conflict && draft?.status !== 'published';
+  const autosaveEnabled = !conflict;
   useEffect(() => {
     if (autosaveTimer.current) { clearTimeout(autosaveTimer.current); autosaveTimer.current = null; }
     if (!dirty || !autosaveEnabled) return;

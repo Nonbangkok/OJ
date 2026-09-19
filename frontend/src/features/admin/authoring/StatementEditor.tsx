@@ -205,9 +205,6 @@ export default function StatementEditor({ id }: { id: string }) {
           onClick={() => setPreviewZoom(100)}>Reset</button>
       </span>
       <Button variant="secondary" size="compact" onClick={() => setShowAssets(true)}>Assets &amp; help</Button>
-      <button type="button" disabled={!dirty || editorDisabled || model.conflict || !model.loaded}
-        onClick={() => void model.save()}>Save now</button>
-      <button type="button" disabled={model.actionsDisabled} onClick={() => void model.runJob('pdf')}>Build PDF</button>
     </header>
     <section className={styles.editorNotices} aria-label="Editor notices">
       {model.error && <p className={styles.editorAlert} role="alert">{model.error}</p>}
@@ -241,10 +238,14 @@ export default function StatementEditor({ id }: { id: string }) {
         </div>
       </Panel>
     </PanelGroup>
-    {showAssets && <Dialog open title="Statement assets & syntax help"
-      description={'Images: <image src="{{ASSET_BASE}}/image.png"> or ![alt]({{ASSET_BASE}}/image.png). Page break: <div class="forced-page-break"></div>. The runner-built PDF remains authoritative.'}
+    {showAssets && <Dialog open wide title="Statement assets & syntax help"
+      description={'The runner-built PDF remains authoritative.'}
       onClose={() => setShowAssets(false)}
       footer={<Button variant="secondary" onClick={() => setShowAssets(false)}>Close</Button>}>
+      <div className={styles.helpList}>
+        <p><strong>Image</strong> — <code>&lt;image src=&quot;&#123;&#123;ASSET_BASE&#125;&#125;/image.png&quot;&gt;</code> or <code>![alt](&#123;&#123;ASSET_BASE&#125;&#125;/image.png)</code></p>
+        <p><strong>Page break</strong> — <code>&lt;div class=&quot;forced-page-break&quot;&gt;&lt;/div&gt;</code></p>
+      </div>
       <StatementAssets draft={draft} disabled={model.actionsDisabled} mutate={model.mutate} onError={model.onError} />
     </Dialog>}
   </main>;

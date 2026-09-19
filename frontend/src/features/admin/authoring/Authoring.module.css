@@ -410,6 +410,23 @@
   margin: 1rem 0;
   color: var(--text-secondary);
 }
+/* Assets & help dialog: syntax reference as a scannable list. */
+.helpList {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+}
+.helpList p {
+  margin: 0;
+}
+.helpList code {
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--background-tertiary);
+  font-size: 0.95em;
+  word-break: break-all;
+}
 .confirmation {
   padding: 1rem;
   border: 2px solid var(--status-warning);
