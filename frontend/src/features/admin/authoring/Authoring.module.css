@@ -152,6 +152,58 @@
   min-width: 0;
   overflow-x: auto;
 }
+/* Bordered panel system for sectioned pages (jobs, testcases): each concern
+   gets a titled box so the page reads as distinct blocks, not one stream. */
+.panel {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  margin: 1rem 0;
+  overflow: hidden;
+}
+.panelHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--background-secondary);
+}
+.panelHead h3,
+.panelHead h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+.panelHead p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+.panelBody {
+  padding: 1rem;
+}
+.panelBody > :last-child {
+  margin-bottom: 0;
+}
+/* Table refinements inside panels: subtle header strip + hover row feedback. */
+.panel table th {
+  background: var(--background-tertiary);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+.panel table tbody tr:hover td {
+  background: var(--background-hover);
+}
+.panel table td,
+.panel table th {
+  padding: 0.55rem 0.7rem;
+  vertical-align: middle;
+}
 .authoring pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;

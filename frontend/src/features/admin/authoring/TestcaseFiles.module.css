@@ -1,6 +1,20 @@
 .root {
   color: var(--text-primary);
 }
+/* Nested inside the workspace panel box: no extra outer chrome, just the body. */
+.root > :first-child {
+  margin-top: 0;
+}
+.root table th {
+  background: var(--background-tertiary);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+.root table tbody tr:hover td {
+  background: var(--background-hover);
+}
 .heading,
 .actions {
   display: flex;

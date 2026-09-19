@@ -212,7 +212,7 @@ function StatementSection() {
 function SolutionSection() {
   const { model, form, editorDisabled } = useOutletContext<WorkspaceContext>();
   return <section className={styles.authoring}>
-    <h2>Reference solution</h2>
+    <h2>Solution</h2>
     <CodeEditor label="solution.cpp" value={form.solutionCpp} disabled={editorDisabled}
       onChange={value => model.edit('solutionCpp', value)} />
     <div className={styles.sectionActions}>
@@ -227,17 +227,27 @@ function TestcasesSection() {
   const seedValid = /^(0|[1-9][0-9]{0,19})$/.test(seed) && !(seed.length === 20 && seed > '18446744073709551615');
   return <section className={styles.authoring}>
     <h2>Testcases</h2>
-    <div className={styles.columnHead}>
-      <h3>Files</h3>
-      <div className={styles.actions}>
-        <label className={styles.seedRow}>Generator seed<input value={seed} disabled={model.actionsDisabled || !form.generatorCpp?.trim()} inputMode="numeric" onChange={e => setSeed(e.target.value)} /></label>
-        <Button disabled={model.actionsDisabled || !form.generatorCpp?.trim() || !seedValid}
-          onClick={() => setConfirm({ action: 'generate', revision: draft.revision })}>Generate inputs</Button>
-        <Button disabled={model.actionsDisabled || !form.solutionCpp.trim()} onClick={() => setConfirm({ action: 'outputs', revision: draft.revision })}>Generate outputs</Button>
+    <section className={styles.panel}>
+      <div className={styles.panelHead}>
+        <h3>Generate</h3>
+        <p>Inputs come from the generator; outputs from the reference solution.</p>
       </div>
-    </div>
-    <TestcaseFiles draftId={draft.id} revision={draft.revision} artifactVersion={draft.updatedAt} disabled={model.actionsDisabled} onMutated={model.refresh} onError={model.onError} onBusyChange={model.setOperationBusy} />
-    <p className={styles.caution}>Legacy multi-file generators may ignore the seed and write to ./input/ instead of reading OJ_SEED or argv[1].</p>
+      <div className={styles.panelBody}>
+        <div className={styles.actions}>
+          <label className={styles.seedRow}>Generator seed<input value={seed} disabled={model.actionsDisabled || !form.generatorCpp?.trim()} inputMode="numeric" onChange={e => setSeed(e.target.value)} /></label>
+          <Button disabled={model.actionsDisabled || !form.generatorCpp?.trim() || !seedValid}
+            onClick={() => setConfirm({ action: 'generate', revision: draft.revision })}>Generate inputs</Button>
+          <Button disabled={model.actionsDisabled || !form.solutionCpp.trim()} onClick={() => setConfirm({ action: 'outputs', revision: draft.revision })}>Generate outputs</Button>
+        </div>
+        <p className={styles.caution}>Legacy multi-file generators may ignore the seed and write to ./input/ instead of reading OJ_SEED or argv[1].</p>
+      </div>
+    </section>
+    <section className={styles.panel}>
+      <div className={styles.panelHead}>
+        <h3>Files</h3>
+      </div>
+      <TestcaseFiles draftId={draft.id} revision={draft.revision} artifactVersion={draft.updatedAt} disabled={model.actionsDisabled} onMutated={model.refresh} onError={model.onError} onBusyChange={model.setOperationBusy} />
+    </section>
   </section>;
 }
 
@@ -245,9 +255,6 @@ function GeneratorSection() {
   const { model, draft, form, editorDisabled } = useOutletContext<WorkspaceContext>();
   return <section className={styles.authoring}>
     <h2>Generator <span className={styles.optionalTag}>optional</span></h2>
-    <div className={styles.columnHead}>
-      <h3>generator.cpp</h3>
-    </div>
     <CodeEditor label="generator.cpp" value={form.generatorCpp || ''} disabled={editorDisabled}
       onChange={value => model.edit('generatorCpp', value || null)} minLines={18} />
     <div className={styles.sectionActions}>
