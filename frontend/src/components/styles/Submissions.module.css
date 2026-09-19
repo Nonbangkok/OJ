@@ -132,3 +132,15 @@
   position: relative;
   align-content: center;
 }
+
+.suggestion-option {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}

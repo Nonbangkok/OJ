@@ -106,7 +106,9 @@ const SubmissionModal = ({ submission, onClose }) => {
           {/* Left Side - Code Editor */}
           <div className={styles['left-panel']}>
             <div className={styles['code-container']}>
-              <div className={editorStyles['editorWrapper']} ref={editorWrapperRef} onClick={handleWrapperClick}>
+              {/* Click-to-focus is a mouse convenience; Tab reaches the textarea directly. */}
+            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
+            <div className={editorStyles['editorWrapper']} ref={editorWrapperRef} onClick={handleWrapperClick}>
                 <button
                   className={styles['copy-button']}
                   onClick={handleCopyCode}

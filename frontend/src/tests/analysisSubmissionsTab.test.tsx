@@ -124,9 +124,8 @@ describe('SubmissionsTab', () => {
         await waitFor(() => expect(mockSearchUsers).toHaveBeenCalledWith('bo'));
 
         const suggestion = await waitFor(() => {
-            const items = document.querySelectorAll('ul li');
-            const el = Array.from(items).find((li) => li.textContent === 'bob');
-            if (!el) throw new Error('user suggestion not shown');
+            const el = document.querySelector('button.suggestion-option');
+            if (!el || el.textContent?.trim() !== 'bob') throw new Error('user suggestion not shown');
             return el;
         });
         fireEvent.click(suggestion);
@@ -150,9 +149,8 @@ describe('SubmissionsTab', () => {
         fireEvent.change(screen.getByLabelText('Filter by user'), { target: { value: 'bo' } });
         await waitFor(() => expect(mockSearchUsers).toHaveBeenCalled());
         const suggestion = await waitFor(() => {
-            const items = document.querySelectorAll('ul li');
-            const el = Array.from(items).find((li) => li.textContent === 'bob');
-            if (!el) throw new Error('user suggestion not shown');
+            const el = document.querySelector('button.suggestion-option');
+            if (!el || el.textContent?.trim() !== 'bob') throw new Error('user suggestion not shown');
             return el;
         });
         fireEvent.click(suggestion);

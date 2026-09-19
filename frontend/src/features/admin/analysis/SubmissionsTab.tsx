@@ -150,7 +150,11 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
           {problemAutocomplete.showSuggestions && problemAutocomplete.suggestions.length > 0 && (
             <ul className={styles['suggestions-list']}>
               {problemAutocomplete.suggestions.map((p: { id: string; title: string }) => (
-                <li key={p.id} onClick={() => selectProblem(p)}>{p.id} — {p.title}</li>
+                <li key={p.id}>
+                  <button type="button" className={styles['suggestion-option']} onClick={() => selectProblem(p)}>
+                    {p.id} — {p.title}
+                  </button>
+                </li>
               ))}
             </ul>
           )}
@@ -172,7 +176,11 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
           {userAutocomplete.showSuggestions && userAutocomplete.suggestions.length > 0 && (
             <ul className={styles['suggestions-list']}>
               {userAutocomplete.suggestions.map((u: { id: number; username: string }) => (
-                <li key={u.username} onClick={() => selectUser(u)}>{u.username}</li>
+                <li key={u.username}>
+                  <button type="button" className={styles['suggestion-option']} onClick={() => selectUser(u)}>
+                    {u.username}
+                  </button>
+                </li>
               ))}
             </ul>
           )}

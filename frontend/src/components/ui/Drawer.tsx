@@ -71,6 +71,10 @@ export function Drawer({
   }
 
   return createPortal(
+    // Backdrop click-to-dismiss is a mouse convenience; Escape and the focus
+    // trap give keyboard users the same control, so the overlay stays
+    // non-focusable by design.
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
     <div
       className={`${styles.backdrop} ${styles[side]}`}
       onClick={(event) => {

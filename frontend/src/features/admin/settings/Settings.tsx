@@ -32,16 +32,17 @@ const Settings = () => { // Renamed component
         {registrationError && <p className={styles['error-message']}>{registrationError}</p>}
         {registrationSuccess && <p className={styles['success-message']}>{registrationSuccess}</p>}
         <div className={styles['setting-item']}>
-          <div>Enable User Registration</div>
-          <label className={styles['toggle-switch']}>
+          <label htmlFor="registration-toggle">Enable User Registration</label>
+          <span className={styles['toggle-switch']}>
             <input
               type="checkbox"
               id="registration-toggle"
+              aria-label="Enable user registration"
               checked={isRegistrationEnabled}
               onChange={handleRegistrationToggle}
             />
             <span className={`${styles.slider} ${styles.round}`}></span>
-          </label>
+          </span>
         </div>
       </div>
 

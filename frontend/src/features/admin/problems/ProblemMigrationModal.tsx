@@ -77,7 +77,16 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
                     <div
                       key={problem.id}
                       className={itemClasses}
+                      role="button"
+                      tabIndex={canMoveProblems ? 0 : -1}
+                      aria-pressed={selectedAvailable.includes(problem.id)}
                       onClick={() => canMoveProblems && handleSelectAvailable(problem.id)}
+                      onKeyDown={(e) => {
+                        if (canMoveProblems && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault();
+                          handleSelectAvailable(problem.id);
+                        }
+                      }}
                     >
                       <div className={modalStyles.migrationProblemDetails}>
                         <h4 className={modalStyles.migrationProblemTitle}>
@@ -169,7 +178,16 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
                     <div
                       key={problem.id}
                       className={itemClasses}
+                      role="button"
+                      tabIndex={canMoveProblems ? 0 : -1}
+                      aria-pressed={selectedContest.includes(problem.id)}
                       onClick={() => canMoveProblems && handleSelectContest(problem.id)}
+                      onKeyDown={(e) => {
+                        if (canMoveProblems && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault();
+                          handleSelectContest(problem.id);
+                        }
+                      }}
                     >
                       <div className={modalStyles.migrationProblemDetails}>
                         <h4 className={modalStyles.migrationProblemTitle}>

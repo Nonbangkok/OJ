@@ -126,8 +126,10 @@ const SubmissionsView = ({
                                         {showProblemSuggestions && problemSuggestions.length > 0 && (
                                             <ul className={styles['suggestions-list']}>
                                                 {problemSuggestions.map(p => (
-                                                    <li key={p.id} onClick={() => selectProblem(p.id)}>
-                                                        {p.id} - {p.title}
+                                                    <li key={p.id}>
+                                                        <button type="button" className={styles['suggestion-option']} onClick={() => selectProblem(p.id)}>
+                                                            {p.id} - {p.title}
+                                                        </button>
                                                     </li>
                                                 ))}
                                             </ul>
@@ -146,8 +148,10 @@ const SubmissionsView = ({
                                         {showUserSuggestions && userSuggestions.length > 0 && (
                                             <ul className={styles['suggestions-list']}>
                                                 {userSuggestions.map(u => (
-                                                    <li key={u.username} onClick={() => selectUser(u.username)}>
-                                                        {u.username}
+                                                    <li key={u.username}>
+                                                        <button type="button" className={styles['suggestion-option']} onClick={() => selectUser(u.username)}>
+                                                            {u.username}
+                                                        </button>
                                                     </li>
                                                 ))}
                                             </ul>

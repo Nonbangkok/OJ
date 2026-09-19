@@ -42,7 +42,9 @@ const CodeSubmissionForm = ({ problemId, contestId }) => {
       <form onSubmit={handleSubmit}>
         <div className={formStyles['form-group']}>
           <label htmlFor="code">Your Code:</label>
-          <div className={editorStyles['editorWrapper']} ref={editorWrapperRef} onClick={handleWrapperClick}>
+          {/* Click-to-focus is a mouse convenience; Tab reaches the textarea directly. */}
+            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
+            <div className={editorStyles['editorWrapper']} ref={editorWrapperRef} onClick={handleWrapperClick}>
             <div className={editorStyles['lineNumbersGutter']} ref={lineNumbersRef}>
               {Array.from({ length: lineCount }).map((_, i) => (
                 <div key={i + 1}>{i + 1}</div>

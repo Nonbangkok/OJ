@@ -215,3 +215,19 @@
 .export-button:hover {
   background-color: var(--background-hover);
 }
+
+.suggestion-option {
+  display: block;
+  width: 100%;
+  padding: 0.6rem 0.875rem;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-color-primary);
+  font: inherit;
+}
+
+.suggestion-option:hover {
+  background-color: var(--background-secondary);
+}
