@@ -13,10 +13,12 @@ import {
   analyticsContestIdParamSchema,
   analyticsSubmissionsQuerySchema,
   analyticsExportQuerySchema,
+  analyticsRetentionQuerySchema,
 } from '../schemas/requestSchemas';
 import {
   getContestAnalytics,
   getOverviewAnalytics,
+  getRetentionAnalytics,
   getProblemAnalytics,
   getUserAnalytics,
   listProblemsForAnalytics,
@@ -116,6 +118,13 @@ router.get('/analytics/problems/:problemId', requireStaffOrAdmin,
       throw new AppError('Problem not found', 404);
     }
     res.json(analytics);
+  }));
+
+router.get('/analytics/retention', requireStaffOrAdmin,
+  validateRequest({ query: analyticsRetentionQuerySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { idleDays } = req.query as unknown as { idleDays: number };
+    res.json(await getRetentionAnalytics(idleDays));
   }));
 
 /**

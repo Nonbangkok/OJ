@@ -190,3 +190,14 @@ export const exportAnalyticsCsv = async (
   link.remove();
   window.URL.revokeObjectURL(url);
 };
+
+export interface RetentionAnalytics {
+  idleUsers: Array<{ userId: number; username: string; lastActive: string }>;
+  neverSubmitted: Array<{ userId: number; username: string; createdAt: string }>;
+  activeUsers: number;
+}
+
+export const fetchRetentionAnalytics = async (idleDays = 30): Promise<RetentionAnalytics> => {
+  const response = await api.get<RetentionAnalytics>('/analytics/retention', { params: { idleDays } });
+  return response.data;
+};

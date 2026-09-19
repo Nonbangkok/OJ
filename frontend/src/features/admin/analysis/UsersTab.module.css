@@ -112,3 +112,13 @@
 .export-button:hover {
   background-color: var(--background-hover);
 }
+
+/* Retention summary strip (active / idle / never-submitted) */
+.retention-card {
+  padding: 0.625rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: var(--background-secondary);
+  color: var(--text-color-primary);
+  font-size: 0.9rem;
+}

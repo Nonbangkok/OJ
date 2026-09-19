@@ -337,6 +337,11 @@ export const analyticsSubmissionsQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+/** Retention (idle/never-submitted) analytics query. */
+export const analyticsRetentionQuerySchema = z.object({
+  idleDays: z.coerce.number().int().min(1).max(365).default(30),
+});
+
 /** Which analysis dataset a CSV export covers. */
 export const analyticsExportKindSchema = z.enum(['users', 'problems', 'submissions']);
 

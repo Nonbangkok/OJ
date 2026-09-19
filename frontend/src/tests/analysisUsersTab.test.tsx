@@ -22,6 +22,7 @@ jest.mock('recharts', () => ({
 }));
 
 const mockFetchUsers = analyticsService.fetchAnalyticsUsers as jest.MockedFunction<typeof analyticsService.fetchAnalyticsUsers>;
+const mockFetchRetention = analyticsService.fetchRetentionAnalytics as jest.MockedFunction<typeof analyticsService.fetchRetentionAnalytics>;
 const mockFetchUserAnalytics = analyticsService.fetchUserAnalytics as jest.MockedFunction<typeof analyticsService.fetchUserAnalytics>;
 
 const mockUsers = [
@@ -50,6 +51,9 @@ const mockUserAnalytics = {
 describe('UsersTab', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockFetchRetention.mockResolvedValue({
+            idleUsers: [], neverSubmitted: [], activeUsers: 0,
+        });
     });
 
     it('renders the user table from the service', async () => {
@@ -139,6 +143,41 @@ describe('UsersTab', () => {
 
         fireEvent.click(screen.getByRole('button', { name: /prev/i }));
         await waitFor(() => expect(mockFetchUsers).toHaveBeenCalledWith(expect.objectContaining({ offset: 0 })));
+    });
+
+    it('renders the retention summary when the retention fetch succeeds', async () => {
+        mockFetchUsers.mockResolvedValueOnce({ users: mockUsers });
+        mockFetchRetention.mockResolvedValueOnce({
+            activeUsers: 12,
+            idleUsers: [{ userId: 3, username: 'idleUser', lastActive: '2026-08-01T00:00:00Z' }],
+            neverSubmitted: [{ userId: 4, username: 'ghost', createdAt: '2026-09-01T00:00:00Z' }],
+        });
+
+        render(
+            <BrowserRouter>
+                <UsersTab onSelectUser={jest.fn()} />
+            </BrowserRouter>
+        );
+
+        const summary = await screen.findByLabelText('Retention summary');
+        expect(summary.textContent).toContain('12');
+        expect(summary.textContent).toContain('active');
+        expect(summary.textContent).toContain('1 idle 30+ days');
+        expect(summary.textContent).toContain('1 registered but never submitted');
+    });
+
+    it('still renders the table when the retention fetch fails', async () => {
+        mockFetchUsers.mockResolvedValueOnce({ users: mockUsers });
+        mockFetchRetention.mockRejectedValueOnce(new Error('boom'));
+
+        render(
+            <BrowserRouter>
+                <UsersTab onSelectUser={jest.fn()} />
+            </BrowserRouter>
+        );
+
+        await waitFor(() => expect(screen.getByText('bob')).toBeInTheDocument());
+        expect(screen.queryByLabelText('Retention summary')).not.toBeInTheDocument();
     });
 });
 

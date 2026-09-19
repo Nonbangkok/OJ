@@ -3,6 +3,8 @@ import {
   AnalyticsUserRow,
   exportAnalyticsCsv,
   fetchAnalyticsUsers,
+  fetchRetentionAnalytics,
+  RetentionAnalytics,
   SortDir,
   UserSortKey,
 } from '../../../services/analyticsService';
@@ -24,6 +26,7 @@ const formatDate = (iso: string | null): string => {
 };
 
 const UsersTab = ({ onSelectUser }: UsersTabProps) => {
+  const [retention, setRetention] = useState<RetentionAnalytics | null>(null);
   const [users, setUsers] = useState<AnalyticsUserRow[]>([]);
   const [search, setSearch] = useState('');
   const [offset, setOffset] = useState(0);
@@ -32,6 +35,15 @@ const UsersTab = ({ onSelectUser }: UsersTabProps) => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    // Retention summary is supplementary — never block the main list on it.
+    fetchRetentionAnalytics()
+      .then((data) => { if (!cancelled) setRetention(data); })
+      .catch(() => { if (!cancelled) setRetention(null); });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +112,14 @@ const UsersTab = ({ onSelectUser }: UsersTabProps) => {
           Export CSV
         </button>
       </div>
+
+      {retention && (
+        <div className={styles['retention-card']} aria-label="Retention summary">
+          <strong>{retention.activeUsers}</strong> active ·{' '}
+          <strong>{retention.idleUsers.length}</strong> idle 30+ days ·{' '}
+          <strong>{retention.neverSubmitted.length}</strong> registered but never submitted
+        </div>
+      )}
 
       <div className={styles['table-card']}>
         <table>

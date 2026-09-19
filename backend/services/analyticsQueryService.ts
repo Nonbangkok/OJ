@@ -1032,3 +1032,72 @@ export const listSubmissionsForAnalytics = async (
     submittedAt: r.submitted_at,
   }));
 };
+
+export interface RetentionAnalytics {
+  /** Users whose latest submission is older than the idle threshold. */
+  idleUsers: Array<{ userId: number; username: string; lastActive: string }>;
+  /** Registered users who never submitted anything. */
+  neverSubmitted: Array<{ userId: number; username: string; createdAt: string }>;
+  /** Currently-active users (submitted within the window) for context. */
+  activeUsers: number;
+}
+
+interface RetentionQueryRow {
+  user_id: number;
+  username: string;
+  last_active: string | null;
+  created_at: string;
+}
+
+/**
+ * Retention / drop-off analytics: who went idle, who never started.
+ * `idleDays` bounds the idle threshold (default 30); activity covers both
+ * submission pools.
+ */
+export const getRetentionAnalytics = async (idleDays: number): Promise<RetentionAnalytics> => {
+  const lastActiveResult = await query<RetentionQueryRow>(`
+    WITH all_submissions AS (
+      SELECT user_id, MAX(submitted_at) AS last_active
+      FROM (
+        SELECT user_id, submitted_at FROM submissions
+        UNION ALL
+        SELECT user_id, submitted_at FROM contest_submissions
+      ) s
+      GROUP BY user_id
+    )
+    SELECT u.id AS user_id, u.username, a.last_active, u.created_at
+    FROM users u
+    LEFT JOIN all_submissions a ON a.user_id = u.id
+    ORDER BY u.id ASC
+  `);
+
+  const idleCutoff = new Date(Date.now() - idleDays * 24 * 60 * 60 * 1000);
+  const idleUsers: RetentionAnalytics['idleUsers'] = [];
+  const neverSubmitted: RetentionAnalytics['neverSubmitted'] = [];
+  let activeUsers = 0;
+
+  for (const row of lastActiveResult.rows) {
+    if (row.last_active === null) {
+      neverSubmitted.push({
+        userId: row.user_id,
+        username: row.username,
+        createdAt: row.created_at,
+      });
+      continue;
+    }
+    if (new Date(row.last_active) < idleCutoff) {
+      idleUsers.push({
+        userId: row.user_id,
+        username: row.username,
+        lastActive: row.last_active,
+      });
+    } else {
+      activeUsers += 1;
+    }
+  }
+
+  // Most-recently-idle first — the most actionable cases for staff.
+  idleUsers.sort((a, b) => (a.lastActive < b.lastActive ? 1 : -1));
+
+  return { idleUsers, neverSubmitted, activeUsers };
+};
