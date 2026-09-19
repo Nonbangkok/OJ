@@ -681,6 +681,36 @@
 }
 .previewPane {
   background: var(--statement-paper);
+  display: flex;
+  flex-direction: column;
+}
+/* Live HTML vs Actual PDF switch above the preview viewport. */
+.previewModeBar {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.35rem 0.5rem 0;
+  background: var(--statement-desk);
+}
+.previewModeBar button {
+  padding: 0.3rem 0.9rem;
+  border: 1px solid var(--statement-separator);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--background-secondary);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.previewModeBar .previewModeActive {
+  background: var(--statement-paper);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.previewPdfEmbed {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: var(--statement-paper);
 }
 .previewPane iframe {
   width: 100%;
@@ -743,29 +773,30 @@
   place-items: center;
   color: var(--statement-empty);
 }
-/* Paged preview: each frame is a fixed A4-aspect "page" showing its own slice
-   of the document — the same document renders in every frame, translated up
-   by one page-height per page index, and the frame clips the rest. A solid
-   border + shadow + page number make page breaks obvious while typing. */
+/* Paged preview: fixed 794×1123px A4 pages (the PDF template's real metrics,
+   16px font) with the template's page margins as white edges, so breaks line
+   up with the runner-built PDF. Pages stay paper-width regardless of pane
+   width; zoom scales the whole sheet. */
 .previewPages {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 1.25rem;
   padding: 1rem;
 }
 .previewMeasure {
   position: absolute;
   left: -9999px;
-  /* Matches the visible page width: viewport padding (1rem) each side. */
-  width: calc(100% - 2rem);
+  width: 794px; /* A4 at 96dpi — same metrics as the real PDF */
   height: 0;
   border: 0;
   visibility: hidden;
 }
 .previewPageWrapper {
-  width: 100%;
+  width: 794px;
   max-width: 100%;
   position: relative;
+  flex-shrink: 0;
 }
 .previewPageNumber {
   font-size: 0.72rem;
@@ -782,12 +813,16 @@
   border: 1px solid var(--statement-separator);
   border-radius: 2px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+.previewPageZoom {
+  position: absolute;
+  inset: 0;
   transform-origin: top left;
 }
 .previewPageContent {
   position: absolute;
   left: 0;
-  width: 100%;
+  width: 794px;
   border: 0;
   background: var(--statement-paper);
 }
