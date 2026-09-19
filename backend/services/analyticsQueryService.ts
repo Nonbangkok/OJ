@@ -246,3 +246,389 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
     })),
   };
 };
+
+// ---------------------------------------------------------------------------
+// Per-user analytics
+// ---------------------------------------------------------------------------
+
+export interface UserListRow {
+  userId: number;
+  username: string;
+  role: string;
+  submissions: number;
+  solved: number;
+  acRate: number;
+  lastActive: string | null;
+}
+
+interface UserListQueryRow {
+  user_id: number;
+  username: string;
+  role: string;
+  submissions: string;
+  solved: string;
+  ac_rate: string;
+  last_active: string | null;
+}
+
+export interface UserAnalytics {
+  user: { id: number; username: string; role: string; createdAt: string };
+  kpis: { submissions: number; solved: number; attempted: number; acRate: number; totalScore: number };
+  dailySeries: Array<{ day: string; count: number }>;
+  hourHistogram: Array<{ hour: number; count: number }>;
+  verdictBreakdown: Array<{ verdict: string; count: number }>;
+  languageBreakdown: Array<{ language: string; count: number }>;
+  cumulativeSolved: Array<{ day: string; solved: number }>;
+  solvedByCategory: Array<{ category: string; solved: number; attempted: number }>;
+}
+
+interface UserRow { id: number; username: string; role: string; created_at: string }
+interface UserKpiRow { submissions: string; attempted: string; solved: string; ac_rate: string; total_score: string }
+interface DayCountRow { day: string; count: string }
+interface HourCountRow { hour: string; count: string }
+interface VerdictCountRow { verdict: string; count: string }
+interface LanguageCountRow { language: string; count: string }
+interface CumulativeSolvedRow { day: string; solved: string }
+interface CategorySolvedRow { category: string; solved: string; attempted: string }
+
+/** Users with aggregate stats for the analysis tab user list. */
+export const listUsersForAnalytics = async (search: string, limit: number, offset: number): Promise<UserListRow[]> => {
+  const result = await query<UserListQueryRow>(`
+    WITH all_submissions AS (
+      SELECT user_id, problem_id, overall_status, submitted_at FROM submissions
+      UNION ALL
+      SELECT user_id, problem_id, overall_status, submitted_at FROM contest_submissions
+    ),
+    best AS (
+      SELECT user_id, problem_id, MAX((overall_status = 'Accepted')::int) AS solved
+      FROM all_submissions
+      GROUP BY user_id, problem_id
+    )
+    SELECT
+      u.id AS user_id,
+      u.username,
+      u.role,
+      COUNT(s.user_id) AS submissions,
+      COALESCE(SUM(b.solved), 0) AS solved,
+      COALESCE(
+        (COUNT(*) FILTER (WHERE s.overall_status = 'Accepted'))::float / NULLIF(COUNT(s.user_id), 0),
+        0
+      ) AS ac_rate,
+      to_char(MAX(s.submitted_at), 'YYYY-MM-DD"T"HH24:MI:SSOF') AS last_active
+    FROM users u
+    LEFT JOIN all_submissions s ON s.user_id = u.id
+    LEFT JOIN best b ON b.user_id = u.id AND b.problem_id = s.problem_id
+    WHERE u.username ILIKE '%' || $1 || '%'
+    GROUP BY u.id, u.username, u.role
+    ORDER BY submissions DESC
+    LIMIT $2 OFFSET $3`,
+    [search, limit, offset]);
+
+  return result.rows.map((r) => ({
+    userId: r.user_id,
+    username: r.username,
+    role: r.role,
+    submissions: toNum(r.submissions),
+    solved: toNum(r.solved),
+    acRate: toNum(r.ac_rate),
+    lastActive: r.last_active,
+  }));
+};
+
+/** Full analytics payload for a single user, or null when the user is missing. */
+export const getUserAnalytics = async (userId: number): Promise<UserAnalytics | null> => {
+  const userResult = await query<UserRow>('SELECT id, username, role, created_at FROM users WHERE id = $1', [userId]);
+  const user = firstRow(userResult.rows);
+  if (!user) return null;
+
+  const kpiResult = await query<UserKpiRow>(`
+    WITH user_submissions AS (
+      SELECT problem_id, overall_status, score FROM submissions WHERE user_id = $1
+      UNION ALL
+      SELECT problem_id, overall_status, score FROM contest_submissions WHERE user_id = $1
+    )
+    SELECT
+      COUNT(*) AS submissions,
+      COUNT(DISTINCT problem_id) AS attempted,
+      COUNT(DISTINCT problem_id) FILTER (WHERE overall_status = 'Accepted') AS solved,
+      COALESCE(
+        (COUNT(*) FILTER (WHERE overall_status = 'Accepted'))::float / NULLIF(COUNT(*), 0),
+        0
+      ) AS ac_rate,
+      COALESCE(SUM(score), 0) AS total_score
+    FROM user_submissions`,
+    [userId]);
+
+  const dailyResult = await query<DayCountRow>(`
+    SELECT to_char(date_trunc('day', submitted_at), 'YYYY-MM-DD') AS day, COUNT(*) AS count
+    FROM (
+      SELECT submitted_at FROM submissions WHERE user_id = $1
+      UNION ALL
+      SELECT submitted_at FROM contest_submissions WHERE user_id = $1
+    ) s
+    GROUP BY 1
+    ORDER BY 1`,
+    [userId]);
+
+  const hourResult = await query<HourCountRow>(`
+    SELECT EXTRACT(HOUR FROM submitted_at)::int AS hour, COUNT(*) AS count
+    FROM (
+      SELECT submitted_at FROM submissions WHERE user_id = $1
+      UNION ALL
+      SELECT submitted_at FROM contest_submissions WHERE user_id = $1
+    ) s
+    GROUP BY 1
+    ORDER BY 1`,
+    [userId]);
+
+  const verdictResult = await query<VerdictCountRow>(`
+    SELECT overall_status AS verdict, COUNT(*) AS count
+    FROM (
+      SELECT overall_status FROM submissions WHERE user_id = $1
+      UNION ALL
+      SELECT overall_status FROM contest_submissions WHERE user_id = $1
+    ) s
+    GROUP BY 1
+    ORDER BY count DESC`,
+    [userId]);
+
+  const languageResult = await query<LanguageCountRow>(`
+    SELECT language, COUNT(*) AS count
+    FROM (
+      SELECT language FROM submissions WHERE user_id = $1
+      UNION ALL
+      SELECT language FROM contest_submissions WHERE user_id = $1
+    ) s
+    GROUP BY 1
+    ORDER BY count DESC`,
+    [userId]);
+
+  const cumulativeResult = await query<CumulativeSolvedRow>(`
+    WITH user_submissions AS (
+      SELECT problem_id, overall_status, submitted_at FROM submissions WHERE user_id = $1
+      UNION ALL
+      SELECT problem_id, overall_status, submitted_at FROM contest_submissions WHERE user_id = $1
+    ),
+    first_solves AS (
+      SELECT problem_id, MIN(submitted_at) AS first_solved_at
+      FROM user_submissions
+      WHERE overall_status = 'Accepted'
+      GROUP BY problem_id
+    )
+    SELECT
+      to_char(date_trunc('day', first_solved_at), 'YYYY-MM-DD') AS day,
+      COUNT(*) AS solved
+    FROM first_solves
+    GROUP BY 1
+    ORDER BY 1`,
+    [userId]);
+
+  const categoryResult = await query<CategorySolvedRow>(`
+    WITH user_submissions AS (
+      SELECT problem_id, overall_status FROM submissions WHERE user_id = $1
+      UNION ALL
+      SELECT problem_id, overall_status FROM contest_submissions WHERE user_id = $1
+    )
+    SELECT
+      COALESCE(p.category, 'uncategorized') AS category,
+      COUNT(DISTINCT us.problem_id) FILTER (WHERE us.overall_status = 'Accepted') AS solved,
+      COUNT(DISTINCT us.problem_id) AS attempted
+    FROM user_submissions us
+    JOIN problems p ON p.id = us.problem_id
+    GROUP BY 1
+    ORDER BY solved DESC`,
+    [userId]);
+
+  const kpi = firstRow(kpiResult.rows);
+
+  return {
+    user: { id: user.id, username: user.username, role: user.role, createdAt: user.created_at },
+    kpis: {
+      submissions: toNum(kpi?.submissions),
+      solved: toNum(kpi?.solved),
+      attempted: toNum(kpi?.attempted),
+      acRate: toNum(kpi?.ac_rate),
+      totalScore: toNum(kpi?.total_score),
+    },
+    dailySeries: dailyResult.rows.map((r) => ({ day: r.day, count: toNum(r.count) })),
+    hourHistogram: hourResult.rows.map((r) => ({ hour: toNum(r.hour), count: toNum(r.count) })),
+    verdictBreakdown: verdictResult.rows.map((r) => ({ verdict: r.verdict, count: toNum(r.count) })),
+    languageBreakdown: languageResult.rows.map((r) => ({ language: r.language, count: toNum(r.count) })),
+    cumulativeSolved: cumulativeResult.rows.map((r) => ({ day: r.day, solved: toNum(r.solved) })),
+    solvedByCategory: categoryResult.rows.map((r) => ({
+      category: r.category,
+      solved: toNum(r.solved),
+      attempted: toNum(r.attempted),
+    })),
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Per-problem analytics
+// ---------------------------------------------------------------------------
+
+export interface ProblemAnalytics {
+  problem: { id: string; title: string; createdAt: string };
+  kpis: { submissions: number; accepted: number; acRate: number; uniqueSubmitters: number };
+  dailySeries: Array<{ day: string; total: number; accepted: number }>;
+  verdictBreakdown: Array<{ verdict: string; count: number }>;
+  testcasePassRates: Array<{ caseNumber: number; passRate: number }>;
+  runtimeBuckets: Array<{ bucket: string; count: number }>;
+  memoryBuckets: Array<{ bucket: string; count: number }>;
+  firstSolves: Array<{ userId: number; username: string; submittedAt: string }>;
+}
+
+interface ProblemRow { id: string; title: string; created_at: string }
+interface ProblemKpiRow { submissions: string; accepted: string; ac_rate: string; unique_submitters: string }
+interface ProblemDailyRow { day: string; total: string; accepted: string }
+interface BucketRow { bucket: string; count: string }
+interface FirstSolveRow { user_id: number; username: string; submitted_at: string }
+interface TestCasePassRow { case_number: number; total: string; passed: string }
+
+/** Full analytics payload for a single problem, or null when missing. */
+export const getProblemAnalytics = async (problemId: string): Promise<ProblemAnalytics | null> => {
+  const problemResult = await query<ProblemRow>('SELECT id, title, created_at FROM problems WHERE id = $1', [problemId]);
+  const problem = firstRow(problemResult.rows);
+  if (!problem) return null;
+
+  const kpiResult = await query<ProblemKpiRow>(`
+    SELECT
+      COUNT(*) AS submissions,
+      COUNT(*) FILTER (WHERE overall_status = 'Accepted') AS accepted,
+      COALESCE(
+        (COUNT(*) FILTER (WHERE overall_status = 'Accepted'))::float / NULLIF(COUNT(*), 0),
+        0
+      ) AS ac_rate,
+      COUNT(DISTINCT user_id) AS unique_submitters
+    FROM (
+      SELECT user_id, overall_status FROM submissions WHERE problem_id = $1
+      UNION ALL
+      SELECT user_id, overall_status FROM contest_submissions WHERE problem_id = $1
+    ) s`,
+    [problemId]);
+
+  const dailyResult = await query<ProblemDailyRow>(`
+    SELECT
+      to_char(date_trunc('day', submitted_at), 'YYYY-MM-DD') AS day,
+      COUNT(*) AS total,
+      COUNT(*) FILTER (WHERE overall_status = 'Accepted') AS accepted
+    FROM (
+      SELECT overall_status, submitted_at FROM submissions WHERE problem_id = $1
+      UNION ALL
+      SELECT overall_status, submitted_at FROM contest_submissions WHERE problem_id = $1
+    ) s
+    GROUP BY 1
+    ORDER BY 1`,
+    [problemId]);
+
+  const verdictResult = await query<VerdictCountRow>(`
+    SELECT overall_status AS verdict, COUNT(*) AS count
+    FROM (
+      SELECT overall_status FROM submissions WHERE problem_id = $1
+      UNION ALL
+      SELECT overall_status FROM contest_submissions WHERE problem_id = $1
+    ) s
+    GROUP BY 1
+    ORDER BY count DESC`,
+    [problemId]);
+
+  // results JSONB elements look like { testCase, status, timeMs, memoryKb }
+  const testcaseResult = await query<TestCasePassRow>(`
+    WITH all_results AS (
+      SELECT results FROM submissions WHERE problem_id = $1 AND results IS NOT NULL
+      UNION ALL
+      SELECT results FROM contest_submissions WHERE problem_id = $1 AND results IS NOT NULL
+    ),
+    cases AS (
+      SELECT (elem->>'testCase')::int AS case_number,
+             (elem->>'status') AS status
+      FROM all_results r,
+           jsonb_array_elements(r.results) AS elem
+    )
+    SELECT
+      case_number,
+      COUNT(*) AS total,
+      COUNT(*) FILTER (WHERE status = 'Accepted') AS passed
+    FROM cases
+    GROUP BY case_number
+    ORDER BY case_number`,
+    [problemId]);
+
+  const runtimeResult = await query<BucketRow>(`
+    SELECT
+      CASE
+        WHEN max_time_ms IS NULL THEN 'unknown'
+        WHEN max_time_ms < 100 THEN '0-100ms'
+        WHEN max_time_ms < 250 THEN '100-250ms'
+        WHEN max_time_ms < 500 THEN '250-500ms'
+        WHEN max_time_ms < 1000 THEN '500ms-1s'
+        ELSE '>1s'
+      END AS bucket,
+      COUNT(*) AS count
+    FROM (
+      SELECT max_time_ms FROM submissions WHERE problem_id = $1
+      UNION ALL
+      SELECT max_time_ms FROM contest_submissions WHERE problem_id = $1
+    ) s
+    GROUP BY 1`,
+    [problemId]);
+
+  const memoryResult = await query<BucketRow>(`
+    SELECT
+      CASE
+        WHEN max_memory_kb IS NULL THEN 'unknown'
+        WHEN max_memory_kb < 51200 THEN '0-50MB'
+        WHEN max_memory_kb < 102400 THEN '50-100MB'
+        WHEN max_memory_kb < 204800 THEN '100-200MB'
+        ELSE '>200MB'
+      END AS bucket,
+      COUNT(*) AS count
+    FROM (
+      SELECT max_memory_kb FROM submissions WHERE problem_id = $1
+      UNION ALL
+      SELECT max_memory_kb FROM contest_submissions WHERE problem_id = $1
+    ) s
+    GROUP BY 1`,
+    [problemId]);
+
+  const firstSolvesResult = await query<FirstSolveRow>(`
+    SELECT user_id, username, to_char(submitted_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') AS submitted_at
+    FROM (
+      SELECT user_id, MIN(submitted_at) AS submitted_at
+      FROM (
+        SELECT user_id, submitted_at FROM submissions WHERE problem_id = $1 AND overall_status = 'Accepted'
+        UNION ALL
+        SELECT user_id, submitted_at FROM contest_submissions WHERE problem_id = $1 AND overall_status = 'Accepted'
+      ) s
+      GROUP BY user_id
+    ) fs
+    JOIN users u ON u.id = fs.user_id
+    ORDER BY fs.submitted_at ASC
+    LIMIT 10`,
+    [problemId]);
+
+  const kpi = firstRow(kpiResult.rows);
+
+  return {
+    problem: { id: problem.id, title: problem.title, createdAt: problem.created_at },
+    kpis: {
+      submissions: toNum(kpi?.submissions),
+      accepted: toNum(kpi?.accepted),
+      acRate: toNum(kpi?.ac_rate),
+      uniqueSubmitters: toNum(kpi?.unique_submitters),
+    },
+    dailySeries: dailyResult.rows.map((r) => ({ day: r.day, total: toNum(r.total), accepted: toNum(r.accepted) })),
+    verdictBreakdown: verdictResult.rows.map((r) => ({ verdict: r.verdict, count: toNum(r.count) })),
+    testcasePassRates: testcaseResult.rows.map((r) => ({
+      caseNumber: r.case_number,
+      passRate: toNum(r.total) === 0 ? 0 : toNum(r.passed) / toNum(r.total),
+    })),
+    runtimeBuckets: runtimeResult.rows.map((r) => ({ bucket: r.bucket, count: toNum(r.count) })),
+    memoryBuckets: memoryResult.rows.map((r) => ({ bucket: r.bucket, count: toNum(r.count) })),
+    firstSolves: firstSolvesResult.rows.map((r) => ({
+      userId: r.user_id,
+      username: r.username,
+      submittedAt: r.submitted_at,
+    })),
+  };
+};
