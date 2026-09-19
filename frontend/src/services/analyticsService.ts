@@ -59,7 +59,7 @@ export interface ProblemAnalytics {
   firstSolves: Array<{ userId: number; username: string; submittedAt: string }>;
 }
 
-export const fetchOverview = async (days: number = 30): Promise<OverviewAnalytics> => {
+export const fetchOverview = async (days = 30): Promise<OverviewAnalytics> => {
   const response = await api.get<OverviewAnalytics>('/analytics/overview', { params: { days } });
   return response.data;
 };
