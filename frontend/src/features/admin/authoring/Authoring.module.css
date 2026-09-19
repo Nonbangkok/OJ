@@ -564,9 +564,13 @@
   color: var(--text-primary);
   background: var(--background-primary);
 }
+/* Three-zone header: left (back link + title), center (editing state),
+   right (status chip, zoom, assets). Grid centers the middle column on the
+   header itself; spacers are gone. */
 .editorHeader {
   min-height: 3.5rem;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 0.6rem;
   padding: 0.5rem 1rem;
@@ -574,8 +578,23 @@
   color: var(--editor-chrome-text);
   border-bottom: 1px solid var(--border-color);
 }
-.headerSpacer {
-  flex: 1;
+.editorHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.editorHeaderRight {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  min-width: 0;
+}
+/* The editing-state label occupies the header's true center column. */
+.editorStateCenter {
+  text-align: center;
+  white-space: nowrap;
 }
 .previewStatusChip {
   color: var(--editor-chrome-muted);
@@ -706,13 +725,15 @@
   color: var(--action-primary-foreground);
   border-color: var(--accent-primary);
 }
-.previewModeBar .previewModeActive {
+.previewModeBar .previewModeActive,
+.previewModeBar .previewModeActive:hover,
+.previewModeBar .previewModeActive:active,
+.previewModeBar .previewModeActive:focus-visible {
   background: var(--statement-paper);
   color: var(--text-primary);
   font-weight: 600;
 }
 .previewModeBar .previewModeActive:hover {
-  background: var(--statement-paper);
   border-color: var(--accent-primary);
 }
 .previewPdfEmbed {
@@ -858,12 +879,18 @@
     overflow: auto;
     grid-template-rows: auto auto auto auto;
   }
+  /* Narrow screens: stack left/center/right into rows; the state label
+     spans the middle row, centered. */
   .editorHeader {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
-  .editorHeader strong {
+  .editorStateCenter {
     grid-column: 1 / -1;
+    grid-row: 2;
     text-align: center;
+  }
+  .editorHeaderRight {
+    justify-content: flex-end;
   }
   .editorWorkspace {
     min-height: 100dvh;

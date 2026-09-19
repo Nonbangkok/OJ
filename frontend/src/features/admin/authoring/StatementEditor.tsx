@@ -222,21 +222,24 @@ export default function StatementEditor({ id }: { id: string }) {
     : previewState === 'error' ? previewError : 'Preview is up to date';
   return <main className={styles.editorShell}>
     <header className={styles.editorHeader}>
-      <Link to={`/admin/authoring/${encodeURIComponent(id)}`}>← Workspace</Link>
-      <div className={styles.editorTitle}><h1>Edit Task: {draft.problemId}</h1></div>
-      <strong>{editorState}</strong>
-      <span className={styles.headerSpacer} />
-      <span className={styles.previewStatusChip} role="status">{previewStatusText}</span>
-      <span className={styles.previewZoomControls} aria-label="Preview zoom controls">
-        <button type="button" aria-label="Zoom out" disabled={previewZoom <= MIN_PREVIEW_ZOOM}
-          onClick={() => setPreviewZoom(zoom => Math.max(MIN_PREVIEW_ZOOM, zoom - PREVIEW_ZOOM_STEP))}>−</button>
-        <output aria-label="Preview zoom">{previewZoom}%</output>
-        <button type="button" aria-label="Zoom in" disabled={previewZoom >= MAX_PREVIEW_ZOOM}
-          onClick={() => setPreviewZoom(zoom => Math.min(MAX_PREVIEW_ZOOM, zoom + PREVIEW_ZOOM_STEP))}>+</button>
-        <button type="button" aria-label="Reset preview zoom" disabled={previewZoom === 100}
-          onClick={() => setPreviewZoom(100)}>Reset</button>
-      </span>
-      <Button variant="secondary" size="compact" onClick={() => setShowAssets(true)}>Assets &amp; help</Button>
+      <div className={styles.editorHeaderLeft}>
+        <Link to={`/admin/authoring/${encodeURIComponent(id)}`}>← Workspace</Link>
+        <div className={styles.editorTitle}><h1>Edit Task: {draft.problemId}</h1></div>
+      </div>
+      <strong className={styles.editorStateCenter}>{editorState}</strong>
+      <div className={styles.editorHeaderRight}>
+        <span className={styles.previewStatusChip} role="status">{previewStatusText}</span>
+        <span className={styles.previewZoomControls} aria-label="Preview zoom controls">
+          <button type="button" aria-label="Zoom out" disabled={previewZoom <= MIN_PREVIEW_ZOOM}
+            onClick={() => setPreviewZoom(zoom => Math.max(MIN_PREVIEW_ZOOM, zoom - PREVIEW_ZOOM_STEP))}>−</button>
+          <output aria-label="Preview zoom">{previewZoom}%</output>
+          <button type="button" aria-label="Zoom in" disabled={previewZoom >= MAX_PREVIEW_ZOOM}
+            onClick={() => setPreviewZoom(zoom => Math.min(MAX_PREVIEW_ZOOM, zoom + PREVIEW_ZOOM_STEP))}>+</button>
+          <button type="button" aria-label="Reset preview zoom" disabled={previewZoom === 100}
+            onClick={() => setPreviewZoom(100)}>Reset</button>
+        </span>
+        <Button variant="secondary" size="compact" onClick={() => setShowAssets(true)}>Assets &amp; help</Button>
+      </div>
     </header>
     <section className={styles.editorNotices} aria-label="Editor notices">
       {model.error && <p className={styles.editorAlert} role="alert">{model.error}</p>}
