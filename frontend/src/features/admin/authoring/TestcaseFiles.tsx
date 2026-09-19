@@ -57,7 +57,7 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
         </p>
       )}
       {savedRevision > revision && (
-        <p role="status">Changes saved. Waiting for the draft revision to refresh.</p>
+        <p role="status">Changes saved. Refreshing…</p>
       )}
       {errorMessage && <p role="alert">{errorMessage}</p>}
       {(loading || busy || inspecting) && (

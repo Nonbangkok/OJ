@@ -246,8 +246,8 @@ export default function StatementEditor({ id }: { id: string }) {
 
   const editorDisabled = model.busy || !!model.activeJob;
   const zoomScale = previewZoom / 100;
-  const editorState = draft.status === 'published' ? 'Published — statement revision available'
-    : draft.publishedAt ? 'Editing revision — live problem unchanged'
+  const editorState = draft.status === 'published' ? 'Published — editing available'
+    : draft.publishedAt ? 'Editing — live problem unchanged'
       : model.conflict ? 'Server conflict'
         : dirty ? (model.saveState === 'saving' ? 'Saving…' : 'Unsaved changes') : 'Saved';
   const previewStatusText = previewState === 'waiting' ? 'Waiting for typing to pause…' : previewState === 'loading' ? 'Updating preview…'

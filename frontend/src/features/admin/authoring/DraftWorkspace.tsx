@@ -88,9 +88,13 @@ export default function DraftWorkspace({ id }: { id: string }) {
             : model.conflict ? 'Server state changed'
               : saveStateText[model.saveState] ?? ''}
         </strong>
-        {model.activeJob && <p role="status" className={styles.navJob}><StatusBadge tone="info">Running</StatusBadge> {jobLabel(model.activeJob.jobType)}</p>}
+        {model.activeJob && <p role="status" className={styles.navJob}>
+          <StatusBadge tone="info" soft>Running</StatusBadge>
+          <span className={styles.navJobName}>{jobLabel(model.activeJob.jobType)}</span>
+        </p>}
         {!model.activeJob && latestResult && <p role="status" className={styles.navJob}>
-          <StatusBadge tone={latestResult.tone}>{latestResult.label}</StatusBadge> {latestResult.name}
+          <StatusBadge tone={latestResult.tone} soft>{latestResult.label}</StatusBadge>
+          <span className={styles.navJobName}>{latestResult.name}</span>
         </p>}
       </div>
       <nav className={styles.sectionNav} aria-label="Draft sections">
@@ -330,13 +334,13 @@ function PublishChecklist({ draft, dirty, canPublish, disabled, onVerify, onPubl
     </li>;
   return <div className={styles.verifyPanel}>
     <ul className={styles.checklist} aria-label="Publish readiness">
-      {item(!!draft.solutionCpp.trim(), 'Reference solution', 'missing',
+      {item(!!draft.solutionCpp.trim(), 'Solution', 'missing',
         <>— <button type="button" className={styles.linkButton} onClick={() => onGoToTestcases()}>add it</button></>)}
       {item(hasOutputs, 'Testcase outputs', 'not generated',
         <>— <button type="button" className={styles.linkButton} onClick={() => onGoToTestcases()}>generate</button></>)}
-      {item(pdfCurrent, `PDF (revision ${draft.revision})`, draft.hasLatestPdf ? 'outdated' : 'not built',
+      {item(pdfCurrent, 'PDF', draft.hasLatestPdf ? 'outdated' : 'not built',
         <>— <button type="button" className={styles.linkButton} disabled={disabled} onClick={onBuildPdf}>build now</button></>)}
-      {item(verified, 'Verified', draft.verifiedRevision === null ? 'never verified' : `verified at revision ${draft.verifiedRevision}`,
+      {item(verified, 'Verified', draft.verifiedRevision === null ? 'never verified' : 'verified',
         <>— <button type="button" className={styles.linkButton} disabled={disabled || !draft.solutionCpp.trim()} onClick={onVerify}>verify now</button></>)}
     </ul>
     {dirty && <p className={styles.caution}>Unsaved edits exist — saving automatically.</p>}
@@ -345,6 +349,5 @@ function PublishChecklist({ draft, dirty, canPublish, disabled, onVerify, onPubl
       <Button disabled={disabled || !draft.solutionCpp.trim()} onClick={onVerify}>Verify All</Button>
       <Button variant="primary" disabled={!canPublish} onClick={onPublish}>Publish problem</Button>
     </div>
-    <p className={styles.caution}>Verify does not prove algorithm correctness.</p>
   </div>;
 }

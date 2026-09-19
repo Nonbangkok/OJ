@@ -11,7 +11,7 @@ export function PdfPreview({ draft }: { draft: Draft }) {
   if (!draft.hasLatestPdf) return <p className={styles.pdfPanelEmpty}>No PDF yet. Build PDF from Verify &amp; Publish.</p>;
   return <section className={styles.pdfPanel}>
     <div className={styles.pdfPanelHead}>
-      <p className={styles.pdfPanelText}>PDF revision {draft.latestPdfRevision} {draft.latestPdfRevision !== draft.revision ? '— outdated; rebuild from Verify & Publish.' : '— current revision.'}</p>
+      <p className={styles.pdfPanelText}>{draft.latestPdfRevision !== draft.revision ? 'PDF is outdated — rebuild from Verify & Publish.' : 'PDF is up to date.'}</p>
       <div className={styles.pdfPanelActions}>
         <Button variant="secondary" size="compact" onClick={() => setOpen(p => !p)}>{open ? 'Hide PDF' : 'Preview PDF'}</Button>
         <a className={styles.pdfOpenLink} href={url} target="_blank" rel="noreferrer">Open actual PDF ↗</a>

@@ -40,7 +40,7 @@ test('a failed sync job surfaces its error through the inspect dialog', async ()
   jest.mocked(api.get).mockResolvedValue({ data: jobs[0] });
   render(<JobHistory jobs={jobs} onError={jest.fn()} />);
 
-  fireEvent.click(screen.getByRole('button', { name: /Inspect Profile sync PDF r4/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Inspect Profile sync PDF/ }));
 
   const dialog = await screen.findByRole('dialog');
   expect(dialog).toHaveTextContent('Profile sync — the author snapshot was refreshed');

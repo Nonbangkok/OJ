@@ -411,9 +411,26 @@
 .backLink:hover {
   color: var(--accent-primary);
 }
+/* Latest job line: badge and job name share one row, clamped so long labels
+   never wrap; the name fades toward muted so the badge carries the state. */
 .navJob {
-  margin: 0;
-  font-size: 0.875rem;
+  margin: 0.35rem 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  font-size: 0.8rem;
+}
+.navJob span {
+  flex-shrink: 0; /* the badge never collapses; the name clamps instead */
+}
+.navJobName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
 }
 .sectionNav {
   display: flex;

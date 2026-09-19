@@ -77,17 +77,17 @@ export default function JobHistory({ jobs, onError }: { jobs: Job[]; onError: (e
       </div>
       <div className={styles.panelBody}>
         {hasSyncJob && <p role="note" className={styles.caution}>Profile sync rebuilds this draft's PDF with updated author metadata and republishes it if it was published. A failed sync leaves the previous PDF live.</p>}
-        <div className={styles.scroll}><table><thead><tr><th>Action</th><th>Revision</th><th>Status</th><th>Created</th><th>Report</th></tr></thead>
+        <div className={styles.scroll}><table><thead><tr><th>Action</th><th>Status</th><th>Created</th><th>Report</th></tr></thead>
           <tbody>{jobs.map(job => { const status = jobStatus(job.status); return <tr key={job.id}><td>{jobLabel(job.jobType)}</td>
-            <td>{job.draftRevision}</td><td><StatusBadge tone={status.tone}>{status.label}</StatusBadge></td>
+            <td><StatusBadge tone={status.tone} soft>{status.label}</StatusBadge></td>
             <td>{job.createdAt ? formatDateTime(job.createdAt) : '—'}</td><td><Button size="compact" variant="secondary" disabled={loading} onClick={async () => {
               setLoading(true); try { setDetail(await authoringService.getJob(job.id)); }
               catch (err) { onError(err); } finally { setLoading(false); }
-            }}>Inspect {jobLabel(job.jobType)} r{job.draftRevision}</Button></td></tr>; })}</tbody></table></div>
+            }}>Inspect {jobLabel(job.jobType)}</Button></td></tr>; })}</tbody></table></div>
         {!jobs.length && <p>No builds yet.</p>}
       </div>
     </section>
-    {detail && <Dialog open title={`${jobLabel(detail.jobType)}: ${detail.status} (revision ${detail.draftRevision})`}
+    {detail && <Dialog open title={`${jobLabel(detail.jobType)}: ${detail.status}`}
       onClose={() => setDetail(null)}
       footer={<Button variant="secondary" onClick={() => setDetail(null)}>Close</Button>}>
       {detail.jobType === 'sync_pdf' && <p>Profile sync — the author snapshot was refreshed from its profile and the PDF rebuilt. Published problems were republished with the new metadata in the same step.</p>}
