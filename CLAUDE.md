@@ -60,7 +60,7 @@ Nginx (`nginx-proxy/default.conf`) serves the frontend at `/` and proxies `/api/
 
 `controllers/ → services/ → db.ts`
 
-- **`controllers/*.ts`** — Express routers. Each file defines routes, attaches middleware (auth, validation, upload), and delegates to services. All five (`auth`, `admin`, `problem`, `submission`, `contest`) are registered in `server.ts`.
+- **`controllers/*.ts`** — Express routers. Each file defines routes, attaches middleware (auth, validation, upload), and delegates to services. All routers (`auth`, `admin`, `problem`, `submission`, `contest`, `health`, `analytics`, `userProfile`, `authorProfile`, and the authoring family) are registered in `server.ts`.
 - **`services/*.ts`** — business logic and **raw parameterized SQL** via `db.query`. No ORM. Query-heavy logic lives in `*QueryService.ts` files.
 - **`db.ts`** — single `pg.Pool`; export `query(text, params)` and `pool`.
 
@@ -69,7 +69,8 @@ Cross-cutting concerns:
 - **Validation** — Zod schemas in `schemas/requestSchemas.ts`, applied via `middleware/validation.ts` (`validateRequest({ body, query, params })`).
 - **Errors** — `middleware/errorHandler.ts` provides `asyncHandler`, `AppError`, plus `notFoundHandler`/`errorHandler` mounted last in `server.ts`.
 - **Uploads** — `middleware/upload.ts` (multer). Limit is 1GB (PDFs, testcase ZIPs, DB dumps).
-- **Constants** — magic values (roles, submission/contest statuses, judge config, validation limits) are centralized in `backend/constants/index.ts`. Reuse these rather than hardcoding strings.
+- **Constants** — magic values (roles, submission/contest statuses, judge config, validation limits, query caps) are centralized in `backend/constants/index.ts`. Reuse these rather than hardcoding strings.
+- **Logging** — use `backend/utils/logger.ts` (structured: JSON in production, level-tagged text in dev), not raw `console.*`. Failed logins, judge pipeline failures, and contest scheduler transitions are all logged through it.
 
 ### Judging pipeline
 
@@ -87,7 +88,7 @@ Submission statuses and judge tuning (buffers, timeout slack) live in `SUBMISSIO
 
 ### Database
 
-Schema changes go through versioned, non-destructive migrations in `backend/migrations/` (`0001CoreSchema.ts`, …) applied by `backend/scripts/migrate.ts` under a Postgres advisory lock; applied versions are recorded in `schema_migrations`. Production `npm start` runs migrations before the API starts. Core tables: `users`, `system_settings`, `problems`, `testcases`, `submissions`, `user_sessions`, the `contest_*` family, and the authoring family (`author_profiles`, `problem_drafts`, `problem_draft_assets`, `problem_draft_testcases`, `authoring_jobs`, `authoring_job_inputs`, `authoring_job_files`, `authoring_published_problems`). To change the schema, add a new numbered migration — do not edit an applied one. `backend/scripts/init_db.ts` remains only as a destructive dev reset (drops all tables).
+Schema changes go through versioned, non-destructive migrations in `backend/migrations/` (`0001CoreSchema.ts`, …) applied by `backend/scripts/migrate.ts` under a Postgres advisory lock; applied versions are recorded in `schema_migrations`. Production `npm start` runs migrations before the API starts. Core tables: `users`, `system_settings`, `problems`, `testcases`, `submissions` (indexed on user_id / problem_id / submitted_at), `user_sessions`, the `contest_*` family, and the authoring family (`author_profiles`, `problem_drafts`, `problem_draft_assets`, `problem_draft_testcases`, `authoring_jobs`, `authoring_job_inputs`, `authoring_job_files`, `authoring_published_problems`). To change the schema, add a new numbered migration — do not edit an applied one. `backend/scripts/init_db.ts` remains only as a destructive dev reset (drops all tables).
 
 ### Frontend structure (`frontend/src/`)
 
@@ -97,6 +98,7 @@ Schema changes go through versioned, non-destructive migrations in `backend/migr
 - **`context/`** — global React context: `AuthContext`, `SettingsContext`, `ThemeContext`.
 - **`layouts/`** — `MainLayout` / contest / admin layouts; `App.tsx` switches navbar + layout by URL pattern.
 - **`config/`** — frontend constants (polling intervals, UI timeouts). Real-time updates (submission status, scoreboards) use **polling**, not websockets — intervals are in `POLLING_INTERVALS`.
+- **Error handling** — a global `ErrorBoundary` wraps the app (`components/ErrorBoundary.tsx`); a 401 session-expiry interceptor in `services/api.ts` redirects to `/login?expired=1&returnTo=…`. Modals use the accessible `components/ui/Dialog` (Escape, focus trap) — not raw overlay divs.
 
 Test config note: coverage is enforced only on `src/services/*.ts` (85% branches / 90% lines, excluding `api.ts`). There are separate `tsconfig.tests.*.json` for type-checking test subsets.
 

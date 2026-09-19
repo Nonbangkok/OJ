@@ -190,11 +190,72 @@ submissions + 200 users/problems, ran EXPLAIN ANALYZE before/after:
 Migration tests updated in tests/migrations/ (3 files asserting version
 list). Runner proven idempotent (second run = "already up to date").
 
+## Final summary (2026-09-20, all phases complete)
+
+Branch `upgrade/system-wide-2026-09` — 24 commits on top of d1df313 (master).
+**Every suite green**: backend 587 passed / 137 DB-gated skipped (by design),
+frontend 539 passed (102 suites), visual regression 4/4, production build
+clean, full Docker stack rebuilt and exercised end-to-end at :8080 (login,
+all analytics endpoints, CSV export download, cheat-detection UI, retention
+summary, dark mode).
+
+### Phase 2 — Sustainability & Code Quality
+- 0010 submission-pool indexes (EXPLAIN-verified 21ms→0.4ms worst query)
+- Magic values → constants ('Accepted' x25, LIMIT 200, full-score, maxAge,
+  saltRounds, role literals)
+- Raw try/catch controllers → asyncHandler + AppError
+- TS 4.9.5 → 5.5.4 + @types/react 19 alignment (CRA needs
+  --legacy-peer-deps for npm ops now)
+- validateRequest writes Zod query defaults back into req.query (Express 5
+  defineProperty), killing per-controller default duplication
+- AuthorProfiles split 491 → 287 lines (hook + 2 components)
+- Dead `cors` dep dropped; user-event v14
+
+### Phase 3 — Security & Reliability
+- Structured logger (utils/logger.ts) wired through judge pipeline,
+  scheduler, migration, auth failures (failed logins were silent before)
+- Import-progress token: query-string support removed (header-only) so it
+  never lands in proxy access logs
+- Global ErrorBoundary + 401 session-expiry interceptor with returnTo
+- Fixed live bug: unquoted SUBMISSION_STATUS SQL interpolation (42703 at
+  runtime) — caught by stack testing, regression-guarded by unit test
+
+### Phase 4 — UX/UI
+- Complete dark-mode tokenisation: analysis feature (~40 hex), VerdictBadge
+  (--verdict-* + color-mix), ActivityHeatmap, UserProfile dots, ModalLayout
+  warning, scoreboard medals, ContestScoreboard, react-datepicker
+- Undefined --accent-color/--link-color fallback traps fixed
+- 4 raw modals → accessible ui/Dialog (Escape, focus trap)
+- Home quote-box keyboard a11y; all 4 jsx-a11y interaction rules
+  re-enabled with zero violations (autocomplete suggestions became real
+  buttons, migration rows got role=button + keyboard)
+- SubmissionsTab overflow-x + phone-width filter stacking
+
+### Phase 5 — New Features (all E2E-verified on the stack)
+- CSV export (users/problems/submissions) — RFC 4180, staff-gated,
+  10k-row cap, browser download verified
+- Contest cheat detection — normalised token-stream similarity
+  (strip comments, identifier/literal collapse, k=5 shingle Jaccard),
+  /admin/contests/:id/similarity with tunable ?threshold, ContestDetail
+  "Similar submissions" section; seeded contest verified (alice-bob 68%
+  detected, genuinely-different carol not flagged)
+- Retention analytics — /analytics/retention (active / idle 30+ days /
+  never-submitted), UsersTab summary strip
+- Side-by-side user comparison in analysis (no backend change)
+
+### Deferred decisions for the user
+- Major dep bumps: node-cron 3→4, connect-pg-simple 9→10, uuid 9→14,
+  archiver 7→8, express-sse 0.5→1.0, dotenv 17→18, htmlparser2 10→12
+- CRA → Vite migration (react-scripts 5.0.1 is dead upstream) — strategic,
+  not urgent
+- judgeService timeMs parse-failure keeps stale value (trusted wrapper,
+  low severity)
+
 ## Phase status
 
-- [x] Phase 1: Baseline & Audit (baseline green; both audits in this file)
-- [~] Phase 2: Sustainability & Code Quality (4/8 items done)
-- [~] Phase 3: Security & Reliability (logging done; token/auth items pending)
-- [ ] Phase 4: UX/UI Upgrade
-- [ ] Phase 5: New Features
-- [ ] Phase 6: Final Sweep
+- [x] Phase 1: Baseline & Audit
+- [x] Phase 2: Sustainability & Code Quality
+- [x] Phase 3: Security & Reliability
+- [x] Phase 4: UX/UI Upgrade
+- [x] Phase 5: New Features
+- [x] Phase 6: Final Sweep
