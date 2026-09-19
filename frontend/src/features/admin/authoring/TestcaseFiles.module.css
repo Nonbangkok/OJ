@@ -1,5 +1,7 @@
 .root {
   color: var(--text-primary);
+  /* Sits directly inside the workspace panel box — carry the body padding here. */
+  padding: 1rem;
 }
 /* Nested inside the workspace panel box: no extra outer chrome, just the body. */
 .root > :first-child {
