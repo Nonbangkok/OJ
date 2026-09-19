@@ -88,9 +88,10 @@
 }
 
 /* Keep the table a bounded height with an internal scroll and a sticky
-   header so long result lists don't stretch the page. */
+   header so long result lists don't stretch the page. Sized to the
+   viewport so most of the list is visible at once. */
 .table-scroll {
-  max-height: 520px;
+  max-height: 70vh;
   overflow-y: auto;
 }
 
@@ -132,14 +133,18 @@
   text-align: left;
 }
 
-.link-button {
-  background: none;
-  border: none;
-  padding: 0 0.25rem;
-  color: var(--link-color, #0d6efd);
+.view-button {
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: var(--background-tertiary);
+  color: var(--text-color-primary);
   cursor: pointer;
   font-size: 0.85rem;
-  text-decoration: underline;
+}
+
+.view-button:hover {
+  border-color: var(--accent-color, #0d6efd);
 }
 
 .empty {

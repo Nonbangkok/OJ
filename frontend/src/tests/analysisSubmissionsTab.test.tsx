@@ -204,9 +204,9 @@ describe('SubmissionsTab', () => {
             </BrowserRouter>
         );
 
-        await waitFor(() => expect(screen.getByRole('button', { name: 'View' })).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByRole('button', { name: 'View code' })).toBeInTheDocument());
 
-        fireEvent.click(screen.getByRole('button', { name: 'View' }));
+        fireEvent.click(screen.getByRole('button', { name: 'View code' }));
 
         await waitFor(() => expect(mockGetById).toHaveBeenCalledWith(42, null));
     });

@@ -235,10 +235,10 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
                   <td>
                     <button
                       type="button"
-                      className={styles['link-button']}
+                      className={styles['view-button']}
                       onClick={() => handleViewCode(s)}
                     >
-                      View
+                      View code
                     </button>
                   </td>
                 </tr>
