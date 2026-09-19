@@ -230,14 +230,15 @@ function TestcasesSection() {
     <section className={styles.panel}>
       <div className={styles.panelHead}>
         <h3>Generate</h3>
-        <p>Inputs come from the generator; outputs from the reference solution.</p>
       </div>
       <div className={styles.panelBody}>
-        <div className={styles.actions}>
+        <div className={styles.generateRow}>
           <label className={styles.seedRow}>Generator seed<input value={seed} disabled={model.actionsDisabled || !form.generatorCpp?.trim()} inputMode="numeric" onChange={e => setSeed(e.target.value)} /></label>
-          <Button disabled={model.actionsDisabled || !form.generatorCpp?.trim() || !seedValid}
-            onClick={() => setConfirm({ action: 'generate', revision: draft.revision })}>Generate inputs</Button>
-          <Button disabled={model.actionsDisabled || !form.solutionCpp.trim()} onClick={() => setConfirm({ action: 'outputs', revision: draft.revision })}>Generate outputs</Button>
+          <div className={styles.actions}>
+            <Button disabled={model.actionsDisabled || !form.generatorCpp?.trim() || !seedValid}
+              onClick={() => setConfirm({ action: 'generate', revision: draft.revision })}>Generate inputs</Button>
+            <Button disabled={model.actionsDisabled || !form.solutionCpp.trim()} onClick={() => setConfirm({ action: 'outputs', revision: draft.revision })}>Generate outputs</Button>
+          </div>
         </div>
         <p className={styles.caution}>Legacy multi-file generators may ignore the seed and write to ./input/ instead of reading OJ_SEED or argv[1].</p>
       </div>

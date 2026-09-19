@@ -1,4 +1,5 @@
 import { TestcaseMetadata } from './types';
+import { formatByteSize } from './testcaseSize';
 import styles from './TestcaseFiles.module.css';
 
 export default function TestcaseTable({ testcases, busy, inspecting, locked, onInspect, onReplace, onDelete }: {
@@ -27,10 +28,10 @@ export default function TestcaseTable({ testcases, busy, inspecting, locked, onI
           <tr key={testcase.id}>
             <td>{testcase.caseNumber}</td>
             <th scope="row">{testcase.filename}</th>
-            <td>{testcase.inputBytes.toLocaleString()} bytes</td>
+            <td>{formatByteSize(testcase.inputBytes)}</td>
             <td>
               {testcase.hasOutput
-                ? `${(testcase.outputBytes ?? 0).toLocaleString()} bytes`
+                ? formatByteSize(testcase.outputBytes ?? 0)
                 : 'Missing output'}
             </td>
             <td>

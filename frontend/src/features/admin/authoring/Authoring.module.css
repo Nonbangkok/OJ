@@ -152,6 +152,14 @@
   min-width: 0;
   overflow-x: auto;
 }
+/* Testcases Generate row: seed pinned left, actions pinned right. */
+.generateRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
 /* Bordered panel system for sectioned pages (jobs, testcases): each concern
    gets a titled box so the page reads as distinct blocks, not one stream. */
 .panel {

@@ -18,6 +18,10 @@
 
 /* Define CSS variables for theming */
 :root {
+  /* Native form controls (file-input "Choose file" button, scrollbars,
+     dropdowns) render per the light scheme; the dark override below flips
+     them with the theme so they never blend into the background. */
+  color-scheme: light;
   --background-primary: #ffffff;
   --background-secondary: #f8f9fa;
   --background-tertiary: #e9ecef;
@@ -198,6 +202,7 @@
 }
 
 [data-theme='dark'] {
+  color-scheme: dark;
   --background-primary: #121212;
   --background-secondary: #1e1e1e;
   --background-tertiary: #2a2a2a;
