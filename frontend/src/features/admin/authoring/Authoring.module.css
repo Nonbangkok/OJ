@@ -716,21 +716,23 @@
   font-size: 0.8rem;
   cursor: pointer;
 }
-/* Hover must stay readable in both themes: accent-tinted background with
-   primary text, never a gray-on-gray blend. The tint is strong enough that
-   the accent color itself carries the text — same foreground as primary
-   buttons, readable on light (blue on light blue) and dark alike. */
+/* Hover must stay readable in every browser and theme. Plain token values
+   only — no color-mix() (unsupported on older Safari, which silently drops
+   the whole rule and falls back to the browser's default gray-on-gray). */
 .previewModeBar button:hover {
-  background: color-mix(in srgb, var(--accent-primary) 82%, var(--background-primary));
+  background: var(--accent-primary);
   color: var(--action-primary-foreground);
   border-color: var(--accent-primary);
 }
+/* The selected tab pins its colors with !important: the header's global
+   button rule (.editorHeader button) targets the same elements, and any
+   engine-specific cascade quirk must not be able to blend the text away. */
 .previewModeBar .previewModeActive,
 .previewModeBar .previewModeActive:hover,
 .previewModeBar .previewModeActive:active,
 .previewModeBar .previewModeActive:focus-visible {
-  background: var(--statement-paper);
-  color: var(--text-primary);
+  background: var(--statement-paper) !important;
+  color: var(--text-primary) !important;
   font-weight: 600;
 }
 .previewModeBar .previewModeActive:hover {
