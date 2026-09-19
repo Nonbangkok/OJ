@@ -26,12 +26,12 @@ jest.mock('recharts', () => ({
     CartesianGrid: () => null,
 }));
 
-const mockGetProblems = problemsAdminService.getProblems as jest.MockedFunction<typeof problemsAdminService.getProblems>;
+const mockFetchAnalyticsProblems = analyticsService.fetchAnalyticsProblems as jest.MockedFunction<typeof analyticsService.fetchAnalyticsProblems>;
 const mockFetchProblemAnalytics = analyticsService.fetchProblemAnalytics as jest.MockedFunction<typeof analyticsService.fetchProblemAnalytics>;
 
 const mockProblems = [
-    { id: 'aplusb', title: 'A Plus B', author: 'someone', category: 'math', is_visible: true, contest_id: null, contest_status: null },
-    { id: 'gcd', title: 'GCD', author: 'someone', category: 'math', is_visible: true, contest_id: null, contest_status: null },
+    { problemId: 'aplusb', title: 'A Plus B', category: 'math', submissions: 30, accepted: 20, acRate: 0.667, solvers: 8 },
+    { problemId: 'gcd', title: 'GCD', category: 'math', submissions: 5, accepted: 1, acRate: 0.2, solvers: 1 },
 ];
 
 const mockProblemAnalytics = {
@@ -48,10 +48,10 @@ const mockProblemAnalytics = {
 describe('ProblemsTab', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        mockGetProblems.mockResolvedValue(mockProblems as never);
+        mockFetchAnalyticsProblems.mockResolvedValue({ problems: mockProblems });
     });
 
-    it('renders the problem picker from the admin service', async () => {
+    it('renders the problem table with stats from the service', async () => {
         render(
             <BrowserRouter>
                 <ProblemsTab onSelectProblem={jest.fn()} />
@@ -60,6 +60,8 @@ describe('ProblemsTab', () => {
 
         await waitFor(() => expect(screen.getByText('A Plus B')).toBeInTheDocument());
         expect(screen.getByText('GCD')).toBeInTheDocument();
+        expect(screen.getByText('67%')).toBeInTheDocument();
+        expect(screen.getByText('8')).toBeInTheDocument();
     });
 
     it('calls onSelectProblem when a problem is clicked', async () => {
@@ -76,6 +78,38 @@ describe('ProblemsTab', () => {
         fireEvent.click(screen.getByRole('button', { name: /analyze.*a plus b/i }));
 
         expect(onSelectProblem).toHaveBeenCalledWith('aplusb');
+    });
+
+    it('sorts by AC rate when the header is clicked', async () => {
+        render(
+            <BrowserRouter>
+                <ProblemsTab onSelectProblem={jest.fn()} />
+            </BrowserRouter>
+        );
+
+        await waitFor(() => expect(screen.getByText('A Plus B')).toBeInTheDocument());
+
+        fireEvent.click(screen.getByRole('button', { name: /ac rate/i }));
+
+        await waitFor(() => expect(mockFetchAnalyticsProblems).toHaveBeenCalledWith(
+            expect.objectContaining({ sortBy: 'acRate', sortDir: 'desc' }),
+        ));
+    });
+
+    it('triggers a search fetch with the typed term', async () => {
+        render(
+            <BrowserRouter>
+                <ProblemsTab onSelectProblem={jest.fn()} />
+            </BrowserRouter>
+        );
+
+        await waitFor(() => expect(screen.getByText('A Plus B')).toBeInTheDocument());
+
+        fireEvent.change(screen.getByRole('textbox', { name: /search problems/i }), { target: { value: 'plus' } });
+
+        await waitFor(() => expect(mockFetchAnalyticsProblems).toHaveBeenCalledWith(
+            expect.objectContaining({ search: 'plus' }),
+        ));
     });
 });
 

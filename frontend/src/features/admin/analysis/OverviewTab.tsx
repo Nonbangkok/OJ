@@ -21,15 +21,25 @@ import KpiCard from './components/KpiCard';
 import { useChartColors, VERDICT_COLORS } from './analysisCharts';
 import styles from './OverviewTab.module.css';
 
-const DAY_OPTIONS = [7, 30, 90];
+const DAY_OPTIONS = [7, 30, 90, 0];
+
+const rangeLabel = (days: number): string => {
+  if (days === 0) return 'All time';
+  return days === 30 ? 'Last 30 days' : `${days} days`;
+};
 
 const deltaPercent = (current: number, previous: number): number | null => {
   if (previous === 0) return null;
   return ((current - previous) / previous) * 100;
 };
 
+/** Deltas are meaningless for all-time (no previous window to compare). */
+const windowDelta = (allTime: boolean, current: number, previous: number): number | null =>
+  allTime ? null : deltaPercent(current, previous);
+
 const OverviewTab = () => {
   const [days, setDays] = useState(30);
+  const allTime = days === 0;
   const [data, setData] = useState<OverviewAnalytics | null>(null);
   const [error, setError] = useState<string | null>(null);
   const colors = useChartColors();
@@ -62,17 +72,17 @@ const OverviewTab = () => {
             className={option === days ? styles['range-active'] : styles['range-button']}
             onClick={() => setDays(option)}
           >
-            {option === 30 ? 'Last 30 days' : `${option} days`}
+            {rangeLabel(option)}
           </button>
         ))}
       </div>
 
       <div className={styles['kpi-row']}>
-        <KpiCard label="Submissions" value={kpis.submissions.current} deltaPercent={deltaPercent(kpis.submissions.current, kpis.submissions.previous)} />
-        <KpiCard label="Unique submitters" value={kpis.uniqueSubmitters.current} deltaPercent={deltaPercent(kpis.uniqueSubmitters.current, kpis.uniqueSubmitters.previous)} />
-        <KpiCard label="Accepted" value={kpis.accepted.current} deltaPercent={deltaPercent(kpis.accepted.current, kpis.accepted.previous)} />
-        <KpiCard label="New users" value={kpis.newUsers.current} deltaPercent={deltaPercent(kpis.newUsers.current, kpis.newUsers.previous)} />
-        <KpiCard label="Active problems" value={kpis.activeProblems.current} deltaPercent={deltaPercent(kpis.activeProblems.current, kpis.activeProblems.previous)} />
+        <KpiCard label="Submissions" value={kpis.submissions.current} deltaPercent={windowDelta(allTime, kpis.submissions.current, kpis.submissions.previous)} />
+        <KpiCard label="Unique submitters" value={kpis.uniqueSubmitters.current} deltaPercent={windowDelta(allTime, kpis.uniqueSubmitters.current, kpis.uniqueSubmitters.previous)} />
+        <KpiCard label="Accepted" value={kpis.accepted.current} deltaPercent={windowDelta(allTime, kpis.accepted.current, kpis.accepted.previous)} />
+        <KpiCard label="New users" value={kpis.newUsers.current} deltaPercent={windowDelta(allTime, kpis.newUsers.current, kpis.newUsers.previous)} />
+        <KpiCard label="Active problems" value={kpis.activeProblems.current} deltaPercent={windowDelta(allTime, kpis.activeProblems.current, kpis.activeProblems.previous)} />
       </div>
 
       <ChartCard title="Submissions per day">

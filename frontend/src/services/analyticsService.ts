@@ -27,6 +27,10 @@ export interface OverviewAnalytics {
   }>;
 }
 
+export type UserSortKey = 'username' | 'submissions' | 'solved' | 'acRate' | 'lastActive';
+export type ProblemSortKey = 'title' | 'category' | 'submissions' | 'accepted' | 'acRate' | 'solvers';
+export type SortDir = 'asc' | 'desc';
+
 export interface AnalyticsUserRow {
   userId: number;
   username: string;
@@ -56,6 +60,16 @@ export interface ContestAnalytics {
   scoreboard: Array<{ username: string; totalScore: number; solved: number }>;
 }
 
+export interface ProblemListRow {
+  problemId: string;
+  title: string;
+  category: string | null;
+  submissions: number;
+  accepted: number;
+  acRate: number;
+  solvers: number;
+}
+
 export interface ProblemAnalytics {
   problem: { id: string; title: string };
   kpis: { submissions: number; accepted: number; acRate: number; uniqueSubmitters: number };
@@ -76,8 +90,21 @@ export const fetchAnalyticsUsers = async (params: {
   search?: string;
   limit?: number;
   offset?: number;
+  sortBy?: UserSortKey;
+  sortDir?: SortDir;
 }): Promise<{ users: AnalyticsUserRow[] }> => {
   const response = await api.get<{ users: AnalyticsUserRow[] }>('/analytics/users', { params });
+  return response.data;
+};
+
+export const fetchAnalyticsProblems = async (params: {
+  search?: string;
+  limit?: number;
+  offset?: number;
+  sortBy?: ProblemSortKey;
+  sortDir?: SortDir;
+}): Promise<{ problems: ProblemListRow[] }> => {
+  const response = await api.get<{ problems: ProblemListRow[] }>('/analytics/problems', { params });
   return response.data;
 };
 

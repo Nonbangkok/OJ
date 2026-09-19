@@ -82,6 +82,24 @@ describe('UsersTab', () => {
         await waitFor(() => expect(mockFetchUsers).toHaveBeenCalledWith(expect.objectContaining({ search: 'bo' })));
     });
 
+    it('sorts by username when the header is clicked', async () => {
+        mockFetchUsers.mockResolvedValue({ users: mockUsers });
+
+        render(
+            <BrowserRouter>
+                <UsersTab onSelectUser={jest.fn()} />
+            </BrowserRouter>
+        );
+
+        await waitFor(() => expect(screen.getByText('bob')).toBeInTheDocument());
+
+        fireEvent.click(screen.getByRole('button', { name: /username/i }));
+
+        await waitFor(() => expect(mockFetchUsers).toHaveBeenCalledWith(
+            expect.objectContaining({ sortBy: 'username', sortDir: 'desc' }),
+        ));
+    });
+
     it('calls onSelectUser when a row is clicked', async () => {
         mockFetchUsers.mockResolvedValueOnce({ users: mockUsers });
         const onSelectUser = jest.fn();

@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { AnalyticsUserRow, fetchAnalyticsUsers } from '../../../services/analyticsService';
+import {
+  AnalyticsUserRow,
+  fetchAnalyticsUsers,
+  SortDir,
+  UserSortKey,
+} from '../../../services/analyticsService';
+import SortableHeader from './components/SortableHeader';
 import styles from './UsersTab.module.css';
 
 const PAGE_SIZE = 50;
@@ -20,6 +26,8 @@ const UsersTab = ({ onSelectUser }: UsersTabProps) => {
   const [users, setUsers] = useState<AnalyticsUserRow[]>([]);
   const [search, setSearch] = useState('');
   const [offset, setOffset] = useState(0);
+  const [sortBy, setSortBy] = useState<UserSortKey>('submissions');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -35,6 +43,8 @@ const UsersTab = ({ onSelectUser }: UsersTabProps) => {
           search: search || undefined,
           limit: PAGE_SIZE,
           offset,
+          sortBy,
+          sortDir,
         });
         if (!cancelled) setUsers(result.users);
       } catch {
@@ -46,7 +56,7 @@ const UsersTab = ({ onSelectUser }: UsersTabProps) => {
 
     void load();
     return () => { cancelled = true; };
-  }, [search, offset]);
+  }, [search, offset, sortBy, sortDir]);
 
   // Debounce typing so we do not fire a request per keystroke.
   const handleSearchChange = (value: string) => {
@@ -55,6 +65,17 @@ const UsersTab = ({ onSelectUser }: UsersTabProps) => {
       setOffset(0);
       setSearch(value);
     }, SEARCH_DEBOUNCE_MS);
+  };
+
+  const handleSort = (column: string) => {
+    const key = column as UserSortKey;
+    setOffset(0);
+    if (sortBy === key) {
+      setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(key);
+      setSortDir('desc');
+    }
   };
 
   if (error) return <p className={styles.error}>{error}</p>;
@@ -74,12 +95,12 @@ const UsersTab = ({ onSelectUser }: UsersTabProps) => {
         <table>
           <thead>
             <tr>
-              <th>Username</th>
+              <SortableHeader label="Username" column="username" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <th>Role</th>
-              <th>Submissions</th>
-              <th>Solved</th>
-              <th>AC rate</th>
-              <th>Last active</th>
+              <SortableHeader label="Submissions" column="submissions" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Solved" column="solved" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="AC rate" column="acRate" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Last active" column="lastActive" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <th />
             </tr>
           </thead>

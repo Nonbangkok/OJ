@@ -88,6 +88,24 @@ describe('OverviewTab', () => {
         await waitFor(() => expect(mockFetchOverview).toHaveBeenCalledWith(7));
     });
 
+    it('fetches all-time (days=0) and hides deltas', async () => {
+        mockFetchOverview.mockResolvedValue(mockOverview);
+
+        render(
+            <BrowserRouter>
+                <OverviewTab />
+            </BrowserRouter>
+        );
+
+        await waitFor(() => expect(screen.getByText('100')).toBeInTheDocument());
+
+        fireEvent.click(screen.getByRole('button', { name: 'All time' }));
+
+        await waitFor(() => expect(mockFetchOverview).toHaveBeenCalledWith(0));
+        // Deltas are meaningless for all-time and must disappear.
+        expect(screen.queryByText('+25%')).not.toBeInTheDocument();
+    });
+
     it('renders an error message when the fetch fails', async () => {
         mockFetchOverview.mockRejectedValueOnce(new Error('Network error'));
 
