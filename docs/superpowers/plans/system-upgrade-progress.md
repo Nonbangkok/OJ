@@ -33,18 +33,135 @@ Noted during baseline:
   import-related test ("Dropping existing tables before import...").
 - Visual regression suite `npm run test:visual` not yet run in this session
   (needs the stack; will run during Phase 4).
+- Docker state at session start: **no containers running** (stack down).
+  Real-data volume `oj_db-data` belongs to compose project `oj` (main
+  checkout). Worktrees `authoring-ux` no longer exists on disk (merged &
+  cleaned 2026-09-18 per memory). To test with real data later:
+  `docker compose -p oj` from a checkout + `HTTP_PORT=8080`; running compose
+  from this worktree directly would create a fresh empty `system-upgrade_db-data`
+  volume (safe, but no real data). Decide per-task.
 
 ### Audit findings
 
-(Being filled in by parallel audit agents — backend & frontend.)
+Both audits ran 2026-09-20 (parallel agents). Full reports preserved below.
 
-#### Backend audit
+#### Backend audit — summary
 
-_Pending._
+Overall: backend in good shape — no TODO/FIXME debt, no SQL injection
+vectors, auth coverage on admin/staff routes complete, rate limiting on
+three tiers. Real problems: zero indexes on `submissions` (FIXED — 0010),
+no structured logging (FIXED — logger util + wiring), magic values (FIXED —
+constants consolidation).
 
-#### Frontend audit
+Remaining from audit (not yet done):
+- **Medium security**: `/admin/database/import-progress/:jobId` accepts
+  token via `req.query.token` — query strings land in proxy access logs;
+  prefer header-only (`x-import-token` already supported).
+- **Medium**: analyticsController duplicates pagination defaults vs Zod
+  schema defaults (comments admit Zod defaults "are not written back to
+  req.query").
+- **Medium**: judgeService.ts:65 parse-failure continues with stale timeMs
+  (low severity, wrapper trusted).
+- **Low**: problemController progress-id ad-hoc generation (could use uuid);
+  batchUploadService drops underlying cause in config.json parse error.
+- **Deferred decisions (user)**: node-cron 3→4, connect-pg-simple 9→10,
+  uuid 9→14 major bumps.
 
-_Pending._
+#### Frontend audit — summary
+
+- 🔴 **Analysis feature theming**: ~40 hardcoded hex in 9 CSS files
+  (VerdictBadge 8 verdict colors, KpiCard green/red, error-red duplicates);
+  `var(--accent-color)`/`var(--link-color)` referenced with `#0d6efd`
+  fallbacks but the tokens are **undefined anywhere** — fallback always
+  wins in both themes.
+- 🔴 **TypeScript 4.9.5 pinned** while React 19 + rest of toolchain expect
+  TS ≥5 — blocks @typescript-eslint upgrade (v5, three majors behind).
+  `@types/react ^18` with `react ^19.1.1` mismatch.
+- 🟡 No global ErrorBoundary; no 401/session-expiry interceptor in api.ts;
+  no retry on fetch hooks.
+- 🟡 SubmissionsTab missing `overflow-x: auto` (mobile overflow); analysis
+  feature has zero `@media` queries.
+- 🟡 ActivityHeatmap hardcoded light-mode greens (unreadable dark);
+  UserProfile verdict dots; ModalLayout warning banner; react-datepicker
+  light-only popup.
+- 🟡 4 raw modals bypass accessible `ui/Dialog` (SubmissionModal,
+  ProblemMigrationModal, EditUserModal, AddUserModal).
+- 🟡 Home.tsx quote-box click-only (no role/tabIndex/keyboard).
+- 🟡 jsx-a11y key rules disabled in .eslintrc.json.
+- 🟡 Test gaps: analysis drill-downs (UserDetail/ProblemDetail/
+  ContestDetail/KpiCard/VerdictBadge/analysisCharts), submission-flow
+  components, ActivityHeatmap.
+- 🟢 user-event v13 old (v14 current); `cors` dead dep in frontend;
+  AuthorProfiles.tsx 491 lines > 400 limit.
+
+<details>
+<summary>Full backend audit report (preserved)</summary>
+
+No TODO/FIXME/HACK/XXX markers in backend source or tests. Auth gates
+verified complete route-by-route across all controllers (admin,
+analytics, authoring*, contest, problem, submission, profile).
+Intentionally public routes all reasonable. SQL injection: none — all
+interpolations parameterized or whitelist-based (USER_SORT_COLUMNS /
+PROBLEM_SORT_COLUMNS from Zod enums; metadataColumns static). Session
+fixation handled (regenerate on login, httpOnly, sameSite lax, neutral
+auth errors). Env Zod-validated, test fallbacks only under NODE_ENV=test.
+Rate limiting three-tier (general 1000/15min, auth 10/15min, submit
+30/min). Tests: 74 files, 137 DB-gated skipped by design (isolated
+per-test schemas when INTEGRATION_DATABASE_URL set). Deps current except:
+node-cron 3→4, connect-pg-simple 9→10, uuid 9→14, archiver 7→8,
+express-sse 0.5→1.0, dotenv 17→18, htmlparser2 pinned 10 (12 current).
+
+</details>
+
+<details>
+<summary>Full frontend audit report (preserved)</summary>
+
+Zero TODO debt. Hooks own loading/error per STANDARDS. Theme = CSS vars
+in index.css (:root + [data-theme='dark']) + ThemeContext. ~60 hardcoded
+hex across 19 CSS-module files concentrated in analysis feature (worst),
+UserProfile verdict dots, ActivityHeatmap, ScoreboardTable medals,
+ModalLayout warning, ContestScoreboard. Breakpoints documented
+(480/768/900/1200); OverflowTable pattern exists; SubmissionsTab missed
+overflow-x. eslint jsx-a11y/recommended on but 4 key rules off
+(click-events-have-key-events, no-static-element-interactions,
+no-noninteractive-element-interactions, label-has-associated-control).
+80 aria-* usages; 20 :focus rules. Constants discipline good
+(POLLING_INTERVALS/UI_TIMEOUTS/UI_CONFIG); useAuthoringDraft has named
+module constants outside config (AUTOSAVE_DELAY_MS 1200, JOB_POLL_MS 300).
+Only AuthorProfiles.tsx (491) exceeds 400 lines. 90 test files; services
+at threshold; analysis tab tests exist for 5 tabs but not drill-downs/
+KpiCard/VerdictBadge/analysisCharts; submission-flow components untested.
+Deps: typescript 4.9.5 pinned 🔴, @types/react ^18 vs react ^19 🟡,
+react-scripts 5.0.1 (known-dead CRA — strategic Vite migration recorded,
+not urgent), user-event ^13 (v14 current) 🟡, cors dead dep 🟢.
+
+</details>
+
+## Backlog (prioritized)
+
+| # | Task | Phase | Status |
+|---|---|---|---|
+| 1 | submissions/contest_submissions indexes migration | 2 | ✅ done |
+| 2 | Magic values → constants ('Accepted' x25, LIMIT 200, score 100, maxAge, saltRounds) | 2 | ✅ done |
+| 3 | asyncHandler for raw try/catch controllers | 2 | ✅ done |
+| 4 | Structured logger + failed-login logging + judge/scheduler wiring | 3 | ✅ done |
+| 5 | import-progress token: drop query-string support (header only) | 3 | ⬜ |
+| 6 | Analysis feature theming (~40 hex → tokens; define or remove --accent-color/--link-color) | 4 | ⬜ |
+| 7 | TS 5 + @types/react 19 alignment | 2 | ⬜ (needs care w/ CRA) |
+| 8 | Global ErrorBoundary + 401 session-expiry interceptor | 3/4 | ⬜ |
+| 9 | SubmissionsTab overflow-x + analysis mobile media queries | 4 | ⬜ |
+| 10 | Dark mode: ActivityHeatmap, UserProfile dots, ModalLayout, datepicker | 4 | ⬜ |
+| 11 | Raw modals → ui/Dialog (4 components) | 4 | ⬜ |
+| 12 | Home quote-box keyboard a11y; re-enable jsx-a11y rules incrementally | 4 | ⬜ |
+| 13 | Tests: analysis drill-downs + submission-flow + ActivityHeatmap | 2/4 | ⬜ |
+| 14 | CSV export for analysis data | 5 | ⬜ |
+| 15 | Code-similarity / cheat detection for contests | 5 | ⬜ |
+| 16 | Idle users / drop-off analytics | 5 | ⬜ |
+| 17 | Compare 2 contests / 2 users side-by-side | 5 | ⬜ |
+| 18 | analyticsController Zod-defaults dedup | 2 | ⬜ |
+| 19 | Drop cors from frontend deps; user-event v14 | 2 | ⬜ |
+| 20 | Split AuthorProfiles.tsx (491 lines) | 2 | ⬜ |
+| 21 | Dep majors (node-cron, connect-pg-simple, uuid) | 2 | ⬜ deferred → user decision |
 
 ## Backlog
 
@@ -55,11 +172,29 @@ _To be prioritized after audits land._
 - Major DB schema changes beyond additive indexes.
 - Removing features or swapping core dependencies.
 
+## Phase 2 work log
+
+### ✅ 0010_submission_indexes migration (committed)
+
+`backend/migrations/0010SubmissionIndexes.ts` — additive `CREATE INDEX IF
+NOT EXISTS` on: `submissions(user_id, problem_id, submitted_at DESC)`,
+`contest_submissions(user_id, problem_id, submitted_at DESC, contest_id)`.
+Users.username already has UNIQUE from 0001 (no new index needed).
+
+Verification: applied all 10 migrations to a throwaway Postgres 16
+container (separate from real data), seeded 50k submissions + 20k contest
+submissions + 200 users/problems, ran EXPLAIN ANALYZE before/after:
+- recent-submissions ORDER BY submitted_at DESC LIMIT 200: 21.2ms → 0.4ms
+- user profile WHERE user_id: 2.4ms seq scan → bitmap index scan
+- users analytics list (UNION ALL join): 24.9ms → 14.3ms
+Migration tests updated in tests/migrations/ (3 files asserting version
+list). Runner proven idempotent (second run = "already up to date").
+
 ## Phase status
 
-- [ ] Phase 1: Baseline & Audit (in progress)
-- [ ] Phase 2: Sustainability & Code Quality
-- [ ] Phase 3: Security & Reliability
+- [x] Phase 1: Baseline & Audit (baseline green; both audits in this file)
+- [~] Phase 2: Sustainability & Code Quality (4/8 items done)
+- [~] Phase 3: Security & Reliability (logging done; token/auth items pending)
 - [ ] Phase 4: UX/UI Upgrade
 - [ ] Phase 5: New Features
 - [ ] Phase 6: Final Sweep
