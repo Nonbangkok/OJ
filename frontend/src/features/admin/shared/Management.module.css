@@ -42,27 +42,27 @@
   font-weight: 500;
   cursor: pointer;
   transition: filter 0.2s ease;
-  color: white;
+  color: var(--action-button-foreground);
   font-size: 0.9rem;
 }
 
 .create-btn {
   composes: btn;
-  background-color: #28a745;
-  color: white;
+  background-color: var(--action-create-bg);
+  color: var(--action-button-foreground);
   max-width: 15rem;
 }
 .create-btn:hover {
-  background-color: #218838;
+  background-color: var(--action-create-hover);
 }
 
 .edit-btn {
   composes: btn;
-  background-color: #17a2b8; /* A nice teal/info color */
+  background-color: var(--action-edit-bg);
 }
 
 .edit-btn:hover {
-  background-color: #138496;
+  background-color: var(--action-edit-hover);
 }
 
 .delete-btn {
@@ -71,64 +71,64 @@
 }
 
 .delete-btn:hover {
-  background-color: #c82333;
+  background-color: var(--button-danger-hover);
 }
 
 .problems-btn {
   composes: btn;
-  background-color: #007bff; /* Blue for problems */
+  background-color: var(--action-problems-bg);
 }
 
 .problems-btn:hover {
-  background-color: #0069d9;
+  background-color: var(--action-problems-hover);
 }
 
 .visible-btn {
   composes: btn;
-  background-color: #28a745; /* Green for visible */
+  background-color: var(--action-create-bg);
 }
 
 .visible-btn:hover {
-  background-color: #218838;
+  background-color: var(--action-create-hover);
 }
 
 .hidden-btn {
   composes: btn;
-  background-color: #6c757d; /* Gray for hidden */
+  background-color: var(--action-neutral-button-bg);
 }
 
 .hidden-btn:hover {
-  background-color: #545b62;
+  background-color: var(--action-neutral-button-hover);
 }
 
 .show-all-btn {
   composes: btn;
-  background-color: #28a745; /* Green for show all */
+  background-color: var(--action-create-bg);
   font-size: 0.85rem;
 }
 
 .show-all-btn:hover:not(:disabled) {
-  background-color: #218838;
+  background-color: var(--action-create-hover);
 }
 
 .show-all-btn:disabled {
-  background-color: #adb5bd;
+  background-color: var(--action-disabled-bg);
   cursor: not-allowed;
   opacity: 0.6;
 }
 
 .hide-all-btn {
   composes: btn;
-  background-color: #6c757d; /* Gray for hide all */
+  background-color: var(--action-neutral-button-bg);
   font-size: 0.85rem;
 }
 
 .hide-all-btn:hover:not(:disabled) {
-  background-color: #545b62;
+  background-color: var(--action-neutral-button-hover);
 }
 
 .hide-all-btn:disabled {
-  background-color: #adb5bd;
+  background-color: var(--action-disabled-bg);
   cursor: not-allowed;
   opacity: 0.6;
 }
@@ -223,29 +223,35 @@
   display: inline-block;
 }
 
+/* Problems-table marker for problems locked inside a contest; the status
+   color comes from the .badge.scheduled/.running rules via composition. */
+.contest-status-badge {
+  display: inline-block;
+}
+
 .badge.scheduled {
-  background-color: #e3f2fd;
-  color: #1976d2;
-  border: 1px solid #bbdefb;
+  background-color: var(--contest-badge-scheduled-bg);
+  color: var(--contest-badge-scheduled-fg);
+  border: 1px solid var(--contest-badge-scheduled-border);
 }
 
 .badge.running {
-  background-color: #e8f5e8;
-  color: #2e7d32;
-  border: 1px solid #c8e6c9;
+  background-color: var(--contest-badge-running-bg);
+  color: var(--contest-badge-running-fg);
+  border: 1px solid var(--contest-badge-running-border);
   animation: pulse 2s infinite;
 }
 
 .badge.finishing {
-  background-color: #fff3e0;
-  color: #f57c00;
-  border: 1px solid #ffcc02;
+  background-color: var(--contest-badge-finishing-bg);
+  color: var(--contest-badge-finishing-fg);
+  border: 1px solid var(--contest-badge-finishing-border);
 }
 
 .badge.finished {
-  background-color: #f3e5f5;
-  color: #7b1fa2;
-  border: 1px solid #ce93d8;
+  background-color: var(--contest-badge-finished-bg);
+  color: var(--contest-badge-finished-fg);
+  border: 1px solid var(--contest-badge-finished-border);
 }
 
 @keyframes pulse {
@@ -288,21 +294,21 @@
 }
 
 .feedbackBox.info {
-  background-color: #e7f3fe;
-  border-color: #2196f3;
-  color: #1a78c2;
+  background-color: var(--feedback-info-bg);
+  border-color: var(--feedback-info-border);
+  color: var(--feedback-info-fg);
 }
 
 .feedbackBox.success {
-  background-color: #e8f5e9;
-  border-color: #4caf50;
-  color: #2e7d32;
+  background-color: var(--feedback-success-bg);
+  border-color: var(--feedback-success-border);
+  color: var(--feedback-success-fg);
 }
 
 .feedbackBox.error {
-  background-color: #ffebee;
-  border-color: #f44336;
-  color: #c62828;
+  background-color: var(--feedback-error-bg);
+  border-color: var(--feedback-error-border);
+  color: var(--feedback-error-fg);
 }
 
 .closeButton {
@@ -342,7 +348,7 @@
 }
 
 .progressFile {
-  color: black;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -351,7 +357,7 @@
 
 .progressCounters {
   font-weight: 600;
-  color: black;
+  color: var(--text-primary);
 }
 
 /* Progress Bar for Batch Upload */
@@ -377,7 +383,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: black;
+  color: var(--text-primary);
   font-size: 0.8rem;
   font-weight: 600;
 }

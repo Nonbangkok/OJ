@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import adminService from '../../services/adminService';
+import { formatDateTime } from '../../utils/formatters';
 
 const useContestManagement = (styles) => {
     const [contests, setContests] = useState([]);
@@ -84,16 +85,6 @@ const useContestManagement = (styles) => {
                 {statusText[status] || status}
             </span>
         );
-    };
-
-    const formatDateTime = (dateTime) => {
-        return new Date(dateTime).toLocaleString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
     };
 
     return {

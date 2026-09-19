@@ -7,6 +7,7 @@ import { authoringJobFilesSql } from './0005AuthoringJobFiles';
 import { authoringPublishedProblemProvenanceSql } from './0006AuthoringPublishedProblemProvenance';
 import { problemCategorySql } from './0007ProblemCategory';
 import { userProfileSql } from './0008UserProfile';
+import { profileSyncSql } from './0009ProfileSync';
 
 export const coreMigrations: readonly Migration[] = Object.freeze([
   {
@@ -27,4 +28,5 @@ export const migrations: readonly Migration[] = Object.freeze([
   { version: '0006_authoring_published_problem_provenance', sql: authoringPublishedProblemProvenanceSql },
   { version: '0007_problem_category', sql: problemCategorySql },
   { version: '0008_user_profile', sql: userProfileSql },
+  { version: '0009_profile_sync', sql: profileSyncSql },
 ]);

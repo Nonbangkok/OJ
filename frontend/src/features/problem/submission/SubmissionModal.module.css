@@ -77,7 +77,7 @@
 
 /* Close Button */
 .close-button {
-  background-color: #dc3545;
+  background-color: var(--button-danger-bg);
   color: white;
   border: none;
   border-radius: 6px;
@@ -94,7 +94,7 @@
 }
 
 .close-button:hover {
-  background-color: #c82333;
+  background-color: var(--button-danger-hover);
   transform: scale(1.05);
 }
 
@@ -190,35 +190,36 @@
   align-items: stretch;
 }
 
-/* Status Colors - use :global to correctly combine module and global classes */
+/* Status Colors - shared with the .status-* classes in index.css via the
+   --verdict-* tokens so both stay in sync. */
 .detail-value:global(.status-accepted) {
-  color: #48bb78;
+  color: var(--verdict-accepted);
   font-weight: bold;
 }
 .detail-value:global(.status-wrong) {
-  color: #f56565;
+  color: var(--verdict-wrong);
   font-weight: bold;
 }
 .detail-value:global(.status-time) {
-  color: #f6ad55;
+  color: var(--verdict-time);
   font-weight: bold;
 }
 .detail-value:global(.status-compilation) {
-  color: #a0aec0;
+  color: var(--verdict-compilation);
   font-weight: bold;
 }
 .detail-value:global(.status-runtime) {
-  color: #ed8936;
+  color: var(--verdict-runtime);
   font-weight: bold;
 }
 .detail-value:global(.status-memory) {
-  color: #ed64a6;
+  color: var(--verdict-memory);
   font-weight: bold;
 }
 .detail-value:global(.status-pending),
 .detail-value:global(.status-compiling),
 .detail-value:global(.status-running) {
-  color: #718096;
+  color: var(--verdict-pending);
   font-weight: bold;
 }
 

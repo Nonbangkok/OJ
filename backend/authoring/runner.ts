@@ -30,7 +30,7 @@ async function main(): Promise<void> {
       : job.kind === 'generate_outputs'
       ? await generateOutputs(job, '/work', spool, { signal: abort.signal })
       : job.kind === 'verify_all' ? await verifyAll(job, '/work', spool, { signal: abort.signal })
-      : job.kind === 'build_pdf' ? await buildPdf(job, '/work', spool, { signal: abort.signal })
+      : job.kind === 'build_pdf' || job.kind === 'sync_pdf' ? await buildPdf(job, '/work', spool, { signal: abort.signal })
       : await compileJob(job, '/work', { signal: abort.signal }); }
     catch { result = failedResult(job, 'runner_error'); }
     await spool.complete(job.jobId, result);

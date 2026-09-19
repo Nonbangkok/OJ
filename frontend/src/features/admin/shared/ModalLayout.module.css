@@ -36,11 +36,11 @@
 }
 
 .button-save {
-  background-color: #28a745;
-  color: white;
+  background-color: var(--action-create-bg);
+  color: var(--action-button-foreground);
 }
 .button-save:hover {
-  background-color: #218838;
+  background-color: var(--action-create-hover);
 }
 
 .modal-overlay fieldset,
@@ -142,12 +142,6 @@
   margin-bottom: 15px;
   padding-bottom: 10px;
   border-bottom: 2px solid var(--border-color);
-}
-
-.migrationPanelSubHeader {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
 }
 
 .migrationSelectAllButton {
@@ -298,13 +292,13 @@
 }
 
 .migrationControlToAdd {
-  background-color: green;
-  color: white;
+  background-color: var(--status-success);
+  color: var(--action-button-foreground);
 }
 
 .migrationControlToRemove {
-  background-color: #ffc107;
-  color: #212529;
+  background-color: var(--status-warning);
+  color: var(--text-primary);
 }
 
 .migrationSelectionCountContainer {

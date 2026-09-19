@@ -1,5 +1,7 @@
 /**
- * Frontend Constants
+ * Frontend Constants — tunable UI timing (polling intervals, message
+ * timeouts, editor defaults). Domain values that mirror the backend
+ * (roles, submission statuses, app limits) live in utils/constants.ts.
  */
 
 export const POLLING_INTERVALS = {

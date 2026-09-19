@@ -55,7 +55,7 @@ test('lists metadata without fetching contents and inspects bounded text on dema
   expect(get).toHaveBeenCalledTimes(1);
   get.mockResolvedValueOnce({ data: { ...metadata, input: 'é'.repeat(20000), output: null } });
   fireEvent.click(screen.getByRole('button', { name: 'Inspect sample.in' }));
-  const preview = await screen.findByRole('region', { name: 'Testcase preview' });
+  const preview = await screen.findByRole('dialog');
   expect(within(preview).getByLabelText('Input preview').textContent).toHaveLength(16384);
   expect(within(preview).getByText(/truncated/i)).toBeInTheDocument();
   expect(within(preview).getByText('Missing output')).toBeInTheDocument();
@@ -68,8 +68,8 @@ test.each([false, true])(
     const { onMutated } = setup();
     await screen.findByText('sample.in');
     const input = new File(['42'], 'next.in');
-    selectFile('New testcase input', input);
-    if (includeOutput) selectFile('New testcase output (optional)', new File([], 'next.out'));
+    selectFile('Input file', input);
+    if (includeOutput) selectFile('Output file (optional)', new File([], 'next.out'));
     get.mockResolvedValue({
       data: {
         revision: 8,
@@ -95,14 +95,14 @@ test('ZIP replacement requires explicit confirmation and cancellation preserves 
   setup();
   await screen.findByText('sample.in');
   const archive = new File(['zip'], 'cases.zip');
-  selectFile('Testcase ZIP archive', archive);
+  selectFile('ZIP archive (replaces all)', archive);
   fireEvent.click(screen.getByRole('button', { name: 'Replace all from ZIP' }));
   expect(post).not.toHaveBeenCalled();
-  let dialog = screen.getByRole('alertdialog');
+  let dialog = screen.getByRole('dialog');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Replace all from ZIP' }));
-  dialog = screen.getByRole('alertdialog');
+  dialog = screen.getByRole('dialog');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm replacement' }));
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
   expect((post.mock.calls[0][1] as FormData).get('archive')).toBe(archive);
@@ -129,7 +129,7 @@ test('deletion confirms the filename and sends revision in the JSON body', async
   await screen.findByText('sample.in');
   fireEvent.click(screen.getByRole('button', { name: 'Delete sample.in' }));
   expect(remove).not.toHaveBeenCalled();
-  const dialog = screen.getByRole('alertdialog');
+  const dialog = screen.getByRole('dialog');
   expect(within(dialog).getByText(/sample.in/)).toBeInTheDocument();
   get.mockResolvedValue({ data: { revision: 8, testcases: [] } });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm deletion' }));
@@ -149,7 +149,7 @@ test('read-only state disables every mutation while keeping inspection available
   ]) {
     expect(screen.getByRole('button', { name })).toBeDisabled();
   }
-  expect(screen.getByLabelText('New testcase input')).toBeDisabled();
+  expect(screen.getByLabelText('Input file')).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Inspect sample.in' })).toBeEnabled();
 });
 
@@ -163,7 +163,7 @@ test('failed append retains selected files and old cases and prevents duplicate 
     })
   );
   const input = new File(['42'], 'next.in');
-  selectFile('New testcase input', input);
+  selectFile('Input file', input);
   const button = screen.getByRole('button', { name: 'Append testcase' });
   fireEvent.click(button);
   fireEvent.click(button);
@@ -173,7 +173,7 @@ test('failed append retains selected files and old cases and prevents duplicate 
   reject(error);
   await waitFor(() => expect(onError).toHaveBeenCalledWith(error));
   expect(screen.getByText('sample.in')).toBeInTheDocument();
-  expect((screen.getByLabelText('New testcase input') as HTMLInputElement).files?.[0]).toBe(input);
+  expect((screen.getByLabelText('Input file') as HTMLInputElement).files?.[0]).toBe(input);
   expect(onMutated).not.toHaveBeenCalled();
   fireEvent.click(button);
   await waitFor(() => expect(post).toHaveBeenCalledTimes(2));
@@ -184,9 +184,9 @@ test('opening the replacement form preserves the visible append file selection',
   setup();
   await screen.findByText('sample.in');
   const input = new File(['42'], 'next.in');
-  selectFile('New testcase input', input);
+  selectFile('Input file', input);
   fireEvent.click(screen.getByRole('button', { name: 'Replace files for sample.in' }));
-  expect((screen.getByLabelText('New testcase input') as HTMLInputElement).files?.[0]).toBe(input);
+  expect((screen.getByLabelText('Input file') as HTMLInputElement).files?.[0]).toBe(input);
 });
 
 test('a mutation discards any inspection response that arrives after the mutation', async () => {
@@ -199,7 +199,7 @@ test('a mutation discards any inspection response that arrives after the mutatio
     })
   );
   fireEvent.click(screen.getByRole('button', { name: 'Inspect sample.in' }));
-  selectFile('New testcase input', new File(['42'], 'next.in'));
+  selectFile('Input file', new File(['42'], 'next.in'));
   fireEvent.click(screen.getByRole('button', { name: 'Append testcase' }));
   await waitFor(() =>
     expect(screen.getByRole('button', { name: 'Refresh testcases' })).toBeEnabled()
@@ -217,7 +217,7 @@ test('keeps mutations pending until the parent refresh finishes and uses the nex
       finishRefresh = resolve;
     })
   );
-  selectFile('New testcase input', new File(['42'], 'next.in'));
+  selectFile('Input file', new File(['42'], 'next.in'));
   fireEvent.click(screen.getByRole('button', { name: 'Append testcase' }));
   await waitFor(() => expect(onMutated).toHaveBeenCalledTimes(1));
   expect(screen.getByRole('button', { name: 'Delete sample.in' })).toBeDisabled();
@@ -273,7 +273,7 @@ test('notifies the parent if an upload succeeds after switching away from the ta
       finishUpload = resolve;
     })
   );
-  selectFile('New testcase input', new File(['42'], 'next.in'));
+  selectFile('Input file', new File(['42'], 'next.in'));
   fireEvent.click(screen.getByRole('button', { name: 'Append testcase' }));
   unmount();
   await act(async () => {

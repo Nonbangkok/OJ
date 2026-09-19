@@ -90,6 +90,10 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
   app.use(attachRequestUser);
   app.use(generalApiLimiter);
 
+  // Router mount order matters: within each router, static segments must be
+  // registered before parameterised ones on the same path (e.g. problemRoutes
+  // must define /problems-with-stats before /problems/:id). Adding a new router
+  // here means its routes join a single global table — check for collisions.
   app.use('/', authRoutes);
   app.use('/', createAuthoringJobRouter(Boolean(runtimeEnv.AUTHORING_JOBS_DIR)));
   app.use('/', authoringTestcaseRoutes);

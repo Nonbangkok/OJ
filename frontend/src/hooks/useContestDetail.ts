@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import contestService from '../services/contestService';
+import { POLLING_INTERVALS } from '../config/constants';
+import { fetchContestOutcome } from './contestStatusFetch';
 import { useAuth } from '../context/AuthContext';
 
 /**
@@ -22,29 +24,31 @@ const useContestDetail = () => {
       try {
         if (isInitial) setLoading(true);
 
-        const fetchedContest = await contestService.getById(contestId);
-        setContest(fetchedContest);
+        const outcome = await fetchContestOutcome(contestId as string, {
+          previousStatus: contest?.status,
+        });
 
-        // Redirect logic if contest is finished
-        if (fetchedContest.status === 'finished') {
-          const redirectPath = fetchedContest.is_participant
-            ? `/contests/${contestId}/scoreboard`
-            : '/contests';
-          navigate(redirectPath);
+        if (outcome.kind === 'finished' || outcome.kind === 'loaded' || outcome.kind === 'forbidden') {
+          if (outcome.contest !== null) {
+            setContest(outcome.contest);
+          }
+        }
+
+        if (outcome.kind === 'finished') {
+          navigate(outcome.redirectPath);
+        } else if (outcome.kind === 'forbidden') {
+          setError('You need to join this contest to view its details.');
+          if (outcome.redirectPath) {
+            navigate(outcome.redirectPath);
+          }
+        } else if (outcome.kind === 'not-found') {
+          setError('Contest not found.');
+        } else if (outcome.kind === 'error') {
+          setError('Failed to load contest data.');
         }
       } catch (err) {
         console.error('Error fetching contest data:', err);
-        if (err.response?.status === 403) {
-          setError('You need to join this contest to view its details.');
-          // If user is not participant and contest is finished, redirect to /contests
-          if (contest?.status === 'finished') {
-            navigate('/contests');
-          }
-        } else if (err.response?.status === 404) {
-          setError('Contest not found.');
-        } else {
-          setError('Failed to load contest data.');
-        }
+        setError('Failed to load contest data.');
       } finally {
         if (isInitial) setLoading(false);
       }
@@ -57,7 +61,7 @@ const useContestDetail = () => {
 
     const intervalId = setInterval(() => {
       fetchContestData();
-    }, 15000); // Poll every 15 seconds
+    }, POLLING_INTERVALS.CONTEST_GUARD);
 
     return () => clearInterval(intervalId);
   }, [fetchContestData]);

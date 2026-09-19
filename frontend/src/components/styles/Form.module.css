@@ -80,7 +80,7 @@
   border: none;
   border-radius: 6px;
   background-color: var(--accent-primary);
-  color: #ffffff;
+  color: var(--action-button-foreground);
   font-family: var(--font-family-sans-serif);
   font-size: 1rem;
   font-weight: 600;

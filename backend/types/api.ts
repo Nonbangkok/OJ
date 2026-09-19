@@ -167,7 +167,27 @@ export interface CreateAuthorProfileRequestBody {
 
 export type UpdateAuthorProfileRequestBody = Partial<CreateAuthorProfileRequestBody> & {
     removeProfileImage?: boolean;
+    /** Resubmit with true after the client has confirmed the sync impact. */
+    confirmed?: boolean;
 };
+
+/** Response when an author-relevant edit needs confirmation before it cascades. */
+export interface AuthorProfileUpdateConfirmationResponse {
+    confirmationRequired: true;
+    affectedDrafts: number;
+    affectedPublishedProblems: number;
+    profile: {
+        id: string;
+        userId: number | null;
+        akaName: string;
+        realName: string;
+        defaultLanguage: string;
+        countryCode: string;
+        hasProfileImage: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+    };
+}
 
 export interface CreateProblemDraftRequestBody {
     problemId: string;

@@ -38,3 +38,10 @@
   border-color: color-mix(in srgb, var(--status-danger) 40%, transparent);
   color: var(--text-primary);
 }
+
+/* Borderless variant for dense table cells: tinted pill, no outline. */
+.soft {
+  border-color: transparent;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.8rem;
+}

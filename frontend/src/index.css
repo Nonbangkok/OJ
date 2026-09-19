@@ -2,8 +2,26 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Inconsolata:wght@200..900&display=swap');
 
+/*
+ * Responsive breakpoint scale (max-width queries):
+ *   480px  — small mobile: tighten padding, hide secondary chrome,
+ *            collapse multi-column grids to one column
+ *   768px  — mobile/tablet switch: the standard "stack everything"
+ *            breakpoint used by most pages
+ *   800px  — authoring full-screen editor only (grid-rows switch)
+ *   900px  — admin surfaces: AdminNavbar collapse and the authoring
+ *            workspace left-nav stacking (900px max / 901px min pair)
+ *  1200px  — SubmissionModal wide-layout fallback
+ *   390px  — Drawer full-bleed on very small phones (iPhone SE class)
+ * Use 480/768 for new rules; other values need a concrete reason.
+ */
+
 /* Define CSS variables for theming */
 :root {
+  /* Native form controls (file-input "Choose file" button, scrollbars,
+     dropdowns) render per the light scheme; the dark override below flips
+     them with the theme so they never blend into the background. */
+  color-scheme: light;
   --background-primary: #ffffff;
   --background-secondary: #f8f9fa;
   --background-tertiary: #e9ecef;
@@ -46,6 +64,16 @@
   --status-warning: #ffc107;
   --status-info: #17a2b8;
 
+  /* Verdict colors shared by the global .status-* classes and the
+     SubmissionModal detail values */
+  --verdict-accepted: #48bb78;
+  --verdict-wrong: #f56565;
+  --verdict-time: #f6ad55;
+  --verdict-compilation: #a0aec0;
+  --verdict-runtime: #ed8936;
+  --verdict-memory: #ed64a6;
+  --verdict-pending: #718096;
+
   --status-success-bg: #48bb78;
   --status-error-bg: #dc3545;
   --status-warning-bg: #ffc107;
@@ -58,9 +86,123 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --shadow-hover: 0 4px 10px rgba(0, 0, 0, 0.1);
+  --box-shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.15), 0 3px 6px rgba(0, 0, 0, 0.1);
+
+  /* Semantic aliases — legacy names kept working; map onto the tokens above */
+  --card-bg: var(--surface-elevated);
+  --primary-color: var(--accent-primary);
+  --primary-dark: var(--accent-primary-hover);
+  --accent-hover: var(--accent-primary-hover);
+  --text-color: var(--text-primary);
+  --text-color-primary: var(--text-primary);
+  --bg-secondary: var(--background-secondary);
+  --background-hover: var(--background-tertiary);
+  --background-darker: var(--background-tertiary);
+  --background-light: var(--background-tertiary);
+  --input-bg: var(--background-primary);
+  --border-color-light: var(--border-color);
+  --error-color: var(--status-danger);
+  --error-bg: rgba(220, 53, 69, 0.1);
+  --text-error: var(--error-text);
+  --text-success: #198754;
+  --text-warning: #b8860b;
+  --warning-color: #f57c00;
+  --background-error: rgba(220, 53, 69, 0.1);
+  --background-success: rgba(40, 167, 69, 0.1);
+
+  /* Code-editor palette — deliberately dark in both themes, mirroring the
+     highlight.js theme used for syntax coloring. */
+  --editor-bg: #282c34;
+  --editor-surface: #21252b;
+  --editor-border: #181b20;
+  --editor-border-strong: #3a3f4b;
+  --editor-text: #abb2bf;
+  --editor-gutter-text: #565c66;
+  --editor-gutter-muted: #636d83;
+  --editor-focus: #61afef;
+
+  /* Statement-editor chrome — dark toolbar by design, constant per theme. */
+  --editor-chrome-bg: #202428;
+  --editor-chrome-text: #f7f7f7;
+  --editor-chrome-muted: #c9cdd1;
+  --editor-chrome-button-bg: #3a4048;
+  --editor-chrome-button-border: #4a525c;
+
+  /* Statement paper preview — pages stay white like printed paper in both
+     themes; the desk around the pages follows the theme. */
+  --statement-paper: #ffffff;
+  --statement-desk: #e9edf1;
+  --statement-stripe-a: #f4f6f8;
+  --statement-stripe-b: #eef1f4;
+  --statement-page-number: #55606b;
+  --statement-separator: #b6bfc9;
+  --statement-empty: #666666;
+  --statement-continued: #8a949e;
+
+  /* Success tint for the verify checklist. */
+  --success-tint-bg: rgba(25, 135, 84, 0.08);
+  --success-tint-border: rgba(25, 135, 84, 0.35);
+
+  /* Management-page action buttons (legacy composes: btn family). */
+  --action-create-bg: #28a745;
+  --action-create-hover: #218838;
+  --action-edit-bg: #17a2b8;
+  --action-edit-hover: #138496;
+  --action-problems-bg: #007bff;
+  --action-problems-hover: #0069d9;
+  --action-neutral-button-bg: #6c757d;
+  --action-neutral-button-hover: #545b62;
+  --action-disabled-bg: #adb5bd;
+  --action-button-foreground: #ffffff;
+
+  /* Contest-status badges — shared by Management badges, the contest-status
+     badge on the problems table, and ContestCard's joined status. */
+  --contest-badge-scheduled-bg: #e3f2fd;
+  --contest-badge-scheduled-fg: #1976d2;
+  --contest-badge-scheduled-border: #bbdefb;
+  --contest-badge-running-bg: #e8f5e8;
+  --contest-badge-running-fg: #2e7d32;
+  --contest-badge-running-border: #c8e6c9;
+  --contest-badge-finishing-bg: #fff3e0;
+  --contest-badge-finishing-fg: #f57c00;
+  --contest-badge-finishing-border: #ffcc02;
+  --contest-badge-finished-bg: #f3e5f5;
+  --contest-badge-finished-fg: #7b1fa2;
+  --contest-badge-finished-border: #ce93d8;
+
+  /* Batch-upload feedback boxes. */
+  --feedback-info-bg: #e7f3fe;
+  --feedback-info-border: #2196f3;
+  --feedback-info-fg: #1a78c2;
+  --feedback-success-bg: #e8f5e9;
+  --feedback-success-border: #4caf50;
+  --feedback-success-fg: #2e7d32;
+  --feedback-error-bg: #ffebee;
+  --feedback-error-border: #f44336;
+  --feedback-error-fg: #c62828;
+
+  /* ContestCard action buttons (gradient pairs). */
+  --contest-action-join-from: #4caf50;
+  --contest-action-join-to: #45a049;
+  --contest-action-join-hover-from: #45a049;
+  --contest-action-join-hover-to: #3d8b40;
+  --contest-action-enter-from: #2196f3;
+  --contest-action-enter-to: #1976d2;
+  --contest-action-enter-hover-from: #1976d2;
+  --contest-action-enter-hover-to: #1565c0;
+  --contest-action-scoreboard-from: #ff9800;
+  --contest-action-scoreboard-to: #f57c00;
+  --contest-action-scoreboard-hover-from: #f57c00;
+  --contest-action-scoreboard-hover-to: #ef6c00;
+  --contest-action-login-from: #9c27b0;
+  --contest-action-login-to: #7b1fa2;
+  --contest-action-login-hover-from: #7b1fa2;
+  --contest-action-login-hover-to: #6a1b9a;
+  --contest-action-foreground: #ffffff;
 }
 
 [data-theme='dark'] {
+  color-scheme: dark;
   --background-primary: #121212;
   --background-secondary: #1e1e1e;
   --background-tertiary: #2a2a2a;
@@ -108,6 +250,23 @@
   --status-success-bg: #198754;
   --status-warning-bg: #d39e00;
   --shadow-hover: 0 4px 10px rgba(0, 0, 0, 0.4);
+
+  /* Dark-mode overrides for the semantic aliases */
+  --card-bg: var(--surface-elevated);
+  --background-hover: var(--background-tertiary);
+  --background-darker: var(--background-tertiary);
+  --background-light: var(--background-tertiary);
+  --input-bg: var(--background-secondary);
+  --text-success: #2fbf71;
+  --text-warning: #f6c344;
+  --warning-color: #ffa040;
+  --error-bg: rgba(255, 107, 122, 0.12);
+  --background-error: rgba(255, 107, 122, 0.12);
+  --background-success: rgba(46, 204, 113, 0.12);
+
+  /* Dark-mode overrides: the desk around statement pages darkens; the paper
+     itself and the editor palettes intentionally stay constant. */
+  --statement-desk: #1a1d21;
 }
 
 /* Global styles reset and base */
@@ -141,7 +300,7 @@ code {
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 1rem 2rem;
+  padding: 20px;
 }
 
 .admin-main {
@@ -164,40 +323,40 @@ code {
 
 /* Status colors for table cells and other UI elements */
 .status-accepted {
-  color: #48bb78 !important;
+  color: var(--verdict-accepted) !important;
   /* Green */
   font-weight: bold;
 }
 
 .status-wrong {
-  color: #f56565 !important;
+  color: var(--verdict-wrong) !important;
   /* Red */
   font-weight: bold;
 }
 
 .status-time {
-  color: #f6ad55 !important;
+  color: var(--verdict-time) !important;
   /* Orange */
 }
 
 .status-compilation {
-  color: #a0aec0 !important;
+  color: var(--verdict-compilation) !important;
   /* Gray */
 }
 
 .status-runtime {
-  color: #ed8936 !important;
+  color: var(--verdict-runtime) !important;
   /* Orange */
 }
 
 .status-memory {
-  color: #ed64a6 !important;
+  color: var(--verdict-memory) !important;
   /* Pink */
 }
 
 .status-pending,
 .status-compiling,
 .status-running {
-  color: #718096 !important;
+  color: var(--verdict-pending) !important;
   /* Gray */
 }

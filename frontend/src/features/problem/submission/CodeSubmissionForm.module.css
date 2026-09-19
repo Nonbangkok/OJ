@@ -3,8 +3,8 @@
   padding: 15px;
   border: 1px solid var(--border-color);
   border-radius: 4px;
-  background-color: #282c34; /* Keep dark background for output */
-  color: #abb2bf; /* Light grey text */
+  background-color: var(--editor-bg); /* Keep dark background for output */
+  color: var(--editor-text); /* Light grey text */
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
 }
 
@@ -32,9 +32,9 @@
   min-height: 300px;
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
   font-size: 0.95rem;
-  background-color: #282c34; /* Dark background */
-  color: #abb2bf; /* Light grey text */
-  border: 1px solid #3a3f4b; /* Slightly lighter border */
+  background-color: var(--editor-bg); /* Dark background */
+  color: var(--editor-text); /* Light grey text */
+  border: 1px solid var(--editor-border-strong); /* Slightly lighter border */
   line-height: 1.5;
   white-space: pre; /* Keep whitespace */
   overflow-wrap: normal;
@@ -43,7 +43,7 @@
 
 .submission-form-container textarea#code:focus {
   outline: none;
-  border-color: #61afef; /* Highlight on focus */
+  border-color: var(--editor-focus); /* Highlight on focus */
   box-shadow: 0 0 0 2px rgba(97, 175, 239, 0.2);
 }
 
@@ -86,6 +86,6 @@
 .languageButtons button.active {
   background-color: var(--accent-primary);
   border-color: var(--accent-primary);
-  color: #ffffff;
+  color: var(--action-primary-foreground);
   font-weight: 600;
 }

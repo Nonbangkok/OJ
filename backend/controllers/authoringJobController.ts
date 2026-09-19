@@ -2,8 +2,9 @@ import { Router } from 'express';
 import { requireAdmin, requireAuth } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
-import { compileAuthoringJobSchema, generateAuthoringJobSchema, outputAuthoringJobSchema, problemDraftIdParamSchema } from '../schemas/requestSchemas';
+import { compileAuthoringJobSchema, generateAuthoringJobSchema, expectedRevisionSchema, problemDraftIdParamSchema } from '../schemas/requestSchemas';
 import { DurableJob, getAuthoringJob, getDraftPdf, queueCompileJob, queueGeneratorJob, queueOutputJob, queuePdfJob, queueVerifyJob } from '../services/authoringJobQueryService';
+import { getProfileSync, listProfileSyncs } from '../services/authoringProfileSyncService';
 
 const projectJob = (job: DurableJob) => ({
   id: job.id, draftId: job.draft_id, draftRevision: job.draft_revision, jobType: job.job_type,
@@ -17,7 +18,7 @@ export function createAuthoringJobRouter(enabled: boolean): Router {
   const router = Router();
   for (const action of ['compile', 'generate', 'outputs', 'pdf', 'verify'] as const) router.post(`/admin/authoring/drafts/:id/jobs/${action}`, requireAuth, requireAdmin,
     validateRequest({ params: problemDraftIdParamSchema, body: action === 'compile' ? compileAuthoringJobSchema
-      : action === 'generate' ? generateAuthoringJobSchema : outputAuthoringJobSchema }),
+      : action === 'generate' ? generateAuthoringJobSchema : expectedRevisionSchema }),
     asyncHandler(async (req, res) => {
       if (!enabled) { res.status(503).json({ code: 'runner_unavailable', message: 'Authoring runner is not configured' }); return; }
       const result = action === 'compile'
@@ -54,6 +55,19 @@ export function createAuthoringJobRouter(enabled: boolean): Router {
       const job = await getAuthoringJob(String(req.params.id));
       if (!job) { res.status(404).json({ message: 'Authoring job not found' }); return; }
       res.json(projectJob(job));
+    }));
+  // Profile-sync cascades are readable even when the runner transport is
+  // disabled (same rule as job history): these rows live in the main database.
+  router.get('/admin/authoring/profile-syncs', requireAuth, requireAdmin,
+    asyncHandler(async (_req, res) => {
+      res.json(await listProfileSyncs());
+    }));
+  router.get('/admin/authoring/profile-syncs/:id', requireAuth, requireAdmin,
+    validateRequest({ params: problemDraftIdParamSchema }),
+    asyncHandler(async (req, res) => {
+      const sync = await getProfileSync(String(req.params.id));
+      if (!sync) { res.status(404).json({ code: 'profile_sync_not_found', message: 'Profile sync not found' }); return; }
+      res.json(sync);
     }));
   router.get('/admin/authoring/drafts/:id/pdf', requireAuth, requireAdmin,
     validateRequest({ params: problemDraftIdParamSchema }), asyncHandler(async (req, res) => {

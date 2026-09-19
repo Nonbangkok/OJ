@@ -5,7 +5,7 @@ import * as unzipper from 'unzipper';
 import os from 'os';
 import { Readable } from 'stream';
 import * as db from '../db';
-import { UPLOAD_STATUS, FILE_CONFIG } from '../constants';
+import { UPLOAD_STATUS, FILE_CONFIG, ARCHIVE_LIMITS } from '../constants';
 import { BatchUploadProgressData } from '../types/api';
 import {
   BatchUploadResult,
@@ -14,13 +14,10 @@ import {
   ProblemProcessResult,
   TestcasePairMap,
 } from '../types/service';
+import { pairFlatDirTestcaseFiles, pairZippedTestcaseFiles } from './testcaseZipPairing';
 
-// --- Archive safety limits (zip-slip / zip-bomb protection) ---
-// Caps on the *uncompressed* contents of an uploaded archive. These guard
-// against decompression bombs (a tiny zip that expands to gigabytes / millions
-// of files) before we extract anything to disk.
-export const MAX_ARCHIVE_UNCOMPRESSED_BYTES = 500 * 1024 * 1024; // 500 MB total
-export const MAX_ARCHIVE_ENTRIES = 5000; // file count
+const MAX_ARCHIVE_UNCOMPRESSED_BYTES = ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES;
+export const MAX_ARCHIVE_ENTRIES = ARCHIVE_LIMITS.MAX_ENTRIES;
 const PDF_MAGIC = Buffer.from('%PDF');
 
 export interface ArchiveEntryLike {
@@ -122,26 +119,7 @@ async function processTestcasesFromZip(problemId: string, zipPath: string, log: 
   } else {
     // --- Fallback to original logic for flat zip files ---
     log.push('Detected flat file structure inside zip.');
-    const testcaseFiles: TestcasePairMap<unzipper.File> = {};
-    const fileRegex = /^(?:input|output)?(\d+)\.(?:in|out|txt|sol)$/i;
-
-    for (const file of zip.files) {
-      const fileName = path.basename(file.path);
-      const isJunk = file.path.startsWith('__MACOSX/') || fileName.startsWith('._');
-      if (file.type !== 'File' || isJunk) continue;
-
-      const match = fileName.match(fileRegex);
-      if (match) {
-        const number = parseInt(match[1], 10);
-        if (!testcaseFiles[number]) testcaseFiles[number] = {};
-        const lowerFileName = fileName.toLowerCase();
-        if (lowerFileName.endsWith('.in') || lowerFileName.includes('input')) {
-          testcaseFiles[number].in = file;
-        } else if (lowerFileName.endsWith('.out') || lowerFileName.endsWith('.sol') || lowerFileName.includes('output')) {
-          testcaseFiles[number].out = file;
-        }
-      }
-    }
+    const testcaseFiles = pairZippedTestcaseFiles(zip.files);
     return processPairedFiles(problemId, testcaseFiles, (file) => Promise.resolve(file.stream()), log);
   }
 }
@@ -177,27 +155,8 @@ async function processTestcasesFromInputOutputDirs(problemId: string, inputDir: 
 }
 
 async function processTestcasesFromFlatDir(problemId: string, dirPath: string, log: string[]): Promise<number> {
-  const testcaseFiles: TestcasePairMap<string> = {};
-  const fileRegex = /^(?:input|output)?(\d+)\.(?:in|out|txt|sol)$/i;
-
   const allFiles = await fsPromises.readdir(dirPath);
-
-  for (const fileName of allFiles) {
-    const isJunk = fileName.startsWith('._') || fileName === '.DS_Store';
-    if (isJunk) continue;
-
-    const match = fileName.match(fileRegex);
-    if (match) {
-      const number = parseInt(match[1], 10);
-      if (!testcaseFiles[number]) testcaseFiles[number] = {};
-      const lowerFileName = fileName.toLowerCase();
-      if (lowerFileName.endsWith('.in') || lowerFileName.includes('input')) {
-        testcaseFiles[number].in = path.join(dirPath, fileName);
-      } else if (lowerFileName.endsWith('.out') || lowerFileName.endsWith('.sol') || lowerFileName.includes('output')) {
-        testcaseFiles[number].out = path.join(dirPath, fileName);
-      }
-    }
-  }
+  const testcaseFiles = pairFlatDirTestcaseFiles(allFiles, dirPath);
   return processPairedFiles(problemId, testcaseFiles, (filePath: string) => fsPromises.readFile(filePath), log);
 }
 

@@ -3,13 +3,14 @@ import { requireAuth, requireStaffOrAdmin } from '../middleware/auth';
 import { diskUpload, memoryUpload } from '../middleware/upload';
 import archiver from 'archiver';
 import { processBatchUpload } from '../services/batchUploadService';
+import { registerProgressClient, streamBatchUpload } from '../services/batchUploadProgress';
 import {
   createProblem,
   deleteProblem,
   getAdminProblems,
   getProblemDetail,
   getProblemExportBundle,
-  getProblemPdf,
+  getProblemPdfWithAccess,
   getProblemsWithStatsForUser,
   getVisibleProblems,
   replaceProblemTestcasesFromZip,
@@ -29,7 +30,6 @@ import {
 } from '../types/api';
 import { getErrorMessage } from '../utils/errorMessage';
 import { validateRequest } from '../middleware/validation';
-import { env } from '../config/env';
 import {
   createProblemSchema,
   idParamSchema,
@@ -43,41 +43,10 @@ const router: Router = express.Router();
 
 // A valid PDF file always begins with the magic bytes "%PDF". Reject anything
 // that does not, so a renamed HTML/script payload cannot be stored and later
-// served from the same origin.
+// be served from the same origin.
 const PDF_MAGIC = Buffer.from('%PDF');
 const isPdfBuffer = (buffer: Buffer | undefined | null): boolean =>
   !!buffer && buffer.length >= PDF_MAGIC.length && buffer.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC);
-
-const progressMap = new Map<string, Response>();
-const progressHeartbeatMap = new Map<string, NodeJS.Timeout>();
-
-export const selectProgressResponseOrigin = (
-  requestOrigin: string | undefined,
-  allowedOrigins: readonly string[] = env.CORS_ORIGINS,
-): string | undefined => requestOrigin && allowedOrigins.includes(requestOrigin)
-  ? requestOrigin
-  : allowedOrigins[0];
-
-const writeProgressEvent = (progressId: string, event: string, payload: unknown): void => {
-  const clientResponse = progressMap.get(progressId);
-  if (!clientResponse || clientResponse.writableEnded) {
-    return;
-  }
-  clientResponse.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
-};
-
-const endProgressStream = (progressId: string): void => {
-  const clientResponse = progressMap.get(progressId);
-  if (clientResponse && !clientResponse.writableEnded) {
-    clientResponse.end();
-  }
-  progressMap.delete(progressId);
-  const heartbeat = progressHeartbeatMap.get(progressId);
-  if (heartbeat) {
-    clearInterval(heartbeat);
-    progressHeartbeatMap.delete(progressId);
-  }
-};
 
 router.get('/problems-with-stats', requireAuth, asyncHandler(async (req: Request, res: Response) => {
   const { userId } = req.session;
@@ -101,12 +70,15 @@ router.get('/problems/:id',
   const id = String(req.params.id);
   const problemDetail = await getProblemDetail(id);
   if (!problemDetail) {
-    return res.status(404).json({ message: 'Problem not found' });
+    throw new AppError('Problem not found', 404);
   }
 
   const isStaffOrAdmin = req.session.role === USER_ROLES.ADMIN || req.session.role === USER_ROLES.STAFF;
 
   if (!problemDetail.is_visible && !isStaffOrAdmin) {
+    // Kept inline (not AppError): the response carries hidden-problem context
+    // fields at the top level for the UI; the shared error envelope would nest
+    // them under `details`.
     return res.status(403).json({
       detail: 'This problem has been hidden by administrators and is not accessible to regular users.',
       problemId: id,
@@ -126,7 +98,7 @@ router.get('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
   const id = String(req.params.id);
   const problemDetail = await getProblemDetail(id);
   if (!problemDetail) {
-    return res.status(404).json({ message: 'Problem not found' });
+    throw new AppError('Problem not found', 404);
   }
   res.json(problemDetail);
 }));
@@ -139,13 +111,14 @@ router.get('/problems/:id/pdf', requireAuth,
   // Enforce the same visibility rule as GET /problems/:id before serving the PDF.
   // Hidden problems and problems attached to a contest must only be reachable by
   // staff/admin via this endpoint (contest PDFs have their own guarded endpoint).
-  const problemDetail = await getProblemDetail(id);
-  if (!problemDetail) {
-    return res.status(404).json({ message: 'Problem PDF not found.' });
+  const problem = await getProblemPdfWithAccess(id);
+  if (!problem) {
+    throw new AppError('Problem PDF not found.', 404);
   }
 
   const isStaffOrAdmin = req.session.role === USER_ROLES.ADMIN || req.session.role === USER_ROLES.STAFF;
-  if ((!problemDetail.is_visible || problemDetail.contest_id !== null) && !isStaffOrAdmin) {
+  if ((!problem.is_visible || problem.contest_id !== null) && !isStaffOrAdmin) {
+    // Kept inline for the same reason as the hidden-problem 403 above.
     return res.status(403).json({
       detail: 'This problem has been hidden by administrators and is not accessible to regular users.',
       problemId: id,
@@ -153,15 +126,14 @@ router.get('/problems/:id/pdf', requireAuth,
     });
   }
 
-  const pdfData = await getProblemPdf(id);
-  if (!pdfData) {
-    return res.status(404).json({ message: 'Problem PDF not found.' });
+  if (!problem.problem_pdf) {
+    throw new AppError('Problem PDF not found.', 404);
   }
   res.setHeader('Content-Type', 'application/pdf');
   // Prevent content-type sniffing: ensures the browser treats this strictly as
   // a PDF and never re-interprets the bytes as HTML/JS (XSS via uploaded file).
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.send(pdfData);
+  res.send(problem.problem_pdf);
 }));
 
 router.post('/admin/problems', requireAuth, requireStaffOrAdmin,
@@ -187,10 +159,10 @@ router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
     memory_limit_mb,
   });
   if (updateResult === 'duplicate_id') {
-    return res.status(409).json({ message: `Problem ID '${newId}' already exists.` });
+    throw new AppError(`Problem ID '${newId}' already exists.`, 409);
   }
   if (updateResult === 'not_found') {
-    return res.status(404).json({ message: 'Problem not found' });
+    throw new AppError('Problem not found', 404);
   }
   res.json(updateResult);
 }));
@@ -201,7 +173,7 @@ router.delete('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
   const id = String(req.params.id);
   const deleted = await deleteProblem(id);
   if (!deleted) {
-    return res.status(404).json({ message: 'Problem not found' });
+    throw new AppError('Problem not found', 404);
   }
   res.status(200).json({ message: `Problem ${id} deleted successfully` });
 }));
@@ -219,7 +191,7 @@ router.put('/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin,
 
   const updatedProblem = await updateProblemVisibility(id, isVisible);
   if (!updatedProblem) {
-    return res.status(404).json({ message: 'Problem not found' });
+    throw new AppError('Problem not found', 404);
   }
   res.json({
     message: `Problem ${id} visibility updated successfully`,
@@ -234,62 +206,21 @@ router.post('/admin/problems/batch-upload', requireAuth, requireStaffOrAdmin, di
 
   const progressId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
-  try {
-    res.status(202).json({
-      message: 'Batch upload initiated. Connect to progress endpoint to monitor.',
-      progressId: progressId
-    });
+  res.status(202).json({
+    message: 'Batch upload initiated. Connect to progress endpoint to monitor.',
+    progressId: progressId
+  });
 
-    const batchResults = await processBatchUpload(req.file.path, (progressData: BatchUploadProgressData) => {
-      writeProgressEvent(progressId, 'progress', progressData);
-    });
-
-    writeProgressEvent(progressId, 'complete', { status: 'complete', message: 'Batch upload process finished.', ...batchResults });
-    endProgressStream(progressId);
-
-  } catch (error: unknown) {
-    console.error('Error in batch upload endpoint:', error);
-    const message = getErrorMessage(error, 'A critical error occurred during batch upload.');
-    writeProgressEvent(progressId, 'error', { status: 'error', message });
-    endProgressStream(progressId);
-  }
+  // Stream progress to any connected SSE client; never fails the already-sent 202.
+  const uploadPath = req.file.path;
+  void streamBatchUpload(progressId, (onProgress) =>
+    processBatchUpload(uploadPath, (progressData: BatchUploadProgressData) => onProgress(progressData)));
 });
 
 router.get('/admin/problems/batch-upload-progress/:progressId', requireAuth, requireStaffOrAdmin,
   validateRequest({ params: progressIdParamSchema }),
   (req: Request, res: Response) => {
-  const progressId = String(req.params.progressId);
-  const responseOrigin = selectProgressResponseOrigin(req.headers.origin);
-
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    ...(responseOrigin ? { 'Access-Control-Allow-Origin': responseOrigin } : {}),
-    'Access-Control-Allow-Credentials': 'true',
-    'Vary': 'Origin',
-  });
-
-  progressMap.set(progressId, res);
-  const heartbeat = setInterval(() => {
-    if (!res.writableEnded) {
-      res.write(': keepalive\n\n');
-    }
-  }, 15000);
-  progressHeartbeatMap.set(progressId, heartbeat);
-
-  res.write(`event: initial\ndata: ${JSON.stringify({ message: 'Connected to batch upload progress stream.', progressId })}\n\n`);
-
-  req.on('close', () => {
-    if (progressMap.get(progressId) === res) {
-      progressMap.delete(progressId);
-    }
-    const currentHeartbeat = progressHeartbeatMap.get(progressId);
-    if (currentHeartbeat) {
-      clearInterval(currentHeartbeat);
-      progressHeartbeatMap.delete(progressId);
-    }
-  });
+  registerProgressClient(String(req.params.progressId), req, res);
 });
 
 router.post('/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin,

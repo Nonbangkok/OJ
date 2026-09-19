@@ -1,9 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Admin from '../../pages/admin/Admin';
-import authService from '../../services/authService';
+import { useAuth } from '../../context/AuthContext';
 
-jest.mock('../../services/authService');
+jest.mock('../../context/AuthContext', () => ({
+    useAuth: jest.fn(),
+}));
 
 // Mock ThemeContext to prevent useTheme errors from LoadingPage
 jest.mock('../../context/ThemeContext', () => ({
@@ -20,10 +22,11 @@ jest.mock('../../features/admin/settings/Settings', () => () => <div data-testid
 describe('Admin Page', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        (useAuth as jest.Mock).mockReturnValue({ user: null, isLoading: false });
     });
 
     it('displays loading state initially', () => {
-        jest.mocked(authService.checkLogin).mockReturnValue(new Promise(() => { }));
+        (useAuth as jest.Mock).mockReturnValue({ user: null, isLoading: true });
 
         render(
             <BrowserRouter>
@@ -35,8 +38,8 @@ describe('Admin Page', () => {
     });
 
     it('displays admin panel and sections for admin user', async () => {
-        jest.mocked(authService.checkLogin).mockResolvedValueOnce({
-            isAuthenticated: true, user: { id: 1, username: 'admin', role: 'admin', hasAvatar: false }
+        (useAuth as jest.Mock).mockReturnValue({
+            user: { id: 1, username: 'admin', role: 'admin', hasAvatar: false }, isLoading: false
         });
 
         render(
@@ -55,8 +58,8 @@ describe('Admin Page', () => {
     });
 
     it('displays only staff sections for staff user', async () => {
-        jest.mocked(authService.checkLogin).mockResolvedValueOnce({
-            isAuthenticated: true, user: { id: 2, username: 'staff', role: 'staff', hasAvatar: false }
+        (useAuth as jest.Mock).mockReturnValue({
+            user: { id: 2, username: 'staff', role: 'staff', hasAvatar: false }, isLoading: false
         });
 
         render(
@@ -75,8 +78,8 @@ describe('Admin Page', () => {
     });
 
     it('displays nothing for regular user', async () => {
-        jest.mocked(authService.checkLogin).mockResolvedValueOnce({
-            isAuthenticated: true, user: { id: 3, username: 'user', role: 'user', hasAvatar: false }
+        (useAuth as jest.Mock).mockReturnValue({
+            user: { id: 3, username: 'user', role: 'user', hasAvatar: false }, isLoading: false
         });
 
         render(

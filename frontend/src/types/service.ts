@@ -19,7 +19,7 @@ export interface SubmitRequest {
 
 export interface SubmissionQueryParams {
   filter?: 'all' | 'mine';
-  problemId?: string;
+  problemId?: string | number;
   contestId?: string | number;
   filterProblemId?: string;
   filterUserId?: string;

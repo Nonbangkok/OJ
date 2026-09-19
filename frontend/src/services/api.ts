@@ -1,4 +1,4 @@
-import axios, { type AxiosResponse } from 'axios';
+import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL;
 const LARGE_UPLOAD_API_URL = process.env.REACT_APP_LARGE_UPLOAD_API_URL || API_URL;
@@ -18,10 +18,5 @@ export const largeUploadApi = axios.create({
 });
 
 export const getLargeUploadBaseUrl = (): string => largeUploadApi.defaults.baseURL ?? '';
-
-export const requestData = async <T>(request: Promise<AxiosResponse<T>>): Promise<T> => {
-  const response = await request;
-  return response.data;
-};
 
 export default api;

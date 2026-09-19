@@ -1,14 +1,21 @@
 import { useState, useRef, useEffect } from 'react';
 import hljs from 'highlight.js/lib/core';
 import { UI_TIMEOUTS } from '../config/constants';
+import { getStatusClass } from '../utils/formatters';
+import type { SubmissionDetail, TestCaseResult } from '../types';
 
-const useSubmissionModal = (submission) => {
+type ParsedResults = TestCaseResult[] | 'error' | null;
+
+/** The modal only reads these fields; callers may pass a partial detail. */
+type SubmissionModalInput = Partial<SubmissionDetail> | null;
+
+const useSubmissionModal = (submission: SubmissionModalInput) => {
   const [copySuccess, setCopySuccess] = useState(false);
   const [code, setCode] = useState('');
   const [lineCount, setLineCount] = useState(1);
   const [hasScrollbar, setHasScrollbar] = useState(false);
-  const lineNumbersRef = useRef(null);
-  const editorWrapperRef = useRef(null);
+  const lineNumbersRef = useRef<HTMLDivElement | null>(null);
+  const editorWrapperRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (submission?.code) {
@@ -97,27 +104,18 @@ const useSubmissionModal = (submission) => {
     }
   };
 
-  const highlightCode = (code) => {
+  const highlightCode = (source: string): string => {
     try {
-      return hljs.highlight(code, { language: 'cpp' }).value;
+      return hljs.highlight(source, { language: 'cpp' }).value;
     } catch (e) {
       console.warn('Highlighting error:', e);
-      return code;
+      return source;
     }
   };
 
-  const getStatusClass = (status) => {
-    if (!status) return '';
-    return `status-${status.split(' ')[0].toLowerCase()}`;
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString();
-  };
-
-  const parseResults = () => {
+  const parseResults = (): ParsedResults => {
     if (!submission?.results) return null;
-    let results;
+    let results: unknown;
     try {
       results =
         typeof submission.results === 'string'
@@ -147,5 +145,7 @@ const useSubmissionModal = (submission) => {
     parsedResults,
   };
 };
+
+const formatDate = (dateString: string): string => new Date(dateString).toLocaleString();
 
 export default useSubmissionModal;

@@ -1,5 +1,5 @@
 import * as db from '../db';
-import path from 'path';
+import { PoolClient } from 'pg';
 import unzipper from 'unzipper';
 import { AdminProblemRow, ProblemDetailDTO, ProblemRow } from '../types/models';
 import { CreateProblemRequestBody, UpdateProblemRequestBody } from '../types/api';
@@ -8,8 +8,35 @@ import {
   ProblemExportTestcaseRow,
   ProblemStatsRow,
   ReplaceProblemTestcasesFromZipResult,
-  TestcasePairMap,
 } from '../types/service';
+import { fullyPairedCaseNumbers, pairZippedTestcaseFiles } from './testcaseZipPairing';
+
+/**
+ * Run `body` inside a single transaction. BEGIN/COMMIT/ROLLBACK on a dedicated
+ * pool client (same pattern as problemMigration.ts), with the client always
+ * released back to the pool.
+ */
+async function withTransaction<T>(body: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await db.pool.connect();
+
+  try {
+    await client.query('BEGIN');
+    const result = await body(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      // A failed ROLLBACK usually means the connection is already broken;
+      // release() will discard it. Surface the original error.
+      console.error('ROLLBACK failed during transaction cleanup:', rollbackError);
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 
 export const getProblemsWithStatsForUser = async (userId: number): Promise<ProblemStatsRow[]> => {
   const query = `
@@ -79,6 +106,17 @@ export const getProblemPdf = async (problemId: string): Promise<Buffer | null> =
   return result.rows[0]?.problem_pdf ?? null;
 };
 
+/** Single query for the PDF route: the PDF bytes plus the visibility context. */
+export const getProblemPdfWithAccess = async (
+  problemId: string,
+): Promise<Pick<ProblemRow, 'problem_pdf' | 'is_visible' | 'contest_id' | 'title'> | null> => {
+  const result = await db.query<Pick<ProblemRow, 'problem_pdf' | 'is_visible' | 'contest_id' | 'title'>>(
+    'SELECT problem_pdf, is_visible, contest_id, title FROM problems WHERE id = $1',
+    [problemId],
+  );
+  return result.rows[0] ?? null;
+};
+
 export const createProblem = async (payload: CreateProblemRequestBody): Promise<ProblemRow> => {
   const result = await db.query<ProblemRow>(
     'INSERT INTO problems (id, title, author, category, time_limit_ms, memory_limit_mb) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
@@ -91,37 +129,41 @@ export const updateProblem = async (
   oldId: string,
   payload: UpdateProblemRequestBody,
 ): Promise<'duplicate_id' | 'not_found' | ProblemRow> => {
-  if (oldId !== payload.id) {
-    const existingProblem = await db.query<Pick<ProblemRow, 'id'>>('SELECT id FROM problems WHERE id = $1', [payload.id]);
-    if (existingProblem.rows.length > 0) {
-      return 'duplicate_id';
+  return withTransaction(async (client) => {
+    if (oldId !== payload.id) {
+      const existingProblem = await client.query<Pick<ProblemRow, 'id'>>('SELECT id FROM problems WHERE id = $1', [payload.id]);
+      if (existingProblem.rows.length > 0) {
+        return 'duplicate_id';
+      }
     }
-  }
 
-  const result = await db.query<ProblemRow>(
-    'UPDATE problems SET id = $1, title = COALESCE($2, title), author = COALESCE($3, author), category = COALESCE($4, category), time_limit_ms = COALESCE($5, time_limit_ms), memory_limit_mb = COALESCE($6, memory_limit_mb) WHERE id = $7 RETURNING *',
-    [payload.id, payload.title ?? null, payload.author ?? null, payload.category ?? null, payload.time_limit_ms ?? null, payload.memory_limit_mb ?? null, oldId]
-  );
+    const result = await client.query<ProblemRow>(
+      'UPDATE problems SET id = $1, title = COALESCE($2, title), author = COALESCE($3, author), category = COALESCE($4, category), time_limit_ms = COALESCE($5, time_limit_ms), memory_limit_mb = COALESCE($6, memory_limit_mb) WHERE id = $7 RETURNING *',
+      [payload.id, payload.title ?? null, payload.author ?? null, payload.category ?? null, payload.time_limit_ms ?? null, payload.memory_limit_mb ?? null, oldId]
+    );
 
-  if (result.rows.length === 0) {
-    return 'not_found';
-  }
+    if (result.rows.length === 0) {
+      return 'not_found';
+    }
 
-  if (oldId !== payload.id) {
-    await db.query('UPDATE contest_problems SET problem_id = $1 WHERE problem_id = $2', [payload.id, oldId]);
-    await db.query('UPDATE contest_submissions SET problem_id = $1 WHERE problem_id = $2', [payload.id, oldId]);
-  }
+    if (oldId !== payload.id) {
+      await client.query('UPDATE contest_problems SET problem_id = $1 WHERE problem_id = $2', [payload.id, oldId]);
+      await client.query('UPDATE contest_submissions SET problem_id = $1 WHERE problem_id = $2', [payload.id, oldId]);
+    }
 
-  return result.rows[0];
+    return result.rows[0];
+  });
 };
 
 export const deleteProblem = async (problemId: string): Promise<boolean> => {
-  await db.query('DELETE FROM submissions WHERE problem_id = $1', [problemId]);
-  await db.query('DELETE FROM testcases WHERE problem_id = $1', [problemId]);
-  await db.query('DELETE FROM contest_problems WHERE problem_id = $1', [problemId]);
-  await db.query('DELETE FROM contest_submissions WHERE problem_id = $1', [problemId]);
-  const result = await db.query<Pick<ProblemRow, 'id'>>('DELETE FROM problems WHERE id = $1 RETURNING id', [problemId]);
-  return (result.rowCount ?? 0) > 0;
+  return withTransaction(async (client) => {
+    await client.query('DELETE FROM submissions WHERE problem_id = $1', [problemId]);
+    await client.query('DELETE FROM testcases WHERE problem_id = $1', [problemId]);
+    await client.query('DELETE FROM contest_problems WHERE problem_id = $1', [problemId]);
+    await client.query('DELETE FROM contest_submissions WHERE problem_id = $1', [problemId]);
+    const result = await client.query<Pick<ProblemRow, 'id'>>('DELETE FROM problems WHERE id = $1 RETURNING id', [problemId]);
+    return (result.rowCount ?? 0) > 0;
+  });
 };
 
 export const getAdminProblems = async (): Promise<AdminProblemRow[]> => {
@@ -150,60 +192,40 @@ export const replaceProblemTestcasesFromZip = async (
   problemId: string,
   zipBuffer: Buffer,
 ): Promise<ReplaceProblemTestcasesFromZipResult> => {
-  await db.query('DELETE FROM testcases WHERE problem_id = $1', [problemId]);
-
   const zip = await unzipper.Open.buffer(zipBuffer);
-  const testcaseFiles: TestcasePairMap<unzipper.File> = {};
-  const fileRegex = /^(?:input|output)?(\d+)\.(?:in|out|txt|sol)$/i;
-
-  for (const file of zip.files) {
-    const fileName = path.basename(file.path);
-    const isJunk = file.path.startsWith('__MACOSX/') || fileName.startsWith('._');
-
-    if (file.type !== 'File' || isJunk) {
-      continue;
-    }
-
-    const match = fileName.match(fileRegex);
-    if (!match) {
-      continue;
-    }
-
-    const number = Number.parseInt(match[1], 10);
-    testcaseFiles[number] ??= {};
-
-    const lowerFileName = fileName.toLowerCase();
-    if (lowerFileName.endsWith('.in') || lowerFileName.includes('input')) {
-      testcaseFiles[number].in = file;
-      continue;
-    }
-    if (lowerFileName.endsWith('.out') || lowerFileName.endsWith('.sol') || lowerFileName.includes('output')) {
-      testcaseFiles[number].out = file;
-    }
-  }
-
-  const sortedKeys = Object.keys(testcaseFiles).map(Number).sort((a, b) => a - b);
-  const pairedCases = sortedKeys.filter((key) => testcaseFiles[key].in && testcaseFiles[key].out);
+  const testcaseFiles = pairZippedTestcaseFiles(zip.files);
+  const pairedCases = fullyPairedCaseNumbers(testcaseFiles);
 
   if (pairedCases.length === 0) {
     return { kind: 'no_valid_pairs' };
   }
 
-  let caseNumber = 1;
+  // Read all pair buffers *before* opening the transaction so a corrupt zip
+  // entry fails without touching existing testcases; the DELETE + INSERTs
+  // then run atomically.
+  const pairBuffers: Array<{ input: Buffer; output: Buffer }> = [];
   for (const key of pairedCases) {
     const pair = testcaseFiles[key];
-    const inputData = await pair.in!.buffer();
-    const outputData = await pair.out!.buffer();
-
-    await db.query(
-      'INSERT INTO testcases (problem_id, case_number, input_data, output_data) VALUES ($1, $2, $3, $4)',
-      [problemId, caseNumber, inputData.toString('utf-8'), outputData.toString('utf-8')]
-    );
-
-    caseNumber += 1;
+    pairBuffers.push({
+      input: await pair.in!.buffer(),
+      output: await pair.out!.buffer(),
+    });
   }
 
-  return { kind: 'ok', insertedCount: pairedCases.length };
+  return withTransaction(async (client) => {
+    await client.query('DELETE FROM testcases WHERE problem_id = $1', [problemId]);
+
+    let caseNumber = 1;
+    for (const { input, output } of pairBuffers) {
+      await client.query(
+        'INSERT INTO testcases (problem_id, case_number, input_data, output_data) VALUES ($1, $2, $3, $4)',
+        [problemId, caseNumber, input.toString('utf-8'), output.toString('utf-8')]
+      );
+      caseNumber += 1;
+    }
+
+    return { kind: 'ok', insertedCount: pairedCases.length };
+  });
 };
 
 export const getProblemExportBundle = async (problemId: string): Promise<ProblemExportBundle | null> => {

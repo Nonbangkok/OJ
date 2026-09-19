@@ -151,8 +151,8 @@ export async function judge(problemId: string, executablePath: string): Promise<
     }
 
     const results: JudgeResult['results'] = [];
-    for (const testcase of testcases) {
-      const { case_number, input_data, output_data } = testcase;
+    for (let i = 0; i < testcases.length; i++) {
+      const { case_number, input_data, output_data } = testcases[i];
 
       const runResult = await runSingleCase(executablePath, input_data, time_limit_ms, memory_limit_mb);
 
@@ -179,8 +179,7 @@ export async function judge(problemId: string, executablePath: string): Promise<
       if (runResult.status !== SUBMISSION_STATUS.ACCEPTED) {
         // To show all results, comment out the loop break.
         // For now, let's fill the rest with 'Skipped' to show the user there are more.
-        const currentIndex = testcases.findIndex((testcaseRow) => testcaseRow.case_number === case_number);
-        for (let j = currentIndex + 1; j < testcases.length; j++) {
+        for (let j = i + 1; j < testcases.length; j++) {
           results.push({ testCase: testcases[j].case_number, status: SUBMISSION_STATUS.SKIPPED });
         }
         break;

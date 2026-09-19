@@ -1,27 +1,16 @@
-import { useState, useEffect } from 'react';
-import authService from '../services/authService';
+import { useAuth } from '../context/AuthContext';
+import type { AuthUser } from '../types';
 
-const useAdminPage = () => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+interface UseAdminPageResult {
+  user: AuthUser | null;
+  loading: boolean;
+}
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const data = await authService.checkLogin();
-        if (data.isAuthenticated) {
-          setUser(data.user);
-        }
-      } catch (error) {
-        console.error('Could not fetch user data for admin panel', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUser();
-  }, []);
+/** Reads the session user from AuthContext — no extra /me request per page. */
+const useAdminPage = (): UseAdminPageResult => {
+  const { user, isLoading } = useAuth();
 
-  return { user, loading };
+  return { user, loading: isLoading };
 };
 
 export default useAdminPage;

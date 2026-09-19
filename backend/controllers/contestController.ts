@@ -14,15 +14,17 @@ import {
   createContest,
   deleteContest,
   getContestDetail,
-  getContestProblemDetailForParticipant,
-  getContestProblemPdfForParticipant,
-  getContestProblemsForParticipant,
-  getContestScoreboard,
   joinContest,
   listContests,
   moveSingleProblemToMainSystem,
   updateContest,
 } from '../services/contestQueryService';
+import { getContestScoreboard } from '../services/contestScoreboardQueryService';
+import {
+  getContestProblemDetailForParticipant,
+  getContestProblemPdfForParticipant,
+  getContestProblemsForParticipant,
+} from '../services/contestParticipantQueryService';
 
 const router: Router = express.Router();
 
@@ -70,16 +72,13 @@ router.post('/contests/:id/join', requireAuth,
 
   const result = await joinContest(id, userId);
   if (result === 'not_found') {
-    res.status(404).json({ message: 'Contest not found' });
-    return;
+    throw new AppError('Contest not found', 404);
   }
   if (result === 'ended') {
-    res.status(400).json({ message: 'Cannot join contest that has already ended' });
-    return;
+    throw new AppError('Cannot join contest that has already ended', 400);
   }
   if (result === 'already_joined') {
-    res.status(400).json({ message: 'Already joined this contest' });
-    return;
+    throw new AppError('Already joined this contest', 400);
   }
 
   res.json({ message: 'Successfully joined contest' });
@@ -145,12 +144,10 @@ router.delete('/admin/contests/:id', requireAuth, requireStaffOrAdmin,
   const result = await deleteContest(id);
 
   if (result === 'not_found') {
-    res.status(404).json({ message: 'Contest not found' });
-    return;
+    throw new AppError('Contest not found', 404);
   }
   if (result === 'running') {
-    res.status(400).json({ message: 'Cannot delete a running contest' });
-    return;
+    throw new AppError('Cannot delete a running contest', 400);
   }
 
   res.json({ message: `Contest ${id} deleted successfully` });
@@ -193,16 +190,13 @@ router.delete('/admin/contests/:id/problems/:problemId', requireAuth, requireSta
 
   const result = await moveSingleProblemToMainSystem(id, problemId);
   if (result.kind === 'not_found_contest') {
-    res.status(404).json({ message: 'Contest not found' });
-    return;
+    throw new AppError('Contest not found', 404);
   }
   if (result.kind === 'invalid_status') {
-    res.status(400).json({ message: 'Can only move problems from scheduled or running contests' });
-    return;
+    throw new AppError('Can only move problems from scheduled or running contests', 400);
   }
   if (result.kind === 'not_found_problem') {
-    res.status(404).json({ message: 'Problem not found in this contest' });
-    return;
+    throw new AppError('Problem not found in this contest', 404);
   }
 
   res.json({
@@ -223,12 +217,10 @@ router.get('/contests/:id/problems', requireAuth,
 
   const result = await getContestProblemsForParticipant(id, userId);
   if (result.kind === 'not_found') {
-    res.status(404).json({ message: 'Contest not found' });
-    return;
+    throw new AppError('Contest not found', 404);
   }
   if (result.kind === 'not_participant') {
-    res.status(403).json({ message: 'You must join this contest to view problems' });
-    return;
+    throw new AppError('You must join this contest to view problems', 403);
   }
   if (result.kind === 'inactive') {
     res.json([]);
@@ -250,20 +242,16 @@ router.get('/contests/:id/problems/:problemId', requireAuth,
 
   const result = await getContestProblemDetailForParticipant(contestId, problemId, userId);
   if (result.kind === 'not_found_contest') {
-    res.status(404).json({ message: 'Contest not found.' });
-    return;
+    throw new AppError('Contest not found.', 404);
   }
   if (result.kind === 'inactive') {
-    res.status(403).json({ message: 'Contest is not active.' });
-    return;
+    throw new AppError('Contest is not active.', 403);
   }
   if (result.kind === 'not_participant') {
-    res.status(403).json({ message: 'You are not a participant in this contest.' });
-    return;
+    throw new AppError('You are not a participant in this contest.', 403);
   }
   if (result.kind === 'not_found_problem') {
-    res.status(404).json({ message: 'Problem not found in this contest.' });
-    return;
+    throw new AppError('Problem not found in this contest.', 404);
   }
   res.json(result.data);
 }));
@@ -281,20 +269,16 @@ router.get('/contests/:id/problems/:problemId/pdf', requireAuth,
 
   const result = await getContestProblemPdfForParticipant(contestId, problemId, userId);
   if (result.kind === 'not_found_contest') {
-    res.status(404).json({ message: 'Contest not found.' });
-    return;
+    throw new AppError('Contest not found.', 404);
   }
   if (result.kind === 'inactive') {
-    res.status(403).json({ message: 'Contest is not active.' });
-    return;
+    throw new AppError('Contest is not active.', 403);
   }
   if (result.kind === 'not_participant') {
-    res.status(403).json({ message: 'You are not a participant in this contest.' });
-    return;
+    throw new AppError('You are not a participant in this contest.', 403);
   }
   if (result.kind === 'not_found_pdf') {
-    res.status(404).json({ message: 'Problem PDF not found.' });
-    return;
+    throw new AppError('Problem PDF not found.', 404);
   }
 
   res.setHeader('Content-Type', 'application/pdf');

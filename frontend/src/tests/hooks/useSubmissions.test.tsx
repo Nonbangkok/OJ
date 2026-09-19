@@ -1,15 +1,19 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useSubmissions } from '../../hooks/useSubmissions';
 import submissionService from '../../services/submissionService';
-import authService from '../../services/authService';
+import { useAuth } from '../../context/AuthContext';
 
 jest.mock('../../services/submissionService');
-jest.mock('../../services/authService');
+jest.mock('../../context/AuthContext');
+
+const mockAuth = (user: object | null) => {
+    jest.mocked(useAuth).mockReturnValue({ user, isLoading: false } as ReturnType<typeof useAuth>);
+};
 
 describe('useSubmissions', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        (jest.mocked(authService.checkLogin) as jest.Mock).mockResolvedValue({ isAuthenticated: false });
+        mockAuth(null);
         (jest.mocked(submissionService.searchProblems) as jest.Mock).mockResolvedValue([]);
         (jest.mocked(submissionService.searchUsers) as jest.Mock).mockResolvedValue([]);
     });

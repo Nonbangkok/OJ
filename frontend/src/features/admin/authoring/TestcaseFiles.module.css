@@ -1,5 +1,31 @@
 .root {
   color: var(--text-primary);
+  /* Sits directly inside the workspace panel box — carry the body padding here. */
+  padding: 1rem;
+}
+/* Nested inside the workspace panel box: no extra outer chrome, just the body. */
+.root > :first-child {
+  margin-top: 0;
+}
+/* Header strip applies to thead only — a row-header th (scope="row") must
+   stay transparent like its sibling cells. */
+.root table thead th {
+  background: var(--background-tertiary);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+.root table tbody th[scope='row'] {
+  background: transparent;
+  font-size: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text-primary);
+}
+.root table tbody tr:hover td,
+.root table tbody tr:hover th[scope='row'] {
+  background: var(--background-hover);
 }
 .heading,
 .actions {
@@ -103,4 +129,116 @@
   padding: 0.75rem;
   border: 1px solid var(--border-color);
   background: var(--background-primary);
+}
+.dialogFields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.dialogFields label {
+  display: block;
+  margin: 0.8rem 0;
+  font-weight: 500;
+}
+.dialogFields input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.65rem;
+  margin-top: 0.35rem;
+  color: var(--text-primary);
+  background: var(--background-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+}
+
+/* Side-by-side input/output comparison inside the preview modal. */
+.previewColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.previewColumn {
+  min-width: 0;
+}
+.previewColumn h5 {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.previewColumn pre {
+  margin: 0;
+  padding: 0.75rem;
+  max-height: 22rem;
+  overflow: auto;
+  background: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.previewTruncated {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.previewMissing {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+@media (max-width: 768px) {
+  .previewColumns {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Compact inline upload bar replacing the two big panels. */
+.uploadBar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.uploadForm {
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--background-secondary);
+}
+.uploadForm fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.uploadForm label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.uploadForm button {
+  align-self: flex-start;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--background-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.uploadForm button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
