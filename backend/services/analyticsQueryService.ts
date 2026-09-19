@@ -313,7 +313,7 @@ export const listUsersForAnalytics = async (search: string, limit: number, offse
         (COUNT(*) FILTER (WHERE s.overall_status = 'Accepted'))::float / NULLIF(COUNT(s.user_id), 0),
         0
       ) AS ac_rate,
-      to_char(MAX(s.submitted_at), 'YYYY-MM-DD"T"HH24:MI:SSOF') AS last_active
+      to_char(MAX(s.submitted_at), 'YYYY-MM-DD"T"HH24:MI:SSTZH:TZM') AS last_active
     FROM users u
     LEFT JOIN all_submissions s ON s.user_id = u.id
     LEFT JOIN best b ON b.user_id = u.id AND b.problem_id = s.problem_id
@@ -591,7 +591,7 @@ export const getProblemAnalytics = async (problemId: string): Promise<ProblemAna
     [problemId]);
 
   const firstSolvesResult = await query<FirstSolveRow>(`
-    SELECT user_id, username, to_char(submitted_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') AS submitted_at
+    SELECT user_id, username, to_char(submitted_at, 'YYYY-MM-DD"T"HH24:MI:SSTZH:TZM') AS submitted_at
     FROM (
       SELECT user_id, MIN(submitted_at) AS submitted_at
       FROM (
