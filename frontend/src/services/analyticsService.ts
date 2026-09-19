@@ -70,6 +70,27 @@ export interface ProblemListRow {
   solvers: number;
 }
 
+export interface SubmissionFilters {
+  problemId?: string;
+  userId?: number;
+  verdict?: string;
+}
+
+export interface SubmissionListRow {
+  id: number;
+  source: 'main' | 'contest';
+  problemId: string;
+  problemTitle: string;
+  userId: number;
+  username: string;
+  verdict: string;
+  score: number;
+  language: string;
+  timeMs: number | null;
+  memoryKb: number | null;
+  submittedAt: string;
+}
+
 export interface ProblemAnalytics {
   problem: { id: string; title: string };
   kpis: { submissions: number; accepted: number; acRate: number; uniqueSubmitters: number };
@@ -120,5 +141,16 @@ export const fetchProblemAnalytics = async (problemId: string): Promise<ProblemA
 
 export const fetchContestAnalytics = async (contestId: number): Promise<ContestAnalytics> => {
   const response = await api.get<ContestAnalytics>(`/analytics/contests/${contestId}`);
+  return response.data;
+};
+
+export const fetchAnalyticsSubmissions = async (params: {
+  problemId?: string;
+  userId?: number;
+  verdict?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ submissions: SubmissionListRow[] }> => {
+  const response = await api.get<{ submissions: SubmissionListRow[] }>('/analytics/submissions', { params });
   return response.data;
 };

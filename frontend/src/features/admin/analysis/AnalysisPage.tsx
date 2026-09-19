@@ -6,15 +6,17 @@ import ProblemsTab from './ProblemsTab';
 import ProblemDetail from './ProblemDetail';
 import ContestsTab from './ContestsTab';
 import ContestDetail from './ContestDetail';
+import SubmissionsTab from './SubmissionsTab';
 import styles from './AnalysisPage.module.css';
 
-type AnalysisTab = 'overview' | 'users' | 'problems' | 'contests';
+type AnalysisTab = 'overview' | 'users' | 'problems' | 'contests' | 'submissions';
 
 const TABS: Array<{ key: AnalysisTab; label: string }> = [
   { key: 'overview', label: 'Overview' },
   { key: 'users', label: 'Users' },
   { key: 'problems', label: 'Problems' },
   { key: 'contests', label: 'Contests' },
+  { key: 'submissions', label: 'Submissions' },
 ];
 
 const AnalysisPage = () => {
@@ -45,6 +47,17 @@ const AnalysisPage = () => {
 
   const handleBackToContests = () => {
     setSelectedContestId(null);
+  };
+
+  // Cross-navigation from the submissions table into a detail view.
+  const handleShowUser = (userId: number) => {
+    setSelectedUserId(userId);
+    setTab('users');
+  };
+
+  const handleShowProblem = (problemId: string) => {
+    setSelectedProblemId(problemId);
+    setTab('problems');
   };
 
   const switchTab = (key: AnalysisTab) => {
@@ -86,6 +99,9 @@ const AnalysisPage = () => {
         selectedContestId === null
           ? <ContestsTab onSelectContest={handleSelectContest} />
           : <ContestDetail contestId={selectedContestId} onBack={handleBackToContests} />
+      )}
+      {tab === 'submissions' && (
+        <SubmissionsTab onSelectUser={handleShowUser} onSelectProblem={handleShowProblem} />
       )}
     </div>
   );
