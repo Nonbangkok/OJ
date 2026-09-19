@@ -223,7 +223,7 @@ export default function StatementEditor({ id }: { id: string }) {
   return <main className={styles.editorShell}>
     <header className={styles.editorHeader}>
       <Link to={`/admin/authoring/${encodeURIComponent(id)}`}>← Workspace</Link>
-      <div className={styles.editorTitle}><h1>Edit Task: {draft.problemId}</h1><span>{draft.title}</span></div>
+      <div className={styles.editorTitle}><h1>Edit Task: {draft.problemId}</h1></div>
       <strong>{editorState}</strong>
       <span className={styles.headerSpacer} />
       <span className={styles.previewStatusChip} role="status">{previewStatusText}</span>

@@ -615,10 +615,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.editorTitle span {
-  color: var(--editor-chrome-muted);
-  font-size: 0.8rem;
-}
 .editorNotices {
   min-height: 0;
 }
@@ -701,10 +697,23 @@
   font-size: 0.8rem;
   cursor: pointer;
 }
+/* Hover must stay readable in both themes: accent-tinted background with
+   primary text, never a gray-on-gray blend. The tint is strong enough that
+   the accent color itself carries the text — same foreground as primary
+   buttons, readable on light (blue on light blue) and dark alike. */
+.previewModeBar button:hover {
+  background: color-mix(in srgb, var(--accent-primary) 82%, var(--background-primary));
+  color: var(--action-primary-foreground);
+  border-color: var(--accent-primary);
+}
 .previewModeBar .previewModeActive {
   background: var(--statement-paper);
   color: var(--text-primary);
   font-weight: 600;
+}
+.previewModeBar .previewModeActive:hover {
+  background: var(--statement-paper);
+  border-color: var(--accent-primary);
 }
 .previewPdfEmbed {
   flex: 1;
