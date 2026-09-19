@@ -87,7 +87,7 @@ describe('User Profile Page', () => {
         jest.mocked(userService.getProfile).mockResolvedValue(profileData);
 
         jest.mocked(useAuth).mockReturnValue({
-            user: { id: 7, username: 'someoneelse', role: 'user' },
+            user: { id: 7, username: 'someoneelse', role: 'user', hasAvatar: false },
             isLoading: false,
             login: jest.fn(),
             logout: jest.fn(),
@@ -97,7 +97,7 @@ describe('User Profile Page', () => {
         expect(screen.queryByRole('button', { name: /change avatar/i })).not.toBeInTheDocument();
 
         jest.mocked(useAuth).mockReturnValue({
-            user: { id: 3, username: 'tester', role: 'user' },
+            user: { id: 3, username: 'tester', role: 'user', hasAvatar: false },
             isLoading: false,
             login: jest.fn(),
             logout: jest.fn(),

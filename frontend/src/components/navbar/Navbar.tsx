@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, type MouseEvent } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
-import ThemeToggleButton from '../shared/ThemeToggleButton';
+import NavbarUserMenu from './NavbarUserMenu';
 import styles from './Navbar.module.css';
 import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/logo512.png';
@@ -87,12 +87,7 @@ const Navbar = () => {
         </ul>
         <div className={styles['nav-actions']}>
           {user ? (
-            <>
-              <NavLink to={`/profile/${user.username}`} className={styles['nav-user']}>
-                <span className={styles.username}>{user?.username}</span>
-              </NavLink>
-              <button onClick={handleLogout} className={styles['logout-btn']}>Logout</button>
-            </>
+            <NavbarUserMenu />
           ) : (
             <>
               <NavLink to="/login" className={styles['nav-action-link']}>Login</NavLink>
@@ -102,7 +97,6 @@ const Navbar = () => {
               )}
             </>
           )}
-          <ThemeToggleButton />
         </div>
       </div>
     </nav>

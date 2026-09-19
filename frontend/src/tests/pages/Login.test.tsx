@@ -39,7 +39,7 @@ describe('Login Page', () => {
     it('submits credentials successfully', async () => {
         jest.mocked(authService.login).mockResolvedValueOnce({
             message: 'Logged in',
-            user: { id: 1, username: 'testuser', role: 'user' }
+            user: { id: 1, username: 'testuser', role: 'user', hasAvatar: false }
         });
 
         render(

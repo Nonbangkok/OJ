@@ -7,6 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 // Mock react-router-dom
 jest.mock('react-router-dom', () => ({
   NavLink: ({ children, to }) => <a href={to}>{children}</a>,
+  Link: ({ children, to, ...props }) => <a href={to} {...props}>{children}</a>,
   useNavigate: () => jest.fn(),
   useLocation: () => ({ pathname: '/' }),
 }));
@@ -63,9 +64,9 @@ describe('Navbar Component', () => {
     expect(screen.getByText(/Login/i)).toBeInTheDocument();
   });
 
-  test('renders username and logout button when user is logged in', () => {
+  test('renders username and avatar trigger when user is logged in', () => {
     jest.mocked(useAuth).mockReturnValue({
-      user: { id: 1, username: 'testuser', role: 'user' },
+      user: { id: 1, username: 'testuser', role: 'user', hasAvatar: false },
       isLoading: false,
       login: jest.fn(),
       logout: mockLogout,
@@ -74,12 +75,12 @@ describe('Navbar Component', () => {
     render(<Navbar />);
 
     expect(screen.getByText('testuser')).toBeInTheDocument();
-    expect(screen.getByText(/Logout/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open user menu/i })).toBeInTheDocument();
   });
 
   test('renders Admin Panel link only for admins', () => {
     jest.mocked(useAuth).mockReturnValue({
-      user: { id: 2, username: 'adminuser', role: 'admin' },
+      user: { id: 2, username: 'adminuser', role: 'admin', hasAvatar: false },
       isLoading: false,
       login: jest.fn(),
       logout: mockLogout,
@@ -92,7 +93,7 @@ describe('Navbar Component', () => {
 
   test('calls logout function when logout button is clicked', () => {
     jest.mocked(useAuth).mockReturnValue({
-      user: { id: 3, username: 'testuser', role: 'user' },
+      user: { id: 3, username: 'testuser', role: 'user', hasAvatar: false },
       isLoading: false,
       login: jest.fn(),
       logout: mockLogout,
@@ -100,7 +101,8 @@ describe('Navbar Component', () => {
 
     render(<Navbar />);
 
-    fireEvent.click(screen.getByText(/Logout/i));
+    fireEvent.click(screen.getByRole('button', { name: /open user menu/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /log out/i }));
     expect(mockLogout).toHaveBeenCalled();
   });
 });

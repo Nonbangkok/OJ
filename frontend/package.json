@@ -7,6 +7,7 @@
     "node": "20.x"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.7.0",
     "@testing-library/react": "^16.3.0",
@@ -78,10 +79,11 @@
   "jest": {
     "moduleNameMapper": {
       "^react-router-dom$": "<rootDir>/node_modules/react-router-dom/dist/index.js",
-      "^react-router/dom$": "<rootDir>/node_modules/react-router/dist/development/dom-export.js"
+      "^react-router/dom$": "<rootDir>/node_modules/react-router/dist/development/dom-export.js",
+      "^@phosphor-icons/react$": "<rootDir>/node_modules/@phosphor-icons/react/dist/index.es.js"
     },
     "transformIgnorePatterns": [
-      "[/\\\\]node_modules[/\\\\](?!axios|react-router-dom|@remix-run|turbo-stream).+\\.(js|jsx|mjs|cjs|ts|tsx)$"
+      "[/\\\\]node_modules[/\\\\](?!axios|react-router-dom|@remix-run|turbo-stream|@phosphor-icons).+\\.(js|jsx|mjs|cjs|ts|tsx)$"
     ],
     "collectCoverageFrom": [
       "src/services/*.ts",

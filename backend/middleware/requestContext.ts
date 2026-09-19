@@ -12,6 +12,7 @@ export const attachRequestUser = (req: Request, _res: Response, next: NextFuncti
             id: session.userId,
             username: session.username,
             role: session.role as 'user' | 'staff' | 'admin',
+            hasAvatar: session.hasAvatar === true,
         };
     } else {
         req.user = undefined;

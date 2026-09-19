@@ -21,7 +21,7 @@ jest.mock('react-router-dom', () => ({
     useParams: () => ({ contestId: 'contest-1' }),
 }));
 jest.mock('../../context/AuthContext', () => ({
-    useAuth: () => ({ user: { id: 1, username: 'testuser', role: 'user' }, isLoading: false, login: jest.fn(), logout: jest.fn() }),
+    useAuth: () => ({ user: { id: 1, username: 'testuser', role: 'user', hasAvatar: false }, isLoading: false, login: jest.fn(), logout: jest.fn() }),
 }));
 
 describe('ContestSubmissions Page', () => {
@@ -39,7 +39,7 @@ describe('ContestSubmissions Page', () => {
         jest.mocked(submissionService.getAll).mockResolvedValue([]);
         jest.mocked(submissionService.searchProblems).mockResolvedValue([]);
         jest.mocked(submissionService.searchUsers).mockResolvedValue([]);
-        jest.mocked(authService.checkLogin).mockResolvedValue({ isAuthenticated: true, user: { id: 1, username: 'testuser', role: 'user' } });
+        jest.mocked(authService.checkLogin).mockResolvedValue({ isAuthenticated: true, user: { id: 1, username: 'testuser', role: 'user', hasAvatar: false } });
     });
 
     it('displays loading state', () => {

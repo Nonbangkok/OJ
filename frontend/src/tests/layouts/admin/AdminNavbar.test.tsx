@@ -33,7 +33,7 @@ const renderNavbar = (
   path = '/admin'
 ) => {
   jest.mocked(useAuth).mockReturnValue({
-    user: { id: 1, username: `${role}-user`, role },
+    user: { id: 1, username: `${role}-user`, role, hasAvatar: false },
     isLoading: false,
     login: jest.fn(),
     logout: mockLogout,

@@ -116,7 +116,10 @@ router.post(
   asyncHandler(async (req: Request, res: Response<LoginSuccessResponse | MessageResponse>) => {
     const { username, password } = req.body as LoginRequestBody;
 
-    const result = await db.query<UserRow>('SELECT * FROM users WHERE username = $1', [username]);
+    const result = await db.query<UserRow & { has_avatar: boolean }>(
+      'SELECT *, (avatar_png IS NOT NULL) AS has_avatar FROM users WHERE username = $1',
+      [username],
+    );
     if (result.rows.length === 0) {
       // Use a single neutral message for both unknown-username and wrong-password
       // failures so the endpoint does not leak which usernames exist.
@@ -138,6 +141,7 @@ router.post(
     req.session.userId = user.id;
     req.session.username = user.username;
     req.session.role = user.role;
+    req.session.hasAvatar = user.has_avatar;
 
     await saveSession(req);
 
@@ -147,6 +151,7 @@ router.post(
         id: user.id,
         username: user.username,
         role: user.role,
+        hasAvatar: user.has_avatar,
       },
     });
   }),

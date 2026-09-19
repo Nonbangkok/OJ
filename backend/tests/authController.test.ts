@@ -190,7 +190,7 @@ describe('Auth Controller', () => {
                 saveUninitialized: false,
             }));
             appWithUser.use((req: Request, _res: Response, next: NextFunction) => {
-                req.user = { id: 1, username: 'tester', role: 'user' };
+                req.user = { id: 1, username: 'tester', role: 'user', hasAvatar: true };
                 next();
             });
             appWithUser.use('/', authRouter);
@@ -199,6 +199,7 @@ describe('Auth Controller', () => {
             expect(res.status).toBe(200);
             expect(res.body.isAuthenticated).toBe(true);
             expect(res.body.user.username).toBe('tester');
+            expect(res.body.user.hasAvatar).toBe(true);
         });
     });
 });

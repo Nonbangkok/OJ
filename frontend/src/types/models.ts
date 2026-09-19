@@ -18,6 +18,7 @@ export interface AuthUser {
   id: number;
   username: string;
   role: UserRole;
+  hasAvatar: boolean;
 }
 
 export interface ProblemSuggestion {

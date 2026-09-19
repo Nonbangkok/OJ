@@ -36,7 +36,7 @@ describe('Admin Page', () => {
 
     it('displays admin panel and sections for admin user', async () => {
         jest.mocked(authService.checkLogin).mockResolvedValueOnce({
-            isAuthenticated: true, user: { id: 1, username: 'admin', role: 'admin' }
+            isAuthenticated: true, user: { id: 1, username: 'admin', role: 'admin', hasAvatar: false }
         });
 
         render(
@@ -56,7 +56,7 @@ describe('Admin Page', () => {
 
     it('displays only staff sections for staff user', async () => {
         jest.mocked(authService.checkLogin).mockResolvedValueOnce({
-            isAuthenticated: true, user: { id: 2, username: 'staff', role: 'staff' }
+            isAuthenticated: true, user: { id: 2, username: 'staff', role: 'staff', hasAvatar: false }
         });
 
         render(
@@ -76,7 +76,7 @@ describe('Admin Page', () => {
 
     it('displays nothing for regular user', async () => {
         jest.mocked(authService.checkLogin).mockResolvedValueOnce({
-            isAuthenticated: true, user: { id: 3, username: 'user', role: 'user' }
+            isAuthenticated: true, user: { id: 3, username: 'user', role: 'user', hasAvatar: false }
         });
 
         render(

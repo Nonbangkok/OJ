@@ -72,7 +72,12 @@ export interface UserRow {
 }
 
 /** Reused compact user shape for API responses and request context. */
-export type UserPublicProfileDTO = Pick<UserRow, 'id' | 'username' | 'role'>;
+export interface UserPublicProfileDTO {
+    id: number;
+    username: string;
+    role: UserRole;
+    hasAvatar: boolean;
+}
 
 /** `system_settings` table row. */
 export interface SystemSettingRow {

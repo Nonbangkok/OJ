@@ -76,6 +76,8 @@ router.put('/profile/avatar',
       throw new AppError('Authentication required', 401);
     }
     const result = await updateUserAvatar(userId, avatarPng);
+    req.session.hasAvatar = true;
+    req.session.save(() => undefined);
 
     res.json({
       message: 'Avatar updated',
