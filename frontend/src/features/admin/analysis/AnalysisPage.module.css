@@ -31,6 +31,6 @@
 
 .tab-active {
   color: var(--text-color-primary);
-  border-bottom-color: var(--accent-color, #0d6efd);
+  border-bottom-color: var(--accent-primary);
   font-weight: 600;
 }

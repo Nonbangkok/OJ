@@ -53,7 +53,7 @@
 }
 
 .analyze-button:hover {
-  border-color: var(--accent-color, #0d6efd);
+  border-color: var(--accent-primary);
 }
 
 .loading,
@@ -64,5 +64,5 @@
 }
 
 .error {
-  color: #dc3545;
+  color: var(--status-danger);
 }

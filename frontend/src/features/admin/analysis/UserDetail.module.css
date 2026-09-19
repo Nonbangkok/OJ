@@ -57,5 +57,5 @@
 }
 
 .error {
-  color: #dc3545;
+  color: var(--status-danger);
 }

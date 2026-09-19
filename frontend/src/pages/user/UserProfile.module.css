@@ -163,12 +163,12 @@
   background-color: var(--text-muted);
 }
 
-.verdict-dot-accepted { background-color: #48bb78; }
-.verdict-dot-wrong { background-color: #f56565; }
-.verdict-dot-time { background-color: #f6ad55; }
-.verdict-dot-memory { background-color: #ed64a6; }
-.verdict-dot-runtime { background-color: #ed8936; }
-.verdict-dot-compilation { background-color: #a0aec0; }
+.verdict-dot-accepted { background-color: var(--verdict-accepted); }
+.verdict-dot-wrong { background-color: var(--verdict-wrong); }
+.verdict-dot-time { background-color: var(--verdict-time); }
+.verdict-dot-memory { background-color: var(--verdict-memory); }
+.verdict-dot-runtime { background-color: var(--verdict-runtime); }
+.verdict-dot-compilation { background-color: var(--verdict-compilation); }
 
 .language-name {
   font-family: 'Inconsolata', monospace;

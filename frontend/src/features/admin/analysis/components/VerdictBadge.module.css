@@ -7,47 +7,53 @@
   white-space: nowrap;
 }
 
+/*
+ * Verdict colours use the shared --verdict-* tokens from index.css so both
+ * themes stay in sync with the global .status-* classes. Backgrounds are
+ * translucent tints of the same token (color-mix keeps the relationship
+ * automatic when the token shifts in dark mode).
+ */
 .accepted {
-  background-color: rgba(25, 135, 84, 0.15);
-  color: #198754;
+  background-color: color-mix(in srgb, var(--verdict-accepted) 15%, transparent);
+  color: var(--verdict-accepted);
 }
 
 .wrong-answer {
-  background-color: rgba(220, 53, 69, 0.15);
-  color: #dc3545;
+  background-color: color-mix(in srgb, var(--verdict-wrong) 15%, transparent);
+  color: var(--verdict-wrong);
 }
 
 .time-limit-exceeded {
-  background-color: rgba(255, 193, 7, 0.18);
-  color: #b58200;
+  background-color: color-mix(in srgb, var(--verdict-time) 18%, transparent);
+  color: var(--verdict-time);
 }
 
 .memory-limit-exceeded {
-  background-color: rgba(253, 126, 20, 0.15);
-  color: #d9690a;
+  background-color: color-mix(in srgb, var(--verdict-memory) 15%, transparent);
+  color: var(--verdict-memory);
 }
 
 .runtime-error {
-  background-color: rgba(111, 66, 201, 0.15);
-  color: #6f42c1;
+  background-color: color-mix(in srgb, var(--verdict-runtime) 15%, transparent);
+  color: var(--verdict-runtime);
 }
 
 .compilation-error {
-  background-color: rgba(73, 80, 87, 0.15);
-  color: #495057;
+  background-color: color-mix(in srgb, var(--verdict-compilation) 15%, transparent);
+  color: var(--verdict-compilation);
 }
 
 .system-error {
-  background-color: rgba(108, 117, 125, 0.18);
-  color: #5c636a;
+  background-color: color-mix(in srgb, var(--verdict-pending) 18%, transparent);
+  color: var(--verdict-pending);
 }
 
 .skipped {
-  background-color: rgba(206, 212, 218, 0.25);
-  color: #6c757d;
+  background-color: color-mix(in srgb, var(--verdict-pending) 12%, transparent);
+  color: var(--verdict-pending);
 }
 
 .default {
-  background-color: rgba(108, 117, 125, 0.15);
+  background-color: color-mix(in srgb, var(--verdict-pending) 15%, transparent);
   color: var(--text-secondary);
 }

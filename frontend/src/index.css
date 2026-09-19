@@ -36,6 +36,14 @@
 
   --accent-primary: #007bff;
   --accent-primary-hover: #0056b3;
+  --text-on-primary: #ffffff;
+
+  /* Activity heatmap (GitHub-style contribution grid) */
+  --heatmap-empty: #ebedf0;
+  --heatmap-level-1: #9be9a8;
+  --heatmap-level-2: #40c463;
+  --heatmap-level-3: #30a14e;
+  --heatmap-level-4: #216e39;
 
   --action-primary-foreground: #ffffff;
   --action-primary-background: #0069d9;
@@ -143,6 +151,15 @@
   --success-tint-bg: rgba(25, 135, 84, 0.08);
   --success-tint-border: rgba(25, 135, 84, 0.35);
 
+  /* Warning tint (modal notices). */
+  --warning-tint-bg: #fff3cd;
+  --warning-tint-text: #856404;
+
+  /* Scoreboard medal accents. */
+  --medal-gold: #d4a017;
+  --medal-silver: #9aa5b1;
+  --medal-bronze: #b0703c;
+
   /* Management-page action buttons (legacy composes: btn family). */
   --action-create-bg: #28a745;
   --action-create-hover: #218838;
@@ -217,6 +234,14 @@
 
   --accent-primary: #0d6efd;
   --accent-primary-hover: #3d8bfd;
+  --text-on-primary: #ffffff;
+
+  /* Activity heatmap — brighter greens for dark surfaces */
+  --heatmap-empty: #30363d;
+  --heatmap-level-1: #0e4429;
+  --heatmap-level-2: #006d32;
+  --heatmap-level-3: #26a641;
+  --heatmap-level-4: #39d353;
 
   --action-primary-foreground: #ffffff;
   --action-primary-background: #0b5ed7;
@@ -260,6 +285,15 @@
   --text-success: #2fbf71;
   --text-warning: #f6c344;
   --warning-color: #ffa040;
+
+  /* Warning tint readable on dark surfaces. */
+  --warning-tint-bg: rgba(255, 193, 7, 0.12);
+  --warning-tint-text: #ffd57e;
+
+  /* Medals brightened for dark backgrounds. */
+  --medal-gold: #ffcc4d;
+  --medal-silver: #c6cdd5;
+  --medal-bronze: #d2926b;
   --error-bg: rgba(255, 107, 122, 0.12);
   --background-error: rgba(255, 107, 122, 0.12);
   --background-success: rgba(46, 204, 113, 0.12);
@@ -394,4 +428,46 @@ code {
 
 .error-boundary-actions a {
   color: var(--accent-primary);
+}
+
+/* react-datepicker ships light-only styles; retint its hardcoded surfaces
+   for dark mode (used in the contest scheduling modal). */
+[data-theme='dark'] .react-datepicker {
+  background-color: var(--background-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .react-datepicker__header {
+  background-color: var(--background-tertiary);
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme='dark'] .react-datepicker__current-month,
+[data-theme='dark'] .react-datepicker__day-name,
+[data-theme='dark'] .react-datepicker-time__header {
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .react-datepicker__day {
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .react-datepicker__day:hover {
+  background-color: var(--background-hover);
+}
+
+[data-theme='dark'] .react-datepicker__day--selected,
+[data-theme='dark'] .react-datepicker__day--keyboard-selected {
+  background-color: var(--accent-primary);
+  color: var(--text-on-primary);
+}
+
+[data-theme='dark'] .react-datepicker__day--disabled {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+[data-theme='dark'] .react-datepicker__time-list-item {
+  color: var(--text-primary);
 }

@@ -21,9 +21,9 @@
 }
 
 .range-active {
-  background-color: var(--accent-color, #0d6efd);
-  border-color: var(--accent-color, #0d6efd);
-  color: #fff;
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--text-on-primary);
 }
 
 .kpi-row {
@@ -73,7 +73,7 @@
 }
 
 .table-card a {
-  color: var(--link-color, #0d6efd);
+  color: var(--accent-primary);
 }
 
 .loading,
@@ -84,5 +84,5 @@
 }
 
 .error {
-  color: #dc3545;
+  color: var(--status-danger);
 }

@@ -71,7 +71,7 @@
 }
 
 .table-card a {
-  color: var(--link-color, #0d6efd);
+  color: var(--accent-primary);
 }
 
 .empty {
@@ -87,5 +87,5 @@
 }
 
 .error {
-  color: #dc3545;
+  color: var(--status-danger);
 }

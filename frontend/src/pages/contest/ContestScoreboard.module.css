@@ -79,7 +79,7 @@
 .problemScore.partial {
   background: var(--contest-badge-finishing-bg);
   color: var(--contest-badge-finishing-fg);
-  border: 1px solid #ffe0b2;
+  border: 1px solid var(--contest-badge-finishing-border);
 }
 
 .score {

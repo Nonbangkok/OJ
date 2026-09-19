@@ -9,15 +9,15 @@
 }
 
 .medal-gold {
-  color: #d4a017;
+  color: var(--medal-gold);
 }
 
 .medal-silver {
-  color: #9aa5b1;
+  color: var(--medal-silver);
 }
 
 .medal-bronze {
-  color: #b0703c;
+  color: var(--medal-bronze);
 }
 
 :global([data-theme='dark']) .rank-1,

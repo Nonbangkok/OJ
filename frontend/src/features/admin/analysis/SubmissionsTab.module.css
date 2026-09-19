@@ -119,14 +119,14 @@
 }
 
 .table-card a {
-  color: var(--link-color, #0d6efd);
+  color: var(--accent-primary);
 }
 
 .cell-link {
   background: none;
   border: none;
   padding: 0;
-  color: var(--link-color, #0d6efd);
+  color: var(--accent-primary);
   cursor: pointer;
   font: inherit;
   text-decoration: underline;
@@ -144,7 +144,7 @@
 }
 
 .view-button:hover {
-  border-color: var(--accent-color, #0d6efd);
+  border-color: var(--accent-primary);
 }
 
 .empty {
@@ -180,5 +180,24 @@
 }
 
 .error {
-  color: #dc3545;
+  color: var(--status-danger);
+}
+
+/* Phone width: filters stack and the table scrolls horizontally instead of
+   overflowing the viewport. */
+@media (max-width: 480px) {
+  .filter-input,
+  .filter-select {
+    width: 100%;
+  }
+
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Let wide result tables scroll sideways rather than stretch the page. */
+.table-scroll {
+  overflow-x: auto;
 }

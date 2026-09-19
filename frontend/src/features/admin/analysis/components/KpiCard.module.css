@@ -25,9 +25,9 @@
 }
 
 .delta-up {
-  color: #198754;
+  color: var(--status-success);
 }
 
 .delta-down {
-  color: #dc3545;
+  color: var(--status-danger);
 }

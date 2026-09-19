@@ -114,12 +114,12 @@
 }
 
 .migrationModalWarning {
-  background: #fff3cd;
-  color: #856404;
+  background: var(--warning-tint-bg);
+  color: var(--warning-tint-text);
   padding: 12px 16px;
   border-radius: 8px;
   margin-bottom: 20px;
-  border-left: 4px solid #ffc107;
+  border-left: 4px solid var(--status-warning);
 }
 
 .migrationModalGrid {
