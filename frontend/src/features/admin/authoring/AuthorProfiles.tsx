@@ -327,7 +327,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
                 <p>Save and sync now?</p>
               </div>
             )}
-            <fieldset disabled={saving} className={styles.dialogFields}>
+            <fieldset disabled={saving} className={`${styles.root} ${styles.dialogFields}`}>
               <legend className={styles.legend}>Author details</legend>
             <div className={styles.fields}>
               <label>
