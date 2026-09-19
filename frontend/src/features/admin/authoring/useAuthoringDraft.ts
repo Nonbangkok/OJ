@@ -6,6 +6,10 @@ import { Draft, DraftFields, editableFields, isActive, Job } from './types';
 type AuthoringDraftOptions = { allowPublishedStatementEdit?: boolean };
 
 export const AUTOSAVE_DELAY_MS = 1200;
+/** Poll cadence while an authoring job is running: fast enough that job
+ *  completion feels near-instant (compile/PDF results land within ~300ms of
+ *  the backend finishing), still gentle on the API. */
+export const JOB_POLL_MS = 300;
 
 // Crash-recovery snapshot for every editable field (statement recovery lives in
 // the statement editor). Best-effort: browser storage is an aid, never a
@@ -29,7 +33,7 @@ function writeRecovery(id: string, recovery: DraftRecovery | null) {
   } catch { /* Recovery is best-effort. */ }
 }
 
-export default function useAuthoringDraft(id: string, pollMs = 3000, options: AuthoringDraftOptions = {}) {
+export default function useAuthoringDraft(id: string, options: AuthoringDraftOptions = {}) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [form, setForm] = useState<Draft | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -150,11 +154,13 @@ export default function useAuthoringDraft(id: string, pollMs = 3000, options: Au
           }
         }
       } catch (err) { if (!cancelled) { onError(err); setLoaded(false); } }
-      if (!cancelled) timer = setTimeout(poll, pollMs);
+      // While a job runs, poll fast (near-instant completion feedback); the
+      // 3s idle interval only matters when nothing is executing.
+      if (!cancelled) timer = setTimeout(poll, JOB_POLL_MS);
     };
-    timer = setTimeout(poll, pollMs);
+    timer = setTimeout(poll, JOB_POLL_MS);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [id, pollMs, onError, activeJobId]);
+  }, [id, onError, activeJobId]);
 
   function edit<K extends keyof DraftFields>(key: K, value: DraftFields[K]) {
     const canEditPublishedStatement = options.allowPublishedStatementEdit && key === 'statementHtml';

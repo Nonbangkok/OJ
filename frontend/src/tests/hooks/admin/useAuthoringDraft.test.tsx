@@ -98,7 +98,7 @@ test('resuming an active durable job disables mutations and polling refreshes co
   jest.mocked(api.get).mockImplementation(async url => ({ data: url.endsWith('/jobs')
     ? [{ ...job, status: finished ? 'succeeded' : 'running' }]
     : { ...draft, status: finished ? 'ready' : 'draft' } }));
-  const { result } = renderHook(() => useAuthoringDraft('d1', 20));
+  const { result } = renderHook(() => useAuthoringDraft('d1'));
   await waitFor(() => expect(result.current.activeJob?.id).toBe('j1'));
   expect(result.current.actionsDisabled).toBe(true);
   finished = true;
@@ -108,7 +108,7 @@ test('resuming an active durable job disables mutations and polling refreshes co
 });
 
 test('an idle draft stops polling after its initial snapshot', async () => {
-  const { result } = renderHook(() => useAuthoringDraft('d1', 20));
+  const { result } = renderHook(() => useAuthoringDraft('d1'));
   await waitFor(() => expect(result.current.draft?.revision).toBe(3));
   expect(api.get).toHaveBeenCalledTimes(2);
 
@@ -177,7 +177,7 @@ test('published and dirty drafts cannot invoke jobs or Publish even through hand
 test('statement editor can save a statement-only revision from a published draft', async () => {
   const published = { ...draft, status: 'published', publishedAt: '2026-09-16T00:00:00.000Z' };
   jest.mocked(api.get).mockImplementation(async url => ({ data: url.endsWith('/jobs') ? [] : published }));
-  const { result } = renderHook(() => useAuthoringDraft('d1', 3000, { allowPublishedStatementEdit: true }));
+  const { result } = renderHook(() => useAuthoringDraft('d1', { allowPublishedStatementEdit: true }));
   await waitFor(() => expect(result.current.draft?.status).toBe('published'));
 
   act(() => result.current.edit('statementHtml', '<p>Corrected statement</p>'));

@@ -142,10 +142,19 @@ async function queueJob(draftId: string, revision: number, kind: JobSnapshot['ki
       await client.query("UPDATE problem_drafts SET status='draft',verified_revision=NULL,updated_at=NOW() WHERE id=$1", [draftId]);
     }
     await client.query('COMMIT');
+    // Deliver to the runner without waiting out the coordinator's poll tick.
+    notifyJobActivity();
     return { kind: 'queued', job: inserted.rows[0] };
   } catch (error) { await client.query('ROLLBACK'); throw error; }
   finally { client.release(); }
 }
+
+/** Set by the coordinator at boot (avoids a circular import): called after
+ *  job writes so delivery/result-import runs immediately, not on the next
+ *  poll tick — this is what makes enqueue→result feel near-instant. */
+let jobActivityListener: (() => void) | undefined;
+export function setJobActivityListener(listener: (() => void) | undefined): void { jobActivityListener = listener; }
+export function notifyJobActivity(): void { jobActivityListener?.(); }
 
 /** Loads private job state for admin projection or internal reconciliation. */
 export async function getAuthoringJob(id: string, database: JobDatabase = db): Promise<DurableJob | null> {
@@ -279,6 +288,7 @@ export async function applyJobResult(id: string, input: unknown, database: JobDa
     await client.query('DELETE FROM authoring_job_inputs WHERE job_id=$1', [id]);
     await client.query('DELETE FROM authoring_job_files WHERE job_id=$1', [id]);
     await client.query('COMMIT');
+    notifyJobActivity();
     return updated.rows.length === 1;
   } catch (error) { await client.query('ROLLBACK'); throw error; }
   finally { client.release(); }

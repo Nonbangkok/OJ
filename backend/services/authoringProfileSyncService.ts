@@ -6,7 +6,7 @@ import { StatementError } from '../authoring/statementSanitizer';
 import { getAuthorProfile } from './authorProfileQueryService';
 import { createFallbackAuthorAvatar } from './authorProfileImageService';
 import { capturePdfSnapshot } from './authoringPdfSnapshotService';
-import { ACTIVE_JOB_STATUSES, JobDatabase } from './authoringJobQueryService';
+import { ACTIVE_JOB_STATUSES, JobDatabase, notifyJobActivity } from './authoringJobQueryService';
 
 /** How often a contended draft is retried before it is deferred. */
 export const PROFILE_SYNC = {
@@ -186,6 +186,7 @@ export async function startProfileSyncItem(
       attempts=attempts+1, sync_revision=$2, sync_pdf_job_id=$3, error_message=NULL, updated_at=NOW()
       WHERE id=$1`, [itemId, updated.revision, snapshot.jobId]);
     await client.query('COMMIT');
+    notifyJobActivity(); // deliver the sync_pdf job to the runner immediately
     return { kind: 'queued', jobId: snapshot.jobId, revision: updated.revision };
   } catch (error) {
     await client.query('ROLLBACK');

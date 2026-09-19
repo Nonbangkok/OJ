@@ -2,7 +2,7 @@ import * as db from '../db';
 import { AUTHORING_RUNNER, jobSnapshotSchema } from '../authoring/protocol';
 import { AuthoringSpool } from '../authoring/spool';
 import { TestcaseError } from '../authoring/testcases';
-import { ACTIVE_JOB_STATUSES, AUTHORING_COORDINATOR_LOCK, applyJobResult, DurableJob, failAuthoringJob, getAuthoringJob, JobDatabase, readQueuedInput, readQueuedFile } from './authoringJobQueryService';
+import { ACTIVE_JOB_STATUSES, AUTHORING_COORDINATOR_LOCK, applyJobResult, DurableJob, failAuthoringJob, getAuthoringJob, JobDatabase, readQueuedInput, readQueuedFile, setJobActivityListener } from './authoringJobQueryService';
 import { reconcileProfileSyncs } from './authoringProfileSyncService';
 
 /** Reconciles durable queue entries with disk, including both crash windows around result import. */
@@ -74,17 +74,37 @@ export async function reconcileAuthoringJobs(spool: AuthoringSpool, database: Jo
   }
 }
 
-/** Starts a non-overlapping polling loop; the next tick retries transient DB/disk failures. */
+/** Starts a non-overlapping polling loop; the next tick retries transient DB/disk failures.
+ *  `kick()` runs a reconciliation immediately — called when a job is enqueued so
+ *  delivery to the runner doesn't wait for the next poll tick. */
 export async function startAuthoringCoordinator(root: string): Promise<() => void> {
   const spool = new AuthoringSpool(root);
   await spool.initialize();
   let stopped = false;
-  let timer: ReturnType<typeof setTimeout>;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let running = false;
+  let kicked = false;
   const tick = async () => {
+    if (running) { kicked = true; return; } // a kick during a running tick reruns after it
+    running = true;
     try { await reconcileAuthoringJobs(spool); }
     catch { console.error('Authoring job reconciliation failed; will retry'); }
-    if (!stopped) { timer = setTimeout(tick, AUTHORING_RUNNER.POLL_MS); timer.unref(); }
+    finally { running = false; }
+    if (stopped) return;
+    if (kicked) { kicked = false; timer = setTimeout(tick, 0); }
+    else timer = setTimeout(tick, AUTHORING_RUNNER.POLL_MS);
+    timer.unref();
+  };
+  const kick = () => {
+    if (stopped) return;
+    if (running) { kicked = true; return; }
+    clearTimeout(timer);
+    timer = setTimeout(tick, 0);
+    timer.unref();
   };
   await tick();
-  return () => { stopped = true; clearTimeout(timer); };
+  // Job writes (enqueue, result import) call this so delivery and follow-up
+  // reconciliation start immediately instead of on the next poll tick.
+  setJobActivityListener(kick);
+  return () => { stopped = true; clearTimeout(timer); setJobActivityListener(undefined); };
 }

@@ -2,7 +2,10 @@ import { z } from 'zod';
 import { TESTCASE_LIMITS, validateTestcaseFilename } from './testcases';
 
 export const AUTHORING_RUNNER = {
-  POLL_MS: 1000,
+  /** Backend-side job reconciliation cadence. Enqueues and result imports kick
+   *  an immediate pass (see the coordinator's job-activity listener), so this
+   *  only bounds the idle wait; 250ms keeps completion pickup snappy anyway. */
+  POLL_MS: 250,
   JOB_TIMEOUT_MS: 15 * 60_000,
   COMPILE_TIMEOUT_MS: 30_000,
   GENERATOR_TIMEOUT_MS: 60_000,

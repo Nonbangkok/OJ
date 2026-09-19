@@ -132,7 +132,7 @@ function PdfEmbed({ draftId, revision, buildRunning }: { draftId: string; revisi
 }
 
 export default function StatementEditor({ id }: { id: string }) {
-  const model = useAuthoringDraft(id, 3000, { allowPublishedStatementEdit: true });
+  const model = useAuthoringDraft(id, { allowPublishedStatementEdit: true });
   const { draft, form, dirty } = model;
   const [preview, setPreview] = useState('');
   const [previewState, setPreviewState] = useState<'waiting' | 'loading' | 'ready' | 'error'>('waiting');
