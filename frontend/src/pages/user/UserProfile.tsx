@@ -11,6 +11,17 @@ import styles from './UserProfile.module.css';
 const formatDate = (iso: string): string =>
   new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
 
+const verdictClass = (verdict: string): string =>
+  verdict.split(' ')[0].toLowerCase();
+
+const makeBarWidth = (counts: Record<string, number>) => {
+  const max = Math.max(...Object.values(counts), 1);
+  return (key: string): number => Math.round((counts[key] / max) * 100);
+};
+
+const verdictBarWidthFor = (counts: Record<string, number>) => makeBarWidth(counts);
+const languageBarWidthFor = (counts: Record<string, number>) => makeBarWidth(counts);
+
 const UserProfile = () => {
   const { username } = useParams<{ username: string }>();
   const { user } = useAuth();
@@ -64,6 +75,8 @@ const UserProfile = () => {
   const avatarVersion = profile.avatarUpdatedAt
     ? `?v=${new Date(profile.avatarUpdatedAt).getTime()}`
     : '';
+  const verdictBarWidth = makeBarWidth(profile.verdictCounts);
+  const languageBarWidth = makeBarWidth(profile.languageCounts);
 
   return (
     <div className={styles['profile-container']}>
@@ -133,35 +146,56 @@ const UserProfile = () => {
         <ActivityHeatmap activity={profile.dailyActivity} />
       </div>
 
-      {Object.keys(profile.verdictCounts).length > 0 && (
-        <div className={styles.section}>
-          <h2>Verdicts</h2>
-          <ul className={styles['verdict-list']}>
-            {Object.entries(profile.verdictCounts)
-              .sort(([, a], [, b]) => b - a)
-              .map(([verdict, count]) => (
-                <li key={verdict} className={styles['verdict-chip']}>
-                  {verdict}: {count}
-                </li>
-              ))}
-          </ul>
-        </div>
-      )}
+      <div className={styles['two-col']}>
+        {Object.keys(profile.verdictCounts).length > 0 && (
+          <div className={styles.section}>
+            <h2>Verdicts</h2>
+            <ul className={styles['breakdown-list']}>
+              {Object.entries(profile.verdictCounts)
+                .sort(([, a], [, b]) => b - a)
+                .map(([verdict, count]) => (
+                  <li key={verdict} className={styles['breakdown-row']}>
+                    <span className={styles['breakdown-name']}>
+                      <span className={`${styles['verdict-dot']} ${styles[`verdict-dot-${verdictClass(verdict)}`]}`} aria-hidden="true" />
+                      {verdict}
+                    </span>
+                    <span className={styles['breakdown-bar']} aria-hidden="true">
+                      <span
+                        className={styles['breakdown-bar-fill']}
+                        style={{ width: `${verdictBarWidth(verdict)}%` }}
+                      />
+                    </span>
+                    <span className={styles['breakdown-count']}>{count}</span>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )}
 
-      {Object.keys(profile.languageCounts).length > 0 && (
-        <div className={styles.section}>
-          <h2>Languages</h2>
-          <ul className={styles['verdict-list']}>
-            {Object.entries(profile.languageCounts)
-              .sort(([, a], [, b]) => b - a)
-              .map(([language, count]) => (
-                <li key={language} className={styles['verdict-chip']}>
-                  {language}: {count}
-                </li>
-              ))}
-          </ul>
-        </div>
-      )}
+        {Object.keys(profile.languageCounts).length > 0 && (
+          <div className={styles.section}>
+            <h2>Languages</h2>
+            <ul className={styles['breakdown-list']}>
+              {Object.entries(profile.languageCounts)
+                .sort(([, a], [, b]) => b - a)
+                .map(([language, count]) => (
+                  <li key={language} className={styles['breakdown-row']}>
+                    <span className={`${styles['breakdown-name']} ${styles['language-name']}`}>
+                      {language}
+                    </span>
+                    <span className={styles['breakdown-bar']} aria-hidden="true">
+                      <span
+                        className={styles['breakdown-bar-fill']}
+                        style={{ width: `${languageBarWidth(language)}%` }}
+                      />
+                    </span>
+                    <span className={styles['breakdown-count']}>{count}</span>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
