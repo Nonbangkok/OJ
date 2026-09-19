@@ -228,40 +228,34 @@ router.post('/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin,
   memoryUpload.fields([
   { name: 'problemPdf', maxCount: 1 },
   { name: 'testcasesZip', maxCount: 1 }
-]), async (req: Request, res: Response) => {
+]), asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const files = (req.files ?? {}) as { [fieldname: string]: Express.Multer.File[] };
   const problemPdfFile = files['problemPdf'] ? files['problemPdf'][0] : null;
   const testcasesZipFile = files['testcasesZip'] ? files['testcasesZip'][0] : null;
 
   if (!problemPdfFile && !testcasesZipFile) {
-    return res.status(400).json({ message: 'No files uploaded.' });
+    throw new AppError('No files uploaded.', 400);
   }
 
   // Reject non-PDF payloads before they ever reach the database / get served.
   if (problemPdfFile && !isPdfBuffer(problemPdfFile.buffer)) {
-    return res.status(400).json({ message: 'Uploaded problem PDF is not a valid PDF file.' });
+    throw new AppError('Uploaded problem PDF is not a valid PDF file.', 400);
   }
 
-  try {
-    if (problemPdfFile) {
-      await updateProblemPdf(id, problemPdfFile.buffer);
-    }
-
-    if (testcasesZipFile) {
-      const replaceResult = await replaceProblemTestcasesFromZip(id, testcasesZipFile.buffer);
-      if (replaceResult.kind === 'no_valid_pairs') {
-        return res.status(400).json({ message: 'No valid testcase pairs (.in/.out or input/output) found in the ZIP file.' });
-      }
-    }
-
-    res.status(200).json({ message: 'Files processed successfully.' });
-
-  } catch (error: unknown) {
-    console.error(`Error processing uploads for problem ${id}:`, error);
-    res.status(500).json({ message: 'An error occurred during file processing.' });
+  if (problemPdfFile) {
+    await updateProblemPdf(id, problemPdfFile.buffer);
   }
-});
+
+  if (testcasesZipFile) {
+    const replaceResult = await replaceProblemTestcasesFromZip(id, testcasesZipFile.buffer);
+    if (replaceResult.kind === 'no_valid_pairs') {
+      throw new AppError('No valid testcase pairs (.in/.out or input/output) found in the ZIP file.', 400);
+    }
+  }
+
+  res.status(200).json({ message: 'Files processed successfully.' });
+}));
 
 // Admin API Endpoints for Problem Export
 router.post('/admin/problems/export', requireAuth, requireStaffOrAdmin,

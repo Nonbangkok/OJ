@@ -18,7 +18,6 @@ import {
   updateAdminUserSchema,
   updateRegistrationSettingSchema,
 } from '../schemas/requestSchemas';
-import { getErrorMessage } from '../utils/errorMessage';
 import {
   buildDatabaseExportRequest,
   getDatabaseImportProgress,
@@ -152,32 +151,23 @@ router.get('/admin/database/import-progress/:jobId', (req: Request, res: Respons
   res.json(progress);
 });
 
-router.post('/admin/database/export', requireAuth, requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const { command, dumpFilePath, downloadName } = buildDatabaseExportRequest();
+router.post('/admin/database/export', requireAuth, requireAdmin, asyncHandler(async (_req: Request, res: Response) => {
+  const { command, dumpFilePath, downloadName } = buildDatabaseExportRequest();
 
-    await runCommand(command);
+  await runCommand(command);
 
-    // Send the file as a download
-    res.download(dumpFilePath, downloadName, (err) => {
-      if (err) {
-        console.error('Error sending file:', err);
-        if (!res.headersSent) {
-          res.status(500).json({ message: 'Error downloading backup file.' });
-        }
+  // Send the file as a download
+  res.download(dumpFilePath, downloadName, (err) => {
+    if (err) {
+      console.error('Error sending file:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ message: 'Error downloading backup file.' });
       }
-      // Clean up the temporary dump file
-      void unlinkIfExists(dumpFilePath);
-    });
-
-  } catch (error: unknown) {
-    console.error('Error during database export:', error);
-    if (!res.headersSent) {
-      const message = getErrorMessage(error);
-      res.status(500).json({ message: 'Failed to export database.', error: message });
     }
-  }
-});
+    // Clean up the temporary dump file
+    void unlinkIfExists(dumpFilePath);
+  });
+}));
 
 router.get('/admin/settings/registration', requireAuth, requireAdmin, asyncHandler(async (_req: Request, res: Response) => {
   const enabled = await getRegistrationEnabled();
