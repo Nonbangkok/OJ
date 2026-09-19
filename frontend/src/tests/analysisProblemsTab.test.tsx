@@ -35,7 +35,7 @@ const mockProblems = [
 ];
 
 const mockProblemAnalytics = {
-    problem: { id: 'aplusb', title: 'A Plus B', createdAt: '2026-01-01T00:00:00Z' },
+    problem: { id: 'aplusb', title: 'A Plus B' },
     kpis: { submissions: 10, accepted: 7, acRate: 0.7, uniqueSubmitters: 5 },
     dailySeries: [{ day: '2026-09-19', total: 2, accepted: 1 }],
     verdictBreakdown: [{ verdict: 'Accepted', count: 7 }, { verdict: 'Wrong Answer', count: 3 }],

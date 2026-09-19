@@ -22,7 +22,7 @@ describe('analyticsQueryService.getOverviewAnalytics', () => {
             }],
         } as never)
             .mockResolvedValueOnce({ rows: [{ current_users: '5', previous_users: '3' }] } as never)
-            .mockResolvedValueOnce({ rows: [{ current_problems: '2', previous_problems: '1' }] } as never)
+            .mockResolvedValueOnce({ rows: [{ current_users: '2', previous_users: '1' }] } as never)
             .mockResolvedValueOnce({
                 rows: [
                     { day: '2026-09-18', total: '12', accepted: '7' },
@@ -40,7 +40,7 @@ describe('analyticsQueryService.getOverviewAnalytics', () => {
         expect(result.kpis.uniqueSubmitters).toEqual({ current: 10, previous: 8 });
         expect(result.kpis.accepted).toEqual({ current: 60, previous: 40 });
         expect(result.kpis.newUsers).toEqual({ current: 5, previous: 3 });
-        expect(result.kpis.newProblems).toEqual({ current: 2, previous: 1 });
+        expect(result.kpis.activeProblems).toEqual({ current: 2, previous: 1 });
         expect(result.dailySeries).toEqual([
             { day: '2026-09-18', total: 12, accepted: 7 },
             { day: '2026-09-19', total: 10, accepted: 6 },
@@ -196,7 +196,7 @@ describe('analyticsQueryService.getProblemAnalytics', () => {
 
     it('computes testcase pass rates from the results JSONB aggregation', async () => {
         mockQuery.mockResolvedValueOnce({
-            rows: [{ id: 'aplusb', title: 'A Plus B', created_at: '2026-01-01T00:00:00Z' }],
+            rows: [{ id: 'aplusb', title: 'A Plus B' }],
         } as never)
             .mockResolvedValueOnce({
                 rows: [{ submissions: '10', accepted: '7', ac_rate: '0.7', unique_submitters: '5' }],
@@ -214,7 +214,7 @@ describe('analyticsQueryService.getProblemAnalytics', () => {
 
         const result = await getProblemAnalytics('aplusb');
 
-        expect(result?.problem).toEqual({ id: 'aplusb', title: 'A Plus B', createdAt: '2026-01-01T00:00:00Z' });
+        expect(result?.problem).toEqual({ id: 'aplusb', title: 'A Plus B' });
         expect(result?.kpis).toEqual({ submissions: 10, accepted: 7, acRate: 0.7, uniqueSubmitters: 5 });
         expect(result?.testcasePassRates).toEqual([{ caseNumber: 3, passRate: 0.7 }]);
         expect(result?.runtimeBuckets).toEqual([{ bucket: '0-100ms', count: 4 }]);

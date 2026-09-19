@@ -66,7 +66,6 @@ const ProblemDetail = ({ problemId, onBack }: ProblemDetailProps) => {
     <div className={styles.container}>
       <button type="button" onClick={onBack} className={styles['back-button']}>← Back to problems</button>
       <h3 className={styles.title}>{data.problem.title}</h3>
-      <p className={styles.subtitle}>Created {new Date(data.problem.createdAt).toLocaleDateString()}</p>
 
       <div className={styles['kpi-row']}>
         <KpiCard label="Submissions" value={kpis.submissions} deltaPercent={null} />

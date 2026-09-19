@@ -11,7 +11,7 @@ export interface OverviewAnalytics {
     uniqueSubmitters: OverviewKpi;
     accepted: OverviewKpi;
     newUsers: OverviewKpi;
-    newProblems: OverviewKpi;
+    activeProblems: OverviewKpi;
   };
   dailySeries: Array<{ day: string; total: number; accepted: number }>;
   verdictBreakdown: Array<{ verdict: string; count: number }>;
@@ -32,11 +32,6 @@ interface KpiRow {
 interface NewUsersRow {
   current_users: string;
   previous_users: string;
-}
-
-interface NewProblemsRow {
-  current_problems: string;
-  previous_problems: string;
 }
 
 interface DailyRow {
@@ -113,12 +108,16 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
     FROM users`,
     [days, days * 2]);
 
-  const newProblemsResult = await query<NewProblemsRow>(`
+  const activeProblemsResult = await query<NewUsersRow>(`
     SELECT
-      COUNT(*) FILTER (WHERE created_at >= NOW() - ($1 || ' days')::interval) AS current_problems,
-      COUNT(*) FILTER (WHERE created_at >= NOW() - ($2 || ' days')::interval
-                         AND created_at < NOW() - ($1 || ' days')::interval) AS previous_problems
-    FROM problems`,
+      COUNT(DISTINCT problem_id) FILTER (WHERE submitted_at >= NOW() - ($1 || ' days')::interval) AS current_users,
+      COUNT(DISTINCT problem_id) FILTER (WHERE submitted_at >= NOW() - ($2 || ' days')::interval
+                                           AND submitted_at < NOW() - ($1 || ' days')::interval) AS previous_users
+    FROM (
+      SELECT problem_id, submitted_at FROM submissions
+      UNION ALL
+      SELECT problem_id, submitted_at FROM contest_submissions
+    ) s`,
     [days, days * 2]);
 
   const dailyResult = await query<DailyRow>(`
@@ -217,9 +216,9 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
         current: toNum(newUsersResult.rows[0]?.current_users),
         previous: toNum(newUsersResult.rows[0]?.previous_users),
       },
-      newProblems: {
-        current: toNum(newProblemsResult.rows[0]?.current_problems),
-        previous: toNum(newProblemsResult.rows[0]?.previous_problems),
+      activeProblems: {
+        current: toNum(activeProblemsResult.rows[0]?.current_users),
+        previous: toNum(activeProblemsResult.rows[0]?.previous_users),
       },
     },
     dailySeries: dailyResult.rows.map((r) => ({ day: r.day, total: toNum(r.total), accepted: toNum(r.accepted) })),
@@ -468,7 +467,7 @@ export const getUserAnalytics = async (userId: number): Promise<UserAnalytics | 
 // ---------------------------------------------------------------------------
 
 export interface ProblemAnalytics {
-  problem: { id: string; title: string; createdAt: string };
+  problem: { id: string; title: string };
   kpis: { submissions: number; accepted: number; acRate: number; uniqueSubmitters: number };
   dailySeries: Array<{ day: string; total: number; accepted: number }>;
   verdictBreakdown: Array<{ verdict: string; count: number }>;
@@ -478,7 +477,7 @@ export interface ProblemAnalytics {
   firstSolves: Array<{ userId: number; username: string; submittedAt: string }>;
 }
 
-interface ProblemRow { id: string; title: string; created_at: string }
+interface ProblemRow { id: string; title: string }
 interface ProblemKpiRow { submissions: string; accepted: string; ac_rate: string; unique_submitters: string }
 interface ProblemDailyRow { day: string; total: string; accepted: string }
 interface BucketRow { bucket: string; count: string }
@@ -487,7 +486,7 @@ interface TestCasePassRow { case_number: number; total: string; passed: string }
 
 /** Full analytics payload for a single problem, or null when missing. */
 export const getProblemAnalytics = async (problemId: string): Promise<ProblemAnalytics | null> => {
-  const problemResult = await query<ProblemRow>('SELECT id, title, created_at FROM problems WHERE id = $1', [problemId]);
+  const problemResult = await query<ProblemRow>('SELECT id, title FROM problems WHERE id = $1', [problemId]);
   const problem = firstRow(problemResult.rows);
   if (!problem) return null;
 
@@ -610,7 +609,7 @@ export const getProblemAnalytics = async (problemId: string): Promise<ProblemAna
   const kpi = firstRow(kpiResult.rows);
 
   return {
-    problem: { id: problem.id, title: problem.title, createdAt: problem.created_at },
+    problem: { id: problem.id, title: problem.title },
     kpis: {
       submissions: toNum(kpi?.submissions),
       accepted: toNum(kpi?.accepted),

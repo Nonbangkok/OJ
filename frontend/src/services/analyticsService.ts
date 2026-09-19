@@ -11,7 +11,7 @@ export interface OverviewAnalytics {
     uniqueSubmitters: OverviewKpi;
     accepted: OverviewKpi;
     newUsers: OverviewKpi;
-    newProblems: OverviewKpi;
+    activeProblems: OverviewKpi;
   };
   dailySeries: Array<{ day: string; total: number; accepted: number }>;
   verdictBreakdown: Array<{ verdict: string; count: number }>;
@@ -49,7 +49,7 @@ export interface UserAnalytics {
 }
 
 export interface ProblemAnalytics {
-  problem: { id: string; title: string; createdAt: string };
+  problem: { id: string; title: string };
   kpis: { submissions: number; accepted: number; acRate: number; uniqueSubmitters: number };
   dailySeries: Array<{ day: string; total: number; accepted: number }>;
   verdictBreakdown: Array<{ verdict: string; count: number }>;

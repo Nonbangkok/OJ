@@ -72,7 +72,7 @@ const OverviewTab = () => {
         <KpiCard label="Unique submitters" value={kpis.uniqueSubmitters.current} deltaPercent={deltaPercent(kpis.uniqueSubmitters.current, kpis.uniqueSubmitters.previous)} />
         <KpiCard label="Accepted" value={kpis.accepted.current} deltaPercent={deltaPercent(kpis.accepted.current, kpis.accepted.previous)} />
         <KpiCard label="New users" value={kpis.newUsers.current} deltaPercent={deltaPercent(kpis.newUsers.current, kpis.newUsers.previous)} />
-        <KpiCard label="New problems" value={kpis.newProblems.current} deltaPercent={deltaPercent(kpis.newProblems.current, kpis.newProblems.previous)} />
+        <KpiCard label="Active problems" value={kpis.activeProblems.current} deltaPercent={deltaPercent(kpis.activeProblems.current, kpis.activeProblems.previous)} />
       </div>
 
       <ChartCard title="Submissions per day">

@@ -28,7 +28,7 @@ const mockOverview = {
         uniqueSubmitters: { current: 10, previous: 8 },
         accepted: { current: 60, previous: 40 },
         newUsers: { current: 5, previous: 3 },
-        newProblems: { current: 2, previous: 1 },
+        activeProblems: { current: 2, previous: 1 },
     },
     dailySeries: [
         { day: '2026-09-18', total: 12, accepted: 7 },
