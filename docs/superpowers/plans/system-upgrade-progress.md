@@ -154,7 +154,7 @@ not urgent), user-event ^13 (v14 current) 🟡, cors dead dep 🟢.
 | 11 | Raw modals → ui/Dialog (4 components) | 4 | ✅ done |
 | 12 | Home quote-box keyboard a11y; re-enable jsx-a11y rules incrementally | 4 | ✅ quote-box done; jsx-a11y rules ⬜ |
 | 13 | Tests: analysis drill-downs + submission-flow + ActivityHeatmap | 2/4 | ⬜ |
-| 14 | CSV export for analysis data | 5 | ⬜ |
+| 14 | CSV export for analysis data | 5 | ✅ done (E2E verified on stack at :8080) |
 | 15 | Code-similarity / cheat detection for contests | 5 | ⬜ |
 | 16 | Idle users / drop-off analytics | 5 | ⬜ |
 | 17 | Compare 2 contests / 2 users side-by-side | 5 | ⬜ |
