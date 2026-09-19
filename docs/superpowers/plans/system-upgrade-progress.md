@@ -147,7 +147,7 @@ not urgent), user-event ^13 (v14 current) 🟡, cors dead dep 🟢.
 | 4 | Structured logger + failed-login logging + judge/scheduler wiring | 3 | ✅ done |
 | 5 | import-progress token: drop query-string support (header only) | 3 | ✅ done |
 | 6 | Analysis feature theming (~40 hex → tokens; define or remove --accent-color/--link-color) | 4 | ✅ done |
-| 7 | TS 5 + @types/react 19 alignment | 2 | ⬜ (needs care w/ CRA) |
+| 7 | TS 5 + @types/react 19 alignment | 2 | ✅ done (TS 5.5.4, legacy-peer-deps for CRA) |
 | 8 | Global ErrorBoundary + 401 session-expiry interceptor | 3/4 | ✅ done |
 | 9 | SubmissionsTab overflow-x + analysis mobile media queries | 4 | ✅ done |
 | 10 | Dark mode: ActivityHeatmap, UserProfile dots, ModalLayout, datepicker | 4 | ✅ done (also medals, ContestScoreboard) |
@@ -159,8 +159,8 @@ not urgent), user-event ^13 (v14 current) 🟡, cors dead dep 🟢.
 | 16 | Idle users / drop-off analytics | 5 | ⬜ |
 | 17 | Compare 2 contests / 2 users side-by-side | 5 | ⬜ |
 | 18 | analyticsController Zod-defaults dedup | 2 | ⬜ |
-| 19 | Drop cors from frontend deps; user-event v14 | 2 | ⬜ |
-| 20 | Split AuthorProfiles.tsx (491 lines) | 2 | ⬜ |
+| 19 | Drop cors from frontend deps; user-event v14 | 2 | ✅ done |
+| 20 | Split AuthorProfiles.tsx (491 lines) | 2 | ✅ done (287 + 3 units) |
 | 21 | Dep majors (node-cron, connect-pg-simple, uuid) | 2 | ⬜ deferred → user decision |
 
 ## Backlog
