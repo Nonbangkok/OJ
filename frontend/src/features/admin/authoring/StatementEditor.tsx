@@ -56,7 +56,10 @@ function useCompactEditorLayout() {
  *  that fills the pane — continuous flow, no page slicing. The iframe is
  *  sized to the document's full rendered height (measured after load), so the
  *  whole statement paints at every zoom level and the pane scrolls instead of
- *  clipping content inside the frame. The Actual PDF tab is where exact
+ *  clipping content inside the frame. The outer box reserves layout space at
+ *  the SCALED size (height × zoom) while the inner box zooms visually — a
+ *  bare transform reserves the unscaled height, letting the pane scroll past
+ *  the end of the shrunken content. The Actual PDF tab is where exact
  *  pagination lives (the runner-built file itself). */
 function LivePreview({ preview, zoomScale }: { preview: string; zoomScale: number }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -69,10 +72,12 @@ function LivePreview({ preview, zoomScale }: { preview: string; zoomScale: numbe
     } catch { /* same-origin srcdoc; ignore transient access errors */ }
   };
   return <div className={styles.previewLive}
-    style={{ width: `${100 / zoomScale}%`, transform: `scale(${zoomScale})` }}>
-    <iframe title="Live statement preview" sandbox="allow-same-origin" srcDoc={preview}
-      ref={frameRef} onLoad={measure} className={styles.previewLiveFrame}
-      style={docHeight ? { height: `${docHeight}px` } : undefined} />
+    style={{ width: `${100 / zoomScale}%`, height: docHeight ? `${Math.ceil(docHeight * zoomScale)}px` : undefined }}>
+    <div className={styles.previewLiveZoom} style={{ transform: `scale(${zoomScale})` }}>
+      <iframe title="Live statement preview" sandbox="allow-same-origin" srcDoc={preview}
+        ref={frameRef} onLoad={measure} className={styles.previewLiveFrame}
+        style={docHeight ? { height: `${docHeight}px` } : undefined} />
+    </div>
   </div>;
 }
 

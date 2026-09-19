@@ -773,13 +773,21 @@
   place-items: center;
   color: var(--statement-empty);
 }
-/* Live HTML preview: continuous flow, fills the pane at the zoom level. */
+/* Live HTML preview: the outer box reserves layout space at the scaled size
+   (set inline as docHeight × zoom); the inner box scales visually from the
+   top-left so the shrunken content never leaves scrollable blank space. */
 .previewLive {
   position: relative;
   min-width: 100%;
   min-height: 100%;
-  transform-origin: top left;
   background: var(--statement-paper);
+}
+.previewLiveZoom {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  transform-origin: top left;
 }
 .previewLiveFrame {
   display: block;
