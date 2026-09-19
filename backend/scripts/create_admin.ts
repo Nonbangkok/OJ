@@ -68,10 +68,10 @@ async function createAdmin(): Promise<void> {
 
     await db.query(
       `INSERT INTO users (username, password_hash, role)
-       VALUES ($1, $2, ${USER_ROLES.ADMIN})
+       VALUES ($1, $2, '${USER_ROLES.ADMIN}')
        ON CONFLICT (username) DO UPDATE SET
          password_hash = EXCLUDED.password_hash,
-         role = ${USER_ROLES.ADMIN};`,
+         role = '${USER_ROLES.ADMIN}';`,
       [username, hashedPassword]
     );
 

@@ -1,4 +1,5 @@
 import { getOverviewAnalytics } from '../services/analyticsQueryService';
+import { SUBMISSION_STATUS } from '../constants';
 import * as db from '../db';
 
 jest.mock('../db');
@@ -123,6 +124,10 @@ describe('analyticsQueryService.listUsersForAnalytics', () => {
 
         expect(mockQuery.mock.calls[0][1]).toEqual(['bo', 25, 50]);
         expect(String(mockQuery.mock.calls[0][0])).toContain('ac_rate ASC');
+        // Regression guard: the Accepted literal must stay a quoted SQL string
+        // (an unquoted ${SUBMISSION_STATUS.ACCEPTED} becomes a bare identifier
+        // and Postgres rejects it with 42703 at runtime).
+        expect(String(mockQuery.mock.calls[0][0])).toContain(`'${SUBMISSION_STATUS.ACCEPTED}'`);
         expect(rows).toEqual([{
             userId: 2,
             username: 'bob',
