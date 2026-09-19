@@ -52,35 +52,51 @@ function useCompactEditorLayout() {
   return compact;
 }
 
+/** A4 aspect ratio (210/297) — pages size to the pane width and each page
+ *  shows its own slice of the document, so page boundaries are obvious. */
+const A4_ASPECT = 210 / 297;
+
 /** Slices the preview content into fixed-aspect page frames so the author can
- *  see where page boundaries fall while typing. Purely visual: the runner-built
+ *  see where page boundaries fall while typing. Every page renders the same
+ *  document, translated up by one page-height per page index: page N shows
+ *  exactly the lines that land on page N. Purely visual: the runner-built
  *  PDF remains authoritative. */
 function PagedPreview({ preview, zoomScale }: { preview: string; zoomScale: number }) {
   const [pages, setPages] = useState(1);
-  // Measure rendered content height inside the iframe to compute the page count.
-  const frameRef = useRef<HTMLIFrameElement>(null);
+  const [docHeight, setDocHeight] = useState(0);
+  const [pageHeight, setPageHeight] = useState(0);
+  const measureRef = useRef<HTMLIFrameElement>(null);
   useEffect(() => {
     setPages(1);
+    setDocHeight(0);
+    setPageHeight(0);
   }, [preview]);
   const measure = () => {
     try {
-      const doc = frameRef.current?.contentDocument;
+      const doc = measureRef.current?.contentDocument;
       if (!doc?.body) return;
       const inner = Math.ceil(doc.documentElement.scrollHeight);
-      const frameHeight = frameRef.current?.clientHeight ?? 0;
-      if (frameHeight > 0 && inner > 0) setPages(Math.max(1, Math.ceil(inner / frameHeight)));
+      const width = measureRef.current?.clientWidth ?? 0;
+      if (inner > 0 && width > 0) {
+        const height = width / A4_ASPECT;
+        setPageHeight(height);
+        setDocHeight(inner);
+        setPages(Math.max(1, Math.ceil(inner / height)));
+      }
     } catch { /* sandboxed frame content is same-origin via srcdoc; ignore */ }
   };
   return <div className={styles.previewPages}>
+    {/* Hidden full-width measuring frame: reports the document's total height
+        once, so page count matches A4 pagination of the pane width. */}
+    <iframe title="Statement preview measurement" sandbox="allow-same-origin" srcDoc={preview}
+      ref={measureRef} onLoad={measure} className={styles.previewMeasure} aria-hidden="true" />
     {Array.from({ length: pages }, (_, index) => <div key={index} className={styles.previewPageWrapper}>
       <div className={styles.previewPageNumber} aria-hidden="true">Page {index + 1} / {pages}</div>
-      <div className={styles.previewCanvas}
-        style={{ width: `${100 / zoomScale}%`, height: `${100 / zoomScale}%`, transform: `scale(${zoomScale})` }}>
-        {index === 0 && <iframe title="Fast statement preview" sandbox="allow-same-origin" srcDoc={preview}
-          ref={frameRef} onLoad={measure} />}
-        {index > 0 && <div className={styles.previewContinued} aria-hidden="true">
-          Continued on this page — the actual PDF paginates at print time.
-        </div>}
+      <div className={styles.previewPageFrame}
+        style={{ width: `${100 / zoomScale}%`, transform: `scale(${zoomScale})` }}>
+        <iframe title={`Statement preview page ${index + 1}`} sandbox="allow-same-origin" srcDoc={preview}
+          className={styles.previewPageContent}
+          style={docHeight ? { height: `${docHeight}px`, top: `${-index * pageHeight}px` } : undefined} />
       </div>
     </div>)}
   </div>;

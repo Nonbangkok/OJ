@@ -737,32 +737,35 @@
   overflow: auto;
   background: var(--statement-desk);
 }
-.previewCanvas {
-  min-width: 100%;
-  min-height: 100%;
-  transform-origin: top left;
-  background: var(--statement-paper);
-}
 .previewEmpty {
   flex: 1;
   display: grid;
   place-items: center;
   color: var(--statement-empty);
 }
-/* Paged preview: each frame is a fixed A4-aspect "page" with a visible
-   boundary and page number, so page breaks are obvious while typing. */
+/* Paged preview: each frame is a fixed A4-aspect "page" showing its own slice
+   of the document — the same document renders in every frame, translated up
+   by one page-height per page index, and the frame clips the rest. A solid
+   border + shadow + page number make page breaks obvious while typing. */
 .previewPages {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
   padding: 1rem;
 }
-.previewPageWrapper {
-  position: relative;
+.previewMeasure {
+  position: absolute;
+  left: -9999px;
+  /* Matches the visible page width: viewport padding (1rem) each side. */
+  width: calc(100% - 2rem);
+  height: 0;
+  border: 0;
+  visibility: hidden;
 }
-.previewPageWrapper + .previewPageWrapper {
-  border-top: 2px dashed var(--statement-separator);
-  padding-top: 1rem;
+.previewPageWrapper {
+  width: 100%;
+  max-width: 100%;
+  position: relative;
 }
 .previewPageNumber {
   font-size: 0.72rem;
@@ -770,29 +773,23 @@
   text-align: right;
   padding-bottom: 0.25rem;
 }
-.previewPageWrapper .previewCanvas {
+.previewPageFrame {
+  position: relative;
+  width: 100%;
   aspect-ratio: 210 / 297;
   overflow: hidden;
+  background: var(--statement-paper);
+  border: 1px solid var(--statement-separator);
+  border-radius: 2px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  transform-origin: top left;
 }
-.previewPageWrapper iframe {
+.previewPageContent {
+  position: absolute;
+  left: 0;
   width: 100%;
-  height: 100%;
   border: 0;
   background: var(--statement-paper);
-}
-.previewContinued {
-  min-height: 100%;
-  display: grid;
-  place-items: center;
-  color: var(--statement-continued);
-  font-size: 0.85rem;
-  background: repeating-linear-gradient(
-    45deg,
-    var(--statement-stripe-a),
-    var(--statement-stripe-a) 12px,
-    var(--statement-stripe-b) 12px,
-    var(--statement-stripe-b) 24px
-  );
 }
 @media (max-width: 480px) {
   .authoring {
