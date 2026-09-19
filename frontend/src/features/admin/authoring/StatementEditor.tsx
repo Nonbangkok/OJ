@@ -53,14 +53,45 @@ function useCompactEditorLayout() {
 }
 
 /** Live HTML preview: the sanitized statement rendered in a sandboxed frame
- *  that fills the pane — continuous flow, no page slicing. The Actual PDF tab
- *  is where exact pagination lives (the runner-built file itself). */
+ *  that fills the pane — continuous flow, no page slicing. The iframe is
+ *  sized to the document's full rendered height (measured after load), so the
+ *  whole statement paints at every zoom level and the pane scrolls instead of
+ *  clipping content inside the frame. The Actual PDF tab is where exact
+ *  pagination lives (the runner-built file itself). */
 function LivePreview({ preview, zoomScale }: { preview: string; zoomScale: number }) {
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const [docHeight, setDocHeight] = useState(0);
+  useEffect(() => { setDocHeight(0); }, [preview]);
+  const measure = () => {
+    try {
+      const doc = frameRef.current?.contentDocument;
+      if (doc?.body) setDocHeight(Math.ceil(doc.documentElement.scrollHeight));
+    } catch { /* same-origin srcdoc; ignore transient access errors */ }
+  };
   return <div className={styles.previewLive}
     style={{ width: `${100 / zoomScale}%`, transform: `scale(${zoomScale})` }}>
     <iframe title="Live statement preview" sandbox="allow-same-origin" srcDoc={preview}
-      className={styles.previewLiveFrame} />
+      ref={frameRef} onLoad={measure} className={styles.previewLiveFrame}
+      style={docHeight ? { height: `${docHeight}px` } : undefined} />
   </div>;
+}
+
+/** Embeds the runner-built PDF. While a build job runs, the currently loaded
+ *  file stays put (switching src mid-load aborts the request and can leave
+ *  Chrome's viewer blank); the new revision swaps in once, after the job
+ *  finishes and the refreshed draft reports it. */
+function PdfEmbed({ draftId, revision, buildRunning }: { draftId: string; revision: number | null; buildRunning: boolean }) {
+  // The revision actually loaded in the iframe; lags `revision` while a job runs.
+  const [loadedRevision, setLoadedRevision] = useState(revision);
+  useEffect(() => {
+    if (!buildRunning && revision !== null && revision !== loadedRevision) {
+      setLoadedRevision(revision);
+    }
+  }, [buildRunning, revision, loadedRevision]);
+  if (loadedRevision === null) return <div className={styles.previewEmpty}>No PDF built yet.</div>;
+  return <iframe title="Latest runner-built PDF" className={styles.previewPdfEmbed}
+    key={loadedRevision}
+    src={`${authoringService.draftPdfUrl(draftId, loadedRevision)}#view=FitH`} />;
 }
 
 export default function StatementEditor({ id }: { id: string }) {
@@ -242,9 +273,8 @@ export default function StatementEditor({ id }: { id: string }) {
         <div className={styles.previewViewport}>
           {pdfMode
             ? (draft.hasLatestPdf
-              ? <iframe title="Latest runner-built PDF" className={styles.previewPdfEmbed}
-                key={draft.latestPdfRevision}
-                src={`${authoringService.draftPdfUrl(draft.id, draft.latestPdfRevision)}#view=FitH`} />
+              ? <PdfEmbed draftId={draft.id} revision={draft.latestPdfRevision}
+                buildRunning={!!model.activeJob} />
               : <div className={styles.previewEmpty}>No PDF built yet.</div>)
             : (preview ? <LivePreview preview={preview} zoomScale={zoomScale} />
               : <div className={styles.previewEmpty}>Preview will appear here.</div>)}
