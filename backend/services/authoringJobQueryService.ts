@@ -220,16 +220,19 @@ export async function applyJobResult(id: string, input: unknown, database: JobDa
     }
     if (buildingPdf && status === 'succeeded') {
       const content = await readPdf!(result.pdf!);
+      // A sync on a published draft keeps it published — published_at is the
+      // durable fact; the status lifecycle must not demote it, and the republish
+      // decision keys off published_at, not the (mutable) status value.
+      const syncKeepsPublished = syncing && draft.published_at !== null;
       await client.query(`UPDATE problem_drafts SET latest_pdf=$1,latest_pdf_revision=$2,
-        status='generated',verified_revision=NULL,updated_at=NOW() WHERE id=$3`, [content, result.revision, job.draft_id]);
+        status=${syncKeepsPublished ? "'published'" : "'generated'"},verified_revision=NULL,updated_at=NOW() WHERE id=$3`, [content, result.revision, job.draft_id]);
       if (verifying) await client.query("UPDATE problem_drafts SET status='ready',verified_revision=$1 WHERE id=$2", [result.revision, job.draft_id]);
       if (syncing) {
-        // A published draft stays published: refresh the legacy problem's author
-        // metadata and PDF in the same transaction, guarded by provenance like
-        // the publish path so legacy edits made outside authoring are never
-        // silently overwritten. Testcases are untouched (statement unchanged).
-        if (draft.status === 'published') {
-          await client.query(`UPDATE problem_drafts SET status='published' WHERE id=$1`, [job.draft_id]);
+        // Refresh the legacy problem's author metadata and PDF in the same
+        // transaction, guarded by provenance like the publish path so legacy
+        // edits made outside authoring are never silently overwritten.
+        // Testcases are untouched (statement unchanged).
+        if (syncKeepsPublished) {
           const republished = await republishSyncedProblem(client, job.draft_id, draft, content);
           if (!republished) throw new TestcaseError('sync_republish_failed',
             'The published problem changed outside authoring; the PDF was not republished');

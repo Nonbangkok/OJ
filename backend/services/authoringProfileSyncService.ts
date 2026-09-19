@@ -138,12 +138,14 @@ export async function startProfileSyncItem(
     }
 
     const avatar = profile.profile_image_png ?? await createFallbackAuthorAvatar(profile.aka_name);
-    // Snapshot update keeps the draft's status and statement source untouched;
-    // the revision bump is the sync's own authority.
+    // Snapshot update keeps the draft's statement source untouched; the revision
+    // bump is the sync's own authority. A published draft stays 'published' so a
+    // later failed PDF rebuild cannot silently demote it and skip republish.
     const updated = (await client.query<ProblemDraftRow>(`
       UPDATE problem_drafts SET
         author_aka_name=$2, author_real_name=$3, language=$4, country_code=$5,
         author_profile_image_png=$6, revision=revision+1, verified_revision=NULL,
+        status=CASE WHEN published_at IS NOT NULL THEN 'published' ELSE status END,
         updated_at=NOW()
       WHERE id=$1
       RETURNING *

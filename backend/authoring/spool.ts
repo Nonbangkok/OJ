@@ -54,7 +54,7 @@ export class AuthoringSpool {
       || await this.exists(this.location('ready', job.jobId))) return;
     const stage = await mkdtemp(path.join(this.root, 'staging', `${job.jobId}-`));
     try {
-      if (job.kind === 'build_pdf' || job.kind === 'verify_all') {
+      if (job.kind === 'build_pdf' || job.kind === 'sync_pdf' || job.kind === 'verify_all') {
         if (!readFile) throw new TestcaseError('invalid_pdf_inputs', 'PDF snapshot reader is required');
         await mkdir(path.join(stage, 'pdf', 'assets'), { recursive: true, mode: 0o700 });
         for (const [name, file, artifact] of [
