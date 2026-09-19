@@ -30,6 +30,7 @@ import UserManagement from './features/admin/users/UserManagement';
 import ProblemManagement from './features/admin/problems/ProblemManagement';
 import ContestManagement from './features/admin/contests/ContestManagement';
 import Settings from './features/admin/settings/Settings';
+import AnalysisPage from './features/admin/analysis/AnalysisPage';
 import ProblemAuthoring from './features/admin/authoring/ProblemAuthoring';
 
 // New layout for standard pages
@@ -79,6 +80,7 @@ const Layout = () => {
           <Route path="authoring/:draftId/editor" element={<ProblemAuthoring editorMode />} />
           <Route path="contests" element={<ContestManagement />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="analysis" element={<AnalysisPage />} />
         </Route>
 
         {/* Contest routes with their own self-contained layout */}

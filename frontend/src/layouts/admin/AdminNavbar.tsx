@@ -81,6 +81,11 @@ const AdminNavbar = () => {
                   Contests
                 </NavLink>
               </li>
+              <li>
+                <NavLink to="/admin/analysis" onClick={closeMenu}>
+                  Analysis
+                </NavLink>
+              </li>
             </>
           )}
           {user?.role === USER_ROLES.ADMIN && (
