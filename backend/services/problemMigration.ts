@@ -1,6 +1,7 @@
 import * as db from '../db';
 import { PoolClient } from 'pg';
 import { CONTEST_STATUS } from '../constants';
+import { logger } from '../utils/logger';
 import { ContestRow } from '../types/models';
 import {
   AvailableContestProblemRow,
@@ -80,7 +81,7 @@ export const moveProblemsToContest = async (contestId: number, problemIds: strin
 
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error moving problems to contest:', error);
+    logger.error('failed to move problems to contest', { err: error });
     throw error;
   } finally {
     client.release();
@@ -132,7 +133,7 @@ export const moveProblemsBackToMain = async (contestId: number, problemIds: stri
 
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error moving problems back to main:', error);
+    logger.error('failed to move problems back to main', { err: error });
     throw error;
   } finally {
     client.release();
@@ -237,7 +238,7 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
 
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error migrating contest submissions:', error);
+    logger.error('failed to migrate contest submissions', { err: error });
     throw error;
   } finally {
     client.release();
@@ -258,7 +259,7 @@ export const getAvailableProblemsForContest = async (): Promise<AvailableContest
     `);
     return result.rows;
   } catch (error) {
-    console.error('Error fetching available problems:', error);
+    logger.error('failed to fetch available problems', { err: error });
     throw error;
   }
 };
@@ -302,7 +303,7 @@ export const getProblemsInContest = async (contestId: number): Promise<ContestPr
       return result.rows;
     }
   } catch (error) {
-    console.error('Error fetching contest problems:', error);
+    logger.error('failed to fetch contest problems', { err: error });
     throw error;
   }
 };

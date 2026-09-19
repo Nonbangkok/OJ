@@ -8,6 +8,7 @@ import { ContestSubmissionRow, SubmissionRow } from '../types/models';
 import { CompileCommandError } from '../types/service';
 import { JUDGE_CONFIG, SUBMISSION_STATUS } from '../constants';
 import { findForbiddenInclude } from '../utils/compileGuard';
+import { logger } from '../utils/logger';
 
 const execPromise = promisify(exec);
 
@@ -62,7 +63,7 @@ async function runSubmissionPipeline(
       [submissionId]
     );
     if (subRes.rows.length === 0) {
-      console.error(`Submission ${submissionId} not found for processing (${table}).`);
+      logger.warn('submission not found for processing', { submissionId, table });
       return;
     }
     const { problem_id, code } = subRes.rows[0];
@@ -102,7 +103,7 @@ async function runSubmissionPipeline(
       await execPromise(compileCommand, COMPILE_EXEC_OPTIONS);
     } catch (compileError: unknown) {
       const error = compileError as CompileCommandError;
-      console.error(`Compilation error for submission ${submissionId} (${table}):`, error.stderr);
+      logger.warn('submission compile failed', { submissionId, table, stderr: error.stderr });
       await db.query(
         `UPDATE ${table} SET overall_status = '${SUBMISSION_STATUS.COMPILATION_ERROR}', results = $1 WHERE id = $2`,
         [
@@ -112,7 +113,7 @@ async function runSubmissionPipeline(
       );
       return;
     } finally {
-      fs.unlink(filePath, (err) => { if (err) console.error(`Error deleting .cpp file for sub ${submissionId}:`, err); });
+      fs.unlink(filePath, (err) => { if (err) logger.warn('failed to delete submission source', { submissionId, err }); });
     }
 
     await db.query(
@@ -131,17 +132,17 @@ async function runSubmissionPipeline(
     );
 
   } catch (error) {
-    console.error(`Critical error processing submission ${submissionId} (${table}):`, error);
+    logger.error('submission pipeline failed', { submissionId, table, err: error });
     try {
       await db.query(
         `UPDATE ${table} SET overall_status = '${SUBMISSION_STATUS.SYSTEM_ERROR}' WHERE id = $1`,
         [submissionId]
       );
     } catch (dbError) {
-      console.error(`Failed to update submission ${submissionId} to System Error status:`, dbError);
+      logger.error('failed to record system-error status', { submissionId, table, err: dbError });
     }
   } finally {
-    fs.unlink(outputPath, (err) => { if (err) console.error(`Error deleting .out file for sub ${submissionId}:`, err); });
+    fs.unlink(outputPath, (err) => { if (err) logger.warn('failed to delete submission binary', { submissionId, err }); });
   }
 }
 

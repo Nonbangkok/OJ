@@ -3,6 +3,7 @@ import * as db from '../db';
 import { migrateSubmissionsAfterContest } from './problemMigration';
 import { CONTEST_STATUS } from '../constants';
 import { ContestSchedulerStatus, ContestTimingRow } from '../types/service';
+import { logger } from '../utils/logger';
 
 class ContestScheduler {
   private isRunning: boolean;
@@ -21,18 +22,18 @@ class ContestScheduler {
   // Start the scheduler
   start(): void {
     if (this.isRunning) {
-      console.log('Contest scheduler is already running');
+      logger.warn('contest scheduler is already running');
       return;
     }
 
-    console.log('Starting Contest Scheduler...');
+    logger.info('starting contest scheduler');
 
     // Check every minute for contests that need to start or end
     this.checkInterval = cron.schedule('* * * * *', async () => {
       try {
         await this.checkContestStatus();
       } catch (error) {
-        console.error('Error in contest scheduler:', error);
+        logger.error('contest scheduler start failed', { err: error });
       }
     }, {
       scheduled: true,
@@ -40,7 +41,7 @@ class ContestScheduler {
     });
 
     this.isRunning = true;
-    console.log('Contest Scheduler started - checking every minute');
+    logger.info('contest scheduler started - checking every minute');
   }
 
   // Stop the scheduler
@@ -50,13 +51,13 @@ class ContestScheduler {
       this.checkInterval = null;
     }
     this.isRunning = false;
-    console.log('Contest Scheduler stopped');
+    logger.info('contest scheduler stopped');
   }
 
   // Main function to check and update contest statuses
   async checkContestStatus(): Promise<void> {
     if (this.tickInProgress) {
-      console.log('Contest scheduler tick already in progress - skipping this tick');
+      logger.debug('contest scheduler tick already in progress - skipping');
       return;
     }
 
@@ -71,7 +72,7 @@ class ContestScheduler {
       await this.endRunningContests(now);
 
     } catch (error) {
-      console.error('Error checking contest status:', error);
+      logger.error('contest status check failed', { err: error });
       throw error;
     } finally {
       this.tickInProgress = false;
@@ -90,7 +91,7 @@ class ContestScheduler {
       `, [now]);
 
       for (const contest of result.rows) {
-        console.log(`🚀 Starting contest: ${contest.title} (ID: ${contest.id})`);
+        logger.info('starting contest', { contestId: contest.id, title: contest.title });
 
         await db.query(`
           UPDATE contests
@@ -98,14 +99,14 @@ class ContestScheduler {
           WHERE id = $1
         `, [contest.id]);
 
-        console.log(`✅ Contest ${contest.id} status updated to 'running'`);
+        logger.info('contest status updated', { contestId: contest.id, status: CONTEST_STATUS.RUNNING });
       }
 
       if (result.rows.length > 0) {
-        console.log(`Started ${result.rows.length} contest(s)`);
+        logger.info('started scheduled contests', { count: result.rows.length });
       }
     } catch (error) {
-      console.error('Error starting scheduled contests:', error);
+      logger.error('failed to start scheduled contests', { err: error });
       throw error;
     }
   }
@@ -122,7 +123,7 @@ class ContestScheduler {
       `, [now]);
 
       for (const contest of result.rows) {
-        console.log(`🏁 Ending contest: ${contest.title} (ID: ${contest.id})`);
+        logger.info('ending contest', { contestId: contest.id, title: contest.title });
 
         // Set status to 'finishing' to prevent new submissions
         await db.query(`
@@ -131,15 +132,15 @@ class ContestScheduler {
           WHERE id = $1
         `, [contest.id]);
 
-        console.log(`⏳ Contest ${contest.id} status updated to 'finishing'`);
+        logger.info('contest status updated', { contestId: contest.id, status: CONTEST_STATUS.FINISHING });
 
         // Migrate submissions and finalize contest (this may take time)
         try {
-          console.log(`📊 Migrating submissions for contest ${contest.id}...`);
+          logger.info('migrating submissions after contest', { contestId: contest.id });
           await migrateSubmissionsAfterContest(contest.id);
-          console.log(`✅ Contest ${contest.id} migration completed successfully`);
+          logger.info('contest migration completed', { contestId: contest.id });
         } catch (migrationError) {
-          console.error(`❌ Error migrating contest ${contest.id}:`, migrationError);
+          logger.error('contest migration failed', { contestId: contest.id, err: migrationError });
 
           // Even if migration fails, update status to prevent infinite loops
           await db.query(`
@@ -148,15 +149,15 @@ class ContestScheduler {
             WHERE id = $1
           `, [contest.id]);
 
-          console.log(`⚠️ Contest ${contest.id} marked as finished despite migration error`);
+          logger.warn('contest marked finished despite migration error', { contestId: contest.id });
         }
       }
 
       if (result.rows.length > 0) {
-        console.log(`Ended ${result.rows.length} contest(s)`);
+        logger.info('ended running contests', { count: result.rows.length });
       }
     } catch (error) {
-      console.error('Error ending running contests:', error);
+      logger.error('failed to end running contests', { err: error });
       throw error;
     }
   }
@@ -172,7 +173,7 @@ class ContestScheduler {
 
   // Manual trigger for testing
   async manualCheck(): Promise<void> {
-    console.log('Manual contest status check triggered');
+    logger.info('manual contest status check triggered');
     await this.checkContestStatus();
   }
 }

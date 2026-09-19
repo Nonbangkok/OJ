@@ -94,7 +94,7 @@ describe('Contest Scheduler Service', () => {
 
             await contestScheduler.checkContestStatus();
 
-            expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Error migrating'), error);
+            expect(console.error).toHaveBeenCalledWith(expect.stringContaining('contest migration failed'));
             expect(db.query).toHaveBeenNthCalledWith(4, expect.stringContaining('UPDATE contests\n            SET status = \'finished\''), [3]);
 
             jest.useRealTimers();
@@ -124,7 +124,7 @@ describe('Contest Scheduler Service', () => {
 
             // Overlapping tick while the first is still migrating: must be skipped.
             await contestScheduler.checkContestStatus();
-            expect(console.log).toHaveBeenCalledWith('Contest scheduler tick already in progress - skipping this tick');
+            expect(console.log).toHaveBeenCalledWith(expect.stringContaining('tick already in progress'));
             expect(migrateSubmissionsAfterContest).toHaveBeenCalledTimes(1);
 
             // Release the first tick; it completes its normal three queries

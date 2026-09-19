@@ -16,6 +16,7 @@ import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
 import { authLimiter } from '../middleware/rateLimit';
 import { loginSchema, registerSchema } from '../schemas/requestSchemas';
+import { logger } from '../utils/logger';
 
 const router: Router = express.Router();
 
@@ -123,6 +124,7 @@ router.post(
     if (result.rows.length === 0) {
       // Use a single neutral message for both unknown-username and wrong-password
       // failures so the endpoint does not leak which usernames exist.
+      logger.warn('login failed', { reason: 'unknown_username', username });
       res.status(401).json({ message: 'Invalid username or password' });
       return;
     }
@@ -130,6 +132,7 @@ router.post(
     const user = result.rows[0];
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
+      logger.warn('login failed', { reason: 'wrong_password', username });
       res.status(401).json({ message: 'Invalid username or password' });
       return;
     }

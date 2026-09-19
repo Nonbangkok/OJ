@@ -37,7 +37,7 @@ describe('Submission Service', () => {
             await processSubmission(1);
 
             expect(db.query).toHaveBeenCalledWith('SELECT * FROM submissions WHERE id = $1', [1]);
-            expect(console.error).toHaveBeenCalledWith(expect.stringContaining('not found'));
+            expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('not found'));
             expect(fs.promises.writeFile).not.toHaveBeenCalled();
         });
 

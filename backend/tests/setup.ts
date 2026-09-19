@@ -43,6 +43,14 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    (console.error as unknown as jest.SpyInstance).mockRestore();
-    (console.warn as unknown as jest.SpyInstance).mockRestore();
+    // A test file may have installed (and already restored) its own console
+    // spies in a later afterEach hook; only restore the ones still mocked.
+    const maybeRestore = (method: 'error' | 'warn'): void => {
+        const spy = console[method] as unknown as jest.SpyInstance | undefined;
+        if (typeof spy?.mockRestore === 'function') {
+            spy.mockRestore();
+        }
+    };
+    maybeRestore('error');
+    maybeRestore('warn');
 });

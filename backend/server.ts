@@ -2,6 +2,7 @@ import { createApp } from './app';
 import { env } from './config/env';
 import contestScheduler from './services/contestScheduler';
 import { startAuthoringCoordinator } from './services/authoringJobCoordinator';
+import { logger } from './utils/logger';
 
 const app = createApp();
 const port = Number(env.PORT) || 5000;
@@ -11,20 +12,20 @@ if (env.AUTHORING_JOBS_DIR) {
       process.once(signal, () => { stop(); process.exit(0); });
     }
   }).catch(() => {
-    console.error('Unable to initialize authoring transport');
+    logger.error('unable to initialize authoring transport');
     process.exit(1);
   });
 }
 app.listen(port, () => {
-  console.log(`Server listening at http://localhost:${port}`);
+  logger.info('server listening', { port });
 
   // Start Contest Scheduler
   try {
     if (contestScheduler && typeof contestScheduler.start === 'function') {
       contestScheduler.start();
-      console.log('✅ Contest Scheduler initialized successfully');
+      logger.info('contest scheduler initialized');
     }
   } catch (error) {
-    console.error('❌ Failed to start Contest Scheduler:', error);
+    logger.error('failed to start contest scheduler', { err: error });
   }
 });

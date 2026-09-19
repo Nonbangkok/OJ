@@ -1,6 +1,7 @@
 import * as db from '../db';
 import { exec } from 'child_process';
 import { SUBMISSION_STATUS, JUDGE_CONFIG } from '../constants';
+import { logger } from '../utils/logger';
 import {
   ExecutionError,
   JudgeProblemLimitsRow,
@@ -62,7 +63,7 @@ async function runSingleCase(
             const sumSeconds = timeExpression.split('+').reduce((acc, val) => acc + parseFloat(val || '0'), 0);
             timeMs = Number((sumSeconds * 1000).toFixed(3));
           } catch (e) {
-            console.error("Error parsing CPU time:", e);
+            logger.warn('failed to parse CPU time from wrapper output', { err: e });
           }
         }
         if (memMatch) memoryKb = parseInt(memMatch[1], 10);
@@ -111,13 +112,13 @@ async function runSingleCase(
       if (err.code === 'EPIPE') {
         hasEpipError = true;
         epipErrorMessage = `Program crashed while receiving input: ${err.message}`;
-        console.warn(`Caught EPIPE on stdin for executable ${executablePath}. Error: ${err.message}`);
+        logger.warn('EPIPE on stdin while feeding testcase input', { executablePath, err: err.message });
       }
     });
 
     // Also catch errors on the child process itself
     child.on('error', (err) => {
-      console.warn(`Child process error for ${executablePath}:`, err);
+      logger.warn('judge child process error', { executablePath, err });
       if (!hasEpipError) {
         hasEpipError = true;
         epipErrorMessage = `Process error: ${err.message}`;
@@ -197,7 +198,7 @@ export async function judge(problemId: string, executablePath: string): Promise<
     return { results, score, overallStatus, maxTimeMs: maxTime, maxMemoryKb: maxMemory };
 
   } catch (error) {
-    console.error("Error during judging:", error);
+    logger.error('judge failed', { problemId, err: error });
     return { overallStatus: SUBMISSION_STATUS.SYSTEM_ERROR, score: 0, results: [{ testCase: 1, status: 'Could not read test cases' }], maxTimeMs: 0, maxMemoryKb: 0 };
   }
 }
