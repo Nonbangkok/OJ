@@ -48,6 +48,14 @@ export interface UserAnalytics {
   solvedByCategory: Array<{ category: string; solved: number; attempted: number }>;
 }
 
+export interface ContestAnalytics {
+  contest: { contestId: number; title: string; status: string; startTime: string; endTime: string };
+  kpis: { participants: number; submitters: number; submissions: number; accepted: number; avgScore: number; maxScore: number };
+  submissionTimeline: Array<{ bucket: string; count: number }>;
+  problemStats: Array<{ problemId: string; title: string; submissions: number; accepted: number; acRate: number; solvers: number }>;
+  scoreboard: Array<{ username: string; totalScore: number; solved: number }>;
+}
+
 export interface ProblemAnalytics {
   problem: { id: string; title: string };
   kpis: { submissions: number; accepted: number; acRate: number; uniqueSubmitters: number };
@@ -80,5 +88,10 @@ export const fetchUserAnalytics = async (userId: number): Promise<UserAnalytics>
 
 export const fetchProblemAnalytics = async (problemId: string): Promise<ProblemAnalytics> => {
   const response = await api.get<ProblemAnalytics>(`/analytics/problems/${problemId}`);
+  return response.data;
+};
+
+export const fetchContestAnalytics = async (contestId: number): Promise<ContestAnalytics> => {
+  const response = await api.get<ContestAnalytics>(`/analytics/contests/${contestId}`);
   return response.data;
 };

@@ -1,0 +1,53 @@
+.table-card {
+  background-color: var(--background-darker);
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  overflow-x: auto;
+}
+
+.table-card table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-card th,
+.table-card td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-color-light, var(--border-color));
+}
+
+.table-card th {
+  color: var(--text-color-secondary);
+  font-weight: 600;
+}
+
+.empty {
+  text-align: center;
+  color: var(--text-color-secondary);
+}
+
+.analyze-button {
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: var(--background-secondary);
+  color: var(--text-color-primary);
+  cursor: pointer;
+}
+
+.analyze-button:hover {
+  border-color: var(--accent-color, #0d6efd);
+}
+
+.loading,
+.error {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-color-secondary);
+}
+
+.error {
+  color: #dc3545;
+}

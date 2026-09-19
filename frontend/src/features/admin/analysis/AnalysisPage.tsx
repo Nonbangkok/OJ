@@ -4,20 +4,24 @@ import UsersTab from './UsersTab';
 import UserDetail from './UserDetail';
 import ProblemsTab from './ProblemsTab';
 import ProblemDetail from './ProblemDetail';
+import ContestsTab from './ContestsTab';
+import ContestDetail from './ContestDetail';
 import styles from './AnalysisPage.module.css';
 
-type AnalysisTab = 'overview' | 'users' | 'problems';
+type AnalysisTab = 'overview' | 'users' | 'problems' | 'contests';
 
 const TABS: Array<{ key: AnalysisTab; label: string }> = [
   { key: 'overview', label: 'Overview' },
   { key: 'users', label: 'Users' },
   { key: 'problems', label: 'Problems' },
+  { key: 'contests', label: 'Contests' },
 ];
 
 const AnalysisPage = () => {
   const [tab, setTab] = useState<AnalysisTab>('overview');
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
+  const [selectedContestId, setSelectedContestId] = useState<number | null>(null);
 
   const handleSelectUser = (userId: number) => {
     setSelectedUserId(userId);
@@ -35,10 +39,19 @@ const AnalysisPage = () => {
     setSelectedProblemId(null);
   };
 
+  const handleSelectContest = (contestId: number) => {
+    setSelectedContestId(contestId);
+  };
+
+  const handleBackToContests = () => {
+    setSelectedContestId(null);
+  };
+
   const switchTab = (key: AnalysisTab) => {
     setTab(key);
     setSelectedUserId(null);
     setSelectedProblemId(null);
+    setSelectedContestId(null);
   };
 
   return (
@@ -68,6 +81,11 @@ const AnalysisPage = () => {
         selectedProblemId === null
           ? <ProblemsTab onSelectProblem={handleSelectProblem} />
           : <ProblemDetail problemId={selectedProblemId} onBack={handleBackToProblems} />
+      )}
+      {tab === 'contests' && (
+        selectedContestId === null
+          ? <ContestsTab onSelectContest={handleSelectContest} />
+          : <ContestDetail contestId={selectedContestId} onBack={handleBackToContests} />
       )}
     </div>
   );

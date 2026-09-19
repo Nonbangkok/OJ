@@ -4,6 +4,7 @@ import {
     fetchAnalyticsUsers,
     fetchUserAnalytics,
     fetchProblemAnalytics,
+    fetchContestAnalytics,
 } from '../../services/analyticsService';
 
 jest.mock('../../services/api');
@@ -66,6 +67,16 @@ describe('Analytics Service', () => {
         const result = await fetchProblemAnalytics('aplusb');
 
         expect(api.get).toHaveBeenCalledWith('/analytics/problems/aplusb');
+        expect(result).toEqual(mockData);
+    });
+
+    it('fetchContestAnalytics requests by contestId', async () => {
+        const mockData = { contest: { contestId: 1 } };
+        jest.mocked(api.get).mockResolvedValueOnce({ data: mockData });
+
+        const result = await fetchContestAnalytics(1);
+
+        expect(api.get).toHaveBeenCalledWith('/analytics/contests/1');
         expect(result).toEqual(mockData);
     });
 });
