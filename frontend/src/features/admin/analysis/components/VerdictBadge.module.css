@@ -49,5 +49,5 @@
 
 .default {
   background-color: rgba(108, 117, 125, 0.15);
-  color: var(--text-color-secondary);
+  color: var(--text-secondary);
 }

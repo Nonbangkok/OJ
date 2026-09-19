@@ -21,7 +21,7 @@
 
 .subtitle {
   margin: 0;
-  color: var(--text-color-secondary);
+  color: var(--text-secondary);
 }
 
 .kpi-row {
@@ -46,14 +46,14 @@
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  color: var(--text-color-secondary);
+  color: var(--text-secondary);
 }
 
 .loading,
 .error {
   padding: 2rem;
   text-align: center;
-  color: var(--text-color-secondary);
+  color: var(--text-secondary);
 }
 
 .error {

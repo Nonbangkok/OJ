@@ -21,7 +21,7 @@
 
 .subtitle {
   margin: 0;
-  color: var(--text-color-secondary);
+  color: var(--text-secondary);
 }
 
 .kpi-row {
@@ -60,7 +60,7 @@
 }
 
 .table-card th {
-  color: var(--text-color-secondary);
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
@@ -70,14 +70,14 @@
 
 .empty {
   text-align: center;
-  color: var(--text-color-secondary);
+  color: var(--text-secondary);
 }
 
 .loading,
 .error {
   padding: 2rem;
   text-align: center;
-  color: var(--text-color-secondary);
+  color: var(--text-secondary);
 }
 
 .error {

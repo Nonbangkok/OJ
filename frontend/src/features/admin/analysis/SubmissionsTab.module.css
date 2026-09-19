@@ -43,7 +43,7 @@
   background: none;
   border: none;
   padding: 0 0.25rem;
-  color: var(--text-color-secondary);
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 1rem;
   line-height: 1;
@@ -109,7 +109,7 @@
 
 /* Sticky header must be fully opaque so scrolling rows never show through. */
 .table-card th {
-  color: var(--text-color-secondary);
+  color: var(--text-secondary);
   font-weight: 600;
   position: sticky;
   top: 0;
@@ -149,7 +149,7 @@
 
 .empty {
   text-align: center;
-  color: var(--text-color-secondary);
+  color: var(--text-secondary);
 }
 
 .pagination {
@@ -176,7 +176,7 @@
 .error {
   padding: 2rem;
   text-align: center;
-  color: var(--text-color-secondary);
+  color: var(--text-secondary);
 }
 
 .error {

@@ -10,7 +10,7 @@
 
 .label {
   font-size: 0.85rem;
-  color: var(--text-color-secondary);
+  color: var(--text-secondary);
 }
 
 .value {

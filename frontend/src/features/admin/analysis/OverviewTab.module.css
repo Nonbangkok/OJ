@@ -68,7 +68,7 @@
 }
 
 .table-card th {
-  color: var(--text-color-secondary);
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
@@ -80,7 +80,7 @@
 .error {
   padding: 2rem;
   text-align: center;
-  color: var(--text-color-secondary);
+  color: var(--text-secondary);
 }
 
 .error {
