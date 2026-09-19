@@ -10,6 +10,7 @@ import MetadataFields from './MetadataFields';
 import StatementTab, { PdfPreview } from './StatementTab';
 import TestcaseFiles from './TestcaseFiles';
 import CodeEditor from './CodeEditor';
+import { GENERATOR_TEMPLATE } from './generatorTemplate';
 import styles from './Authoring.module.css';
 
 const saveStateText: Record<string, string> = {
@@ -257,6 +258,20 @@ function GeneratorSection() {
     <h2>Generator <span className={styles.optionalTag}>optional</span></h2>
     <CodeEditor label="generator.cpp" value={form.generatorCpp || ''} disabled={editorDisabled}
       onChange={value => model.edit('generatorCpp', value || null)} minLines={18} />
+    <details className={styles.generatorTemplate}>
+      <summary>Reference template — the runner contract</summary>
+      <ul>
+        <li>Write 1–1000 <code>.txt</code> files into <code>input/</code> — the runner collects them as the draft's testcases.</li>
+        <li>The seed arrives as <code>argv[1]</code>; using it makes generation reproducible.</li>
+        <li>Opening a file whose folder doesn't exist fails <em>silently</em> — check the stream before writing.</li>
+        <li>Exit 0; keep total runtime within the generator timeout.</li>
+      </ul>
+      <pre>{GENERATOR_TEMPLATE}</pre>
+      <Button variant="secondary" size="compact" disabled={editorDisabled || !!form.generatorCpp?.trim()}
+        onClick={() => model.edit('generatorCpp', GENERATOR_TEMPLATE)}>
+        {form.generatorCpp?.trim() ? 'Editor already has code' : 'Use this template'}
+      </Button>
+    </details>
     <div className={styles.sectionActions}>
       <Button disabled={model.actionsDisabled || !form.generatorCpp?.trim()} onClick={() => void model.runJob('compile', { target: 'generator' })}>Compile generator</Button>
     </div>

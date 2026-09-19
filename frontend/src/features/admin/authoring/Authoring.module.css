@@ -160,6 +160,41 @@
   justify-content: space-between;
   gap: 0.75rem 1rem;
 }
+/* Collapsible generator reference under the code editor. */
+.generatorTemplate {
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--background-secondary);
+}
+.generatorTemplate summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.generatorTemplate ul {
+  margin: 0.6rem 0;
+  padding-left: 1.2rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+.generatorTemplate pre {
+  margin: 0.6rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--editor-bg);
+  color: var(--editor-text);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+.generatorTemplate button {
+  margin-top: 0.25rem;
+}
 /* Draft list page: title row and the problem-cell link stack (ID over title). */
 .listHead {
   display: flex;
