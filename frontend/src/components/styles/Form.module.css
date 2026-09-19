@@ -105,3 +105,15 @@
   color: var(--text-muted);
   cursor: not-allowed;
 }
+
+/* Session-expiry notice shown above the login form (LoginForm.tsx) */
+.expired-notice {
+  color: var(--text-secondary);
+  background-color: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  text-align: center;
+}

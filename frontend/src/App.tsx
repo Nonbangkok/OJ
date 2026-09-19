@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, useLocation, Outlet } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Components
 import Navbar from './components/navbar/Navbar';
@@ -116,15 +117,17 @@ const Layout = () => {
 
 const App = () => {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <SettingsProvider>
-          <Router>
-            <Layout />
-          </Router>
-        </SettingsProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <SettingsProvider>
+            <Router>
+              <Layout />
+            </Router>
+          </SettingsProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

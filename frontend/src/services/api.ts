@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { type AxiosError, type AxiosInstance } from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL;
 const LARGE_UPLOAD_API_URL = process.env.REACT_APP_LARGE_UPLOAD_API_URL || API_URL;
@@ -18,5 +18,47 @@ export const largeUploadApi = axios.create({
 });
 
 export const getLargeUploadBaseUrl = (): string => largeUploadApi.defaults.baseURL ?? '';
+
+const SESSION_EXPIRY_KEY = 'oj:session-expiry-redirect';
+
+/**
+ * Send the user to the login page (with a way back) when any API call
+ * returns a bare 401 — i.e. the session cookie expired mid-session.
+ * A 401 from /login itself (wrong credentials) is not an expiry.
+ *
+ * Redirecting via history.replaceState + reload instead of react-router
+ * navigation keeps this module free of React/context imports (avoiding a
+ * circular dependency with AuthContext).
+ */
+export const installSessionExpiryInterceptor = (instance: AxiosInstance): void => {
+  instance.interceptors.response.use(undefined, (error: AxiosError) => {
+    const status = error.response?.status;
+    const requestUrl = error.config?.url ?? '';
+
+    if (status !== 401 || requestUrl.includes('/login')) {
+      throw error;
+    }
+
+    // Guard against a redirect loop when several in-flight requests all
+    // fail at once after the session died: only the first one navigates.
+    if (window.sessionStorage.getItem(SESSION_EXPIRY_KEY) === '1') {
+      throw error;
+    }
+    window.sessionStorage.setItem(SESSION_EXPIRY_KEY, '1');
+
+    const returnTo = window.location.pathname + window.location.search;
+    window.history.replaceState({}, '', `/login?expired=1&returnTo=${encodeURIComponent(returnTo)}`);
+    window.location.reload();
+    throw error;
+  });
+};
+
+installSessionExpiryInterceptor(api);
+installSessionExpiryInterceptor(largeUploadApi);
+
+// Clear the loop-guard flag once the user has landed somewhere after login.
+if (window.location.pathname !== '/login') {
+  window.sessionStorage.removeItem(SESSION_EXPIRY_KEY);
+}
 
 export default api;
