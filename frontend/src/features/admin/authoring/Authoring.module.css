@@ -706,38 +706,8 @@
   padding: 0.35rem 0.5rem 0;
   background: var(--statement-desk);
 }
-.previewModeBar button {
-  padding: 0.3rem 0.9rem;
-  border: 1px solid var(--statement-separator);
-  border-bottom: 0;
-  border-radius: 6px 6px 0 0;
-  background: var(--background-secondary);
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-/* Hover must stay readable in every browser and theme. Plain token values
-   only — no color-mix() (unsupported on older Safari, which silently drops
-   the whole rule and falls back to the browser's default gray-on-gray). */
-.previewModeBar button:hover {
-  background: var(--accent-primary);
-  color: var(--action-primary-foreground);
-  border-color: var(--accent-primary);
-}
-/* The selected tab pins its colors with !important: the header's global
-   button rule (.editorHeader button) targets the same elements, and any
-   engine-specific cascade quirk must not be able to blend the text away. */
-.previewModeBar .previewModeActive,
-.previewModeBar .previewModeActive:hover,
-.previewModeBar .previewModeActive:active,
-.previewModeBar .previewModeActive:focus-visible {
-  background: var(--statement-paper) !important;
-  color: var(--text-primary) !important;
-  font-weight: 600;
-}
-.previewModeBar .previewModeActive:hover {
-  border-color: var(--accent-primary);
-}
+/* Tab buttons are styled inline by PreviewModeTab — no class rules here,
+   so no engine's cascade can intervene. */
 .previewPdfEmbed {
   flex: 1;
   width: 100%;

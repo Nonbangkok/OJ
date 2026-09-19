@@ -1,3 +1,4 @@
+import type { CSSProperties, ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ImperativePanelGroupHandle, Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
@@ -50,6 +51,37 @@ function useCompactEditorLayout() {
     return () => media.removeEventListener('change', sync);
   }, []);
   return compact;
+}
+
+/** Preview-mode tab styled entirely through inline styles: some Safari
+ *  builds resolved the class/pseudo-class cascade differently and rendered
+ *  the selected tab's text invisible. Inline styles outrank every CSS rule
+ *  and browser default, and hover is tracked in React state, so the colors
+ *  are engine-proof by construction. */
+function PreviewModeTab({ selected, onSelect, children }: {
+  selected: boolean; onSelect: () => void; children: ReactNode;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const base: CSSProperties = {
+    padding: '0.3rem 0.9rem',
+    fontSize: '0.8rem',
+    cursor: 'pointer',
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    border: '1px solid #8a949e',
+    borderBottom: 0,
+  };
+  const style: CSSProperties = selected
+    ? { ...base, background: '#ffffff', color: '#212529', fontWeight: 600 }
+    : hovered
+      ? { ...base, background: '#0d6efd', color: '#ffffff' }
+      : { ...base, background: '#f8f9fa', color: '#495057' };
+  return <button type="button" role="tab" aria-selected={selected}
+    style={style} onClick={onSelect}
+    onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+    onFocus={() => setHovered(true)} onBlur={() => setHovered(false)}>
+    {children}
+  </button>;
 }
 
 /** Live HTML preview: the sanitized statement rendered in a sandboxed frame
@@ -268,15 +300,11 @@ export default function StatementEditor({ id }: { id: string }) {
         onDoubleClick={() => panels.current?.setLayout([50, 50])} />
       <Panel defaultSize={50} minSize={25} className={styles.previewPane}>
         <div className={styles.previewModeBar} role="tablist" aria-label="Preview mode">
-          <button type="button" role="tab" aria-selected={pdfMode === false}
-            className={pdfMode ? '' : styles.previewModeActive}
-            onClick={() => setPdfMode(false)}>Live HTML</button>
-          <button type="button" role="tab" aria-selected={pdfMode === true}
-            className={pdfMode ? styles.previewModeActive : ''}
-            onClick={() => setPdfMode(true)}>
+          <PreviewModeTab selected={pdfMode === false} onSelect={() => setPdfMode(false)}>Live HTML</PreviewModeTab>
+          <PreviewModeTab selected={pdfMode === true} onSelect={() => setPdfMode(true)}>
             Actual PDF
             {pdfStale && <span className={styles.previewStaleDot} aria-label="PDF is outdated" title="Statement changed since the last build" />}
-          </button>
+          </PreviewModeTab>
         </div>
         <div className={styles.previewViewport}>
           {pdfMode
