@@ -19,9 +19,12 @@ const tooManyRequests = (message: string) => ({ message });
 const GENERAL_LIMIT_SKIP_PATHS = [
   '/admin/authoring/drafts/', // GET polling + PATCH saves + preview renders
   '/admin/authoring/jobs/', // job status polls
+  '/admin/authoring/profile-syncs', // sync run cascade view (list + detail polls)
+  '/admin/author-profiles', // profile list/images — loaded alongside the workspace
 ] as const;
 
-const skipGeneralLimit = (req: Request): boolean => {
+/** Exported for tests: pins the workspace routes excluded from the general limiter. */
+export const skipGeneralLimit = (req: Request): boolean => {
   if (isTestEnv(req)) return true;
   return GENERAL_LIMIT_SKIP_PATHS.some((prefix) => req.path.startsWith(prefix));
 };
