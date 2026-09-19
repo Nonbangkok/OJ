@@ -145,7 +145,7 @@ describe('Admin Controller', () => {
 
         it('should return 404 for an unknown import job regardless of token', async () => {
             const res = await request(app)
-                .get('/admin/database/import-progress/does-not-exist?token=whatever');
+                .get('/admin/database/import-progress/does-not-exist').set('x-import-token', 'whatever');
 
             expect(res.status).toBe(404);
             expect(res.body.message).toBe('Import job not found.');
@@ -165,7 +165,7 @@ describe('Admin Controller', () => {
             const start = await startImport();
 
             const res = await request(app)
-                .get(`/admin/database/import-progress/${start.body.jobId}?token=wrong-token`);
+                .get(`/admin/database/import-progress/${start.body.jobId}`).set('x-import-token', 'wrong-token');
 
             expect(res.status).toBe(401);
         });
@@ -174,7 +174,7 @@ describe('Admin Controller', () => {
             const start = await startImport();
 
             const res = await request(app)
-                .get(`/admin/database/import-progress/${start.body.jobId}?token=${start.body.token}`);
+                .get(`/admin/database/import-progress/${start.body.jobId}`).set('x-import-token', start.body.token);
 
             expect(res.status).toBe(200);
             expect(res.body.status).toBeDefined();
@@ -182,7 +182,7 @@ describe('Admin Controller', () => {
             expect(res.body.token).toBeUndefined();
         });
 
-        it('should also accept the token via the x-import-token header', async () => {
+        it('should accept the token via the x-import-token header', async () => {
             const start = await startImport();
 
             const res = await request(app)

@@ -138,9 +138,13 @@ router.post('/admin/database/import', requireAuth, requireAdmin, diskUpload.sing
 
 // No session middleware runs for this path (server.ts skips it because the import
 // drops the session table). Authenticate with the per-job token returned by the
-// import start endpoint instead of being fully open.
+// import start endpoint instead of being fully open. Header-only: a query-string
+// token would land in nginx/proxy access logs.
 router.get('/admin/database/import-progress/:jobId', (req: Request, res: Response) => {
-  const progress = getDatabaseImportProgress(String(req.params.jobId), req.query.token ?? req.headers['x-import-token']);
+  const token = Array.isArray(req.headers['x-import-token'])
+    ? req.headers['x-import-token'][0]
+    : req.headers['x-import-token'];
+  const progress = getDatabaseImportProgress(String(req.params.jobId), token);
 
   if (progress === null) {
     return res.status(404).json({ message: 'Import job not found.' });
