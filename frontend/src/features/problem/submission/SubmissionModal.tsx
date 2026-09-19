@@ -1,5 +1,6 @@
 import Editor from 'react-simple-code-editor';
 import useSubmissionModal from '../../../hooks/useSubmissionModal';
+import { Dialog } from '../../../components/ui/Dialog';
 import 'highlight.js/styles/atom-one-dark.css';
 
 import styles from './SubmissionModal.module.css';
@@ -65,12 +66,13 @@ const SubmissionModal = ({ submission, onClose }) => {
   };
 
   return (
-    <div className={styles['modal-overlay']} onClick={onClose}>
-      <div className={styles['modal-content']} onClick={(e) => e.stopPropagation()}>
-        {/* Top Bar */}
-        <div className={styles['top-bar']}>
-          {/* Submission Detail */}
-          <div className={styles['submission-detail']}>
+    <Dialog
+      open={Boolean(submission)}
+      onClose={onClose}
+      title="Submission Detail"
+      wide
+    >
+      <div className={styles['submission-detail']}>
             <div className={styles['detail-row']}>
               <span className={styles['detail-label']}>When:</span>
               <span className={styles['detail-value']}>{formatDate(submission.submitted_at)}</span>
@@ -97,15 +99,9 @@ const SubmissionModal = ({ submission, onClose }) => {
               <span className={styles['detail-label']}>Language:</span>
               <span className={styles['detail-value']}>{submission.language}</span>
             </div>
-          </div>
+      </div>
 
-          {/* Close Button */}
-          <button className={styles['close-button']} onClick={onClose}>
-            ✕
-          </button>
-        </div>
-
-        {/* Main Content */}
+      {/* Main Content */}
         <div className={styles['main-content']}>
           {/* Left Side - Code Editor */}
           <div className={styles['left-panel']}>
@@ -143,15 +139,14 @@ const SubmissionModal = ({ submission, onClose }) => {
             </div>
           </div>
 
-          {/* Right Side - Testcase Results */}
-          <div className={styles['right-panel']}>
-            <div className={styles['testcase-container']}>
-              {renderTestcaseResults()}
-            </div>
+        {/* Right Side - Testcase Results */}
+        <div className={styles['right-panel']}>
+          <div className={styles['testcase-container']}>
+            {renderTestcaseResults()}
           </div>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 };
 

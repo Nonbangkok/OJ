@@ -13,7 +13,19 @@ const Home = () => {
 
   return (
     <div className={styles['home-container']}>
-      <div className={styles['quote-box']} onClick={handleClick}>
+      <div
+        className={styles['quote-box']}
+        role="button"
+        tabIndex={0}
+        aria-label="Show another quote"
+        onClick={handleClick}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleClick();
+          }
+        }}
+      >
         <p className={textClassName}>
           {currentQuote}
         </p>

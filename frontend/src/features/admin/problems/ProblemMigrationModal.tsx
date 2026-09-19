@@ -2,6 +2,7 @@ import useProblemMigrationModal from '../../../hooks/admin/useProblemMigrationMo
 import formStyles from '../../../components/styles/Form.module.css';
 import modalStyles from '../shared/ModalLayout.module.css';
 import LoadingPage from '../../../components/shared/LoadingPage';
+import { Dialog } from '../../../components/ui/Dialog';
 
 const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
   const {
@@ -25,16 +26,12 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
   if (loading) return <LoadingPage />;
 
   return (
-    <div className={modalStyles['modal-overlay']} onClick={onClose}>
-      <div
-        className={`${formStyles['form-container']} ${modalStyles.migrationModalContainer}`}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className={modalStyles.migrationModalHeader}>
-          <h2>Manage Contest Problems</h2>
-          <p>Contest: <strong>{contest.title}</strong></p>
-        </div>
-
+    <Dialog
+      open
+      onClose={onClose}
+      title={`Manage Contest Problems — ${contest.title}`}
+      wide
+    >
         {error && (
           <div className={formStyles['error-message']}>
             <h3>Error: {error}</h3>
@@ -207,8 +204,7 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
             Close
           </button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 
