@@ -1,0 +1,33 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background-color: var(--background-darker);
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.label {
+  font-size: 0.85rem;
+  color: var(--text-color-secondary);
+}
+
+.value {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--text-color-primary);
+}
+
+.delta {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.delta-up {
+  color: #198754;
+}
+
+.delta-down {
+  color: #dc3545;
+}
