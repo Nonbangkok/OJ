@@ -4,6 +4,22 @@
   gap: 0.5rem;
 }
 
+.medal {
+  flex-shrink: 0;
+}
+
+.medal-gold {
+  color: #d4a017;
+}
+
+.medal-silver {
+  color: #9aa5b1;
+}
+
+.medal-bronze {
+  color: #b0703c;
+}
+
 :global([data-theme='dark']) .rank-1,
 .rank-1 {
   background-color: rgba(255, 215, 0, 0.1); /* Gold/Yellow tint */

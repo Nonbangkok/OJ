@@ -10,7 +10,12 @@ jest.mock('../../components/styles/Table.module.css', () => ({
 jest.mock('../../features/scoreboard/ScoreboardTable.module.css', () => ({
     'rank-1': 'rank-1',
     'rank-2': 'rank-2',
-    'rank-3': 'rank-3'
+    'rank-3': 'rank-3',
+    'user-cell': 'user-cell',
+    medal: 'medal',
+    'medal-gold': 'medal-gold',
+    'medal-silver': 'medal-silver',
+    'medal-bronze': 'medal-bronze'
 }));
 
 const mockScoreboard = [
@@ -39,12 +44,16 @@ describe('ScoreboardTable', () => {
         expect(screen.getByText(/dave/)).toBeInTheDocument();
     });
 
-    it('renders medal emojis for top 3', () => {
+    it('renders Phosphor medal icons for top 3 with rank colors', () => {
         render(<MemoryRouter><ScoreboardTable scoreboard={mockScoreboard} /></MemoryRouter>);
 
-        expect(screen.getByText(/🥇/)).toBeInTheDocument();
-        expect(screen.getByText(/🥈/)).toBeInTheDocument();
-        expect(screen.getByText(/🥉/)).toBeInTheDocument();
+        const medals = document.querySelectorAll('svg[class*="medal"]');
+        expect(medals.length).toBe(3);
+
+        const classes = [...medals].map((el) => el.getAttribute('class') ?? '');
+        expect(classes.some((cls) => cls.includes('medal-gold'))).toBe(true);
+        expect(classes.some((cls) => cls.includes('medal-silver'))).toBe(true);
+        expect(classes.some((cls) => cls.includes('medal-bronze'))).toBe(true);
     });
 
     it('renders scores correctly', () => {

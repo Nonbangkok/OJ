@@ -1,8 +1,11 @@
 import { Link } from 'react-router-dom';
+import { Medal } from '@phosphor-icons/react';
 
 import UserAvatar from '../../components/user/UserAvatar';
 import tableStyles from '../../components/styles/Table.module.css';
 import styles from './ScoreboardTable.module.css';
+
+const MEDAL_WEIGHTS = ['gold', 'silver', 'bronze'] as const;
 
 const ScoreboardTable = ({ scoreboard }) => {
     return (
@@ -23,9 +26,14 @@ const ScoreboardTable = ({ scoreboard }) => {
                             <td>
                                 <span className={styles['user-cell']}>
                                     <UserAvatar username={user.username} hasAvatar={user.has_avatar} size={28} />
-                                    {index === 0 && '🥇'}
-                                    {index === 1 && '🥈'}
-                                    {index === 2 && '🥉'}
+                                    {index < 3 && (
+                                        <Medal
+                                            size={18}
+                                            weight="fill"
+                                            aria-label={`Rank ${index + 1} medal`}
+                                            className={`${styles.medal} ${styles[`medal-${MEDAL_WEIGHTS[index]}`]}`}
+                                        />
+                                    )}
                                     <Link to={`/profile/${user.username}`}>{user.username}</Link>
                                 </span>
                             </td>

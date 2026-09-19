@@ -41,10 +41,9 @@ describe('Scoreboard Page', () => {
             expect(screen.getByText(/seconduser/)).toBeInTheDocument();
             expect(screen.getByText(/thirduser/)).toBeInTheDocument();
 
-            // Check for emojis (🥇, 🥈, 🥉)
-            expect(screen.getByText(/🥇/)).toBeInTheDocument();
-            expect(screen.getByText(/🥈/)).toBeInTheDocument();
-            expect(screen.getByText(/🥉/)).toBeInTheDocument();
+            // Check for medal icons on the top 3 (gold, silver, bronze)
+            const medals = document.querySelectorAll('svg[class*="medal"]');
+            expect(medals.length).toBe(3);
         });
     });
 
