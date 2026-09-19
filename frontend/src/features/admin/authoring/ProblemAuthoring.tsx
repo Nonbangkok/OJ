@@ -59,21 +59,16 @@ function DraftList() {
   }, []);
   return (
     <section className={styles.authoring}>
-      <h1>Problem Authoring</h1>
-      <p>
-        Write, build and verify a new problem. Published problems remain hidden until enabled in
-        Problem Management.
-      </p>
-      {error && <p role="alert">{error}</p>}
-      <div className={`${styles.actions} ${styles.topActions}`}>
-        <Button onClick={() => { setCreateError(''); setCreating(true); }}>New draft</Button>
-        <Link className={styles.actionLink} to="/admin/authoring/profiles">
-          Author profiles
-        </Link>
-        <Link className={styles.actionLink} to="/admin/problems">
-          Problem Management
-        </Link>
+      <div className={styles.listHead}>
+        <h1>Problem Authoring</h1>
+        <div className={styles.actions}>
+          <Link className={styles.actionLink} to="/admin/authoring/profiles">
+            Author profiles
+          </Link>
+          <Button onClick={() => { setCreateError(''); setCreating(true); }}>New draft</Button>
+        </div>
       </div>
+      {error && <p role="alert">{error}</p>}
       {creating && (
         <form
           id="new-draft-form"
@@ -110,65 +105,69 @@ function DraftList() {
       {loading ? (
         <p role="status">Loading drafts…</p>
       ) : (
-        <OverflowTable label="Saved drafts">
-          <table>
-            <caption>Saved drafts</caption>
-            <thead>
-              <tr>
-                <th>Problem</th>
-                <th>Author</th>
-                <th>Status</th>
-                <th>Revision</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {drafts.map((d) => {
-                const status = draftStatus(d.status);
-                return (
-                  <tr key={d.id}>
-                    <td>
-                      <Link to={`/admin/authoring/${d.id}`}>
-                        {d.problemId} — {d.title}
-                      </Link>
-                    </td>
-                    <td>{d.authorAkaName}</td>
-                    <td>
-                      <StatusBadge tone={status.tone} title={status.hint}>
-                        {status.label}
-                      </StatusBadge>
-                    </td>
-                    <td>{d.revision}</td>
-                    <td>
-                      {d.status === 'published' && (
-                        <Button
-                          size="compact"
-                          variant="secondary"
-                          disabled={busy}
-                          onClick={async () => {
-                            setBusy(true);
-                            setError('');
-                            try {
-                              await authoringService.startNewRevision(d.id);
-                              navigate(`/admin/authoring/${d.id}`);
-                            } catch (err) {
-                              setError(getErrorMessage(err, 'Could not start a new revision'));
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          Start new revision
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {!drafts.length && <p>No drafts yet. Create your first draft above.</p>}
-        </OverflowTable>
+        <section className={styles.panel}>
+          <div className={styles.panelHead}>
+            <h3>Drafts</h3>
+            <p>{drafts.length} saved</p>
+          </div>
+          <OverflowTable label="Saved drafts">
+            <table>
+              <thead>
+                <tr>
+                  <th>Problem</th>
+                  <th>Author</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {drafts.map((d) => {
+                  const status = draftStatus(d.status);
+                  return (
+                    <tr key={d.id}>
+                      <td>
+                        <Link className={styles.draftLink} to={`/admin/authoring/${d.id}`}>
+                          <span className={styles.draftProblemId}>{d.problemId}</span>
+                          <span className={styles.draftTitle}>{d.title}</span>
+                        </Link>
+                      </td>
+                      <td className={styles.draftAuthor}>{d.authorAkaName}</td>
+                      <td>
+                        <StatusBadge tone={status.tone} soft title={status.hint}>
+                          {status.label}
+                        </StatusBadge>
+                      </td>
+                      <td>
+                        {d.status === 'published' && (
+                          <Button
+                            size="compact"
+                            variant="secondary"
+                            disabled={busy}
+                            onClick={async () => {
+                              setBusy(true);
+                              setError('');
+                              try {
+                                await authoringService.startNewRevision(d.id);
+                                navigate(`/admin/authoring/${d.id}`);
+                              } catch (err) {
+                                setError(getErrorMessage(err, 'Could not start a new revision'));
+                              } finally {
+                                setBusy(false);
+                              }
+                            }}
+                          >
+                            Start new revision
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {!drafts.length && <p className={styles.panelBody}>No drafts yet. Create your first draft above.</p>}
+          </OverflowTable>
+        </section>
       )}
     </section>
   );

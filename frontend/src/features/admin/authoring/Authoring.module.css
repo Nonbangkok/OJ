@@ -160,6 +160,43 @@
   justify-content: space-between;
   gap: 0.75rem 1rem;
 }
+/* Draft list page: title row and the problem-cell link stack (ID over title). */
+.listHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+.listHead h1 {
+  margin: 0;
+}
+.draftLink {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  text-decoration: none;
+  min-width: 0;
+}
+.draftLink:hover .draftTitle {
+  text-decoration: underline;
+}
+.draftProblemId {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.draftTitle {
+  color: var(--accent-primary);
+  font-weight: 500;
+  max-width: 46ch;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.draftAuthor {
+  color: var(--text-secondary);
+}
 /* Bordered panel system for sectioned pages (jobs, testcases): each concern
    gets a titled box so the page reads as distinct blocks, not one stream. */
 .panel {

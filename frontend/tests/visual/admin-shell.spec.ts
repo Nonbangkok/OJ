@@ -11,7 +11,8 @@ test('authoring shell is responsive and visually stable', async ({ page }, testI
     true
   );
   await expect(page.getByRole('navigation', { name: 'Admin' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Problem Management' })).toBeVisible();
+  // The content-area Problem Management link was removed by design; the admin
+  // navbar's Problems link (asserted below on desktop) covers navigation.
 
   const menu = page.getByRole('button', { name: 'Menu', exact: true });
   const authoring = page.getByRole('link', { name: 'Authoring', exact: true });

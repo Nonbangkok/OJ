@@ -88,10 +88,9 @@ test('lists resumable drafts and creates a draft with explicit author metadata',
     'href',
     '/admin/authoring/profiles'
   );
-  expect(screen.getByRole('link', { name: 'Problem Management' })).toHaveAttribute(
-    'href',
-    '/admin/problems'
-  );
+  // The Problem Management link was removed by design: visibility management
+  // lives in the admin problems section, not on the authoring landing page.
+  expect(screen.queryByRole('link', { name: 'Problem Management' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'New draft' }));
   fireEvent.change(screen.getByLabelText('Problem ID'), { target: { value: 'new' } });
   fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'New problem' } });
