@@ -4,8 +4,12 @@ import { MemoryRouter } from 'react-router-dom';
 import ContestDetail from './ContestDetail';
 import { fetchContestAnalytics } from '../../../services/analyticsService';
 import type { ContestAnalytics } from '../../../services/analyticsService';
+import { fetchContestSimilarity } from '../../../services/contestService';
 
 jest.mock('../../../services/analyticsService');
+jest.mock('../../../services/contestService', () => ({
+  fetchContestSimilarity: jest.fn().mockResolvedValue({ contestId: 3, pairs: [] }),
+}));
 
 const mockFetch = fetchContestAnalytics as jest.MockedFunction<typeof fetchContestAnalytics>;
 
@@ -44,6 +48,29 @@ describe('ContestDetail', () => {
       expect(screen.getByText(/scoreboard/i)).toBeInTheDocument();
     });
     expect(screen.getByText('alice')).toBeInTheDocument();
+  });
+
+  it('renders the similar-submissions (cheat detection) section', async () => {
+    mockFetch.mockResolvedValueOnce(sample);
+    jest.mocked(fetchContestSimilarity).mockResolvedValueOnce({
+      contestId: 3,
+      pairs: [{
+        problemId: 'aplusb', userA: 'alice', userB: 'bob',
+        similarity: 0.93, submissionIdA: 1, submissionIdB: 2,
+      }],
+    });
+
+    render(
+      <MemoryRouter>
+        <ContestDetail contestId={3} onBack={jest.fn()} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/similar submissions/i)).toBeInTheDocument();
+    });
+    expect(screen.getAllByText('alice').length).toBeGreaterThanOrEqual(2); // scoreboard + similarity row
+    expect(screen.getByText('93%')).toBeInTheDocument();
   });
 
   it('shows an error with a back button when the fetch fails', async () => {

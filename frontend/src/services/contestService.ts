@@ -36,3 +36,23 @@ const contestService = {
 };
 
 export default contestService;
+
+export interface ContestSimilarPair {
+  problemId: string;
+  userA: string;
+  userB: string;
+  similarity: number;
+  submissionIdA: number;
+  submissionIdB: number;
+}
+
+export interface ContestSimilarityResponse {
+  contestId: number;
+  pairs: ContestSimilarPair[];
+}
+
+/** Cheat detection: user pairs with near-identical contest submissions. */
+export const fetchContestSimilarity = async (contestId: number): Promise<ContestSimilarityResponse> => {
+  const response = await api.get<ContestSimilarityResponse>(`/admin/contests/${contestId}/similarity`);
+  return response.data;
+};

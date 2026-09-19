@@ -7,6 +7,7 @@ import { validateRequest } from '../middleware/validation';
 import {
   contestBodySchema,
   contestIdParamSchema,
+  numericContestIdParamSchema,
   contestProblemParamsSchema,
   moveContestProblemsBodySchema,
 } from '../schemas/requestSchemas';
@@ -20,6 +21,7 @@ import {
   updateContest,
 } from '../services/contestQueryService';
 import { getContestScoreboard } from '../services/contestScoreboardQueryService';
+import { findSimilarContestPairs } from '../services/similarityService';
 import {
   getContestProblemDetailForParticipant,
   getContestProblemPdfForParticipant,
@@ -284,5 +286,16 @@ router.get('/contests/:id/problems/:problemId/pdf', requireAuth,
   res.setHeader('Content-Type', 'application/pdf');
   res.send(result.data);
 }));
+
+// Contest cheat detection: pairs of different users whose (latest) contest
+// submissions for the same problem are near-identical after normalisation.
+router.get('/admin/contests/:id/similarity', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: numericContestIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params as unknown as { id: number };
+    const contestId = Number(id);
+    const pairs = await findSimilarContestPairs(contestId);
+    res.json({ contestId, pairs });
+  }));
 
 export default router;

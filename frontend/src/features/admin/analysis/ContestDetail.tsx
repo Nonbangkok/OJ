@@ -11,6 +11,7 @@ import {
   YAxis,
 } from 'recharts';
 import { ContestAnalytics, fetchContestAnalytics } from '../../../services/analyticsService';
+import { ContestSimilarPair, fetchContestSimilarity } from '../../../services/contestService';
 import ChartCard from './components/ChartCard';
 import KpiCard from './components/KpiCard';
 import { useChartColors } from './analysisCharts';
@@ -28,6 +29,7 @@ const formatDateTime = (iso: string): string => new Date(iso).toLocaleString();
 const ContestDetail = ({ contestId, onBack }: ContestDetailProps) => {
   const [data, setData] = useState<ContestAnalytics | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [similarPairs, setSimilarPairs] = useState<ContestSimilarPair[] | null>(null);
   const colors = useChartColors();
 
   useEffect(() => {
@@ -35,11 +37,21 @@ const ContestDetail = ({ contestId, onBack }: ContestDetailProps) => {
 
     const load = async () => {
       setError(null);
+      setSimilarPairs(null);
       try {
         const result = await fetchContestAnalytics(contestId);
         if (!cancelled) setData(result);
       } catch {
         if (!cancelled) setError('Failed to load contest analytics. Please try again.');
+        return;
+      }
+      // Cheat detection is supplementary — a failure here must not take the
+      // page down.
+      try {
+        const similarity = await fetchContestSimilarity(contestId);
+        if (!cancelled) setSimilarPairs(similarity.pairs);
+      } catch {
+        if (!cancelled) setSimilarPairs([]);
       }
     };
 
@@ -145,6 +157,31 @@ const ContestDetail = ({ contestId, onBack }: ContestDetailProps) => {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className={styles["table-card"]}>
+        <h3>Similar submissions (possible cheating)</h3>
+        {similarPairs === null && <p className={styles.empty}>Checking…</p>}
+        {similarPairs !== null && similarPairs.length === 0 && (
+          <p className={styles.empty}>No similar submission pairs detected.</p>
+        )}
+        {similarPairs !== null && similarPairs.length > 0 && (
+          <table>
+            <thead>
+              <tr><th>Problem</th><th>User A</th><th>User B</th><th>Similarity</th></tr>
+            </thead>
+            <tbody>
+              {similarPairs.map((pair) => (
+                <tr key={`${pair.submissionIdA}-${pair.submissionIdB}`}>
+                  <td>{pair.problemId}</td>
+                  <td><Link to={`/profile/${pair.userA}`}>{pair.userA}</Link></td>
+                  <td><Link to={`/profile/${pair.userB}`}>{pair.userB}</Link></td>
+                  <td>{Math.round(pair.similarity * 100)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

@@ -3,11 +3,13 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import contestRouter from '../controllers/contestController';
 import * as db from '../db';
+import { findSimilarContestPairs } from '../services/similarityService';
 import { errorHandler } from '../middleware/errorHandler';
 
 // Mock Dependencies
 jest.mock('../db');
 jest.mock('../services/problemMigration');
+jest.mock('../services/similarityService');
 jest.mock('../middleware/auth', () => ({
     requireStaffOrAdmin: (req: Request, res: Response, next: NextFunction) => {
         if (req.session) {
@@ -215,6 +217,30 @@ describe('Contest Controller', () => {
             expect(res.body[1].participant_count).toBe('14');
             expect(res.body[1].problem_count).toBe('7');
             expect(res.body[1].status).toBe('running');
+        });
+    });
+
+    describe('GET /admin/contests/:id/similarity', () => {
+        it('returns similar pairs for the contest', async () => {
+            (findSimilarContestPairs as jest.Mock).mockResolvedValueOnce([{
+                problemId: 'aplusb', userA: 'alice', userB: 'bob',
+                similarity: 0.95, submissionIdA: 1, submissionIdB: 2,
+            }]);
+
+            const res = await request(app).get('/admin/contests/5/similarity');
+
+            expect(res.status).toBe(200);
+            expect(res.body.contestId).toBe(5);
+            expect(res.body.pairs).toHaveLength(1);
+            expect(res.body.pairs[0]).toMatchObject({ userA: 'alice', userB: 'bob', similarity: 0.95 });
+            expect(findSimilarContestPairs).toHaveBeenCalledWith(5);
+        });
+
+        it('rejects a non-numeric contest id with 400', async () => {
+            const res = await request(app).get('/admin/contests/abc/similarity');
+
+            expect(res.status).toBe(400);
+            expect(findSimilarContestPairs).not.toHaveBeenCalled();
         });
     });
 });

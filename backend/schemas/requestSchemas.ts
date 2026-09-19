@@ -324,6 +324,11 @@ export const analyticsContestIdParamSchema = z.object({
   contestId: z.coerce.number().int().positive(),
 });
 
+/** :id params that must be positive integers (contest similarity etc.). */
+export const numericContestIdParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
 export const analyticsSubmissionsQuerySchema = z.object({
   problemId: z.string().trim().max(50).optional(),
   userId: z.coerce.number().int().positive().optional(),
