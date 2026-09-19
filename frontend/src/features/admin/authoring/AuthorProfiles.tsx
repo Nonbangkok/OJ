@@ -3,16 +3,12 @@ import { Button, Dialog } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
 import { getErrorMessage } from '../../../utils/error';
 import { Profile, ProfileUpdateConfirmation } from './types';
-import { drawProfileCrop, loadProfileImage, profileCropToPng } from './profileImage';
+import { profileCropToPng } from './profileImage';
+import { useProfileImageCrop } from './useProfileImageCrop';
+import ProfileSyncGateDialog, { PendingSync } from './ProfileSyncGateDialog';
+import ProfileFieldsForm, { Fields } from './ProfileFieldsForm';
 import styles from './AuthorProfiles.module.css';
 
-interface Fields {
-  akaName: string;
-  realName: string;
-  defaultLanguage: string;
-  countryCode: string;
-  userId: string;
-}
 const emptyFields: Fields = {
   akaName: '',
   realName: '',
@@ -28,12 +24,6 @@ const isConfirmation = (
 ): result is ProfileUpdateConfirmation =>
   (result as ProfileUpdateConfirmation).confirmationRequired === true;
 
-/** Pending cascade impact from the server's confirmation gate. */
-interface PendingSync {
-  affectedDrafts: number;
-  affectedPublishedProblems: number;
-}
-
 export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,15 +34,13 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [pendingSync, setPendingSync] = useState<PendingSync | null>(null);
-  const [image, setImage] = useState<HTMLImageElement | null>(null);
-  const [imageLoading, setImageLoading] = useState(false);
-  const [removeImage, setRemoveImage] = useState(false);
-  const [zoom, setZoom] = useState(1);
-  const [x, setX] = useState(50);
-  const [y, setY] = useState(50);
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const imageRequest = useRef(0);
   const listRequest = useRef(0);
+  const setErrorRef = useRef(setError);
+  setErrorRef.current = setError;
+  const {
+    image, imageLoading, removeImage, zoom, x, y, canvas,
+    setZoom, setX, setY, reset: resetImage, choose: chooseImage, requestRemoval,
+  } = useProfileImageCrop((message) => setErrorRef.current(message));
 
   const load = useCallback(async () => {
     const request = ++listRequest.current;
@@ -71,27 +59,8 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
     void load();
     return () => {
       listRequest.current += 1;
-      imageRequest.current += 1;
     };
   }, [load]);
-  useEffect(() => {
-    if (!image || !canvas.current) return;
-    try {
-      drawProfileCrop(canvas.current, image, zoom, x, y);
-    } catch (failure) {
-      setError(profileErrorMessage(failure));
-    }
-  }, [image, zoom, x, y]);
-
-  function resetImage() {
-    imageRequest.current += 1;
-    setImage(null);
-    setImageLoading(false);
-    setRemoveImage(false);
-    setZoom(1);
-    setX(50);
-    setY(50);
-  }
   function edit(profile: Profile | 'new') {
     setEditing(profile);
     setError('');
@@ -109,25 +78,6 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
             userId: profile.userId === null ? '' : String(profile.userId),
           }
     );
-  }
-  async function chooseImage(file: File) {
-    const request = ++imageRequest.current;
-    setImageLoading(true);
-    setError('');
-    setImage(null);
-    try {
-      const source = await loadProfileImage(file);
-      if (request !== imageRequest.current) return;
-      setImage(source);
-      setRemoveImage(false);
-      setZoom(1);
-      setX(50);
-      setY(50);
-    } catch (failure) {
-      if (request === imageRequest.current) setError(profileErrorMessage(failure));
-    } finally {
-      if (request === imageRequest.current) setImageLoading(false);
-    }
   }
   async function save(event?: React.FormEvent) {
     event?.preventDefault();
@@ -303,187 +253,33 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
             }
           >
             {error && <p role="alert">{error}</p>}
-            <fieldset disabled={saving || !!pendingSync} className={`${styles.root} ${styles.dialogFields}`}>
-              <legend className={styles.legend}>Author details</legend>
-            <div className={styles.fields}>
-              <label>
-                AKA name
-                <input
-                  required
-                  maxLength={100}
-                  value={fields.akaName}
-                  onChange={(e) => update('akaName', e.target.value)}
-                />
-              </label>
-              <label>
-                Real name
-                <input
-                  required
-                  maxLength={255}
-                  value={fields.realName}
-                  onChange={(e) => update('realName', e.target.value)}
-                />
-              </label>
-              <label>
-                Default language
-                <input
-                  required
-                  maxLength={50}
-                  value={fields.defaultLanguage}
-                  onChange={(e) => update('defaultLanguage', e.target.value)}
-                />
-              </label>
-              <div>
-                <label>
-                  Country code
-                  <input
-                    required
-                    maxLength={3}
-                    minLength={3}
-                    pattern="[A-Z]{3}"
-                    aria-describedby="profile-country-help"
-                    value={fields.countryCode}
-                    onChange={(e) => update('countryCode', e.target.value.toUpperCase())}
-                  />
-                </label>
-                <small id="profile-country-help">Three letters, for example THA or USA.</small>
-              </div>
-              <div>
-                <label>
-                  User account ID (optional)
-                  <input
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    aria-describedby="profile-user-help"
-                    value={fields.userId}
-                    onChange={(e) => update('userId', e.target.value)}
-                  />
-                </label>
-                <small id="profile-user-help">
-                  Leave blank for an author without a linked account.
-                </small>
-              </div>
-            </div>
-            <label>
-              Profile image
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = '';
-                  if (file) void chooseImage(file);
-                }}
-              />
-            </label>
-            <p className={styles.hint}>
-              JPEG, PNG, or WebP, up to 10 MiB and 25 million pixels. Saved as a square 512 × 512
-              PNG.
-            </p>
-            {imageLoading && <p role="status">Loading image…</p>}
-            {image && (
-              <div className={styles.crop}>
-                <canvas
-                  ref={canvas}
-                  width={512}
-                  height={512}
-                  role="img"
-                  aria-label="Square profile image crop preview"
-                />
-                <div>
-                  <label>
-                    Crop zoom
-                    <input
-                      type="range"
-                      min={1}
-                      max={4}
-                      step={0.05}
-                      value={zoom}
-                      onChange={(e) => setZoom(Number(e.target.value))}
-                    />
-                  </label>
-                  <label>
-                    Horizontal position
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={x}
-                      onChange={(e) => setX(Number(e.target.value))}
-                    />
-                  </label>
-                  <label>
-                    Vertical position
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={y}
-                      onChange={(e) => setY(Number(e.target.value))}
-                    />
-                  </label>
-                  <p className={styles.hint}>
-                    Adjust the square crop, then save the profile to apply it.
-                  </p>
-                </div>
-              </div>
-            )}
-            {!image &&
-              (existingImage ? (
-                <p>Profile image saved. Choose a file to replace it.</p>
-              ) : (
-                <p>
-                  Fallback avatar:{' '}
-                  <span className={styles.avatar}>
-                    {Array.from(fields.akaName.trim())[0] || '?'}
-                  </span>{' '}
-                  (first character of the AKA name).
-                </p>
-              ))}
-            {(image || existingImage) && (
-              <Button
-                variant="destructive"
-                disabled={imageLoading}
-                onClick={() => {
-                  resetImage();
-                  setRemoveImage(true);
-                }}
-              >
-                Remove image
-              </Button>
-            )}
-          </fieldset>
+            <ProfileFieldsForm
+              saving={saving}
+              gated={!!pendingSync}
+              fields={fields}
+              update={update}
+              image={image}
+              imageLoading={imageLoading}
+              existingImage={Boolean(existingImage)}
+              canvas={canvas}
+              zoom={zoom}
+              x={x}
+              y={y}
+              setZoom={setZoom}
+              setX={setX}
+              setY={setY}
+              chooseImage={(file) => void chooseImage(file)}
+              requestRemoval={requestRemoval}
+            />
         </Dialog>
         </form>
       )}
       {editing && editing !== 'new' && pendingSync && (
-        <Dialog
-          open
-          title="Update linked problems?"
-          description={`This change will update ${pendingSync.affectedDrafts} ${
-            pendingSync.affectedDrafts === 1 ? 'draft' : 'drafts'
-          }${
-            pendingSync.affectedPublishedProblems > 0
-              ? ` — including ${pendingSync.affectedPublishedProblems} published ${
-                  pendingSync.affectedPublishedProblems === 1 ? 'problem' : 'problems'
-                }`
-              : ''
-          } with the new author metadata and PDF.`}
-          onClose={() => setPendingSync(null)}
-          footer={
-            <>
-              <Button
-                loading={saving}
-                loadingLabel="Saving profile…"
-                onClick={() => void save()}
-              >
-                Save and sync linked problems
-              </Button>
-              <Button variant="secondary" disabled={saving} onClick={() => setPendingSync(null)}>
-                Keep editing
-              </Button>
-            </>
-          }
+        <ProfileSyncGateDialog
+          pendingSync={pendingSync}
+          saving={saving}
+          onConfirm={() => void save()}
+          onKeepEditing={() => setPendingSync(null)}
         />
       )}
     </section>
