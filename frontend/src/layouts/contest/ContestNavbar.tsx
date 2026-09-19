@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, type MouseEvent } from 'react';
-import { NavLink, useParams, useNavigate, useLocation } from 'react-router-dom';
+import { NavLink, useParams, useLocation } from 'react-router-dom';
 import contestService from '../../services/contestService';
 import styles from './ContestNavbar.module.css';
+import NavbarUserMenu from '../../components/navbar/NavbarUserMenu';
 import { useAuth } from '../../context/AuthContext';
-import ThemeToggleButton from '../../components/shared/ThemeToggleButton';
 import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/logo512.png';
 import darkmodeLogo from '../../assets/logo512_darkmode.png';
@@ -11,9 +11,8 @@ import type { Contest, SliderStyle } from '../../types';
 
 const ContestNavbar = () => {
   const { contestId } = useParams();
-  const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [contest, setContest] = useState<Contest | null>(null);
   const navRef = useRef<HTMLUListElement | null>(null);
   const { theme } = useTheme(); // Get current theme
@@ -38,11 +37,6 @@ const ContestNavbar = () => {
       fetchContestDetails();
     }
   }, [contestId]);
-
-  const handleLogout = () => {
-    void logout();
-    navigate('/');
-  };
 
   const handleMouseEnter = (e: MouseEvent<HTMLLIElement>) => {
     const li = e.currentTarget;
@@ -109,18 +103,7 @@ const ContestNavbar = () => {
         </ul>
 
         <div className={styles['nav-actions']}>
-          {user && (
-            <span className={styles.username}>
-              {user.username}
-            </span>
-          )}
-          {/* The Exit Contest button has been moved to the left as an icon */}
-          {user && (
-            <button onClick={handleLogout} className={styles['logout-btn']}>
-              Logout
-            </button>
-          )}
-          <ThemeToggleButton />
+          {user && <NavbarUserMenu />}
         </div>
       </div>
     </nav>

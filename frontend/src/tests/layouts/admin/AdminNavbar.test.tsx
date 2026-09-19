@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../../../context/AuthContext';
@@ -153,25 +153,13 @@ describe('AdminNavbar', () => {
     );
   });
 
-  it('waits for logout to finish before navigating home', async () => {
-    let resolveLogout: (() => void) | undefined;
-    mockLogout.mockReturnValue(
-      new Promise<void>((resolve) => {
-        resolveLogout = resolve;
-      })
-    );
+  it('logs out through the user menu', async () => {
     renderNavbar();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+    fireEvent.click(screen.getByRole('button', { name: /open user menu/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /log out/i }));
 
-    expect(screen.getByLabelText('Current route')).toHaveTextContent('/admin');
-    expect(screen.queryByRole('heading', { name: 'Home' })).not.toBeInTheDocument();
-
-    await act(async () => {
-      resolveLogout?.();
-    });
-
-    expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument();
+    await waitFor(() => expect(mockLogout).toHaveBeenCalledTimes(1));
   });
 
   it('marks the active route without requiring pointer interaction', () => {

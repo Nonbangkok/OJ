@@ -1,19 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 
 import logo from '../../assets/logo512.png';
 import darkmodeLogo from '../../assets/logo512_darkmode.png';
-import ThemeToggleButton from '../../components/shared/ThemeToggleButton';
+import NavbarUserMenu from '../../components/navbar/NavbarUserMenu';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { USER_ROLES } from '../../utils/constants';
 import styles from './AdminNavbar.module.css';
 
 const AdminNavbar = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { theme } = useTheme();
   const location = useLocation();
-  const navigate = useNavigate();
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const currentLogo = theme === 'dark' ? darkmodeLogo : logo;
@@ -35,11 +34,6 @@ const AdminNavbar = () => {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [menuOpen]);
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
-  };
 
   const closeMenu = () => setMenuOpen(false);
   const openClassName = menuOpen ? styles['menu-open'] : '';
@@ -110,17 +104,7 @@ const AdminNavbar = () => {
           role="group"
           aria-label={user ? `Signed in as ${user.username}` : 'Account actions'}
         >
-          {user && <span className={styles.username}>{user.username}</span>}
-          <ThemeToggleButton />
-          {user && (
-            <button
-              type="button"
-              onClick={() => void handleLogout()}
-              className={styles['logout-btn']}
-            >
-              Logout
-            </button>
-          )}
+          {user && <NavbarUserMenu />}
         </div>
       </div>
     </nav>
