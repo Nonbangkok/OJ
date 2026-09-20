@@ -9,6 +9,9 @@ import { ProblemDraftRow } from '../types/authoring';
 
 jest.mock('../services/authoringDraftQueryService');
 jest.mock('../services/authorProfileSnapshotService');
+jest.mock('../services/authoringTestcaseQueryService', () => ({
+  getDraftTestcaseStats: jest.fn().mockResolvedValue({ total: 2, withOutput: 2 }),
+}));
 
 const draftRow = (overrides: Partial<ProblemDraftRow> = {}): ProblemDraftRow => ({
   id: '11111111-1111-4111-8111-111111111111',
@@ -184,6 +187,9 @@ describe('Problem Authoring draft controller', () => {
 
     expect(found.status).toBe(200);
     expect(found.body.statementHtml).toBe('<p>Statement</p>');
+    // The detail payload carries the real testcase pairing facts so the
+    // publish checklist never depends on the draft status lifecycle.
+    expect(found.body.testcaseStats).toEqual({ total: 2, withOutput: 2 });
     expect(missing.status).toBe(404);
     expect(missing.body).toEqual({ message: 'Problem draft not found' });
   });

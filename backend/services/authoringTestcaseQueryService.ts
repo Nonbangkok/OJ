@@ -17,6 +17,22 @@ const metadataColumns = `id, case_number AS "caseNumber", original_input_filenam
   (output_data IS NOT NULL) AS "hasOutput", source, source_revision AS "sourceRevision",
   created_at AS "createdAt", updated_at AS "updatedAt"`;
 
+/** Counts of stored testcases and how many have a paired expected output. */
+export interface DraftTestcaseStats {
+  total: number;
+  withOutput: number;
+}
+
+export async function getDraftTestcaseStats(draftId: string, database: JobDatabase = db): Promise<DraftTestcaseStats> {
+  const result = await database.query<{ total: string; with_output: string }>(
+    `SELECT count(*) AS total, count(output_data) AS with_output
+     FROM problem_draft_testcases WHERE draft_id = $1`,
+    [draftId],
+  );
+  const row = result.rows[0];
+  return { total: Number(row?.total ?? 0), withOutput: Number(row?.with_output ?? 0) };
+}
+
 export async function listDraftTestcases(draftId: string, database: JobDatabase = db) {
   const draft = (await database.query('SELECT revision FROM problem_drafts WHERE id=$1', [draftId])).rows[0];
   if (!draft) return null;

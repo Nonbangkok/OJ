@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import api from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
@@ -34,6 +34,7 @@ const draft = {
   latestPdfRevision: null,
   status: 'ready',
   publishedAt: null,
+  testcaseStats: { total: 2, withOutput: 2 },
 };
 function show(path = '/admin/authoring') {
   return render(
@@ -434,4 +435,75 @@ test('a draft without a linked profile keeps its metadata inputs enabled', async
   for (const label of ['Problem ID', 'Title', 'AKA name', 'Real name', 'Language', 'Country code']) {
     expect(await screen.findByLabelText(label)).toBeEnabled();
   }
+});
+
+test('the Testcases checklist item shows real pairing counts, not the draft status', async () => {
+  // Status reset to 'draft' (as a fresh verify start does) while the
+  // testcases themselves are complete — the checklist must still tick.
+  const reset = { ...draft, status: 'draft', verifiedRevision: null };
+  jest.mocked(api.get).mockImplementation(async (url) => ({
+    data: url.endsWith('/d1') ? reset : [],
+  }));
+  show('/admin/authoring/d1');
+  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
+  const checklist = screen.getByLabelText('Publish readiness');
+  expect(within(checklist).getByText('Testcases')).toBeInTheDocument();
+  expect(within(checklist).getByText(/2 cases, all paired/)).toBeInTheDocument();
+  expect(within(checklist).queryByText('not generated')).not.toBeInTheDocument();
+});
+
+test('the Testcases checklist item names the missing pairs', async () => {
+  const partial = { ...draft, testcaseStats: { total: 5, withOutput: 3 } };
+  jest.mocked(api.get).mockImplementation(async (url) => ({
+    data: url.endsWith('/d1') ? partial : [],
+  }));
+  show('/admin/authoring/d1');
+  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
+  expect(screen.getByText(/2 of 5 cases missing expected outputs/)).toBeInTheDocument();
+  expect(screen.queryByText('not generated')).not.toBeInTheDocument();
+});
+
+test('the Testcases checklist item reports an empty testcase set', async () => {
+  const empty = { ...draft, testcaseStats: { total: 0, withOutput: 0 } };
+  jest.mocked(api.get).mockImplementation(async (url) => ({
+    data: url.endsWith('/d1') ? empty : [],
+  }));
+  show('/admin/authoring/d1');
+  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
+  expect(screen.getByText(/no testcases yet/)).toBeInTheDocument();
+});
+
+test('a failed verification shows a plain-language explanation with the failing case', async () => {
+  jest.mocked(api.get).mockImplementation(async (url) => ({
+    data: url.endsWith('/d1') ? draft
+      : url.endsWith('/jobs') ? [{
+          id: 'j1', draftId: 'd1', draftRevision: 3, jobType: 'verify_all',
+          status: 'failed', createdAt: '2026-09-20T00:00:00Z',
+          errorCode: 'wrong_answer', errorMessage: 'output mismatch',
+          resultSummary: { failedCase: { caseNumber: 4, durationMs: 12 } },
+        }]
+      : [],
+  }));
+  show('/admin/authoring/d1');
+  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
+  expect(screen.getByText(/Solution output does not match the expected output/i)).toBeInTheDocument();
+  expect(screen.getByText(/#4/)).toBeInTheDocument();
+  expect(screen.getByText(/cannot be published until verification passes/i)).toBeInTheDocument();
+});
+
+test('a succeeded verification shows the passing summary', async () => {
+  jest.mocked(api.get).mockImplementation(async (url) => ({
+    data: url.endsWith('/d1') ? draft
+      : url.endsWith('/jobs') ? [{
+          id: 'j1', draftId: 'd1', draftRevision: 3, jobType: 'verify_all',
+          status: 'succeeded', createdAt: '2026-09-20T00:00:00Z',
+          errorCode: null, errorMessage: null,
+          resultSummary: { verification: { caseCount: 7 } },
+        }]
+      : [],
+  }));
+  show('/admin/authoring/d1');
+  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
+  expect(screen.getByText(/All checks passed at revision 3/i)).toBeInTheDocument();
+  expect(screen.getByText(/7 testcases executed/i)).toBeInTheDocument();
 });

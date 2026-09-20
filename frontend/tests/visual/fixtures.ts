@@ -26,6 +26,7 @@ const drafts = [
     solutionCpp: '#include <bits/stdc++.h>\nint main() { return 0; }',
     generatorCpp: null,
     templateVersion: 'red-gate-v1',
+    testcaseStats: { total: 2, withOutput: 2 },
   },
   {
     id: 'draft-20260916-02',
@@ -50,6 +51,7 @@ const drafts = [
     solutionCpp: '#include <iostream>\nint main() { return 0; }',
     generatorCpp: '#include <iostream>\nint main() { return 0; }',
     templateVersion: 'red-gate-v1',
+    testcaseStats: { total: 2, withOutput: 2 },
   },
 ];
 

@@ -4,7 +4,7 @@ import { Button, Dialog, StatusBadge } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
 import useAuthoringDraft from './useAuthoringDraft';
 import { Profile } from './types';
-import { draftStatus, jobLabel, jobStatus } from './status';
+import { draftStatus, jobLabel, jobStatus, verifyFailureExplanation } from './status';
 import JobHistory from './JobHistory';
 import MetadataFields from './MetadataFields';
 import StatementTab, { PdfPreview } from './StatementTab';
@@ -302,11 +302,48 @@ function VerifySection() {
       <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
       <span className={styles.verifyHeroText}>{status.hint}</span>
     </div>
+    <VerifyOutcome draft={draft} jobs={model.jobs} />
     <PublishChecklist draft={draft} dirty={model.dirty} canPublish={model.canPublish} disabled={model.actionsDisabled}
       onVerify={() => void model.runJob('verify')} onPublish={() => setConfirm({ action: 'publish', revision: draft.revision })}
       onBuildPdf={() => void model.runJob('pdf')} onGoToTestcases={() => navigate('testcases', { relative: 'path' })} />
     <PdfPreview draft={draft} />
   </section>;
+}
+
+/**
+ * Outcome of the most recent Verify All for the current revision: a green
+ * panel when it passed, and a plain-language failure explanation (which
+ * stage failed and on which testcase) when it did not.
+ */
+function VerifyOutcome({ draft, jobs }: { draft: import('./types').Draft; jobs: import('./types').Job[] }) {
+  const verify = jobs.find(job => job.jobType === 'verify_all');
+  if (!verify || verify.status === 'queued' || verify.status === 'compiling' || verify.status === 'running') {
+    return null;
+  }
+  if (verify.status === 'succeeded') {
+    return <div className={styles.verifyOutcome} role="status">
+      <StatusBadge tone="success">Verified</StatusBadge>
+      <span className={styles.verifyOutcomeText}>
+        All checks passed at revision {verify.draftRevision}
+        {verify.resultSummary?.verification?.caseCount
+          ? ` — ${verify.resultSummary.verification.caseCount} testcases executed against the solution.`
+          : '.'}
+      </span>
+    </div>;
+  }
+  const { title, detail } = verifyFailureExplanation(verify);
+  return <div className={styles.verifyOutcome} role="alert">
+    <StatusBadge tone="danger">{verify.status === 'timed_out' ? 'Timed out' : 'Failed'}</StatusBadge>
+    <div className={styles.verifyOutcomeText}>
+      <strong>{title}.</strong> {detail}
+      {verify.resultSummary?.failedCase
+        ? <> Failing testcase: <code>#${verify.resultSummary.failedCase.caseNumber}</code>{verify.resultSummary.failedCase.durationMs !== undefined ? ` (${verify.resultSummary.failedCase.durationMs} ms)` : ''}.</>
+        : null}
+      <div className={styles.verifyOutcomeHint}>
+        The problem cannot be published until verification passes.
+      </div>
+    </div>
+  </div>;
 }
 
 function JobsSection() {
@@ -323,21 +360,30 @@ function PublishChecklist({ draft, dirty, canPublish, disabled, onVerify, onPubl
   // Each gate names exactly what is missing and offers the action that fixes it.
   const pdfCurrent = draft.hasLatestPdf && draft.latestPdfRevision === draft.revision;
   const verified = draft.verifiedRevision === draft.revision;
-  const hasOutputs = draft.status === 'generated' || draft.status === 'ready' || draft.status === 'published';
-  const item = (done: boolean, label: string, detail: string, action?: React.ReactNode) =>
+  // Testcase readiness is a fact about the stored cases (every input has its
+  // paired expected output), deliberately independent of the draft status —
+  // starting a fresh verify resets the status, but never the testcases.
+  const { total, withOutput } = draft.testcaseStats;
+  const testcasesComplete = total > 0 && withOutput === total;
+  const testcaseDetail = total === 0
+    ? 'no testcases yet'
+    : withOutput === total
+      ? `${total} ${total === 1 ? 'case' : 'cases'}, all paired`
+      : `${total - withOutput} of ${total} ${total - withOutput === 1 ? 'case' : 'cases'} missing expected outputs`;
+  const item = (done: boolean, label: string, detail: string, action?: React.ReactNode, detailWhenDone = false) =>
     <li className={done ? styles.checkDone : styles.checkTodo} key={label}>
       <span className={styles.checkMark} aria-hidden>{done ? '✓' : '○'}</span>
       <span className={styles.checkBody}>
         <span className={styles.checkLabel}>{label}</span>
-        <span className={styles.checkDetail}>{done ? 'Done' : detail} {!done && action}</span>
+        <span className={styles.checkDetail}>{done && !detailWhenDone ? 'Done' : detail} {!done && action}</span>
       </span>
     </li>;
   return <div className={styles.verifyPanel}>
     <ul className={styles.checklist} aria-label="Publish readiness">
       {item(!!draft.solutionCpp.trim(), 'Solution', 'missing',
         <>— <button type="button" className={styles.linkButton} onClick={() => onGoToTestcases()}>add it</button></>)}
-      {item(hasOutputs, 'Testcase outputs', 'not generated',
-        <>— <button type="button" className={styles.linkButton} onClick={() => onGoToTestcases()}>generate</button></>)}
+      {item(testcasesComplete, 'Testcases', testcaseDetail,
+        <>— <button type="button" className={styles.linkButton} onClick={() => onGoToTestcases()}>{total === 0 ? 'add them' : 'open testcases'}</button></>, true)}
       {item(pdfCurrent, 'PDF', draft.hasLatestPdf ? 'outdated' : 'not built',
         <>— <button type="button" className={styles.linkButton} disabled={disabled} onClick={onBuildPdf}>build now</button></>)}
       {item(verified, 'Verified', draft.verifiedRevision === null ? 'never verified' : 'verified',

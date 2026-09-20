@@ -4,11 +4,17 @@ export interface DraftFields {
   timeLimitMs: number; memoryLimitMb: number; statementHtml: string;
   solutionCpp: string; generatorCpp: string | null; templateVersion: string;
 }
+/** Real testcase pairing facts from the DB (not the status lifecycle). */
+export interface DraftTestcaseStats {
+  total: number;
+  withOutput: number;
+}
 export interface Draft extends DraftFields {
   id: string; revision: number; verifiedRevision: number | null;
   status: 'draft' | 'generated' | 'ready' | 'published';
   hasLatestPdf: boolean; latestPdfRevision: number | null; hasAuthorProfileImage: boolean;
   updatedAt: string; publishedAt: string | null;
+  testcaseStats: DraftTestcaseStats;
 }
 export interface Profile {
   id: string;

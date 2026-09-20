@@ -24,6 +24,7 @@ import {
   startProblemDraftRevision,
   updateProblemDraft,
 } from '../services/authoringDraftQueryService';
+import { getDraftTestcaseStats } from '../services/authoringTestcaseQueryService';
 import {
   addStatementAsset,
   deleteStatementAsset,
@@ -244,7 +245,11 @@ router.get('/admin/authoring/drafts/:id',
       res.status(404).json({ message: 'Problem draft not found' });
       return;
     }
-    res.json(toDraftDetailResponse(draft));
+    // Checklist facts come from the testcase table itself, not the draft
+    // status lifecycle — a reset (e.g. a fresh verify run) must not make
+    // existing testcases disappear from the publish readiness view.
+    const testcaseStats = await getDraftTestcaseStats(draft.id);
+    res.json({ ...toDraftDetailResponse(draft), testcaseStats });
   }));
 
 router.patch('/admin/authoring/drafts/:id',
