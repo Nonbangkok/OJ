@@ -321,7 +321,7 @@ function VerifyOutcome({ draft, jobs }: { draft: import('./types').Draft; jobs: 
     return null;
   }
   if (verify.status === 'succeeded') {
-    return <div className={styles.verifyOutcome} role="status">
+    return <div className={`${styles.verifyOutcome} ${styles.verifyOutcomePassed}`} role="status">
       <StatusBadge tone="success">Verified</StatusBadge>
       <span className={styles.verifyOutcomeText}>
         All checks passed at revision {verify.draftRevision}
@@ -332,8 +332,11 @@ function VerifyOutcome({ draft, jobs }: { draft: import('./types').Draft; jobs: 
     </div>;
   }
   const { title, detail } = verifyFailureExplanation(verify);
-  return <div className={styles.verifyOutcome} role="alert">
-    <StatusBadge tone="danger">{verify.status === 'timed_out' ? 'Timed out' : 'Failed'}</StatusBadge>
+  const timedOut = verify.status === 'timed_out';
+  return <div
+    className={`${styles.verifyOutcome} ${timedOut ? styles.verifyOutcomeTimedOut : styles.verifyOutcomeFailed}`}
+    role="alert">
+    <StatusBadge tone={timedOut ? 'warning' : 'danger'}>{timedOut ? 'Timed out' : 'Failed'}</StatusBadge>
     <div className={styles.verifyOutcomeText}>
       <strong>{title}.</strong> {detail}
       {verify.resultSummary?.failedCase

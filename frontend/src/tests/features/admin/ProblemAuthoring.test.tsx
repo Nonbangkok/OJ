@@ -489,6 +489,23 @@ test('a failed verification shows a plain-language explanation with the failing 
   expect(screen.getByText(/Solution output does not match the expected output/i)).toBeInTheDocument();
   expect(screen.getByText(/#4/)).toBeInTheDocument();
   expect(screen.getByText(/cannot be published until verification passes/i)).toBeInTheDocument();
+  // The failure banner carries the danger tone.
+  expect(screen.getByRole('alert').className).toMatch(/verifyOutcomeFailed/);
+});
+
+test('a timed-out verification uses the warning tone', async () => {
+  jest.mocked(api.get).mockImplementation(async (url) => ({
+    data: url.endsWith('/d1') ? draft
+      : url.endsWith('/jobs') ? [{
+          id: 'j1', draftId: 'd1', draftRevision: 3, jobType: 'verify_all',
+          status: 'timed_out', createdAt: '2026-09-20T00:00:00Z',
+          errorCode: 'solution_timeout', errorMessage: null, resultSummary: null,
+        }]
+      : [],
+  }));
+  show('/admin/authoring/d1');
+  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
+  expect(screen.getByRole('alert').className).toMatch(/verifyOutcomeTimedOut/);
 });
 
 test('a succeeded verification shows the passing summary', async () => {
@@ -506,4 +523,6 @@ test('a succeeded verification shows the passing summary', async () => {
   fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
   expect(screen.getByText(/All checks passed at revision 3/i)).toBeInTheDocument();
   expect(screen.getByText(/7 testcases executed/i)).toBeInTheDocument();
+  // The success banner carries the green tone.
+  expect(screen.getByText(/All checks passed at revision 3/i).closest('div').className).toMatch(/verifyOutcomePassed/);
 });

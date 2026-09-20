@@ -991,17 +991,30 @@
   color: var(--text-secondary);
   font-size: 0.925rem;
 }
-/* Outcome banner for the latest Verify All run (Verify & Publish tab) */
+/* Outcome banner for the latest Verify All run (Verify & Publish tab).
+   Tone follows the outcome: passed = green, failed = red, timed out = amber. */
 .verifyOutcome {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
   border: 1px solid var(--border-color);
-  border-left: 4px solid var(--status-danger, var(--border-color));
+  border-left-width: 4px;
   border-radius: var(--radius-md);
   background: var(--background-secondary);
   margin-bottom: 1.25rem;
+}
+.verifyOutcomePassed {
+  border-left-color: var(--status-success);
+  background: var(--success-tint-bg);
+}
+.verifyOutcomeFailed {
+  border-left-color: var(--status-danger);
+  background: var(--danger-tint-bg, var(--background-secondary));
+}
+.verifyOutcomeTimedOut {
+  border-left-color: var(--warning-color);
+  background: var(--warning-tint-bg);
 }
 .verifyOutcomeText {
   color: var(--text-primary);
@@ -1123,9 +1136,19 @@
   min-height: 0;
   height: 100%;
 }
-.codeScroll textarea,
-.codeScroll pre {
+.codeScroll textarea {
   overflow: auto !important; /* the single scroller */
+  white-space: pre !important;
+  word-wrap: normal !important;
+  overflow-wrap: normal !important;
+  /* Extra bottom room so the last lines are never hidden under the edge. */
+  padding-bottom: 3rem !important;
+}
+/* The highlighted layer must never grow its own scrollbars — the JS scroll
+   sync moves it to match the textarea. overflow:hidden keeps exactly one
+   horizontal and one vertical scrollbar in the whole editor. */
+.codeScroll pre {
+  overflow: hidden !important;
   white-space: pre !important;
   word-wrap: normal !important;
   overflow-wrap: normal !important;
