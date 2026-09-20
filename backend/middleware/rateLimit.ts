@@ -15,12 +15,15 @@ const tooManyRequests = (message: string) => ({ message });
  * statement preview) is excluded: a single editing session legitimately issues
  * several requests per second, far above a general browsing budget, and each
  * excluded route is an authenticated admin endpoint with its own bounded cost.
+ * SSE realtime streams are excluded too — each is one long-lived request per
+ * open page, not a request budget item.
  */
 const GENERAL_LIMIT_SKIP_PATHS = [
   '/admin/authoring/drafts/', // GET polling + PATCH saves + preview renders
   '/admin/authoring/jobs/', // job status polls
   '/admin/authoring/profile-syncs', // sync run cascade view (list + detail polls)
   '/admin/author-profiles', // profile list/images — loaded alongside the workspace
+  '/realtime/', // SSE streams — one request per page view, held open indefinitely
 ] as const;
 
 /** Exported for tests: pins the workspace routes excluded from the general limiter. */

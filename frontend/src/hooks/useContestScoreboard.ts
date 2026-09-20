@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import contestService from '../services/contestService';
-import { POLLING_INTERVALS } from '../config/constants';
+import { subscribeScoreboard, isRealtimeSupported } from '../services/realtimeService';
+import { POLLING_INTERVALS, REALTIME } from '../config/constants';
 import type {
   Contest,
   ContestProblem,
@@ -33,6 +34,10 @@ const useContestScoreboard = (contestId?: string | number): UseContestScoreboard
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  // Realtime (SSE) state — see useSubmissions for the pattern: while the
+  // stream is healthy the interval poll is a slow safety net; a dead stream
+  // (readyState CLOSED, not a transient retry) reverts to fast polling.
+  const [realtimeDown, setRealtimeDown] = useState(!isRealtimeSupported());
 
   const fetchContestData = useCallback(async () => {
     if (!contestId) {
@@ -87,12 +92,31 @@ const useContestScoreboard = (contestId?: string | number): UseContestScoreboard
     void fetchContestData();
   }, [fetchContestData]);
 
+  // Realtime scoreboard pings — refetch on every "something changed" event
+  // for this contest (verdict landed, post-contest migration rewrote the
+  // final scoreboard). Subscribed regardless of contest status so the final
+  // migration event at contest end still arrives.
+  useEffect(() => {
+    if (!contestId || !isRealtimeSupported()) {
+      return undefined;
+    }
+    const unsubscribe = subscribeScoreboard(contestId, () => {
+      void fetchScoreboard();
+    }, {
+      onStreamDown: () => setRealtimeDown(true),
+    });
+    return unsubscribe;
+  }, [contestId, fetchScoreboard]);
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
     if (contest?.status === 'running') {
+      const intervalMs = realtimeDown
+        ? REALTIME.SCOREBOARD_POLL_WHEN_STREAM_DOWN_MS
+        : REALTIME.SCOREBOARD_FALLBACK_POLL_MS;
       interval = setInterval(() => {
         void fetchScoreboard();
-      }, POLLING_INTERVALS.SCOREBOARD);
+      }, intervalMs);
     }
 
     return () => {
@@ -100,7 +124,7 @@ const useContestScoreboard = (contestId?: string | number): UseContestScoreboard
         clearInterval(interval);
       }
     };
-  }, [contest?.status, fetchScoreboard]);
+  }, [contest?.status, fetchScoreboard, realtimeDown]);
 
   const formatDateTime = (dateTime: Date | string) =>
     formatDateTimeShared(dateTime, { hour: '2-digit', minute: '2-digit', second: '2-digit' });

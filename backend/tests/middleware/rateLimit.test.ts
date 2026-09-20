@@ -31,9 +31,16 @@ describe('general API limiter skip paths', () => {
     expect(skipped('/admin/author-profiles/abc/image')).toBe(true);
   });
 
+  it('skips SSE realtime streams', () => {
+    expect(skipped('/realtime/submissions')).toBe(true);
+    expect(skipped('/realtime/contests/5')).toBe(true);
+  });
+
   it('does not skip unrelated routes', () => {
     expect(skipped('/problems')).toBe(false);
     expect(skipped('/submit')).toBe(false);
     expect(skipped('/admin/authoring')).toBe(false); // exact mount, no trailing path
+    expect(skipped('/realtime')).toBe(false); // exact mount, no trailing path
+    expect(skipped('/realtime-thing/other')).toBe(false); // prefix must match a path segment
   });
 });

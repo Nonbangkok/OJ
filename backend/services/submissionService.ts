@@ -14,6 +14,7 @@ import {
 } from '../constants';
 import { findForbiddenInclude } from '../utils/compileGuard';
 import { logger } from '../utils/logger';
+import { publishRealtime } from './realtimeHub';
 
 const execPromise = promisify(exec);
 
@@ -56,6 +57,28 @@ const FORBIDDEN_INCLUDE_MESSAGE = (target: string): string =>
   `Use standard library headers (e.g. <bits/stdc++.h>) only.`;
 
 /**
+ * Publish a realtime `submission_update` after a status/score transition has
+ * been persisted. Kept tiny and side-effect free so every emission point in
+ * the pipeline is one readable line; publishRealtime itself never throws.
+ */
+const publishSubmissionStatus = (
+  submissionId: number,
+  table: 'submissions' | 'contest_submissions',
+  userId: number | null,
+  overallStatus: string,
+  score: number
+): void => {
+  publishRealtime({
+    type: 'submission_update',
+    submissionId,
+    table,
+    overall_status: overallStatus,
+    score,
+    user_id: userId,
+  });
+};
+
+/**
  * Compile a submission's source and run it against the problem's testcases,
  * persisting each status transition. Shared by the standalone
  * (`submissions`) and contest (`contest_submissions`) pipelines — the only
@@ -68,6 +91,9 @@ async function runSubmissionPipeline(
 ): Promise<void> {
   let filePath = '';
   let outputPath = '';
+  // Owner of the submission — needed by the System Error handler below, so it
+  // must live outside the try block alongside the file paths.
+  let userId: number | null = null;
 
   try {
     const subRes = await db.query<SubmissionRow | ContestSubmissionRow>(
@@ -78,13 +104,16 @@ async function runSubmissionPipeline(
       logger.warn('submission not found for processing', { submissionId, table });
       return;
     }
-    const { problem_id, code, language } = subRes.rows[0];
+    const { problem_id, code, language, user_id, contest_id } = subRes.rows[0] as
+      Pick<SubmissionRow, 'problem_id' | 'code' | 'language' | 'user_id'> & { contest_id?: number };
+    userId = user_id;
     const submissionLanguage = (language as SubmissionLanguage) ?? 'cpp';
 
     await db.query(
       `UPDATE ${table} SET overall_status = '${SUBMISSION_STATUS.COMPILING}' WHERE id = $1`,
       [submissionId]
     );
+    publishSubmissionStatus(submissionId, table, user_id, SUBMISSION_STATUS.COMPILING, 0);
 
     const prepare = LANGUAGE_PREPARE[submissionLanguage];
     const uniqueId = `${filePrefix}_${submissionId}_${Date.now()}`;
@@ -106,6 +135,7 @@ async function runSubmissionPipeline(
           submissionId,
         ]
       );
+      publishSubmissionStatus(submissionId, table, user_id, SUBMISSION_STATUS.COMPILATION_ERROR, 0);
       return;
     }
 
@@ -130,6 +160,7 @@ async function runSubmissionPipeline(
           submissionId,
         ]
       );
+      publishSubmissionStatus(submissionId, table, user_id, SUBMISSION_STATUS.COMPILATION_ERROR, 0);
       return;
     }
 
@@ -137,6 +168,7 @@ async function runSubmissionPipeline(
       `UPDATE ${table} SET overall_status = '${SUBMISSION_STATUS.RUNNING}' WHERE id = $1`,
       [submissionId]
     );
+    publishSubmissionStatus(submissionId, table, user_id, SUBMISSION_STATUS.RUNNING, 0);
 
     // Compiled languages run the produced artifact; interpreted languages run
     // the source through their interpreter. The judge applies per-language
@@ -158,6 +190,13 @@ async function runSubmissionPipeline(
        WHERE id = $6`,
       [overallStatus, score, JSON.stringify(results), maxTimeMs, maxMemoryKb, submissionId]
     );
+    publishSubmissionStatus(submissionId, table, user_id, overallStatus, score);
+    // A landed contest verdict can move the scoreboard: emit a ping so
+    // connected clients refetch the authoritative payload. Chatty-free by
+    // design — intermediate statuses don't ping, only final verdicts.
+    if (table === 'contest_submissions' && contest_id != null) {
+      publishRealtime({ type: 'scoreboard_update', contestId: contest_id });
+    }
 
   } catch (error) {
     logger.error('submission pipeline failed', { submissionId, table, err: error });
@@ -166,6 +205,7 @@ async function runSubmissionPipeline(
         `UPDATE ${table} SET overall_status = '${SUBMISSION_STATUS.SYSTEM_ERROR}' WHERE id = $1`,
         [submissionId]
       );
+      publishSubmissionStatus(submissionId, table, userId, SUBMISSION_STATUS.SYSTEM_ERROR, 0);
     } catch (dbError) {
       logger.error('failed to record system-error status', { submissionId, table, err: dbError });
     }

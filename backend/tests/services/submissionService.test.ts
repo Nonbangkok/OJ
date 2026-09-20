@@ -3,8 +3,12 @@ import * as db from '../../db';
 import fs from 'fs';
 import cp from 'child_process';
 import { judge } from '../../services/judgeService';
+import { publishRealtime } from '../../services/realtimeHub';
 
 jest.mock('../../db');
+jest.mock('../../services/realtimeHub', () => ({
+    publishRealtime: jest.fn(),
+}));
 jest.mock('fs', () => ({
     existsSync: jest.fn(),
     mkdirSync: jest.fn(),
@@ -126,6 +130,139 @@ describe('Submission Service', () => {
 
             expect(db.query).toHaveBeenNthCalledWith(2, expect.stringContaining('UPDATE contest_submissions SET overall_status = \'Compiling\''), [1]);
             expect(db.query).toHaveBeenNthCalledWith(4, expect.stringContaining('UPDATE contest_submissions\n       SET overall_status'), ['Accepted', 100, JSON.stringify([{ testCase: 1, status: 'Accepted' }]), 10, 2048, 1]);
+        });
+    });
+
+    describe('realtime emissions', () => {
+        it('publishes the full status sequence for a regular submission', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}) // UPDATE Running
+                .mockResolvedValueOnce({}); // UPDATE final results
+
+            (fs.existsSync as jest.Mock).mockReturnValue(true);
+
+            (judge as jest.Mock).mockResolvedValueOnce({
+                results: [{ testCase: 1, status: 'Accepted' }],
+                score: 100,
+                overallStatus: 'Accepted',
+                maxTimeMs: 10,
+                maxMemoryKb: 2048
+            });
+
+            await processSubmission(1);
+
+            // Every status transition publishes a realtime event after the
+            // DB write succeeds.
+            expect(publishRealtime).toHaveBeenCalledTimes(3);
+            expect(publishRealtime).toHaveBeenNthCalledWith(1, {
+                type: 'submission_update',
+                submissionId: 1,
+                table: 'submissions',
+                overall_status: 'Compiling',
+                score: 0,
+                user_id: 42,
+            });
+            expect(publishRealtime).toHaveBeenNthCalledWith(2, {
+                type: 'submission_update',
+                submissionId: 1,
+                table: 'submissions',
+                overall_status: 'Running',
+                score: 0,
+                user_id: 42,
+            });
+            expect(publishRealtime).toHaveBeenNthCalledWith(3, {
+                type: 'submission_update',
+                submissionId: 1,
+                table: 'submissions',
+                overall_status: 'Accepted',
+                score: 100,
+                user_id: 42,
+            });
+        });
+
+        it('publishes Compilation Error (no further events) when the compile fails', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'bad code', language: 'cpp' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}); // UPDATE Compilation Error
+
+            (fs.existsSync as jest.Mock).mockReturnValue(true);
+
+            (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, options, cb) => {
+                const callback = typeof options === 'function' ? options : cb;
+                callback({ stderr: 'syntax error' }, null, 'syntax error');
+            });
+
+            await processSubmission(1);
+
+            expect(publishRealtime).toHaveBeenCalledTimes(2);
+            expect(publishRealtime).toHaveBeenNthCalledWith(2, {
+                type: 'submission_update',
+                submissionId: 1,
+                table: 'submissions',
+                overall_status: 'Compilation Error',
+                score: 0,
+                user_id: 42,
+            });
+        });
+
+        it('publishes a scoreboard_update when a contest submission reaches its final verdict', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', contest_id: 9, user_id: 42, code: 'int main(){}', language: 'cpp' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}) // UPDATE Running
+                .mockResolvedValueOnce({}); // UPDATE final results
+
+            (fs.existsSync as jest.Mock).mockReturnValue(true);
+
+            (judge as jest.Mock).mockResolvedValueOnce({
+                results: [{ testCase: 1, status: 'Accepted' }],
+                score: 100,
+                overallStatus: 'Accepted',
+                maxTimeMs: 10,
+                maxMemoryKb: 2048
+            });
+
+            await processContestSubmission(1);
+
+            // Compiling, Running, final submission_update, then the scoreboard ping.
+            expect(publishRealtime).toHaveBeenCalledTimes(4);
+            expect(publishRealtime).toHaveBeenNthCalledWith(3, {
+                type: 'submission_update',
+                submissionId: 1,
+                table: 'contest_submissions',
+                overall_status: 'Accepted',
+                score: 100,
+                user_id: 42,
+            });
+            expect(publishRealtime).toHaveBeenNthCalledWith(4, {
+                type: 'scoreboard_update',
+                contestId: 9,
+            });
+        });
+
+        it('publishes System Error when the pipeline throws mid-flight', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockRejectedValueOnce(new Error('db blew up')) // UPDATE Running fails
+                .mockResolvedValueOnce({}); // UPDATE System Error
+
+            (fs.existsSync as jest.Mock).mockReturnValue(true);
+
+            await processSubmission(1);
+
+            expect(publishRealtime).toHaveBeenCalledTimes(2);
+            expect(publishRealtime).toHaveBeenNthCalledWith(2, {
+                type: 'submission_update',
+                submissionId: 1,
+                table: 'submissions',
+                overall_status: 'System Error',
+                score: 0,
+                user_id: 42,
+            });
         });
     });
 

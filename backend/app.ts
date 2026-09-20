@@ -13,6 +13,7 @@ import authRoutes from './controllers/authController';
 import problemRoutes from './controllers/problemController';
 import submissionRoutes from './controllers/submissionController';
 import contestRoutes from './controllers/contestController';
+import realtimeRoutes from './controllers/realtimeController';
 import healthRoutes from './controllers/healthController';
 import authoringDraftRoutes from './controllers/authoringDraftController';
 import authorProfileRoutes from './controllers/authorProfileController';
@@ -103,6 +104,7 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
   app.use('/', problemRoutes);
   app.use('/', submissionRoutes);
   app.use('/', contestRoutes);
+  app.use('/', realtimeRoutes);
   app.use('/', authoringDraftRoutes);
   app.use('/', authorProfileRoutes);
   app.use('/', userProfileRoutes);

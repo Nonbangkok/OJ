@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import submissionService from '../services/submissionService';
+import { subscribeSubmissions, isRealtimeSupported } from '../services/realtimeService';
 import { useAuth } from '../context/AuthContext';
 import { useAutocomplete } from './useAutocomplete';
 import { USER_ROLES, SUBMISSION_STATUS } from '../utils/constants';
-import { POLLING_INTERVALS } from '../config/constants';
+import { POLLING_INTERVALS, REALTIME } from '../config/constants';
 import type { SubmissionDetail, SubmissionSummary, SubmissionQueryParams, AuthUser } from '../types';
 
 type SubmissionFilter = 'all' | 'mine';
@@ -25,6 +26,11 @@ export const useSubmissions = (
   const [filter, setFilter] = useState<SubmissionFilter>('all');
   const [selectedSubmission, setSelectedSubmission] = useState<SubmissionDetail | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // Realtime (SSE) state. While the stream is healthy, interval polling runs
+  // only as a slow safety net; if the stream dies for good (auth failure,
+  // server error — not a transient drop, which the browser retries), revert
+  // to the original fast interval so the page never stops updating.
+  const [realtimeDown, setRealtimeDown] = useState(!isRealtimeSupported());
 
   const problemAutocomplete = useAutocomplete(submissionService.searchProblems, { contestId });
   const userAutocomplete = useAutocomplete(submissionService.searchUsers, { contestId });
@@ -81,7 +87,24 @@ export const useSubmissions = (
     fetchData();
   }, [fetchData]);
 
-  // 3. Polling for Pending Submissions
+  // 2. Realtime (SSE) stream — refetch whenever one of the user's own
+  //    submissions changes, so verdicts appear without waiting for a poll
+  //    tick. Unauthenticated visitors never connect (the endpoint requires
+  //    a session); their 401 would just trip onStreamDown.
+  useEffect(() => {
+    if (!currentUser || !isRealtimeSupported()) {
+      return undefined;
+    }
+    const unsubscribe = subscribeSubmissions(() => {
+      void fetchData();
+    }, {
+      onStreamDown: () => setRealtimeDown(true),
+    });
+    return unsubscribe;
+  }, [currentUser, fetchData]);
+
+  // 3. Polling for Pending Submissions (fallback safety net — SSE only
+  //    lowers latency, polling stays the correctness floor)
   useEffect(() => {
     const processingStatuses: string[] = [
       SUBMISSION_STATUS.PENDING,
@@ -93,10 +116,13 @@ export const useSubmissions = (
     );
 
     if (isProcessing) {
-      const intervalId = setInterval(fetchData, POLLING_INTERVALS.SUBMISSIONS);
+      const intervalMs = realtimeDown
+        ? POLLING_INTERVALS.SUBMISSIONS
+        : REALTIME.SUBMISSIONS_FALLBACK_POLL_MS;
+      const intervalId = setInterval(fetchData, intervalMs);
       return () => clearInterval(intervalId);
     }
-  }, [submissions, fetchData]);
+  }, [submissions, fetchData, realtimeDown]);
 
   // 4. Handlers
   const handleApplyFilters = () => {

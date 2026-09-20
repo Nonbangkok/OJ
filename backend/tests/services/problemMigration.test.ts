@@ -1,9 +1,15 @@
 import {
     moveProblemsToContest,
     moveProblemsBackToMain,
-    getAvailableProblemsForContest
+    getAvailableProblemsForContest,
+    migrateSubmissionsAfterContest
 } from '../../services/problemMigration';
 import * as db from '../../db';
+import { publishRealtime } from '../../services/realtimeHub';
+
+jest.mock('../../services/realtimeHub', () => ({
+    publishRealtime: jest.fn(),
+}));
 
 // Mock db.pool.connect
 const mockClient = {
@@ -108,6 +114,42 @@ describe('Problem Migration Service', () => {
 
             expect(problems).toHaveLength(2);
             expect(db.query).toHaveBeenCalledWith(expect.stringContaining('WHERE contest_id IS NULL'));
+        });
+    });
+
+    describe('migrateSubmissionsAfterContest', () => {
+        it('should publish a scoreboard_update after the final scoreboard is written', async () => {
+            // All client queries succeed; the scoreboard INSERT returns one row.
+            (mockClient.query as jest.Mock).mockImplementation(async (text: string) => {
+                if (String(text).includes('SELECT id, status FROM contests')) {
+                    return { rows: [{ id: 1, status: 'finishing' }] };
+                }
+                if (String(text).includes('INSERT INTO contest_scoreboards')) {
+                    return { rows: [{ user_id: 1 }] };
+                }
+                if (String(text).includes('INSERT INTO submissions')) {
+                    return { rows: [{ id: 10 }] };
+                }
+                return { rows: [] };
+            });
+
+            const result = await migrateSubmissionsAfterContest(1);
+
+            expect(result.success).toBe(true);
+            expect(publishRealtime).toHaveBeenCalledWith({ type: 'scoreboard_update', contestId: 1 });
+        });
+
+        it('should not publish when the migration rolls back', async () => {
+            (mockClient.query as jest.Mock).mockImplementation(async (text: string) => {
+                if (String(text).includes('SELECT id, status FROM contests')) {
+                    return { rows: [{ id: 1, status: 'running' }] }; // wrong status → throws
+                }
+                return { rows: [] };
+            });
+
+            await expect(migrateSubmissionsAfterContest(1)).rejects.toThrow('finishing');
+
+            expect(publishRealtime).not.toHaveBeenCalled();
         });
     });
 });

@@ -335,6 +335,13 @@ export const STATEMENT_ASSET = {
     ALLOWED_MIME_TYPES: ['image/jpeg', 'image/png', 'image/webp'],
 } as const;
 
+/** SSE realtime stream tuning (see services/realtimeHub.ts + realtimeController). */
+export const REALTIME_CONFIG = {
+    // Heartbeat comment cadence — well inside the 300s nginx read timeout so
+    // idle streams stay open without tripping intermediaries.
+    HEARTBEAT_INTERVAL_MS: 30_000,
+} as const;
+
 export const RATE_LIMIT_CONFIG = {
     // General API limiter. Budget set for real app behavior: every page load
     // costs ~2 requests (/me + /settings/registration) before any data fetch,

@@ -3,6 +3,7 @@ import { PoolClient } from 'pg';
 import { CONTEST_STATUS } from '../constants';
 import { logger } from '../utils/logger';
 import { ContestRow } from '../types/models';
+import { publishRealtime } from './realtimeHub';
 import {
   AvailableContestProblemRow,
   ContestMigrationResult,
@@ -228,6 +229,10 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
     );
 
     await client.query('COMMIT');
+
+    // The final scoreboard rewrite is visible to connected clients — ping
+    // them to refetch (publishRealtime never throws).
+    publishRealtime({ type: 'scoreboard_update', contestId });
 
     return {
       success: true,

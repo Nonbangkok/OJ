@@ -11,6 +11,19 @@ export const POLLING_INTERVALS = {
   BATCH_PROCESS: 2000,
 } as const;
 
+/**
+ * Realtime (SSE) tuning. While the EventSource stream is healthy, interval
+ * polling is only a slow safety net; if the stream dies for good
+ * (readyState === CLOSED — e.g. auth failure or server error), the hooks
+ * revert to their original fast intervals.
+ */
+export const REALTIME = {
+  SUBMISSIONS_FALLBACK_POLL_MS: 30000,
+  SCOREBOARD_FALLBACK_POLL_MS: 5 * 60 * 1000,
+  /** Scoreboard poll while the realtime stream is down (matches the pre-SSE value). */
+  SCOREBOARD_POLL_WHEN_STREAM_DOWN_MS: POLLING_INTERVALS.SCOREBOARD,
+} as const;
+
 export const UI_TIMEOUTS = {
   SUCCESS_MESSAGE_SHORT: 3000,
   SUCCESS_MESSAGE_LONG: 5000,
