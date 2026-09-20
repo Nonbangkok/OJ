@@ -12,11 +12,17 @@ import {
 } from '../constants';
 
 const nonEmptyString = z.string().trim().min(1);
-// A category must be one of the fixed categories; an empty selection means
-// uncategorized (null). Validated once here so every write path shares it.
-const problemCategory = z.preprocess(
-  (value) => (value === '' ? null : value),
-  z.enum(PROBLEM_CATEGORIES).nullable(),
+// Categories must come from the fixed list. An empty array means
+// uncategorized. Deduplicated and sorted on the way in so equal sets always
+// compare equal (the publish provenance guard relies on that).
+const problemCategories = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined) return [];
+    if (typeof value === 'string') return value === '' ? [] : [value];
+    if (Array.isArray(value)) return [...new Set(value)].sort();
+    return value;
+  },
+  z.array(z.enum(PROBLEM_CATEGORIES)),
 );
 export const expectedRevisionSchema = z.object({
   expectedRevision: z.number().int().positive().max(2147483647),
@@ -117,7 +123,7 @@ export const createProblemSchema = z.object({
   id: nonEmptyString,
   title: z.string().trim().min(PROBLEM_VALIDATION.MIN_TITLE_LENGTH).max(STRING_LIMITS.TITLE),
   author: z.string().trim().min(PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH).max(STRING_LIMITS.AUTHOR),
-  category: problemCategory.optional(),
+  categories: problemCategories.optional(),
   time_limit_ms: z.number().int().min(PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS),
   memory_limit_mb: z.number().int().min(PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB),
 });
@@ -126,7 +132,7 @@ export const updateProblemSchema = z.object({
   id: nonEmptyString,
   title: z.string().trim().min(PROBLEM_VALIDATION.MIN_TITLE_LENGTH).max(STRING_LIMITS.TITLE).optional(),
   author: z.string().trim().min(PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH).max(STRING_LIMITS.AUTHOR).optional(),
-  category: problemCategory.optional(),
+  categories: problemCategories.optional(),
   time_limit_ms: z.number().int().min(PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS).optional(),
   memory_limit_mb: z.number().int().min(PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB).optional(),
 });
@@ -199,7 +205,7 @@ const editableProblemDraftFields = {
   authorRealName: nonEmptyString.max(AUTHORING_VALIDATION.MAX_REAL_NAME_LENGTH),
   language: nonEmptyString.max(AUTHORING_VALIDATION.MAX_LANGUAGE_LENGTH),
   countryCode: z.string().regex(/^[A-Z]{3}$/),
-  category: problemCategory,
+  categories: problemCategories,
   timeLimitMs: z.number().int().min(PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS)
     .max(AUTHORING_VALIDATION.MAX_INT),
   memoryLimitMb: z.number().int().min(PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB)
@@ -217,7 +223,7 @@ export const createProblemDraftSchema = z.object({
   authorRealName: editableProblemDraftFields.authorRealName.optional(),
   language: editableProblemDraftFields.language.optional(),
   countryCode: editableProblemDraftFields.countryCode.optional(),
-  category: editableProblemDraftFields.category.default(null),
+  categories: editableProblemDraftFields.categories.default([]),
   statementHtml: editableProblemDraftFields.statementHtml.default(''),
   solutionCpp: editableProblemDraftFields.solutionCpp.default(''),
   generatorCpp: editableProblemDraftFields.generatorCpp.default(null),
@@ -259,7 +265,7 @@ export const updateProblemDraftSchema = z.object({
   authorRealName: editableProblemDraftFields.authorRealName.optional(),
   language: editableProblemDraftFields.language.optional(),
   countryCode: editableProblemDraftFields.countryCode.optional(),
-  category: editableProblemDraftFields.category.optional(),
+  categories: editableProblemDraftFields.categories.optional(),
   timeLimitMs: editableProblemDraftFields.timeLimitMs.optional(),
   memoryLimitMb: editableProblemDraftFields.memoryLimitMb.optional(),
   statementHtml: editableProblemDraftFields.statementHtml.optional(),

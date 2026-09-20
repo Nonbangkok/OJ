@@ -139,8 +139,8 @@ router.get('/problems/:id/pdf', requireAuth,
 router.post('/admin/problems', requireAuth, requireStaffOrAdmin,
   validateRequest({ body: createProblemSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const { id, title, author, category, time_limit_ms, memory_limit_mb } = req.body as CreateProblemRequestBody;
-  const createdProblem = await createProblem({ id, title, author, category, time_limit_ms, memory_limit_mb });
+  const { id, title, author, categories, time_limit_ms, memory_limit_mb } = req.body as CreateProblemRequestBody;
+  const createdProblem = await createProblem({ id, title, author, categories, time_limit_ms, memory_limit_mb });
   res.status(201).json(createdProblem);
 }));
 
@@ -148,13 +148,13 @@ router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
   validateRequest({ params: idParamSchema, body: updateProblemSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const oldId = String(req.params.id);
-  const { id: newId, title, author, category, time_limit_ms, memory_limit_mb } = req.body as UpdateProblemRequestBody;
+  const { id: newId, title, author, categories, time_limit_ms, memory_limit_mb } = req.body as UpdateProblemRequestBody;
 
   const updateResult = await updateProblem(oldId, {
     id: newId,
     title,
     author,
-    category,
+    categories,
     time_limit_ms,
     memory_limit_mb,
   });

@@ -160,7 +160,7 @@ router.get('/analytics/export', requireStaffOrAdmin,
       );
       csv = toCsv(
         ['problemId', 'title', 'category', 'submissions', 'accepted', 'acRate', 'solvers'],
-        problems.map((p) => [p.problemId, p.title, p.category, p.submissions, p.accepted, p.acRate, p.solvers]),
+        problems.map((p) => [p.problemId, p.title, p.categories.join('; '), p.submissions, p.accepted, p.acRate, p.solvers]),
       );
     } else {
       const submissions = await listSubmissionsForAnalytics(

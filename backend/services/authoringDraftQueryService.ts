@@ -19,7 +19,7 @@ export type CreateProblemDraftInput = Pick<
   | 'author_real_name'
   | 'language'
   | 'country_code'
-  | 'category'
+  | 'categories'
   | 'time_limit_ms'
   | 'memory_limit_mb'
   | 'created_by'
@@ -56,7 +56,7 @@ type EditableProblemDraftFields = Pick<
   | 'language'
   | 'country_code'
   | 'author_profile_image_png'
-  | 'category'
+  | 'categories'
   | 'time_limit_ms'
   | 'memory_limit_mb'
   | 'statement_html'
@@ -88,7 +88,7 @@ const EDITABLE_FIELDS: readonly (keyof EditableProblemDraftFields)[] = [
   'language',
   'country_code',
   'author_profile_image_png',
-  'category',
+  'categories',
   'time_limit_ms',
   'memory_limit_mb',
   'statement_html',
@@ -106,7 +106,7 @@ export const createProblemDraft = async (
     INSERT INTO problem_drafts (
       id, problem_id, title, author_profile_id, author_aka_name,
       author_real_name, language, country_code, author_profile_image_png,
-      category, time_limit_ms, memory_limit_mb, statement_html, solution_cpp,
+      categories, time_limit_ms, memory_limit_mb, statement_html, solution_cpp,
       generator_cpp, template_version, created_by
     )
     VALUES (
@@ -126,7 +126,7 @@ export const createProblemDraft = async (
     input.language,
     input.country_code,
     input.author_profile_image_png ?? null,
-    input.category,
+    [...input.categories],
     input.time_limit_ms,
     input.memory_limit_mb,
     input.statement_html ?? '',
@@ -177,7 +177,13 @@ export const updateProblemDraft = async (
     if (value === undefined) {
       continue;
     }
-    values.push(value);
+    // Categories normalize to a sorted, deduplicated set at the storage layer
+    // too (not just in request validation) so the publish provenance guard's
+    // element-wise array comparison is order-independent.
+    const normalized = field === 'categories' && Array.isArray(value)
+      ? [...new Set(value)].sort()
+      : value;
+    values.push(normalized);
     assignments.push(`${field} = $${values.length}`);
   }
 

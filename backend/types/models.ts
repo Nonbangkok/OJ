@@ -90,8 +90,8 @@ export interface ProblemRow {
     id: string;
     title: string;
     author: string | null;
-    /** One of PROBLEM_CATEGORIES, or null when uncategorized. */
-    category: ProblemCategory | null;
+    /** Fixed-list categories; an empty array means uncategorized. */
+    categories: readonly ProblemCategory[];
     problem_pdf: Buffer | null;
     time_limit_ms: number;
     memory_limit_mb: number;
@@ -114,7 +114,7 @@ export type ProblemDetailDTO = Pick<
 /** `problems` row augmented with contest status for the admin index. */
 export interface AdminProblemRow extends Pick<
     ProblemRow,
-    'id' | 'title' | 'author' | 'category' | 'is_visible' | 'contest_id'
+    'id' | 'title' | 'author' | 'categories' | 'is_visible' | 'contest_id'
 > {
     contest_status: ContestStatus | null;
 }

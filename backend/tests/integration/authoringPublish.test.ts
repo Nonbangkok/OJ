@@ -42,7 +42,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   async function draft(problemId = 'publish-test') {
     const d = await createProblemDraft({ problem_id: problemId, title: 'Publish test', author_profile_id: null,
       author_aka_name: 'AKA', author_real_name: 'Private real name', language: 'Thai', country_code: 'THA',
-      category: null,
+      categories: [],
       time_limit_ms: 1000, memory_limit_mb: 256, created_by: null, solution_cpp: source,
       generator_cpp: '// PRIVATE_GENERATOR\nint main(){}', statement_html: '<h1>Publication</h1>' }, database);
     for (const [number, input, output] of [[2, '1\r\n', '\t2 \n'], [7, '', '']] as const) {
@@ -183,29 +183,30 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     expect((await rows('problems'))[0]).toEqual(expect.objectContaining({ title: 'Corrected title', time_limit_ms: 1500 }));
   });
 
-  it('carries the draft category into the legacy problem and provenance, and detects out-of-band category edits', async () => {
+  it('carries the draft categories into the legacy problem and provenance, and detects out-of-band edits', async () => {
     const d = await ready();
-    await updateProblemDraft(d.id, 1, { category: 'Graph' }, database);
+    await updateProblemDraft(d.id, 1, { categories: ['Graph', 'Divide and Conquer'] }, database);
     await verify(d, 2);
     expect((await post(d.id, 2)).status).toBe(201);
-    expect((await rows('problems'))[0]).toEqual(expect.objectContaining({ category: 'Graph' }));
+    const stored = (await rows('problems'))[0];
+    expect([...stored.categories].sort()).toEqual(['Divide and Conquer', 'Graph']);
 
     // A category edit made outside authoring must block the next republish,
     // like any other publication-metadata change.
-    await pool.query("UPDATE problems SET category='Math' WHERE id=$1", [d.problem_id]);
+    await pool.query("UPDATE problems SET categories=ARRAY['Math'] WHERE id=$1", [d.problem_id]);
     await updateProblemDraft(d.id, 2, { statement_html: '<h1>Correction</h1>' }, database);
     await verify(d, 3);
     const mismatch = await post(d.id, 3);
     expect(mismatch.status).toBe(409);
     expect(mismatch.body.code).toBe('published_problem_mismatch');
 
-    // Restoring the legacy category lets the republish through, and clearing
-    // the draft category clears the problem's category on the next publish.
-    await pool.query("UPDATE problems SET category='Graph' WHERE id=$1", [d.problem_id]);
-    await updateProblemDraft(d.id, 3, { category: null }, database);
+    // Restoring the legacy categories lets the republish through, and an empty
+    // draft category set clears the problem's categories on the next publish.
+    await pool.query("UPDATE problems SET categories=ARRAY['Divide and Conquer','Graph'] WHERE id=$1", [d.problem_id]);
+    await updateProblemDraft(d.id, 3, { categories: [] }, database);
     await verify(d, 4);
     expect((await post(d.id, 4)).status).toBe(200);
-    expect((await rows('problems'))[0].category).toBeNull();
+    expect((await rows('problems'))[0].categories).toEqual([]);
   });
 
   it.each(['unverified', 'stale_revision', 'stale_verified_revision', 'stale_pdf', 'missing_pdf', 'corrupt_pdf', 'no_verification_job', 'incomplete_pair', 'empty_cases', 'busy'])(

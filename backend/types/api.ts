@@ -132,7 +132,7 @@ export interface CreateProblemRequestBody {
     id: string;
     title: string;
     author: string;
-    category?: ProblemCategory | null;
+    categories?: readonly ProblemCategory[];
     time_limit_ms: number;
     memory_limit_mb: number;
 }
@@ -141,7 +141,7 @@ export interface UpdateProblemRequestBody {
     id: string;
     title?: string;
     author?: string;
-    category?: ProblemCategory | null;
+    categories?: readonly ProblemCategory[];
     time_limit_ms?: number;
     memory_limit_mb?: number;
 }
@@ -198,7 +198,7 @@ export interface CreateProblemDraftRequestBody {
     authorRealName?: string;
     language?: string;
     countryCode?: string;
-    category?: ProblemCategory | null;
+    categories?: readonly ProblemCategory[];
     timeLimitMs: number;
     memoryLimitMb: number;
     statementHtml: string;

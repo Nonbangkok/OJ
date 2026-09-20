@@ -45,7 +45,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   async function draft() {
     const d = await createProblemDraft({ problem_id: 'pdf-test', title: 'PDF test', author_profile_id: null,
       author_aka_name: 'ผู้เขียน', author_real_name: 'Author', language: 'Thai', country_code: 'THA',
-      category: null,
+      categories: [],
       time_limit_ms: 1000, memory_limit_mb: 256, created_by: null, solution_cpp: '',
       statement_html: '# โจทย์ใหม่\n\nสมการ $x^2$\n\n<image src="{{ASSET_BASE}}/diagram.png" style="width:80%">' }, database);
     await pool.query('UPDATE problem_drafts SET author_profile_image_png=$1 WHERE id=$2', [avatar, d.id]);

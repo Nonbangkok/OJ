@@ -32,7 +32,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   async function draft() {
     return createProblemDraft({ problem_id: 'workspace', title: 'Workspace', author_profile_id: null,
       author_aka_name: 'A', author_real_name: 'Author', language: 'English', country_code: 'GBR',
-      category: null,
+      categories: [],
       time_limit_ms: 1000, memory_limit_mb: 256, created_by: null,
       solution_cpp: 'PRIVATE SOLUTION', generator_cpp: 'PRIVATE GENERATOR', statement_html: '<p>SAVED</p>' }, database);
   }

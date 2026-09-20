@@ -130,7 +130,7 @@ describe('Analytics Controller', () => {
     describe('GET /analytics/problems', () => {
         it('passes search/sort to the service and returns rows', async () => {
             mockListProblemsForAnalytics.mockResolvedValueOnce([{
-                problemId: 'aplusb', title: 'A Plus B', category: 'math',
+                problemId: 'aplusb', title: 'A Plus B', categories: ['Math'],
                 submissions: 30, accepted: 20, acRate: 0.667, solvers: 8,
             }] as never);
 
@@ -310,7 +310,7 @@ describe('Analytics Controller', () => {
 
         it('exports the problems dataset as CSV', async () => {
             mockListProblemsForAnalytics.mockResolvedValueOnce([{
-                problemId: 'aplusb', title: 'A Plus B', category: 'math',
+                problemId: 'aplusb', title: 'A Plus B', categories: ['Math'],
                 submissions: 30, accepted: 20, acRate: 0.66, solvers: 15,
             }] as never);
 
@@ -318,7 +318,7 @@ describe('Analytics Controller', () => {
 
             expect(res.status).toBe(200);
             expect(res.text.split('\r\n')[0]).toBe('problemId,title,category,submissions,accepted,acRate,solvers');
-            expect(res.text.split('\r\n')[1]).toContain('aplusb,A Plus B,math');
+            expect(res.text.split('\r\n')[1]).toContain('aplusb,A Plus B,Math');
         });
 
         it('exports the submissions dataset with filters applied', async () => {

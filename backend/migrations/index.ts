@@ -10,6 +10,7 @@ import { userProfileSql } from './0008UserProfile';
 import { profileSyncSql } from './0009ProfileSync';
 import { submissionIndexesSql } from './0010SubmissionIndexes';
 import { authoringDraftCategorySql } from './0011AuthoringDraftCategory';
+import { problemCategoriesSql } from './0012ProblemCategories';
 
 export const coreMigrations: readonly Migration[] = Object.freeze([
   {
@@ -33,4 +34,5 @@ export const migrations: readonly Migration[] = Object.freeze([
   { version: '0009_profile_sync', sql: profileSyncSql },
   { version: '0010_submission_indexes', sql: submissionIndexesSql },
   { version: '0011_authoring_draft_category', sql: authoringDraftCategorySql },
+  { version: '0012_problem_categories', sql: problemCategoriesSql },
 ]);

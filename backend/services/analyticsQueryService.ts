@@ -447,11 +447,14 @@ export const getUserAnalytics = async (userId: number): Promise<UserAnalytics | 
       SELECT problem_id, overall_status FROM contest_submissions WHERE user_id = $1
     )
     SELECT
-      COALESCE(p.category, 'uncategorized') AS category,
+      cat.category,
       COUNT(DISTINCT us.problem_id) FILTER (WHERE us.overall_status = '${SUBMISSION_STATUS.ACCEPTED}') AS solved,
       COUNT(DISTINCT us.problem_id) AS attempted
     FROM user_submissions us
     JOIN problems p ON p.id = us.problem_id
+    CROSS JOIN LATERAL unnest(
+      CASE WHEN cardinality(p.categories) > 0 THEN p.categories ELSE ARRAY['uncategorized'] END
+    ) AS cat(category)
     GROUP BY 1
     ORDER BY solved DESC`,
     [userId]);
@@ -806,7 +809,7 @@ export const getContestAnalytics = async (contestId: number): Promise<ContestAna
 export interface ProblemListRow {
   problemId: string;
   title: string;
-  category: string | null;
+  categories: readonly string[];
   submissions: number;
   accepted: number;
   acRate: number;
@@ -816,7 +819,7 @@ export interface ProblemListRow {
 interface ProblemListQueryRow {
   problem_id: string;
   title: string;
-  category: string | null;
+  categories: readonly string[];
   submissions: string;
   accepted: string;
   ac_rate: string;
@@ -826,7 +829,7 @@ interface ProblemListQueryRow {
 /** Sortable columns for the problems list, mapped to SQL expressions. */
 const PROBLEM_SORT_COLUMNS: Record<string, string> = {
   title: 'p.title',
-  category: 'p.category',
+  category: 'categories_text',
   submissions: 'submissions',
   accepted: 'accepted',
   acRate: 'ac_rate',
@@ -867,7 +870,8 @@ export const listProblemsForAnalytics = async (
     SELECT
       p.id AS problem_id,
       p.title,
-      p.category,
+      ARRAY(SELECT c FROM unnest(p.categories) c ORDER BY c) AS categories,
+      ARRAY_TO_STRING(ARRAY(SELECT c FROM unnest(p.categories) c ORDER BY c), ', ') AS categories_text,
       COALESCE(pp.submissions, 0) AS submissions,
       COALESCE(pp.accepted, 0) AS accepted,
       COALESCE(pp.ac_rate, 0) AS ac_rate,
@@ -882,7 +886,7 @@ export const listProblemsForAnalytics = async (
   return result.rows.map((r) => ({
     problemId: r.problem_id,
     title: r.title,
-    category: r.category,
+    categories: r.categories ?? [],
     submissions: toNum(r.submissions),
     accepted: toNum(r.accepted),
     acRate: toNum(r.ac_rate),

@@ -117,7 +117,7 @@ describe('Problem Controller', () => {
             expect(res.status).toBe(200);
             expect(res.body).toEqual(mockProblems);
             expect(db.query).toHaveBeenCalledWith(
-                'SELECT id, title, author, category FROM problems WHERE is_visible = true AND contest_id IS NULL ORDER BY id'
+                'SELECT id, title, author, categories FROM problems WHERE is_visible = true AND contest_id IS NULL ORDER BY id'
             );
         });
     });
@@ -307,12 +307,12 @@ describe('Problem Controller', () => {
             );
         });
 
-        it('should create a problem with a category', async () => {
+        it('should create a problem with categories', async () => {
             const newProblem = {
                 id: 'P4',
                 title: 'Problem 4',
                 author: 'Author 4',
-                category: 'Dynamic Programming',
+                categories: ['Dynamic Programming', 'Graph'],
                 time_limit_ms: 1000,
                 memory_limit_mb: 256
             };
@@ -325,20 +325,20 @@ describe('Problem Controller', () => {
             expect(res.status).toBe(201);
             expect(db.query).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO problems'),
-                expect.arrayContaining(['Dynamic Programming'])
+                ['P4', 'Problem 4', 'Author 4', ['Dynamic Programming', 'Graph'], 1000, 256]
             );
         });
 
-        it('should treat an empty-string category as uncategorized (null)', async () => {
+        it('should treat an empty array as uncategorized and normalize the set', async () => {
             const newProblem = {
                 id: 'P4b',
                 title: 'Problem 4b',
                 author: 'Author 4',
-                category: '',
+                categories: [],
                 time_limit_ms: 1000,
                 memory_limit_mb: 256
             };
-            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ ...newProblem, category: null }] });
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ ...newProblem, categories: [] }] });
 
             const res = await request(app)
                 .post('/admin/problems')
@@ -347,7 +347,7 @@ describe('Problem Controller', () => {
             expect(res.status).toBe(201);
             expect(db.query).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO problems'),
-                expect.arrayContaining([null])
+                ['P4b', 'Problem 4b', 'Author 4', [], 1000, 256]
             );
         });
 
@@ -356,7 +356,7 @@ describe('Problem Controller', () => {
                 id: 'P5',
                 title: 'Problem 5',
                 author: 'Author 5',
-                category: 'x'.repeat(51),
+                categories: ['Not A Real Category'],
                 time_limit_ms: 1000,
                 memory_limit_mb: 256
             };

@@ -31,7 +31,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     (db.pool.connect as jest.Mock).mockImplementation(() => pool.connect());
     const draft = await createProblemDraft({ problem_id: 'test', title: 'Fixture', author_profile_id: null,
       author_aka_name: 'A', author_real_name: 'Author', language: 'Thai', country_code: 'THA',
-      category: null,
+      categories: [],
       time_limit_ms: 1000, memory_limit_mb: 256, created_by: null }, database);
     id = draft.id; base = `/admin/authoring/drafts/${id}/testcases`;
   });

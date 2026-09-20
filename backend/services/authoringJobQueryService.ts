@@ -319,24 +319,24 @@ type PoolClientLike = { query: (sql: string, values?: unknown[]) => Promise<{ ro
  */
 async function republishSyncedProblem(client: PoolClientLike,
   draftId: string, draft: ProblemDraftRow, pdf: Buffer): Promise<boolean> {
-  const provenance = (await client.query(`SELECT problem_id,title,author,category,time_limit_ms,memory_limit_mb
+  const provenance = (await client.query(`SELECT problem_id,title,author,categories,time_limit_ms,memory_limit_mb
       FROM authoring_published_problems WHERE draft_id=$1`, [draftId])).rows[0] as
-    { problem_id: string; title: string; author: string | null; category: string | null; time_limit_ms: number; memory_limit_mb: number } | undefined;
+    { problem_id: string; title: string; author: string | null; categories: readonly string[]; time_limit_ms: number; memory_limit_mb: number } | undefined;
   if (!provenance) return false;
   const updated = await client.query(`UPDATE problems SET
-    title=$2, author=$3, category=$4, problem_pdf=$5
+    title=$2, author=$3, categories=$4::text[], problem_pdf=$5
     WHERE id=$1 AND title=$6 AND author IS NOT DISTINCT FROM $7
-      AND category IS NOT DISTINCT FROM $8
+      AND categories IS NOT DISTINCT FROM $8
       AND time_limit_ms=$9 AND memory_limit_mb=$10
     RETURNING id`,
-  [provenance.problem_id, draft.title, draft.author_aka_name, draft.category, pdf,
-    provenance.title, provenance.author, provenance.category, provenance.time_limit_ms, provenance.memory_limit_mb]);
+  [provenance.problem_id, draft.title, draft.author_aka_name, [...draft.categories], pdf,
+    provenance.title, provenance.author, [...provenance.categories], provenance.time_limit_ms, provenance.memory_limit_mb]);
   if (!updated.rows.length) {
     const existing = await client.query('SELECT 1 FROM problems WHERE id=$1', [provenance.problem_id]);
     if (!existing.rows.length) return false;
     return false;
   }
-  await client.query(`UPDATE authoring_published_problems SET title=$2,author=$3,category=$4,updated_at=NOW() WHERE draft_id=$1`,
-    [draftId, draft.title, draft.author_aka_name, draft.category]);
+  await client.query(`UPDATE authoring_published_problems SET title=$2,author=$3,categories=$4::text[],updated_at=NOW() WHERE draft_id=$1`,
+    [draftId, draft.title, draft.author_aka_name, [...draft.categories]]);
   return true;
 }

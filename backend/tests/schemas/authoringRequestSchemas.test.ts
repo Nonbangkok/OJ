@@ -33,7 +33,7 @@ describe('problem authoring request schemas', () => {
     expect(result).toEqual({
       ...validCreateBody,
       title: 'Red Gate',
-      category: null,
+      categories: [],
       statementHtml: '',
       solutionCpp: '',
       generatorCpp: null,
@@ -41,12 +41,15 @@ describe('problem authoring request schemas', () => {
     });
   });
 
-  it('accepts a fixed-list category and maps empty string to null', () => {
-    expect(createProblemDraftSchema.parse({ ...validCreateBody, category: 'Graph' }).category)
-      .toBe('Graph');
-    expect(createProblemDraftSchema.parse({ ...validCreateBody, category: '' }).category)
-      .toBe(null);
-    expect(createProblemDraftSchema.safeParse({ ...validCreateBody, category: 'Bogus' }).success)
+  it('accepts fixed-list categories, dedupes and sorts, and maps null to empty', () => {
+    expect(createProblemDraftSchema.parse({ ...validCreateBody, categories: ['Graph', 'Math'] }).categories)
+      .toEqual(['Graph', 'Math']);
+    // Order and duplicates normalize so equal sets always compare equal.
+    expect(createProblemDraftSchema.parse({ ...validCreateBody, categories: ['Math', 'Graph', 'Math'] }).categories)
+      .toEqual(['Graph', 'Math']);
+    expect(createProblemDraftSchema.parse({ ...validCreateBody, categories: null }).categories)
+      .toEqual([]);
+    expect(createProblemDraftSchema.safeParse({ ...validCreateBody, categories: ['Bogus'] }).success)
       .toBe(false);
   });
 

@@ -321,7 +321,7 @@ describe('analyticsQueryService.listProblemsForAnalytics', () => {
             rows: [{
                 problem_id: 'aplusb',
                 title: 'A Plus B',
-                category: 'math',
+                categories: ['Math'],
                 submissions: '30',
                 accepted: '20',
                 ac_rate: '0.667',
@@ -335,7 +335,7 @@ describe('analyticsQueryService.listProblemsForAnalytics', () => {
         expect(rows).toEqual([{
             problemId: 'aplusb',
             title: 'A Plus B',
-            category: 'math',
+            categories: ['Math'],
             submissions: 30,
             accepted: 20,
             acRate: 0.667,
