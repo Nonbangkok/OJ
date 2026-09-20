@@ -49,7 +49,7 @@ describe('useCodeSubmission', () => {
 
     it('loads code from localStorage cache correctly', () => {
         const cacheObj = {
-            [mockProblemId]: {
+            [`${mockProblemId}:cpp`]: {
                 code: 'console.log("cached")',
                 timestamp: new Date().getTime() - 1000 // 1 sec ago
             }
@@ -61,9 +61,69 @@ describe('useCodeSubmission', () => {
         expect(result.current.code).toBe('console.log("cached")');
     });
 
+    it('keys the cache per language so switching does not restore the other language\'s code', () => {
+        const cacheObj = {
+            [`${mockProblemId}:cpp`]: {
+                code: '#include <iostream>',
+                timestamp: new Date().getTime() - 1000
+            },
+            [`${mockProblemId}:python`]: {
+                code: 'print("py")',
+                timestamp: new Date().getTime() - 1000
+            }
+        };
+        localStorage.setItem('oj-submission-cache', JSON.stringify(cacheObj));
+
+        const { result, rerender } = renderHook(
+            ({ problemId }) => useCodeSubmission(problemId, undefined),
+            { initialProps: { problemId: mockProblemId } }
+        );
+
+        // cpp cache is loaded initially.
+        expect(result.current.code).toBe('#include <iostream>');
+
+        // Switching to python loads the python cache, not the C++ code.
+        act(() => {
+            result.current.setLanguage('python');
+        });
+        rerender({ problemId: mockProblemId });
+
+        expect(result.current.language).toBe('python');
+        expect(result.current.code).toBe('print("py")');
+
+        // Switching back to cpp restores the C++ code.
+        act(() => {
+            result.current.setLanguage('cpp');
+        });
+        rerender({ problemId: mockProblemId });
+
+        expect(result.current.code).toBe('#include <iostream>');
+    });
+
+    it('starts from a blank editor for a language with no cached draft', () => {
+        const cacheObj = {
+            [`${mockProblemId}:cpp`]: {
+                code: '#include <iostream>',
+                timestamp: new Date().getTime() - 1000
+            }
+        };
+        localStorage.setItem('oj-submission-cache', JSON.stringify(cacheObj));
+
+        const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined));
+
+        expect(result.current.code).toBe('#include <iostream>');
+
+        act(() => {
+            result.current.setLanguage('python');
+        });
+
+        // No python draft: the editor is blank, not the C++ code.
+        expect(result.current.code).toBe('');
+    });
+
     it('ignores expired cache items', () => {
         const cacheObj = {
-            [mockProblemId]: {
+            [`${mockProblemId}:cpp`]: {
                 code: 'console.log("expired")',
                 timestamp: new Date().getTime() - (40 * 60 * 1000) // 40 mins ago
             }
@@ -99,7 +159,35 @@ describe('useCodeSubmission', () => {
         });
 
         const cache = JSON.parse(localStorage.getItem('oj-submission-cache'));
-        expect(cache[mockProblemId].code).toBe('print("hello")');
+        expect(cache[`${mockProblemId}:cpp`].code).toBe('print("hello")');
         expect(mockNavigate).toHaveBeenCalledWith('/submissions');
+    });
+
+    it('submits with the selected language and caches under its own key', async () => {
+        (jest.mocked(submissionService.submit) as jest.Mock).mockResolvedValueOnce({ success: true });
+
+        const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined));
+
+        act(() => {
+            result.current.setLanguage('python');
+        });
+        act(() => {
+            result.current.setCode('print("py")');
+        });
+
+        const mockEvent = { preventDefault: jest.fn() } as unknown as React.FormEvent<Element>;
+
+        await act(async () => {
+            await result.current.handleSubmit(mockEvent);
+        });
+
+        expect(submissionService.submit).toHaveBeenCalledWith({
+            problemId: mockProblemId,
+            language: 'python',
+            code: 'print("py")'
+        });
+
+        const cache = JSON.parse(localStorage.getItem('oj-submission-cache'));
+        expect(cache[`${mockProblemId}:python`].code).toBe('print("py")');
     });
 });

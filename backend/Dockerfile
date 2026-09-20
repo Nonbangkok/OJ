@@ -1,14 +1,17 @@
 # Use an official Node.js runtime as a parent image. We'll use a recent Long-Term Support (LTS) version.
 FROM node:20-slim
 
-# Install g++, build tools, and the 'time' utility
+# Install g++, build tools, the 'time' utility, and Python 3 (stdlib only —
+# `python` submissions run via `python3`, resolved from /usr/bin inside
+# JUDGE_CONFIG.SANDBOX_PATH; no pip packages are installed).
 # Add PostgreSQL 16 repository and install postgresql-client-16
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
     && sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list' \
     && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg \
     && apt-get update \
-    && apt-get install -y build-essential time postgresql-client-16
+    && apt-get install -y build-essential time python3 postgresql-client-16 \
+    && test "$(command -v python3)" = "/usr/bin/python3"
 
 # sharp's SVG fallback avatars need actual glyphs in the deployed runtime.
 # DejaVu covers Latin; Garuda supplies Thai initials instead of missing-glyph boxes.

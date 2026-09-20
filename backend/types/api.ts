@@ -3,7 +3,7 @@
  * Covers request bodies, composite response payloads, and
  * callback parameter types used inside controllers.
  */
-import { ProblemCategory } from '../constants';
+import { ProblemCategory, SubmissionLanguage } from '../constants';
 import { ContestStatus, ProblemDetailDTO, UserPublicProfileDTO } from './models';
 
 // ---------------------------------------------------------------------------
@@ -236,7 +236,7 @@ export interface DeleteStatementAssetQuery {
 
 export interface SubmitRequestBody {
     problemId: string;
-    language: string;
+    language: SubmissionLanguage;
     code: string;
     contestId?: string;
 }

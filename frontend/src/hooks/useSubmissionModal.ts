@@ -1,8 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import hljs from 'highlight.js/lib/core';
+import cpp from 'highlight.js/lib/languages/cpp';
+import python from 'highlight.js/lib/languages/python';
 import { UI_TIMEOUTS } from '../config/constants';
 import { getStatusClass } from '../utils/formatters';
 import type { SubmissionDetail, TestCaseResult } from '../types';
+
+// Register the highlight.js grammar for every supported language so viewed
+// submissions are highlighted with their own language.
+hljs.registerLanguage('cpp', cpp);
+hljs.registerLanguage('python', python);
 
 type ParsedResults = TestCaseResult[] | 'error' | null;
 
@@ -105,8 +112,14 @@ const useSubmissionModal = (submission: SubmissionModalInput) => {
   };
 
   const highlightCode = (source: string): string => {
+    // Highlight with the submission's own language; fall back to the raw
+    // string when the language has no registered grammar.
+    const language = submission?.language;
     try {
-      return hljs.highlight(source, { language: 'cpp' }).value;
+      if (!language || !hljs.getLanguage(language)) {
+        return source;
+      }
+      return hljs.highlight(source, { language }).value;
     } catch (e) {
       console.warn('Highlighting error:', e);
       return source;

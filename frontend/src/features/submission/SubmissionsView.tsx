@@ -7,7 +7,7 @@ import { getStatusClass, canViewCode, formatDateTime } from '../../utils/formatt
 import tableStyles from '../../components/styles/Table.module.css';
 import LoadingPage from '../../components/shared/LoadingPage';
 import { Button } from '../../components/ui';
-import { USER_ROLES } from '../../utils/constants';
+import { USER_ROLES, getLanguageDisplayName } from '../../utils/constants';
 import type { AuthUser } from '../../types';
 
 type SubmissionsViewProps = {
@@ -232,7 +232,7 @@ const SubmissionsView = ({
                                                 sub.score
                                             )}
                                         </td>
-                                        <td>{sub.language}</td>
+                                        <td>{getLanguageDisplayName(sub.language)}</td>
                                         <td>
                                             {viewable && (
                                                 <Button

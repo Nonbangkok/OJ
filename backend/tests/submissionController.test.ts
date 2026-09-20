@@ -53,13 +53,26 @@ describe('Submission Controller', () => {
             expect(Array.isArray(res.body.errors)).toBe(true);
         });
 
-        it('should return 400 if language is not cpp', async () => {
+        it('should return 400 if language is not supported', async () => {
+            const res = await request(app)
+                .post('/submit')
+                .send({ problemId: 'P1', language: 'java', code: 'System.out.println(1);' });
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Validation failed');
+        });
+
+        it('should accept a python submission', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ 1: 1 }] }); // Problem exists check
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ id: 303 }] }); // Insertion result
+
             const res = await request(app)
                 .post('/submit')
                 .send({ problemId: 'P1', language: 'python', code: 'print("hello")' });
 
-            expect(res.status).toBe(400);
-            expect(res.body.message).toBe('Only C++ is supported.');
+            expect(res.status).toBe(202);
+            expect(res.body.submissionId).toBe(303);
+            expect(processSubmission).toHaveBeenCalledWith(303);
         });
 
         it('should accept a valid regular submission', async () => {

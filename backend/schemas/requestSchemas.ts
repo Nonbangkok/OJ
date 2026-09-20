@@ -10,6 +10,7 @@ import {
   STATEMENT_ASSET,
   STRING_LIMITS,
   SUBMISSION_VALIDATION,
+  SUPPORTED_LANGUAGES,
   USER_ROLES,
   USER_VALIDATION,
 } from '../constants';
@@ -322,7 +323,7 @@ export const updateProblemDraftSchema = z.object({
 // Submission schemas
 export const submitSchema = z.object({
   problemId: nonEmptyString,
-  language: nonEmptyString,
+  language: z.enum(SUPPORTED_LANGUAGES),
   code: nonEmptyString.max(SUBMISSION_VALIDATION.MAX_CODE_LENGTH),
   contestId: nonEmptyString.optional(),
 });

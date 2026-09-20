@@ -1,7 +1,7 @@
 import { judge } from '../../services/judgeService';
 import * as db from '../../db';
 import cp from 'child_process';
-import { SUBMISSION_STATUS, JUDGE_CONFIG } from '../../constants';
+import { SUBMISSION_STATUS, JUDGE_CONFIG, LANGUAGE_LIMITS } from '../../constants';
 
 jest.mock('../../db');
 jest.mock('child_process');
@@ -14,7 +14,7 @@ describe('Judge Service', () => {
     it('should return system error if problem not found', async () => {
         (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 
-        const result = await judge('P1', '/tmp/a.out');
+        const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
         expect(result.overallStatus).toBe(SUBMISSION_STATUS.SYSTEM_ERROR);
     });
 
@@ -22,7 +22,7 @@ describe('Judge Service', () => {
         (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ time_limit_ms: 1000, memory_limit_mb: 256 }] }); // Problem
         (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] }); // Testcases
 
-        const result = await judge('P1', '/tmp/a.out');
+        const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
         expect(result.overallStatus).toBe(SUBMISSION_STATUS.SYSTEM_ERROR);
     });
 
@@ -49,7 +49,7 @@ describe('Judge Service', () => {
                 return mockChild2;
             });
 
-        const result = await judge('P1', '/tmp/a.out');
+        const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
 
         expect(result.score).toBe(100);
         expect(result.overallStatus).toBe(SUBMISSION_STATUS.ACCEPTED);
@@ -74,7 +74,7 @@ describe('Judge Service', () => {
             return mockChild;
         });
 
-        const result = await judge('P1', '/tmp/a.out');
+        const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
 
         expect(result.score).toBe(0); // Failed first case
         expect(result.overallStatus).toBe(SUBMISSION_STATUS.WRONG_ANSWER);
@@ -96,8 +96,116 @@ describe('Judge Service', () => {
             return mockChild;
         });
 
-        const result = await judge('P1', '/tmp/a.out');
+        const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
         expect(result.overallStatus).toBe(SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED);
+    });
+
+    it('executes the provided runnable command via the time_wrapper path', async () => {
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ time_limit_ms: 1000, memory_limit_mb: 256 }] });
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ case_number: 1, input_data: '1 2', output_data: '3' }] });
+
+        const mockChild = { stdin: { write: jest.fn(), end: jest.fn(), on: jest.fn() }, on: jest.fn() };
+        (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, opts, cb) => {
+            cb(null, '3\n', '');
+            return mockChild;
+        });
+
+        await judge('P1', { command: 'python3', args: ['/tmp/s.py'] }, 'python');
+
+        expect(cp.exec).toHaveBeenCalledTimes(1);
+        const cmd = (cp.exec as unknown as jest.Mock).mock.calls[0][0];
+        expect(cmd).toContain('time_wrapper');
+        expect(cmd).toContain('python3 /tmp/s.py');
+    });
+
+    it('computes effective limits from the language multipliers (python: time x4, memory x2)', async () => {
+        // Problem limits: 1000ms / 256MB. Python must be judged against
+        // 4000ms / 512MB (the effective limits), not the raw C++ ones.
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ time_limit_ms: 1000, memory_limit_mb: 256 }] });
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ case_number: 1, input_data: '', output_data: '' }] });
+
+        const mockChild = { stdin: { write: jest.fn(), end: jest.fn(), on: jest.fn() }, on: jest.fn() };
+        (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, opts, cb) => {
+            cb(null, '', '');
+            return mockChild;
+        });
+
+        const result = await judge('P1', { command: 'python3', args: ['/tmp/s.py'] }, 'python');
+
+        const call = (cp.exec as unknown as jest.Mock).mock.calls[0];
+        const [cmd, opts] = call;
+
+        // The `timeout` wall-clock and in-command limits use effective time.
+        const effectiveTimeMs = 1000 * LANGUAGE_LIMITS.python.timeMultiplier;
+        expect(cmd).toContain(`timeout ${effectiveTimeMs / 1000}s`);
+        // RLIMIT_AS = effective memory + slack; RLIMIT_CPU = ceil(effective seconds) + slack.
+        const effectiveMemoryMb = 256 * LANGUAGE_LIMITS.python.memoryMultiplier;
+        const expectedAsLimitMb = effectiveMemoryMb + JUDGE_CONFIG.MEMORY_LIMIT_SLACK_MB;
+        const expectedCpuLimitS = Math.ceil(effectiveTimeMs / 1000) + JUDGE_CONFIG.CPU_LIMIT_SLACK_S;
+        expect(cmd).toContain(`${expectedAsLimitMb} ${expectedCpuLimitS}`);
+        // The exec wall-clock timeout also uses the effective time + buffer.
+        expect(opts.timeout).toBe(effectiveTimeMs + JUDGE_CONFIG.TIMEOUT_BUFFER_MS);
+
+        // The reported effective limits are exposed on the result.
+        expect(result.timeLimitMs).toBe(effectiveTimeMs);
+        expect(result.memoryLimitMb).toBe(effectiveMemoryMb);
+    });
+
+    it('keeps cpp limits identical when multipliers are 1x/1x', async () => {
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ time_limit_ms: 1000, memory_limit_mb: 256 }] });
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ case_number: 1, input_data: '', output_data: '' }] });
+
+        const mockChild = { stdin: { write: jest.fn(), end: jest.fn(), on: jest.fn() }, on: jest.fn() };
+        (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, opts, cb) => {
+            cb(null, '', '');
+            return mockChild;
+        });
+
+        const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
+
+        const [cmd, opts] = (cp.exec as unknown as jest.Mock).mock.calls[0];
+        expect(cmd).toContain('timeout 1s');
+        expect(cmd).toContain(`${256 + JUDGE_CONFIG.MEMORY_LIMIT_SLACK_MB} ${1 + JUDGE_CONFIG.CPU_LIMIT_SLACK_S}`);
+        expect(opts.timeout).toBe(1000 + JUDGE_CONFIG.TIMEOUT_BUFFER_MS);
+        expect(result.timeLimitMs).toBe(1000);
+        expect(result.memoryLimitMb).toBe(256);
+    });
+
+    it('reports a python TLE at the effective (4x) limit, not the raw problem limit', async () => {
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ time_limit_ms: 1000, memory_limit_mb: 256 }] });
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ case_number: 1, input_data: '', output_data: '' }] });
+
+        const mockChild = { stdin: { write: jest.fn(), end: jest.fn(), on: jest.fn() }, on: jest.fn() };
+        (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, opts, cb) => {
+            const tleError = new Error('Command failed') as any;
+            tleError.code = JUDGE_CONFIG.TLE_EXIT_CODE;
+            cb(tleError, '', '');
+            return mockChild;
+        });
+
+        const result = await judge('P1', { command: 'python3', args: ['/tmp/s.py'] }, 'python');
+
+        expect(result.overallStatus).toBe(SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED);
+        // A python TLE is reported against the python-scaled limit (4000ms).
+        expect(result.results[0].timeMs).toBe(1000 * LANGUAGE_LIMITS.python.timeMultiplier);
+    });
+
+    it('caps a python Memory Limit Exceeded at the effective (2x) limit', async () => {
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ time_limit_ms: 1000, memory_limit_mb: 256 }] });
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ case_number: 1, input_data: '', output_data: '' }] });
+
+        const mockChild = { stdin: { write: jest.fn(), end: jest.fn(), on: jest.fn() }, on: jest.fn() };
+        (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, opts, cb) => {
+            const mleError = new Error('Command failed') as any;
+            mleError.signal = 'SIGSEGV';
+            cb(mleError, '', 'MemoryError');
+            return mockChild;
+        });
+
+        const result = await judge('P1', { command: 'python3', args: ['/tmp/s.py'] }, 'python');
+
+        expect(result.overallStatus).toBe(SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED);
+        expect(result.results[0].memoryKb).toBe(256 * LANGUAGE_LIMITS.python.memoryMultiplier * 1024);
     });
 
     it('strips secrets from the executed program environment (sandbox env-strip)', async () => {
@@ -116,7 +224,7 @@ describe('Judge Service', () => {
             return mockChild;
         });
 
-        await judge('P1', '/tmp/a.out');
+        await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
 
         expect(cp.exec).toHaveBeenCalledTimes(1);
         const opts = (cp.exec as unknown as jest.Mock).mock.calls[0][1];

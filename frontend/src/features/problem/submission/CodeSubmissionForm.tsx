@@ -6,6 +6,7 @@ import editorStyles from '../../../components/styles/CodeEditor.module.css';
 import formStyles from '../../../components/styles/Form.module.css';
 import styles from './CodeSubmissionForm.module.css';
 import { UI_CONFIG } from '../../../config/constants';
+import { SUPPORTED_LANGUAGES, getLanguageDisplayName } from '../../../utils/constants';
 
 const CodeSubmissionForm = ({ problemId, contestId }) => {
   const {
@@ -28,13 +29,16 @@ const CodeSubmissionForm = ({ problemId, contestId }) => {
       <div className={styles.formHeader}>
         <h2>Submit Solution</h2>
         <div className={styles.languageButtons}>
-          <button
-            className={language === 'cpp' ? styles.active : ''}
-            onClick={() => setLanguage('cpp')}
-            disabled={isSubmitting}
-          >
-            C++
-          </button>
+          {SUPPORTED_LANGUAGES.map((supportedLanguage) => (
+            <button
+              key={supportedLanguage}
+              className={language === supportedLanguage ? styles.active : ''}
+              onClick={() => setLanguage(supportedLanguage)}
+              disabled={isSubmitting}
+            >
+              {getLanguageDisplayName(supportedLanguage)}
+            </button>
+          ))}
         </div>
       </div>
 

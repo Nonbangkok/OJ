@@ -7,6 +7,7 @@ import styles from './SubmissionModal.module.css';
 import editorStyles from '../../../components/styles/CodeEditor.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 import { UI_CONFIG } from '../../../config/constants';
+import { getLanguageDisplayName } from '../../../utils/constants';
 
 const SubmissionModal = ({ submission, onClose }) => {
   const {
@@ -95,7 +96,7 @@ const SubmissionModal = ({ submission, onClose }) => {
         </div>
         <div className={styles['detail-item']}>
           <span className={styles['detail-label']}>Language</span>
-          <span className={styles['detail-value']}>{submission.language}</span>
+          <span className={styles['detail-value']}>{getLanguageDisplayName(submission.language)}</span>
         </div>
       </div>
 

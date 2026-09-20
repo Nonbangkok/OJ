@@ -1,6 +1,7 @@
 import * as db from '../db';
 import { exec } from 'child_process';
-import { SUBMISSION_STATUS, JUDGE_CONFIG } from '../constants';
+import { SUBMISSION_STATUS, JUDGE_CONFIG, LANGUAGE_LIMITS, SubmissionLanguage } from '../constants';
+import { RunnableCommand } from '../constants';
 import { logger } from '../utils/logger';
 import {
   ExecutionError,
@@ -11,7 +12,7 @@ import {
 } from '../types/service';
 
 async function runSingleCase(
-  executablePath: string,
+  runnable: RunnableCommand,
   input: string,
   timeLimitMs: number,
   memoryLimitMb: number
@@ -23,12 +24,17 @@ async function runSingleCase(
     // Resource limits handed to the sandbox wrapper. RLIMIT_AS gets a little
     // headroom over the problem's memory limit (runtime/loader/UBSan overhead);
     // RLIMIT_CPU gets the wall-clock limit plus slack as a hard backstop.
+    // `timeLimitMs` / `memoryLimitMb` are the EFFECTIVE limits for the
+    // submission's language (already multiplied by LANGUAGE_LIMITS).
     const asLimitMb = memoryLimitMb + JUDGE_CONFIG.MEMORY_LIMIT_SLACK_MB;
     const cpuLimitS = Math.ceil(timeLimitMs / 1000) + JUDGE_CONFIG.CPU_LIMIT_SLACK_S;
 
     // Use timeout command which is reliable on Linux. The wrapper now also
     // applies setrlimit() + privilege-drop on the untrusted binary itself.
-    const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${executablePath} ${asLimitMb} ${cpuLimitS}`;
+    // The runnable (compiled binary, or `python3 <src>`) uses internally
+    // generated paths, which never contain shell metacharacters.
+    const runnableCommand = [runnable.command, ...runnable.args].join(' ');
+    const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${runnableCommand} ${asLimitMb} ${cpuLimitS}`;
     // Strip the backend's environment from the executed user code so a
     // submission cannot read DATABASE_URL/PGPASSWORD/SECRET_KEY via getenv().
     // Only a minimal PATH is exposed (needed for the `timeout` lookup).
@@ -112,13 +118,13 @@ async function runSingleCase(
       if (err.code === 'EPIPE') {
         hasEpipError = true;
         epipErrorMessage = `Program crashed while receiving input: ${err.message}`;
-        logger.warn('EPIPE on stdin while feeding testcase input', { executablePath, err: err.message });
+        logger.warn('EPIPE on stdin while feeding testcase input', { runnable: runnable.command, err: err.message });
       }
     });
 
     // Also catch errors on the child process itself
     child.on('error', (err) => {
-      logger.warn('judge child process error', { executablePath, err });
+      logger.warn('judge child process error', { runnable: runnable.command, err });
       if (!hasEpipError) {
         hasEpipError = true;
         epipErrorMessage = `Process error: ${err.message}`;
@@ -130,7 +136,11 @@ async function runSingleCase(
   });
 }
 
-export async function judge(problemId: string, executablePath: string): Promise<JudgeResult> {
+export async function judge(
+  problemId: string,
+  runnable: RunnableCommand,
+  language: SubmissionLanguage
+): Promise<JudgeResult> {
   try {
     const problemRes = await db.query<JudgeProblemLimitsRow>(
       'SELECT time_limit_ms, memory_limit_mb FROM problems WHERE id = $1',
@@ -140,6 +150,13 @@ export async function judge(problemId: string, executablePath: string): Promise<
       return { overallStatus: SUBMISSION_STATUS.SYSTEM_ERROR, score: 0, results: [], maxTimeMs: 0, maxMemoryKb: 0 };
     }
     const { time_limit_ms, memory_limit_mb } = problemRes.rows[0];
+
+    // Effective limits for this language: one problem serves every language,
+    // the multipliers (in LANGUAGE_LIMITS) scale the raw limits at execution
+    // time (C++ is the identity, so C++ behavior is unchanged).
+    const { timeMultiplier, memoryMultiplier } = LANGUAGE_LIMITS[language];
+    const effectiveTimeMs = time_limit_ms * timeMultiplier;
+    const effectiveMemoryMb = memory_limit_mb * memoryMultiplier;
 
     const testcasesRes = await db.query<JudgeTestcaseRow>(
       'SELECT case_number, input_data, output_data FROM testcases WHERE problem_id = $1 ORDER BY case_number ASC',
@@ -155,7 +172,7 @@ export async function judge(problemId: string, executablePath: string): Promise<
     for (let i = 0; i < testcases.length; i++) {
       const { case_number, input_data, output_data } = testcases[i];
 
-      const runResult = await runSingleCase(executablePath, input_data, time_limit_ms, memory_limit_mb);
+      const runResult = await runSingleCase(runnable, input_data, effectiveTimeMs, effectiveMemoryMb);
 
       // Now, compare output
       if (runResult.status === SUBMISSION_STATUS.PENDING) {
@@ -195,7 +212,17 @@ export async function judge(problemId: string, executablePath: string): Promise<
     const maxTime = Math.max(0, ...results.map(r => r.timeMs || 0));
     const maxMemory = Math.max(0, ...results.map(r => r.memoryKb || 0));
 
-    return { results, score, overallStatus, maxTimeMs: maxTime, maxMemoryKb: maxMemory };
+    return {
+      results,
+      score,
+      overallStatus,
+      maxTimeMs: maxTime,
+      maxMemoryKb: maxMemory,
+      // The effective (language-scaled) limits this submission was judged
+      // against — the C++ problem limits multiplied by LANGUAGE_LIMITS.
+      timeLimitMs: effectiveTimeMs,
+      memoryLimitMb: effectiveMemoryMb,
+    };
 
   } catch (error) {
     logger.error('judge failed', { problemId, err: error });

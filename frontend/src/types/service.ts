@@ -13,7 +13,7 @@ export interface RegisterRequest {
 
 export interface SubmitRequest {
   problemId: string;
-  language: string;
+  language: 'cpp' | 'python';
   code: string;
   contestId?: string | number;
 }

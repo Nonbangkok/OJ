@@ -101,6 +101,9 @@ export interface JudgeResult {
   overallStatus: string;
   maxTimeMs: number;
   maxMemoryKb: number;
+  /** Effective (language-scaled) limits the submission was judged against. */
+  timeLimitMs?: number;
+  memoryLimitMb?: number;
 }
 
 // ---------------------------------------------------------------------------

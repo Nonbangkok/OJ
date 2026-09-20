@@ -29,6 +29,23 @@ export const SUBMISSION_STATUS = {
   SKIPPED: 'Skipped',
 } as const;
 
+/** Closed set of submission languages, mirroring backend SUPPORTED_LANGUAGES. */
+export const SUPPORTED_LANGUAGES = ['cpp', 'python'] as const;
+export type SubmissionLanguage = (typeof SUPPORTED_LANGUAGES)[number];
+
+/** Display names for the submission languages. Unknown keys fall back to the
+ *  raw language string at the call site (see getLanguageDisplayName). */
+export const LANGUAGE_DISPLAY_NAMES: Record<SubmissionLanguage, string> = {
+  cpp: 'C++',
+  python: 'Python',
+};
+
+/** Map a submission language key to its display name; unknown keys (e.g. a
+ *  stale value from an older row) map to the raw string itself. */
+export function getLanguageDisplayName(language: string): string {
+  return (LANGUAGE_DISPLAY_NAMES as Record<string, string>)[language] ?? language;
+}
+
 /** Closed set of problem categories, mirroring backend PROBLEM_CATEGORIES.
  *  A problem may carry several; an empty selection means uncategorized. */
 export const PROBLEM_CATEGORIES = [

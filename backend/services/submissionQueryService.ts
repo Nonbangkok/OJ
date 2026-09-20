@@ -23,12 +23,11 @@ export const validateAndQueueSubmission = async (
 ): Promise<QueueSubmissionResult> => {
     const { problemId, language, code, contestId } = submission;
 
-    if (language !== 'cpp') {
-        throw new AppError('Only C++ is supported.', 400);
-    }
-
-    if (!problemId || !code) {
-        throw new AppError('Problem ID and code are required.', 400);
+    // `language` membership is enforced by the submitSchema Zod enum upstream;
+    // `problemId`/`code` non-emptiness likewise. Keep the cheap guards for any
+    // internal callers that bypass HTTP validation.
+    if (!problemId || !code || !language) {
+        throw new AppError('Problem ID, language, and code are required.', 400);
     }
 
     if (contestId) {

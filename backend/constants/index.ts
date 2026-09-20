@@ -133,6 +133,66 @@ export const JUDGE_CONFIG = {
     MAX_CONCURRENT_JUDGES: 3,
 } as const;
 
+// --- Submission languages ---
+
+/** The closed set of languages a submission may be written in. */
+export const SUPPORTED_LANGUAGES = ['cpp', 'python'] as const;
+export type SubmissionLanguage = (typeof SUPPORTED_LANGUAGES)[number];
+
+/**
+ * Per-language judge multipliers applied to a problem's raw limits. One
+ * problem serves every language: an interpreter is slower and heavier than
+ * compiled C++, so Python gets time x4 / memory x2. C++ is the identity.
+ */
+export const LANGUAGE_LIMITS: Record<SubmissionLanguage, {
+    timeMultiplier: number;   // C++ = 1, Python = 4
+    memoryMultiplier: number; // C++ = 1, Python = 2
+}> = {
+    cpp: { timeMultiplier: 1, memoryMultiplier: 1 },
+    python: { timeMultiplier: 4, memoryMultiplier: 2 },
+};
+
+/** The runnable command the judge executes for a submission. */
+export interface RunnableCommand {
+    command: string;
+    args: string[];
+}
+
+/**
+ * Per-language "prepare" recipe: how a submission's source is turned into a
+ * runnable command. Every language defines
+ *  - `sourceExtension`  — file suffix for the written source,
+ *  - `checkCommand(src, out)` — the compile/verification phase command (g++
+ *    for C++, `python3 -m py_compile` for Python — a fast syntax check whose
+ *    failure maps to Compilation Error),
+ *  - `runCommand(src | out)` — what the judge executes,
+ *  - `compiledArtifactPath(out)` — the produced artifact to chmod/unlink, or
+ *    null for interpreted languages that produce none.
+ */
+export const LANGUAGE_PREPARE: Record<SubmissionLanguage, {
+    sourceExtension: string;
+    checkCommand: (sourcePath: string, outputPath: string) => string;
+    runCommand: (path: string) => RunnableCommand;
+    compiledArtifactPath: (outputPath: string) => string | null;
+}> = {
+    cpp: {
+        sourceExtension: '.cpp',
+        // UndefinedBehaviorSanitizer reliably catches signed integer overflow
+        // as a runtime error.
+        checkCommand: (sourcePath, outputPath) =>
+            `g++ -std=c++20 -fsanitize=signed-integer-overflow ${sourcePath} -o ${outputPath}`,
+        runCommand: (binaryPath) => ({ command: binaryPath, args: [] }),
+        compiledArtifactPath: (outputPath) => outputPath,
+    },
+    python: {
+        sourceExtension: '.py',
+        // No compile step — verify syntax only. Stdlib interpreter, stdlib only.
+        checkCommand: (sourcePath) => `python3 -m py_compile ${sourcePath}`,
+        runCommand: (sourcePath) => ({ command: 'python3', args: [sourcePath] }),
+        compiledArtifactPath: () => null,
+    },
+};
+
 export const SUBMISSION_VALIDATION = {
     // Maximum source code size accepted for a submission (characters).
     MAX_CODE_LENGTH: 65536, // 64 KiB

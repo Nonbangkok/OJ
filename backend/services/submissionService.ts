@@ -6,7 +6,12 @@ import { promisify } from 'util';
 import { judge } from './judgeService';
 import { ContestSubmissionRow, SubmissionRow } from '../types/models';
 import { CompileCommandError } from '../types/service';
-import { JUDGE_CONFIG, SUBMISSION_STATUS } from '../constants';
+import {
+  JUDGE_CONFIG,
+  LANGUAGE_PREPARE,
+  SUBMISSION_STATUS,
+  SubmissionLanguage,
+} from '../constants';
 import { findForbiddenInclude } from '../utils/compileGuard';
 import { logger } from '../utils/logger';
 
@@ -28,15 +33,22 @@ const COMPILE_EXEC_OPTIONS = {
   env: { PATH: JUDGE_CONFIG.SANDBOX_PATH } as unknown as NodeJS.ProcessEnv,
 };
 
+/** The neutral name substituted for the internal temp source path in
+ *  compiler/checker output so server filesystem paths are not disclosed. */
+const SANITIZED_SOURCE_NAME: Record<SubmissionLanguage, string> = {
+  cpp: 'solution.cpp',
+  python: 'solution.py',
+};
+
 /**
- * Replace the internal temporary source path in compiler output with a neutral
- * name so server filesystem paths are not disclosed to submitters.
+ * Replace the internal temporary source path in compiler/checker output with a
+ * neutral name so server filesystem paths are not disclosed to submitters.
  */
-export function sanitizeCompilerStderr(stderr: string | undefined, sourcePath: string): string {
+export function sanitizeCompilerStderr(stderr: string | undefined, sourcePath: string, language: SubmissionLanguage = 'cpp'): string {
   if (!stderr) {
     return 'Compilation failed';
   }
-  return sourcePath ? stderr.split(sourcePath).join('solution.cpp') : stderr;
+  return sourcePath ? stderr.split(sourcePath).join(SANITIZED_SOURCE_NAME[language]) : stderr;
 }
 
 const FORBIDDEN_INCLUDE_MESSAGE = (target: string): string =>
@@ -66,15 +78,17 @@ async function runSubmissionPipeline(
       logger.warn('submission not found for processing', { submissionId, table });
       return;
     }
-    const { problem_id, code } = subRes.rows[0];
+    const { problem_id, code, language } = subRes.rows[0];
+    const submissionLanguage = (language as SubmissionLanguage) ?? 'cpp';
 
     await db.query(
       `UPDATE ${table} SET overall_status = '${SUBMISSION_STATUS.COMPILING}' WHERE id = $1`,
       [submissionId]
     );
 
+    const prepare = LANGUAGE_PREPARE[submissionLanguage];
     const uniqueId = `${filePrefix}_${submissionId}_${Date.now()}`;
-    filePath = path.join(__dirname, 'submissions', `${uniqueId}.cpp`);
+    filePath = path.join(__dirname, 'submissions', `${uniqueId}${prepare.sourceExtension}`);
     outputPath = path.join(__dirname, 'submissions', `${uniqueId}.out`);
     const submissionsDir = path.join(__dirname, 'submissions');
 
@@ -95,33 +109,47 @@ async function runSubmissionPipeline(
       return;
     }
 
-    await fs.promises.writeFile(filePath, code);
+    // Keep the source readable (0644) so the unprivileged judge user (`nobody`,
+    // after time_wrapper's privilege drop) can read it — equivalent to how the
+    // compiled C++ binary is handed over.
+    await fs.promises.writeFile(filePath, code, { mode: 0o644 });
 
-    // Use UndefinedBehaviorSanitizer to reliably catch signed integer overflow as a runtime error.
-    const compileCommand = `g++ -std=c++20 -fsanitize=signed-integer-overflow ${filePath} -o ${outputPath}`;
+    // Language-agnostic "prepare" phase: compile (C++) or syntax-check
+    // (Python via py_compile). A failure maps to Compilation Error with the
+    // sanitized stderr shown to the submitter.
+    const checkCommand = prepare.checkCommand(filePath, outputPath);
     try {
-      await execPromise(compileCommand, COMPILE_EXEC_OPTIONS);
+      await execPromise(checkCommand, COMPILE_EXEC_OPTIONS);
     } catch (compileError: unknown) {
       const error = compileError as CompileCommandError;
-      logger.warn('submission compile failed', { submissionId, table, stderr: error.stderr });
+      logger.warn('submission compile failed', { submissionId, table, language: submissionLanguage, stderr: error.stderr });
       await db.query(
         `UPDATE ${table} SET overall_status = '${SUBMISSION_STATUS.COMPILATION_ERROR}', results = $1 WHERE id = $2`,
         [
-          JSON.stringify([{ status: SUBMISSION_STATUS.COMPILATION_ERROR, output: sanitizeCompilerStderr(error.stderr, filePath) }]),
+          JSON.stringify([{ status: SUBMISSION_STATUS.COMPILATION_ERROR, output: sanitizeCompilerStderr(error.stderr, filePath, submissionLanguage) }]),
           submissionId,
         ]
       );
       return;
-    } finally {
-      fs.unlink(filePath, (err) => { if (err) logger.warn('failed to delete submission source', { submissionId, err }); });
     }
 
     await db.query(
       `UPDATE ${table} SET overall_status = '${SUBMISSION_STATUS.RUNNING}' WHERE id = $1`,
       [submissionId]
     );
-    await fs.promises.chmod(outputPath, 0o755);
-    const judgeResult = await judge(problem_id, outputPath);
+
+    // Compiled languages run the produced artifact; interpreted languages run
+    // the source through their interpreter. The judge applies per-language
+    // limit multipliers from here on.
+    const artifactPath = prepare.compiledArtifactPath(outputPath);
+    if (artifactPath) {
+      await fs.promises.chmod(artifactPath, 0o755);
+    }
+    const judgeResult = await judge(
+      problem_id,
+      prepare.runCommand(artifactPath ?? filePath),
+      submissionLanguage
+    );
 
     const { results, score, overallStatus, maxTimeMs, maxMemoryKb } = judgeResult;
     await db.query(
@@ -142,6 +170,7 @@ async function runSubmissionPipeline(
       logger.error('failed to record system-error status', { submissionId, table, err: dbError });
     }
   } finally {
+    fs.unlink(filePath, (err) => { if (err) logger.warn('failed to delete submission source', { submissionId, err }); });
     fs.unlink(outputPath, (err) => { if (err) logger.warn('failed to delete submission binary', { submissionId, err }); });
   }
 }

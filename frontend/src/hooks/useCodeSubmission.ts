@@ -2,14 +2,17 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import hljs from 'highlight.js/lib/core';
 import cpp from 'highlight.js/lib/languages/cpp';
+import python from 'highlight.js/lib/languages/python';
 import 'highlight.js/styles/atom-one-dark.css';
 import submissionService from '../services/submissionService';
 import { APP_CONSTANTS } from '../utils/constants';
+import type { SubmissionLanguage } from '../utils/constants';
 import type { SubmitRequest } from '../types';
 import type { FormEvent, MutableRefObject } from 'react';
 
-// Register C++ language
+// Register the highlight.js grammar for every supported language.
 hljs.registerLanguage('cpp', cpp);
+hljs.registerLanguage('python', python);
 
 const SUBMISSION_CACHE_KEY = 'oj-submission-cache';
 
@@ -40,7 +43,7 @@ const useCodeSubmission = (
   problemId: string,
   contestId: string | null | undefined
 ) => {
-  const [language, setLanguage] = useState('cpp');
+  const [language, setLanguage] = useState<SubmissionLanguage>('cpp');
   const [code, setCode] = useState(``);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -49,9 +52,13 @@ const useCodeSubmission = (
   const editorWrapperRef = useRef<HTMLDivElement | null>(null);
   const lineNumbersRef = useRef<HTMLDivElement | null>(null);
 
+  // The cache key is per problem AND per language, so switching languages
+  // never restores e.g. C++ code into the Python editor.
+  const cacheKey = `${problemId}:${language}`;
+
   useEffect(() => {
     const cachedSubmission = readSubmissionCache();
-    const problemCache = cachedSubmission[problemId];
+    const problemCache = cachedSubmission[cacheKey];
 
     if (problemCache && problemCache.code) {
       const timeDiff = new Date().getTime() - problemCache.timestamp;
@@ -59,12 +66,16 @@ const useCodeSubmission = (
       if (timeDiff < APP_CONSTANTS.SUBMISSION_CACHE_EXPIRY) {
         setCode(problemCache.code);
       } else {
-        // Clear expired cache for this problem
-        delete cachedSubmission[problemId];
+        // Clear expired cache for this problem/language
+        delete cachedSubmission[cacheKey];
         writeSubmissionCache(cachedSubmission);
       }
+    } else {
+      // No cached draft for this language — start from a blank editor rather
+      // than keeping the other language's code around.
+      setCode('');
     }
-  }, [problemId]);
+  }, [cacheKey]);
 
   // Sync scrolling between the editor's textarea, the <pre> block, and the line numbers gutter
   useEffect(() => {
@@ -116,7 +127,7 @@ const useCodeSubmission = (
       await submissionService.submit(submitData);
 
       const submissionCache = readSubmissionCache();
-      submissionCache[problemId] = {
+      submissionCache[cacheKey] = {
         code: code,
         timestamp: new Date().getTime(),
       };
@@ -138,7 +149,7 @@ const useCodeSubmission = (
 
   const highlightCode = (source: string): string => {
     try {
-      return hljs.highlight(source, { language: 'cpp' }).value;
+      return hljs.highlight(source, { language }).value;
     } catch (e) {
       console.warn('Highlighting error:', e);
       return source;

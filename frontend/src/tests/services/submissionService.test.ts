@@ -9,7 +9,7 @@ describe('Submission Service', () => {
     });
 
     it('submit posts submission data', async () => {
-        const submitData = { problemId: 'P1', code: 'print(1)', language: 'python' };
+        const submitData = { problemId: 'P1', code: 'print(1)', language: 'python' as const };
         const mockData = { message: 'Submitted', submissionId: 1, isContestSubmission: false };
         jest.mocked(api.post).mockResolvedValueOnce({ data: mockData });
 

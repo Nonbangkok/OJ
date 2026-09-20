@@ -44,7 +44,7 @@ describe('Submission Service', () => {
         it('should update status to Compiling and run g++ successfully', async () => {
             // Mock db queries: 1. SELECT, 2. UPDATE Compiling, 3. UPDATE Running, 4. UPDATE Results
             (db.query as jest.Mock)
-                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code: 'int main(){}' }] }) // SELECT
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code: 'int main(){}', language: 'cpp' }] }) // SELECT
                 .mockResolvedValueOnce({}) // UPDATE Compiling
                 .mockResolvedValueOnce({}) // UPDATE Running
                 .mockResolvedValueOnce({}); // UPDATE final results
@@ -75,8 +75,8 @@ describe('Submission Service', () => {
             // Verify Running status updated
             expect(db.query).toHaveBeenNthCalledWith(3, expect.stringContaining('UPDATE submissions SET overall_status = \'Running\''), [1]);
 
-            // Verify judge was called
-            expect(judge).toHaveBeenCalledWith('P1', expect.stringContaining('.out'));
+            // Verify judge was called with the compiled binary runnable and language
+            expect(judge).toHaveBeenCalledWith('P1', { command: expect.stringContaining('.out'), args: [] }, 'cpp');
 
             // Verify final results saved
             expect(db.query).toHaveBeenNthCalledWith(4, expect.stringContaining('UPDATE submissions\n       SET overall_status'), ['Accepted', 100, JSON.stringify([{ testCase: 1, status: 'Accepted' }]), 10, 2048, 1]);
@@ -84,7 +84,7 @@ describe('Submission Service', () => {
 
         it('should handle compilation errors correctly', async () => {
             (db.query as jest.Mock)
-                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code: 'bad code' }] }) // SELECT
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code: 'bad code', language: 'cpp' }] }) // SELECT
                 .mockResolvedValueOnce({}) // UPDATE Compiling
                 .mockResolvedValueOnce({}); // UPDATE final status
 
@@ -107,7 +107,7 @@ describe('Submission Service', () => {
     describe('processContestSubmission', () => {
         it('should correctly process a basic contest submission', async () => {
             (db.query as jest.Mock)
-                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code: 'int main(){}' }] }) // SELECT
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code: 'int main(){}', language: 'cpp' }] }) // SELECT
                 .mockResolvedValueOnce({}) // UPDATE Compiling
                 .mockResolvedValueOnce({}) // UPDATE Running
                 .mockResolvedValueOnce({}); // UPDATE final results
@@ -126,6 +126,90 @@ describe('Submission Service', () => {
 
             expect(db.query).toHaveBeenNthCalledWith(2, expect.stringContaining('UPDATE contest_submissions SET overall_status = \'Compiling\''), [1]);
             expect(db.query).toHaveBeenNthCalledWith(4, expect.stringContaining('UPDATE contest_submissions\n       SET overall_status'), ['Accepted', 100, JSON.stringify([{ testCase: 1, status: 'Accepted' }]), 10, 2048, 1]);
+        });
+    });
+
+    describe('python submissions', () => {
+        it('syntax-checks with py_compile and judges via python3 (no g++)', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code: 'print("hi")', language: 'python' }] }) // SELECT
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}) // UPDATE Running
+                .mockResolvedValueOnce({}); // UPDATE final results
+
+            (fs.existsSync as jest.Mock).mockReturnValue(true);
+
+            (judge as jest.Mock).mockResolvedValueOnce({
+                results: [{ testCase: 1, status: 'Accepted' }],
+                score: 100,
+                overallStatus: 'Accepted',
+                maxTimeMs: 10,
+                maxMemoryKb: 2048
+            });
+
+            await processSubmission(1);
+
+            // The "compile" phase is a py_compile syntax check, not g++.
+            expect(cp.exec).toHaveBeenCalledTimes(1);
+            const compileCmd = (cp.exec as jest.Mock).mock.calls[0][0];
+            expect(compileCmd).toContain('python3 -m py_compile');
+            expect(compileCmd).not.toContain('g++');
+
+            // Judge receives the python interpreter runnable plus the language.
+            expect(judge).toHaveBeenCalledWith(
+                'P1',
+                { command: 'python3', args: [expect.stringContaining('.py')] },
+                'python'
+            );
+        });
+
+        it('maps a py_compile syntax error to Compilation Error with sanitized stderr', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code: 'def f(:', language: 'python' }] }) // SELECT
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}); // UPDATE Compilation Error
+
+            (fs.existsSync as jest.Mock).mockReturnValue(true);
+
+            (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, options, cb) => {
+                const callback = typeof options === 'function' ? options : cb;
+                // Reproduce py_compile's stderr shape, quoting the REAL source
+                // path (which the sanitizer must neutralize).
+                const sourcePath = String(cmd).replace('python3 -m py_compile ', '');
+                callback({
+                    stderr: `  File "${sourcePath}", line 1\n    def f(:\n          ^\nSyntaxError: invalid syntax\n`
+                }, null, '');
+            });
+
+            await processSubmission(1);
+
+            expect(db.query).toHaveBeenNthCalledWith(3,
+                expect.stringContaining('UPDATE submissions SET overall_status = \'Compilation Error\''),
+                [expect.not.stringContaining('/srv/app'), 1]);
+            // The Python error message itself survives sanitization.
+            const savedResults = (db.query as jest.Mock).mock.calls[2][1][0];
+            expect(savedResults).toContain('SyntaxError: invalid syntax');
+            expect(savedResults).toContain('solution.py');
+            expect(judge).not.toHaveBeenCalled();
+        });
+
+        it('keeps the source file readable and does not chmod/unlink a binary for python', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code: 'print(1)', language: 'python' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}) // UPDATE Running
+                .mockResolvedValueOnce({}); // UPDATE final results
+
+            (fs.existsSync as jest.Mock).mockReturnValue(true);
+
+            (judge as jest.Mock).mockResolvedValueOnce({
+                results: [], score: 0, overallStatus: 'Accepted', maxTimeMs: 0, maxMemoryKb: 0
+            });
+
+            await processSubmission(1);
+
+            // Python has no compiled artifact: no chmod before judging.
+            expect(fs.promises.chmod).not.toHaveBeenCalled();
         });
     });
 });

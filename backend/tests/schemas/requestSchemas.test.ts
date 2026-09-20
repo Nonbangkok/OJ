@@ -5,7 +5,7 @@ import {
   createProblemSchema,
   batchCreateUsersSchema,
 } from '../../schemas/requestSchemas';
-import { SUBMISSION_VALIDATION, STRING_LIMITS, USER_VALIDATION } from '../../constants';
+import { SUBMISSION_VALIDATION, STRING_LIMITS, SUPPORTED_LANGUAGES, USER_VALIDATION } from '../../constants';
 
 /**
  * Validation-cap coverage (security item B): every otherwise-unbounded
@@ -34,6 +34,30 @@ describe('requestSchemas size & validation caps', () => {
     it('accepts an optional contestId but requires the core fields', () => {
       expect(submitSchema.safeParse({ ...base, code: 'int main(){}', contestId: 'c1' }).success).toBe(true);
       expect(submitSchema.safeParse({ language: 'cpp', code: 'x' }).success).toBe(false); // missing problemId
+    });
+  });
+
+  describe('submitSchema.language', () => {
+    const base = { problemId: 'p1', code: 'int main(){}' };
+
+    it('accepts every supported language', () => {
+      for (const language of SUPPORTED_LANGUAGES) {
+        expect(submitSchema.safeParse({ ...base, language }).success).toBe(true);
+      }
+    });
+
+    it('accepts python', () => {
+      expect(submitSchema.safeParse({ ...base, language: 'python', code: 'print(1)' }).success).toBe(true);
+    });
+
+    it('rejects unknown languages', () => {
+      expect(submitSchema.safeParse({ ...base, language: 'java' }).success).toBe(false);
+      expect(submitSchema.safeParse({ ...base, language: 'C++' }).success).toBe(false); // case-sensitive
+      expect(submitSchema.safeParse({ ...base, language: '' }).success).toBe(false);
+    });
+
+    it('requires the language field', () => {
+      expect(submitSchema.safeParse({ problemId: 'p1', code: 'x' }).success).toBe(false);
     });
   });
 
