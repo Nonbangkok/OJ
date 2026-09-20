@@ -69,7 +69,6 @@ export default function JobHistory({ jobs, onError }: { jobs: Job[]; onError: (e
   const hasSyncJob = jobs.some(job => job.jobType === 'sync_pdf');
   return <section>
     <h2>Build history &amp; logs</h2>
-    <ProfileSyncRuns onError={onError} />
     <section className={styles.panel}>
       <div className={styles.panelHead}>
         <h3>Build jobs</h3>
@@ -87,6 +86,7 @@ export default function JobHistory({ jobs, onError }: { jobs: Job[]; onError: (e
         {!jobs.length && <p>No builds yet.</p>}
       </div>
     </section>
+    <ProfileSyncRuns onError={onError} />
     {detail && <Dialog open title={`${jobLabel(detail.jobType)}: ${detail.status}`}
       onClose={() => setDetail(null)}
       footer={<Button variant="secondary" onClick={() => setDetail(null)}>Close</Button>}>

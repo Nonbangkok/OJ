@@ -81,6 +81,9 @@ test('renders profile sync runs with progress and loads per-draft items on inspe
   expect(await screen.findByText('Writer')).toBeInTheDocument();
   expect(screen.getByText('2/3 synced (1 not synced)')).toBeInTheDocument();
   expect(screen.getByText('Profile sync runs')).toBeInTheDocument();
+  // Build jobs come first; profile sync runs follow.
+  expect(screen.getByText('Build jobs').compareDocumentPosition(screen.getByText('Profile sync runs')))
+    .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
   fireEvent.click(screen.getByRole('button', { name: /Inspect run/ }));
   const dialog = await screen.findByRole('dialog');
