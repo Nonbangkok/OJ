@@ -30,8 +30,8 @@ const mockFetchAnalyticsProblems = analyticsService.fetchAnalyticsProblems as je
 const mockFetchProblemAnalytics = analyticsService.fetchProblemAnalytics as jest.MockedFunction<typeof analyticsService.fetchProblemAnalytics>;
 
 const mockProblems = [
-    { problemId: 'aplusb', title: 'A Plus B', category: 'math', submissions: 30, accepted: 20, acRate: 0.667, solvers: 8 },
-    { problemId: 'gcd', title: 'GCD', category: 'math', submissions: 5, accepted: 1, acRate: 0.2, solvers: 1 },
+    { problemId: 'aplusb', title: 'A Plus B', categories: ['Math'], submissions: 30, accepted: 20, acRate: 0.667, solvers: 8 },
+    { problemId: 'gcd', title: 'GCD', categories: ['Math'], submissions: 5, accepted: 1, acRate: 0.2, solvers: 1 },
 ];
 
 const mockProblemAnalytics = {

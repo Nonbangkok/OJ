@@ -6,7 +6,7 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
         id: '',
         title: '',
         author: '',
-        category: '',
+        categories: [],
         time_limit_ms: 2000,
         memory_limit_mb: 512,
     });
@@ -37,7 +37,7 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
                 id: problem.id,
                 title: problem.title ?? '',
                 author: problem.author ?? '',
-                category: problem.category ?? '',
+                categories: problem.categories ?? [],
                 time_limit_ms: problem.time_limit_ms ?? 3000,
                 memory_limit_mb: problem.memory_limit_mb ?? 256,
             });
@@ -47,7 +47,7 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
                 id: '',
                 title: '',
                 author: currentUser?.username ?? '',
-                category: '',
+                categories: [],
                 time_limit_ms: 1000,
                 memory_limit_mb: 256,
             });
@@ -68,14 +68,21 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
         }));
     };
 
+    // Categories are a checkbox grid: toggling one adds/removes it, always
+    // sorted so equal sets compare equal (mirrors the backend normalization).
+    const handleCategoryToggle = (category, checked) => {
+        setFormData(prev => ({
+            ...prev,
+            categories: checked
+                ? [...prev.categories, category].sort()
+                : prev.categories.filter(c => c !== category),
+        }));
+    };
+
     const handleSave = () => {
         // Pass the collected data back to the parent component.
-        // The category select uses '' for "no category"; send it as null.
-        const problemData = formData.category === ''
-            ? { ...formData, category: null }
-            : formData;
         onSave({
-            problemData,
+            problemData: formData,
             pdfFile,
             zipFile,
         }, isEditing);
@@ -93,6 +100,7 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
         isEditing,
         isUploading,
         handleChange,
+        handleCategoryToggle,
         handleSave
     };
 };

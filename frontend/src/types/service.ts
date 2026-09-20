@@ -46,8 +46,8 @@ export interface CreateProblemRequest {
   id: string;
   title: string;
   author: string;
-  /** One of PROBLEM_CATEGORIES; empty string / null means uncategorized. */
-  category?: ProblemCategory | null;
+  /** Fixed-list categories; an empty array means uncategorized. */
+  categories?: readonly ProblemCategory[];
   time_limit_ms: number;
   memory_limit_mb: number;
 }

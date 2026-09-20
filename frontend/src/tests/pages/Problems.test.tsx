@@ -14,10 +14,10 @@ jest.mock('../../context/ThemeContext', () => ({
 jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading Problems...</div>);
 
 const categorizedProblems = [
-    { id: 'dp-1', title: 'Knapsack', author: null, category: 'Dynamic Programming', best_score: 100 },
-    { id: 'dp-2', title: 'LIS', author: null, category: 'Dynamic Programming', best_score: 50 },
-    { id: 'gr-1', title: 'Greedy Slots', author: null, category: 'Greedy', best_score: null },
-    { id: 'pl-1', title: 'Plain Problem', author: null, category: null, best_score: null },
+    { id: 'dp-1', title: 'Knapsack', author: null, categories: ['Dynamic Programming'], best_score: 100 },
+    { id: 'dp-2', title: 'LIS', author: null, categories: ['Dynamic Programming', 'Data Structures'], best_score: 50 },
+    { id: 'gr-1', title: 'Greedy Slots', author: null, categories: ['Greedy'], best_score: null },
+    { id: 'pl-1', title: 'Plain Problem', author: null, categories: [], best_score: null },
 ];
 
 describe('Problems Page', () => {
@@ -63,6 +63,8 @@ describe('Problems Page', () => {
             expect(screen.getByRole('tab', { name: /All 4/ })).toBeInTheDocument();
         });
         expect(screen.getByRole('tab', { name: /Dynamic Programming 2/ })).toBeInTheDocument();
+        // A problem carrying two categories counts toward both tabs.
+        expect(screen.getByRole('tab', { name: /Data Structures 1/ })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: /Greedy 1/ })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: /Uncategorized 1/ })).toBeInTheDocument();
     });
@@ -80,6 +82,22 @@ describe('Problems Page', () => {
 
         expect(screen.queryByText('Knapsack')).not.toBeInTheDocument();
         expect(screen.getByText('Greedy Slots')).toBeInTheDocument();
+    });
+
+    it('shows a problem in every one of its category tabs', async () => {
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(categorizedProblems);
+
+        render(<BrowserRouter><Problems /></BrowserRouter>);
+
+        await waitFor(() => {
+            expect(screen.getByText('LIS')).toBeInTheDocument();
+        });
+
+        // LIS carries both categories, so both tabs include it.
+        fireEvent.click(screen.getByRole('tab', { name: /^Dynamic Programming/ }));
+        expect(screen.getByText('LIS')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: /^Data Structures/ }));
+        expect(screen.getByText('LIS')).toBeInTheDocument();
     });
 
     it('filters the list by search text across title and id', async () => {

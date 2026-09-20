@@ -30,7 +30,7 @@ export const SUBMISSION_STATUS = {
 } as const;
 
 /** Closed set of problem categories, mirroring backend PROBLEM_CATEGORIES.
- *  An empty selection means uncategorized (null). */
+ *  A problem may carry several; an empty selection means uncategorized. */
 export const PROBLEM_CATEGORIES = [
   'Dynamic Programming',
   'Greedy',

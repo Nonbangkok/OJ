@@ -63,7 +63,7 @@ export interface ContestAnalytics {
 export interface ProblemListRow {
   problemId: string;
   title: string;
-  category: string | null;
+  categories: readonly string[];
   submissions: number;
   accepted: number;
   acRate: number;

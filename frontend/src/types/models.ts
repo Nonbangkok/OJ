@@ -43,7 +43,8 @@ export interface ProblemBase {
   id: string;
   title: string;
   author: string | null;
-  category?: string | null;
+  /** Fixed-list categories; empty array means uncategorized. */
+  categories?: readonly string[];
 }
 
 export interface ContestProblem extends ProblemBase {

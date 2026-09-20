@@ -21,7 +21,9 @@ const ProblemCard = ({ problem, contestId = null }: ProblemCardProps) => {
                 <h3 className={styles['problem-title']}>{problem.title}</h3>
                 <p className={styles['problem-author']}>
                     {problem.id}
-                    {problem.category ? <span className={styles['problem-category']}>{problem.category}</span> : null}
+                    {problem.categories?.map(category => (
+                        <span key={category} className={styles['problem-category']}>{category}</span>
+                    ))}
                 </p>
                 <div className={styles['submission-status-placeholder']}>
                     {hasSubmitted && (

@@ -117,3 +117,107 @@
   font-size: 0.95rem;
   text-align: center;
 }
+
+/* Multi-category checkbox grid inside the problem form. Two columns while
+   the form itself is two columns; denser rows, labels never wrap under the
+   checkbox. */
+.category-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--background-primary);
+}
+/* Class chain matches the .form-group label rule's specificity and wins by
+   source order: keeps flex layout (checkbox + text on one line, real gap)
+   instead of the block display the generic label rule forces. */
+.form-group .category-option {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-weight: 400;
+  font-size: 0.92em;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Same chain fixes the color too: .form-group label sets the grey
+     secondary color that vanishes into the dark background. */
+  color: var(--text-primary);
+}
+.category-option input {
+  margin: 0;
+  flex-shrink: 0;
+  /* Slightly larger checkbox so it reads clearly on dark surfaces. */
+  width: 1.05em;
+  height: 1.05em;
+  accent-color: var(--accent-primary);
+}
+.category-group {
+  grid-column: 1 / -1;
+}
+
+/* Problem create/edit form: a wider two-column modal that never grows past
+   the viewport. Header and actions stay pinned; only the fieldset scrolls. */
+.problem-form {
+  max-width: 880px;
+  display: flex;
+  flex-direction: column;
+  max-height: 88vh;
+  margin: 2rem auto;
+  padding: 0;
+  overflow: hidden; /* the inner content area owns the scrolling */
+}
+.problem-form-header {
+  flex: 0 0 auto;
+  padding: 1.5rem 2rem 0;
+}
+.problem-form-header h2 {
+  margin-bottom: 0.75rem;
+}
+.problem-form-content {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0 2rem;
+  min-height: 0;
+}
+.problem-form-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 1.5rem;
+  border: none;
+  padding: 0;
+  margin: 0 0 1.25rem;
+}
+.problem-form-fields .form-group {
+  margin-bottom: 1.25rem;
+}
+.problem-form-actions {
+  margin-top: 0;
+  padding: 1rem 2rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Narrow widths: everything collapses to one full-width column. */
+@media (max-width: 800px) {
+  .problem-form {
+    max-width: 500px;
+    max-height: 90vh;
+    margin: 1rem auto;
+  }
+  .problem-form-header {
+    padding: 1.25rem 1.25rem 0;
+  }
+  .problem-form-content {
+    padding: 0 1.25rem;
+  }
+  .problem-form-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .problem-form-actions {
+    padding: 1rem 1.25rem 1.25rem;
+  }
+}

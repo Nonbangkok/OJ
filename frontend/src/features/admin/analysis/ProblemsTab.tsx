@@ -112,7 +112,7 @@ const ProblemsTab = ({ onSelectProblem }: ProblemsTabProps) => {
             {problems.map((problem) => (
               <tr key={problem.problemId}>
                 <td>{problem.title}</td>
-                <td>{problem.category ?? '—'}</td>
+                <td>{problem.categories?.length ? problem.categories.join(", ") : "—"}</td>
                 <td>{problem.submissions}</td>
                 <td>{problem.accepted}</td>
                 <td>{formatPercent(problem.acRate)}</td>

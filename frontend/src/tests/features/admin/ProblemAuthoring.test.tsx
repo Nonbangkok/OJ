@@ -22,6 +22,7 @@ const draft = {
   authorRealName: 'Author',
   language: 'Thai',
   countryCode: 'THA',
+  categories: [],
   timeLimitMs: 1000,
   memoryLimitMb: 256,
   statementHtml: '<p>Sum</p>',
@@ -78,21 +79,23 @@ test('staff cannot load private authoring data even through a direct URL', () =>
   expect(api.get).not.toHaveBeenCalled();
 });
 
-test('the metadata category dropdown selects a fixed category and defaults to none', async () => {
+test('the metadata category checkboxes toggle multiple categories and default to none', async () => {
   show('/admin/authoring/d1');
-  const category = await screen.findByLabelText('Category');
-  // An uncategorized draft selects "No category", not a stale free-text value.
-  expect(category).toHaveValue('');
-  expect(screen.getByRole('option', { name: 'No category' })).toBeInTheDocument();
-  expect(screen.getByRole('option', { name: 'Dynamic Programming' })).toBeInTheDocument();
-  fireEvent.change(category, { target: { value: 'Graph' } });
+  const graph = await screen.findByRole('checkbox', { name: 'Graph' });
+  const math = screen.getByRole('checkbox', { name: 'Math' });
+  // An uncategorized draft starts with every checkbox clear.
+  expect(graph).not.toBeChecked();
+  expect(math).not.toBeChecked();
   jest.mocked(api.patch).mockResolvedValue({ data: { ...draft, revision: 4 } });
-  // The category change auto-saves after the usual debounce delay.
+  fireEvent.click(graph);
+  fireEvent.click(math);
+  // The category change auto-saves after the usual debounce delay, as a
+  // sorted set of the checked categories.
   await waitFor(
     () =>
       expect(api.patch).toHaveBeenCalledWith(
         '/admin/authoring/drafts/d1',
-        expect.objectContaining({ category: 'Graph' })
+        expect.objectContaining({ categories: ['Graph', 'Math'] })
       ),
     { timeout: 4000 }
   );

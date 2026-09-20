@@ -17,11 +17,15 @@ const Problems = () => {
   // Coming back from a problem detail page restores the previous scroll spot.
   useScrollRestore(!loading && !error);
 
+  // A problem can carry several categories; it counts toward every one of its
+  // tabs (and toward the "Uncategorized" tab when it has none).
   const categories = useMemo(() => {
     const counts = new Map<string, number>();
     for (const problem of problems) {
-      const key = problem.category?.trim() || UNCATEGORIZED;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+      const keys = problem.categories?.length ? problem.categories : [UNCATEGORIZED];
+      for (const key of keys) {
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
     }
     // Sort by frequency then name so the busiest categories lead.
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
@@ -30,8 +34,9 @@ const Problems = () => {
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     return problems.filter(problem => {
+      const keys = problem.categories?.length ? problem.categories : [UNCATEGORIZED];
       const matchesCategory = activeCategory === ALL_CATEGORIES
-        || (problem.category?.trim() || UNCATEGORIZED) === activeCategory;
+        || keys.includes(activeCategory);
       if (!matchesCategory) return false;
       if (!query) return true;
       return problem.title.toLowerCase().includes(query)
