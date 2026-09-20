@@ -151,7 +151,7 @@ describe('Submission Service', () => {
 
             // The "compile" phase is a py_compile syntax check, not g++.
             expect(cp.exec).toHaveBeenCalledTimes(1);
-            const compileCmd = (cp.exec as jest.Mock).mock.calls[0][0];
+            const compileCmd = (cp.exec as unknown as jest.Mock).mock.calls[0][0];
             expect(compileCmd).toContain('python3 -m py_compile');
             expect(compileCmd).not.toContain('g++');
 
