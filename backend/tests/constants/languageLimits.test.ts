@@ -53,7 +53,7 @@ describe('language constants', () => {
                 args: [],
             });
             expect(LANGUAGE_PREPARE.python.runCommand('/src/s.py')).toEqual({
-                command: 'python3',
+                command: '/usr/bin/python3',
                 args: ['/src/s.py'],
             });
         });

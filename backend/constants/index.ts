@@ -188,7 +188,11 @@ export const LANGUAGE_PREPARE: Record<SubmissionLanguage, {
         sourceExtension: '.py',
         // No compile step — verify syntax only. Stdlib interpreter, stdlib only.
         checkCommand: (sourcePath) => `python3 -m py_compile ${sourcePath}`,
-        runCommand: (sourcePath) => ({ command: 'python3', args: [sourcePath] }),
+        // Absolute interpreter path: the sandbox wrapper execs this directly
+        // via execv(), which does NO PATH lookup — a bare "python3" would
+        // fail with ENOENT. The Dockerfile asserts python3 lives at
+        // /usr/bin/python3 (inside SANDBOX_PATH).
+        runCommand: (sourcePath) => ({ command: '/usr/bin/python3', args: [sourcePath] }),
         compiledArtifactPath: () => null,
     },
 };

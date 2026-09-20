@@ -33,8 +33,11 @@ async function runSingleCase(
     // applies setrlimit() + privilege-drop on the untrusted binary itself.
     // The runnable (compiled binary, or `python3 <src>`) uses internally
     // generated paths, which never contain shell metacharacters.
-    const runnableCommand = [runnable.command, ...runnable.args].join(' ');
-    const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${runnableCommand} ${asLimitMb} ${cpuLimitS}`;
+    // Wrapper argv layout: [wrapper] [exe] [mem_mb] [cpu_s] [extra args...] —
+    // limits come BEFORE the runnable's own args, or the wrapper would feed
+    // them to the child as program arguments.
+    const runnableArgs = runnable.args.join(' ');
+    const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${runnable.command} ${asLimitMb} ${cpuLimitS} ${runnableArgs}`.trim();
     // Strip the backend's environment from the executed user code so a
     // submission cannot read DATABASE_URL/PGPASSWORD/SECRET_KEY via getenv().
     // Only a minimal PATH is exposed (needed for the `timeout` lookup).

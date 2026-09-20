@@ -295,7 +295,7 @@ describe('Submission Service', () => {
             // Judge receives the python interpreter runnable plus the language.
             expect(judge).toHaveBeenCalledWith(
                 'P1',
-                { command: 'python3', args: [expect.stringContaining('.py')] },
+                { command: '/usr/bin/python3', args: [expect.stringContaining('.py')] },
                 'python'
             );
         });

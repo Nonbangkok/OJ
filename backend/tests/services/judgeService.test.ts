@@ -110,12 +110,14 @@ describe('Judge Service', () => {
             return mockChild;
         });
 
-        await judge('P1', { command: 'python3', args: ['/tmp/s.py'] }, 'python');
+        await judge('P1', { command: '/usr/bin/python3', args: ['/tmp/s.py'] }, 'python');
 
         expect(cp.exec).toHaveBeenCalledTimes(1);
         const cmd = (cp.exec as unknown as jest.Mock).mock.calls[0][0];
         expect(cmd).toContain('time_wrapper');
-        expect(cmd).toContain('python3 /tmp/s.py');
+        // Wrapper argv layout: exe, then limits, THEN the runnable's args —
+        // limits must never leak into the child program's argv.
+        expect(cmd).toMatch(/time_wrapper \/usr\/bin\/python3 \d+ \d+ \/tmp\/s\.py/);
     });
 
     it('computes effective limits from the language multipliers (python: time x4, memory x2)', async () => {
@@ -130,7 +132,7 @@ describe('Judge Service', () => {
             return mockChild;
         });
 
-        const result = await judge('P1', { command: 'python3', args: ['/tmp/s.py'] }, 'python');
+        const result = await judge('P1', { command: '/usr/bin/python3', args: ['/tmp/s.py'] }, 'python');
 
         const call = (cp.exec as unknown as jest.Mock).mock.calls[0];
         const [cmd, opts] = call;
@@ -183,7 +185,7 @@ describe('Judge Service', () => {
             return mockChild;
         });
 
-        const result = await judge('P1', { command: 'python3', args: ['/tmp/s.py'] }, 'python');
+        const result = await judge('P1', { command: '/usr/bin/python3', args: ['/tmp/s.py'] }, 'python');
 
         expect(result.overallStatus).toBe(SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED);
         // A python TLE is reported against the python-scaled limit (4000ms).
@@ -202,7 +204,7 @@ describe('Judge Service', () => {
             return mockChild;
         });
 
-        const result = await judge('P1', { command: 'python3', args: ['/tmp/s.py'] }, 'python');
+        const result = await judge('P1', { command: '/usr/bin/python3', args: ['/tmp/s.py'] }, 'python');
 
         expect(result.overallStatus).toBe(SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED);
         expect(result.results[0].memoryKb).toBe(256 * LANGUAGE_LIMITS.python.memoryMultiplier * 1024);
