@@ -1,6 +1,8 @@
 import useProblemManagement from '../../../hooks/admin/useProblemManagement';
+import useRejudge from '../../../hooks/admin/useRejudge';
 import ProblemModal from './ProblemModal';
 import ConfirmationModal from '../shared/ConfirmationModal';
+import RejudgeFeedbackBox from '../shared/RejudgeFeedbackBox';
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 import LoadingPage from '../../../components/shared/LoadingPage';
@@ -52,6 +54,16 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     handleSave,
     handleCloseModal
   } = useProblemManagement();
+
+  const {
+    isRejudgeConfirmOpen,
+    rejudgeTarget,
+    rejudgeFeedback,
+    handleRejudgeClick,
+    handleCloseRejudgeConfirm,
+    handleConfirmRejudge,
+    dismissRejudgeFeedback,
+  } = useRejudge();
 
   if (loading && !batchUploadProgress.visible) return <LoadingPage />;
   if (error) return <div className='error-message'>{error}</div>;
@@ -187,6 +199,13 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
                 <td>
                   <div className={styles.actions}>
                     <Button size="compact" onClick={() => handleEdit(problem)}>Edit</Button>
+                    <Button
+                      size="compact"
+                      onClick={() => handleRejudgeClick({ kind: 'problem', id: problem.id, title: problem.title })}
+                      title="Re-run every submission for this problem against the current testcases and limits"
+                    >
+                      Rejudge
+                    </Button>
                     <Button size="compact" variant="destructive" onClick={() => handleDeleteClick(problem.id)}>Delete</Button>
                   </div>
                 </td>
@@ -219,6 +238,18 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
         message={bulkConfirm.type === 'show'
           ? "Are you sure you want to make all problems visible to users? (Excluding those in contests)"
           : "Are you sure you want to hide all problems from users? (Excluding those in contests)"}
+      />
+      <RejudgeFeedbackBox feedback={rejudgeFeedback} onDismiss={dismissRejudgeFeedback} />
+      <ConfirmationModal
+        isOpen={isRejudgeConfirmOpen}
+        onClose={handleCloseRejudgeConfirm}
+        onConfirm={handleConfirmRejudge}
+        title="Confirm Rejudge"
+        message={rejudgeTarget
+          ? `Rejudge re-runs every submission for problem "${rejudgeTarget.title}" against the current testcases and limits. Scores may change.`
+          : ''}
+        confirmText="Rejudge"
+        confirmStyle="default"
       />
     </div>
   );

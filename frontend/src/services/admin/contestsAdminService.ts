@@ -5,6 +5,7 @@ import type {
   ContestMutationResponse,
   ContestProblemsMutationResponse,
   ContestProblemsResponse,
+  RejudgeResponse,
 } from '../../types';
 import type {
   CreateContestRequest,
@@ -33,6 +34,11 @@ const contestsAdminService = {
 
   deleteContest: async (contestId: string | number): Promise<ContestMutationResponse> => {
     const response = await api.delete<ContestMutationResponse>(`/admin/contests/${contestId}`);
+    return response.data;
+  },
+
+  rejudgeContest: async (contestId: string | number): Promise<RejudgeResponse> => {
+    const response = await api.post<RejudgeResponse>(`/admin/rejudge/contest/${contestId}`);
     return response.data;
   },
 

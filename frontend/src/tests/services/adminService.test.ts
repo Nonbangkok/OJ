@@ -7,6 +7,7 @@ import type {
     ApiMessageResponse,
     ContestProblemsMutationResponse,
     RegistrationSettingsUpdateResponse,
+    RejudgeResponse,
     UpdateUserRequest,
 } from '../../types';
 
@@ -91,6 +92,14 @@ describe('adminService', () => {
             expect(api.post).toHaveBeenCalledWith('/admin/problems/export', { problemIds: ['1', '2'] }, { responseType: 'blob' });
             expect(result).toBe(mockResponse);
         });
+
+        it('rejudgeProblem calls api.post with the correct path', async () => {
+            const response: RejudgeResponse = { queued: 4, skipped: 1 };
+            jest.mocked(api.post).mockResolvedValueOnce({ data: response });
+            const result = await adminService.rejudgeProblem('P1');
+            expect(api.post).toHaveBeenCalledWith('/admin/rejudge/problem/P1');
+            expect(result).toEqual(response);
+        });
     });
 
     describe('Contest Management', () => {
@@ -108,6 +117,14 @@ describe('adminService', () => {
                 problemIds: ['1', '2'],
                 action: 'move_to_contest'
             });
+        });
+
+        it('rejudgeContest calls api.post with the correct path', async () => {
+            const response: RejudgeResponse = { queued: 7, skipped: 2 };
+            jest.mocked(api.post).mockResolvedValueOnce({ data: response });
+            const result = await adminService.rejudgeContest(5);
+            expect(api.post).toHaveBeenCalledWith('/admin/rejudge/contest/5');
+            expect(result).toEqual(response);
         });
     });
 

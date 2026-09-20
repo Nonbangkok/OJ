@@ -1,7 +1,9 @@
 import useContestManagement from '../../../hooks/admin/useContestManagement';
+import useRejudge from '../../../hooks/admin/useRejudge';
 import ContestModal from './ContestModal';
 import ProblemMigrationModal from '../problems/ProblemMigrationModal';
 import ConfirmationModal from '../shared/ConfirmationModal';
+import RejudgeFeedbackBox from '../shared/RejudgeFeedbackBox';
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 import LoadingPage from '../../../components/shared/LoadingPage';
@@ -31,6 +33,16 @@ const ContestManagement = () => {
     getStatusBadge,
     formatDateTime
   } = useContestManagement(styles);
+
+  const {
+    isRejudgeConfirmOpen,
+    rejudgeTarget,
+    rejudgeFeedback,
+    handleRejudgeClick,
+    handleCloseRejudgeConfirm,
+    handleConfirmRejudge,
+    dismissRejudgeFeedback,
+  } = useRejudge();
 
   if (loading) {
     return <LoadingPage />;
@@ -142,6 +154,17 @@ const ContestManagement = () => {
                       </button>
 
                       <button
+                        onClick={() => handleRejudgeClick({ kind: 'contest', id: contest.id, title: contest.title })}
+                        className={styles['rejudge-btn']}
+                        title={contest.status === 'finished'
+                          ? 'Finished contest — its scoreboard is frozen. Rejudge its problems individually instead.'
+                          : 'Re-run every submission in this contest against the current testcases and limits'}
+                        disabled={contest.status === 'finished'}
+                      >
+                        Rejudge
+                      </button>
+
+                      <button
                         onClick={() => {
                           setContestToDelete(contest.id);
                           setIsConfirmModalOpen(true);
@@ -206,6 +229,20 @@ const ContestManagement = () => {
           message="Are you sure you want to delete this contest? This action cannot be undone."
         />
       )}
+
+      {/* Rejudge feedback + confirmation */}
+      <RejudgeFeedbackBox feedback={rejudgeFeedback} onDismiss={dismissRejudgeFeedback} />
+      <ConfirmationModal
+        isOpen={isRejudgeConfirmOpen}
+        onClose={handleCloseRejudgeConfirm}
+        onConfirm={handleConfirmRejudge}
+        title="Confirm Rejudge"
+        message={rejudgeTarget
+          ? `Rejudge re-runs every submission for contest "${rejudgeTarget.title}" against the current testcases and limits. Scores may change.`
+          : ''}
+        confirmText="Rejudge"
+        confirmStyle="default"
+      />
     </div>
   );
 }

@@ -108,3 +108,10 @@ export interface ProblemMutationResponse extends ApiMessageResponse {
 export interface ContestProblemsMutationResponse extends ApiMessageResponse {
   movedProblems?: ProblemBase[];
 }
+
+export interface RejudgeResponse {
+  /** Submissions accepted for rejudge (reset + enqueued). */
+  queued: number;
+  /** Non-judgeable rows excluded from the rejudge. */
+  skipped: number;
+}

@@ -138,4 +138,40 @@ describe('ProblemManagement Component', () => {
             expect(adminService.exportProblems).toHaveBeenCalledWith(['P1']);
         });
     });
+
+    it('opens the rejudge confirm dialog and reports queued/skipped counts', async () => {
+        (jest.mocked(adminService.rejudgeProblem) as jest.Mock).mockResolvedValueOnce({ queued: 4, skipped: 1 });
+        renderProblemManagement();
+
+        await waitFor(() => screen.getByText('Problem 1'));
+        const p1Row = screen.getAllByRole('row').find(r => r.textContent.includes('Problem 1'));
+        fireEvent.click(within(p1Row).getByRole('button', { name: /rejudge/i }));
+
+        // Confirm dialog explains the consequences in plain language.
+        expect(screen.getByText(/re-runs every submission for problem "problem 1"/i)).toBeInTheDocument();
+        expect(screen.getByText(/scores may change/i)).toBeInTheDocument();
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /rejudge/i }));
+
+        await waitFor(() => {
+            expect(adminService.rejudgeProblem).toHaveBeenCalledWith('P1');
+        });
+        expect(await screen.findByText(/rejudge queued for 4 submissions \(1 skipped — no stored code\)/i)).toBeInTheDocument();
+    });
+
+    it('shows an error message when rejudge fails', async () => {
+        (jest.mocked(adminService.rejudgeProblem) as jest.Mock).mockRejectedValueOnce({
+            response: { status: 500, data: { message: 'Rejudge failed on the server.' } },
+        });
+        renderProblemManagement();
+
+        await waitFor(() => screen.getByText('Problem 2'));
+        const p2Row = screen.getAllByRole('row').find(r => r.textContent.includes('Problem 2'));
+        fireEvent.click(within(p2Row).getByRole('button', { name: /rejudge/i }));
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /rejudge/i }));
+
+        await waitFor(() => {
+            expect(adminService.rejudgeProblem).toHaveBeenCalledWith('P2');
+        });
+        expect(await screen.findByText(/rejudge failed on the server/i)).toBeInTheDocument();
+    });
 });

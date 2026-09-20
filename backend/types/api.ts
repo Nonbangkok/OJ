@@ -99,6 +99,25 @@ export interface UpdateRegistrationSettingRequestBody {
 }
 
 // ---------------------------------------------------------------------------
+// Admin rejudge
+// ---------------------------------------------------------------------------
+
+export interface RejudgeProblemParams {
+    problemId: string;
+}
+
+export interface RejudgeContestParams {
+    contestId: number;
+}
+
+export interface RejudgeResponse {
+    /** Submissions accepted for rejudge (reset + enqueued). */
+    queued: number;
+    /** Non-judgeable rows excluded from the rejudge. */
+    skipped: number;
+}
+
+// ---------------------------------------------------------------------------
 // Problem — Batch Upload Progress
 // ---------------------------------------------------------------------------
 

@@ -1,23 +1,30 @@
 import express, { Request, Response, Router } from 'express';
 import { requireAuth, requireAdmin, requireStaffOrAdmin } from '../middleware/auth';
-import { USER_VALIDATION, SECURITY_CONFIG } from '../constants';
+import { CONTEST_STATUS, USER_VALIDATION, SECURITY_CONFIG } from '../constants';
 import { diskUpload } from '../middleware/upload';
 import {
   BatchCreateUsersRequestBody,
   BatchCreateUsersSuccessResponse,
   CreateAdminUserRequestBody,
+  RejudgeContestParams,
+  RejudgeProblemParams,
+  RejudgeResponse,
   UpdateAdminUserRequestBody,
   UpdateRegistrationSettingRequestBody,
 } from '../types/api';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
 import {
+  analyticsContestIdParamSchema,
+  analyticsProblemIdParamSchema,
   batchCreateUsersSchema,
   createAdminUserSchema,
   idParamSchema,
   updateAdminUserSchema,
   updateRegistrationSettingSchema,
 } from '../schemas/requestSchemas';
+import { getContestStatusById } from '../services/contestAccess';
+import { rejudgeContest, rejudgeProblem } from '../services/rejudgeService';
 import {
   buildDatabaseExportRequest,
   getDatabaseImportProgress,
@@ -176,6 +183,34 @@ router.post('/admin/database/export', requireAuth, requireAdmin, asyncHandler(as
 router.get('/admin/settings/registration', requireAuth, requireAdmin, asyncHandler(async (_req: Request, res: Response) => {
   const enabled = await getRegistrationEnabled();
   res.json({ enabled });
+}));
+
+// Batch rejudge: re-run every judgeable submission through the normal judge
+// pipeline against the current testcases/limits. The service logs start and
+// completion with counts; these routes stay thin.
+router.post('/admin/rejudge/problem/:problemId', requireAuth, requireAdmin,
+  validateRequest({ params: analyticsProblemIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response<RejudgeResponse>) => {
+  const { problemId } = req.params as unknown as RejudgeProblemParams;
+  const result = await rejudgeProblem(problemId);
+  res.json(result);
+}));
+
+router.post('/admin/rejudge/contest/:contestId', requireAuth, requireAdmin,
+  validateRequest({ params: analyticsContestIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response<RejudgeResponse>) => {
+  const { contestId } = req.params as unknown as RejudgeContestParams;
+  const contestStatus = await getContestStatusById(String(contestId));
+  if (contestStatus === null) {
+    throw new AppError('Contest not found.', 404);
+  }
+  // Finished contests keep a frozen scoreboard snapshot; rejudge is refused
+  // so the historical record stays intact (per-problem rejudge remains open).
+  if (contestStatus === CONTEST_STATUS.FINISHED) {
+    throw new AppError('This contest is finished and its scoreboard is frozen. Rejudge its problems individually instead.', 409);
+  }
+  const result = await rejudgeContest(Number(contestId));
+  res.json(result);
 }));
 
 router.put('/admin/settings/registration', requireAuth, requireAdmin,

@@ -144,4 +144,33 @@ describe('ContestManagement Component', () => {
             expect(adminService.deleteContest).toHaveBeenCalledWith(1);
         });
     });
+
+    it('disables Rejudge for finished contests with a visible reason', async () => {
+        renderContestManagement();
+
+        await waitFor(() => screen.getByText('Contest 3'));
+        const c3Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 3'));
+        const rejudgeBtn = within(c3Row).getByRole('button', { name: /rejudge/i });
+        expect(rejudgeBtn).toBeDisabled();
+        expect(rejudgeBtn).toHaveAttribute('title', 'Finished contest — its scoreboard is frozen. Rejudge its problems individually instead.');
+    });
+
+    it('opens the rejudge confirm dialog and reports queued/skipped counts', async () => {
+        (jest.mocked(adminService.rejudgeContest) as jest.Mock).mockResolvedValueOnce({ queued: 6, skipped: 2 });
+        renderContestManagement();
+
+        await waitFor(() => screen.getByText('Contest 2'));
+        const c2Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 2'));
+        fireEvent.click(within(c2Row).getByRole('button', { name: /rejudge/i }));
+
+        // Confirm dialog explains the consequences in plain language.
+        expect(screen.getByText(/re-runs every submission for contest "contest 2"/i)).toBeInTheDocument();
+        expect(screen.getByText(/scores may change/i)).toBeInTheDocument();
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /rejudge/i }));
+
+        await waitFor(() => {
+            expect(adminService.rejudgeContest).toHaveBeenCalledWith(2);
+        });
+        expect(await screen.findByText(/rejudge queued for 6 submissions \(2 skipped — no stored code\)/i)).toBeInTheDocument();
+    });
 });

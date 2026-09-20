@@ -104,6 +104,22 @@
   background-color: var(--action-problems-hover);
 }
 
+/* Batch rejudge action (problems + contests panels). */
+.rejudge-btn {
+  composes: btn;
+  background-color: var(--action-edit-bg);
+}
+
+.rejudge-btn:hover:not(:disabled) {
+  background-color: var(--action-edit-hover);
+}
+
+.rejudge-btn:disabled {
+  background-color: var(--action-disabled-bg);
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .visible-btn {
   composes: btn;
   background-color: var(--action-create-bg);

@@ -7,6 +7,7 @@ import type {
   ApiMessageResponse,
   BatchUploadStartResponse,
   ProblemMutationResponse,
+  RejudgeResponse,
   UploadProgressResponse,
 } from '../../types';
 import type { CreateProblemRequest, UpdateProblemRequest } from '../../types';
@@ -36,6 +37,11 @@ const problemsAdminService = {
 
   deleteProblem: async (problemId: string): Promise<ApiMessageResponse> => {
     const response = await api.delete<ApiMessageResponse>(`/admin/problems/${problemId}`);
+    return response.data;
+  },
+
+  rejudgeProblem: async (problemId: string | number): Promise<RejudgeResponse> => {
+    const response = await api.post<RejudgeResponse>(`/admin/rejudge/problem/${problemId}`);
     return response.data;
   },
 
