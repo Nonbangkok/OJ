@@ -45,6 +45,8 @@ export interface ProblemBase {
   author: string | null;
   /** Fixed-list categories; empty array means uncategorized. */
   categories?: readonly string[];
+  /** Codeforces-like rating (800–3500 step 100); null/absent = Unrated. */
+  difficulty?: number | null;
 }
 
 export interface ContestProblem extends ProblemBase {

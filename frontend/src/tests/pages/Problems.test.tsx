@@ -26,7 +26,7 @@ describe('Problems Page', () => {
     });
 
     it('renders loading state initially', () => {
-        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockReturnValue(new Promise(() => { }));
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockReturnValueOnce(new Promise(() => { }));
         render(<BrowserRouter><Problems /></BrowserRouter>);
         expect(screen.getByText(/loading problems\.\.\.$/i)).toBeInTheDocument();
     });
@@ -113,5 +113,125 @@ describe('Problems Page', () => {
 
         expect(screen.queryByText('Knapsack')).not.toBeInTheDocument();
         expect(screen.getByText('LIS')).toBeInTheDocument();
+    });
+
+    describe('difficulty filter & sort', () => {
+        const ratedProblems = [
+            { id: 'a-easy', title: 'Easy One', author: null, categories: [], difficulty: 800 },
+            { id: 'b-mid', title: 'Middle One', author: null, categories: [], difficulty: 1500 },
+            { id: 'c-hard', title: 'Hard One', author: null, categories: [], difficulty: 2500 },
+            { id: 'd-unrated', title: 'Unrated One', author: null, categories: [], difficulty: null },
+        ];
+
+        /** Emulates the backend: no filter -> Unrated included, ordered by id;
+         *  min/max filter -> Unrated excluded; difficulty sort -> NULLS LAST. */
+        const emulateBackend = (query: Record<string, unknown> = {}) => {
+            let rows = [...ratedProblems];
+            const q = query as { difficultyMin?: number; difficultyMax?: number; sort?: string; order?: string };
+            if (q.difficultyMin !== undefined) {
+                rows = rows.filter(p => p.difficulty !== null && p.difficulty >= (q.difficultyMin as number));
+            }
+            if (q.difficultyMax !== undefined) {
+                rows = rows.filter(p => p.difficulty !== null && p.difficulty <= (q.difficultyMax as number));
+            }
+            if (q.sort === 'difficulty') {
+                const rated = rows
+                    .filter(p => p.difficulty !== null)
+                    .sort((a, b) => q.order === 'desc' ? (b.difficulty as number) - (a.difficulty as number) : (a.difficulty as number) - (b.difficulty as number));
+                const unrated = rows.filter(p => p.difficulty === null);
+                rows = [...rated, ...unrated];
+            }
+            return rows;
+        };
+
+        // The implementation is set inside each test, not in beforeEach: the
+        // shared suite's earlier tests leave once-queued values behind, and a
+        // per-test implementation is immune to that leftover state.
+        const useBackend = () => {
+            const mock = jest.mocked(problemService.getAllWithStats) as jest.Mock;
+            mock.mockImplementation(((query: Record<string, unknown> = {}) =>
+                Promise.resolve(emulateBackend(query))) as never);
+            return mock;
+        };
+
+        it('shows every problem including Unrated when no difficulty filter is set', async () => {
+            const mock = useBackend();
+            render(<BrowserRouter><Problems /></BrowserRouter>);
+
+            await waitFor(() => {
+                expect(screen.getByText('Easy One')).toBeInTheDocument();
+            });
+            expect(screen.getByText('Unrated One')).toBeInTheDocument();
+            expect(screen.getAllByRole('heading', { level: 3 }).length).toBe(4);
+            // The default request carries no difficulty params at all.
+            expect(mock).toHaveBeenLastCalledWith({});
+        });
+
+        it('filters by difficulty min and max, excluding Unrated', async () => {
+            const mock = useBackend();
+            render(<BrowserRouter><Problems /></BrowserRouter>);
+
+            await waitFor(() => {
+                expect(screen.getByText('Easy One')).toBeInTheDocument();
+            });
+
+            fireEvent.change(screen.getByLabelText('Difficulty minimum'), { target: { value: '1000' } });
+
+            await waitFor(() => {
+                expect(screen.getByText('Middle One')).toBeInTheDocument();
+            });
+            expect(screen.getByText('Hard One')).toBeInTheDocument();
+            expect(screen.queryByText('Easy One')).not.toBeInTheDocument();
+            expect(screen.queryByText('Unrated One')).not.toBeInTheDocument();
+            expect(mock).toHaveBeenLastCalledWith({ difficultyMin: 1000 });
+
+            fireEvent.change(screen.getByLabelText('Difficulty maximum'), { target: { value: '2000' } });
+
+            await waitFor(() => {
+                expect(screen.queryByText('Hard One')).not.toBeInTheDocument();
+            });
+            expect(screen.getByText('Middle One')).toBeInTheDocument();
+            expect(mock).toHaveBeenLastCalledWith({ difficultyMin: 1000, difficultyMax: 2000 });
+        });
+
+        it('sorts by difficulty, requesting NULLS LAST in both directions', async () => {
+            const mock = useBackend();
+            render(<BrowserRouter><Problems /></BrowserRouter>);
+
+            await waitFor(() => {
+                expect(screen.getByText('Easy One')).toBeInTheDocument();
+            });
+
+            fireEvent.change(screen.getByLabelText('Sort problems'), { target: { value: 'difficulty-asc' } });
+            await waitFor(() => {
+                expect(mock).toHaveBeenLastCalledWith({ sort: 'difficulty', order: 'asc' });
+            });
+
+            fireEvent.change(screen.getByLabelText('Sort problems'), { target: { value: 'difficulty-desc' } });
+            await waitFor(() => {
+                expect(mock).toHaveBeenLastCalledWith({ sort: 'difficulty', order: 'desc' });
+            });
+        });
+
+        it('clearing the difficulty filter restores the default view', async () => {
+            const mock = useBackend();
+            render(<BrowserRouter><Problems /></BrowserRouter>);
+
+            await waitFor(() => {
+                expect(screen.getByText('Easy One')).toBeInTheDocument();
+            });
+
+            fireEvent.change(screen.getByLabelText('Difficulty minimum'), { target: { value: '1000' } });
+            await waitFor(() => {
+                expect(screen.queryByText('Easy One')).not.toBeInTheDocument();
+            });
+
+            fireEvent.change(screen.getByLabelText('Difficulty minimum'), { target: { value: '' } });
+            await waitFor(() => {
+                expect(screen.getByText('Easy One')).toBeInTheDocument();
+            });
+            expect(screen.getByText('Unrated One')).toBeInTheDocument();
+            expect(mock).toHaveBeenLastCalledWith({});
+        });
     });
 });

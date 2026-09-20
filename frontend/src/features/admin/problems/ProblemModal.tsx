@@ -1,5 +1,5 @@
 import useProblemModal from '../../../hooks/admin/useProblemModal';
-import { PROBLEM_CATEGORIES } from '../../../utils/constants';
+import { PROBLEM_CATEGORIES, PROBLEM_DIFFICULTY_OPTIONS, difficultyBand } from '../../../utils/constants';
 import formStyles from '../../../components/styles/Form.module.css';
 import modalStyles from '../shared/ModalLayout.module.css';
 
@@ -129,7 +129,7 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
             </div>
 
             <div className={`${formStyles['form-group']} ${formStyles['category-group']}`}>
-              <label>Categories</label>
+              <span className={formStyles['group-label']}>Categories</span>
               <div className={formStyles['category-options']}>
                 {PROBLEM_CATEGORIES.map(category => (
                   <label key={category} className={formStyles['category-option']}>
@@ -141,6 +141,31 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
                     {category}
                   </label>
                 ))}
+              </div>
+            </div>
+
+            <div className={formStyles['form-group']}>
+              <label htmlFor="difficulty">Difficulty</label>
+              <div className={formStyles['difficulty-field']}>
+                <select
+                  id="difficulty"
+                  name="difficulty"
+                  value={formData.difficulty ?? ''}
+                  onChange={handleChange}
+                >
+                  <option value="">Unrated</option>
+                  {PROBLEM_DIFFICULTY_OPTIONS.map(option => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+                {formData.difficulty !== null && difficultyBand(formData.difficulty) !== null && (
+                  <span
+                    className={formStyles[`difficulty-preview-${difficultyBand(formData.difficulty)}`]}
+                    aria-hidden="true"
+                  >
+                    {formData.difficulty}
+                  </span>
+                )}
               </div>
             </div>
           </fieldset>

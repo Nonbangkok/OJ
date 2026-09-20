@@ -3,16 +3,39 @@ import styles from './Problems.module.css';
 import { useProblems } from '../../hooks/useProblems';
 import { useScrollRestore } from '../../hooks/useScrollRestore';
 import ProblemCard from '../../features/problem/ProblemCard';
+import { PROBLEM_DIFFICULTY_OPTIONS } from '../../utils/constants';
+import type { ProblemListDifficultyQuery } from '../../services/problemService';
 
 import LoadingPage from '../../components/shared/LoadingPage';
 
 const ALL_CATEGORIES = 'All';
 const UNCATEGORIZED = 'Uncategorized';
+const DIFFICULTY_SORT_NONE = '';
+const DIFFICULTY_SORT_ASC = 'difficulty-asc';
+const DIFFICULTY_SORT_DESC = 'difficulty-desc';
 
 const Problems = () => {
-  const { problems, loading, error } = useProblems();
   const [activeCategory, setActiveCategory] = useState(ALL_CATEGORIES);
   const [search, setSearch] = useState('');
+  const [difficultyMin, setDifficultyMin] = useState('');
+  const [difficultyMax, setDifficultyMax] = useState('');
+  const [difficultySort, setDifficultySort] = useState(DIFFICULTY_SORT_NONE);
+
+  // Server-side difficulty controls. With nothing selected the query is empty
+  // and the backend returns exactly the pre-feature default view (Unrated
+  // problems included, ordered by id).
+  const difficultyQuery = useMemo<ProblemListDifficultyQuery>(() => {
+    const query: ProblemListDifficultyQuery = {};
+    if (difficultyMin !== '') query.difficultyMin = Number(difficultyMin);
+    if (difficultyMax !== '') query.difficultyMax = Number(difficultyMax);
+    if (difficultySort === DIFFICULTY_SORT_ASC || difficultySort === DIFFICULTY_SORT_DESC) {
+      query.sort = 'difficulty';
+      query.order = difficultySort === DIFFICULTY_SORT_ASC ? 'asc' : 'desc';
+    }
+    return query;
+  }, [difficultyMin, difficultyMax, difficultySort]);
+
+  const { problems, loading, error } = useProblems(null, true, difficultyQuery);
 
   // Coming back from a problem detail page restores the previous scroll spot.
   useScrollRestore(!loading && !error);
@@ -60,6 +83,44 @@ const Problems = () => {
           onChange={event => setSearch(event.target.value)}
           aria-label="Search problems"
         />
+        <div className={styles['difficulty-controls']}>
+          <label className={styles['difficulty-control']}>
+            <span className={styles['difficulty-control-label']}>Difficulty</span>
+            <select
+              aria-label="Difficulty minimum"
+              className={styles['difficulty-select']}
+              value={difficultyMin}
+              onChange={event => setDifficultyMin(event.target.value)}
+            >
+              <option value="">Min</option>
+              {PROBLEM_DIFFICULTY_OPTIONS.map(option => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </label>
+          <span className={styles['difficulty-separator']} aria-hidden="true">–</span>
+          <select
+            aria-label="Difficulty maximum"
+            className={styles['difficulty-select']}
+            value={difficultyMax}
+            onChange={event => setDifficultyMax(event.target.value)}
+          >
+            <option value="">Max</option>
+            {PROBLEM_DIFFICULTY_OPTIONS.map(option => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+          <select
+            aria-label="Sort problems"
+            className={styles['difficulty-select']}
+            value={difficultySort}
+            onChange={event => setDifficultySort(event.target.value)}
+          >
+            <option value="">Sort: Default</option>
+            <option value={DIFFICULTY_SORT_ASC}>Difficulty ↑</option>
+            <option value={DIFFICULTY_SORT_DESC}>Difficulty ↓</option>
+          </select>
+        </div>
       </div>
 
       {problems.length > 0 && (

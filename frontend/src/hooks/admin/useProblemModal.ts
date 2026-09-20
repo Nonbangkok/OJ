@@ -7,6 +7,7 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
         title: '',
         author: '',
         categories: [],
+        difficulty: null,
         time_limit_ms: 2000,
         memory_limit_mb: 512,
     });
@@ -38,6 +39,7 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
                 title: problem.title ?? '',
                 author: problem.author ?? '',
                 categories: problem.categories ?? [],
+                difficulty: problem.difficulty ?? null,
                 time_limit_ms: problem.time_limit_ms ?? 3000,
                 memory_limit_mb: problem.memory_limit_mb ?? 256,
             });
@@ -48,6 +50,7 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
                 title: '',
                 author: currentUser?.username ?? '',
                 categories: [],
+                difficulty: null,
                 time_limit_ms: 1000,
                 memory_limit_mb: 256,
             });
@@ -65,6 +68,9 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
             ...prev,
             // Treat all form values as strings. The backend will handle parsing.
             [name]: value,
+            // Difficulty is tri-state: '' = Unrated (null), otherwise the
+            // numeric rating from the dropdown.
+            ...(name === 'difficulty' ? { difficulty: value === '' ? null : Number(value) } : {}),
         }));
     };
 

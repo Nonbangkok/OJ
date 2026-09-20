@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { formatTimeAgo, formatDateAbsolute, generateResultString } from '../../utils/formatters';
+import { difficultyBand } from '../../utils/constants';
 import type { ProblemSummary } from '../../types';
 import styles from './ProblemCard.module.css';
 
@@ -14,6 +15,8 @@ const ProblemCard = ({ problem, contestId = null }: ProblemCardProps) => {
     const linkPath = contestId
         ? `/contests/${contestId}/problems/${problem.id}`
         : `/problems/${problem.id}`;
+    const difficulty = problem.difficulty ?? null;
+    const band = difficultyBand(difficulty);
 
     return (
         <div className={styles['problem-list-item']}>
@@ -24,6 +27,16 @@ const ProblemCard = ({ problem, contestId = null }: ProblemCardProps) => {
                     {problem.categories?.map(category => (
                         <span key={category} className={styles['problem-category']}>{category}</span>
                     ))}
+                    {difficulty !== null && band !== null && (
+                        <span
+                            data-testid="problem-difficulty"
+                            data-band={band}
+                            className={styles[`difficulty-chip-${band}`]}
+                            title={`Difficulty ${difficulty}`}
+                        >
+                            {difficulty}
+                        </span>
+                    )}
                 </p>
                 <div className={styles['submission-status-placeholder']}>
                     {hasSubmitted && (

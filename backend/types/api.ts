@@ -133,6 +133,8 @@ export interface CreateProblemRequestBody {
     title: string;
     author: string;
     categories?: readonly ProblemCategory[];
+    /** Codeforces-like rating (800–3500 step 100); null = Unrated. */
+    difficulty?: number | null;
     time_limit_ms: number;
     memory_limit_mb: number;
 }
@@ -142,6 +144,8 @@ export interface UpdateProblemRequestBody {
     title?: string;
     author?: string;
     categories?: readonly ProblemCategory[];
+    /** Codeforces-like rating (800–3500 step 100); null = Unrated. */
+    difficulty?: number | null;
     time_limit_ms?: number;
     memory_limit_mb?: number;
 }
@@ -199,6 +203,8 @@ export interface CreateProblemDraftRequestBody {
     language?: string;
     countryCode?: string;
     categories?: readonly ProblemCategory[];
+    /** Codeforces-like rating (800–3500 step 100); null = Unrated. */
+    difficulty?: number | null;
     timeLimitMs: number;
     memoryLimitMb: number;
     statementHtml: string;

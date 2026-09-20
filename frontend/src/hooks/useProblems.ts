@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import problemService from '../services/problemService';
+import problemService, { ProblemListDifficultyQuery } from '../services/problemService';
 import contestService from '../services/contestService';
 import type { ProblemBase, ProblemSummary } from '../types';
 
@@ -8,6 +8,8 @@ import type { ProblemBase, ProblemSummary } from '../types';
  * fetches contest-specific problems instead.
  * @param {string} [contestId] - Optional contest ID for contest problems
  * @param {boolean} [enabled] - Whether to fetch (used to wait on a guard)
+ * @param {ProblemListDifficultyQuery} [difficultyQuery] - Optional server-side
+ *   difficulty filter/sort for the non-contest list (refetches on change)
  */
 
 interface UseProblemsResult {
@@ -17,10 +19,16 @@ interface UseProblemsResult {
   refresh: () => Promise<void>;
 }
 
-export const useProblems = (contestId: string | null = null, enabled = true): UseProblemsResult => {
+export const useProblems = (
+  contestId: string | null = null,
+  enabled = true,
+  difficultyQuery: ProblemListDifficultyQuery = {},
+): UseProblemsResult => {
   const [problems, setProblems] = useState<ProblemSummary[] | ProblemBase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const difficultyKey = JSON.stringify(difficultyQuery);
 
   const fetchProblems = useCallback(async () => {
     if (!enabled) {
@@ -34,7 +42,7 @@ export const useProblems = (contestId: string | null = null, enabled = true): Us
       setError('');
       const data = contestId
         ? await contestService.getProblems(contestId)
-        : await problemService.getAllWithStats();
+        : await problemService.getAllWithStats(JSON.parse(difficultyKey) as ProblemListDifficultyQuery);
       setProblems(data);
     } catch (err) {
       setError(
@@ -43,7 +51,7 @@ export const useProblems = (contestId: string | null = null, enabled = true): Us
     } finally {
       setLoading(false);
     }
-  }, [contestId, enabled]);
+  }, [contestId, enabled, difficultyKey]);
 
   useEffect(() => {
     void fetchProblems();

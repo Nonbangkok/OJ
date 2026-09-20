@@ -100,6 +100,22 @@ test('the metadata category checkboxes toggle multiple categories and default to
     { timeout: 4000 }
   );
 });
+test('the metadata difficulty dropdown saves a rating and clears back to Unrated', async () => {
+  show('/admin/authoring/d1');
+  const difficulty = await screen.findByLabelText('Difficulty');
+  // An unrated draft starts empty.
+  expect(difficulty).toHaveValue('');
+  jest.mocked(api.patch).mockResolvedValue({ data: { ...draft, revision: 4 } });
+  fireEvent.change(difficulty, { target: { value: '2100' } });
+  await waitFor(
+    () =>
+      expect(api.patch).toHaveBeenCalledWith(
+        '/admin/authoring/drafts/d1',
+        expect.objectContaining({ difficulty: 2100 })
+      ),
+    { timeout: 4000 }
+  );
+});
 test('lists resumable drafts and creates a draft with explicit author metadata', async () => {
   show();
   // Problem ID and title are separate links to the same draft.

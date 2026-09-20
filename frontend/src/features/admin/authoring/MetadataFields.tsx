@@ -1,5 +1,5 @@
 import { DraftFields, Profile } from './types';
-import { PROBLEM_CATEGORIES } from '../../../utils/constants';
+import { PROBLEM_CATEGORIES, PROBLEM_DIFFICULTY_OPTIONS, difficultyBand } from '../../../utils/constants';
 import styles from './Authoring.module.css';
 
 export default function MetadataFields({ value, profiles, onEdit, disabled = false, problemIdLocked = false }: {
@@ -40,6 +40,14 @@ export default function MetadataFields({ value, profiles, onEdit, disabled = fal
         </label>)}
       </div>
     </fieldset>
+    <label>Difficulty<select value={value.difficulty ?? ''} onChange={e => onEdit('difficulty', e.target.value === '' ? null : Number(e.target.value))}>
+      <option value="">Unrated</option>
+      {PROBLEM_DIFFICULTY_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+    </select>
+      {value.difficulty !== null && difficultyBand(value.difficulty) !== null && (
+        <span className={styles[`difficultyChip${difficultyBand(value.difficulty)}`]} aria-hidden="true">{value.difficulty}</span>
+      )}
+    </label>
     <label>Time limit (ms)<input required type="number" min={1} max={900000} value={value.timeLimitMs || ''} onChange={e => onEdit('timeLimitMs', Number(e.target.value))} /></label>
     <label>Memory limit (MiB)<input required type="number" min={1} max={736} value={value.memoryLimitMb || ''} onChange={e => onEdit('memoryLimitMb', Number(e.target.value))} /></label>
   </fieldset>;

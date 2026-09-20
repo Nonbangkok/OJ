@@ -92,6 +92,8 @@ export interface ProblemRow {
     author: string | null;
     /** Fixed-list categories; an empty array means uncategorized. */
     categories: readonly ProblemCategory[];
+    /** Codeforces-like rating (800–3500 step 100); null = Unrated. */
+    difficulty: number | null;
     problem_pdf: Buffer | null;
     time_limit_ms: number;
     memory_limit_mb: number;
@@ -106,7 +108,7 @@ export type ProblemWithPdf = Pick<
 
 export type ProblemDetailDTO = Pick<
     ProblemRow,
-    'id' | 'title' | 'author' | 'time_limit_ms' | 'memory_limit_mb' | 'is_visible' | 'contest_id'
+    'id' | 'title' | 'author' | 'categories' | 'difficulty' | 'time_limit_ms' | 'memory_limit_mb' | 'is_visible' | 'contest_id'
 > & {
     has_pdf: boolean;
 };
@@ -114,7 +116,7 @@ export type ProblemDetailDTO = Pick<
 /** `problems` row augmented with contest status for the admin index. */
 export interface AdminProblemRow extends Pick<
     ProblemRow,
-    'id' | 'title' | 'author' | 'categories' | 'is_visible' | 'contest_id'
+    'id' | 'title' | 'author' | 'categories' | 'difficulty' | 'is_visible' | 'contest_id'
 > {
     contest_status: ContestStatus | null;
 }

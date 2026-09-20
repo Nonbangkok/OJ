@@ -45,6 +45,14 @@
   --heatmap-level-3: #30a14e;
   --heatmap-level-4: #216e39;
 
+  /* Problem difficulty heat-map bands (800–1100 green … 2800–3500 purple).
+     Chip numbers render in white, so every band clears WCAG AA (≥4.5:1). */
+  --difficulty-band-1: #1a7f37;
+  --difficulty-band-2: #9a6700;
+  --difficulty-band-3: #bc4c00;
+  --difficulty-band-4: #cf222e;
+  --difficulty-band-5: #8250df;
+
   --action-primary-foreground: #ffffff;
   --action-primary-background: #0069d9;
   --action-primary-hover-background: var(--accent-primary-hover);
@@ -245,6 +253,14 @@
   --heatmap-level-2: #006d32;
   --heatmap-level-3: #26a641;
   --heatmap-level-4: #39d353;
+
+  /* Difficulty bands — lifted a notch for dark surfaces, still AA with
+     white chip text (≥4.5:1) and distinct from the card background. */
+  --difficulty-band-1: #238636;
+  --difficulty-band-2: #9e6a03;
+  --difficulty-band-3: #c2540a;
+  --difficulty-band-4: #da3633;
+  --difficulty-band-5: #8957e5;
 
   --action-primary-foreground: #ffffff;
   --action-primary-background: #0b5ed7;

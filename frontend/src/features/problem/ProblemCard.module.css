@@ -47,6 +47,42 @@
   vertical-align: middle;
 }
 
+/* Difficulty rating chip: the number itself, colored by heat-map band.
+   White text on the band color passes WCAG AA in both themes; Unrated
+   problems render no chip at all. */
+[class*='difficulty-chip-'] {
+  display: inline-block;
+  margin-left: 0.6rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
+.difficulty-chip-1 {
+  background-color: var(--difficulty-band-1);
+}
+
+.difficulty-chip-2 {
+  background-color: var(--difficulty-band-2);
+}
+
+.difficulty-chip-3 {
+  background-color: var(--difficulty-band-3);
+}
+
+.difficulty-chip-4 {
+  background-color: var(--difficulty-band-4);
+}
+
+.difficulty-chip-5 {
+  background-color: var(--difficulty-band-5);
+}
+
 .submission-status-placeholder {
   min-height: 28px; /* Reserve space for the status line */
 }

@@ -65,7 +65,7 @@ export async function publishProblemDraft(draftId: string, expectedRevision: num
     let legacyProblemId = draft.problem_id;
     if (isRepublish) {
       const provenance = (await client.query<{ problem_id: string; title: string; author: string | null;
-        categories: readonly string[]; time_limit_ms: number; memory_limit_mb: number }>(`SELECT problem_id,title,author,categories,time_limit_ms,memory_limit_mb
+        categories: readonly string[]; difficulty: number | null; time_limit_ms: number; memory_limit_mb: number }>(`SELECT problem_id,title,author,categories,difficulty,time_limit_ms,memory_limit_mb
           FROM authoring_published_problems WHERE draft_id=$1 FOR UPDATE`, [draftId])).rows[0];
       if (!provenance) return await reject('published_problem_provenance_missing');
       legacyProblemId = provenance.problem_id;
@@ -73,13 +73,14 @@ export async function publishProblemDraft(draftId: string, expectedRevision: num
       // authoring metadata edits while refusing to overwrite legacy edits made
       // outside the authoring workflow.
       const updated = await client.query<{ is_visible: boolean }>(`UPDATE problems SET
-        title=$2,author=$3,categories=$4::text[],problem_pdf=$5,time_limit_ms=$6,memory_limit_mb=$7
-        WHERE id=$1 AND title=$8 AND author IS NOT DISTINCT FROM $9
-          AND categories IS NOT DISTINCT FROM $10
-          AND time_limit_ms=$11 AND memory_limit_mb=$12
+        title=$2,author=$3,categories=$4::text[],difficulty=$5,problem_pdf=$6,time_limit_ms=$7,memory_limit_mb=$8
+        WHERE id=$1 AND title=$9 AND author IS NOT DISTINCT FROM $10
+          AND categories IS NOT DISTINCT FROM $11
+          AND difficulty IS NOT DISTINCT FROM $12
+          AND time_limit_ms=$13 AND memory_limit_mb=$14
         RETURNING is_visible`,
-      [legacyProblemId, draft.title, draft.author_aka_name, [...draft.categories], draft.latest_pdf, draft.time_limit_ms, draft.memory_limit_mb,
-        provenance.title, provenance.author, [...provenance.categories], provenance.time_limit_ms, provenance.memory_limit_mb]);
+      [legacyProblemId, draft.title, draft.author_aka_name, [...draft.categories], draft.difficulty, draft.latest_pdf, draft.time_limit_ms, draft.memory_limit_mb,
+        provenance.title, provenance.author, [...provenance.categories], provenance.difficulty, provenance.time_limit_ms, provenance.memory_limit_mb]);
       if (!updated.rows.length) {
         const existing = await client.query('SELECT 1 FROM problems WHERE id=$1', [legacyProblemId]);
         return await reject(existing.rows.length ? 'published_problem_mismatch' : 'published_problem_missing');
@@ -90,20 +91,20 @@ export async function publishProblemDraft(draftId: string, expectedRevision: num
       // ON CONFLICT targets only the Problem ID, including races with the legacy upload path.
       // Never upsert: another author's published problem must remain untouched.
       const inserted = await client.query(`INSERT INTO problems
-        (id,title,author,categories,problem_pdf,time_limit_ms,memory_limit_mb,is_visible)
-        VALUES ($1,$2,$3,$4::text[],$5,$6,$7,false) ON CONFLICT (id) DO NOTHING RETURNING id`,
-        [draft.problem_id, draft.title, draft.author_aka_name, [...draft.categories], draft.latest_pdf, draft.time_limit_ms, draft.memory_limit_mb]);
+        (id,title,author,categories,difficulty,problem_pdf,time_limit_ms,memory_limit_mb,is_visible)
+        VALUES ($1,$2,$3,$4::text[],$5,$6,$7,$8,false) ON CONFLICT (id) DO NOTHING RETURNING id`,
+        [draft.problem_id, draft.title, draft.author_aka_name, [...draft.categories], draft.difficulty, draft.latest_pdf, draft.time_limit_ms, draft.memory_limit_mb]);
       if (!inserted.rows.length) return await reject('problem_id_conflict');
     }
     await client.query(`INSERT INTO testcases (problem_id,case_number,input_data,output_data)
       SELECT $1,case_number,input_data,output_data FROM problem_draft_testcases WHERE draft_id=$2 ORDER BY case_number`, [legacyProblemId, draftId]);
     if (isRepublish) {
-      await client.query(`UPDATE authoring_published_problems SET title=$2,author=$3,categories=$4::text[],time_limit_ms=$5,memory_limit_mb=$6,
-        updated_at=NOW() WHERE draft_id=$1`, [draftId, draft.title, draft.author_aka_name, [...draft.categories], draft.time_limit_ms, draft.memory_limit_mb]);
+      await client.query(`UPDATE authoring_published_problems SET title=$2,author=$3,categories=$4::text[],difficulty=$5,time_limit_ms=$6,memory_limit_mb=$7,
+        updated_at=NOW() WHERE draft_id=$1`, [draftId, draft.title, draft.author_aka_name, [...draft.categories], draft.difficulty, draft.time_limit_ms, draft.memory_limit_mb]);
     } else {
       await client.query(`INSERT INTO authoring_published_problems
-        (draft_id,problem_id,title,author,categories,time_limit_ms,memory_limit_mb)
-        VALUES ($1,$2,$3,$4,$5::text[],$6,$7)`, [draftId, draft.problem_id, draft.title, draft.author_aka_name, [...draft.categories],
+        (draft_id,problem_id,title,author,categories,difficulty,time_limit_ms,memory_limit_mb)
+        VALUES ($1,$2,$3,$4,$5::text[],$6,$7,$8)`, [draftId, draft.problem_id, draft.title, draft.author_aka_name, [...draft.categories], draft.difficulty,
         draft.time_limit_ms, draft.memory_limit_mb]);
     }
     const published = (await client.query<{ published_at: Date }>(isRepublish

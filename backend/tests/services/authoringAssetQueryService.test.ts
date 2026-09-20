@@ -17,6 +17,7 @@ const draftRow = (overrides: Partial<ProblemDraftRow> = {}): ProblemDraftRow => 
   country_code: 'THA',
   author_profile_image_png: null,
   categories: [],
+  difficulty: null,
   time_limit_ms: 1000,
   memory_limit_mb: 256,
   statement_html: '',

@@ -170,6 +170,7 @@ export interface ProblemStatsRow {
   title: string;
   author: string | null;
   categories: readonly string[];
+  difficulty: number | null;
   best_score: number | null;
   submission_count: string | null;
   latest_submission_at: Date | null;

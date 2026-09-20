@@ -70,6 +70,30 @@ export const PROBLEM_CATEGORIES = [
 ] as const;
 export type ProblemCategory = (typeof PROBLEM_CATEGORIES)[number];
 
+/** Problem difficulty lives on a Codeforces-like numeric scale. */
+export const PROBLEM_DIFFICULTY_MIN = 800;
+export const PROBLEM_DIFFICULTY_MAX = 3500;
+export const PROBLEM_DIFFICULTY_STEP = 100;
+
+/**
+ * Heat-map band boundaries for difficulty display, expressed as data: the
+ * first entry whose `max` covers the value wins. A null difficulty (Unrated)
+ * maps to null — there is no band for it.
+ */
+export const PROBLEM_DIFFICULTY_BANDS: readonly { max: number; band: number }[] = [
+  { max: 1100, band: 1 }, // 800–1100 green
+  { max: 1600, band: 2 }, // 1200–1600 yellow
+  { max: 2100, band: 3 }, // 1700–2100 orange
+  { max: 2700, band: 4 }, // 2200–2700 red
+  { max: 3500, band: 5 }, // 2800–3500 purple
+];
+
+/** Map a difficulty to its 1–5 display band; null (Unrated) → null. */
+export function difficultyBand(difficulty: number | null): number | null {
+  if (difficulty === null) return null;
+  return PROBLEM_DIFFICULTY_BANDS.find(boundary => difficulty <= boundary.max)?.band ?? null;
+}
+
 export const SECURITY_CONFIG = {
     SALT_ROUNDS: 10,
     SESSION_MAX_AGE_MS: 24 * 60 * 60 * 1000, // 24 hours

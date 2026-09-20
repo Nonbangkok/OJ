@@ -20,7 +20,24 @@ describe('Problem Service', () => {
 
         const result = await problemService.getAllWithStats();
 
-        expect(api.get).toHaveBeenCalledWith('/problems-with-stats');
+        expect(api.get).toHaveBeenCalledWith('/problems-with-stats', { params: {} });
+        expect(result).toEqual(mockData);
+    });
+
+    it('getAllWithStats passes difficulty filter and sort params through', async () => {
+        const mockData = [{ id: 'P1', title: 'A problem', author: null, difficulty: 1200 }];
+        jest.mocked(api.get).mockResolvedValueOnce({ data: mockData });
+
+        const result = await problemService.getAllWithStats({
+            difficultyMin: 1000,
+            difficultyMax: 2000,
+            sort: 'difficulty',
+            order: 'desc',
+        });
+
+        expect(api.get).toHaveBeenCalledWith('/problems-with-stats', {
+            params: { difficultyMin: 1000, difficultyMax: 2000, sort: 'difficulty', order: 'desc' },
+        });
         expect(result).toEqual(mockData);
     });
 

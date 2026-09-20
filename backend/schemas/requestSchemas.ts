@@ -3,6 +3,9 @@ import { seedSchema } from '../authoring/protocol';
 import {
   AUTHORING_VALIDATION,
   PROBLEM_CATEGORIES,
+  PROBLEM_DIFFICULTY_MAX,
+  PROBLEM_DIFFICULTY_MIN,
+  PROBLEM_DIFFICULTY_STEP,
   PROBLEM_VALIDATION,
   STATEMENT_ASSET,
   STRING_LIMITS,
@@ -24,6 +27,15 @@ const problemCategories = z.preprocess(
   },
   z.array(z.enum(PROBLEM_CATEGORIES)),
 );
+// Difficulty on the 800–3500 step-100 scale, or null/undefined (Unrated).
+const problemDifficulty = z.number().int()
+  .min(PROBLEM_DIFFICULTY_MIN)
+  .max(PROBLEM_DIFFICULTY_MAX)
+  .refine((value) => value % PROBLEM_DIFFICULTY_STEP === 0, {
+    message: `difficulty must be a multiple of ${PROBLEM_DIFFICULTY_STEP}`,
+  })
+  .nullable()
+  .optional();
 export const expectedRevisionSchema = z.object({
   expectedRevision: z.number().int().positive().max(2147483647),
 }).strict();
@@ -124,6 +136,7 @@ export const createProblemSchema = z.object({
   title: z.string().trim().min(PROBLEM_VALIDATION.MIN_TITLE_LENGTH).max(STRING_LIMITS.TITLE),
   author: z.string().trim().min(PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH).max(STRING_LIMITS.AUTHOR),
   categories: problemCategories.optional(),
+  difficulty: problemDifficulty,
   time_limit_ms: z.number().int().min(PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS),
   memory_limit_mb: z.number().int().min(PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB),
 });
@@ -133,6 +146,7 @@ export const updateProblemSchema = z.object({
   title: z.string().trim().min(PROBLEM_VALIDATION.MIN_TITLE_LENGTH).max(STRING_LIMITS.TITLE).optional(),
   author: z.string().trim().min(PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH).max(STRING_LIMITS.AUTHOR).optional(),
   categories: problemCategories.optional(),
+  difficulty: problemDifficulty,
   time_limit_ms: z.number().int().min(PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS).optional(),
   memory_limit_mb: z.number().int().min(PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB).optional(),
 });
@@ -140,6 +154,31 @@ export const updateProblemSchema = z.object({
 export const updateProblemVisibilitySchema = z.object({
   isVisible: z.boolean(),
 });
+
+/**
+ * Difficulty filtering/sorting for the user-facing problem list
+ * (/problems-with-stats). difficultyMin/Max are inclusive and exclude Unrated
+ * (NULL) problems; sort=difficulty puts NULLs last in both directions.
+ */
+const difficultyBound = z.coerce.number().int()
+  .min(PROBLEM_DIFFICULTY_MIN)
+  .max(PROBLEM_DIFFICULTY_MAX)
+  .refine((value) => value % PROBLEM_DIFFICULTY_STEP === 0, {
+    message: `difficulty bound must be a multiple of ${PROBLEM_DIFFICULTY_STEP}`,
+  });
+export const problemsWithStatsQuerySchema = z.object({
+  difficultyMin: difficultyBound.optional(),
+  difficultyMax: difficultyBound.optional(),
+  sort: z.enum(['difficulty']).optional(),
+  order: z.enum(['asc', 'desc']).optional(),
+}).refine(
+  ({ difficultyMin, difficultyMax }) =>
+    difficultyMin === undefined || difficultyMax === undefined || difficultyMin <= difficultyMax,
+  { message: 'difficultyMin must not exceed difficultyMax' },
+).refine(
+  ({ sort, order }) => order === undefined || sort !== undefined,
+  { message: 'order requires sort' },
+);
 
 export const progressIdParamSchema = z.object({
   progressId: nonEmptyString,
@@ -206,6 +245,7 @@ const editableProblemDraftFields = {
   language: nonEmptyString.max(AUTHORING_VALIDATION.MAX_LANGUAGE_LENGTH),
   countryCode: z.string().regex(/^[A-Z]{3}$/),
   categories: problemCategories,
+  difficulty: problemDifficulty,
   timeLimitMs: z.number().int().min(PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS)
     .max(AUTHORING_VALIDATION.MAX_INT),
   memoryLimitMb: z.number().int().min(PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB)
@@ -224,6 +264,7 @@ export const createProblemDraftSchema = z.object({
   language: editableProblemDraftFields.language.optional(),
   countryCode: editableProblemDraftFields.countryCode.optional(),
   categories: editableProblemDraftFields.categories.default([]),
+  difficulty: editableProblemDraftFields.difficulty.default(null),
   statementHtml: editableProblemDraftFields.statementHtml.default(''),
   solutionCpp: editableProblemDraftFields.solutionCpp.default(''),
   generatorCpp: editableProblemDraftFields.generatorCpp.default(null),
@@ -266,6 +307,7 @@ export const updateProblemDraftSchema = z.object({
   language: editableProblemDraftFields.language.optional(),
   countryCode: editableProblemDraftFields.countryCode.optional(),
   categories: editableProblemDraftFields.categories.optional(),
+  difficulty: editableProblemDraftFields.difficulty.optional(),
   timeLimitMs: editableProblemDraftFields.timeLimitMs.optional(),
   memoryLimitMb: editableProblemDraftFields.memoryLimitMb.optional(),
   statementHtml: editableProblemDraftFields.statementHtml.optional(),

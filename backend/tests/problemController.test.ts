@@ -117,7 +117,7 @@ describe('Problem Controller', () => {
             expect(res.status).toBe(200);
             expect(res.body).toEqual(mockProblems);
             expect(db.query).toHaveBeenCalledWith(
-                'SELECT id, title, author, categories FROM problems WHERE is_visible = true AND contest_id IS NULL ORDER BY id'
+                'SELECT id, title, author, categories, difficulty FROM problems WHERE is_visible = true AND contest_id IS NULL ORDER BY id'
             );
         });
     });
@@ -325,7 +325,7 @@ describe('Problem Controller', () => {
             expect(res.status).toBe(201);
             expect(db.query).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO problems'),
-                ['P4', 'Problem 4', 'Author 4', ['Dynamic Programming', 'Graph'], 1000, 256]
+                ['P4', 'Problem 4', 'Author 4', ['Dynamic Programming', 'Graph'], null, 1000, 256]
             );
         });
 
@@ -347,7 +347,7 @@ describe('Problem Controller', () => {
             expect(res.status).toBe(201);
             expect(db.query).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO problems'),
-                ['P4b', 'Problem 4b', 'Author 4', [], 1000, 256]
+                ['P4b', 'Problem 4b', 'Author 4', [], null, 1000, 256]
             );
         });
 

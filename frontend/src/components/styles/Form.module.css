@@ -221,3 +221,43 @@
     padding: 1rem 1.25rem 1.25rem;
   }
 }
+
+/* Difficulty dropdown with a live band-colored preview chip beside it
+   (same shared --difficulty-band-* tokens as the problem card). */
+.difficulty-field {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.difficulty-field select {
+  flex: 0 1 auto;
+}
+
+[class*='difficulty-preview-'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+}
+
+.difficulty-preview-1 { background-color: var(--difficulty-band-1); }
+.difficulty-preview-2 { background-color: var(--difficulty-band-2); }
+.difficulty-preview-3 { background-color: var(--difficulty-band-3); }
+.difficulty-preview-4 { background-color: var(--difficulty-band-4); }
+.difficulty-preview-5 { background-color: var(--difficulty-band-5); }
+
+/* Group heading for a control cluster (e.g. the category checkboxes): not a
+   per-control label, so it is a span styled like one. */
+.group-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}

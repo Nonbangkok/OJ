@@ -4,6 +4,8 @@ export interface DraftFields {
   problemId: string; title: string; authorProfileId: string | null;
   authorAkaName: string; authorRealName: string; language: string; countryCode: string;
   categories: readonly ProblemCategory[];
+  /** Codeforces-like rating (800–3500 step 100); null = Unrated. */
+  difficulty: number | null;
   timeLimitMs: number; memoryLimitMb: number; statementHtml: string;
   solutionCpp: string; generatorCpp: string | null; templateVersion: string;
 }
@@ -80,5 +82,5 @@ export interface ProfileSyncRun {
   items?: ProfileSyncItem[];
 }
 export const editableFields: (keyof DraftFields)[] = ['problemId', 'title', 'authorProfileId', 'authorAkaName',
-  'authorRealName', 'language', 'countryCode', 'categories', 'timeLimitMs', 'memoryLimitMb', 'statementHtml',
+  'authorRealName', 'language', 'countryCode', 'categories', 'difficulty', 'timeLimitMs', 'memoryLimitMb', 'statementHtml',
   'solutionCpp', 'generatorCpp', 'templateVersion'];

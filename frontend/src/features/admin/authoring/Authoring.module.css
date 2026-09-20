@@ -1244,3 +1244,25 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Difficulty dropdown chip — the shared --difficulty-band-* tokens, same
+   as the problem card, so the preview matches the published card exactly. */
+[class*='difficultyChip'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+  justify-self: start;
+}
+
+.difficultyChip1 { background-color: var(--difficulty-band-1); }
+.difficultyChip2 { background-color: var(--difficulty-band-2); }
+.difficultyChip3 { background-color: var(--difficulty-band-3); }
+.difficultyChip4 { background-color: var(--difficulty-band-4); }
+.difficultyChip5 { background-color: var(--difficulty-band-5); }

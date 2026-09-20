@@ -34,6 +34,7 @@ describe('problem authoring request schemas', () => {
       ...validCreateBody,
       title: 'Red Gate',
       categories: [],
+      difficulty: null,
       statementHtml: '',
       solutionCpp: '',
       generatorCpp: null,

@@ -6,9 +6,22 @@ import type {
   ProblemsWithStatsResponse,
 } from '../types';
 
+/** Difficulty filtering/sorting for the problems list (server-side). */
+export interface ProblemListDifficultyQuery {
+  /** Inclusive lower bound; when set, Unrated problems are excluded. */
+  difficultyMin?: number;
+  /** Inclusive upper bound; when set, Unrated problems are excluded. */
+  difficultyMax?: number;
+  /** 'difficulty' sorts NULLS LAST in both directions. */
+  sort?: 'difficulty';
+  order?: 'asc' | 'desc';
+}
+
 const problemService = {
-  getAllWithStats: async (): Promise<ProblemsWithStatsResponse> => {
-    const response = await api.get<ProblemsWithStatsResponse>('/problems-with-stats');
+  getAllWithStats: async (difficultyQuery: ProblemListDifficultyQuery = {}): Promise<ProblemsWithStatsResponse> => {
+    const response = await api.get<ProblemsWithStatsResponse>('/problems-with-stats', {
+      params: difficultyQuery,
+    });
     return response.data;
   },
 

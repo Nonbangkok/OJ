@@ -9,6 +9,7 @@ import type {
   UploadProgressState,
 } from '../../types';
 import { getErrorMessage, toApiLikeError } from '../../utils/error';
+import type { ProblemCategory } from '../../utils/constants';
 
 import { getBulkVisibilityTargets, normalizeUploadProgress } from './problemManagement.helpers';
 
@@ -16,6 +17,9 @@ export interface ProblemSaveData {
   id: string;
   title: string;
   author: string;
+  categories?: readonly ProblemCategory[];
+  /** Codeforces-like rating (800–3500 step 100); null = Unrated. */
+  difficulty?: number | null;
   time_limit_ms: number;
   memory_limit_mb: number;
 }

@@ -21,6 +21,7 @@ const initialFields: DraftFields = {
   language: 'Thai',
   countryCode: 'THA',
   categories: [],
+  difficulty: null,
   timeLimitMs: 1000,
   memoryLimitMb: 256,
   statementHtml: '',

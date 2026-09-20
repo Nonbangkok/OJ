@@ -83,6 +83,7 @@ export interface ProblemDraftRow {
   country_code: string;
   author_profile_image_png: Buffer | null;
   categories: readonly ProblemCategory[];
+  difficulty: number | null;
   time_limit_ms: number;
   memory_limit_mb: number;
   statement_html: string;

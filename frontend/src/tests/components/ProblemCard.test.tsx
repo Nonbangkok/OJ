@@ -86,4 +86,32 @@ describe('ProblemCard', () => {
         const link = screen.getByText('Edit').closest('a');
         expect(link).toHaveAttribute('href', '/contests/contest-123/problems/prob-1');
     });
+
+    it.each([
+        [900, 1],
+        [1500, 2],
+        [2000, 3],
+        [2500, 4],
+        [3200, 5],
+    ])('renders difficulty %d as a chip in band %d', (difficulty, band) => {
+        render(
+            <BrowserRouter>
+                <ProblemCard problem={{ ...mockProblem, difficulty }} />
+            </BrowserRouter>
+        );
+
+        const chip = screen.getByText(String(difficulty));
+        expect(chip).toBeInTheDocument();
+        expect(chip).toHaveAttribute('data-band', String(band));
+    });
+
+    it('renders no difficulty chip for Unrated problems', () => {
+        render(
+            <BrowserRouter>
+                <ProblemCard problem={{ ...mockProblem, difficulty: null }} />
+            </BrowserRouter>
+        );
+
+        expect(screen.queryByTestId('problem-difficulty')).not.toBeInTheDocument();
+    });
 });

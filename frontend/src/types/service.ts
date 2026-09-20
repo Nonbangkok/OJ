@@ -48,6 +48,8 @@ export interface CreateProblemRequest {
   author: string;
   /** Fixed-list categories; an empty array means uncategorized. */
   categories?: readonly ProblemCategory[];
+  /** Codeforces-like rating (800–3500 step 100); null = Unrated. */
+  difficulty?: number | null;
   time_limit_ms: number;
   memory_limit_mb: number;
 }

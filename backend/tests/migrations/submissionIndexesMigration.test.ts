@@ -16,6 +16,7 @@ describe('submission indexes migration', () => {
       '0010_submission_indexes',
       '0011_authoring_draft_category',
       '0012_problem_categories',
+      '0013_problem_difficulty',
     ]);
   });
 

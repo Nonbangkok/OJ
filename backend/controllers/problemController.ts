@@ -34,6 +34,7 @@ import {
   createProblemSchema,
   idParamSchema,
   problemExportSchema,
+  problemsWithStatsQuerySchema,
   progressIdParamSchema,
   updateProblemSchema,
   updateProblemVisibilitySchema,
@@ -48,12 +49,23 @@ const PDF_MAGIC = Buffer.from('%PDF');
 const isPdfBuffer = (buffer: Buffer | undefined | null): boolean =>
   !!buffer && buffer.length >= PDF_MAGIC.length && buffer.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC);
 
-router.get('/problems-with-stats', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+router.get('/problems-with-stats', requireAuth,
+  validateRequest({ query: problemsWithStatsQuerySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
   const { userId } = req.session;
   if (!userId) {
     throw new AppError('Authentication required', 401);
   }
-  const problems = await getProblemsWithStatsForUser(userId);
+  // validateRequest writes Zod defaults/coercions back into req.query.
+  const { difficultyMin, difficultyMax, sort, order } = req.query as unknown as {
+    difficultyMin?: number; difficultyMax?: number; sort?: 'difficulty'; order?: 'asc' | 'desc';
+  };
+  const problems = await getProblemsWithStatsForUser(userId, {
+    ...(difficultyMin !== undefined ? { difficultyMin } : {}),
+    ...(difficultyMax !== undefined ? { difficultyMax } : {}),
+    ...(sort !== undefined ? { sort } : {}),
+    ...(order !== undefined ? { order } : {}),
+  });
   res.json(problems);
 }));
 
@@ -139,8 +151,8 @@ router.get('/problems/:id/pdf', requireAuth,
 router.post('/admin/problems', requireAuth, requireStaffOrAdmin,
   validateRequest({ body: createProblemSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const { id, title, author, categories, time_limit_ms, memory_limit_mb } = req.body as CreateProblemRequestBody;
-  const createdProblem = await createProblem({ id, title, author, categories, time_limit_ms, memory_limit_mb });
+  const { id, title, author, categories, difficulty, time_limit_ms, memory_limit_mb } = req.body as CreateProblemRequestBody;
+  const createdProblem = await createProblem({ id, title, author, categories, difficulty, time_limit_ms, memory_limit_mb });
   res.status(201).json(createdProblem);
 }));
 
@@ -148,13 +160,14 @@ router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
   validateRequest({ params: idParamSchema, body: updateProblemSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const oldId = String(req.params.id);
-  const { id: newId, title, author, categories, time_limit_ms, memory_limit_mb } = req.body as UpdateProblemRequestBody;
+  const { id: newId, title, author, categories, difficulty, time_limit_ms, memory_limit_mb } = req.body as UpdateProblemRequestBody;
 
   const updateResult = await updateProblem(oldId, {
     id: newId,
     title,
     author,
     categories,
+    difficulty,
     time_limit_ms,
     memory_limit_mb,
   });

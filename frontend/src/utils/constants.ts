@@ -50,3 +50,33 @@ export const PROBLEM_CATEGORIES = [
   'Other',
 ] as const;
 export type ProblemCategory = (typeof PROBLEM_CATEGORIES)[number];
+
+/** Problem difficulty scale, mirroring backend PROBLEM_DIFFICULTY_*. */
+export const PROBLEM_DIFFICULTY_MIN = 800;
+export const PROBLEM_DIFFICULTY_MAX = 3500;
+export const PROBLEM_DIFFICULTY_STEP = 100;
+
+/** Every selectable difficulty value on the scale, ascending. */
+export const PROBLEM_DIFFICULTY_OPTIONS: readonly number[] = Array.from(
+  { length: (PROBLEM_DIFFICULTY_MAX - PROBLEM_DIFFICULTY_MIN) / PROBLEM_DIFFICULTY_STEP + 1 },
+  (_, index) => PROBLEM_DIFFICULTY_MIN + index * PROBLEM_DIFFICULTY_STEP,
+);
+
+/**
+ * Heat-map band boundaries for the difficulty chip (1–5), mirroring the
+ * backend PROBLEM_DIFFICULTY_BANDS data: the first entry covering the value
+ * wins. null (Unrated) maps to null.
+ */
+const DIFFICULTY_BANDS: readonly { max: number; band: number }[] = [
+  { max: 1100, band: 1 }, // 800–1100 green
+  { max: 1600, band: 2 }, // 1200–1600 yellow
+  { max: 2100, band: 3 }, // 1700–2100 orange
+  { max: 2700, band: 4 }, // 2200–2700 red
+  { max: 3500, band: 5 }, // 2800–3500 purple
+];
+
+/** Map a difficulty to its 1–5 display band; null/undefined (Unrated) → null. */
+export function difficultyBand(difficulty: number | null | undefined): number | null {
+  if (difficulty === null || difficulty === undefined) return null;
+  return DIFFICULTY_BANDS.find(boundary => difficulty <= boundary.max)?.band ?? null;
+}
