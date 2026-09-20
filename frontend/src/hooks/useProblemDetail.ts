@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type MouseEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, type MouseEvent } from 'react';
 import { useParams } from 'react-router-dom';
 import problemService from '../services/problemService';
 import contestService from '../services/contestService';
@@ -71,16 +71,20 @@ export const useProblemDetail = () => {
     }
   }, [problemId, contestId]);
 
-  const handleMouseEnter = (e: MouseEvent<HTMLButtonElement>) => {
+  // Memoized: ProblemDetail's measure effect lists resetSlider in its deps, so
+  // a fresh identity here would re-arm the timer after every reset-driven
+  // render — resetting the slider back to the active tab every 150ms even
+  // while an item is being hovered.
+  const handleMouseEnter = useCallback((e: MouseEvent<HTMLButtonElement>) => {
     const btn = e.currentTarget;
     setSliderStyle({
       height: btn.offsetHeight + 5,
       top: btn.offsetTop + 22,
       opacity: 1,
     });
-  };
+  }, []);
 
-  const resetSlider = (styles?: { active: string }) => {
+  const resetSlider = useCallback((styles?: { active: string }) => {
     try {
       const activeClass = styles?.active ?? 'active';
       const activeBtn = navRef.current?.querySelector<HTMLElement>(`.${activeClass}`);
@@ -93,10 +97,10 @@ export const useProblemDetail = () => {
       } else {
         setSliderStyle((prev) => ({ ...prev, opacity: 0 }));
       }
-    } catch (e) {
+    } catch {
       setSliderStyle({ opacity: 0 });
     }
-  };
+  }, []);
 
   return {
     problemId,

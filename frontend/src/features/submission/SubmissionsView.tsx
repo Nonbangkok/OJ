@@ -6,6 +6,7 @@ import { useSubmissions } from '../../hooks/useSubmissions';
 import { getStatusClass, canViewCode, formatDateTime } from '../../utils/formatters';
 import tableStyles from '../../components/styles/Table.module.css';
 import LoadingPage from '../../components/shared/LoadingPage';
+import { Button } from '../../components/ui';
 import { USER_ROLES } from '../../utils/constants';
 import type { AuthUser } from '../../types';
 
@@ -234,13 +235,13 @@ const SubmissionsView = ({
                                         <td>{sub.language}</td>
                                         <td>
                                             {viewable && (
-                                                <button
+                                                <Button
+                                                    size="compact"
                                                     onClick={() => handleViewCode(sub.id)}
-                                                    className={styles['view-code-btn']}
                                                     title={variant === 'contest' ? 'View Code' : undefined}
                                                 >
                                                     View Code
-                                                </button>
+                                                </Button>
                                             )}
                                         </td>
                                     </tr>

@@ -2,6 +2,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
   margin-bottom: 2rem;
 }
 
@@ -17,6 +19,7 @@
 
 .filter-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   background-color: var(--background-tertiary);
   padding: 0.5rem;
@@ -38,11 +41,6 @@
   background-color: var(--background-primary);
   color: var(--text-primary);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.view-code-btn {
-  /* This can be styled like other buttons if needed */
-  padding: 8px 12px;
 }
 
 .submissions-container a {

@@ -1,4 +1,3 @@
-import { useState, useEffect, useRef, type MouseEvent } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -8,17 +7,21 @@ import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/logo512.png';
 import darkmodeLogo from '../../assets/logo512_darkmode.png';
 import { USER_ROLES } from '../../utils/constants';
-import type { SliderStyle } from '../../types';
+import { useNavSlider } from '../../hooks/useNavSlider';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
   const { registrationEnabled } = useSettings();
   const navigate = useNavigate();
   const location = useLocation();
-  const navRef = useRef<HTMLUListElement | null>(null);
   const { theme } = useTheme(); // Get current theme
   const currentLogo = theme === 'dark' ? darkmodeLogo : logo; // Choose logo based on theme
-  const [sliderStyle, setSliderStyle] = useState<SliderStyle>({ opacity: 0 });
+  const {
+    navRef,
+    sliderStyle,
+    handleItemMouseEnter,
+    resetSlider,
+  } = useNavSlider<HTMLUListElement>('horizontal', { recalcKey: location.pathname + String(user?.role) });
 
   const handleLogout = () => {
     try {
@@ -29,42 +32,6 @@ const Navbar = () => {
     }
   };
 
-  const handleMouseEnter = (e: MouseEvent<HTMLLIElement>) => {
-    const li = e.currentTarget;
-    setSliderStyle({
-      width: li.offsetWidth + 20,
-      left: li.offsetLeft - 10,
-      opacity: 1,
-    });
-  };
-
-  const resetSlider = () => {
-    try {
-      const activeLink = navRef.current?.querySelector<HTMLAnchorElement>('a.active');
-      if (activeLink && activeLink.parentElement) {
-        const activeLi = activeLink.parentElement;
-        setSliderStyle({
-          width: activeLi.offsetWidth + 20,
-          left: activeLi.offsetLeft - 10,
-          opacity: 1,
-        });
-      } else {
-        setSliderStyle((prev) => ({ ...prev, opacity: 0 }));
-      }
-    } catch (e) {
-      // Catch potential errors if navRef.current is not available
-      setSliderStyle({ opacity: 0 });
-    }
-  };
-
-  useEffect(() => {
-    // Delay to ensure DOM is ready for measurement, especially on initial load
-    const timer = setTimeout(() => {
-      resetSlider();
-    }, 150);
-    return () => clearTimeout(timer);
-  }, [location.pathname, user]); // Re-calculate on path or user change
-
   return (
     <nav className={styles.navbar}>
       <div className={styles['navbar-container']}>
@@ -74,15 +41,15 @@ const Navbar = () => {
         </NavLink>
         <ul ref={navRef} className={styles['nav-links']} onMouseLeave={resetSlider}>
           <div className={styles.slider} style={sliderStyle} />
-          <li onMouseEnter={handleMouseEnter}><NavLink to="/problems">Problems</NavLink></li>
-          <li onMouseEnter={handleMouseEnter}><NavLink to="/submissions">Submissions</NavLink></li>
-          <li onMouseEnter={handleMouseEnter}><NavLink to="/scoreboard">Scoreboard</NavLink></li>
-          <li onMouseEnter={handleMouseEnter}><NavLink to="/contests">Contests</NavLink></li>
+          <li onMouseEnter={handleItemMouseEnter}><NavLink to="/problems">Problems</NavLink></li>
+          <li onMouseEnter={handleItemMouseEnter}><NavLink to="/submissions">Submissions</NavLink></li>
+          <li onMouseEnter={handleItemMouseEnter}><NavLink to="/scoreboard">Scoreboard</NavLink></li>
+          <li onMouseEnter={handleItemMouseEnter}><NavLink to="/contests">Contests</NavLink></li>
           {user?.role === USER_ROLES.ADMIN && (
-            <li onMouseEnter={handleMouseEnter}><NavLink to="/admin">Admin Panel</NavLink></li>
+            <li onMouseEnter={handleItemMouseEnter}><NavLink to="/admin">Admin Panel</NavLink></li>
           )}
           {user?.role === USER_ROLES.STAFF && (
-            <li onMouseEnter={handleMouseEnter}><NavLink to="/admin">Staff Panel</NavLink></li>
+            <li onMouseEnter={handleItemMouseEnter}><NavLink to="/admin">Staff Panel</NavLink></li>
           )}
         </ul>
         <div className={styles['nav-actions']}>
@@ -103,4 +70,4 @@ const Navbar = () => {
   );
 };
 
-export default Navbar; 
+export default Navbar;

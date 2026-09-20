@@ -19,6 +19,7 @@ export type CreateProblemDraftInput = Pick<
   | 'author_real_name'
   | 'language'
   | 'country_code'
+  | 'category'
   | 'time_limit_ms'
   | 'memory_limit_mb'
   | 'created_by'
@@ -55,6 +56,7 @@ type EditableProblemDraftFields = Pick<
   | 'language'
   | 'country_code'
   | 'author_profile_image_png'
+  | 'category'
   | 'time_limit_ms'
   | 'memory_limit_mb'
   | 'statement_html'
@@ -86,6 +88,7 @@ const EDITABLE_FIELDS: readonly (keyof EditableProblemDraftFields)[] = [
   'language',
   'country_code',
   'author_profile_image_png',
+  'category',
   'time_limit_ms',
   'memory_limit_mb',
   'statement_html',
@@ -103,14 +106,14 @@ export const createProblemDraft = async (
     INSERT INTO problem_drafts (
       id, problem_id, title, author_profile_id, author_aka_name,
       author_real_name, language, country_code, author_profile_image_png,
-      time_limit_ms, memory_limit_mb, statement_html, solution_cpp,
+      category, time_limit_ms, memory_limit_mb, statement_html, solution_cpp,
       generator_cpp, template_version, created_by
     )
     VALUES (
       $1, $2, $3, $4, $5,
       $6, $7, $8, $9,
-      $10, $11, $12, $13,
-      $14, $15, $16
+      $10, $11, $12, $13, $14,
+      $15, $16, $17
     )
     RETURNING *
   `, [
@@ -123,6 +126,7 @@ export const createProblemDraft = async (
     input.language,
     input.country_code,
     input.author_profile_image_png ?? null,
+    input.category,
     input.time_limit_ms,
     input.memory_limit_mb,
     input.statement_html ?? '',

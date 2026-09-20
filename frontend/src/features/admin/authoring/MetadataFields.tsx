@@ -1,4 +1,5 @@
 import { DraftFields, Profile } from './types';
+import { PROBLEM_CATEGORIES } from '../../../utils/constants';
 import styles from './Authoring.module.css';
 
 export default function MetadataFields({ value, profiles, onEdit, disabled = false, problemIdLocked = false }: {
@@ -24,6 +25,11 @@ export default function MetadataFields({ value, profiles, onEdit, disabled = fal
     <label>Real name<input required maxLength={255} value={value.authorRealName} onChange={e => onEdit('authorRealName', e.target.value)} /></label>
     <label>Language<input required maxLength={50} value={value.language} onChange={e => onEdit('language', e.target.value)} /></label>
     <label>Country code<input required pattern="[A-Z]{3}" maxLength={3} value={value.countryCode} onChange={e => onEdit('countryCode', e.target.value.toUpperCase())} /></label>
+    <label>Category<select value={value.category ?? ''} onChange={e =>
+      onEdit('category', (PROBLEM_CATEGORIES as readonly string[]).includes(e.target.value) ? e.target.value as DraftFields['category'] : null)}>
+      <option value="">No category</option>
+      {PROBLEM_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+    </select></label>
     <label>Time limit (ms)<input required type="number" min={1} max={900000} value={value.timeLimitMs || ''} onChange={e => onEdit('timeLimitMs', Number(e.target.value))} /></label>
     <label>Memory limit (MiB)<input required type="number" min={1} max={736} value={value.memoryLimitMb || ''} onChange={e => onEdit('memoryLimitMb', Number(e.target.value))} /></label>
   </fieldset>;

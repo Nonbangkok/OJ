@@ -6,6 +6,7 @@ import AddUserModal from './AddUserModal';
 import BatchUserCreation from './BatchUserCreation'; // Import the new component
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
+import { Button } from '../../../components/ui';
 import { APP_CONSTANTS } from '../../../utils/constants';
 import LoadingPage from '../../../components/shared/LoadingPage';
 
@@ -38,9 +39,9 @@ const UserManagement = () => {
       <div className={styles['management-container']}>
         <div className={styles['management-header']}>
           <h2>User Management</h2>
-          <button onClick={() => setIsAddModalOpen(true)} className={styles['create-btn']}>
+          <Button onClick={() => setIsAddModalOpen(true)}>
             Create New User
-          </button>
+          </Button>
         </div>
         <div className={tableStyles['table-container']}>
           <table className={tableStyles.table}>
@@ -65,12 +66,12 @@ const UserManagement = () => {
                     */}
                       {currentUser && user.id !== currentUser.id && user.username !== APP_CONSTANTS.SYSTEM_ADMIN_USERNAME && (
                         <>
-                          <button onClick={() => handleEdit(user)} className={styles['edit-btn']}>
+                          <Button size="compact" onClick={() => handleEdit(user)}>
                             Edit
-                          </button>
-                          <button onClick={() => handleDeleteClick(user)} className={styles['delete-btn']}>
+                          </Button>
+                          <Button size="compact" variant="destructive" onClick={() => handleDeleteClick(user)}>
                             Delete
-                          </button>
+                          </Button>
                         </>
                       )}
                     </div>

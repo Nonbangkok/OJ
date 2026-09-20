@@ -3,9 +3,12 @@
   background-color: var(--background-secondary);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  overflow: hidden; /* This is important for the border-radius to work on the table */
+  /* Clip the radius corners; wide tables scroll horizontally inside the
+     container instead of expanding the document. */
+  overflow: hidden auto;
   box-shadow: var(--box-shadow);
   margin-bottom: 2rem;
+  max-width: 100%;
 }
 
 .table {

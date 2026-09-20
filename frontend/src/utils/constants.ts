@@ -28,3 +28,25 @@ export const SUBMISSION_STATUS = {
   COMPILATION_ERROR: 'Compilation Error',
   SKIPPED: 'Skipped',
 } as const;
+
+/** Closed set of problem categories, mirroring backend PROBLEM_CATEGORIES.
+ *  An empty selection means uncategorized (null). */
+export const PROBLEM_CATEGORIES = [
+  'Dynamic Programming',
+  'Greedy',
+  'Graph',
+  'Tree',
+  'Data Structures',
+  'String',
+  'Math',
+  'Geometry',
+  'Divide and Conquer',
+  'Binary Search',
+  'Constructive',
+  'Bitmasks',
+  'Sorting',
+  '2D-Grid',
+  'Implementation',
+  'Other',
+] as const;
+export type ProblemCategory = (typeof PROBLEM_CATEGORIES)[number];

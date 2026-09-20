@@ -49,6 +49,27 @@ export const PROBLEM_VALIDATION = {
     MIN_MEMORY_LIMIT_MB: 1,
 } as const;
 
+/** The closed set of problem categories. Problems may also be uncategorized (null). */
+export const PROBLEM_CATEGORIES = [
+    'Dynamic Programming',
+    'Greedy',
+    'Graph',
+    'Tree',
+    'Data Structures',
+    'String',
+    'Math',
+    'Geometry',
+    'Divide and Conquer',
+    'Binary Search',
+    'Constructive',
+    'Bitmasks',
+    'Sorting',
+    '2D-Grid',
+    'Implementation',
+    'Other',
+] as const;
+export type ProblemCategory = (typeof PROBLEM_CATEGORIES)[number];
+
 export const SECURITY_CONFIG = {
     SALT_ROUNDS: 10,
     SESSION_MAX_AGE_MS: 24 * 60 * 60 * 1000, // 24 hours

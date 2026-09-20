@@ -7,6 +7,7 @@ import NavbarUserMenu from '../../components/navbar/NavbarUserMenu';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { USER_ROLES } from '../../utils/constants';
+import { useNavSlider } from '../../hooks/useNavSlider';
 import styles from './AdminNavbar.module.css';
 
 const AdminNavbar = () => {
@@ -16,6 +17,12 @@ const AdminNavbar = () => {
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const currentLogo = theme === 'dark' ? darkmodeLogo : logo;
+  const {
+    navRef,
+    sliderStyle,
+    handleItemMouseEnter,
+    resetSlider,
+  } = useNavSlider<HTMLUListElement>('horizontal', { recalcKey: location.pathname + String(user?.role) });
 
   useEffect(() => {
     setMenuOpen(false);
@@ -61,9 +68,15 @@ const AdminNavbar = () => {
           {menuOpen ? 'Close menu' : 'Menu'}
         </button>
 
-        <ul id="admin-navigation" className={`${styles['nav-links']} ${openClassName}`.trim()}>
+        <ul
+          id="admin-navigation"
+          ref={navRef}
+          className={`${styles['nav-links']} ${openClassName}`.trim()}
+          onMouseLeave={resetSlider}
+        >
+          <div className={styles.slider} style={sliderStyle} aria-hidden="true" />
           {user?.role === USER_ROLES.ADMIN && (
-            <li>
+            <li onMouseEnter={handleItemMouseEnter}>
               <NavLink to="/admin/users" onClick={closeMenu}>
                 Users
               </NavLink>
@@ -71,17 +84,17 @@ const AdminNavbar = () => {
           )}
           {(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.STAFF) && (
             <>
-              <li>
+              <li onMouseEnter={handleItemMouseEnter}>
                 <NavLink to="/admin/problems" onClick={closeMenu}>
                   Problems
                 </NavLink>
               </li>
-              <li>
+              <li onMouseEnter={handleItemMouseEnter}>
                 <NavLink to="/admin/contests" onClick={closeMenu}>
                   Contests
                 </NavLink>
               </li>
-              <li>
+              <li onMouseEnter={handleItemMouseEnter}>
                 <NavLink to="/admin/analysis" onClick={closeMenu}>
                   Analysis
                 </NavLink>
@@ -89,14 +102,14 @@ const AdminNavbar = () => {
             </>
           )}
           {user?.role === USER_ROLES.ADMIN && (
-            <li>
+            <li onMouseEnter={handleItemMouseEnter}>
               <NavLink to="/admin/authoring" onClick={closeMenu}>
                 Authoring
               </NavLink>
             </li>
           )}
           {user?.role === USER_ROLES.ADMIN && (
-            <li>
+            <li onMouseEnter={handleItemMouseEnter}>
               <NavLink to="/admin/settings" onClick={closeMenu}>
                 Settings
               </NavLink>

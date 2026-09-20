@@ -1,132 +1,104 @@
-/* Modal Overlay */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(0, 0, 0, 0.75);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
+/* Submission Detail modal body. The Dialog (size="fullscreen") provides the
+   near-viewport shell, fixed header and close button; everything here lives
+   in the scroll-managed body region. */
 
-/* Modal Content */
-.modal-content {
-  background-color: var(--background-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  box-shadow: var(--box-shadow);
-  width: 95vw;
-  max-width: 1400px;
-  height: 90vh;
-  max-height: 900px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  color: var(--text-primary);
-}
-
-/* Top Bar */
-.top-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 2rem;
+/* Metadata: responsive grid so every label keeps room and long values wrap
+   instead of truncating. */
+.submission-detail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.5rem 1.5rem;
+  padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--border-color);
-  background-color: var(--border-color);
+  background-color: var(--background-tertiary);
   flex-shrink: 0;
 }
 
-/* Submission Detail */
-.submission-detail {
+.detail-item {
   display: flex;
-  gap: 2rem; /* Reduced gap for better flexibility */
-  flex-wrap: nowrap; /* Prevent wrapping to a new line */
-  align-items: center;
-  flex-grow: 1;
-  min-width: 0; /* Important for allowing flex items to shrink below their content size */
-}
-
-.detail-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0; /* Allow the row itself to shrink */
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
 }
 
 .detail-label {
   font-weight: 600;
   color: var(--text-secondary);
-  font-size: 1rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  min-width: fit-content;
-  flex-shrink: 0; /* Prevent labels like 'Status:' from shrinking */
 }
 
 .detail-value {
   font-weight: 500;
   color: var(--text-primary);
-  font-size: 1.1rem;
-  white-space: nowrap; /* Keep the value on a single line */
-  overflow: hidden; /* Hide the overflowing part */
-  text-overflow: ellipsis; /* Show '...' when text overflows */
-}
-
-/* Close Button */
-.close-button {
-  background-color: var(--button-danger-bg);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
   font-size: 1rem;
-  font-weight: bold;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
+  overflow-wrap: break-word;
 }
 
-.close-button:hover {
-  background-color: var(--button-danger-hover);
-  transform: scale(1.05);
-}
-
-.close-button:active {
-  transform: scale(0.95);
-}
-
-/* Main Content */
+/* Main content: code left ~60%, testcase results right ~40%. The row is the
+   last flex child and stretches to the remaining modal height; each panel
+   scrolls on its own. */
 .main-content {
   display: flex;
   flex: 1;
-  overflow: hidden;
+  min-height: 0;
   gap: 1px;
+  background-color: var(--border-color);
 }
 
-/* Left and Right Panels */
-.left-panel,
-.right-panel {
+.panel {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  min-height: 0;
   background-color: var(--background-primary);
-  overflow: hidden;
 }
 
 .left-panel {
-  flex: 1.2;
-  min-width: 0;
+  flex: 3;
 }
 
 .right-panel {
-  flex: 0.8;
-  min-width: 300px;
+  flex: 2;
+}
+
+/* Code panel */
+.code-container {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  display: flex;
+  position: relative;
+}
+
+.code-container > div {
+  width: 100%;
+  height: 100%;
+  /* The shared editor wrapper caps itself at 65vh for inline forms; inside
+     the fullscreen modal it must fill the panel instead. */
+  max-height: none;
+  min-height: 0;
+}
+
+/* Testcase panel: header row + independently scrolling table. */
+.testcase-container {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.testcase-container .table {
+  width: 100%;
+}
+
+.empty-message {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--text-secondary);
+  margin: 0;
 }
 
 /* Copy Button */
@@ -159,35 +131,6 @@
 
 .copy-button:active {
   transform: scale(0.95);
-}
-
-/* Code Container */
-.code-container {
-  flex: 1;
-  padding: 1rem;
-  overflow: hidden;
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.code-container > div:not(.copy-button) {
-  width: 100%;
-  height: 100%;
-  max-height: 100%;
-}
-
-/* Testcase Container */
-.testcase-container {
-  flex: 1;
-  padding: 1rem;
-  padding-left: 0rem;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: stretch;
 }
 
 /* Status Colors - shared with the .status-* classes in index.css via the
@@ -223,92 +166,19 @@
   font-weight: bold;
 }
 
-/* Responsive Design */
-@media (max-width: 1200px) {
+/* Stacked layout on smaller screens. */
+@media (max-width: 1024px) {
   .main-content {
     flex-direction: column;
+    overflow-y: auto;
   }
 
-  .left-panel,
-  .right-panel {
+  .panel {
     flex: none;
-    min-width: auto;
+    min-height: 18rem;
   }
 
   .left-panel {
-    height: 60%;
-  }
-
-  .right-panel {
-    height: 40%;
-  }
-
-  .code-container,
-  .testcase-container {
-    justify-content: flex-start;
-    align-items: stretch;
-  }
-}
-
-@media (max-width: 768px) {
-  .modal-overlay {
-    padding: 1rem;
-  }
-
-  .modal-content {
-    width: 100%;
-    height: 95vh;
-    border-radius: 8px;
-  }
-
-  .top-bar {
-    padding: 1rem 1.5rem;
-  }
-
-  .submission-detail {
-    gap: 1rem;
-  }
-
-  .panel-header {
-    padding: 0.75rem 1rem;
-  }
-
-  .panel-header h3 {
-    font-size: 1rem;
-  }
-
-  .code-container,
-  .testcase-container {
-    padding: 0.75rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .submission-detail {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-
-  .detail-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem;
-  }
-
-  .detail-label {
-    font-size: 0.9rem;
-  }
-
-  .detail-value {
-    font-size: 1rem;
-  }
-
-  .copy-button {
-    top: 0.5rem;
-    right: 0.5rem;
-    width: 28px;
-    height: 28px;
-    font-size: 0.9rem;
+    flex: 1.5;
   }
 }

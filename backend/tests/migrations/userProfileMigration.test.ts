@@ -14,6 +14,7 @@ describe('user profile migration', () => {
       '0008_user_profile',
       '0009_profile_sync',
       '0010_submission_indexes',
+      '0011_authoring_draft_category',
     ]);
   });
 

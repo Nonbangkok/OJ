@@ -26,6 +26,7 @@ const ScoreboardTable = ({ scoreboard }) => {
                             <td>
                                 <span className={styles['user-cell']}>
                                     <UserAvatar username={user.username} hasAvatar={user.has_avatar} size={28} />
+                                    <Link to={`/profile/${user.username}`}>{user.username}</Link>
                                     {index < 3 && (
                                         <Medal
                                             size={18}
@@ -34,7 +35,6 @@ const ScoreboardTable = ({ scoreboard }) => {
                                             className={`${styles.medal} ${styles[`medal-${MEDAL_WEIGHTS[index]}`]}`}
                                         />
                                     )}
-                                    <Link to={`/profile/${user.username}`}>{user.username}</Link>
                                 </span>
                             </td>
                             <td>{user.problems_solved}</td>

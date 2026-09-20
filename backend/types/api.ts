@@ -3,6 +3,7 @@
  * Covers request bodies, composite response payloads, and
  * callback parameter types used inside controllers.
  */
+import { ProblemCategory } from '../constants';
 import { ContestStatus, ProblemDetailDTO, UserPublicProfileDTO } from './models';
 
 // ---------------------------------------------------------------------------
@@ -131,7 +132,7 @@ export interface CreateProblemRequestBody {
     id: string;
     title: string;
     author: string;
-    category?: string | null;
+    category?: ProblemCategory | null;
     time_limit_ms: number;
     memory_limit_mb: number;
 }
@@ -140,7 +141,7 @@ export interface UpdateProblemRequestBody {
     id: string;
     title?: string;
     author?: string;
-    category?: string | null;
+    category?: ProblemCategory | null;
     time_limit_ms?: number;
     memory_limit_mb?: number;
 }
@@ -197,6 +198,7 @@ export interface CreateProblemDraftRequestBody {
     authorRealName?: string;
     language?: string;
     countryCode?: string;
+    category?: ProblemCategory | null;
     timeLimitMs: number;
     memoryLimitMb: number;
     statementHtml: string;

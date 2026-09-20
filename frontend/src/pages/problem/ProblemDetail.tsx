@@ -30,7 +30,7 @@ const ProblemDetail = () => {
   useEffect(() => {
     // Delay to ensure DOM is ready for measurement
     const timer = setTimeout(() => {
-      resetSlider();
+      resetSlider({ active: styles.active });
     }, 150);
     return () => clearTimeout(timer);
   }, [activeView, problem, resetSlider]); // Recalculate on view or problem change
@@ -127,7 +127,7 @@ const ProblemDetail = () => {
               </button>
             )}
           </div>
-          <nav ref={navRef} className={styles['problem-nav']} onMouseLeave={() => resetSlider()}>
+          <nav ref={navRef} className={styles['problem-nav']} onMouseLeave={() => resetSlider({ active: styles.active })}>
             <div className={styles.slider} style={sliderStyle} />
             <button
               className={`${styles['nav-btn']} ${activeView === 'statement' ? styles.active : ''}`}

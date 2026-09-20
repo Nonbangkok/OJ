@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type MouseEvent } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useParams, useLocation } from 'react-router-dom';
 import contestService from '../../services/contestService';
 import styles from './ContestNavbar.module.css';
@@ -7,17 +7,24 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/logo512.png';
 import darkmodeLogo from '../../assets/logo512_darkmode.png';
-import type { Contest, SliderStyle } from '../../types';
+import { useNavSlider } from '../../hooks/useNavSlider';
+import type { Contest } from '../../types';
 
 const ContestNavbar = () => {
   const { contestId } = useParams();
   const location = useLocation();
   const { user } = useAuth();
   const [contest, setContest] = useState<Contest | null>(null);
-  const navRef = useRef<HTMLUListElement | null>(null);
   const { theme } = useTheme(); // Get current theme
   const currentLogo = theme === 'dark' ? darkmodeLogo : logo; // Choose logo based on theme
-  const [sliderStyle, setSliderStyle] = useState<SliderStyle>({ opacity: 0 });
+  const {
+    navRef,
+    sliderStyle,
+    handleItemMouseEnter,
+    resetSlider,
+  } = useNavSlider<HTMLUListElement>('horizontal', {
+    recalcKey: location.pathname + String(user?.role) + String(contest?.status),
+  });
 
   useEffect(() => {
     const fetchContestDetails = async () => {
@@ -38,40 +45,6 @@ const ContestNavbar = () => {
     }
   }, [contestId]);
 
-  const handleMouseEnter = (e: MouseEvent<HTMLLIElement>) => {
-    const li = e.currentTarget;
-    setSliderStyle({
-      width: li.offsetWidth + 20,
-      left: li.offsetLeft - 10,
-      opacity: 1,
-    });
-  };
-
-  const resetSlider = () => {
-    try {
-      const activeLink = navRef.current?.querySelector<HTMLAnchorElement>('a.active');
-      if (activeLink && activeLink.parentElement) {
-        const activeLi = activeLink.parentElement;
-        setSliderStyle({
-          width: activeLi.offsetWidth + 20,
-          left: activeLi.offsetLeft - 10,
-          opacity: 1,
-        });
-      } else {
-        setSliderStyle((prev) => ({ ...prev, opacity: 0 }));
-      }
-    } catch (e) {
-      setSliderStyle({ opacity: 0 });
-    }
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      resetSlider();
-    }, 150);
-    return () => clearTimeout(timer);
-  }, [location.pathname, user, contest]); // Re-calculate on path, user or contest change
-
   return (
     <nav className={styles.navbar}>
       <div className={styles.effectHolder}></div>
@@ -89,15 +62,15 @@ const ContestNavbar = () => {
           <div className={styles.slider} style={sliderStyle} />
           {contest && contest.status !== 'finished' && (
             <>
-              <li onMouseEnter={handleMouseEnter}>
+              <li onMouseEnter={handleItemMouseEnter}>
                 <NavLink to={`/contests/${contestId}/problems`}>Problems</NavLink>
               </li>
-              <li onMouseEnter={handleMouseEnter}>
+              <li onMouseEnter={handleItemMouseEnter}>
                 <NavLink to={`/contests/${contestId}/submissions`}>Submissions</NavLink>
               </li>
             </>
           )}
-          <li onMouseEnter={handleMouseEnter}>
+          <li onMouseEnter={handleItemMouseEnter}>
             <NavLink to={`/contests/${contestId}/scoreboard`}>Scoreboard</NavLink>
           </li>
         </ul>

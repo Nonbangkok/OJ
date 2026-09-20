@@ -2,12 +2,14 @@
   position: relative;
   display: flex;
   align-items: center;
+  min-width: 0; /* let the username ellipsize instead of overflowing the navbar */
 }
 
 .trigger {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
   background: none;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
@@ -45,6 +47,9 @@
   color: var(--text-secondary);
   font-weight: 500;
   font-size: 0.9375rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .caret {

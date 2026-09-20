@@ -63,6 +63,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   async function linkedDraft(problemId: string, profileId: string, extra: { published?: boolean } = {}) {
     const d = await createProblemDraft({ problem_id: problemId, title: `${problemId} title`, author_profile_id: profileId,
       author_aka_name: 'Old Aka', author_real_name: 'Old Real', language: 'Thai', country_code: 'THA',
+      category: null,
       time_limit_ms: 1000, memory_limit_mb: 256, created_by: null, solution_cpp: 'int main(){}',
       statement_html: '<h1>Statement</h1>' }, database);
     if (extra.published) {

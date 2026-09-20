@@ -45,6 +45,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   async function draft() {
     const d = await createProblemDraft({ problem_id: 'outputs', title: 'Outputs', author_profile_id: null,
       author_aka_name: 'A', author_real_name: 'Author', language: 'Thai', country_code: 'THA',
+      category: null,
       time_limit_ms: 1000, memory_limit_mb: 256, created_by: null,
       solution_cpp: '#include <iostream>\nint main(){int n;std::cin>>n;std::cout<<n*2<<"\\n";}' }, database);
     for (const n of [1, 2]) await pool.query(`INSERT INTO problem_draft_testcases

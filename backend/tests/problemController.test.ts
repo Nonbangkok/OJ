@@ -329,7 +329,29 @@ describe('Problem Controller', () => {
             );
         });
 
-        it('should reject a category longer than the limit', async () => {
+        it('should treat an empty-string category as uncategorized (null)', async () => {
+            const newProblem = {
+                id: 'P4b',
+                title: 'Problem 4b',
+                author: 'Author 4',
+                category: '',
+                time_limit_ms: 1000,
+                memory_limit_mb: 256
+            };
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ ...newProblem, category: null }] });
+
+            const res = await request(app)
+                .post('/admin/problems')
+                .send(newProblem);
+
+            expect(res.status).toBe(201);
+            expect(db.query).toHaveBeenCalledWith(
+                expect.stringContaining('INSERT INTO problems'),
+                expect.arrayContaining([null])
+            );
+        });
+
+        it('should reject a category not in the fixed category list', async () => {
             const invalidProblem = {
                 id: 'P5',
                 title: 'Problem 5',

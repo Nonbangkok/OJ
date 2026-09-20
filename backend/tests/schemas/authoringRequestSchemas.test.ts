@@ -33,11 +33,21 @@ describe('problem authoring request schemas', () => {
     expect(result).toEqual({
       ...validCreateBody,
       title: 'Red Gate',
+      category: null,
       statementHtml: '',
       solutionCpp: '',
       generatorCpp: null,
       templateVersion: 'red-gate-v1',
     });
+  });
+
+  it('accepts a fixed-list category and maps empty string to null', () => {
+    expect(createProblemDraftSchema.parse({ ...validCreateBody, category: 'Graph' }).category)
+      .toBe('Graph');
+    expect(createProblemDraftSchema.parse({ ...validCreateBody, category: '' }).category)
+      .toBe(null);
+    expect(createProblemDraftSchema.safeParse({ ...validCreateBody, category: 'Bogus' }).success)
+      .toBe(false);
   });
 
   it('rejects invalid identifiers, country codes, and resource limits', () => {

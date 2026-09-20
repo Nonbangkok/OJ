@@ -16,6 +16,9 @@ export interface DialogProps {
   closeOnEscape?: boolean;
   /** Renders a wider, taller variant for content-heavy dialogs (help, galleries). */
   wide?: boolean;
+  /** Near-viewport sizing for full workspaces (code + results). The dialog
+   *  still respects the backdrop padding so it never touches the edges. */
+  size?: 'default' | 'fullscreen';
 }
 
 export function Dialog({
@@ -28,6 +31,7 @@ export function Dialog({
   initialFocusRef,
   closeOnEscape = true,
   wide = false,
+  size = 'default',
 }: DialogProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -97,7 +101,7 @@ export function Dialog({
     >
       <div
         ref={dialogRef}
-        className={`${styles.dialog}${wide ? ` ${styles.dialogWide}` : ''}`}
+        className={`${styles.dialog}${wide ? ` ${styles.dialogWide}` : ''}${size === 'fullscreen' ? ` ${styles.dialogFullscreen}` : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

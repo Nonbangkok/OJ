@@ -433,13 +433,27 @@
   color: var(--text-secondary);
 }
 .sectionNav {
+  position: relative; /* Needed for slider positioning */
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   border-top: 1px solid var(--border-color);
   padding-top: 1rem;
 }
+/* The gray hover-follow pill shared with the top navbars. */
+.sectionSlider {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  background-color: var(--navbar-slider-background);
+  border-radius: var(--radius-sm);
+  z-index: 1;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
 .navBtn {
+  position: relative;
+  z-index: 2; /* Ensure labels stay above the slider */
   width: 100%;
   padding: 0.7rem 1rem;
   text-align: left;
@@ -455,14 +469,15 @@
     background 0.15s ease,
     color 0.15s ease;
 }
+/* The slider carries the hover/active background on desktop, so the buttons
+   only change text color; the accent stays as the active label color. */
 .navBtn:hover {
-  background: var(--background-primary);
   color: var(--text-primary);
 }
 .navBtnActive,
 .navBtnActive:hover {
-  background: var(--accent-primary);
-  color: var(--action-primary-foreground);
+  color: var(--accent-primary);
+  font-weight: 600;
 }
 .workspaceMain {
   flex: 1;
@@ -485,12 +500,26 @@
   .leftNav {
     width: 100%;
   }
+  /* The nav becomes a wrapping row here, so the vertical pill is hidden and
+     static hover/active backgrounds take over. */
+  .sectionSlider {
+    display: none;
+  }
   .sectionNav {
     flex-direction: row;
     flex-wrap: wrap;
   }
   .navBtn {
     width: auto;
+  }
+  .navBtn:hover {
+    background: var(--background-primary);
+    color: var(--text-primary);
+  }
+  .navBtnActive,
+  .navBtnActive:hover {
+    background: var(--accent-primary);
+    color: var(--action-primary-foreground);
   }
 }
 .tabs {

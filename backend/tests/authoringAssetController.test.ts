@@ -21,6 +21,7 @@ const draftRow = (overrides: Partial<ProblemDraftRow> = {}): ProblemDraftRow => 
   language: 'Thai',
   country_code: 'THA',
   author_profile_image_png: Buffer.from('profile'),
+  category: null,
   time_limit_ms: 1000,
   memory_limit_mb: 256,
   statement_html: '<p>Statement</p>',

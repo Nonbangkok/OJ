@@ -27,30 +27,51 @@
   margin: 0;
 }
 
-/* General styles for action buttons inside tables */
+/* General styles for action buttons inside tables — centered so the group
+   sits directly beneath the centered ACTIONS header cell. */
 .actions {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.5rem;
   align-items: center;
+  justify-content: center;
 }
 
-/* Base button style for this context */
+/* Base button style for this context — metrics match the shared ui/Button
+   (height, padding, radius, weight) so management buttons look identical to
+   buttons elsewhere in the app. */
 .btn {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 6px;
-  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0.625rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 6px);
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.25;
   cursor: pointer;
-  transition: filter 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    filter 0.2s ease;
   color: var(--action-button-foreground);
-  font-size: 0.9rem;
+}
+
+.btn:focus-visible {
+  outline: 3px solid var(--action-focus-ring);
+  outline-offset: 2px;
 }
 
 .create-btn {
   composes: btn;
   background-color: var(--action-create-bg);
   color: var(--action-button-foreground);
-  max-width: 15rem;
+}
+.create-btn:disabled {
+  background-color: var(--action-disabled-bg);
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 .create-btn:hover {
   background-color: var(--action-create-hover);

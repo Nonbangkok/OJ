@@ -69,9 +69,13 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
     };
 
     const handleSave = () => {
-        // Pass the collected data back to the parent component
+        // Pass the collected data back to the parent component.
+        // The category select uses '' for "no category"; send it as null.
+        const problemData = formData.category === ''
+            ? { ...formData, category: null }
+            : formData;
         onSave({
-            problemData: formData,
+            problemData,
             pdfFile,
             zipFile,
         }, isEditing);

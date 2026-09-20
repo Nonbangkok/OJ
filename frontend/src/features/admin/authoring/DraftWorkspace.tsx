@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate, useOutletContext } from 'react-router-dom';
 import { Button, Dialog, StatusBadge } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
+import { useNavSlider } from '../../../hooks/useNavSlider';
 import useAuthoringDraft from './useAuthoringDraft';
 import { Profile } from './types';
 import { draftStatus, jobLabel, jobStatus, verifyFailureExplanation } from './status';
@@ -36,6 +37,14 @@ export default function DraftWorkspace({ id }: { id: string }) {
   const model = useAuthoringDraft(id);
   const { draft, form, onError } = model;
   const navigate = useNavigate();
+  // The left nav's gray pill tracks the hovered section and settles on the
+  // active route; NavLink's automatic `active` class is the anchor selector.
+  const {
+    navRef: sectionNavRef,
+    sliderStyle: sectionSliderStyle,
+    handleItemMouseEnter: handleSectionMouseEnter,
+    resetSlider: resetSectionSlider,
+  } = useNavSlider<HTMLElement>('vertical', { itemPadding: 3, activeSelector: 'a.active' });
   const [confirm, setConfirm] = useState<{ action: 'generate' | 'outputs' | 'publish'; revision: number } | null>(null);
   const [leaveGuard, setLeaveGuard] = useState(false);
   useEffect(() => {
@@ -97,9 +106,12 @@ export default function DraftWorkspace({ id }: { id: string }) {
           <span className={styles.navJobName}>{latestResult.name}</span>
         </p>}
       </div>
-      <nav className={styles.sectionNav} aria-label="Draft sections">
+      <nav ref={sectionNavRef} className={styles.sectionNav} aria-label="Draft sections"
+        onMouseLeave={resetSectionSlider}>
+        <div className={styles.sectionSlider} style={sectionSliderStyle} aria-hidden="true" />
         {sections.map(section => <NavLink key={section.path} to={section.path} relative="path"
-          className={({ isActive }) => isActive ? `${styles.navBtn} ${styles.navBtnActive}` : styles.navBtn}>
+          className={({ isActive }) => isActive ? `${styles.navBtn} ${styles.navBtnActive}` : styles.navBtn}
+          onMouseEnter={handleSectionMouseEnter}>
           {section.label}
         </NavLink>)}
       </nav>

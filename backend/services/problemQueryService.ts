@@ -137,9 +137,12 @@ export const updateProblem = async (
       }
     }
 
+    // Category is tri-state: undefined = leave unchanged, null = uncategorized.
+    // COALESCE alone cannot express that, so a separate flag gates the write.
+    const categoryProvided = payload.category !== undefined;
     const result = await client.query<ProblemRow>(
-      'UPDATE problems SET id = $1, title = COALESCE($2, title), author = COALESCE($3, author), category = COALESCE($4, category), time_limit_ms = COALESCE($5, time_limit_ms), memory_limit_mb = COALESCE($6, memory_limit_mb) WHERE id = $7 RETURNING *',
-      [payload.id, payload.title ?? null, payload.author ?? null, payload.category ?? null, payload.time_limit_ms ?? null, payload.memory_limit_mb ?? null, oldId]
+      'UPDATE problems SET id = $1, title = COALESCE($2, title), author = COALESCE($3, author), category = CASE WHEN $8::boolean THEN $4 ELSE category END, time_limit_ms = COALESCE($5, time_limit_ms), memory_limit_mb = COALESCE($6, memory_limit_mb) WHERE id = $7 RETURNING *',
+      [payload.id, payload.title ?? null, payload.author ?? null, payload.category ?? null, payload.time_limit_ms ?? null, payload.memory_limit_mb ?? null, oldId, categoryProvided]
     );
 
     if (result.rows.length === 0) {

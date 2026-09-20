@@ -1,3 +1,5 @@
+import { ProblemCategory } from '../constants';
+
 export const AUTHORING_DRAFT_STATUSES = ['draft', 'generated', 'ready', 'published'] as const;
 export type AuthoringDraftStatus = typeof AUTHORING_DRAFT_STATUSES[number];
 
@@ -80,6 +82,7 @@ export interface ProblemDraftRow {
   language: string;
   country_code: string;
   author_profile_image_png: Buffer | null;
+  category: ProblemCategory | null;
   time_limit_ms: number;
   memory_limit_mb: number;
   statement_html: string;

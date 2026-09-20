@@ -1,3 +1,4 @@
+import type { ProblemCategory } from '../utils/constants';
 import type { ContestStatus, UserRole } from './models';
 
 export interface LoginRequest {
@@ -45,7 +46,8 @@ export interface CreateProblemRequest {
   id: string;
   title: string;
   author: string;
-  category?: string;
+  /** One of PROBLEM_CATEGORIES; empty string / null means uncategorized. */
+  category?: ProblemCategory | null;
   time_limit_ms: number;
   memory_limit_mb: number;
 }

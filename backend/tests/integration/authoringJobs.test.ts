@@ -41,6 +41,7 @@ describeDatabase('durable authoring job protocol', () => {
   afterAll(async () => { await pool.end(); await adminPool.query(`DROP SCHEMA ${schema} CASCADE`); await adminPool.end(); });
   const draft = () => createProblemDraft({ problem_id: 'test', title: 'Fixture', author_profile_id: null,
     author_aka_name: 'A', author_real_name: 'Author', language: 'Thai', country_code: 'THA',
+    category: null,
     time_limit_ms: 1000, memory_limit_mb: 256, created_by: null, solution_cpp: 'int main(){}' }, database);
 
   it('reserves one job per draft and recovers delivery after a backend restart', async () => {

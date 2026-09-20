@@ -73,6 +73,7 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+  min-width: 0; /* allow shrinking so the username can ellipsize on narrow screens */
 }
 
 .nav-user {

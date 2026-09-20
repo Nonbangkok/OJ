@@ -17,15 +17,17 @@
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
+/* Title/meta block: flexes, long titles wrap instead of pushing the row. */
 .problem-info {
-  width: 400px;
-  flex-grow: 0.6;
+  flex: 1 1 40%;
+  min-width: 0;
 }
 
 .problem-title {
   color: var(--text-primary);
   margin: 0 0 0.25rem 0;
   font-size: 1.25rem;
+  overflow-wrap: break-word;
 }
 
 .problem-author {
@@ -56,6 +58,7 @@
   gap: 1rem;
   font-size: 0.85rem;
   color: var(--text-muted);
+  flex-wrap: wrap;
 }
 
 .submission-tries {
@@ -64,21 +67,22 @@
   border-radius: 4px;
 }
 
+/* Score block: fixed-ish middle zone, shrinks on narrow screens. */
 .problem-score-placeholder {
-  width: 300px; /* Match the width of the score details */
+  flex: 1 1 30%;
   min-height: 22px; /* Reserve space for the score bar */
-  flex-grow: 0.4;
+  min-width: 0;
 }
 
 .problem-score-details {
   display: flex;
   align-items: center;
   gap: 1rem;
-  width: 400px; /* Fixed width for alignment */
+  min-width: 0;
 }
 
 .score-bar-container {
-  width: 200px;
+  flex: 0 1 200px;
   height: 20px;
   background-color: var(--background-tertiary);
   border-radius: 6px;
@@ -129,18 +133,27 @@
   color: var(--text-secondary);
   white-space: nowrap;
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* Action link styled to match the shared compact button: consistent height,
+   padding and radius, vertically centered by the row's align-items. */
 .problem-action-btn {
-  width: 30px;
-  padding: 0.6rem 1.5rem;
-  border-radius: 6px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--radius-sm, 6px);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 0.95rem;
   text-align: center;
   transition: background-color 0.2s ease;
-  flex-shrink: 0;
   color: var(--action-button-foreground);
+  border: 1px solid transparent;
 }
 
 .problem-action-btn.new,
@@ -153,6 +166,11 @@
   background-color: var(--accent-primary-hover);
 }
 
+.problem-action-btn:focus-visible {
+  outline: 3px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
 @media (max-width: 768px) {
   .problem-list-item {
     flex-direction: column;
@@ -162,12 +180,20 @@
   }
 
   .problem-info,
-  .problem-score-placeholder,
+  .problem-score-placeholder {
+    flex-basis: auto;
+  }
+
   .problem-score-details {
-    width: 100%;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .score-bar-container {
+    flex: 1 1 100%;
   }
 
   .problem-action-btn {
-    align-self: flex-end;
+    align-self: stretch;
   }
 }

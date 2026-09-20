@@ -20,6 +20,7 @@ const initialFields: DraftFields = {
   authorRealName: '',
   language: 'Thai',
   countryCode: 'THA',
+  category: null,
   timeLimitMs: 1000,
   memoryLimitMb: 256,
   statementHtml: '',

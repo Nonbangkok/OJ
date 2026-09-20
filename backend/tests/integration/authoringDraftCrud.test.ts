@@ -41,6 +41,7 @@ describeWithDatabase('problem authoring draft persistence', () => {
     author_real_name: 'Example Author',
     language: 'Thai',
     country_code: 'THA',
+    category: null,
     time_limit_ms: 1000,
     memory_limit_mb: 256,
     created_by: null,

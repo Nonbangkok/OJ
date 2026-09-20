@@ -4,6 +4,7 @@ import ConfirmationModal from '../shared/ConfirmationModal';
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 import LoadingPage from '../../../components/shared/LoadingPage';
+import { Button } from '../../../components/ui';
 
 interface ProblemManagementProps {
   currentUser?: { username?: string } | null;
@@ -61,22 +62,24 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
         <h2>Problem Management</h2>
         <div className={styles['header-actions']}>
           <div className={styles['bulk-actions']}>
-            <button
+            <Button
+              size="compact"
+              variant="neutral"
               onClick={handleShowAll}
-              className={styles['show-all-btn']}
               disabled={loading || problems.every(p => p.is_visible)}
               title="Show all hidden problems"
             >
               Show All
-            </button>
-            <button
+            </Button>
+            <Button
+              size="compact"
+              variant="neutral"
               onClick={handleHideAll}
-              className={styles['hide-all-btn']}
               disabled={loading || problems.every(p => !p.is_visible)}
               title="Hide all visible problems"
             >
               Hide All
-            </button>
+            </Button>
           </div>
           <input
             type="file"
@@ -85,19 +88,17 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
             style={{ display: 'none' }}
             accept=".zip"
           />
-          <button
+          <Button
             onClick={handleExportSelected}
-            className={styles['create-btn']}
-            style={{ marginRight: '10px' }}
             disabled={loading || selectedProblems.length === 0}
             title={selectedProblems.length === 0 ? 'Select problems to export' : 'Export selected problems'}
           >
             Export Selected
-          </button>
-          <button onClick={handleTriggerBatchUpload} className={styles['create-btn']} style={{ marginRight: '10px' }}>
+          </Button>
+          <Button onClick={handleTriggerBatchUpload}>
             Batch Upload
-          </button>
-          <button onClick={handleCreate} className={styles['create-btn']}>Create New Problem</button>
+          </Button>
+          <Button onClick={handleCreate}>Create New Problem</Button>
         </div>
       </div>
       {/* Batch Upload Feedback UI */}
@@ -173,19 +174,20 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
                       {problem.contest_status === 'scheduled' ? 'In Scheduled Contest' : 'In Running Contest'}
                     </span>
                   ) : (
-                    <button
+                    <Button
+                      size="compact"
+                      variant={problem.is_visible ? 'secondary' : 'neutral'}
                       onClick={() => handleToggleVisibility(problem.id, problem.is_visible)}
-                      className={problem.is_visible ? styles['visible-btn'] : styles['hidden-btn']}
                       title={problem.is_visible ? 'Click to hide' : 'Click to show'}
                     >
                       {problem.is_visible ? 'Visible' : 'Hidden'}
-                    </button>
+                    </Button>
                   )}
                 </td>
                 <td>
                   <div className={styles.actions}>
-                    <button onClick={() => handleEdit(problem)} className={styles['edit-btn']}>Edit</button>
-                    <button onClick={() => handleDeleteClick(problem.id)} className={styles['delete-btn']}>Delete</button>
+                    <Button size="compact" onClick={() => handleEdit(problem)}>Edit</Button>
+                    <Button size="compact" variant="destructive" onClick={() => handleDeleteClick(problem.id)}>Delete</Button>
                   </div>
                 </td>
               </tr>

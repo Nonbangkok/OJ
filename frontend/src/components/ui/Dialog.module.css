@@ -40,6 +40,44 @@
   line-height: 1.55;
 }
 
+/* Full-workspace dialogs (submission detail): ~85-90% of the viewport with
+   internal flex layout — header stays fixed, the body region fills the rest
+   and manages its own scrolling. */
+.dialogFullscreen {
+  display: flex;
+  flex-direction: column;
+  height: min(88vh, 52rem);
+  max-height: calc(100vh - 2rem);
+  max-width: min(90vw, 88rem);
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* Sections the fullscreen consumer marks as scrollable carry their own
+   overflow; the dialog itself must not scroll. */
+.dialogFullscreen .body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  margin-top: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dialogFullscreen .header {
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  padding: 1rem 1.5rem;
+}
+
+.dialogFullscreen .footer {
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+  margin-top: 0;
+  padding: 1rem 1.5rem;
+}
+
 .header {
   align-items: flex-start;
   display: flex;

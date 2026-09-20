@@ -1,4 +1,5 @@
 import useProblemModal from '../../../hooks/admin/useProblemModal';
+import { PROBLEM_CATEGORIES } from '../../../utils/constants';
 import formStyles from '../../../components/styles/Form.module.css';
 import modalStyles from '../shared/ModalLayout.module.css';
 
@@ -81,15 +82,17 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
 
           <div className={formStyles['form-group']}>
             <label htmlFor="category">Category</label>
-            <input
-              type="text"
+            <select
               id="category"
               name="category"
               value={formData.category}
               onChange={handleChange}
-              maxLength={50}
-              placeholder="e.g. Dynamic Programming (optional)"
-            />
+            >
+              <option value="">No category</option>
+              {PROBLEM_CATEGORIES.map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
           </div>
 
           <div className={formStyles['form-group']}>

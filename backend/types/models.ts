@@ -5,7 +5,7 @@
  * Each interface maps directly to one table row as returned by pg.
  * Use these as the generic parameter for `db.query<T>()`.
  */
-import { CONTEST_STATUS, SUBMISSION_STATUS, USER_ROLES } from '../constants';
+import { CONTEST_STATUS, ProblemCategory, SUBMISSION_STATUS, USER_ROLES } from '../constants';
 
 // ---------------------------------------------------------------------------
 // Primitives / Shared
@@ -90,7 +90,8 @@ export interface ProblemRow {
     id: string;
     title: string;
     author: string | null;
-    category: string | null;
+    /** One of PROBLEM_CATEGORIES, or null when uncategorized. */
+    category: ProblemCategory | null;
     problem_pdf: Buffer | null;
     time_limit_ms: number;
     memory_limit_mb: number;

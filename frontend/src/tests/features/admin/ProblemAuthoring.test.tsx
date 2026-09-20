@@ -77,6 +77,26 @@ test('staff cannot load private authoring data even through a direct URL', () =>
   expect(screen.getByText(/admin access required/i)).toBeInTheDocument();
   expect(api.get).not.toHaveBeenCalled();
 });
+
+test('the metadata category dropdown selects a fixed category and defaults to none', async () => {
+  show('/admin/authoring/d1');
+  const category = await screen.findByLabelText('Category');
+  // An uncategorized draft selects "No category", not a stale free-text value.
+  expect(category).toHaveValue('');
+  expect(screen.getByRole('option', { name: 'No category' })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: 'Dynamic Programming' })).toBeInTheDocument();
+  fireEvent.change(category, { target: { value: 'Graph' } });
+  jest.mocked(api.patch).mockResolvedValue({ data: { ...draft, revision: 4 } });
+  // The category change auto-saves after the usual debounce delay.
+  await waitFor(
+    () =>
+      expect(api.patch).toHaveBeenCalledWith(
+        '/admin/authoring/drafts/d1',
+        expect.objectContaining({ category: 'Graph' })
+      ),
+    { timeout: 4000 }
+  );
+});
 test('lists resumable drafts and creates a draft with explicit author metadata', async () => {
   show();
   // Problem ID and title are separate links to the same draft.
