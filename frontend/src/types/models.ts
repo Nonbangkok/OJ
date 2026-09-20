@@ -174,6 +174,22 @@ export interface UserProfileDailyActivity {
   count: number;
 }
 
+/** An unlocked achievement as returned by the profile endpoint. */
+export interface UnlockedAchievement {
+  id: string;
+  name: string;
+  description: string;
+}
+
+/** Derivable stats the backend computes for progress display. */
+export interface AchievementStats {
+  problemsSolved: number;
+  currentStreak: number;
+  longestStreak: number;
+  languagesSolvedIn: Record<string, number>;
+  contestsJoined: number;
+}
+
 export interface UserProfileResponse {
   id: number;
   username: string;
@@ -188,6 +204,13 @@ export interface UserProfileResponse {
   verdictCounts: Record<string, number>;
   languageCounts: Record<string, number>;
   dailyActivity: UserProfileDailyActivity[];
+  currentStreak: number;
+  longestStreak: number;
+  lastAcDate: string | null;
+  achievements: {
+    unlocked: UnlockedAchievement[];
+    stats: AchievementStats;
+  };
 }
 
 export interface UpdateAvatarResponse {

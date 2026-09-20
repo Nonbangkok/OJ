@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import UserProfile from '../../pages/user/UserProfile';
 import userService from '../../services/userService';
@@ -24,6 +24,21 @@ const profileData = {
     verdictCounts: { Accepted: 3, 'Wrong Answer': 5 },
     languageCounts: { cpp: 9 },
     dailyActivity: [{ day: '2026-09-18', count: 2 }],
+    currentStreak: 4,
+    longestStreak: 11,
+    lastAcDate: '2026-09-21',
+    achievements: {
+        unlocked: [
+            { id: 'first_solve', name: 'First Solve', description: 'Solve your first problem' },
+        ],
+        stats: {
+            problemsSolved: 2,
+            currentStreak: 4,
+            longestStreak: 11,
+            languagesSolvedIn: { cpp: 3 },
+            contestsJoined: 0,
+        },
+    },
 };
 
 const renderPage = () =>
@@ -121,5 +136,50 @@ describe('User Profile Page', () => {
         await waitFor(() => {
             expect(screen.getByText(/failed to load profile/i)).toBeInTheDocument();
         });
+    });
+
+    it('renders the streak panel with current and longest streak', async () => {
+        jest.mocked(userService.getProfile).mockResolvedValueOnce(profileData);
+
+        renderPage();
+
+        await waitFor(() => {
+            const streakPanel = document.querySelector('div[class*="streak-panel"]');
+            expect(streakPanel).toBeTruthy();
+            expect(within(streakPanel as HTMLElement).getByText('4')).toBeInTheDocument();
+        });
+        expect(screen.getByText(/day streak/i)).toBeInTheDocument();
+        expect(screen.getByText(/longest streak/i)).toBeInTheDocument();
+        const longest = document.querySelector('span[class*="streak-longest"]');
+        expect(within(longest as HTMLElement).getByText('11')).toBeInTheDocument();
+    });
+
+    it('renders every achievement with locked and unlocked states', async () => {
+        jest.mocked(userService.getProfile).mockResolvedValueOnce(profileData);
+
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByText('First Solve')).toBeInTheDocument();
+        });
+
+        // Unlocked card: name and description, no progress label.
+        expect(screen.getByText('Solve your first problem')).toBeInTheDocument();
+
+        // Locked cards carry the locked state and a progress label.
+        const centuryCard = screen.getByText('Century').closest('div[class*="achievement-card"]');
+        expect(centuryCard).toBeTruthy();
+        expect(centuryCard?.className).toContain('locked');
+        expect(within(centuryCard as HTMLElement).getByText('2/100 problems')).toBeInTheDocument();
+        expect(within(centuryCard as HTMLElement).getByText('locked', { exact: false })).toBeInTheDocument();
+
+        // The unlocked card is not marked locked (locked is its own token).
+        const firstSolveCard = screen.getByText('First Solve').closest('div[class*="achievement-card"]');
+        expect(firstSolveCard?.className).not.toMatch(/\blocked\b/);
+
+        // All eight catalog entries render.
+        for (const name of ['Getting Started', 'Problem Grinder', 'Century', 'On Fire', 'Unstoppable', 'Polyglot', 'Contester']) {
+            expect(screen.getByText(name)).toBeInTheDocument();
+        }
     });
 });

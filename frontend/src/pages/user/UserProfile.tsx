@@ -5,6 +5,11 @@ import ActivityHeatmap from '../../components/user/ActivityHeatmap';
 import LoadingPage from '../../components/shared/LoadingPage';
 import { useAuth } from '../../context/AuthContext';
 import userService from '../../services/userService';
+import {
+  ACHIEVEMENT_CATALOG,
+  progressFraction,
+  progressLabel,
+} from '../../utils/achievements';
 
 import styles from './UserProfile.module.css';
 
@@ -21,6 +26,11 @@ const makeBarWidth = (counts: Record<string, number>) => {
 
 const verdictBarWidthFor = (counts: Record<string, number>) => makeBarWidth(counts);
 const languageBarWidthFor = (counts: Record<string, number>) => makeBarWidth(counts);
+
+const formatAcDate = (iso: string | null): string =>
+  iso
+    ? new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    : '';
 
 const UserProfile = () => {
   const { username } = useParams<{ username: string }>();
@@ -77,6 +87,8 @@ const UserProfile = () => {
     : '';
   const verdictBarWidth = makeBarWidth(profile.verdictCounts);
   const languageBarWidth = makeBarWidth(profile.languageCounts);
+
+  const unlockedIds = new Set(profile.achievements.unlocked.map((achievement) => achievement.id));
 
   return (
     <div className={styles['profile-container']}>
@@ -144,6 +156,61 @@ const UserProfile = () => {
       <div className={styles.section}>
         <h2>Activity</h2>
         <ActivityHeatmap activity={profile.dailyActivity} />
+      </div>
+
+      <div className={styles['streak-panel']}>
+        <span className={styles['streak-flame']} aria-hidden="true" />
+        <div className={styles['streak-body']}>
+          <span className={styles['streak-count']}>
+            {profile.currentStreak}
+          </span>
+          <span className={styles['streak-unit']}>
+            day streak
+            {profile.currentStreak > 0 && profile.lastAcDate && (
+              <span className={styles['streak-last']}> — last AC {formatAcDate(profile.lastAcDate)}</span>
+            )}
+          </span>
+        </div>
+        <span className={styles['streak-longest']}>
+          Longest streak: <strong>{profile.longestStreak}</strong> {profile.longestStreak === 1 ? 'day' : 'days'}
+        </span>
+      </div>
+
+      <div className={styles.section}>
+        <h2>Achievements</h2>
+        <div className={styles['achievements-grid']}>
+          {ACHIEVEMENT_CATALOG.map((achievement) => {
+            const unlocked = unlockedIds.has(achievement.id);
+            const label = progressLabel(achievement, profile.achievements.stats);
+            const fraction = progressFraction(achievement, profile.achievements.stats);
+            return (
+              <div
+                key={achievement.id}
+                className={`${styles['achievement-card']} ${unlocked ? styles.unlocked : styles.locked}`}
+              >
+                <div className={styles['achievement-head']}>
+                  <span className={styles['achievement-icon']} aria-hidden="true" />
+                  {!unlocked && <span className={styles['achievement-lock']}>Locked</span>}
+                </div>
+                <span className={styles['achievement-name']}>{achievement.name}</span>
+                <span className={styles['achievement-description']}>{achievement.description}</span>
+                {!unlocked && (
+                  <>
+                    <span className={styles['achievement-progress']} aria-hidden="true">
+                      <span
+                        className={styles['achievement-progress-fill']}
+                        style={{ width: `${Math.round(fraction * 100)}%` }}
+                      />
+                    </span>
+                    <span className={styles['achievement-progress-label']}>
+                      {label ?? 'Not yet started'}
+                    </span>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className={styles['two-col']}>

@@ -45,6 +45,19 @@ describe('GET /users/:username/profile', () => {
       verdict_counts: { Accepted: 3, 'Wrong Answer': 5, 'Runtime Error': 1 },
       language_counts: { cpp: 9 },
       daily_activity: [{ day: '2026-09-18', count: 2 }],
+      current_streak: 2,
+      longest_streak: 5,
+      last_ac_date: '2026-09-21',
+      achievements: {
+        unlocked: [{ id: 'first_solve', name: 'First Solve', description: 'Solve your first problem' }],
+        stats: {
+          problemsSolved: 2,
+          currentStreak: 2,
+          longestStreak: 5,
+          languagesSolvedIn: { cpp: 3 },
+          contestsJoined: 0,
+        },
+      },
     });
 
     const res = await request(createTestApp()).get('/users/tester/profile');
@@ -65,6 +78,19 @@ describe('GET /users/:username/profile', () => {
       verdictCounts: { Accepted: 3, 'Wrong Answer': 5, 'Runtime Error': 1 },
       languageCounts: { cpp: 9 },
       dailyActivity: [{ day: '2026-09-18', count: 2 }],
+      currentStreak: 2,
+      longestStreak: 5,
+      lastAcDate: '2026-09-21',
+      achievements: {
+        unlocked: [{ id: 'first_solve', name: 'First Solve', description: 'Solve your first problem' }],
+        stats: {
+          problemsSolved: 2,
+          currentStreak: 2,
+          longestStreak: 5,
+          languagesSolvedIn: { cpp: 3 },
+          contestsJoined: 0,
+        },
+      },
     });
   });
 

@@ -1,5 +1,6 @@
 import { query } from '../db';
-import { PROFILE_ACTIVITY_WINDOW_DAYS, SUBMISSION_QUERY_CONFIG } from '../constants';
+import { PROFILE_ACTIVITY_WINDOW_DAYS, SUBMISSION_QUERY_CONFIG, SUBMISSION_STATUS, ACHIEVEMENTS } from '../constants';
+import { computeStreaks } from '../utils/streaks';
 
 export interface UserProfileStatsRow {
     id: number;
@@ -15,6 +16,19 @@ export interface UserProfileStatsRow {
     verdict_counts: Record<string, number>;
     language_counts: Record<string, number>;
     daily_activity: Array<{ day: string; count: number }>;
+    current_streak: number;
+    longest_streak: number;
+    last_ac_date: string | null;
+    achievements: {
+        unlocked: Array<{ id: string; name: string; description: string }>;
+        stats: {
+            problemsSolved: number;
+            currentStreak: number;
+            longestStreak: number;
+            languagesSolvedIn: Record<string, number>;
+            contestsJoined: number;
+        };
+    };
 }
 
 export interface UserAvatarRow {
@@ -29,7 +43,12 @@ export interface UserAvatarRow {
 export const getUserProfileStats = async (
     username: string,
 ): Promise<UserProfileStatsRow | null> => {
-    const result = await query<UserProfileStatsRow>(`
+    const result = await query<UserProfileStatsRow & {
+        ac_days: string[];
+        languages_solved_in: Record<string, number>;
+        contests_joined: number;
+        today: string;
+    }>(`
       WITH user_submissions AS (
         SELECT problem_id, language, overall_status, score, submitted_at
         FROM submissions
@@ -79,15 +98,67 @@ export const getUserProfileStats = async (
              SELECT to_char(submitted_at::date, 'YYYY-MM-DD') AS day, COUNT(*) AS day_count
              FROM user_submissions
              WHERE submitted_at >= NOW() - ($2 || ' days')::interval
-             GROUP BY submitted_at::date
+             GROUP BY 1
            ) activity),
            '[]'::jsonb
-        ) AS daily_activity
+        ) AS daily_activity,
+        COALESCE(
+          (SELECT jsonb_agg(day ORDER BY day)
+           FROM (
+             SELECT DISTINCT to_char(submitted_at AT TIME ZONE 'Asia/Bangkok', 'YYYY-MM-DD') AS day
+             FROM user_submissions
+             WHERE overall_status = '${SUBMISSION_STATUS.ACCEPTED}'
+           ) ac_days),
+           '[]'::jsonb
+        ) AS ac_days,
+        COALESCE(
+          (SELECT jsonb_object_agg(language, ac_count)
+           FROM (
+             SELECT language, COUNT(*) AS ac_count
+             FROM user_submissions
+             WHERE overall_status = '${SUBMISSION_STATUS.ACCEPTED}'
+             GROUP BY language
+           ) ac_languages),
+           '{}'::jsonb
+        ) AS languages_solved_in,
+        (SELECT COUNT(*)::int FROM contest_participants WHERE user_id = u.id) AS contests_joined,
+        to_char(NOW() AT TIME ZONE 'Asia/Bangkok', 'YYYY-MM-DD') AS today
       FROM users u
       WHERE u.username = $1
     `, [username, PROFILE_ACTIVITY_WINDOW_DAYS]);
 
-    return result.rows[0] ?? null;
+    const row = result.rows[0];
+    if (!row) return null;
+
+    const { currentStreak, longestStreak, lastAcDate } = computeStreaks(row.ac_days ?? [], row.today);
+
+    const achievementStats = {
+        problemsSolved: Number(row.problems_solved),
+        currentStreak,
+        longestStreak,
+        languagesSolvedIn: row.languages_solved_in ?? {},
+        contestsJoined: Number(row.contests_joined ?? 0),
+    };
+
+    const unlocked = ACHIEVEMENTS
+        .filter((achievement) => achievement.check(achievementStats))
+        .map(({ id, name, description }) => ({ id, name, description }));
+
+    const {
+        ac_days: _acDays,
+        languages_solved_in: _languagesSolvedIn,
+        contests_joined: _contestsJoined,
+        today: _today,
+        ...stats
+    } = row;
+
+    return {
+        ...stats,
+        current_streak: currentStreak,
+        longest_streak: longestStreak,
+        last_ac_date: lastAcDate,
+        achievements: { unlocked, stats: achievementStats },
+    };
 };
 
 /**

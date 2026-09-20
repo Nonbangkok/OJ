@@ -43,6 +43,10 @@ router.get('/users/:username/profile',
       verdictCounts: stats.verdict_counts,
       languageCounts: stats.language_counts,
       dailyActivity: stats.daily_activity,
+      currentStreak: stats.current_streak,
+      longestStreak: stats.longest_streak,
+      lastAcDate: stats.last_ac_date,
+      achievements: stats.achievements,
     });
   }));
 

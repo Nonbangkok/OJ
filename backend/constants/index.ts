@@ -235,6 +235,92 @@ export const USER_AVATAR = {
 
 export const PROFILE_ACTIVITY_WINDOW_DAYS = 365;
 
+// --- Achievements -----------------------------------------------------------
+
+/**
+ * Serializable statistics an achievement check runs over. Derived in the
+ * profile query from submission history — no stored state.
+ */
+export interface AchievementStats {
+    /** Distinct problems with a full-score (Accepted) submission. */
+    problemsSolved: number;
+    /** Longest run of consecutive AC days (Asia/Bangkok day boundary). */
+    longestStreak: number;
+    /** Consecutive AC days ending today or yesterday. */
+    currentStreak: number;
+    /** Distinct languages with at least one AC, keyed by language → AC count. */
+    languagesSolvedIn: Record<string, number>;
+    /** Count of contest_participants rows for the user. */
+    contestsJoined: number;
+}
+
+/** A fixed achievement: pure check over serializable stats. */
+export interface Achievement {
+    id: string;
+    name: string;
+    description: string;
+    check: (stats: AchievementStats) => boolean;
+}
+
+/**
+ * The achievement catalog — the complete, code-defined set. Unlocked purely
+ * by derivable statistics; no admin management, no stored unlock state.
+ */
+export const ACHIEVEMENTS: readonly Achievement[] = [
+    {
+        id: 'first_solve',
+        name: 'First Solve',
+        description: 'Solve your first problem',
+        check: (s) => s.problemsSolved >= 1,
+    },
+    {
+        id: 'ten_solves',
+        name: 'Getting Started',
+        description: 'Solve 10 problems',
+        check: (s) => s.problemsSolved >= 10,
+    },
+    {
+        id: 'fifty_solves',
+        name: 'Problem Grinder',
+        description: 'Solve 50 problems',
+        check: (s) => s.problemsSolved >= 50,
+    },
+    {
+        id: 'hundred_solves',
+        name: 'Century',
+        description: 'Solve 100 problems',
+        check: (s) => s.problemsSolved >= 100,
+    },
+    {
+        id: 'streak_7',
+        name: 'On Fire',
+        description: 'Reach a 7-day AC streak',
+        check: (s) => s.longestStreak >= 7,
+    },
+    {
+        id: 'streak_30',
+        name: 'Unstoppable',
+        description: 'Reach a 30-day AC streak',
+        check: (s) => s.longestStreak >= 30,
+    },
+    {
+        id: 'polyglot',
+        name: 'Polyglot',
+        description: 'Solve a problem in 2 or more languages',
+        check: (s) => Object.values(s.languagesSolvedIn).filter((count) => count >= 1).length >= 2,
+    },
+    {
+        id: 'contester',
+        name: 'Contester',
+        description: 'Participate in your first contest',
+        check: (s) => s.contestsJoined >= 1,
+    },
+];
+
+/** Lookup of the catalog by id. */
+export const ACHIEVEMENT_BY_ID: Readonly<Record<string, Achievement>> =
+    Object.fromEntries(ACHIEVEMENTS.map((achievement) => [achievement.id, achievement]));
+
 const STATEMENT_ASSET_MAX_FILE_MIB = 10;
 const STATEMENT_ASSET_MAX_TOTAL_MIB = 100;
 
