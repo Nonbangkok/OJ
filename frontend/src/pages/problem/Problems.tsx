@@ -150,7 +150,11 @@ const Problems = () => {
       {filtered.length > 0 ? (
         <div className={styles['problem-list']}>
           {filtered.map(problem => (
-            <ProblemCard key={problem.id} problem={problem} />
+            <ProblemCard
+              key={problem.id}
+              problem={problem}
+              highlightCategory={activeCategory === ALL_CATEGORIES ? null : activeCategory}
+            />
           ))}
         </div>
       ) : (

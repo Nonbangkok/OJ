@@ -7,9 +7,13 @@ import styles from './ProblemCard.module.css';
 interface ProblemCardProps {
     problem: ProblemSummary;
     contestId?: string | null;
+    /** When a specific category filter is active, show only that category's
+     *  badge; with no filter (default) badges stay hidden — categories can
+     *  reveal problem content, so they are opt-in. */
+    highlightCategory?: string | null;
 }
 
-const ProblemCard = ({ problem, contestId = null }: ProblemCardProps) => {
+const ProblemCard = ({ problem, contestId = null, highlightCategory = null }: ProblemCardProps) => {
     const submissionCount = Number(problem.submission_count ?? 0);
     const hasSubmitted = submissionCount > 0;
     const linkPath = contestId
@@ -17,6 +21,11 @@ const ProblemCard = ({ problem, contestId = null }: ProblemCardProps) => {
         : `/problems/${problem.id}`;
     const difficulty = problem.difficulty ?? null;
     const band = difficultyBand(difficulty);
+    // Only the selected category is ever shown, and only while a filter is
+    // active — problems with several categories display just the one chosen.
+    const visibleCategory = highlightCategory && problem.categories?.includes(highlightCategory)
+        ? highlightCategory
+        : null;
 
     return (
         <div className={styles['problem-list-item']}>
@@ -24,9 +33,9 @@ const ProblemCard = ({ problem, contestId = null }: ProblemCardProps) => {
                 <h3 className={styles['problem-title']}>{problem.title}</h3>
                 <p className={styles['problem-author']}>
                     {problem.id}
-                    {problem.categories?.map(category => (
-                        <span key={category} className={styles['problem-category']}>{category}</span>
-                    ))}
+                    {visibleCategory && (
+                        <span className={styles['problem-category']}>{visibleCategory}</span>
+                    )}
                     {difficulty !== null && band !== null && (
                         <span
                             data-testid="problem-difficulty"

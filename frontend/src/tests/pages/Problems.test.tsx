@@ -100,6 +100,34 @@ describe('Problems Page', () => {
         expect(screen.getByText('LIS')).toBeInTheDocument();
     });
 
+    it('hides category badges by default (spoiler-free) and shows only the selected one when filtered', async () => {
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(categorizedProblems);
+
+        render(<BrowserRouter><Problems /></BrowserRouter>);
+
+        await waitFor(() => {
+            expect(screen.getByText('Knapsack')).toBeInTheDocument();
+        });
+
+        // Default "All" view: no badge text anywhere on the cards —
+        // categories can reveal problem content, so they stay hidden.
+        expect(screen.queryByText('Dynamic Programming', { selector: 'span' })).not.toBeInTheDocument();
+        expect(screen.queryByText('Greedy', { selector: 'span' })).not.toBeInTheDocument();
+
+        // Selecting a category reveals ONLY that category's badge.
+        fireEvent.click(screen.getByRole('tab', { name: /^Dynamic Programming/ }));
+        // Knapsack (single category) and LIS (two categories) both show the
+        // selected one; LIS's other category stays hidden.
+        const badges = screen.getAllByText('Dynamic Programming', { selector: 'span' });
+        expect(badges).toHaveLength(2);
+        expect(screen.queryByText('Data Structures', { selector: 'span' })).not.toBeInTheDocument();
+
+        // Switching to the Greedy tab swaps which badge shows.
+        fireEvent.click(screen.getByRole('tab', { name: /^Greedy/ }));
+        expect(screen.getByText('Greedy', { selector: 'span' })).toBeInTheDocument();
+        expect(screen.queryByText('Dynamic Programming', { selector: 'span' })).not.toBeInTheDocument();
+    });
+
     it('filters the list by search text across title and id', async () => {
         (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(categorizedProblems);
 
