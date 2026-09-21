@@ -82,6 +82,10 @@ const ContestManagement = () => {
           </button>
         </div>
       ) : (
+        <div>
+        {/* Rejudge feedback sits above the table so the outcome is visible
+            without scrolling past the toolbar. */}
+        <RejudgeFeedbackBox feedback={rejudgeFeedback} onDismiss={dismissRejudgeFeedback} />
         <div className={tableStyles['table-container']}>
           <table className={tableStyles.table}>
             <thead>
@@ -182,6 +186,7 @@ const ContestManagement = () => {
             </tbody>
           </table>
         </div>
+        </div>
       )}
 
       {/* Contest Modal */}
@@ -230,8 +235,7 @@ const ContestManagement = () => {
         />
       )}
 
-      {/* Rejudge feedback + confirmation */}
-      <RejudgeFeedbackBox feedback={rejudgeFeedback} onDismiss={dismissRejudgeFeedback} />
+      {/* Rejudge confirmation */}
       <ConfirmationModal
         isOpen={isRejudgeConfirmOpen}
         onClose={handleCloseRejudgeConfirm}

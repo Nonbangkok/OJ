@@ -94,6 +94,9 @@ async function runSubmissionPipeline(
   // Owner of the submission — needed by the System Error handler below, so it
   // must live outside the try block alongside the file paths.
   let userId: number | null = null;
+  // Language also escapes the try: the finally-block cleanup needs to know
+  // whether this submission produced a compiled binary at all.
+  let submissionLanguage: SubmissionLanguage = 'cpp';
 
   try {
     const subRes = await db.query<SubmissionRow | ContestSubmissionRow>(
@@ -107,7 +110,7 @@ async function runSubmissionPipeline(
     const { problem_id, code, language, user_id, contest_id } = subRes.rows[0] as
       Pick<SubmissionRow, 'problem_id' | 'code' | 'language' | 'user_id'> & { contest_id?: number };
     userId = user_id;
-    const submissionLanguage = (language as SubmissionLanguage) ?? 'cpp';
+    submissionLanguage = (language as SubmissionLanguage) ?? 'cpp';
 
     await db.query(
       `UPDATE ${table} SET overall_status = '${SUBMISSION_STATUS.COMPILING}' WHERE id = $1`,
@@ -211,7 +214,11 @@ async function runSubmissionPipeline(
     }
   } finally {
     fs.unlink(filePath, (err) => { if (err) logger.warn('failed to delete submission source', { submissionId, err }); });
-    fs.unlink(outputPath, (err) => { if (err) logger.warn('failed to delete submission binary', { submissionId, err }); });
+    // Compiled languages leave a binary to clean up; interpreted ones never
+    // create one, so skip the unlink (its ENOENT would be pure log noise).
+    if (LANGUAGE_PREPARE[submissionLanguage].compiledArtifactPath(outputPath)) {
+      fs.unlink(outputPath, (err) => { if (err) logger.warn('failed to delete submission binary', { submissionId, err }); });
+    }
   }
 }
 

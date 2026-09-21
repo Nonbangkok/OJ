@@ -113,6 +113,9 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
           <Button onClick={handleCreate}>Create New Problem</Button>
         </div>
       </div>
+      {/* Rejudge feedback sits above the table so the outcome is visible
+          without scrolling past the toolbar. */}
+      <RejudgeFeedbackBox feedback={rejudgeFeedback} onDismiss={dismissRejudgeFeedback} />
       {/* Batch Upload Feedback UI */}
       {batchUploadFeedback.visible && (
         <div className={`${styles.feedbackBox} ${styles[batchUploadFeedback.type]}`}>
@@ -239,7 +242,6 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
           ? "Are you sure you want to make all problems visible to users? (Excluding those in contests)"
           : "Are you sure you want to hide all problems from users? (Excluding those in contests)"}
       />
-      <RejudgeFeedbackBox feedback={rejudgeFeedback} onDismiss={dismissRejudgeFeedback} />
       <ConfirmationModal
         isOpen={isRejudgeConfirmOpen}
         onClose={handleCloseRejudgeConfirm}
