@@ -47,6 +47,33 @@
   vertical-align: middle;
 }
 
+/* Per-card reveal toggle for hidden categories. Reads as a quiet inline text
+   button beside the badges — never competing with the primary actions. */
+.category-toggle {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.45rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.72rem;
+  color: var(--accent-primary);
+  vertical-align: middle;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.category-toggle:hover,
+.category-toggle:focus-visible {
+  color: var(--accent-primary-hover);
+}
+
+.category-toggle:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
 /* Difficulty rating chip: the number itself, colored by heat-map band.
    White text on the band color passes WCAG AA in both themes; Unrated
    problems render no chip at all. */

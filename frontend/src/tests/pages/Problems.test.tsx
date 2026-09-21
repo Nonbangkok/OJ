@@ -128,6 +128,54 @@ describe('Problems Page', () => {
         expect(screen.queryByText('Dynamic Programming', { selector: 'span' })).not.toBeInTheDocument();
     });
 
+    it('reveals all categories per card through the show-categories toggle', async () => {
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(categorizedProblems);
+
+        render(<BrowserRouter><Problems /></BrowserRouter>);
+
+        await waitFor(() => {
+            expect(screen.getByText('LIS')).toBeInTheDocument();
+        });
+
+        // Default view: every categorized card offers "Show categories";
+        // the uncategorized card (Plain Problem) offers nothing.
+        const toggles = screen.getAllByRole('button', { name: 'Show categories' });
+        expect(toggles).toHaveLength(3); // Knapsack, LIS, Greedy Slots
+
+        // Reveal LIS's categories: find its toggle via the card heading's DOM.
+        const lisHeading = screen.getByText('LIS');
+        const lisToggle = lisHeading.closest('div')?.querySelector('button') as HTMLElement;
+        expect(lisToggle).toBeTruthy();
+        fireEvent.click(lisToggle);
+        expect(screen.getAllByText('Dynamic Programming', { selector: 'span' }).length).toBeGreaterThanOrEqual(1);
+        expect(screen.getByText('Data Structures', { selector: 'span' })).toBeInTheDocument();
+
+        // Toggling again hides them.
+        fireEvent.click(screen.getAllByRole('button', { name: 'Hide categories' })[0]);
+        expect(screen.queryByText('Data Structures', { selector: 'span' })).not.toBeInTheDocument();
+    });
+
+    it('offers "Show all categories" for a multi-category problem under a filter', async () => {
+        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(categorizedProblems);
+
+        render(<BrowserRouter><Problems /></BrowserRouter>);
+
+        await waitFor(() => {
+            expect(screen.getByText('LIS')).toBeInTheDocument();
+        });
+
+        // Filter to Dynamic Programming: LIS shows that badge and — because
+        // it carries a second category — also a "Show all categories" toggle.
+        fireEvent.click(screen.getByRole('tab', { name: /^Dynamic Programming/ }));
+        const showAll = screen.getAllByRole('button', { name: 'Show all categories' });
+        expect(showAll).toHaveLength(1); // only LIS (Knapsack has a single category)
+
+        fireEvent.click(showAll[0]);
+        // Both of LIS's categories are now visible together.
+        expect(screen.getAllByText('Dynamic Programming', { selector: 'span' }).length).toBeGreaterThanOrEqual(1);
+        expect(screen.getByText('Data Structures', { selector: 'span' })).toBeInTheDocument();
+    });
+
     it('filters the list by search text across title and id', async () => {
         (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(categorizedProblems);
 

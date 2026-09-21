@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatTimeAgo, formatDateAbsolute, generateResultString } from '../../utils/formatters';
 import { difficultyBand } from '../../utils/constants';
@@ -7,13 +8,14 @@ import styles from './ProblemCard.module.css';
 interface ProblemCardProps {
     problem: ProblemSummary;
     contestId?: string | null;
-    /** When a specific category filter is active, show only that category's
-     *  badge; with no filter (default) badges stay hidden — categories can
-     *  reveal problem content, so they are opt-in. */
+    /** When a specific category filter is active, that category's badge
+     *  shows by default; with no filter badges stay hidden — categories can
+     *  reveal problem content, so they are opt-in per card. */
     highlightCategory?: string | null;
 }
 
 const ProblemCard = ({ problem, contestId = null, highlightCategory = null }: ProblemCardProps) => {
+    const [revealed, setRevealed] = useState(false);
     const submissionCount = Number(problem.submission_count ?? 0);
     const hasSubmitted = submissionCount > 0;
     const linkPath = contestId
@@ -21,11 +23,24 @@ const ProblemCard = ({ problem, contestId = null, highlightCategory = null }: Pr
         : `/problems/${problem.id}`;
     const difficulty = problem.difficulty ?? null;
     const band = difficultyBand(difficulty);
-    // Only the selected category is ever shown, and only while a filter is
-    // active — problems with several categories display just the one chosen.
-    const visibleCategory = highlightCategory && problem.categories?.includes(highlightCategory)
+
+    const categories = problem.categories ?? [];
+    const hasCategories = categories.length > 0;
+    // With a filter active the selected category leads; once revealed, every
+    // remaining category joins it (selected first, then the rest).
+    const filteredCategory = highlightCategory && categories.includes(highlightCategory)
         ? highlightCategory
         : null;
+    const revealedCategories = revealed
+        ? (filteredCategory
+            ? [filteredCategory, ...categories.filter(c => c !== filteredCategory)]
+            : categories)
+        : [];
+
+    // The toggle exists whenever categories could stay hidden: by default all
+    // are hidden, and under a filter the non-selected ones are.
+    const hasHiddenCategories = hasCategories
+        && (filteredCategory ? categories.length > 1 : true);
 
     return (
         <div className={styles['problem-list-item']}>
@@ -33,8 +48,21 @@ const ProblemCard = ({ problem, contestId = null, highlightCategory = null }: Pr
                 <h3 className={styles['problem-title']}>{problem.title}</h3>
                 <p className={styles['problem-author']}>
                     {problem.id}
-                    {visibleCategory && (
-                        <span className={styles['problem-category']}>{visibleCategory}</span>
+                    {!revealed && filteredCategory && (
+                        <span className={styles['problem-category']}>{filteredCategory}</span>
+                    )}
+                    {revealedCategories.map(category => (
+                        <span key={category} className={styles['problem-category']}>{category}</span>
+                    ))}
+                    {hasHiddenCategories && (
+                        <button
+                            type="button"
+                            className={styles['category-toggle']}
+                            aria-expanded={revealed}
+                            onClick={() => setRevealed(previous => !previous)}
+                        >
+                            {revealed ? 'Hide categories' : (filteredCategory ? 'Show all categories' : 'Show categories')}
+                        </button>
                     )}
                     {difficulty !== null && band !== null && (
                         <span
