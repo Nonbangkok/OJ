@@ -47,7 +47,17 @@ const ProblemCard = ({ problem, contestId = null, highlightCategory = null }: Pr
             <div className={styles['problem-info']}>
                 <h3 className={styles['problem-title']}>{problem.title}</h3>
                 <p className={styles['problem-author']}>
-                    {problem.id}
+                    <span className={styles['problem-id']}>{problem.id}</span>
+                    {difficulty !== null && band !== null && (
+                        <span
+                            data-testid="problem-difficulty"
+                            data-band={band}
+                            className={styles[`difficulty-chip-${band}`]}
+                            title={`Difficulty ${difficulty}`}
+                        >
+                            {difficulty}
+                        </span>
+                    )}
                     {!revealed && filteredCategory && (
                         <span className={styles['problem-category']}>{filteredCategory}</span>
                     )}
@@ -64,29 +74,17 @@ const ProblemCard = ({ problem, contestId = null, highlightCategory = null }: Pr
                             {revealed ? 'Hide categories' : (filteredCategory ? 'Show all categories' : 'Show categories')}
                         </button>
                     )}
-                    {difficulty !== null && band !== null && (
-                        <span
-                            data-testid="problem-difficulty"
-                            data-band={band}
-                            className={styles[`difficulty-chip-${band}`]}
-                            title={`Difficulty ${difficulty}`}
-                        >
-                            {difficulty}
-                        </span>
-                    )}
                 </p>
-                <div className={styles['submission-status-placeholder']}>
-                    {hasSubmitted && (
-                        <div className={styles['submission-status']}>
-                            <span className={styles['submission-time']}>
-                                Submitted {formatTimeAgo(problem.latest_submission_at)} ({formatDateAbsolute(problem.latest_submission_at)})
-                            </span>
-                            <span className={styles['submission-tries']}>
-                                {submissionCount} {submissionCount > 1 ? 'tries' : 'try'}
-                            </span>
-                        </div>
-                    )}
-                </div>
+                {hasSubmitted && (
+                    <div className={styles['submission-status']}>
+                        <span className={styles['submission-time']}>
+                            Submitted {formatTimeAgo(problem.latest_submission_at)} ({formatDateAbsolute(problem.latest_submission_at)})
+                        </span>
+                        <span className={styles['submission-tries']}>
+                            {submissionCount} {submissionCount > 1 ? 'tries' : 'try'}
+                        </span>
+                    </div>
+                )}
             </div>
 
             <div className={styles['problem-score-placeholder']}>

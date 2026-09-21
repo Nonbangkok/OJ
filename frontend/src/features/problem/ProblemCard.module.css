@@ -1,11 +1,21 @@
+/* Problem card: a three-zone grid so every card shares one alignment
+   structure regardless of attempt state.
+     [ problem info (1fr) ][ score (220-320px) ][ action (110px) ]
+   Zone content is vertically centered as a block; the action button is
+   always the same size in the same place, top to bottom across the list. */
 .problem-list-item {
-  display: flex;
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(220px, 320px)
+    110px;
+  grid-template-areas: 'info score action';
   align-items: center;
-  gap: 1.5rem;
+  column-gap: 1.25rem;
   background-color: var(--background-secondary);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 1rem 1.5rem;
+  padding: 0.9rem 1.25rem;
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease;
@@ -17,56 +27,80 @@
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
-/* Title/meta block: flexes, long titles wrap instead of pushing the row. */
+/* ------------------------------------------------------------------ *
+ * Left zone: problem information
+ * ------------------------------------------------------------------ */
+
+/* Explicit grid areas keep the placement stable at every breakpoint: the
+   action always shares the first row with the info zone, and the score
+   spans the second row on narrow layouts — regardless of attempt state. */
 .problem-info {
-  flex: 1 1 40%;
+  grid-area: info;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
   min-width: 0;
 }
 
 .problem-title {
   color: var(--text-primary);
-  margin: 0 0 0.25rem 0;
-  font-size: 1.25rem;
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.3;
   overflow-wrap: break-word;
 }
 
+/* ID + difficulty + categories live on one metadata row: the ID leads as
+   plain muted text; badges/toggle trail after it with consistent gaps. */
 .problem-author {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 0.5rem;
+  row-gap: 0.25rem;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   margin: 0;
+  min-width: 0;
+}
+
+/* The raw problem ID: plain muted mono-ish text leading the metadata row. */
+.problem-id {
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
 }
 
 .problem-category {
   display: inline-block;
-  margin-left: 0.6rem;
-  padding: 0.1rem 0.6rem;
+  padding: 0.08rem 0.55rem;
   border-radius: 999px;
   border: 1px solid var(--border-color);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--text-secondary);
-  vertical-align: middle;
+  line-height: 1.5;
 }
 
-/* Per-card reveal toggle for hidden categories. Reads as a quiet inline text
-   button beside the badges — never competing with the primary actions. */
+/* Per-card reveal toggle for hidden categories: quiet secondary action —
+   muted color, no border, no underline until hovered. Present but never
+   competing with the primary elements. */
 .category-toggle {
   display: inline-block;
-  margin-left: 0.4rem;
-  padding: 0.1rem 0.45rem;
+  padding: 0.08rem 0.2rem;
   border: none;
-  border-radius: 999px;
+  border-radius: 4px;
   background: transparent;
   font-size: 0.72rem;
-  color: var(--accent-primary);
-  vertical-align: middle;
+  color: var(--text-muted);
   cursor: pointer;
-  text-decoration: underline dotted;
-  text-underline-offset: 2px;
+  text-decoration: none;
+  line-height: 1.5;
 }
 
 .category-toggle:hover,
 .category-toggle:focus-visible {
-  color: var(--accent-primary-hover);
+  color: var(--accent-primary);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
 }
 
 .category-toggle:focus-visible {
@@ -74,20 +108,17 @@
   outline-offset: 1px;
 }
 
-/* Difficulty rating chip: the number itself, colored by heat-map band.
-   White text on the band color passes WCAG AA in both themes; Unrated
-   problems render no chip at all. */
+/* Difficulty chip sits in the metadata row right after the ID: white text
+   on the band color passes WCAG AA in both themes; Unrated renders no chip. */
 [class*='difficulty-chip-'] {
   display: inline-block;
-  margin-left: 0.6rem;
-  padding: 0.1rem 0.55rem;
+  padding: 0.08rem 0.5rem;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: #ffffff;
-  vertical-align: middle;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 .difficulty-chip-1 {
@@ -110,42 +141,47 @@
   background-color: var(--difficulty-band-5);
 }
 
+/* Attempt metadata: second muted line under the ID row, same rhythm for
+   every attempted card. Hidden entirely for unattempted problems. */
 .submission-status-placeholder {
-  min-height: 28px; /* Reserve space for the status line */
+  display: none;
 }
 
 .submission-status {
-  margin-top: 0.5rem;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  font-size: 0.85rem;
+  gap: 0.5rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
-  flex-wrap: wrap;
 }
 
 .submission-tries {
   background-color: var(--background-tertiary);
-  padding: 0.2rem 0.5rem;
+  padding: 0.1rem 0.45rem;
   border-radius: 4px;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Score block: fixed-ish middle zone, shrinks on narrow screens. */
+/* ------------------------------------------------------------------ *
+ * Middle zone: progress / score
+ * ------------------------------------------------------------------ */
+
+/* The zone exists on every card (even unattempted) so the grid columns —
+   and therefore the action button's position — never shift between cards. */
 .problem-score-placeholder {
-  flex: 1 1 30%;
-  min-height: 22px; /* Reserve space for the score bar */
+  grid-area: score;
   min-width: 0;
 }
 
 .problem-score-details {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
   min-width: 0;
 }
 
 .score-bar-container {
-  flex: 0 1 200px;
+  flex: 1 1 auto;
   height: 20px;
   background-color: var(--background-tertiary);
   border-radius: 6px;
@@ -200,15 +236,21 @@
   text-overflow: ellipsis;
 }
 
-/* Action link styled to match the shared compact button: consistent height,
-   padding and radius, vertically centered by the row's align-items. */
+/* ------------------------------------------------------------------ *
+ * Right zone: action
+ * ------------------------------------------------------------------ */
+
+/* Fixed-width action column: identical dimensions for New and Edit, so
+   buttons line up vertically across every card in the list. */
 .problem-action-btn {
-  flex-shrink: 0;
+  grid-area: action;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
   min-height: 2.5rem;
-  padding: 0.625rem 1.25rem;
+  padding: 0.5rem 0.75rem;
+  box-sizing: border-box;
   border-radius: var(--radius-sm, 6px);
   text-decoration: none;
   font-weight: 600;
@@ -234,29 +276,42 @@
   outline-offset: 2px;
 }
 
-@media (max-width: 768px) {
-  .problem-list-item {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.75rem;
-    padding: 1rem;
-  }
+/* ------------------------------------------------------------------ *
+ * Responsive
+ * ------------------------------------------------------------------ */
 
-  .problem-info,
-  .problem-score-placeholder {
-    flex-basis: auto;
+/* Narrow-desktop/tablet: drop the dedicated score column; score flows to a
+   second row spanning the card, action stays on the first row. */
+@media (max-width: 900px) {
+  .problem-list-item {
+    grid-template-columns:
+      minmax(0, 1fr)
+      100px;
+    grid-template-areas:
+      'info action'
+      'score score';
+    row-gap: 0.6rem;
   }
 
   .problem-score-details {
     flex-wrap: wrap;
     gap: 0.5rem;
   }
+}
 
-  .score-bar-container {
-    flex: 1 1 100%;
+/* Mobile: single column stack; the action stays full-width and last so it
+   remains easy to reach, nothing overlaps. */
+@media (max-width: 600px) {
+  .problem-list-item {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'info'
+      'score'
+      'action';
+    padding: 1rem;
   }
 
   .problem-action-btn {
-    align-self: stretch;
+    width: 100%;
   }
 }
