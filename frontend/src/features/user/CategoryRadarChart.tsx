@@ -62,7 +62,9 @@ export default function CategoryRadarChart({ categories }: { categories: Categor
         if (!node || typeof ResizeObserver === 'undefined') return;
         const observer = new ResizeObserver((entries) => {
           const width = entries[0]?.contentRect.width ?? 0;
-          const narrow = width > 0 && width < 480;
+          // The radar column on desktop is ~450px next to the summary, so
+          // compact kicks in only for genuinely narrow containers.
+          const narrow = width > 0 && width < 360;
           setCompact((previous) => (previous !== narrow ? narrow : previous));
         });
         observer.observe(node);
