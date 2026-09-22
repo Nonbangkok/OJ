@@ -87,7 +87,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   it('requires admin authentication and strict revision-only requests', async () => {
     const id = randomUUID();
     expect((await post(id, 1, '')).status).toBe(401);
-    for (const role of ['user', 'staff']) expect((await post(id, 1, role)).status).toBe(403);
+    for (const role of ['user']) expect((await post(id, 1, role)).status).toBe(403);
     for (const body of [{}, { expectedRevision: 0 }, { expectedRevision: 1, isVisible: true }]) {
       expect((await request(app).post(`/admin/authoring/drafts/${id}/publish`).set('x-test-role', 'admin').send(body)).status).toBe(400);
     }

@@ -27,6 +27,13 @@ const profileData = {
     currentStreak: 4,
     longestStreak: 11,
     lastAcDate: '2026-09-21',
+    categoryStats: [
+        { category: 'Dynamic Programming', solved: 4 },
+        { category: 'Math', solved: 4 },
+        { category: 'Binary Search', solved: 2 },
+        { category: 'Graph', solved: 0 },
+        { category: 'Uncategorized', solved: 1 },
+    ],
     achievements: {
         unlocked: [
             { id: 'first_solve', name: 'First Solve', description: 'Solve your first problem' },

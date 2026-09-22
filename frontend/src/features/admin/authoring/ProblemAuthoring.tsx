@@ -195,8 +195,8 @@ export default function ProblemAuthoring({ editorMode = false }: { editorMode?: 
   const { draftId } = useParams();
   const location = useLocation();
   if (isLoading) return <p role="status">Loading authoring…</p>;
-  if (user?.role !== 'admin')
-    return <p role="alert">Admin access required for Problem Authoring.</p>;
+  if (user?.role !== 'admin' && user?.role !== 'staff')
+    return <p role="alert">Admin or staff access required for Problem Authoring.</p>;
   if (editorMode) {
     return draftId ? <StatementEditor key={draftId} id={draftId} /> : <DraftList />;
   }

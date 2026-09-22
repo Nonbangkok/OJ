@@ -47,6 +47,7 @@ router.get('/users/:username/profile',
       longestStreak: stats.longest_streak,
       lastAcDate: stats.last_ac_date,
       achievements: stats.achievements,
+      categoryStats: stats.categoryStats,
     });
   }));
 

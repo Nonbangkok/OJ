@@ -8,7 +8,7 @@ import { pipeline } from 'node:stream/promises';
 import { Request, Response, Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
-import { requireAdmin, requireAuth } from '../middleware/auth';
+import { requireAuth, requireStaffOrAdmin } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { TESTCASE_LIMITS, TestcaseError, validateTestcaseFilename } from '../authoring/testcases';
 import { prepareTestcaseArchive, prepareTestcaseFile } from '../services/authoringTestcaseUploadService';
@@ -105,19 +105,19 @@ async function withUpload(req: Request, res: Response, action: (files: Record<st
   }
 }
 
-router.get(base, requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+router.get(base, requireAuth, requireStaffOrAdmin, asyncHandler(async (req, res) => {
   if (!validParams(req, res)) return;
   const result = await listDraftTestcases(String(req.params.id));
   if (!result) { res.status(404).json({ code: 'draft_not_found', message: 'Problem draft not found' }); return; }
   res.json(result);
 }));
-router.get(`${base}/:caseId`, requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+router.get(`${base}/:caseId`, requireAuth, requireStaffOrAdmin, asyncHandler(async (req, res) => {
   if (!validParams(req, res)) return;
   const result = await getDraftTestcase(String(req.params.id), String(req.params.caseId));
   if (!result) { res.status(404).json({ code: 'testcase_not_found', message: 'Testcase not found' }); return; }
   res.json(result);
 }));
-for (const method of ['post', 'patch'] as const) router[method](method === 'post' ? base : `${base}/:caseId`, requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+for (const method of ['post', 'patch'] as const) router[method](method === 'post' ? base : `${base}/:caseId`, requireAuth, requireStaffOrAdmin, asyncHandler(async (req, res) => {
   if (!validParams(req, res)) return;
   let result: TestcaseMutationResult | undefined;
   try {
@@ -140,7 +140,7 @@ for (const method of ['post', 'patch'] as const) router[method](method === 'post
     if (result && !res.destroyed) sendMutation(res, result, method === 'post' ? 201 : 200);
   } catch (error) { if (!res.destroyed && !handleUploadError(error, res)) throw error; }
 }));
-router.delete(`${base}/:caseId`, requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+router.delete(`${base}/:caseId`, requireAuth, requireStaffOrAdmin, asyncHandler(async (req, res) => {
   if (!validParams(req, res)) return;
   try { sendMutation(res, await mutateDraftTestcases(String(req.params.id), revision(req.body), { kind: 'delete', caseId: String(req.params.caseId) })); }
   catch (error) { if (!handleUploadError(error, res)) throw error; }

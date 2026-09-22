@@ -71,10 +71,10 @@ const createTestApp = (role?: 'user' | 'staff' | 'admin'): Express => {
 describe('Problem Authoring statement asset controller', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('allows only authenticated admins', async () => {
+  it('allows admins and staff; rejects anonymous and plain users', async () => {
     const path = `/admin/authoring/drafts/${metadata.draft_id}/assets`;
     expect((await request(createTestApp()).get(path)).status).toBe(401);
-    expect((await request(createTestApp('staff')).get(path)).status).toBe(403);
+    expect((await request(createTestApp('user')).get(path)).status).toBe(403);
     expect(assetService.listStatementAssets).not.toHaveBeenCalled();
   });
 

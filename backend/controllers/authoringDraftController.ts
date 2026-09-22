@@ -1,6 +1,6 @@
 import express, { Request, Response, Router } from 'express';
 import { STATEMENT_ASSET } from '../constants';
-import { requireAdmin, requireAuth } from '../middleware/auth';
+import { requireAuth, requireStaffOrAdmin } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { statementAssetUpload } from '../middleware/upload';
 import { validateRequest } from '../middleware/validation';
@@ -144,7 +144,7 @@ const resolveCreateAuthorSnapshot = async (
   });
 };
 
-router.use('/admin/authoring/drafts', requireAuth, requireAdmin);
+router.use('/admin/authoring/drafts', requireAuth, requireStaffOrAdmin);
 
 /**
  * Shared result-kind → response mapping for draft mutations. Each entry maps a

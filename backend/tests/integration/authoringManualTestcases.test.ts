@@ -114,8 +114,8 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     expect((await readdir(os.tmpdir())).filter(n => n.startsWith('oj-authoring-upload-')).sort()).toEqual(before);
   });
 
-  it('requires admin authorization for every testcase route', async () => {
-    for (const [role, status] of [['', 401], ['staff', 403]] as const) {
+  it('requires admin-or-staff authorization for every testcase route', async () => {
+    for (const [role, status] of [['', 401], ['user', 403]] as const) {
       const a = app(role);
       expect((await request(a).get(base)).status).toBe(status);
       expect((await request(a).get(`${base}/${randomUUID()}`)).status).toBe(status);

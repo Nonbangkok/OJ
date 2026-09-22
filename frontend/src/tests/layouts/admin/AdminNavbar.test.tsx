@@ -94,7 +94,8 @@ describe('AdminNavbar', () => {
     expect(within(navigation).getByRole('link', { name: 'Problems' })).toBeInTheDocument();
     expect(within(navigation).getByRole('link', { name: 'Contests' })).toBeInTheDocument();
     expect(within(navigation).queryByRole('link', { name: 'Users' })).not.toBeInTheDocument();
-    expect(within(navigation).queryByRole('link', { name: 'Authoring' })).not.toBeInTheDocument();
+    // Staff author problems too, so Authoring stays visible to them.
+    expect(within(navigation).getByRole('link', { name: 'Authoring' })).toBeInTheDocument();
     expect(within(navigation).queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Signed in as staff-user' })).toBeInTheDocument();
   });

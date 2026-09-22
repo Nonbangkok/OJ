@@ -1,5 +1,5 @@
 import { query } from '../db';
-import { PROFILE_ACTIVITY_WINDOW_DAYS, SUBMISSION_QUERY_CONFIG, SUBMISSION_STATUS, ACHIEVEMENTS } from '../constants';
+import { PROFILE_ACTIVITY_WINDOW_DAYS, SUBMISSION_QUERY_CONFIG, SUBMISSION_STATUS, ACHIEVEMENTS, PROBLEM_CATEGORIES} from '../constants';
 import { computeStreaks } from '../utils/streaks';
 
 export interface UserProfileStatsRow {
@@ -19,6 +19,8 @@ export interface UserProfileStatsRow {
     current_streak: number;
     longest_streak: number;
     last_ac_date: string | null;
+    /** Solved-problem counts per category, fixed axis order, zero-filled. */
+    categoryStats: Array<{ category: string; solved: number }>;
     achievements: {
         unlocked: Array<{ id: string; name: string; description: string }>;
         stats: {
@@ -48,6 +50,7 @@ export const getUserProfileStats = async (
         languages_solved_in: Record<string, number>;
         contests_joined: number;
         today: string;
+        category_stats_raw: Record<string, number>;
     }>(`
       WITH user_submissions AS (
         SELECT problem_id, language, overall_status, score, submitted_at
@@ -121,6 +124,23 @@ export const getUserProfileStats = async (
            ) ac_languages),
            '{}'::jsonb
         ) AS languages_solved_in,
+        COALESCE(
+          (SELECT jsonb_object_agg(category, solved_count)
+           FROM (
+             SELECT cat.category, COUNT(*)::int AS solved_count
+             FROM (
+               SELECT DISTINCT problem_id
+               FROM user_submissions
+               WHERE overall_status = '${SUBMISSION_STATUS.ACCEPTED}'
+             ) solved
+             JOIN problems p ON p.id = solved.problem_id
+             CROSS JOIN LATERAL unnest(
+               CASE WHEN cardinality(p.categories) > 0 THEN p.categories ELSE ARRAY['Uncategorized'] END
+             ) AS cat(category)
+             GROUP BY cat.category
+           ) per_category),
+           '{}'::jsonb
+        ) AS category_stats_raw,
         (SELECT COUNT(*)::int FROM contest_participants WHERE user_id = u.id) AS contests_joined,
         to_char(NOW() AT TIME ZONE 'Asia/Bangkok', 'YYYY-MM-DD') AS today
       FROM users u
@@ -149,8 +169,40 @@ export const getUserProfileStats = async (
         languages_solved_in: _languagesSolvedIn,
         contests_joined: _contestsJoined,
         today: _today,
+        category_stats_raw: categoryStatsRaw,
         ...stats
     } = row;
+
+    // Fixed axis order: the user-facing radar order first, then any remaining
+    // system categories (alphabetically) the order does not mention, and
+    // Uncategorized always last. The shape must not reorder when counts
+    // change; zero-value categories stay present so every axis renders.
+    const solvedByCategory = (categoryStatsRaw ?? {}) as Record<string, number>;
+    const RADAR_CATEGORY_ORDER = [
+        'Dynamic Programming',
+        'Math',
+        'Binary Search',
+        'Data Structures',
+        'Graph',
+        'Greedy',
+        '2D-Grid',
+        'Tree',
+        'Divide and Conquer',
+        'Bitmasks',
+        'Constructive',
+        'Sorting',
+        'Implementation',
+    ];
+    const orderedCategories = [
+        ...RADAR_CATEGORY_ORDER,
+        ...PROBLEM_CATEGORIES.filter((category) => !RADAR_CATEGORY_ORDER.includes(category as never))
+            .sort(),
+        'Uncategorized',
+    ];
+    const categoryStats = orderedCategories.map((category) => ({
+        category,
+        solved: Number(solvedByCategory[category] ?? 0),
+    }));
 
     return {
         ...stats,
@@ -158,6 +210,7 @@ export const getUserProfileStats = async (
         longest_streak: longestStreak,
         last_ac_date: lastAcDate,
         achievements: { unlocked, stats: achievementStats },
+        categoryStats,
     };
 };
 

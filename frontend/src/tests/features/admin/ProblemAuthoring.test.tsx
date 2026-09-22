@@ -72,10 +72,17 @@ beforeEach(() => {
           : [],
   }));
 });
-test('staff cannot load private authoring data even through a direct URL', () => {
+test('staff can open authoring like admins; plain users are rejected', async () => {
   (useAuth as jest.Mock).mockReturnValue({ user: { role: 'staff' }, isLoading: false });
   show('/admin/authoring/d1');
-  expect(screen.getByText(/admin access required/i)).toBeInTheDocument();
+  // Staff author problems too — no access alert, the draft loads.
+  expect(screen.queryByText(/access required/i)).not.toBeInTheDocument();
+  await screen.findByLabelText('Problem ID');
+
+  (useAuth as jest.Mock).mockReturnValue({ user: { role: 'user' }, isLoading: false });
+  jest.mocked(api.get).mockClear();
+  show('/admin/authoring/d1');
+  expect(screen.getByText(/admin or staff access required/i)).toBeInTheDocument();
   expect(api.get).not.toHaveBeenCalled();
 });
 

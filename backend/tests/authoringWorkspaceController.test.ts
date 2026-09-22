@@ -33,8 +33,8 @@ beforeEach(() => {
   });
 });
 
-it('requires authenticated admin access for previews, private images and job history', async () => {
-  for (const [role, status] of [[undefined, 401], ['staff', 403], ['user', 403]] as const) {
+it('requires admin-or-staff access for previews, private images and job history', async () => {
+  for (const [role, status] of [[undefined, 401], ['user', 403]] as const) {
     expect((await request(app(role)).post(`/admin/authoring/drafts/${id}/preview`).send({ statementHtml: '' })).status).toBe(status);
     expect((await request(app(role)).get(`/admin/authoring/drafts/${id}/jobs`)).status).toBe(status);
     expect((await request(app(role)).get(`/admin/authoring/drafts/${id}/assets/${assetId}`)).status).toBe(status);

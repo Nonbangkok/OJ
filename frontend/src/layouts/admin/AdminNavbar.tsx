@@ -101,7 +101,7 @@ const AdminNavbar = () => {
               </li>
             </>
           )}
-          {user?.role === USER_ROLES.ADMIN && (
+          {(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.STAFF) && (
             <li onMouseEnter={handleItemMouseEnter}>
               <NavLink to="/admin/authoring" onClick={closeMenu}>
                 Authoring

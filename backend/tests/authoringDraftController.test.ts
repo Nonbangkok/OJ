@@ -76,13 +76,16 @@ describe('Problem Authoring draft controller', () => {
     jest.clearAllMocks();
   });
 
-  it('allows only authenticated admins', async () => {
+  it('allows admins and staff; rejects anonymous and plain users', async () => {
+    (authoringDraftService.listProblemDrafts as jest.Mock).mockResolvedValue([]);
     const anonymous = await request(createTestApp()).get('/admin/authoring/drafts');
+    const user = await request(createTestApp('user')).get('/admin/authoring/drafts');
     const staff = await request(createTestApp('staff')).get('/admin/authoring/drafts');
 
     expect(anonymous.status).toBe(401);
-    expect(staff.status).toBe(403);
-    expect(authoringDraftService.listProblemDrafts).not.toHaveBeenCalled();
+    expect(user.status).toBe(403);
+    // Authoring is admin + staff: staff can author problems too.
+    expect(staff.status).toBe(200);
   });
 
   it('creates a draft for the authenticated admin and omits binary values', async () => {

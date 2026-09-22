@@ -52,12 +52,12 @@ describe('Author Profile controller', () => {
     jest.clearAllMocks();
   });
 
-  it('allows only authenticated admins', async () => {
+  it('allows admins and staff; rejects anonymous and plain users', async () => {
     const anonymous = await request(createTestApp()).get('/admin/author-profiles');
-    const staff = await request(createTestApp('staff')).get('/admin/author-profiles');
+    const user = await request(createTestApp('user')).get('/admin/author-profiles');
 
     expect(anonymous.status).toBe(401);
-    expect(staff.status).toBe(403);
+    expect(user.status).toBe(403);
     expect(profileService.listAuthorProfiles).not.toHaveBeenCalled();
   });
 

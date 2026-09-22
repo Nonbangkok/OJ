@@ -1,6 +1,6 @@
 import express, { Request, Response, Router } from 'express';
 import { AUTHOR_PROFILE_IMAGE } from '../constants';
-import { requireAdmin, requireAuth } from '../middleware/auth';
+import { requireAuth, requireStaffOrAdmin } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { authorProfileImageUpload } from '../middleware/upload';
 import { validateRequest } from '../middleware/validation';
@@ -65,7 +65,7 @@ const toProfileUpdates = (
   ...(body.countryCode !== undefined ? { country_code: body.countryCode } : {}),
 });
 
-router.use('/admin/author-profiles', requireAuth, requireAdmin);
+router.use('/admin/author-profiles', requireAuth, requireStaffOrAdmin);
 
 router.post('/admin/author-profiles',
   authorProfileImageUpload.single(AUTHOR_PROFILE_IMAGE.FIELD_NAME),

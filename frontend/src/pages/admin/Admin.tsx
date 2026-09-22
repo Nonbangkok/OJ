@@ -16,9 +16,9 @@ const Admin = () => {
   return (
     <div className={styles['admin-container']}>
       <h1>Admin Panel</h1>
-      {user?.role === USER_ROLES.ADMIN && <section className={styles['admin-section']}>
+      {(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.STAFF) && <section className={styles['admin-section']}>
         <h2>Problem Authoring</h2>
-        <p>Create drafts, build PDFs and testcases, verify C++ solutions and publish hidden problems.</p>
+        <p>Create drafts, build PDFs and testcases, verify solutions and publish hidden problems.</p>
         <Link to="/admin/authoring">Open Problem Authoring</Link>
       </section>}
 

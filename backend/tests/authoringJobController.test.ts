@@ -19,8 +19,8 @@ const app = (role?: string, enabled = true) => {
   return a;
 };
 
-it('authorizes both queueing and reading jobs for admins only', async () => {
-  for (const [role, status] of [[undefined, 401], ['staff', 403]] as const) {
+it('authorizes queueing and reading jobs for admins and staff only', async () => {
+  for (const [role, status] of [[undefined, 401], ['user', 403]] as const) {
     expect((await request(app(role)).post(`/admin/authoring/drafts/${id}/jobs/compile`).send({ expectedRevision: 1 })).status).toBe(status);
     expect((await request(app(role)).post(`/admin/authoring/drafts/${id}/jobs/generate`).send({ expectedRevision: 1, seed: '1' })).status).toBe(status);
     expect((await request(app(role)).get(`/admin/authoring/jobs/${id}`)).status).toBe(status);
@@ -35,7 +35,7 @@ it('returns 503 if the authoring runner transport is not configured', async () =
 
 it('protects PDF build and download, validates revisions, and reports unavailable runner', async () => {
   const url = `/admin/authoring/drafts/${id}/jobs/pdf`;
-  for (const [role, status] of [[undefined, 401], ['staff', 403]] as const) {
+  for (const [role, status] of [[undefined, 401], ['user', 403]] as const) {
     expect((await request(app(role)).post(url).send({ expectedRevision: 1 })).status).toBe(status);
     expect((await request(app(role)).get(`/admin/authoring/drafts/${id}/pdf`)).status).toBe(status);
   }
@@ -46,7 +46,7 @@ it('protects PDF build and download, validates revisions, and reports unavailabl
 it('protects output generation with admin authorization, revision validation and runner availability', async () => {
   const url = `/admin/authoring/drafts/${id}/jobs/outputs`;
   expect((await request(app()).post(url).send({ expectedRevision: 1 })).status).toBe(401);
-  expect((await request(app('staff')).post(url).send({ expectedRevision: 1 })).status).toBe(403);
+  expect((await request(app('user')).post(url).send({ expectedRevision: 1 })).status).toBe(403);
   expect((await request(app('admin')).post(url).send({ expectedRevision: 0 })).status).toBe(400);
   expect((await request(app('admin')).post(url).send({ expectedRevision: 1, seed: '1' })).status).toBe(400);
   expect((await request(app('admin', false)).post(url).send({ expectedRevision: 1 })).status).toBe(503);
@@ -55,7 +55,7 @@ it('protects output generation with admin authorization, revision validation and
 it('protects Verify All and accepts only an explicit current revision', async () => {
   const url = `/admin/authoring/drafts/${id}/jobs/verify`;
   expect((await request(app()).post(url).send({ expectedRevision: 1 })).status).toBe(401);
-  expect((await request(app('staff')).post(url).send({ expectedRevision: 1 })).status).toBe(403);
+  expect((await request(app('user')).post(url).send({ expectedRevision: 1 })).status).toBe(403);
   for (const body of [{}, { expectedRevision: 0 }, { expectedRevision: 1, regenerate: true }]) {
     expect((await request(app('admin')).post(url).send(body)).status).toBe(400);
   }
@@ -109,8 +109,8 @@ it('returns terminal job diagnostics, and reports a missing job', async () => {
   expect((await request(app('admin')).get(`/admin/authoring/jobs/${id}`)).status).toBe(404);
 });
 
-it('lists profile sync cascades for admins only', async () => {
-  for (const [role, status] of [[undefined, 401], ['staff', 403]] as const) {
+it('lists profile sync cascades for admins and staff', async () => {
+  for (const [role, status] of [[undefined, 401], ['user', 403]] as const) {
     expect((await request(app(role)).get('/admin/authoring/profile-syncs')).status).toBe(status);
   }
   (profileSyncService.listProfileSyncs as jest.Mock).mockResolvedValueOnce([{
@@ -129,7 +129,7 @@ it('lists profile sync cascades for admins only', async () => {
 });
 
 it('returns one profile sync with per-draft items, and reports a missing run', async () => {
-  for (const [role, status] of [[undefined, 401], ['staff', 403]] as const) {
+  for (const [role, status] of [[undefined, 401], ['user', 403]] as const) {
     expect((await request(app(role)).get(`/admin/authoring/profile-syncs/${id}`)).status).toBe(status);
   }
   expect((await request(app('admin')).get('/admin/authoring/profile-syncs/not-a-uuid')).status).toBe(400);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import ActivityHeatmap from '../../components/user/ActivityHeatmap';
+import ProblemSolvingProfile from '../../features/user/ProblemSolvingProfile';
 import LoadingPage from '../../components/shared/LoadingPage';
 import { useAuth } from '../../context/AuthContext';
 import userService from '../../services/userService';
@@ -175,6 +176,8 @@ const UserProfile = () => {
           Longest streak: <strong>{profile.longestStreak}</strong> {profile.longestStreak === 1 ? 'day' : 'days'}
         </span>
       </div>
+
+      <ProblemSolvingProfile categories={profile.categoryStats} />
 
       <div className={styles.section}>
         <h2>Achievements</h2>

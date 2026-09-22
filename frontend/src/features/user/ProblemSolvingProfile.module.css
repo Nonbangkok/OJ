@@ -1,0 +1,128 @@
+/* Problem Solving Profile: same card visual language as the Profile page's
+   .section cards (surface, border, radius, heading) — mirrored here so the
+   module is self-contained like the page's other sections. */
+.section {
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.section h2 {
+  color: var(--text-primary);
+  font-size: 1rem;
+  margin: 0 0 1rem;
+  font-weight: 600;
+}
+
+/* Radar and summary share a row on wide screens; stack under it on narrow. */
+.profileBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(220px, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.radarColumn {
+  min-width: 0;
+}
+
+.radarWrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Empty state overlays the (still rendered) axes so the radar never looks
+   broken — the message makes the lack of data explicit. */
+.radarEmpty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  margin: 0;
+  padding: 0 15%;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  background-color: color-mix(in srgb, var(--surface-elevated) 72%, transparent);
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+}
+
+/* Recharts tooltip: dark elevated surface matching the page. */
+.radarTooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm, 6px);
+  box-shadow: var(--box-shadow);
+}
+
+.radarTooltipCategory {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.radarTooltipValue {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+/* Compact category readout: light 3-column grid, secondary to the radar. */
+.summaryGrid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.3rem 0.75rem;
+}
+
+.summaryItem {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+  font-size: 0.8rem;
+}
+
+.summaryItemEmpty {
+  composes: summaryItem;
+  opacity: 0.55;
+}
+
+
+.summaryName {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summaryValue {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* Tablet: radar keeps the lead; summary stays a 3-col grid beside it. */
+@media (max-width: 900px) {
+  .profileBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Mobile: compact summary (2 columns) and no horizontal overflow. */
+@media (max-width: 600px) {
+  .summaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

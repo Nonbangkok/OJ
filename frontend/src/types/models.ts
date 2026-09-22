@@ -207,10 +207,17 @@ export interface UserProfileResponse {
   currentStreak: number;
   longestStreak: number;
   lastAcDate: string | null;
+  /** Solved-problem counts per category, fixed axis order, zero-filled. */
+  categoryStats: CategoryStat[];
   achievements: {
     unlocked: UnlockedAchievement[];
     stats: AchievementStats;
   };
+}
+
+export interface CategoryStat {
+  category: string;
+  solved: number;
 }
 
 export interface UpdateAvatarResponse {
