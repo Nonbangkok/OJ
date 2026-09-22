@@ -192,6 +192,12 @@
   min-width: 0;
 }
 
+/* The details row spans the zone's full width so the bar can flex into
+   all of it (a plain flex child would shrink-wrap to its content). */
+.problem-score-placeholder .problem-score-details {
+  width: 100%;
+}
+
 /* Score bar + result text read as ONE group: tight gap, single baseline.
    The bar and the [PP] text are aligned on their text midlines so the
    numbers in the bar sit level with the result text. */
@@ -203,13 +209,9 @@
 }
 
 .score-bar-container {
-  /* The bar leads the group but no longer stretches to fill the whole
-     score zone — the pair stays compact instead of the text dangling at
-     the far end of a wide bar. The floor keeps the score number readable
-     even next to long result text. */
+  /* The bar fills the score zone's remaining width so the score reads as a
+     proportion of the full track. */
   flex: 1 1 auto;
-  min-width: 120px;
-  max-width: 180px;
   height: 20px;
   background-color: var(--background-tertiary);
   border-radius: 6px;
@@ -258,13 +260,15 @@
   font-family: 'Inconsolata';
   font-size: 1rem;
   /* Same tone as the bar's number so the pair reads as one unit rather
-     than two siblings from different families. */
+     than two siblings from different families. Fixed-size so the bar
+     always gets the zone's remaining width. */
   color: var(--text-primary);
   white-space: nowrap;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex-shrink: 1;
+  flex: 0 0 auto;
+  max-width: 40%;
 }
 
 /* ------------------------------------------------------------------ *
