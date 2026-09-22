@@ -28,11 +28,11 @@ const profileData = {
     longestStreak: 11,
     lastAcDate: '2026-09-21',
     categoryStats: [
-        { category: 'Dynamic Programming', solved: 4 },
-        { category: 'Math', solved: 4 },
-        { category: 'Binary Search', solved: 2 },
-        { category: 'Graph', solved: 0 },
-        { category: 'Uncategorized', solved: 1 },
+        { category: 'Dynamic Programming', solved: 4, total: 6, percentage: 66.7 },
+        { category: 'Math', solved: 4, total: 4, percentage: 100 },
+        { category: 'Binary Search', solved: 2, total: 3, percentage: 66.7 },
+        { category: 'Graph', solved: 0, total: 5, percentage: 0 },
+        { category: 'Uncategorized', solved: 1, total: 2, percentage: 50 },
     ],
     achievements: {
         unlocked: [

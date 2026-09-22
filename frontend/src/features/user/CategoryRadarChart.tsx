@@ -16,19 +16,14 @@ import styles from './ProblemSolvingProfile.module.css';
 const COMPACT_LABELS: Record<string, string> = {
   'Dynamic Programming': 'DP',
   'Divide and Conquer': 'D&C',
-  'Data Structures': 'Data Structures',
   '2D-Grid': '2D Grid',
 };
 
 const compactLabel = (category: string): string => COMPACT_LABELS[category] ?? category;
 
-/** Sensible rounded radar maximum: the largest count rounded up to a clean
- *  step (1→5, 6→10, 17→20, 43→50 …) so values keep their proportions. */
-const roundedMax = (max: number): number => {
-  if (max <= 0) return 5;
-  const step = max <= 10 ? 5 : max <= 100 ? 10 : max <= 1000 ? 100 : 1000;
-  return Math.ceil(max / step) * step;
-};
+/** Clean percentage text: 100%, 66.7%, 33.3% — never trailing zeros. */
+const percentText = (percentage: number): string =>
+  `${Number.isInteger(percentage) ? percentage : percentage.toFixed(1)}%`;
 
 interface TooltipEntry {
   payload: CategoryStat;
@@ -40,7 +35,8 @@ const CategoryTooltip = ({ active, payload }: { active?: boolean; payload?: Tool
   return (
     <div className={styles.radarTooltip}>
       <span className={styles.radarTooltipCategory}>{stat.category}</span>
-      <span className={styles.radarTooltipValue}>{stat.solved} solved</span>
+      <span className={styles.radarTooltipValue}>{stat.solved} / {stat.total} solved</span>
+      <span className={styles.radarTooltipValue}>{percentText(stat.percentage)} complete</span>
     </div>
   );
 };
@@ -48,44 +44,50 @@ const CategoryTooltip = ({ active, payload }: { active?: boolean; payload?: Tool
 export default function CategoryRadarChart({ categories }: { categories: CategoryStat[] }) {
   const [compact, setCompact] = useState(false);
   const data = categories.map((stat) => ({ ...stat, label: compactLabel(stat.category) }));
-  const maxSolved = categories.reduce((max, stat) => Math.max(max, stat.solved), 0);
-  const domainMax = roundedMax(maxSolved);
-  const hasData = maxSolved > 0;
+  const hasData = categories.some((stat) => stat.solved > 0);
 
   return (
     <div
       className={styles.radarWrap}
-      // Recharts ResponsiveContainer observes its parent; a width observer
-      // switches to compact axis labels when the radar gets narrow. The
-      // guard keeps jsdom (no ResizeObserver) working in tests.
+      // The radar fills its container's usable area (tight margins, large
+      // outer radius). A width observer switches to compact axis labels when
+      // the radar gets narrow; the guard keeps jsdom (no ResizeObserver)
+      // working in tests.
       ref={(node) => {
         if (!node || typeof ResizeObserver === 'undefined') return;
         const observer = new ResizeObserver((entries) => {
           const width = entries[0]?.contentRect.width ?? 0;
-          // The radar column on desktop is ~450px next to the summary, so
-          // compact kicks in only for genuinely narrow containers.
           const narrow = width > 0 && width < 360;
           setCompact((previous) => (previous !== narrow ? narrow : previous));
         });
         observer.observe(node);
       }}
     >
-      <ResponsiveContainer width="100%" height={compact ? 300 : 380}>
-        <RadarChart data={data} outerRadius="72%">
+      <ResponsiveContainer width="100%" height={compact ? 320 : 420}>
+        <RadarChart
+          data={data}
+          // Tight margins let the grid dominate the card; the radius ratio
+          // keeps ~20% of the width for the outer label ring.
+          margin={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          outerRadius="80%"
+        >
           <PolarGrid stroke="var(--border-color)" />
           <PolarAngleAxis
             dataKey={compact ? 'label' : 'category'}
             tick={{ fill: 'var(--text-secondary)', fontSize: compact ? 11 : 12 }}
           />
+          {/* Completion is always 0-100%: a fixed domain (never adaptive),
+              with only the key ring levels labeled to stay subtle. */}
           <PolarRadiusAxis
-            domain={[0, domainMax]}
+            domain={[0, 100]}
             tickCount={5}
+            tickFormatter={(value: number) => (value === 0 || value === 50 || value === 100 ? `${value}%` : '')}
             tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
             stroke="var(--border-color)"
             angle={90}
           />
           <Radar
-            dataKey="solved"
+            dataKey="percentage"
             stroke="var(--accent-primary)"
             fill="var(--accent-primary)"
             fillOpacity={0.25}

@@ -207,7 +207,7 @@ export interface UserProfileResponse {
   currentStreak: number;
   longestStreak: number;
   lastAcDate: string | null;
-  /** Solved-problem counts per category, fixed axis order, zero-filled. */
+  /** Solved/total counts per category, fixed axis order, zero-filled. */
   categoryStats: CategoryStat[];
   achievements: {
     unlocked: UnlockedAchievement[];
@@ -218,6 +218,9 @@ export interface UserProfileResponse {
 export interface CategoryStat {
   category: string;
   solved: number;
+  total: number;
+  /** solved/total as a percentage (0 when total is 0); one decimal max. */
+  percentage: number;
 }
 
 export interface UpdateAvatarResponse {

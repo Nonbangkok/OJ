@@ -59,14 +59,19 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
       [userId, problemId, status, status === 'Accepted' ? 100 : 0],
     );
 
-  const categoryStatsOf = async (username: string): Promise<Array<{ category: string; solved: number }>> => {
+  type CategoryStat = { category: string; solved: number; total: number; percentage: number };
+
+  const categoryStatsOf = async (username: string): Promise<CategoryStat[]> => {
     const stats = await getUserProfileStats(username);
     expect(stats).not.toBeNull();
-    return (stats as unknown as { categoryStats: Array<{ category: string; solved: number }> }).categoryStats;
+    return (stats as unknown as { categoryStats: CategoryStat[] }).categoryStats;
   };
 
-  const solvedOf = (stats: Array<{ category: string; solved: number }>, category: string): number =>
-    stats.find((stat) => stat.category === category)?.solved ?? -1;
+  const statOf = (stats: CategoryStat[], category: string): CategoryStat | undefined =>
+    stats.find((stat) => stat.category === category);
+
+  const solvedOf = (stats: CategoryStat[], category: string): number =>
+    statOf(stats, category)?.solved ?? -1;
 
   it('counts each solved problem once regardless of accepted submission count', async () => {
     const username = await seedUser();
@@ -136,6 +141,58 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     expect(solvedOf(stats, 'Tree')).toBe(0);
     expect(solvedOf(stats, 'Bitmasks')).toBe(0);
     expect(solvedOf(stats, 'String')).toBe(0);
+  });
+
+  it('computes completion percentage from solved and the visible problem totals', async () => {
+    const username = await seedUser();
+    const userId = await userIdOf(username);
+    // 6 visible DP problems (2x2 categories for two of them), user solves 4.
+    for (const [id, cats] of [
+      ['dp1', ['Dynamic Programming']],
+      ['dp2', ['Dynamic Programming']],
+      ['dp3', ['Dynamic Programming']],
+      ['dp4', ['Dynamic Programming']],
+      ['dp5', ['Dynamic Programming']],
+      ['dp6', ['Dynamic Programming']],
+      ['m1', ['Math']],
+      ['m2', ['Math']],
+    ] as const) {
+      await seedProblem(id, [...cats]);
+    }
+    // dp1 solved twice: still one solved problem.
+    await seedSubmission(userId, 'dp1', 'Accepted');
+    await seedSubmission(userId, 'dp1', 'Accepted');
+    for (const id of ['dp2', 'dp3', 'dp4']) await seedSubmission(userId, id, 'Accepted');
+    // A hidden problem and a contest problem exist but are outside the
+    // standalone visible universe; solving the hidden one must not change
+    // the visible totals math.
+    await pool.query(`INSERT INTO contests (id, title, start_time, end_time) VALUES (1, 'c', NOW(), NOW() + INTERVAL '1 day')`);
+    await pool.query(`INSERT INTO problems (id, title, is_visible, categories) VALUES ('hidden', 'h', false, ARRAY['Math'])`);
+    await pool.query(`INSERT INTO problems (id, title, is_visible, contest_id, categories) VALUES (99, 'c', true, 1, ARRAY['Math'])`);
+    await seedSubmission(userId, 'hidden', 'Accepted');
+
+    const stats = await categoryStatsOf(username);
+    const dp = statOf(stats, 'Dynamic Programming');
+    expect(dp).toMatchObject({ solved: 4, total: 6, percentage: 66.7 });
+    // Math total counts only visible standalone problems (m1, m2): the
+    // hidden solve contributes to nothing visible.
+    expect(statOf(stats, 'Math')).toMatchObject({ solved: 0, total: 2, percentage: 0 });
+  });
+
+  it('reports 100% for a fully solved category and 0/0 without NaN for empty ones', async () => {
+    const username = await seedUser();
+    const userId = await userIdOf(username);
+    await seedProblem('m1', ['Math']);
+    await seedProblem('m2', ['Math']);
+    await seedSubmission(userId, 'm1', 'Accepted');
+    await seedSubmission(userId, 'm2', 'Accepted');
+
+    const stats = await categoryStatsOf(username);
+    expect(statOf(stats, 'Math')).toMatchObject({ solved: 2, total: 2, percentage: 100 });
+    // A category with no problems at all: 0/0 -> percentage 0, never NaN.
+    const constructive = statOf(stats, 'Constructive');
+    expect(constructive).toMatchObject({ solved: 0, total: 0, percentage: 0 });
+    expect(Number.isFinite(constructive?.percentage)).toBe(true);
   });
 
   it('keeps the fixed category order regardless of solved counts', async () => {
