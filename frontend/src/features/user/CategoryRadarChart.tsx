@@ -43,7 +43,12 @@ const CategoryTooltip = ({ active, payload }: { active?: boolean; payload?: Tool
 
 export default function CategoryRadarChart({ categories }: { categories: CategoryStat[] }) {
   const [compact, setCompact] = useState(false);
-  const data = categories.map((stat) => ({ ...stat, label: compactLabel(stat.category) }));
+  // Categories with no problems at all (total 0) have an undefined completion
+  // — they stay in the summary as "0 / 0 —" but leave the radar, where a 0
+  // point would read as "0% complete" and mislead.
+  const data = categories
+    .filter((stat) => stat.total > 0)
+    .map((stat) => ({ ...stat, label: compactLabel(stat.category) }));
   const hasData = categories.some((stat) => stat.solved > 0);
 
   return (
@@ -66,9 +71,10 @@ export default function CategoryRadarChart({ categories }: { categories: Categor
       <ResponsiveContainer width="100%" height={compact ? 320 : 420}>
         <RadarChart
           data={data}
-          // Tight margins let the grid dominate the card; the radius ratio
-          // keeps ~20% of the width for the outer label ring.
-          margin={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          // Horizontal margin buys room for the left/right axis labels
+          // (e.g. "Implementation") without shrinking the radar: the radius
+          // ratio is unchanged, only the label ring gets the slack.
+          margin={{ top: 12, right: 28, bottom: 12, left: 28 }}
           outerRadius="80%"
         >
           <PolarGrid stroke="var(--border-color)" />
@@ -81,7 +87,9 @@ export default function CategoryRadarChart({ categories }: { categories: Categor
           <PolarRadiusAxis
             domain={[0, 100]}
             tickCount={5}
-            tickFormatter={(value: number) => (value === 0 || value === 50 || value === 100 ? `${value}%` : '')}
+            // Only the meaningful reference rings are labeled (50/100); the
+            // center 0% adds noise without information.
+            tickFormatter={(value: number) => (value === 50 || value === 100 ? `${value}%` : '')}
             tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
             stroke="var(--border-color)"
             angle={90}

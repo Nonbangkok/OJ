@@ -79,9 +79,10 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.3rem 0.75rem;
+  /* Two columns on desktop: enough width for full category names
+     ("Dynamic Programming") plus the right-aligned solved/total and %. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.3rem 1.25rem;
 }
 
 .summaryItem {
@@ -101,9 +102,9 @@
 
 .summaryName {
   color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 
 .summaryFraction {
@@ -126,9 +127,9 @@
   }
 }
 
-/* Mobile: compact summary (2 columns) and no horizontal overflow. */
+/* Mobile: single summary column — full category names always fit. */
 @media (max-width: 600px) {
   .summaryGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
 }

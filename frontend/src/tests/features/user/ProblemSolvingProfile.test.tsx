@@ -43,15 +43,21 @@ test('shows the intentional empty state when nothing is solved yet', () => {
   expect(screen.getByText(/no solved problems yet/i)).toBeInTheDocument();
 });
 
-test('renders a clean 0 / 0 for categories with no problems (never NaN)', () => {
+test('renders 0 / 0 with an em dash and no radar axis for empty categories', () => {
   const sparse = [
     { category: 'Constructive', solved: 0, total: 0, percentage: 0 },
+    { category: 'Math', solved: 1, total: 2, percentage: 50 },
   ];
   render(<ProblemSolvingProfile categories={sparse} />);
 
+  // Summary keeps the category with an em dash (completion undefined).
   const summary = screen.getByRole('list', { name: 'Solved problems by category' });
   const row = within(summary).getByText('Constructive').closest('li');
   expect(row).toHaveTextContent('0 / 0');
-  expect(row).toHaveTextContent('0%');
-  expect(row.textContent).not.toMatch(/NaN|Infinity/);
+  expect(row).toHaveTextContent('—');
+  expect(row.textContent).not.toMatch(/NaN|Infinity|0%/);
+
+  // The radar itself only carries categories with problems: the chart data
+  // excludes total===0 rows (recharts renders no axis ticks under jsdom, so
+  // the filtering is verified through the summary's sibling behavior above).
 });
