@@ -246,10 +246,14 @@
 }
 
 .actionButtons {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  flex-wrap: wrap;
+  /* 2x2 action grid (Edit/Problems top, Rejudge/Delete bottom): a controlled
+     layout instead of flex-wrap, so the last button never drops alone onto
+     its own row. All four cells share one size via the grid tracks. */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(7.5rem, 1fr));
+  gap: 0.5rem;
+  justify-content: center;
+  align-items: center;
 }
 
 .badge {
