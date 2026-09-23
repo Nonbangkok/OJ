@@ -84,10 +84,13 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   /* Row gap gives each line breathing room for scanning; the column gap
      keeps the two summary columns clearly separated. */
-  gap: 0.45rem 1.25rem;
+  gap: 0.6rem 1.25rem;
 }
 
 .summaryItem {
+  /* Wrapped category names keep readable line spacing; short ones are
+     unaffected (single line). */
+  line-height: 1.5;
   display: grid;
   /* Fraction and percentage sit in fixed right-aligned tracks so every
      row's numbers line up in a clean column. */
