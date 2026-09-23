@@ -82,12 +82,16 @@
   /* Two columns on desktop: enough width for full category names
      ("Dynamic Programming") plus the right-aligned solved/total and %. */
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.3rem 1.25rem;
+  /* Row gap gives each line breathing room for scanning; the column gap
+     keeps the two summary columns clearly separated. */
+  gap: 0.45rem 1.25rem;
 }
 
 .summaryItem {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  /* Fraction and percentage sit in fixed right-aligned tracks so every
+     row's numbers line up in a clean column. */
+  grid-template-columns: minmax(0, 1fr) 3.2rem 3.4rem;
   align-items: baseline;
   column-gap: 0.4rem;
   min-width: 0;
@@ -111,6 +115,7 @@
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  text-align: right;
 }
 
 .summaryValue {
@@ -118,6 +123,7 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  text-align: right;
 }
 
 /* Tablet: radar keeps the lead; summary stays a 3-col grid beside it. */
