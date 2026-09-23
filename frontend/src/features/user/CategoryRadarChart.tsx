@@ -75,7 +75,7 @@ export default function CategoryRadarChart({ categories }: { categories: Categor
           // (e.g. "Implementation") without shrinking the radar: the radius
           // ratio is unchanged, only the label ring gets the slack. The left
           // gets extra room — its labels are the longest on the ring.
-          margin={{ top: 12, right: 30, bottom: 12, left: 58 }}
+          margin={{ top: 12, right: 30, bottom: 12, left: 66 }}
           outerRadius="80%"
         >
           <PolarGrid stroke="var(--border-color)" />
@@ -97,7 +97,7 @@ export default function CategoryRadarChart({ categories }: { categories: Categor
             // axis, so the 100% ring label lands on that axis's label. A
             // dy offset nudges the ring labels just below the label ring
             // instead of repositioning the axis.
-            tick={{ fill: 'var(--text-muted)', fontSize: 10, dy: 10 }}
+            tick={{ fill: 'var(--text-muted)', fontSize: 10, dy: 12 }}
           />
           <Radar
             dataKey="percentage"

@@ -126,6 +126,13 @@
   text-align: right;
 }
 
+/* A 0% completion is a "not started yet" state, not a quantity worth
+   emphasizing — soften it so real progress reads first. */
+.summaryValue.zero {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
 /* Tablet: radar keeps the lead; summary stays a 3-col grid beside it. */
 @media (max-width: 900px) {
   .profileBody {

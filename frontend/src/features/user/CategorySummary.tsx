@@ -18,7 +18,7 @@ export default function CategorySummary({ categories }: { categories: CategorySt
         <li key={stat.category} className={stat.solved > 0 ? styles.summaryItem : styles.summaryItemEmpty}>
           <span className={styles.summaryName} title={stat.category}>{stat.category}</span>
           <span className={styles.summaryFraction}>{stat.solved} / {stat.total}</span>
-          <span className={styles.summaryValue}>{percentText(stat)}</span>
+          <span className={`${styles.summaryValue}${stat.percentage === 0 ? ` ${styles.zero}` : ''}`}>{percentText(stat)}</span>
         </li>
       ))}
     </ul>
