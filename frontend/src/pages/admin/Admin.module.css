@@ -9,19 +9,91 @@
   color: var(--text-primary);
 }
 
-.admin-section {
-  margin-top: 2rem;
-  padding: 2rem;
-  background-color: var(--background-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: var(--box-shadow);
+.admin-subtitle {
+  color: var(--text-secondary);
+  margin: 0.5rem 0 0;
 }
 
-/* This is a general style that will apply to h2 inside the management components */
-.admin-section h2 {
-  margin-top: 0;
-  margin-bottom: 1rem;
+/* --- Admin hub -------------------------------------------------------------
+   Navigation cards: the same surface/border/radius language as every other
+   admin card, arranged as a responsive grid of section tiles. */
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-top: 2rem;
+}
+
+.hub-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.25rem 1.5rem;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--box-shadow);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.hub-card:hover {
+  border-color: var(--accent-primary);
+  background-color: var(--background-tertiary);
+  transform: translateY(-2px);
+}
+
+.hub-card:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.hub-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   color: var(--text-primary);
-  font-size: 1.75rem;
+  font-size: var(--font-size-section-title);
+  font-weight: 600;
+}
+
+/* The arrow nudges forward on hover to reinforce the navigation affordance. */
+.hub-card-arrow {
+  color: var(--text-muted);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.hub-card:hover .hub-card-arrow,
+.hub-card:focus-visible .hub-card-arrow {
+  color: var(--accent-primary);
+  transform: translateX(3px);
+}
+
+.hub-card-description {
+  color: var(--text-secondary);
+  font-size: var(--font-size-metadata);
+  line-height: 1.5;
+}
+
+/* Tablet: two columns. */
+@media (max-width: 1024px) {
+  .hub-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Mobile: single column. */
+@media (max-width: 600px) {
+  .admin-container {
+    padding: 0 1rem;
+  }
+
+  .hub-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
