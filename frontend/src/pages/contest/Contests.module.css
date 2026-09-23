@@ -9,8 +9,10 @@
 }
 
 .header h1 {
-  color: var(--accent-primary);
-  margin-bottom: 10px;
+  /* Same page-title treatment as every other page (text-primary, not the
+     accent blue this header historically used). */
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
   font-size: var(--font-size-page-title);
 }
 
