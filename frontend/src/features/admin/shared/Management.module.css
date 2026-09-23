@@ -464,6 +464,14 @@
 /* --- Problem Management redesign: layered toolbar ------------------------- */
 
 /* Page title block (left of the header). */
+/* Breathing room between the filter/context bars and the table below.
+   Applied via a local class on the table wrapper (CSS Modules scope the
+   shared Table styles separately, so a cross-module selector would not
+   match the hashed class names). */
+.tableWrap {
+  margin-top: 1.5rem;
+}
+
 /* Filter bar: one quiet row of scope controls, a breath below the header. */
 .filter-bar {
   display: flex;

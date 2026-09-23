@@ -306,7 +306,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
       )}
 
       {/* --- 4. Table: minimal row actions -------------------------------- */}
-      <div className={tableStyles['table-container']}>
+      <div className={`${tableStyles['table-container']} ${styles.tableWrap}`}>
         <table className={tableStyles.table}>
           <thead>
             <tr>
