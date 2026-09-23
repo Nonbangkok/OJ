@@ -163,7 +163,7 @@
   background-color: var(--text-muted);
 }
 
-.verdict-dot-accepted { background-color: var(--verdict-accepted); }
+.verdict-dot-accepted { background-color: var(--accent-primary); }
 .verdict-dot-wrong { background-color: var(--verdict-wrong); }
 .verdict-dot-time { background-color: var(--verdict-time); }
 .verdict-dot-memory { background-color: var(--verdict-memory); }
@@ -228,7 +228,7 @@
   content: '';
   position: absolute;
   inset: 6px 2px 0 2px;
-  background: linear-gradient(180deg, var(--heatmap-level-2), var(--heatmap-level-4));
+  background: linear-gradient(180deg, var(--accent-primary), var(--accent-primary-hover));
   border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%;
   transform: rotate(45deg);
 }
@@ -240,7 +240,7 @@
   top: 0;
   width: 12px;
   height: 16px;
-  background: linear-gradient(180deg, var(--heatmap-level-2), var(--heatmap-level-3));
+  background: linear-gradient(180deg, var(--accent-primary), var(--accent-primary-hover));
   border-radius: 50% 50% 50% 50% / 65% 65% 35% 35%;
   transform: translateX(-50%) rotate(20deg);
 }
@@ -256,7 +256,9 @@
   font-family: 'Inconsolata', monospace;
   font-size: 2.25rem;
   font-weight: 700;
-  color: var(--text-success);
+  /* Follows the site's accent blue like the rest of the profile (outside
+     the Activity heatmap, green belongs only there). */
+  color: var(--accent-primary);
   line-height: 1;
 }
 
@@ -314,8 +316,8 @@
   height: 14px;
   border-radius: 50%;
   flex-shrink: 0;
-  background-color: var(--heatmap-level-3);
-  box-shadow: 0 0 0 3px var(--background-success);
+  background-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
 }
 
 .achievement-card.locked .achievement-icon {
@@ -360,7 +362,7 @@
 }
 
 .achievement-card.unlocked .achievement-name {
-  color: var(--text-success);
+  color: var(--accent-primary);
 }
 
 .achievement-progress {
@@ -376,7 +378,9 @@
   display: block;
   height: 100%;
   border-radius: 3px;
-  background-color: var(--heatmap-level-2);
+  /* Locked-card progress follows the accent blue too; the softer hover
+     shade keeps it quieter than the unlocked cards' markers. */
+  background-color: var(--accent-primary-hover);
 }
 
 .achievement-progress-label {
