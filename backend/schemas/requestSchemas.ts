@@ -163,12 +163,10 @@ const collectionName = z.string().trim().min(1).max(100);
 
 export const createCollectionSchema = z.object({
   name: collectionName,
-  description: z.string().trim().max(500).nullable().optional(),
 });
 
 export const updateCollectionSchema = z.object({
   name: collectionName,
-  description: z.string().trim().max(500).nullable().optional(),
 }).strict();
 
 export const collectionIdParamSchema = z.object({

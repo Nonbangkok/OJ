@@ -46,25 +46,25 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     );
 
   it('creates, renames, and rejects duplicate collection names', async () => {
-    const created = await createCollection('Chapter 1', 'Basics');
+    const created = await createCollection('Chapter 1');
     expect(created.kind).toBe('created');
 
-    const dup = await createCollection('Chapter 1', null);
+    const dup = await createCollection('Chapter 1');
     expect(dup.kind).toBe('duplicate_name');
 
-    const renamed = await updateCollection((created as { collection: { id: number } }).collection.id, 'Chapter One', 'Updated');
+    const renamed = await updateCollection((created as { collection: { id: number } }).collection.id, 'Chapter One');
     expect(renamed.kind).toBe('updated');
     expect((renamed as { collection: { name: string } }).collection.name).toBe('Chapter One');
 
-    const missing = await updateCollection(99999, 'Nope', null);
+    const missing = await updateCollection(99999, 'Nope');
     expect(missing.kind).toBe('not_found');
   });
 
   it('derives All Visible / All Hidden / Mixed / Empty from member problems', async () => {
-    const a = await createCollection('A', null);
-    const b = await createCollection('B', null);
-    const c = await createCollection('C', null);
-    const e = await createCollection('Empty', null);
+    const a = await createCollection('A');
+    const b = await createCollection('B');
+    const c = await createCollection('C');
+    const e = await createCollection('Empty');
     const idOf = (r: unknown) => (r as { collection: { id: number } }).collection.id;
     await seedProblem('a1'); await seedProblem('a2');
     await pool.query(`UPDATE problems SET collection_id=$1 WHERE id IN ('a1','a2')`, [idOf(a)]);
@@ -81,7 +81,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   });
 
   it('flips the existing visibility column for every problem in one action', async () => {
-    const created = await createCollection('D', null);
+    const created = await createCollection('D');
     const id = (created as { collection: { id: number } }).collection.id;
     await seedProblem('d1', true); await seedProblem('d2', false); await seedProblem('d3', true);
     await pool.query(`UPDATE problems SET collection_id=$1 WHERE id LIKE 'd%'`, [id]);
@@ -98,7 +98,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   });
 
   it('deleting a collection detaches its problems instead of deleting them', async () => {
-    const created = await createCollection('E', null);
+    const created = await createCollection('E');
     const id = (created as { collection: { id: number } }).collection.id;
     await seedProblem('e1'); await seedProblem('e2');
     await pool.query(`UPDATE problems SET collection_id=$1 WHERE id LIKE 'e%'`, [id]);
@@ -110,8 +110,8 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   });
 
   it('a problem carries at most one collection through create and update', async () => {
-    const a = await createCollection('F', null);
-    const b = await createCollection('G', null);
+    const a = await createCollection('F');
+    const b = await createCollection('G');
     const idA = (a as { collection: { id: number } }).collection.id;
     const idB = (b as { collection: { id: number } }).collection.id;
 
@@ -133,7 +133,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   });
 
   it('leaves categories untouched when a collection is assigned', async () => {
-    const created = await createCollection('H', null);
+    const created = await createCollection('H');
     const id = (created as { collection: { id: number } }).collection.id;
     await createProblem({ id: 'h1', title: 'H One', author: 'x', categories: ['Math', 'Graph'], collection_id: id, time_limit_ms: 1000, memory_limit_mb: 256 } as never);
 

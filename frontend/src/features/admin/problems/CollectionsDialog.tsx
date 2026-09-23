@@ -23,13 +23,12 @@ const STATUS_LABEL: Record<CollectionWithStats['status'], string> = {
  *  read-only — the real visibility lives on the problems themselves. */
 export default function CollectionsDialog({ open, onClose, onChanged, collections }: CollectionsDialogProps) {
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [editing, setEditing] = useState<CollectionWithStats | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   const reset = () => {
-    setName(''); setDescription(''); setEditing(null); setError('');
+    setName(''); setEditing(null); setError('');
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -38,9 +37,9 @@ export default function CollectionsDialog({ open, onClose, onChanged, collection
     setBusy(true); setError('');
     try {
       if (editing) {
-        await adminService.updateCollection(editing.id, name.trim(), description.trim() || null);
+        await adminService.updateCollection(editing.id, name.trim());
       } else {
-        await adminService.createCollection(name.trim(), description.trim() || null);
+        await adminService.createCollection(name.trim());
       }
       reset();
       await onChanged();
@@ -54,7 +53,6 @@ export default function CollectionsDialog({ open, onClose, onChanged, collection
   const startEdit = (collection: CollectionWithStats) => {
     setEditing(collection);
     setName(collection.name);
-    setDescription(collection.description ?? '');
     setError('');
   };
 
@@ -94,16 +92,6 @@ export default function CollectionsDialog({ open, onClose, onChanged, collection
             required
             disabled={busy}
             onChange={(event) => setName(event.target.value)}
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="collection-description">Description (optional)</label>
-          <input
-            id="collection-description"
-            value={description}
-            maxLength={500}
-            disabled={busy}
-            onChange={(event) => setDescription(event.target.value)}
           />
         </div>
         <Button type="submit" disabled={busy} loading={busy}>

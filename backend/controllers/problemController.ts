@@ -232,8 +232,8 @@ router.get('/admin/collections', requireAuth, requireStaffOrAdmin, asyncHandler(
 router.post('/admin/collections', requireAuth, requireStaffOrAdmin,
   validateRequest({ body: createCollectionSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-    const { name, description } = req.body as { name: string; description?: string | null };
-    const result = await createCollection(name, description ?? null);
+    const { name } = req.body as { name: string };
+    const result = await createCollection(name);
     if (result.kind === 'duplicate_name') {
       throw new AppError(`A collection named "${name}" already exists`, 409);
     }
@@ -243,8 +243,8 @@ router.post('/admin/collections', requireAuth, requireStaffOrAdmin,
 router.put('/admin/collections/:id', requireAuth, requireStaffOrAdmin,
   validateRequest({ params: collectionIdParamSchema, body: updateCollectionSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-    const { name, description } = req.body as { name: string; description?: string | null };
-    const result = await updateCollection(Number(req.params.id), name, description ?? null);
+    const { name } = req.body as { name: string };
+    const result = await updateCollection(Number(req.params.id), name);
     if (result.kind === 'not_found') throw new AppError('Collection not found', 404);
     if (result.kind === 'duplicate_name') {
       throw new AppError(`A collection named "${name}" already exists`, 409);
