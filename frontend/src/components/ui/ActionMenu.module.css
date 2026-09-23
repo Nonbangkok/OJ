@@ -6,15 +6,18 @@
 /* Quiet trigger: same visual weight as muted text, becomes clearly
    interactive on hover/focus. */
 .trigger {
+  /* Ghost-button look: a visible (subtle) border and surface at rest, so it
+     reads as a control rather than plain text, while staying low-priority. */
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 2rem;
-  min-height: 2rem;
-  padding: 0 0.4rem;
-  border: 1px solid transparent;
+  box-sizing: border-box;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-sm, 4px);
-  background: transparent;
+  background-color: var(--background-secondary);
   color: var(--text-secondary);
   font-size: 1rem;
   line-height: 1;
@@ -28,7 +31,7 @@
 .trigger:hover,
 .trigger:focus-visible {
   background-color: var(--background-tertiary);
-  border-color: var(--border-color);
+  border-color: var(--accent-primary);
   color: var(--text-primary);
 }
 
@@ -38,8 +41,10 @@
 }
 
 .triggerText {
-  min-width: 0;
-  padding: 0.35rem 0.7rem;
+  width: auto;
+  height: auto;
+  min-height: 2.1rem;
+  padding: 0.4rem 0.75rem;
   font-size: 0.85rem;
   font-weight: 500;
 }

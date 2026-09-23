@@ -7,8 +7,10 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
+  /* Tighter now that the subtitle is gone: one rule line, small gap to the
+     filter row (was tuned for the two-line title block). */
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -462,30 +464,24 @@
 /* --- Problem Management redesign: layered toolbar ------------------------- */
 
 /* Page title block (left of the header). */
-.page-title {
-  min-width: 0;
-}
-
-.page-subtitle {
-  margin: 0.25rem 0 0;
-  color: var(--text-secondary);
-  font-size: var(--font-size-metadata);
-}
-
-/* Filter bar: one quiet row of scope controls. */
+/* Filter bar: one quiet row of scope controls, a breath below the header. */
 .filter-bar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-top: 1rem;
+  margin-top: 0.75rem;
 }
 
+/* All filter controls share one height (2.1rem box) so the row aligns on a
+   single baseline regardless of control type. */
 .filter-search {
   flex: 1 1 14rem;
   min-width: 10rem;
   max-width: 24rem;
-  padding: 0.45rem 0.75rem;
+  box-sizing: border-box;
+  height: 2.1rem;
+  padding: 0 0.75rem;
   border-radius: var(--radius-sm, 6px);
   border: 1px solid var(--border-color);
   background-color: var(--background-primary);
@@ -506,7 +502,9 @@
 }
 
 .filter-control select {
-  padding: 0.45rem 0.6rem;
+  box-sizing: border-box;
+  height: 2.1rem;
+  padding: 0 0.5rem;
   border-radius: var(--radius-sm, 6px);
   border: 1px solid var(--border-color);
   background-color: var(--background-primary);
@@ -631,6 +629,7 @@
 .row-actions {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.35rem;
 }
 

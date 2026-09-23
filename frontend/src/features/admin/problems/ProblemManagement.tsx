@@ -141,10 +141,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     <div className={styles['management-container']}>
       {/* --- 1. Page header: creation/import only -------------------------- */}
       <div className={styles['management-header']}>
-        <div className={styles['page-title']}>
-          <h2>Problem Management</h2>
-          <p className={styles['page-subtitle']}>Manage problems, visibility, collections, exports, and uploads.</p>
-        </div>
+        <h2>Problem Management</h2>
         <div className={styles['header-actions']}>
           <input
             type="file"
@@ -366,7 +363,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
                 </td>
                 <td className={styles['col-center']}>
                   <div className={styles['row-actions']}>
-                    <Button size="compact" onClick={() => handleEdit(problem)}>Edit</Button>
+                    <Button size="compact" variant="secondary" onClick={() => handleEdit(problem)}>Edit</Button>
                     <ActionMenu
                       label={`Row actions for ${problem.id}`}
                       items={[
