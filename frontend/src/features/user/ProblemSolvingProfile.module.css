@@ -20,7 +20,9 @@
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(220px, 1fr);
   gap: 1.25rem;
-  align-items: start;
+  /* The summary centers against the (taller) radar column instead of
+     hugging the top of the card. */
+  align-items: center;
 }
 
 .radarColumn {
