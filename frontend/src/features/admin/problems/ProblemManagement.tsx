@@ -1,8 +1,12 @@
+import { useEffect, useMemo, useState } from 'react';
 import useProblemManagement from '../../../hooks/admin/useProblemManagement';
 import useRejudge from '../../../hooks/admin/useRejudge';
 import ProblemModal from './ProblemModal';
+import CollectionsDialog from './CollectionsDialog';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import RejudgeFeedbackBox from '../shared/RejudgeFeedbackBox';
+import adminService from '../../../services/adminService';
+import type { CollectionWithStats } from '../../../services/admin/problemsAdminService';
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 import LoadingPage from '../../../components/shared/LoadingPage';
@@ -65,6 +69,43 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     dismissRejudgeFeedback,
   } = useRejudge();
 
+  // Collections: list + filter + per-collection visibility actions.
+  const [collections, setCollections] = useState<CollectionWithStats[]>([]);
+  const [collectionFilter, setCollectionFilter] = useState<string>('all');
+  const [collectionsOpen, setCollectionsOpen] = useState(false);
+  const [collectionConfirm, setCollectionConfirm] = useState<{ id: number; name: string; count: number; isVisible: boolean } | null>(null);
+
+  const refreshCollections = () => {
+    adminService.getCollections()
+      .then(setCollections)
+      .catch(() => setCollections([]));
+  };
+  useEffect(refreshCollections, []);
+
+  const refreshAfterCollectionChange = () => {
+    refreshCollections();
+    return fetchProblems();
+  };
+
+  const visibleProblems = useMemo(() => {
+    if (collectionFilter === 'all') return problems;
+    if (collectionFilter === 'none') return problems.filter(problem => problem.collection_id === null);
+    return problems.filter(problem => problem.collection_id === Number(collectionFilter));
+  }, [problems, collectionFilter]);
+
+  const filteredCollection = collections.find(c => c.id === Number(collectionFilter));
+
+  const runCollectionVisibility = async () => {
+    if (!collectionConfirm) return;
+    try {
+      await adminService.setCollectionVisibility(collectionConfirm.id, collectionConfirm.isVisible);
+      setCollectionConfirm(null);
+      await refreshAfterCollectionChange();
+    } catch {
+      setCollectionConfirm(null);
+    }
+  };
+
   if (loading && !batchUploadProgress.visible) return <LoadingPage />;
   if (error) return <div className='error-message'>{error}</div>;
 
@@ -72,6 +113,46 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     <div className={styles['management-container']}>
       <div className={styles['management-header']}>
         <h2>Problem Management</h2>
+        <div className={styles['collection-controls']}>
+          <label htmlFor="collection-filter">Collection</label>
+          <select
+            id="collection-filter"
+            value={collectionFilter}
+            onChange={(event) => setCollectionFilter(event.target.value)}
+            aria-label="Filter problems by collection"
+          >
+            <option value="all">All Collections</option>
+            <option value="none">No Collection</option>
+            {collections.map(collection => (
+              <option key={collection.id} value={collection.id}>{collection.name}</option>
+            ))}
+          </select>
+          <Button size="compact" variant="secondary" onClick={() => setCollectionsOpen(true)}>
+            Manage Collections
+          </Button>
+          {filteredCollection && (
+            <>
+              <Button
+                size="compact"
+                variant="neutral"
+                disabled={loading || filteredCollection.problem_count === 0}
+                onClick={() => setCollectionConfirm({ id: filteredCollection.id, name: filteredCollection.name, count: filteredCollection.problem_count, isVisible: true })}
+                title="Set every problem in this collection to visible"
+              >
+                Show Collection
+              </Button>
+              <Button
+                size="compact"
+                variant="neutral"
+                disabled={loading || filteredCollection.problem_count === 0}
+                onClick={() => setCollectionConfirm({ id: filteredCollection.id, name: filteredCollection.name, count: filteredCollection.problem_count, isVisible: false })}
+                title="Set every problem in this collection to hidden"
+              >
+                Hide Collection
+              </Button>
+            </>
+          )}
+        </div>
         <div className={styles['header-actions']}>
           <div className={styles['bulk-actions']}>
             <Button
@@ -159,19 +240,20 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
                 <input
                   type="checkbox"
                   onChange={handleSelectAll}
-                  checked={selectedProblems.length > 0 && selectedProblems.length === problems.length}
+                  checked={selectedProblems.length > 0 && selectedProblems.length === visibleProblems.length}
                   disabled={loading || problems.length === 0}
                   title="Select all problems"
                 />
               </th>
               <th>ID</th>
               <th>Title</th>
+              <th>Collection</th>
               <th>Visibility</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {problems.map(problem => (
+            {visibleProblems.map(problem => (
               <tr key={problem.id}>
                 <td>
                   <input
@@ -183,6 +265,11 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
                 </td>
                 <td>{problem.id}</td>
                 <td>{problem.title}</td>
+                <td>
+                  {problem.collection_id !== null
+                    ? problem.collection_name
+                    : <span className={styles['no-collection']}>No Collection</span>}
+                </td>
                 <td>
                   {problem.contest_id && (problem.contest_status === 'scheduled' || problem.contest_status === 'running') ? (
                     <span className={`${styles['contest-status-badge']} ${styles[problem.contest_status === 'scheduled' ? 'scheduled' : 'running']}`}>
@@ -217,8 +304,24 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
           </tbody>
         </table>
       </div>
+      <CollectionsDialog
+        open={collectionsOpen}
+        onClose={() => setCollectionsOpen(false)}
+        onChanged={refreshAfterCollectionChange}
+        collections={collections}
+      />
+      {collectionConfirm && (
+        <ConfirmationModal
+          isOpen
+          onClose={() => setCollectionConfirm(null)}
+          onConfirm={runCollectionVisibility}
+          title={collectionConfirm.isVisible ? 'Confirm Show Collection' : 'Confirm Hide Collection'}
+          message={`Are you sure you want to ${collectionConfirm.isVisible ? 'show' : 'hide'} all ${collectionConfirm.count} problem${collectionConfirm.count === 1 ? '' : 's'} in "${collectionConfirm.name}"?`}
+        />
+      )}
       {isModalOpen && (
         <ProblemModal
+          collections={collections}
           problem={editingProblem}
           onClose={handleCloseModal}
           onSave={handleSave}

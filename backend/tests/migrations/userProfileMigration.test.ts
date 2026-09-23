@@ -17,6 +17,7 @@ describe('user profile migration', () => {
       '0011_authoring_draft_category',
       '0012_problem_categories',
       '0013_problem_difficulty',
+      '0014_problem_collections',
     ]);
   });
 

@@ -429,3 +429,32 @@
   font-size: 0.8rem;
   font-weight: 600;
 }
+
+/* --- Problem Collections toolbar -------------------------------------------- */
+
+.collection-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.collection-controls label {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: var(--font-size-metadata);
+}
+
+.collection-controls select {
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-color);
+  background-color: var(--background-primary);
+  color: var(--text-primary);
+}
+
+/* Muted "No Collection" text in the problem table. */
+.no-collection {
+  color: var(--text-muted);
+}

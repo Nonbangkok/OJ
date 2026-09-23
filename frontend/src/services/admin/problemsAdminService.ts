@@ -16,6 +16,17 @@ interface UploadFilesResponse extends ApiMessageResponse {
   jobId?: string;
 }
 
+
+export interface CollectionWithStats {
+  id: number;
+  name: string;
+  description: string | null;
+  problem_count: number;
+  status: 'empty' | 'all_visible' | 'all_hidden' | 'mixed';
+  created_at: string;
+  updated_at: string;
+}
+
 const problemsAdminService = {
   getProblems: async (): Promise<AdminProblemsResponse> => {
     const response = await api.get<AdminProblemsResponse>('/admin/problems');
@@ -84,6 +95,32 @@ const problemsAdminService = {
       withCredentials: true,
     });
   },
+
+  // Problem Collections (organizational groups)
+  getCollections: async (): Promise<CollectionWithStats[]> => {
+    const response = await api.get<CollectionWithStats[]>('/admin/collections');
+    return response.data;
+  },
+
+  createCollection: async (name: string, description: string | null): Promise<CollectionWithStats> => {
+    const response = await api.post<CollectionWithStats>('/admin/collections', { name, description });
+    return response.data;
+  },
+
+  updateCollection: async (id: number, name: string, description: string | null): Promise<CollectionWithStats> => {
+    const response = await api.put<CollectionWithStats>(`/admin/collections/${id}`, { name, description });
+    return response.data;
+  },
+
+  deleteCollection: async (id: number): Promise<void> => {
+    await api.delete(`/admin/collections/${id}`);
+  },
+
+  setCollectionVisibility: async (id: number, isVisible: boolean): Promise<{ message: string; updated: number }> => {
+    const response = await api.put<{ message: string; updated: number }>(`/admin/collections/${id}/visibility`, { isVisible });
+    return response.data;
+  },
 };
 
 export default problemsAdminService;
+

@@ -92,6 +92,8 @@ export interface ProblemRow {
     author: string | null;
     /** Fixed-list categories; an empty array means uncategorized. */
     categories: readonly ProblemCategory[];
+    /** Organizational collection (Chapter 1, Practice Set, ...); at most one. */
+    collection_id: number | null;
     /** Codeforces-like rating (800–3500 step 100); null = Unrated. */
     difficulty: number | null;
     problem_pdf: Buffer | null;
@@ -116,8 +118,10 @@ export type ProblemDetailDTO = Pick<
 /** `problems` row augmented with contest status for the admin index. */
 export interface AdminProblemRow extends Pick<
     ProblemRow,
-    'id' | 'title' | 'author' | 'categories' | 'difficulty' | 'is_visible' | 'contest_id'
+    'id' | 'title' | 'author' | 'categories' | 'difficulty' | 'collection_id' | 'is_visible' | 'contest_id'
 > {
+    /** Joined name for display; null when the problem has no collection. */
+    collection_name: string | null;
     contest_status: ContestStatus | null;
 }
 

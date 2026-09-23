@@ -4,7 +4,7 @@ import { PROBLEM_CATEGORIES, PROBLEM_DIFFICULTY_OPTIONS, difficultyBand } from '
 import formStyles from '../../../components/styles/Form.module.css';
 import modalStyles from '../shared/ModalLayout.module.css';
 
-const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser }) => {
+const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser, collections = [] }) => {
   const {
     formData,
     authors,
@@ -20,6 +20,12 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
     handleCategoryToggle,
     handleSave
   } = useProblemModal(problem, onSave, uploadProgress, currentUser);
+  // The collection select is controlled directly (null vs number, not a string
+  // form value) so the exact "No Collection" state survives round trips.
+  const handleCollectionChange = (event) => {
+    const { value } = event.target;
+    handleChange({ target: { name: 'collection_id', value: value === '' ? null : Number(value) } });
+  };
 
   return (
     <div className={modalStyles['modal-backdrop']}>
@@ -168,6 +174,21 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
                   </span>
                 )}
               </div>
+            </div>
+
+            <div className={formStyles['form-group']}>
+              <label htmlFor="collection_id">Collection</label>
+              <select
+                id="collection_id"
+                name="collection_id"
+                value={formData.collection_id ?? ''}
+                onChange={handleCollectionChange}
+              >
+                <option value="">No Collection</option>
+                {collections.map(collection => (
+                  <option key={collection.id} value={collection.id}>{collection.name}</option>
+                ))}
+              </select>
             </div>
           </fieldset>
         </div>

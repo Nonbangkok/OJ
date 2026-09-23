@@ -138,6 +138,7 @@ export const createProblemSchema = z.object({
   author: z.string().trim().min(PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH).max(STRING_LIMITS.AUTHOR),
   categories: problemCategories.optional(),
   difficulty: problemDifficulty,
+  collection_id: z.number().int().positive().nullable().optional(),
   time_limit_ms: z.number().int().min(PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS),
   memory_limit_mb: z.number().int().min(PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB),
 });
@@ -148,6 +149,7 @@ export const updateProblemSchema = z.object({
   author: z.string().trim().min(PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH).max(STRING_LIMITS.AUTHOR).optional(),
   categories: problemCategories.optional(),
   difficulty: problemDifficulty,
+  collection_id: z.number().int().positive().nullable().optional(),
   time_limit_ms: z.number().int().min(PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS).optional(),
   memory_limit_mb: z.number().int().min(PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB).optional(),
 });
@@ -155,6 +157,27 @@ export const updateProblemSchema = z.object({
 export const updateProblemVisibilitySchema = z.object({
   isVisible: z.boolean(),
 });
+
+// Problem Collections (organizational groups, distinct from categories)
+const collectionName = z.string().trim().min(1).max(100);
+
+export const createCollectionSchema = z.object({
+  name: collectionName,
+  description: z.string().trim().max(500).nullable().optional(),
+});
+
+export const updateCollectionSchema = z.object({
+  name: collectionName,
+  description: z.string().trim().max(500).nullable().optional(),
+}).strict();
+
+export const collectionIdParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+}).strict();
+
+export const collectionVisibilityBodySchema = z.object({
+  isVisible: z.boolean(),
+}).strict();
 
 /**
  * Difficulty filtering/sorting for the user-facing problem list

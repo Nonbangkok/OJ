@@ -19,6 +19,13 @@ import {
   updateProblemVisibility,
 } from '../services/problemQueryService';
 import { USER_ROLES } from '../constants';
+import {
+  createCollection,
+  deleteCollection,
+  listCollections,
+  setCollectionVisibility,
+  updateCollection,
+} from '../services/collectionQueryService';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import {
   BatchUploadProgressData,
@@ -38,6 +45,10 @@ import {
   progressIdParamSchema,
   updateProblemSchema,
   updateProblemVisibilitySchema,
+  collectionIdParamSchema,
+  collectionVisibilityBodySchema,
+  createCollectionSchema,
+  updateCollectionSchema,
 } from '../schemas/requestSchemas';
 
 const router: Router = express.Router();
@@ -151,8 +162,8 @@ router.get('/problems/:id/pdf', requireAuth,
 router.post('/admin/problems', requireAuth, requireStaffOrAdmin,
   validateRequest({ body: createProblemSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const { id, title, author, categories, difficulty, time_limit_ms, memory_limit_mb } = req.body as CreateProblemRequestBody;
-  const createdProblem = await createProblem({ id, title, author, categories, difficulty, time_limit_ms, memory_limit_mb });
+  const { id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb } = req.body as CreateProblemRequestBody;
+  const createdProblem = await createProblem({ id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb });
   res.status(201).json(createdProblem);
 }));
 
@@ -160,7 +171,7 @@ router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
   validateRequest({ params: idParamSchema, body: updateProblemSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const oldId = String(req.params.id);
-  const { id: newId, title, author, categories, difficulty, time_limit_ms, memory_limit_mb } = req.body as UpdateProblemRequestBody;
+  const { id: newId, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb } = req.body as UpdateProblemRequestBody;
 
   const updateResult = await updateProblem(oldId, {
     id: newId,
@@ -168,6 +179,7 @@ router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
     author,
     categories,
     difficulty,
+    collection_id,
     time_limit_ms,
     memory_limit_mb,
   });
@@ -211,6 +223,55 @@ router.put('/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin,
     problem: updatedProblem
   });
 }));
+
+// Problem Collections (organizational groups; visibility stays on problems)
+router.get('/admin/collections', requireAuth, requireStaffOrAdmin, asyncHandler(async (_req: Request, res: Response) => {
+  res.json(await listCollections());
+}));
+
+router.post('/admin/collections', requireAuth, requireStaffOrAdmin,
+  validateRequest({ body: createCollectionSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { name, description } = req.body as { name: string; description?: string | null };
+    const result = await createCollection(name, description ?? null);
+    if (result.kind === 'duplicate_name') {
+      throw new AppError(`A collection named "${name}" already exists`, 409);
+    }
+    res.status(201).json(result.collection);
+  }));
+
+router.put('/admin/collections/:id', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: collectionIdParamSchema, body: updateCollectionSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { name, description } = req.body as { name: string; description?: string | null };
+    const result = await updateCollection(Number(req.params.id), name, description ?? null);
+    if (result.kind === 'not_found') throw new AppError('Collection not found', 404);
+    if (result.kind === 'duplicate_name') {
+      throw new AppError(`A collection named "${name}" already exists`, 409);
+    }
+    res.json(result.collection);
+  }));
+
+router.delete('/admin/collections/:id', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: collectionIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const deleted = await deleteCollection(Number(req.params.id));
+    if (!deleted) throw new AppError('Collection not found', 404);
+    res.json({ message: 'Collection deleted; its problems were moved to No Collection' });
+  }));
+
+// Collection-wide visibility: writes the SAME is_visible column the individual
+// and global toggles use — one transaction, no parallel visibility system.
+router.put('/admin/collections/:id/visibility', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: collectionIdParamSchema, body: collectionVisibilityBodySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { isVisible } = req.body as { isVisible: boolean };
+    const updated = await setCollectionVisibility(Number(req.params.id), isVisible);
+    res.json({
+      message: `${updated} problem${updated === 1 ? '' : 's'} ${isVisible ? 'shown' : 'hidden'}`,
+      updated,
+    });
+  }));
 
 router.post('/admin/problems/batch-upload', requireAuth, requireStaffOrAdmin, diskUpload.single('problemsZip'), async (req: Request, res: Response) => {
   if (!req.file) {

@@ -325,7 +325,7 @@ describe('Problem Controller', () => {
             expect(res.status).toBe(201);
             expect(db.query).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO problems'),
-                ['P4', 'Problem 4', 'Author 4', ['Dynamic Programming', 'Graph'], null, 1000, 256]
+                ['P4', 'Problem 4', 'Author 4', ['Dynamic Programming', 'Graph'], null, null, 1000, 256]
             );
         });
 
@@ -347,7 +347,7 @@ describe('Problem Controller', () => {
             expect(res.status).toBe(201);
             expect(db.query).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO problems'),
-                ['P4b', 'Problem 4b', 'Author 4', [], null, 1000, 256]
+                ['P4b', 'Problem 4b', 'Author 4', [], null, null, 1000, 256]
             );
         });
 

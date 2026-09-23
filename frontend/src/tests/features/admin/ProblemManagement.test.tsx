@@ -38,6 +38,10 @@ describe('ProblemManagement Component', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(mockProblems);
+        // Auto-mocks reset between tests (react-scripts sets resetMocks), so
+        // the collections fetch the page performs on mount must be re-stubbed
+        // every time — it defaults to an empty list.
+        (jest.mocked(adminService.getCollections) as jest.Mock).mockResolvedValue([]);
     });
 
     it('renders loading state initially', () => {

@@ -150,8 +150,8 @@ export const getProblemPdfWithAccess = async (
 
 export const createProblem = async (payload: CreateProblemRequestBody): Promise<ProblemRow> => {
   const result = await db.query<ProblemRow>(
-    'INSERT INTO problems (id, title, author, categories, difficulty, time_limit_ms, memory_limit_mb) VALUES ($1, $2, $3, $4::text[], $5, $6, $7) RETURNING *',
-    [payload.id, payload.title, payload.author, [...payload.categories ?? []], payload.difficulty ?? null, payload.time_limit_ms, payload.memory_limit_mb]
+    'INSERT INTO problems (id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb) VALUES ($1, $2, $3, $4::text[], $5, $6, $7, $8) RETURNING *',
+    [payload.id, payload.title, payload.author, [...payload.categories ?? []], payload.difficulty ?? null, payload.collection_id ?? null, payload.time_limit_ms, payload.memory_limit_mb]
   );
   return result.rows[0];
 };
@@ -175,8 +175,8 @@ export const updateProblem = async (
     // null = clear the rating (Unrated), number = set it.
     const difficultyProvided = payload.difficulty !== undefined;
     const result = await client.query<ProblemRow>(
-      'UPDATE problems SET id = $1, title = COALESCE($2, title), author = COALESCE($3, author), categories = CASE WHEN $8::boolean THEN $4::text[] ELSE categories END, difficulty = CASE WHEN $9::boolean THEN $5 ELSE difficulty END, time_limit_ms = COALESCE($6, time_limit_ms), memory_limit_mb = COALESCE($7, memory_limit_mb) WHERE id = $10 RETURNING *',
-      [payload.id, payload.title ?? null, payload.author ?? null, [...payload.categories ?? []], payload.difficulty ?? null, payload.time_limit_ms ?? null, payload.memory_limit_mb ?? null, categoriesProvided, difficultyProvided, oldId]
+      'UPDATE problems SET id = $1, title = COALESCE($2, title), author = COALESCE($3, author), categories = CASE WHEN $8::boolean THEN $4::text[] ELSE categories END, difficulty = CASE WHEN $9::boolean THEN $5 ELSE difficulty END, collection_id = CASE WHEN $11::boolean THEN $10 ELSE collection_id END, time_limit_ms = COALESCE($6, time_limit_ms), memory_limit_mb = COALESCE($7, memory_limit_mb) WHERE id = $12 RETURNING *',
+      [payload.id, payload.title ?? null, payload.author ?? null, [...payload.categories ?? []], payload.difficulty ?? null, payload.time_limit_ms ?? null, payload.memory_limit_mb ?? null, categoriesProvided, difficultyProvided, payload.collection_id ?? null, payload.collection_id !== undefined, oldId]
     );
 
     if (result.rows.length === 0) {
@@ -205,7 +205,7 @@ export const deleteProblem = async (problemId: string): Promise<boolean> => {
 
 export const getAdminProblems = async (): Promise<AdminProblemRow[]> => {
   const result = await db.query<AdminProblemRow>(
-    'SELECT p.id, p.title, p.author, p.categories, p.difficulty, p.is_visible, p.contest_id, c.status AS contest_status FROM problems p LEFT JOIN contests c ON p.contest_id = c.id ORDER BY p.id'
+    'SELECT p.id, p.title, p.author, p.categories, p.difficulty, p.collection_id, col.name AS collection_name, p.is_visible, p.contest_id, c.status AS contest_status FROM problems p LEFT JOIN contests c ON p.contest_id = c.id LEFT JOIN collections col ON p.collection_id = col.id ORDER BY p.id'
   );
   return result.rows;
 };

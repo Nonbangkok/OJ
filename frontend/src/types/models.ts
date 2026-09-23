@@ -153,6 +153,9 @@ export interface BatchCreatedUser {
 }
 
 export interface AdminProblem extends ProblemBase {
+  /** Organizational collection (at most one); null = No Collection. */
+  collection_id: number | null;
+  collection_name: string | null;
   is_visible: boolean;
   contest_id: number | null;
   contest_status: ContestStatus | null;

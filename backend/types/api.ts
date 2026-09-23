@@ -154,6 +154,7 @@ export interface CreateProblemRequestBody {
     categories?: readonly ProblemCategory[];
     /** Codeforces-like rating (800–3500 step 100); null = Unrated. */
     difficulty?: number | null;
+    collection_id?: number | null;
     time_limit_ms: number;
     memory_limit_mb: number;
 }
@@ -165,6 +166,7 @@ export interface UpdateProblemRequestBody {
     categories?: readonly ProblemCategory[];
     /** Codeforces-like rating (800–3500 step 100); null = Unrated. */
     difficulty?: number | null;
+    collection_id?: number | null;
     time_limit_ms?: number;
     memory_limit_mb?: number;
 }
