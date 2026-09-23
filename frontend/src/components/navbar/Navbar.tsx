@@ -37,7 +37,7 @@ const Navbar = () => {
       <div className={styles['navbar-container']}>
         <NavLink to="/" className={styles['nav-brand']}>
           <img src={currentLogo} alt="Grader Logo" className={styles['nav-logo']} />
-          Grader
+          <span className={styles['nav-brand-name']}>Grader</span>
         </NavLink>
         <ul ref={navRef} className={styles['nav-links']} onMouseLeave={resetSlider}>
           <div className={styles.slider} style={sliderStyle} />

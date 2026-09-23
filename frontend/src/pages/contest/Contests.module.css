@@ -29,12 +29,13 @@
 }
 
 .error {
-  background-color: var(--error-bg);
-  color: var(--error-color);
-  padding: 15px 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  border-left: 4px solid var(--error-color);
+  /* Shared error banner (same as Management). */
+  background: var(--danger-tint-bg);
+  color: var(--status-danger);
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1.25rem;
+  border-left: 4px solid var(--status-danger);
 }
 
 /* Responsive Design */

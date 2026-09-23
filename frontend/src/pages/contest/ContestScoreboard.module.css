@@ -18,7 +18,7 @@
 }
 
 .error h3 {
-  color: var(--error-color);
+  color: var(--status-danger);
   margin-bottom: 20px;
 }
 
