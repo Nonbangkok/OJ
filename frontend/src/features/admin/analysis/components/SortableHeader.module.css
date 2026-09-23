@@ -5,7 +5,7 @@
 }
 
 .active {
-  color: var(--text-color-primary);
+  color: var(--text-primary);
 }
 
 .button {

@@ -10,7 +10,7 @@
 .quote-box {
   background-color: var(--background-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 3rem 3.5rem; /* Increased padding */
   max-width: 750px; /* Increased max-width */
   cursor: pointer;
@@ -32,7 +32,7 @@
 }
 
 .quote-text {
-  font-size: 1.8rem; /* Increased font size */
+  font-size: var(--font-size-page-title);
   font-style: italic;
   color: var(--text-primary);
   margin: 0;
@@ -40,7 +40,7 @@
 }
 
 .welcome-text {
-  font-size: 2.5rem; /* Increased font size */
+  font-size: var(--font-size-page-title);
   font-weight: bold;
   color: var(--accent-primary);
   margin: 0;

@@ -20,6 +20,7 @@ import ChartCard from './components/ChartCard';
 import KpiCard from './components/KpiCard';
 import { useChartColors, VERDICT_COLORS } from './analysisCharts';
 import styles from './OverviewTab.module.css';
+import actionStyles from './AnalysisButtons.module.css';
 
 const DAY_OPTIONS = [7, 30, 90, 0];
 
@@ -69,7 +70,7 @@ const OverviewTab = () => {
           <button
             key={option}
             type="button"
-            className={option === days ? styles['range-active'] : styles['range-button']}
+            className={option === days ? actionStyles['range-active'] : actionStyles['range-button']}
             onClick={() => setDays(option)}
           >
             {rangeLabel(option)}

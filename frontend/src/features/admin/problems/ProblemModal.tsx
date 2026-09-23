@@ -1,4 +1,5 @@
 import useProblemModal from '../../../hooks/admin/useProblemModal';
+import { Button } from '../../../components/ui';
 import { PROBLEM_CATEGORIES, PROBLEM_DIFFICULTY_OPTIONS, difficultyBand } from '../../../utils/constants';
 import formStyles from '../../../components/styles/Form.module.css';
 import modalStyles from '../shared/ModalLayout.module.css';
@@ -172,10 +173,10 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser })
         </div>
 
         <div className={`${modalStyles['modal-actions']} ${formStyles['problem-form-actions']}`}>
-          <button onClick={onClose} className={modalStyles['button-cancel']} disabled={isUploading}>Cancel</button>
-          <button onClick={handleSave} className={modalStyles['button-save']} disabled={isUploading}>
-            {isUploading ? 'Processing...' : 'Save'}
-          </button>
+          <Button variant="secondary" onClick={onClose} disabled={isUploading}>Cancel</Button>
+          <Button onClick={handleSave} disabled={isUploading}>
+            {isUploading ? 'Processing…' : 'Save'}
+          </Button>
         </div>
       </div>
     </div>

@@ -21,7 +21,7 @@
   border-radius: 6px;
   border: 1px solid var(--border-color);
   background-color: var(--background-secondary);
-  color: var(--text-color-primary);
+  color: var(--text-primary);
   width: 260px;
   box-sizing: border-box;
 }
@@ -50,7 +50,7 @@
 }
 
 .clear-button:hover {
-  color: var(--text-color-primary);
+  color: var(--text-primary);
 }
 
 .suggestions-list {
@@ -74,7 +74,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--text-color-primary);
+  color: var(--text-primary);
 }
 
 .suggestions-list li:hover {
@@ -138,7 +138,7 @@
   border-radius: 6px;
   border: 1px solid var(--border-color);
   background-color: var(--background-tertiary);
-  color: var(--text-color-primary);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 0.85rem;
 }
@@ -163,7 +163,7 @@
   border-radius: 6px;
   border: 1px solid var(--border-color);
   background-color: var(--background-secondary);
-  color: var(--text-color-primary);
+  color: var(--text-primary);
   cursor: pointer;
 }
 
@@ -207,7 +207,7 @@
   border-radius: 6px;
   border: 1px solid var(--border-color);
   background-color: var(--background-secondary);
-  color: var(--text-color-primary);
+  color: var(--text-primary);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -224,7 +224,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-color-primary);
+  color: var(--text-primary);
   font: inherit;
 }
 

@@ -1,4 +1,4 @@
-import { Dialog } from '../../../components/ui/Dialog';
+import { Button, Dialog } from '../../../components/ui';
 import formStyles from '../../../components/styles/Form.module.css';
 import useEditUserModal from '../../../hooks/admin/useEditUserModal';
 import modalStyles from '../shared/ModalLayout.module.css';
@@ -41,8 +41,8 @@ const EditUserModal = ({ user, onClose, onSave }) => {
         </select>
       </div>
       <div className={modalStyles['modal-actions']}>
-        <button onClick={onClose} className={modalStyles['button-cancel']}>Cancel</button>
-        <button onClick={handleSave} className={modalStyles['button-save']}>Save</button>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={handleSave}>Save</Button>
       </div>
     </Dialog>
   );

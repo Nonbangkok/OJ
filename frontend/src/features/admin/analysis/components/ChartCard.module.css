@@ -11,7 +11,7 @@
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border-color);
-  color: var(--text-color-primary);
+  color: var(--text-primary);
   font-size: 1.1rem;
 }
 

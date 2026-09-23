@@ -19,7 +19,7 @@
 
 .setting-item label {
   font-weight: 500;
-  color: var(--text-color-primary);
+  color: var(--text-primary);
 }
 
 /* The switch - the box around the slider */
@@ -87,7 +87,7 @@
 
 .settings-container h2 {
   margin-bottom: 2rem;
-  color: var(--text-color-primary);
+  color: var(--text-primary);
   text-align: center;
 }
 
@@ -120,7 +120,7 @@
 
 .setting-item > div {
   flex-grow: 1;
-  color: var(--text-color-primary);
+  color: var(--text-primary);
 }
 
 .action-button {
@@ -160,12 +160,12 @@
   border: 1px solid var(--border-color);
   border-radius: 5px;
   background-color: var(--input-bg);
-  color: var(--text-color-primary);
+  color: var(--text-primary);
 }
 
 .file-input::file-selector-button {
   background-color: var(--background-light);
-  color: var(--text-color-primary);
+  color: var(--text-primary);
   border: 1px solid var(--border-color);
   padding: 0.5rem 0.8rem;
   border-radius: 5px;

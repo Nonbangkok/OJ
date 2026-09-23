@@ -9,7 +9,7 @@
   border-radius: 6px;
   border: 1px solid var(--border-color);
   background-color: var(--background-secondary);
-  color: var(--text-color-primary);
+  color: var(--text-primary);
   max-width: 320px;
 }
 
@@ -48,7 +48,7 @@
   border-radius: 6px;
   border: 1px solid var(--border-color);
   background-color: var(--background-secondary);
-  color: var(--text-color-primary);
+  color: var(--text-primary);
   cursor: pointer;
 }
 
@@ -67,7 +67,7 @@
   border-radius: 6px;
   border: 1px solid var(--border-color);
   background-color: var(--background-secondary);
-  color: var(--text-color-primary);
+  color: var(--text-primary);
   cursor: pointer;
 }
 
@@ -104,7 +104,7 @@
   border-radius: 6px;
   border: 1px solid var(--border-color);
   background-color: var(--background-secondary);
-  color: var(--text-color-primary);
+  color: var(--text-primary);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -119,6 +119,6 @@
   border-radius: 6px;
   border: 1px solid var(--border-color);
   background-color: var(--background-secondary);
-  color: var(--text-color-primary);
+  color: var(--text-primary);
   font-size: 0.9rem;
 }

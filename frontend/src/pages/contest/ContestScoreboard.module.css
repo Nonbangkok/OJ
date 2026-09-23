@@ -23,7 +23,7 @@
 }
 
 .backLink {
-  color: var(--primary-color);
+  color: var(--accent-primary);
   text-decoration: none;
   font-weight: 500;
   transition: color 0.2s ease;
@@ -32,7 +32,7 @@
 }
 
 .backLink:hover {
-  color: var(--primary-dark);
+  color: var(--accent-primary-hover);
   background: var(--bg-secondary);
 }
 
@@ -43,7 +43,7 @@
   color: var(--text-secondary);
   background: var(--card-bg);
   border: 1px solid var(--border-color);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
 }
 
 .noDataIcon {

@@ -3,6 +3,7 @@ import { Contest } from '../../../types';
 import contestsAdminService from '../../../services/admin/contestsAdminService';
 import SortableHeader from './components/SortableHeader';
 import styles from './ContestsTab.module.css';
+import actionStyles from './AnalysisButtons.module.css';
 
 type ContestSortKey = 'title' | 'status' | 'start_time' | 'end_time' | 'participant_count';
 type SortDir = 'asc' | 'desc';
@@ -101,7 +102,7 @@ const ContestsTab = ({ onSelectContest }: ContestsTabProps) => {
                 <td>
                   <button
                     type="button"
-                    className={styles['analyze-button']}
+                    className={actionStyles['action-button']}
                     onClick={() => onSelectContest(contest.id)}
                   >
                     Analyze {contest.title}

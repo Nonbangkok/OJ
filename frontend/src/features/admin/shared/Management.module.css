@@ -253,7 +253,7 @@
 
 .badge {
   padding: 6px 12px;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   font-size: 0.8rem;
   font-weight: 600;
   white-space: nowrap;
@@ -409,7 +409,7 @@
 
 .progressBarFill {
   height: 100%;
-  background-color: var(--primary-color);
+  background-color: var(--accent-primary);
   width: 0%; /* Will be updated by React state */
   border-radius: 8px;
   transition: width 0.3s ease-in-out;

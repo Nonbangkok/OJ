@@ -2,7 +2,7 @@
 .contest-banner {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 20px;
   margin-bottom: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -26,7 +26,7 @@
 
 .status-badge {
   padding: 6px 12px;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   font-size: 0.9rem;
   font-weight: 600;
   display: inline-block;
@@ -77,7 +77,7 @@
 }
 
 .view-scoreboard {
-  background: var(--primary-color);
+  background: var(--accent-primary);
   color: white;
 }
 
@@ -205,7 +205,7 @@
 
 .nav-btn.active {
   background-color: transparent;
-  color: var(--primary-color);
+  color: var(--accent-primary);
   font-weight: 600;
 }
 

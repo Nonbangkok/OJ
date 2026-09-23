@@ -12,7 +12,7 @@
   margin-top: 0;
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 10px;
-  color: var(--text-color-primary);
+  color: var(--text-primary);
 }
 
 .output-container pre {

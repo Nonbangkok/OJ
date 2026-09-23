@@ -3,6 +3,7 @@
 }
 
 .scoreboard-container h1 {
+  font-size: var(--font-size-page-title);
   margin-bottom: 2rem;
   color: var(--text-primary);
 }

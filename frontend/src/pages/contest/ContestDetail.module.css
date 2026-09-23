@@ -23,14 +23,14 @@
 }
 
 .backLink {
-  color: var(--primary-color);
+  color: var(--accent-primary);
   text-decoration: none;
   font-weight: 500;
   transition: color 0.2s ease;
 }
 
 .backLink:hover {
-  color: var(--primary-dark);
+  color: var(--accent-primary-hover);
   text-decoration: underline;
 }
 
@@ -38,7 +38,7 @@
 .contestHeader {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 30px;
   margin-bottom: 30px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
@@ -55,7 +55,7 @@
 .contestTitle {
   color: var(--text-primary);
   margin: 0;
-  font-size: 2.2rem;
+  font-size: var(--font-size-page-title);
   font-weight: 700;
   flex: 1;
   min-width: 300px;
@@ -82,7 +82,7 @@
 .infoCard {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 20px;
   text-align: center;
   transition:
@@ -123,20 +123,18 @@
 
 .joinButton {
   padding: 14px 40px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--primary-color, #2196f3), var(--primary-dark, #1976d2));
+  border-radius: var(--radius-md);
+  background: var(--accent-primary);
   color: white;
   font-weight: 600;
   font-size: 1.1rem;
   border: none;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
 }
 
 .joinButton:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
+  background: var(--accent-primary-hover);
 }
 
 .joinButton:disabled {
@@ -149,7 +147,7 @@
 .waitingMessage {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 40px;
   text-align: center;
   margin-bottom: 30px;
@@ -183,7 +181,7 @@
   }
 
   .contestTitle {
-    font-size: 1.8rem;
+    font-size: var(--font-size-page-title);
   }
 
   .titleSection {

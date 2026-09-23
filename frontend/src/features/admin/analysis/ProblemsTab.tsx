@@ -8,6 +8,7 @@ import {
 } from '../../../services/analyticsService';
 import SortableHeader from './components/SortableHeader';
 import styles from './ProblemsTab.module.css';
+import actionStyles from './AnalysisButtons.module.css';
 
 const PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -120,7 +121,7 @@ const ProblemsTab = ({ onSelectProblem }: ProblemsTabProps) => {
                 <td>
                   <button
                     type="button"
-                    className={styles['analyze-button']}
+                    className={actionStyles['action-button']}
                     onClick={() => onSelectProblem(problem.problemId)}
                   >
                     Analyze {problem.title}

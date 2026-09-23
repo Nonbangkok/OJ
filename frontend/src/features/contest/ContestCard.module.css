@@ -1,7 +1,7 @@
 .contestCard {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 24px;
   transition: all 0.3s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -10,7 +10,7 @@
 .contestCard:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-  border-color: var(--primary-color);
+  border-color: var(--accent-primary);
 }
 
 .contestHeader {
@@ -39,7 +39,7 @@
 
 .badge {
   padding: 6px 12px;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   font-size: 0.85rem;
   font-weight: 500;
   white-space: nowrap;
@@ -60,7 +60,7 @@
 
 .contestTiming {
   background: var(--bg-secondary);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 16px 0;
   margin: 16px 0;
 }
@@ -124,13 +124,12 @@
 }
 
 .joinBtn {
-  background: linear-gradient(135deg, var(--contest-action-join-from), var(--contest-action-join-to));
-  color: var(--contest-action-foreground);
+  background: var(--accent-primary);
+  color: var(--action-button-foreground);
 }
 
 .joinBtn:hover {
-  background: linear-gradient(135deg, var(--contest-action-join-hover-from), var(--contest-action-join-hover-to));
-  transform: translateY(-2px);
+  background: var(--accent-primary-hover);
 }
 
 .enterBtn {

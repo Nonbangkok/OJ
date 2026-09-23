@@ -1,0 +1,49 @@
+/* Shared compact table-row action button for the analysis tabs — previously
+   copy-pasted per tab with identical rules. Same visual language as the
+   ui Button's neutral variant, sized for table rows. */
+.action-button {
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: var(--background-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.action-button:hover {
+  border-color: var(--accent-primary);
+}
+
+.action-button:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+/* Time-range pill (Overview tab) — same construction, active state swaps
+   to the accent fill. */
+.range-button,
+.range-active {
+  padding: 0.375rem 0.875rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: var(--background-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.range-button:hover {
+  border-color: var(--accent-primary);
+}
+
+.range-active {
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--action-button-foreground);
+}
+
+.range-button:focus-visible,
+.range-active:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}

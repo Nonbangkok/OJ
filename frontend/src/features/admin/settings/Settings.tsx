@@ -1,4 +1,5 @@
 import useAdminSettings from '../../../hooks/admin/useAdminSettings';
+import { Button } from '../../../components/ui';
 import styles from './Settings.module.css'; // Updated CSS import
 import { useSettings } from '../../../context/SettingsContext';
 
@@ -55,13 +56,12 @@ const Settings = () => { // Renamed component
         {/* Export Section */}
         <div className={styles['setting-item']}>
           <div>Export Current Database</div>
-          <button
+          <Button
             onClick={handleExportDatabase}
             disabled={isExporting}
-            className={styles['action-button']}
           >
-            {isExporting ? 'Exporting...' : 'Export Database'}
-          </button>
+            {isExporting ? 'Exporting…' : 'Export Database'}
+          </Button>
         </div>
 
         {/* Import Section */}
@@ -74,13 +74,13 @@ const Settings = () => { // Renamed component
             className={styles['file-input']}
           />
           {databaseFile && <p>Selected file: {databaseFile.name}</p>}
-          <button
+          <Button
+            variant="destructive"
             onClick={handleImportDatabase}
             disabled={isImporting || !databaseFile}
-            className={`${styles['action-button']} ${styles['import-button']}`}
           >
-            {isImporting ? 'Importing...' : 'Upload & Import'}
-          </button>
+            {isImporting ? 'Importing…' : 'Upload & Import'}
+          </Button>
           <p className={styles['warning-message']}>
             WARNING: Importing a database will permanently delete all existing data and replace it. Proceed with caution.
           </p>

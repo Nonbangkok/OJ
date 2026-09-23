@@ -8,7 +8,7 @@
 .container h2 {
   margin-top: 0;
   margin-bottom: 1.5rem;
-  color: var(--text-color-primary);
+  color: var(--text-primary);
 }
 
 .tabs {
@@ -30,7 +30,7 @@
 }
 
 .tab-active {
-  color: var(--text-color-primary);
+  color: var(--text-primary);
   border-bottom-color: var(--accent-primary);
   font-weight: 600;
 }
