@@ -458,3 +458,208 @@
 .no-collection {
   color: var(--text-muted);
 }
+
+/* --- Problem Management redesign: layered toolbar ------------------------- */
+
+/* Page title block (left of the header). */
+.page-title {
+  min-width: 0;
+}
+
+.page-subtitle {
+  margin: 0.25rem 0 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-metadata);
+}
+
+/* Filter bar: one quiet row of scope controls. */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.filter-search {
+  flex: 1 1 14rem;
+  min-width: 10rem;
+  max-width: 24rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-color);
+  background-color: var(--background-primary);
+  color: var(--text-primary);
+}
+
+.filter-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: var(--font-size-metadata);
+  white-space: nowrap;
+}
+
+.filter-control select {
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-color);
+  background-color: var(--background-primary);
+  color: var(--text-primary);
+}
+
+/* Collection scope bar: appears only when a specific collection is filtered. */
+.scope-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.6rem 0.9rem;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.scope-info {
+  color: var(--text-secondary);
+  font-size: var(--font-size-metadata);
+}
+
+.scope-info strong {
+  color: var(--text-primary);
+}
+
+.scope-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Selection bar: appears only while problems are selected. */
+.selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.6rem 0.9rem;
+  background-color: var(--background-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.selection-count {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: var(--font-size-metadata);
+  white-space: nowrap;
+}
+
+.selection-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.selection-move select {
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-color);
+  background-color: var(--background-primary);
+  color: var(--text-primary);
+}
+
+/* Table column alignment. */
+.col-checkbox {
+  text-align: center;
+  width: 2.5rem;
+}
+
+.col-left {
+  text-align: left;
+}
+
+.col-center {
+  text-align: center;
+}
+
+/* Compact, clickable visibility badge (Option A: click to toggle). */
+.visibility-badge {
+  display: inline-block;
+  min-width: 3.5rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.visibility-visible {
+  color: var(--text-success);
+}
+
+.visibility-hidden {
+  color: var(--text-muted);
+}
+
+.visibility-badge:hover,
+.visibility-badge:focus-visible {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.visibility-badge:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+/* Row actions: Edit + overflow menu side by side. */
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Responsive: filter bar wraps to two rows on laptop; everything stays
+   reachable on tablet without page-level horizontal overflow. */
+@media (max-width: 1024px) {
+  .filter-bar {
+    gap: 0.5rem;
+  }
+
+  .filter-search {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .management-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-actions {
+    justify-content: flex-start;
+  }
+
+  .scope-bar,
+  .selection-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

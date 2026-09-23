@@ -1,0 +1,104 @@
+.root {
+  position: relative;
+  display: inline-block;
+}
+
+/* Quiet trigger: same visual weight as muted text, becomes clearly
+   interactive on hover/focus. */
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0 0.4rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.trigger:hover,
+.trigger:focus-visible {
+  background-color: var(--background-tertiary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.triggerText {
+  min-width: 0;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.triggerText::after {
+  content: '▾';
+  margin-left: 0.35rem;
+  font-size: 0.7rem;
+}
+
+/* Anchored dropdown: elevated surface, same tokens as the app's popovers. */
+.menu {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  z-index: 60;
+  min-width: 11rem;
+  display: flex;
+  flex-direction: column;
+  padding: 0.3rem;
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--box-shadow);
+}
+
+.item {
+  display: block;
+  width: 100%;
+  padding: 0.45rem 0.7rem;
+  border: none;
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item:hover:not(:disabled),
+.item:focus-visible {
+  background-color: var(--background-tertiary);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+.item:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.itemDanger {
+  color: var(--status-danger);
+}
+
+.itemDanger:hover:not(:disabled),
+.itemDanger:focus-visible {
+  background-color: var(--danger-tint-bg);
+}

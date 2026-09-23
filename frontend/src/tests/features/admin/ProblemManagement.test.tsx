@@ -87,8 +87,10 @@ describe('ProblemManagement Component', () => {
         (jest.mocked(adminService.updateProblemVisibility) as jest.Mock).mockResolvedValue({ message: 'Updated' });
         renderProblemManagement();
 
-        await waitFor(() => screen.getByText('Hide All'));
-        fireEvent.click(screen.getByText('Hide All'));
+        // Global visibility actions live behind the More menu now.
+        await waitFor(() => screen.getByRole('button', { name: /more global actions/i }));
+        fireEvent.click(screen.getByRole('button', { name: /more global actions/i }));
+        fireEvent.click(screen.getByRole('menuitem', { name: /hide all problems/i }));
 
         // Check confirmation modal
         expect(screen.getByText(/are you sure you want to hide all problems/i)).toBeInTheDocument();
@@ -108,8 +110,8 @@ describe('ProblemManagement Component', () => {
         await waitFor(() => screen.getByText('Problem 1'));
 
         const p1Row = screen.getAllByRole('row').find(r => r.textContent.includes('Problem 1'));
-        const deleteBtn = within(p1Row).getByText(/delete/i);
-        fireEvent.click(deleteBtn);
+        fireEvent.click(within(p1Row).getByRole('button', { name: /row actions for P1/i }));
+        fireEvent.click(within(p1Row).getByRole('menuitem', { name: 'Delete' }));
 
         expect(screen.getByText(/confirm deletion/i)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
@@ -135,8 +137,7 @@ describe('ProblemManagement Component', () => {
         const checkboxes = screen.getAllByRole('checkbox');
         fireEvent.click(checkboxes[1]); // First problem checkbox (index 0 is Select All)
 
-        const exportBtn = screen.getByText(/export selected/i);
-        fireEvent.click(exportBtn);
+        fireEvent.click(screen.getByRole('button', { name: 'Export' }));
 
         await waitFor(() => {
             expect(adminService.exportProblems).toHaveBeenCalledWith(['P1']);
@@ -149,7 +150,8 @@ describe('ProblemManagement Component', () => {
 
         await waitFor(() => screen.getByText('Problem 1'));
         const p1Row = screen.getAllByRole('row').find(r => r.textContent.includes('Problem 1'));
-        fireEvent.click(within(p1Row).getByRole('button', { name: /rejudge/i }));
+        fireEvent.click(within(p1Row).getByRole('button', { name: /row actions for P1/i }));
+        fireEvent.click(within(p1Row).getByRole('menuitem', { name: 'Rejudge' }));
 
         // Confirm dialog explains the consequences in plain language.
         expect(screen.getByText(/re-runs every submission for problem "problem 1"/i)).toBeInTheDocument();
@@ -170,7 +172,8 @@ describe('ProblemManagement Component', () => {
 
         await waitFor(() => screen.getByText('Problem 2'));
         const p2Row = screen.getAllByRole('row').find(r => r.textContent.includes('Problem 2'));
-        fireEvent.click(within(p2Row).getByRole('button', { name: /rejudge/i }));
+        fireEvent.click(within(p2Row).getByRole('button', { name: /row actions for P2/i }));
+        fireEvent.click(within(p2Row).getByRole('menuitem', { name: 'Rejudge' }));
         fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /rejudge/i }));
 
         await waitFor(() => {

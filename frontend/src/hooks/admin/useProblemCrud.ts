@@ -116,6 +116,52 @@ const useProblemCrud = () => {
     setBulkConfirm({ isOpen: true, type: 'hide' });
   };
 
+  /** Bulk visibility for the SELECTED problems only (the selection bar's
+   *  Show/Hide) — distinct from the global Show All / Hide All. */
+  const setSelectionVisibility = async (problemIds: Array<string | number>, isVisible: boolean) => {
+    try {
+      setLoading(true);
+      await Promise.all(
+        problemIds.map((id) => adminService.updateProblemVisibility(id, isVisible)),
+      );
+      await fetchProblems();
+    } catch (errorValue) {
+      setError(isVisible ? 'Failed to show the selected problems.' : 'Failed to hide the selected problems.');
+      console.error(errorValue);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /** Move the SELECTED problems to one collection (or none). At most one
+   *  collection per problem — assignment replaces any previous value. */
+  const moveSelectionToCollection = async (problemIds: Array<string | number>, collectionId: number | null) => {
+    try {
+      setLoading(true);
+      await Promise.all(
+        problemIds.map(async (id) => {
+          const detail = await adminService.getProblemDetail(String(id));
+          await adminService.updateProblem(String(id), {
+            id: detail.id,
+            title: detail.title,
+            author: detail.author,
+            categories: detail.categories as never,
+            difficulty: detail.difficulty,
+            collection_id: collectionId,
+            time_limit_ms: detail.time_limit_ms,
+            memory_limit_mb: detail.memory_limit_mb,
+          });
+        }),
+      );
+      await fetchProblems();
+    } catch (errorValue) {
+      setError('Failed to move the selected problems.');
+      console.error(errorValue);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const executeHideAll = async () => {
     await executeBulkVisibility(false);
   };
@@ -287,6 +333,8 @@ const useProblemCrud = () => {
     handleToggleVisibility,
     handleHideAll,
     executeHideAll,
+    setSelectionVisibility,
+    moveSelectionToCollection,
     handleShowAll,
     executeShowAll,
     handleEdit,

@@ -82,6 +82,8 @@ const useProblemManagement = () => {
     handleToggleVisibility: crud.handleToggleVisibility,
     handleHideAll: crud.handleHideAll,
     executeHideAll: crud.executeHideAll,
+    setSelectionVisibility: crud.setSelectionVisibility,
+    moveSelectionToCollection: crud.moveSelectionToCollection,
     handleShowAll: crud.handleShowAll,
     executeShowAll: crud.executeShowAll,
     handleEdit: crud.handleEdit,

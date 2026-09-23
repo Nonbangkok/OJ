@@ -1,3 +1,5 @@
+export { ActionMenu } from './ActionMenu';
+export type { ActionMenuItem, ActionMenuProps } from './ActionMenu';
 export { Button } from './Button';
 export type { ButtonProps } from './Button';
 export { Dialog } from './Dialog';
