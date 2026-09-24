@@ -19,7 +19,7 @@
 .hero {
   display: flex;
   align-items: flex-end;
-  gap: 1.5rem 2.5rem;
+  gap: 1.5rem 1.75rem;
   flex-wrap: wrap;
   padding: 1.5rem 0 0;
 }
@@ -204,16 +204,17 @@
 
 /* ---------- Contest row (lighter than the problem card) ---------- */
 
+/* Contest row — the ghost action follows the info instead of being pushed
+   to the far edge, keeping the section one compact cluster. */
 .contest-row {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
   padding: 0.125rem 0.25rem;
   min-width: 0;
 }
 
 .contest-row .ghost-action {
-  margin-left: auto;
   flex-shrink: 0;
 }
 
@@ -223,11 +224,13 @@
 
 /* ---------- Quote (pure typography, no box) ---------- */
 
+/* Quote — the shuffle control sits right after the line, so the pair reads
+   as one compact element rather than spanning the page. */
 .quote-section {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 1.5rem;
+  gap: 1rem;
+  flex-wrap: wrap;
   padding: 0.75rem 0.25rem;
 }
 
