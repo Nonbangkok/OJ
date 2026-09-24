@@ -111,8 +111,10 @@ describe('Home Page (logged in)', () => {
     expect(screen.getByText('2 attempts')).toBeInTheDocument();
     expect(screen.getByText(/Last tried/)).toBeInTheDocument();
     expect(screen.getByText('Continue →')).toBeInTheDocument();
-    // The hero primary CTA is Continue Solving when a problem is unfinished.
+    // The hero primary CTA is Continue Solving when a problem is unfinished;
+    // Random Problem is a lower-priority ghost action.
     expect(screen.getByRole('button', { name: 'Continue Solving' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Random Problem →' })).toBeInTheDocument();
     // The older unsolved problem is not the featured one.
     expect(screen.queryByText('Ancient Message')).not.toBeInTheDocument();
   });

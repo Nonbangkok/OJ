@@ -226,9 +226,13 @@ const Home = () => {
               Browse Problems
             </Button>
           )}
-          <Button variant="secondary" onClick={handleRandomProblem}>
-            Random Problem
-          </Button>
+          <button
+            type="button"
+            className={styles['ghost-action']}
+            onClick={handleRandomProblem}
+          >
+            Random Problem →
+          </button>
         </div>
       </section>
 
@@ -315,9 +319,13 @@ const Home = () => {
                 <span>{contestCountdown(contest, now)}</span>
               </p>
             </div>
-            <Button variant="secondary" onClick={() => navigate(`/contests/${contest.id}`)}>
+            <button
+              type="button"
+              className={styles['ghost-action']}
+              onClick={() => navigate(`/contests/${contest.id}`)}
+            >
               Open Contest →
-            </Button>
+            </button>
           </div>
         </section>
       )}
