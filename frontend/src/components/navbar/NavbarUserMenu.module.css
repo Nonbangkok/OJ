@@ -5,7 +5,8 @@
   min-width: 0; /* let the username ellipsize instead of overflowing the navbar */
 }
 
-/* Trigger identifies the user only: avatar + username + chevron. */
+/* Trigger identifies the user only: avatar + username + chevron. No border —
+   hover alone signals it's interactive. */
 .trigger {
   display: flex;
   align-items: center;
@@ -13,14 +14,12 @@
   min-width: 0;
   max-width: 220px; /* long usernames ellipsize instead of stretching the navbar */
   background: none;
-  border: 1px solid var(--border-color);
+  border: none;
   border-radius: var(--radius-lg);
   padding: 0.1875rem 0.625rem 0.1875rem 0.1875rem;
   cursor: pointer;
   color: var(--text-primary);
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease;
+  transition: background-color 0.2s ease;
 }
 
 .trigger:hover {
