@@ -65,6 +65,11 @@ const NavbarUserMenu = () => {
           </span>
         )}
         <span className={styles.username}>{user.username}</span>
+        {user.tier && (
+          <span className={styles['tier-badge']} title={`${user.tier} tier`}>
+            {user.tier}
+          </span>
+        )}
         <CaretDown size={12} weight="bold" className={styles.caret} aria-hidden="true" />
       </button>
 

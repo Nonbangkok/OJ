@@ -62,13 +62,16 @@ const FORBIDDEN_INCLUDE_MESSAGE = (target: string): string =>
  * Publish a realtime `submission_update` after a status/score transition has
  * been persisted. Kept tiny and side-effect free so every emission point in
  * the pipeline is one readable line; publishRealtime itself never throws.
+ * `xpAwarded` is only set on the final Accepted transition when a NEW
+ * first-solve reward was created — it drives the submitter's "+N XP" toast.
  */
 const publishSubmissionStatus = (
   submissionId: number,
   table: 'submissions' | 'contest_submissions',
   userId: number | null,
   overallStatus: string,
-  score: number
+  score: number,
+  xpAwarded?: number
 ): void => {
   publishRealtime({
     type: 'submission_update',
@@ -77,6 +80,7 @@ const publishSubmissionStatus = (
     overall_status: overallStatus,
     score,
     user_id: userId,
+    ...(xpAwarded !== undefined && xpAwarded > 0 ? { xp_awarded: xpAwarded } : {}),
   });
 };
 
@@ -195,19 +199,15 @@ async function runSubmissionPipeline(
        WHERE id = $6`,
       [overallStatus, score, JSON.stringify(results), maxTimeMs, maxMemoryKb, submissionId]
     );
-    publishSubmissionStatus(submissionId, table, user_id, overallStatus, score);
-    // A landed contest verdict can move the scoreboard: emit a ping so
-    // connected clients refetch the authoritative payload. Chatty-free by
-    // design — intermediate statuses don't ping, only final verdicts.
-    if (table === 'contest_submissions' && contest_id != null) {
-      publishRealtime({ type: 'scoreboard_update', contestId: contest_id });
-    }
 
     // First Accepted solve earns XP exactly once — awardSolveReward is
     // idempotent (unique constraint on user_problem_rewards), so rejudges
     // and repeated Accepted submissions award nothing extra. Failures here
     // must never fail the pipeline: the reward is progression metadata,
-    // not part of the verdict.
+    // not part of the verdict. Runs BEFORE the final publish so a newly
+    // created reward can ride on the Accepted event (xp_awarded) and the
+    // submitter's client shows the "+N XP" toast exactly once.
+    let xpAwarded: number | undefined;
     if (
       overallStatus === SUBMISSION_STATUS.ACCEPTED
       && user_id != null
@@ -215,10 +215,21 @@ async function runSubmissionPipeline(
     ) {
       try {
         const xp = await awardSolveReward(user_id, problem_id);
-        if (xp > 0) logger.info('xp reward granted', { userId: user_id, problemId: problem_id, xp });
+        if (xp > 0) {
+          xpAwarded = xp;
+          logger.info('xp reward granted', { userId: user_id, problemId: problem_id, xp });
+        }
       } catch (xpError) {
         logger.error('failed to award xp reward', { submissionId, problemId: problem_id, err: xpError });
       }
+    }
+
+    publishSubmissionStatus(submissionId, table, user_id, overallStatus, score, xpAwarded);
+    // A landed contest verdict can move the scoreboard: emit a ping so
+    // connected clients refetch the authoritative payload. Chatty-free by
+    // design — intermediate statuses don't ping, only final verdicts.
+    if (table === 'contest_submissions' && contest_id != null) {
+      publishRealtime({ type: 'scoreboard_update', contestId: contest_id });
     }
 
   } catch (error) {

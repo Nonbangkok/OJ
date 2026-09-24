@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import styles from '../../components/styles/Submissions.module.css';
 import SubmissionModal from '../problem/submission/SubmissionModal';
+import XpToast from '../../components/user/XpToast';
 import { useSubmissions } from '../../hooks/useSubmissions';
 import { getStatusClass, canViewCode, formatDateTime } from '../../utils/formatters';
 import tableStyles from '../../components/styles/Table.module.css';
@@ -47,6 +48,7 @@ const SubmissionsView = ({
         setFilter,
         selectedSubmission,
         isModalOpen,
+        lastRealtimeEvent,
         filterProblemId,
         filterUserId,
         problemSuggestions,
@@ -267,6 +269,10 @@ const SubmissionsView = ({
             {isModalOpen && (
                 <SubmissionModal submission={selectedSubmission} onClose={handleCloseModal} />
             )}
+
+            {/* "+N XP" toast — only fires on the owner's first-solve Accepted
+                verdict (positive xp_awarded on the SSE event). */}
+            {currentUser && <XpToast event={lastRealtimeEvent} />}
         </div>
     );
 };

@@ -56,9 +56,61 @@
   font-size: 0.875rem;
 }
 
-.change-avatar-button {
-  margin-left: auto;
+/* Own profile: the avatar itself is the "change avatar" control — a round
+   button with a dark translucent overlay (pencil + "Change") on hover/focus. */
+.avatar-button {
+  position: relative;
   flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  /* Match .profile-avatar's 88px + 3px border + 1px outline footprint. */
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-button .profile-avatar {
+  /* The button supplies the 3px/1px ring via box-shadow so the overlay
+     (positioned over the whole button) shares the same circular edge. */
+  border: none;
+  outline: none;
+  box-shadow:
+    0 0 0 3px var(--surface-elevated),
+    0 0 0 4px var(--border-color);
+}
+
+.avatar-button:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+
+.avatar-overlay {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  background-color: rgba(0, 0, 0, 0.55);
+  color: var(--text-primary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.avatar-button:hover .avatar-overlay,
+.avatar-button:focus-visible .avatar-overlay {
+  opacity: 1;
 }
 
 .avatar-input {
@@ -467,9 +519,9 @@
   white-space: nowrap;
 }
 
-/* --- Recent XP ------------------------------------------------------------ */
+/* --- Recently Solved ------------------------------------------------------- */
 
-.recent-xp-list {
+.recent-solved-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -477,40 +529,82 @@
   flex-direction: column;
 }
 
-.recent-xp-row {
+.recent-solved-row {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 0.75rem;
   padding: 0.375rem 0;
   font-size: 0.875rem;
 }
 
-.recent-xp-row + .recent-xp-row {
+.recent-solved-row + .recent-solved-row {
   border-top: 1px solid var(--border-color);
 }
 
-.recent-xp-gain {
+/* The whole title block links to the problem: title on top, muted ID under. */
+.recent-solved-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.recent-solved-title:hover .recent-solved-name,
+.recent-solved-title:focus-visible .recent-solved-name {
+  text-decoration: underline;
+}
+
+.recent-solved-title:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.recent-solved-name {
+  color: var(--text-primary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-solved-id {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
+}
+
+/* Difficulty chip — same recipe as the Problems page (ProblemCard.module.css
+   [class*='difficulty-chip-']): white text on the band color, AA in both
+   themes. Unrated renders no chip. */
+[class*='difficulty-chip-'] {
+  display: inline-block;
+  padding: 0.08rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+  line-height: 1.5;
+}
+
+.difficulty-chip-1 { background-color: var(--difficulty-band-1); }
+.difficulty-chip-2 { background-color: var(--difficulty-band-2); }
+.difficulty-chip-3 { background-color: var(--difficulty-band-3); }
+.difficulty-chip-4 { background-color: var(--difficulty-band-4); }
+.difficulty-chip-5 { background-color: var(--difficulty-band-5); }
+
+.recent-solved-gain {
   font-family: 'Inconsolata', monospace;
   color: var(--accent-primary);
   font-weight: 600;
   white-space: nowrap;
 }
 
-.recent-xp-problem {
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.recent-xp-difficulty {
-  font-family: 'Inconsolata', monospace;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.recent-xp-date {
+.recent-solved-date {
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -551,10 +645,6 @@
     align-items: center;
   }
 
-  .change-avatar-button {
-    margin-left: 0;
-  }
-
   .progression {
     margin-left: 0;
     align-items: center;
@@ -567,11 +657,11 @@
     min-width: 0;
   }
 
-  .recent-xp-row {
-    grid-template-columns: auto 1fr auto;
+  .recent-solved-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
   }
 
-  .recent-xp-date {
+  .recent-solved-date {
     display: none;
   }
 }

@@ -19,6 +19,8 @@ export interface AuthUser {
   username: string;
   role: UserRole;
   hasAvatar: boolean;
+  /** XP-derived tier label (e.g. "Novice"); present on auth-bootstrap responses. */
+  tier?: string;
 }
 
 export interface ProblemSuggestion {
@@ -218,7 +220,7 @@ export interface UserProfileResponse {
   };
   /** XP progression — independent of score; computed by the backend. */
   progression: UserProgression;
-  /** Newest-first reward history for the compact "Recent XP" list. */
+  /** Newest-first solve/XP-reward history for the "Recently Solved" list. */
   recentRewards: RecentXpReward[];
 }
 
@@ -236,6 +238,8 @@ export interface UserProgression {
   globalRank: number | null;
 }
 
+/** A first-solve XP reward: `awardedAt` is the first-solve timestamp, so a
+ *  "Recently Solved" row can be built from it (XP as supporting info). */
 export interface RecentXpReward {
   problemId: string;
   problemTitle: string | null;

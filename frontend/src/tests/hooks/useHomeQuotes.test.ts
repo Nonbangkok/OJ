@@ -10,49 +10,45 @@ describe('useHomeQuotes', () => {
         jest.useRealTimers();
     });
 
-    it('initializes with Welcome quote and correct states', () => {
+    it('initializes with a random quote from the list', () => {
         const { result } = renderHook(() => useHomeQuotes());
 
-        expect(result.current.currentQuote).toBe('Welcome');
-        expect(result.current.isWelcome).toBe(true);
+        expect(typeof result.current.currentQuote).toBe('string');
+        expect(result.current.currentQuote.length).toBeGreaterThan(0);
         expect(result.current.isFading).toBe(false);
     });
 
-    it('updates quote and fades when clicked', () => {
+    it('updates the quote after the fade when another quote is requested', () => {
         const { result } = renderHook(() => useHomeQuotes());
+        const initialQuote = result.current.currentQuote;
 
         act(() => {
-            result.current.handleClick();
+            result.current.showAnotherQuote();
         });
 
-        // Should start fading
+        // Should start fading, quote unchanged until the timeout fires
         expect(result.current.isFading).toBe(true);
-        expect(result.current.isWelcome).toBe(true); // Still true until timeout
-        expect(result.current.currentQuote).toBe('Welcome');
+        expect(result.current.currentQuote).toBe(initialQuote);
 
         act(() => {
             jest.advanceTimersByTime(300);
         });
 
-        // Should finish fading and update quote
+        // Should finish fading and update the quote
         expect(result.current.isFading).toBe(false);
-        expect(result.current.isWelcome).toBe(false);
-        expect(result.current.currentQuote).not.toBe('Welcome');
-        expect(typeof result.current.currentQuote).toBe('string');
+        expect(result.current.currentQuote).not.toBe(initialQuote);
     });
 
-    it('prevents click while fading', () => {
+    it('prevents requesting another quote while fading', () => {
         const { result } = renderHook(() => useHomeQuotes());
 
         act(() => {
-            result.current.handleClick();
+            result.current.showAnotherQuote();
         });
 
         // Now it is fading
-        const quoteWhileFading = result.current.currentQuote;
-
         act(() => {
-            result.current.handleClick(); // Should be ignored
+            result.current.showAnotherQuote(); // Should be ignored
         });
 
         expect(result.current.isFading).toBe(true);

@@ -42,6 +42,26 @@ describe('NavbarUserMenu', () => {
         expect(screen.getByRole('button', { name: /open user menu/i })).toBeInTheDocument();
     });
 
+    it('shows the tier badge next to the username when the user has a tier', () => {
+        jest.mocked(useAuth).mockReturnValue({
+            user: { id: 3, username: 'tester', role: 'user', hasAvatar: false, tier: 'Novice' },
+            isLoading: false,
+            login: jest.fn(),
+            logout: mockLogout,
+        });
+        renderMenu();
+
+        expect(screen.getByText('Novice')).toBeInTheDocument();
+        expect(screen.getByText('tester')).toBeInTheDocument();
+    });
+
+    it('does not show a tier badge when the user has no tier', () => {
+        renderMenu();
+
+        expect(screen.queryByText('Novice')).not.toBeInTheDocument();
+        expect(screen.queryByText('Specialist')).not.toBeInTheDocument();
+    });
+
     it('does not show menu items before clicking', () => {
         renderMenu();
         expect(screen.queryByRole('menuitem', { name: /log out/i })).not.toBeInTheDocument();

@@ -4,10 +4,14 @@ import fs from 'fs';
 import cp from 'child_process';
 import { judge } from '../../services/judgeService';
 import { publishRealtime } from '../../services/realtimeHub';
+import { awardSolveReward } from '../../services/progressionService';
 
 jest.mock('../../db');
 jest.mock('../../services/realtimeHub', () => ({
     publishRealtime: jest.fn(),
+}));
+jest.mock('../../services/progressionService', () => ({
+    awardSolveReward: jest.fn(),
 }));
 jest.mock('fs', () => ({
     existsSync: jest.fn(),
@@ -31,6 +35,8 @@ jest.mock('../../services/judgeService');
 describe('Submission Service', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        // Default: a solve earns nothing new (reward already existed).
+        (awardSolveReward as jest.Mock).mockResolvedValue(0);
         console.error = jest.fn(); // Suppress expected errors in tests
     });
 
@@ -240,6 +246,98 @@ describe('Submission Service', () => {
             expect(publishRealtime).toHaveBeenNthCalledWith(4, {
                 type: 'scoreboard_update',
                 contestId: 9,
+            });
+        });
+
+        it('attaches xp_awarded to the Accepted event when a new first-solve reward is created', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}) // UPDATE Running
+                .mockResolvedValueOnce({}); // UPDATE final results
+
+            (fs.existsSync as jest.Mock).mockReturnValue(true);
+
+            (judge as jest.Mock).mockResolvedValueOnce({
+                results: [{ testCase: 1, status: 'Accepted' }],
+                score: 100,
+                overallStatus: 'Accepted',
+                maxTimeMs: 10,
+                maxMemoryKb: 2048
+            });
+            (awardSolveReward as jest.Mock).mockResolvedValueOnce(46);
+
+            await processSubmission(1);
+
+            expect(awardSolveReward).toHaveBeenCalledWith(42, 'P1');
+            expect(publishRealtime).toHaveBeenLastCalledWith({
+                type: 'submission_update',
+                submissionId: 1,
+                table: 'submissions',
+                overall_status: 'Accepted',
+                score: 100,
+                user_id: 42,
+                xp_awarded: 46,
+            });
+        });
+
+        it('omits xp_awarded when the Accepted solve was already rewarded', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}) // UPDATE Running
+                .mockResolvedValueOnce({}); // UPDATE final results
+
+            (fs.existsSync as jest.Mock).mockReturnValue(true);
+
+            (judge as jest.Mock).mockResolvedValueOnce({
+                results: [{ testCase: 1, status: 'Accepted' }],
+                score: 100,
+                overallStatus: 'Accepted',
+                maxTimeMs: 10,
+                maxMemoryKb: 2048
+            });
+            (awardSolveReward as jest.Mock).mockResolvedValueOnce(0); // re-solve: nothing new
+
+            await processSubmission(1);
+
+            expect(publishRealtime).toHaveBeenLastCalledWith({
+                type: 'submission_update',
+                submissionId: 1,
+                table: 'submissions',
+                overall_status: 'Accepted',
+                score: 100,
+                user_id: 42,
+            });
+        });
+
+        it('omits xp_awarded when the reward lookup fails (reward is not part of the verdict)', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}) // UPDATE Running
+                .mockResolvedValueOnce({}); // UPDATE final results
+
+            (fs.existsSync as jest.Mock).mockReturnValue(true);
+
+            (judge as jest.Mock).mockResolvedValueOnce({
+                results: [{ testCase: 1, status: 'Accepted' }],
+                score: 100,
+                overallStatus: 'Accepted',
+                maxTimeMs: 10,
+                maxMemoryKb: 2048
+            });
+            (awardSolveReward as jest.Mock).mockRejectedValueOnce(new Error('rewards table gone'));
+
+            await processSubmission(1);
+
+            expect(publishRealtime).toHaveBeenLastCalledWith({
+                type: 'submission_update',
+                submissionId: 1,
+                table: 'submissions',
+                overall_status: 'Accepted',
+                score: 100,
+                user_id: 42,
             });
         });
 

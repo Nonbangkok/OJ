@@ -78,6 +78,32 @@ describe('Navbar Component', () => {
     expect(screen.getByRole('button', { name: /open user menu/i })).toBeInTheDocument();
   });
 
+  test('renders the tier badge next to the username when the user has a tier', () => {
+    jest.mocked(useAuth).mockReturnValue({
+      user: { id: 1, username: 'testuser', role: 'user', hasAvatar: false, tier: 'Specialist' },
+      isLoading: false,
+      login: jest.fn(),
+      logout: mockLogout,
+    });
+
+    render(<Navbar />);
+
+    expect(screen.getByText('Specialist')).toBeInTheDocument();
+  });
+
+  test('does not render a tier badge when the user has no tier', () => {
+    jest.mocked(useAuth).mockReturnValue({
+      user: { id: 1, username: 'testuser', role: 'user', hasAvatar: false },
+      isLoading: false,
+      login: jest.fn(),
+      logout: mockLogout,
+    });
+
+    render(<Navbar />);
+
+    expect(screen.queryByText('Novice')).not.toBeInTheDocument();
+  });
+
   test('renders Admin Panel link only for admins', () => {
     jest.mocked(useAuth).mockReturnValue({
       user: { id: 2, username: 'adminuser', role: 'admin', hasAvatar: false },

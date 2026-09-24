@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import UserProfile from '../../pages/user/UserProfile';
 import userService from '../../services/userService';
@@ -135,7 +135,7 @@ describe('User Profile Page', () => {
         });
     });
 
-    it('shows the avatar upload button only on your own profile', async () => {
+    it('shows the avatar change control only on your own profile', async () => {
         jest.mocked(userService.getProfile).mockResolvedValue(profileData);
 
         jest.mocked(useAuth).mockReturnValue({
@@ -156,6 +156,31 @@ describe('User Profile Page', () => {
         });
         renderPage();
         await waitFor(() => expect(screen.getByRole('button', { name: /change avatar/i })).toBeInTheDocument());
+        const avatarButton = screen.getByRole('button', { name: /change avatar/i });
+
+        // The button hosts the avatar (letter fallback here) and the hover overlay.
+        expect(avatarButton.querySelector('span[class*="profile-avatar"]')).toBeInTheDocument();
+        expect(avatarButton.querySelector('span[class*="avatar-overlay"]')).toBeInTheDocument();
+    });
+
+    it('opens the file picker when the avatar button is clicked', async () => {
+        jest.mocked(userService.getProfile).mockResolvedValue(profileData);
+        jest.mocked(useAuth).mockReturnValue({
+            user: { id: 3, username: 'tester', role: 'user', hasAvatar: false },
+            isLoading: false,
+            login: jest.fn(),
+            logout: jest.fn(),
+        });
+        renderPage();
+
+        const avatarButton = await screen.findByRole('button', { name: /change avatar/i });
+        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+        expect(fileInput).toBeInTheDocument();
+
+        // jsdom's HTMLInputElement has no .click(); stand in for it.
+        const clickSpy = jest.spyOn(fileInput, 'click').mockImplementation(() => { });
+        fireEvent.click(avatarButton);
+        expect(clickSpy).toHaveBeenCalledTimes(1);
     });
 
     it('shows an error message when the profile cannot be loaded', async () => {
@@ -231,23 +256,62 @@ describe('User Profile Page', () => {
         expect(bar).toHaveAttribute('aria-valuemax', '500');
     });
 
-    it('renders the Recent XP list from reward history', async () => {
+    it('renders the Recently Solved list from reward history', async () => {
         jest.mocked(userService.getProfile).mockResolvedValueOnce(profileData);
 
         renderPage();
 
         await waitFor(() => {
-            expect(screen.getByText('Binary Search on Ans')).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: 'Recently Solved' })).toBeInTheDocument();
         });
+
+        // The title block links to the problem page.
+        const titleLink = screen.getByRole('link', { name: /binary search on ans/i });
+        expect(titleLink).toHaveAttribute('href', '/problems/bs-on-ans');
+        expect(screen.getByText('Binary Search on Ans')).toBeInTheDocument();
+        // Muted problem ID as the secondary line under the title.
+        expect(screen.getByText('bs-on-ans')).toBeInTheDocument();
+
+        // Difficulty chip: 1400 maps to band 2 and uses the band's chip style.
+        const chip = screen.getByText('1400');
+        expect(chip.className).toContain('difficulty-chip-2');
+
         expect(screen.getByText('+46 XP')).toBeInTheDocument();
         expect(screen.getByText('Stock Span')).toBeInTheDocument();
         expect(screen.getByText('+37 XP')).toBeInTheDocument();
-        expect(screen.getByText('1400')).toBeInTheDocument();
+
+        // Solved date, computed the same way the page formats it.
+        const expectedDate = new Date('2026-09-20T10:00:00.000Z')
+            .toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        expect(screen.getByText(expectedDate)).toBeInTheDocument();
     });
 
     it('hides the rank badge when the user has no rewards', async () => {
         jest.mocked(userService.getProfile).mockResolvedValueOnce({
             ...profileData,
+            // Coherent empty account: no solves anywhere, so no rewards, no
+            // rank, and no Recently Solved section either.
+            problemsAttempted: 0,
+            problemsSolved: 0,
+            totalScore: 0,
+            submissionCount: 0,
+            verdictCounts: {},
+            languageCounts: {},
+            dailyActivity: [],
+            currentStreak: 0,
+            longestStreak: 0,
+            lastAcDate: null,
+            categoryStats: [],
+            achievements: {
+                unlocked: [],
+                stats: {
+                    problemsSolved: 0,
+                    currentStreak: 0,
+                    longestStreak: 0,
+                    languagesSolvedIn: {},
+                    contestsJoined: 0,
+                },
+            },
             progression: {
                 totalXp: 0,
                 level: 1,
@@ -264,6 +328,6 @@ describe('User Profile Page', () => {
             expect(screen.getByText('Novice')).toBeInTheDocument();
         });
         expect(screen.queryByText(/Rank #/)).toBeNull();
-        expect(screen.queryByText('Recent XP')).toBeNull();
+        expect(screen.queryByText('Recently Solved')).toBeNull();
     });
 });

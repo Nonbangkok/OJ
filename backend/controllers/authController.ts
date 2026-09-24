@@ -16,6 +16,7 @@ import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
 import { authLimiter } from '../middleware/rateLimit';
 import { loginSchema, registerSchema } from '../schemas/requestSchemas';
+import { getUserTier } from '../services/progressionService';
 import { logger } from '../utils/logger';
 
 const router: Router = express.Router();
@@ -148,6 +149,15 @@ router.post(
 
     await saveSession(req);
 
+    // Tier rides along at login so the frontend can badge the navbar without
+    // a second round-trip. A failure here must never fail the login itself.
+    let tier: string | undefined;
+    try {
+      tier = await getUserTier(user.id);
+    } catch (tierError) {
+      logger.warn('failed to compute tier at login', { userId: user.id, err: tierError });
+    }
+
     res.json({
       message: 'Login successful',
       user: {
@@ -155,6 +165,7 @@ router.post(
         username: user.username,
         role: user.role,
         hasAvatar: user.has_avatar,
+        ...(tier !== undefined ? { tier } : {}),
       },
     });
   }),
@@ -165,16 +176,26 @@ router.post('/logout', asyncHandler(async (req: Request, res: Response<MessageRe
   res.json({ message: 'Logout successful' });
 }));
 
-router.get('/me', (req: Request, res: Response<MeResponse>) => {
+router.get('/me', asyncHandler(async (req: Request, res: Response<MeResponse>) => {
   if (req.user) {
+    // This endpoint runs once per app bootstrap (session hydration), not per
+    // request, so the tier aggregation is bounded. req.user itself stays
+    // aggregation-free (attachRequestUser never touches progression tables).
+    let tier: string | undefined;
+    try {
+      tier = await getUserTier(req.user.id);
+    } catch (tierError) {
+      logger.warn('failed to compute tier for /me', { userId: req.user.id, err: tierError });
+    }
+
     res.json({
       isAuthenticated: true,
-      user: req.user,
+      user: { ...req.user, ...(tier !== undefined ? { tier } : {}) },
     });
     return;
   }
 
   res.json({ isAuthenticated: false });
-});
+}));
 
 export default router;

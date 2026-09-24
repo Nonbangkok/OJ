@@ -28,39 +28,34 @@ const quotes = [
   "If it works, don't touch it... (this is bad advice)",
 ];
 
+const pickRandomQuote = (excluding?: string): string => {
+  // Prevent showing the same quote twice in a row
+  let newQuote;
+  do {
+    newQuote = quotes[Math.floor(Math.random() * quotes.length)];
+  } while (newQuote === excluding);
+  return newQuote;
+};
+
 const useHomeQuotes = () => {
-  const [currentQuote, setCurrentQuote] = useState('Welcome');
-  const [isWelcome, setIsWelcome] = useState(true);
+  const [currentQuote, setCurrentQuote] = useState<string>(() => pickRandomQuote());
   const [isFading, setIsFading] = useState(false);
 
-  const getRandomQuote = () => {
-    // Prevent showing the same quote twice in a row
-    let newQuote;
-    do {
-      newQuote = quotes[Math.floor(Math.random() * quotes.length)];
-    } while (newQuote === currentQuote);
-    return newQuote;
-  };
-
-  const handleClick = () => {
+  const showAnotherQuote = () => {
     if (isFading) return; // Prevent clicking while animating
 
     setIsFading(true); // Start fade out
 
     setTimeout(() => {
-      if (isWelcome) {
-        setIsWelcome(false);
-      }
-      setCurrentQuote(getRandomQuote());
+      setCurrentQuote((previous) => pickRandomQuote(previous));
       setIsFading(false); // Start fade in
     }, 300); // Match CSS transition duration
   };
 
   return {
     currentQuote,
-    isWelcome,
     isFading,
-    handleClick,
+    showAnotherQuote,
   };
 };
 

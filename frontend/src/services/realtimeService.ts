@@ -16,6 +16,8 @@ export interface SubmissionUpdatePayload {
   overall_status: string;
   score: number;
   user_id: number | null;
+  /** XP granted when this Accepted verdict created a NEW first-solve reward. */
+  xp_awarded?: number;
 }
 
 /** A "something changed" ping for one contest's scoreboard. */

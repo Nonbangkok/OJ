@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import submissionService from '../services/submissionService';
-import { subscribeSubmissions, isRealtimeSupported } from '../services/realtimeService';
+import {
+  subscribeSubmissions,
+  isRealtimeSupported,
+  type SubmissionUpdatePayload,
+} from '../services/realtimeService';
 import { useAuth } from '../context/AuthContext';
 import { useAutocomplete } from './useAutocomplete';
 import { USER_ROLES, SUBMISSION_STATUS } from '../utils/constants';
@@ -31,6 +35,10 @@ export const useSubmissions = (
   // server error — not a transient drop, which the browser retries), revert
   // to the original fast interval so the page never stops updating.
   const [realtimeDown, setRealtimeDown] = useState(!isRealtimeSupported());
+  // Latest SSE submission event — consumed by the "+N XP" first-solve toast.
+  // Server-side filtering already guarantees these are the user's own
+  // submissions, so no extra owner check is needed here.
+  const [lastRealtimeEvent, setLastRealtimeEvent] = useState<SubmissionUpdatePayload | null>(null);
 
   const problemAutocomplete = useAutocomplete(submissionService.searchProblems, { contestId });
   const userAutocomplete = useAutocomplete(submissionService.searchUsers, { contestId });
@@ -95,7 +103,8 @@ export const useSubmissions = (
     if (!currentUser || !isRealtimeSupported()) {
       return undefined;
     }
-    const unsubscribe = subscribeSubmissions(() => {
+    const unsubscribe = subscribeSubmissions((payload) => {
+      setLastRealtimeEvent(payload);
       void fetchData();
     }, {
       onStreamDown: () => setRealtimeDown(true),
@@ -160,6 +169,7 @@ export const useSubmissions = (
     setFilter,
     selectedSubmission,
     isModalOpen,
+    lastRealtimeEvent,
 
     // Autocomplete — expose with backward-compatible names
     filterProblemId: problemAutocomplete.query,

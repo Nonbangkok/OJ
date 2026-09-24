@@ -110,6 +110,10 @@ describe('Auth Controller', () => {
             (db.query as jest.Mock).mockResolvedValueOnce({
                 rows: [{ id: 1, username: 'testuser', password_hash: hashedPassword, role: 'user' }]
             });
+            // Tier lookup (SUM over user_problem_rewards) — no rewards yet.
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ total_xp: '0' }]
+            });
 
             const res = await request(app)
                 .post('/login')
@@ -118,6 +122,40 @@ describe('Auth Controller', () => {
             expect(res.status).toBe(200);
             expect(res.body.message).toBe('Login successful');
             expect(res.body.user.username).toBe('testuser');
+        });
+
+        it('should include the XP-derived tier in the login response', async () => {
+            const hashedPassword = await bcrypt.hash('password123', 10);
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ id: 1, username: 'testuser', password_hash: hashedPassword, role: 'user' }]
+            });
+            // 25000 XP -> level 16 -> Expert.
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ total_xp: '25000' }]
+            });
+
+            const res = await request(app)
+                .post('/login')
+                .send({ username: 'testuser', password: 'password123' });
+
+            expect(res.status).toBe(200);
+            expect(res.body.user.tier).toBe('Expert');
+        });
+
+        it('should still log the user in when the tier lookup fails', async () => {
+            const hashedPassword = await bcrypt.hash('password123', 10);
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ id: 1, username: 'testuser', password_hash: hashedPassword, role: 'user' }]
+            });
+            (db.query as jest.Mock).mockRejectedValueOnce(new Error('rewards table gone'));
+
+            const res = await request(app)
+                .post('/login')
+                .send({ username: 'testuser', password: 'password123' });
+
+            expect(res.status).toBe(200);
+            expect(res.body.user.username).toBe('testuser');
+            expect(res.body.user.tier).toBeUndefined();
         });
 
         it('should return 401 with a neutral message for wrong password', async () => {
@@ -194,12 +232,56 @@ describe('Auth Controller', () => {
                 next();
             });
             appWithUser.use('/', authRouter);
+            // Tier lookup — no rewards yet.
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ total_xp: '0' }] });
 
             const res = await request(appWithUser).get('/me');
             expect(res.status).toBe(200);
             expect(res.body.isAuthenticated).toBe(true);
             expect(res.body.user.username).toBe('tester');
             expect(res.body.user.hasAvatar).toBe(true);
+        });
+
+        it('should include the XP-derived tier in the /me response', async () => {
+            const appWithUser = express();
+            appWithUser.use(express.json());
+            appWithUser.use(session({
+                secret: 'test-secret',
+                resave: false,
+                saveUninitialized: false,
+            }));
+            appWithUser.use((req: Request, _res: Response, next: NextFunction) => {
+                req.user = { id: 1, username: 'tester', role: 'user', hasAvatar: true };
+                next();
+            });
+            appWithUser.use('/', authRouter);
+            // 25000 XP -> level 16 -> Expert.
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ total_xp: '25000' }] });
+
+            const res = await request(appWithUser).get('/me');
+            expect(res.status).toBe(200);
+            expect(res.body.user.tier).toBe('Expert');
+        });
+
+        it('should omit tier (not fail) when the progression lookup errors on /me', async () => {
+            const appWithUser = express();
+            appWithUser.use(express.json());
+            appWithUser.use(session({
+                secret: 'test-secret',
+                resave: false,
+                saveUninitialized: false,
+            }));
+            appWithUser.use((req: Request, _res: Response, next: NextFunction) => {
+                req.user = { id: 1, username: 'tester', role: 'user', hasAvatar: true };
+                next();
+            });
+            appWithUser.use('/', authRouter);
+            (db.query as jest.Mock).mockRejectedValueOnce(new Error('rewards table gone'));
+
+            const res = await request(appWithUser).get('/me');
+            expect(res.status).toBe(200);
+            expect(res.body.isAuthenticated).toBe(true);
+            expect(res.body.user.tier).toBeUndefined();
         });
     });
 });

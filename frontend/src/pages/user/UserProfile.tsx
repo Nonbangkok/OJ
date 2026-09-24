@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import { PencilSimple } from '@phosphor-icons/react';
 
 import ActivityHeatmap from '../../components/user/ActivityHeatmap';
 import ProblemSolvingProfile from '../../features/user/ProblemSolvingProfile';
@@ -11,6 +12,7 @@ import {
   progressFraction,
   progressLabel,
 } from '../../utils/achievements';
+import { difficultyBand } from '../../utils/constants';
 
 import styles from './UserProfile.module.css';
 
@@ -96,19 +98,36 @@ const UserProfile = () => {
 
   const unlockedIds = new Set(profile.achievements.unlocked.map((achievement) => achievement.id));
 
+  const avatarContent = profile.hasAvatar ? (
+    <img
+      className={styles['profile-avatar']}
+      src={`${process.env.REACT_APP_API_URL}/users/${profile.username}/avatar${avatarVersion}`}
+      alt={`${profile.username}'s avatar`}
+    />
+  ) : (
+    <span className={styles['profile-avatar']} aria-hidden="true">
+      {profile.username[0]?.toLocaleUpperCase()}
+    </span>
+  );
+
   return (
     <div className={styles['profile-container']}>
       <div className={styles['profile-header']}>
-        {profile.hasAvatar ? (
-          <img
-            className={styles['profile-avatar']}
-            src={`${process.env.REACT_APP_API_URL}/users/${profile.username}/avatar${avatarVersion}`}
-            alt={`${profile.username}'s avatar`}
-          />
+        {isOwnProfile ? (
+          <button
+            type="button"
+            className={styles['avatar-button']}
+            aria-label="Change avatar"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {avatarContent}
+            <span className={styles['avatar-overlay']} aria-hidden="true">
+              <PencilSimple size={20} weight="fill" />
+              Change
+            </span>
+          </button>
         ) : (
-          <span className={styles['profile-avatar']} aria-hidden="true">
-            {profile.username[0]?.toLocaleUpperCase()}
-          </span>
+          avatarContent
         )}
         <div className={styles['profile-title']}>
           <h1>{profile.username}</h1>
@@ -149,22 +168,13 @@ const UserProfile = () => {
           </div>
         )}
         {isOwnProfile && (
-          <>
-            <button
-              type="button"
-              className={`${styles['change-avatar-button']} button button-secondary`}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              Change Avatar
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className={styles['avatar-input']}
-              onChange={handleAvatarSelected}
-            />
-          </>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className={styles['avatar-input']}
+            onChange={handleAvatarSelected}
+          />
         )}
       </div>
 
@@ -193,24 +203,32 @@ const UserProfile = () => {
 
       {profile.recentRewards?.length > 0 && (
         <div className={styles.section}>
-          <h2>Recent XP</h2>
-          <ul className={styles['recent-xp-list']}>
-            {profile.recentRewards.slice(0, 5).map((reward) => (
-              <li key={`${reward.problemId}-${reward.awardedAt}`} className={styles['recent-xp-row']}>
-                <span className={styles['recent-xp-gain']}>+{reward.xpAwarded} XP</span>
-                <span className={styles['recent-xp-problem']}>
-                  {reward.problemTitle ?? reward.problemId}
-                </span>
-                {reward.difficultySnapshot !== null && (
-                  <span className={styles['recent-xp-difficulty']}>
-                    {reward.difficultySnapshot}
+          <h2>Recently Solved</h2>
+          <ul className={styles['recent-solved-list']}>
+            {profile.recentRewards.slice(0, 5).map((reward) => {
+              const band = difficultyBand(reward.difficultySnapshot);
+              return (
+                <li key={`${reward.problemId}-${reward.awardedAt}`} className={styles['recent-solved-row']}>
+                  <Link className={styles['recent-solved-title']} to={`/problems/${reward.problemId}`}>
+                    <span className={styles['recent-solved-name']}>
+                      {reward.problemTitle ?? reward.problemId}
+                    </span>
+                    <span className={styles['recent-solved-id']}>
+                      {reward.problemId}
+                    </span>
+                  </Link>
+                  {reward.difficultySnapshot !== null && band !== null && (
+                    <span className={styles[`difficulty-chip-${band}`]}>
+                      {reward.difficultySnapshot}
+                    </span>
+                  )}
+                  <span className={styles['recent-solved-gain']}>+{reward.xpAwarded} XP</span>
+                  <span className={styles['recent-solved-date']}>
+                    {formatRewardDate(reward.awardedAt)}
                   </span>
-                )}
-                <span className={styles['recent-xp-date']}>
-                  {formatRewardDate(reward.awardedAt)}
-                </span>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

@@ -77,6 +77,13 @@ export interface UserPublicProfileDTO {
     username: string;
     role: UserRole;
     hasAvatar: boolean;
+    /**
+     * XP-derived tier label (e.g. "Novice", "Specialist"). Present only on
+     * auth-bootstrap responses (login, /me) where the backend computes it —
+     * the per-request `req.user` context stays aggregation-free, so treat it
+     * as optional wherever the DTO doubles as the request context shape.
+     */
+    tier?: string;
 }
 
 /** `system_settings` table row. */

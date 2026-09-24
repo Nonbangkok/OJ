@@ -18,6 +18,13 @@ export type SubmissionUpdateEvent = {
   score: number;
   /** Owning user — used by the controller for server-side per-user filtering. */
   user_id: number | null;
+  /**
+   * XP granted when this event's Accepted verdict created a NEW first-solve
+   * reward. Absent on every other transition (non-Accepted verdicts, re-solves
+   * of already-solved problems, rejudge re-landings) — clients show the
+   * "+N XP" toast only when this is present and positive.
+   */
+  xp_awarded?: number;
 };
 
 /** Emitted when a contest scoreboard's underlying data changed. */

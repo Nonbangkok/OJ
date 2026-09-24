@@ -133,6 +133,22 @@ export const awardSolveReward = async (
 };
 
 /**
+ * Tier label for a user, derived from their total XP. A single SUM query —
+ * deliberately cheaper than `getUserProgression` (no rank window function),
+ * so auth bootstrap endpoints can call it on login/session hydration without
+ * a per-request aggregation cost.
+ */
+export const getUserTier = async (userId: number): Promise<string> => {
+    const totals = await query<{ total_xp: string }>(`
+      SELECT COALESCE(SUM(xp_awarded), 0) AS total_xp
+      FROM user_problem_rewards
+      WHERE user_id = $1
+    `, [userId]);
+    const totalXp = Number(totals.rows[0]?.total_xp ?? 0);
+    return getTierForLevel(getLevelFromXP(totalXp));
+};
+
+/**
  * Total XP + derived level/tier/progress + dense global rank for a user.
  * Returns zeros/level 1 (no rank) for users without rewards.
  */
