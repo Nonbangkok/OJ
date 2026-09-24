@@ -21,6 +21,8 @@ export interface AuthUser {
   hasAvatar: boolean;
   /** XP-derived tier label (e.g. "Novice"); present on auth-bootstrap responses. */
   tier?: string;
+  /** XP-derived level; present whenever tier is. */
+  level?: number;
 }
 
 export interface ProblemSuggestion {

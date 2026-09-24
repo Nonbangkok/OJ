@@ -5,15 +5,17 @@
   min-width: 0; /* let the username ellipsize instead of overflowing the navbar */
 }
 
+/* Trigger identifies the user only: avatar + username + chevron. */
 .trigger {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
+  max-width: 220px; /* long usernames ellipsize instead of stretching the navbar */
   background: none;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 0.25rem 0.75rem 0.25rem 0.25rem;
+  padding: 0.1875rem 0.625rem 0.1875rem 0.1875rem;
   cursor: pointer;
   color: var(--text-primary);
   transition:
@@ -25,9 +27,14 @@
   background-color: var(--background-secondary);
 }
 
+.trigger:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
 .avatar {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
@@ -39,7 +46,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 
@@ -52,23 +59,9 @@
   text-overflow: ellipsis;
 }
 
-/* XP tier label next to the username — small, flat, accent-tinted text. */
-.tier-badge {
-  flex-shrink: 0;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  line-height: 1;
-  color: var(--accent-primary);
-  background-color: var(--surface-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: 0.1875rem 0.375rem;
-  white-space: nowrap;
-}
-
 .caret {
   color: var(--text-muted);
+  flex-shrink: 0;
   transition: transform 0.15s ease;
 }
 
@@ -80,7 +73,7 @@
   position: absolute;
   top: calc(100% + 0.5rem);
   right: 0;
-  min-width: 180px;
+  min-width: 220px;
   background-color: var(--surface-elevated);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -90,6 +83,54 @@
   flex-direction: column;
   gap: 0.125rem;
   z-index: 100;
+}
+
+/* Header: identity + compact progression, secondary text only. */
+.menu-header {
+  padding: 0.5rem 0.625rem 0.625rem;
+}
+
+.menu-header-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.header-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.header-names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.header-username {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Tier + level as quiet accent text — never a badge. */
+.header-tier {
+  color: var(--accent-primary);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.menu-separator {
+  border-top: 1px solid var(--border-color);
+  margin: 0.25rem 0.375rem;
 }
 
 .menu-item {
@@ -109,4 +150,22 @@
 
 .menu-item:hover {
   background-color: var(--background-secondary);
+}
+
+.menu-item:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+/* Narrow screens: keep the avatar + chevron, drop the username text before
+   the control can collide with the nav links. */
+@media (max-width: 560px) {
+  .username {
+    display: none;
+  }
+
+  .trigger {
+    max-width: none;
+    padding: 0.1875rem 0.5rem 0.1875rem 0.1875rem;
+  }
 }

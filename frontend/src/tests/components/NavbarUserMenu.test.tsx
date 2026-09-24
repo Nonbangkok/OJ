@@ -42,24 +42,57 @@ describe('NavbarUserMenu', () => {
         expect(screen.getByRole('button', { name: /open user menu/i })).toBeInTheDocument();
     });
 
-    it('shows the tier badge next to the username when the user has a tier', () => {
+    it('keeps the trigger identity-only: no tier text next to the username', () => {
         jest.mocked(useAuth).mockReturnValue({
-            user: { id: 3, username: 'tester', role: 'user', hasAvatar: false, tier: 'Novice' },
+            user: { id: 3, username: 'tester', role: 'user', hasAvatar: false, tier: 'Novice', level: 4 },
             isLoading: false,
             login: jest.fn(),
             logout: mockLogout,
         });
         renderMenu();
 
-        expect(screen.getByText('Novice')).toBeInTheDocument();
+        // The closed trigger shows the username but never the tier.
         expect(screen.getByText('tester')).toBeInTheDocument();
+        expect(screen.queryByText('Novice')).not.toBeInTheDocument();
     });
 
-    it('does not show a tier badge when the user has no tier', () => {
+    it('shows tier and level in the dropdown header once opened', () => {
+        jest.mocked(useAuth).mockReturnValue({
+            user: { id: 3, username: 'tester', role: 'user', hasAvatar: false, tier: 'Grandmaster', level: 40 },
+            isLoading: false,
+            login: jest.fn(),
+            logout: mockLogout,
+        });
         renderMenu();
+        fireEvent.click(screen.getByRole('button', { name: /open user menu/i }));
 
-        expect(screen.queryByText('Novice')).not.toBeInTheDocument();
-        expect(screen.queryByText('Specialist')).not.toBeInTheDocument();
+        expect(screen.getByText('Grandmaster · Level 40')).toBeInTheDocument();
+        // Header repeats the username alongside the menu items.
+        expect(screen.getAllByText('tester').length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('omits the progression line in the dropdown when the user has no tier', () => {
+        renderMenu();
+        fireEvent.click(screen.getByRole('button', { name: /open user menu/i }));
+
+        expect(screen.queryByText(/· Level /)).not.toBeInTheDocument();
+    });
+
+    it('shows Settings only for staff and admins', () => {
+        const regular = renderMenu();
+        fireEvent.click(screen.getByRole('button', { name: /open user menu/i }));
+        expect(screen.queryByRole('menuitem', { name: /settings/i })).not.toBeInTheDocument();
+        regular.unmount();
+
+        jest.mocked(useAuth).mockReturnValue({
+            user: { id: 3, username: 'tester', role: 'admin', hasAvatar: false },
+            isLoading: false,
+            login: jest.fn(),
+            logout: mockLogout,
+        });
+        renderMenu();
+        fireEvent.click(screen.getByRole('button', { name: /open user menu/i }));
+        expect(screen.getByRole('menuitem', { name: /settings/i })).toHaveAttribute('href', '/admin/settings');
     });
 
     it('does not show menu items before clicking', () => {

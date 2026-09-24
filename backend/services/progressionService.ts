@@ -139,13 +139,26 @@ export const awardSolveReward = async (
  * a per-request aggregation cost.
  */
 export const getUserTier = async (userId: number): Promise<string> => {
+    const { tier } = await getUserTierAndLevel(userId);
+    return tier;
+};
+
+/**
+ * Tier label AND numeric level for a user, same single SUM query. Auth
+ * bootstrap responses use both for the compact "Tier · Level N" display
+ * in the navbar user dropdown.
+ */
+export const getUserTierAndLevel = async (
+    userId: number,
+): Promise<{ tier: string; level: number }> => {
     const totals = await query<{ total_xp: string }>(`
       SELECT COALESCE(SUM(xp_awarded), 0) AS total_xp
       FROM user_problem_rewards
       WHERE user_id = $1
     `, [userId]);
     const totalXp = Number(totals.rows[0]?.total_xp ?? 0);
-    return getTierForLevel(getLevelFromXP(totalXp));
+    const level = getLevelFromXP(totalXp);
+    return { tier: getTierForLevel(level), level };
 };
 
 /**

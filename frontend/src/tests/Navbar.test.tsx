@@ -78,7 +78,7 @@ describe('Navbar Component', () => {
     expect(screen.getByRole('button', { name: /open user menu/i })).toBeInTheDocument();
   });
 
-  test('renders the tier badge next to the username when the user has a tier', () => {
+  test('keeps the navbar identity-only: no tier badge even when the user has a tier', () => {
     jest.mocked(useAuth).mockReturnValue({
       user: { id: 1, username: 'testuser', role: 'user', hasAvatar: false, tier: 'Specialist' },
       isLoading: false,
@@ -88,20 +88,9 @@ describe('Navbar Component', () => {
 
     render(<Navbar />);
 
-    expect(screen.getByText('Specialist')).toBeInTheDocument();
-  });
-
-  test('does not render a tier badge when the user has no tier', () => {
-    jest.mocked(useAuth).mockReturnValue({
-      user: { id: 1, username: 'testuser', role: 'user', hasAvatar: false },
-      isLoading: false,
-      login: jest.fn(),
-      logout: mockLogout,
-    });
-
-    render(<Navbar />);
-
-    expect(screen.queryByText('Novice')).not.toBeInTheDocument();
+    // Tier now lives inside the dropdown header, never on the closed control.
+    expect(screen.queryByText('Specialist')).not.toBeInTheDocument();
+    expect(screen.getByText('testuser')).toBeInTheDocument();
   });
 
   test('renders Admin Panel link only for admins', () => {
