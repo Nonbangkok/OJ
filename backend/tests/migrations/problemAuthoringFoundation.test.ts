@@ -25,6 +25,8 @@ describe('problem authoring foundation migration', () => {
       '0012_problem_categories',
       '0013_problem_difficulty',
       '0014_problem_collections',
+      '0015_drop_collection_description',
+      '0016_user_problem_rewards',
     ]);
   });
 

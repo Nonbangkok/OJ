@@ -1,6 +1,7 @@
 import { query } from '../db';
 import { PROFILE_ACTIVITY_WINDOW_DAYS, SUBMISSION_QUERY_CONFIG, SUBMISSION_STATUS, ACHIEVEMENTS, PROBLEM_CATEGORIES} from '../constants';
 import { computeStreaks } from '../utils/streaks';
+import { getRecentRewards, getUserProgression, RecentReward, UserProgression } from './progressionService';
 
 export interface UserProfileStatsRow {
     id: number;
@@ -33,6 +34,10 @@ export interface UserProfileStatsRow {
             contestsJoined: number;
         };
     };
+    /** XP progression (derived from reward history, independent of score). */
+    progression: UserProgression;
+    /** Newest-first reward history for the "Recent XP" list. */
+    recentRewards: RecentReward[];
 }
 
 export interface UserAvatarRow {
@@ -226,6 +231,11 @@ export const getUserProfileStats = async (
         return { category, solved, total, percentage };
     });
 
+    const [progression, recentRewards] = await Promise.all([
+        getUserProgression(row.id),
+        getRecentRewards(row.id),
+    ]);
+
     return {
         ...stats,
         current_streak: currentStreak,
@@ -233,6 +243,8 @@ export const getUserProfileStats = async (
         last_ac_date: lastAcDate,
         achievements: { unlocked, stats: achievementStats },
         categoryStats,
+        progression,
+        recentRewards,
     };
 };
 

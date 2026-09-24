@@ -216,6 +216,32 @@ export interface UserProfileResponse {
     unlocked: UnlockedAchievement[];
     stats: AchievementStats;
   };
+  /** XP progression — independent of score; computed by the backend. */
+  progression: UserProgression;
+  /** Newest-first reward history for the compact "Recent XP" list. */
+  recentRewards: RecentXpReward[];
+}
+
+export interface UserProgression {
+  totalXp: number;
+  level: number;
+  tier: string;
+  levelProgress: {
+    current: number;
+    required: number;
+    remaining: number;
+    percentage: number;
+  };
+  /** Dense global rank by total XP; null when the user has no rewards. */
+  globalRank: number | null;
+}
+
+export interface RecentXpReward {
+  problemId: string;
+  problemTitle: string | null;
+  xpAwarded: number;
+  difficultySnapshot: number | null;
+  awardedAt: string;
 }
 
 export interface CategoryStat {

@@ -48,6 +48,8 @@ router.get('/users/:username/profile',
       lastAcDate: stats.last_ac_date,
       achievements: stats.achievements,
       categoryStats: stats.categoryStats,
+      progression: stats.progression,
+      recentRewards: stats.recentRewards,
     });
   }));
 

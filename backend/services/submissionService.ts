@@ -9,12 +9,14 @@ import { CompileCommandError } from '../types/service';
 import {
   JUDGE_CONFIG,
   LANGUAGE_PREPARE,
+  SUBMISSION_QUERY_CONFIG,
   SUBMISSION_STATUS,
   SubmissionLanguage,
 } from '../constants';
 import { findForbiddenInclude } from '../utils/compileGuard';
 import { logger } from '../utils/logger';
 import { publishRealtime } from './realtimeHub';
+import { awardSolveReward } from './progressionService';
 
 const execPromise = promisify(exec);
 
@@ -199,6 +201,24 @@ async function runSubmissionPipeline(
     // design — intermediate statuses don't ping, only final verdicts.
     if (table === 'contest_submissions' && contest_id != null) {
       publishRealtime({ type: 'scoreboard_update', contestId: contest_id });
+    }
+
+    // First Accepted solve earns XP exactly once — awardSolveReward is
+    // idempotent (unique constraint on user_problem_rewards), so rejudges
+    // and repeated Accepted submissions award nothing extra. Failures here
+    // must never fail the pipeline: the reward is progression metadata,
+    // not part of the verdict.
+    if (
+      overallStatus === SUBMISSION_STATUS.ACCEPTED
+      && user_id != null
+      && score >= SUBMISSION_QUERY_CONFIG.FULL_PROBLEM_SCORE
+    ) {
+      try {
+        const xp = await awardSolveReward(user_id, problem_id);
+        if (xp > 0) logger.info('xp reward granted', { userId: user_id, problemId: problem_id, xp });
+      } catch (xpError) {
+        logger.error('failed to award xp reward', { submissionId, problemId: problem_id, err: xpError });
+      }
     }
 
   } catch (error) {

@@ -6,6 +6,19 @@ jest.mock('../../db', () => ({
   pool: { connect: jest.fn() },
 }));
 
+// Progression is a separate concern covered by its own tests; the stats
+// tests only exercise the streak/achievement SQL, so keep progression fixed.
+jest.mock('../../services/progressionService', () => ({
+  getUserProgression: jest.fn().mockResolvedValue({
+    totalXp: 0,
+    level: 1,
+    tier: 'Novice',
+    levelProgress: { current: 0, required: 100, remaining: 100, percentage: 0 },
+    globalRank: null,
+  }),
+  getRecentRewards: jest.fn().mockResolvedValue([]),
+}));
+
 const query = db.query as jest.Mock;
 
 const baseRow = {

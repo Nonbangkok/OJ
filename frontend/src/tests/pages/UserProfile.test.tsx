@@ -46,6 +46,29 @@ const profileData = {
             contestsJoined: 0,
         },
     },
+    progression: {
+        totalXp: 2840,
+        level: 6,
+        tier: 'Apprentice',
+        levelProgress: { current: 340, required: 500, remaining: 160, percentage: 68 },
+        globalRank: 3,
+    },
+    recentRewards: [
+        {
+            problemId: 'bs-on-ans',
+            problemTitle: 'Binary Search on Ans',
+            xpAwarded: 46,
+            difficultySnapshot: 1400,
+            awardedAt: '2026-09-20T10:00:00.000Z',
+        },
+        {
+            problemId: 'stock-span',
+            problemTitle: 'Stock Span',
+            xpAwarded: 37,
+            difficultySnapshot: 1200,
+            awardedAt: '2026-09-19T09:00:00.000Z',
+        },
+    ],
 };
 
 const renderPage = () =>
@@ -188,5 +211,59 @@ describe('User Profile Page', () => {
         for (const name of ['Getting Started', 'Problem Grinder', 'Century', 'On Fire', 'Unstoppable', 'Polyglot', 'Contester']) {
             expect(screen.getByText(name)).toBeInTheDocument();
         }
+    });
+
+    it('renders the XP progression block in the identity card', async () => {
+        jest.mocked(userService.getProfile).mockResolvedValueOnce(profileData);
+
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByText('Apprentice')).toBeInTheDocument();
+        });
+        expect(screen.getByText('Level 6')).toBeInTheDocument();
+        expect(screen.getByText('2,840 XP')).toBeInTheDocument();
+        expect(screen.getByText('160 XP to Level 7')).toBeInTheDocument();
+        expect(screen.getByText('Rank #3')).toBeInTheDocument();
+
+        const bar = screen.getByRole('progressbar');
+        expect(bar).toHaveAttribute('aria-valuenow', '340');
+        expect(bar).toHaveAttribute('aria-valuemax', '500');
+    });
+
+    it('renders the Recent XP list from reward history', async () => {
+        jest.mocked(userService.getProfile).mockResolvedValueOnce(profileData);
+
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByText('Binary Search on Ans')).toBeInTheDocument();
+        });
+        expect(screen.getByText('+46 XP')).toBeInTheDocument();
+        expect(screen.getByText('Stock Span')).toBeInTheDocument();
+        expect(screen.getByText('+37 XP')).toBeInTheDocument();
+        expect(screen.getByText('1400')).toBeInTheDocument();
+    });
+
+    it('hides the rank badge when the user has no rewards', async () => {
+        jest.mocked(userService.getProfile).mockResolvedValueOnce({
+            ...profileData,
+            progression: {
+                totalXp: 0,
+                level: 1,
+                tier: 'Novice',
+                levelProgress: { current: 0, required: 100, remaining: 100, percentage: 0 },
+                globalRank: null,
+            },
+            recentRewards: [],
+        });
+
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByText('Novice')).toBeInTheDocument();
+        });
+        expect(screen.queryByText(/Rank #/)).toBeNull();
+        expect(screen.queryByText('Recent XP')).toBeNull();
     });
 });

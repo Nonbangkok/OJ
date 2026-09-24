@@ -17,6 +17,11 @@ import styles from './UserProfile.module.css';
 const formatDate = (iso: string): string =>
   new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
 
+const formatXp = (xp: number): string => xp.toLocaleString();
+
+const formatRewardDate = (iso: string): string =>
+  new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
 const verdictClass = (verdict: string): string =>
   verdict.split(' ')[0].toLowerCase();
 
@@ -111,6 +116,38 @@ const UserProfile = () => {
             Joined {formatDate(profile.createdAt)}
           </span>
         </div>
+        {profile.progression && (
+          <div className={styles['progression']}>
+            <div className={styles['progression-tier']}>
+              <span className={styles['tier-badge']}>{profile.progression.tier}</span>
+              <span className={styles['tier-level']}>Level {profile.progression.level}</span>
+            </div>
+            <div className={styles['progression-xp']}>
+              <span className={styles['xp-total']}>{formatXp(profile.progression.totalXp)} XP</span>
+              <span
+                className={styles['xp-bar']}
+                role="progressbar"
+                aria-label={`XP to next level: ${profile.progression.levelProgress.remaining} XP remaining`}
+                aria-valuemin={0}
+                aria-valuemax={profile.progression.levelProgress.required}
+                aria-valuenow={profile.progression.levelProgress.current}
+              >
+                <span
+                  className={styles['xp-bar-fill']}
+                  style={{ width: `${profile.progression.levelProgress.percentage}%` }}
+                />
+              </span>
+              <span className={styles['xp-remaining']}>
+                {formatXp(profile.progression.levelProgress.remaining)} XP to Level {profile.progression.level + 1}
+              </span>
+            </div>
+            {profile.progression.globalRank !== null && (
+              <span className={styles['rank-badge']}>
+                Rank #{profile.progression.globalRank}
+              </span>
+            )}
+          </div>
+        )}
         {isOwnProfile && (
           <>
             <button
@@ -153,6 +190,30 @@ const UserProfile = () => {
           <span className={styles['stat-label']}>Solve rate</span>
         </div>
       </div>
+
+      {profile.recentRewards?.length > 0 && (
+        <div className={styles.section}>
+          <h2>Recent XP</h2>
+          <ul className={styles['recent-xp-list']}>
+            {profile.recentRewards.slice(0, 5).map((reward) => (
+              <li key={`${reward.problemId}-${reward.awardedAt}`} className={styles['recent-xp-row']}>
+                <span className={styles['recent-xp-gain']}>+{reward.xpAwarded} XP</span>
+                <span className={styles['recent-xp-problem']}>
+                  {reward.problemTitle ?? reward.problemId}
+                </span>
+                {reward.difficultySnapshot !== null && (
+                  <span className={styles['recent-xp-difficulty']}>
+                    {reward.difficultySnapshot}
+                  </span>
+                )}
+                <span className={styles['recent-xp-date']}>
+                  {formatRewardDate(reward.awardedAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className={styles.section}>
         <h2>Activity</h2>
