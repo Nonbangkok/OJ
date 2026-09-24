@@ -50,7 +50,9 @@ export interface ProblemListDifficultyOptions {
 }
 
 export const getProblemsWithStatsForUser = async (
-  userId: number,
+  /** Submitting user; null for guests (public browsing) — the user-keyed
+   *  CTEs return no rows, so only the public problem columns come back. */
+  userId: number | null,
   options: ProblemListDifficultyOptions = {},
 ): Promise<ProblemStatsRow[]> => {
   const filters: string[] = [];

@@ -61,13 +61,15 @@ const PDF_MAGIC = Buffer.from('%PDF');
 const isPdfBuffer = (buffer: Buffer | undefined | null): boolean =>
   !!buffer && buffer.length >= PDF_MAGIC.length && buffer.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC);
 
-router.get('/problems-with-stats', requireAuth,
+router.get('/problems-with-stats', requirePublicAccess,
   validateRequest({ query: problemsWithStatsQuerySchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const { userId } = req.session;
-  if (!userId) {
-    throw new AppError('Authentication required', 401);
-  }
+  // PUBLIC mode guests may browse the problem list. Personal stats columns
+  // (best score, attempts) only exist for logged-in users — the service's
+  // user-keyed CTEs simply come back empty for a null userId, so guests
+  // receive the visible-problem list with no private data attached.
+  // PRIVATE mode is still enforced by requirePublicAccess above.
+  const userId = req.session.userId ?? null;
   // validateRequest writes Zod defaults/coercions back into req.query.
   const { difficultyMin, difficultyMax, sort, order } = req.query as unknown as {
     difficultyMin?: number; difficultyMax?: number; sort?: 'difficulty'; order?: 'asc' | 'desc';
@@ -128,7 +130,7 @@ router.get('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
   res.json(problemDetail);
 }));
 
-router.get('/problems/:id/pdf', requireAuth,
+router.get('/problems/:id/pdf', requirePublicAccess,
   validateRequest({ params: idParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
