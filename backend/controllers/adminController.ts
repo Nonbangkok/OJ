@@ -22,6 +22,7 @@ import {
   idParamSchema,
   updateAdminUserSchema,
   updateRegistrationSettingSchema,
+  updateSiteAccessModeSchema,
 } from '../schemas/requestSchemas';
 import { getContestStatusById } from '../services/contestAccess';
 import { rejudgeContest, rejudgeProblem } from '../services/rejudgeService';
@@ -42,6 +43,7 @@ import {
   updateAdminUser,
   updateRegistrationEnabled,
 } from '../services/adminQueryService';
+import { getSiteAccessMode, updateSiteAccessMode } from '../services/siteSettingsService';
 
 const router: Router = express.Router();
 
@@ -219,6 +221,19 @@ router.put('/admin/settings/registration', requireAuth, requireAdmin,
   const { enabled } = req.body as UpdateRegistrationSettingRequestBody;
   await updateRegistrationEnabled(enabled);
   res.status(200).json({ message: 'Registration setting updated successfully.' });
+}));
+
+router.get('/admin/settings/site-access', requireAuth, requireAdmin, asyncHandler(async (_req: Request, res: Response) => {
+  const accessMode = await getSiteAccessMode();
+  res.json({ accessMode });
+}));
+
+router.put('/admin/settings/site-access', requireAuth, requireAdmin,
+  validateRequest({ body: updateSiteAccessModeSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const { accessMode } = req.body as { accessMode: 'public' | 'private' };
+  await updateSiteAccessMode(accessMode);
+  res.status(200).json({ message: 'Site access mode updated successfully.' });
 }));
 
 export default router;

@@ -15,6 +15,7 @@ import type {
   SubmissionSummary,
   UploadProgress,
   UserSuggestion,
+  SiteConfig,
 } from './models';
 
 export interface ApiMessageResponse {
@@ -92,6 +93,12 @@ export interface BatchUploadStartResponse {
 export type UploadProgressResponse = UploadProgress;
 
 export type RegistrationSettingsResponse = RegistrationSettings;
+
+export type SiteConfigResponse = SiteConfig;
+
+export interface SiteAccessModeUpdateResponse extends ApiMessageResponse {
+  accessMode: 'public' | 'private';
+}
 
 export interface RegistrationSettingsUpdateResponse extends ApiMessageResponse {
   enabled: boolean;

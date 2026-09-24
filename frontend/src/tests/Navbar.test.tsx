@@ -23,6 +23,8 @@ jest.mock('../context/ThemeContext', () => ({
 jest.mock('../assets/logo512.png', () => 'test-file-stub');
 jest.mock('../assets/logo512_darkmode.png', () => 'test-file-stub');
 
+let mockIsPrivateMode = false;
+
 describe('Navbar Component', () => {
   const mockLogout = jest.fn();
 
@@ -33,8 +35,11 @@ describe('Navbar Component', () => {
       login: jest.fn(),
       logout: mockLogout,
     });
+    mockIsPrivateMode = false;
     jest.mocked(useSettings).mockReturnValue({
       registrationEnabled: true,
+      accessMode: mockIsPrivateMode ? 'private' : 'public',
+      isPrivateMode: mockIsPrivateMode,
       isLoading: false,
       refreshSettings: jest.fn(),
     });
@@ -54,6 +59,8 @@ describe('Navbar Component', () => {
   test('does not render register link if registration is disabled', () => {
     jest.mocked(useSettings).mockReturnValue({
       registrationEnabled: false,
+      accessMode: 'public',
+      isPrivateMode: false,
       isLoading: false,
       refreshSettings: jest.fn(),
     });
@@ -121,3 +128,32 @@ describe('Navbar Component', () => {
     expect(mockLogout).toHaveBeenCalled();
   });
 });
+
+  test('PRIVATE mode hides guest content links but keeps Login', () => {
+    jest.mocked(useAuth).mockReturnValue({
+      user: null,
+      isLoading: false,
+      login: jest.fn(),
+      logout: jest.fn(),
+    });
+    jest.mocked(useTheme).mockReturnValue({
+      theme: 'light',
+      toggleTheme: jest.fn(),
+    });
+    mockIsPrivateMode = true;
+    jest.mocked(useSettings).mockReturnValue({
+      registrationEnabled: true,
+      accessMode: 'private',
+      isPrivateMode: true,
+      isLoading: false,
+      refreshSettings: jest.fn(),
+    });
+
+    render(<Navbar />);
+
+    expect(screen.queryByText('Problems')).not.toBeInTheDocument();
+    expect(screen.queryByText('Scoreboard')).not.toBeInTheDocument();
+    expect(screen.queryByText('Contests')).not.toBeInTheDocument();
+    expect(screen.getByText('Login')).toBeInTheDocument();
+    expect(screen.getByText('Register')).toBeInTheDocument();
+  });

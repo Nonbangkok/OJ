@@ -5,6 +5,7 @@ import { ArrowsClockwise, Fire } from '@phosphor-icons/react';
 import { Button } from '../../components/ui';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import contestService from '../../services/contestService';
 import problemService from '../../services/problemService';
 import userService from '../../services/userService';
@@ -104,6 +105,7 @@ const contestCountdown = (contest: Contest, now: Date): string => {
 
 const Home = () => {
   const { user } = useAuth();
+  const { isPrivateMode, registrationEnabled } = useSettings();
   const navigate = useNavigate();
   const { currentQuote, isFading, showAnotherQuote } = useHomeQuotes();
 
@@ -179,7 +181,31 @@ const Home = () => {
   };
 
   if (!user) {
-    // Logged-out Home: a simple welcome with the two actions that make sense.
+    if (isPrivateMode) {
+      // Private-mode guest landing: no Browse Problems CTA — just the door.
+      return (
+        <div className={styles['home-container']}>
+          <section className={styles['logged-out']}>
+            <h1 className={styles['hero-title']}>Welcome to Grader</h1>
+            <p className={styles['hero-subtitle']}>
+              This Grader is private. Log in to access problems, contests, and submissions.
+            </p>
+            <div className={styles['hero-actions']}>
+              <Button variant="primary" onClick={() => navigate('/login')}>
+                Log in
+              </Button>
+              {registrationEnabled && (
+                <Button variant="secondary" onClick={() => navigate('/register')}>
+                  Create account
+                </Button>
+              )}
+            </div>
+          </section>
+        </div>
+      );
+    }
+
+    // Public-mode guest Home: a simple welcome with the two actions that make sense.
     return (
       <div className={styles['home-container']}>
         <section className={styles['logged-out']}>

@@ -11,7 +11,7 @@ import { useNavSlider } from '../../hooks/useNavSlider';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
-  const { registrationEnabled } = useSettings();
+  const { registrationEnabled, isPrivateMode } = useSettings();
   const navigate = useNavigate();
   const location = useLocation();
   const { theme } = useTheme(); // Get current theme
@@ -41,10 +41,16 @@ const Navbar = () => {
         </NavLink>
         <ul ref={navRef} className={styles['nav-links']} onMouseLeave={resetSlider}>
           <div className={styles.slider} style={sliderStyle} />
-          <li onMouseEnter={handleItemMouseEnter}><NavLink to="/problems">Problems</NavLink></li>
-          <li onMouseEnter={handleItemMouseEnter}><NavLink to="/submissions">Submissions</NavLink></li>
-          <li onMouseEnter={handleItemMouseEnter}><NavLink to="/scoreboard">Scoreboard</NavLink></li>
-          <li onMouseEnter={handleItemMouseEnter}><NavLink to="/contests">Contests</NavLink></li>
+          {/* Private mode + guest: hide content links — they only lead to
+              auth gates. Logged-in users keep the full navigation. */}
+          {!(isPrivateMode && !user) && (
+            <>
+              <li onMouseEnter={handleItemMouseEnter}><NavLink to="/problems">Problems</NavLink></li>
+              <li onMouseEnter={handleItemMouseEnter}><NavLink to="/submissions">Submissions</NavLink></li>
+              <li onMouseEnter={handleItemMouseEnter}><NavLink to="/scoreboard">Scoreboard</NavLink></li>
+              <li onMouseEnter={handleItemMouseEnter}><NavLink to="/contests">Contests</NavLink></li>
+            </>
+          )}
           {user?.role === USER_ROLES.ADMIN && (
             <li onMouseEnter={handleItemMouseEnter}><NavLink to="/admin">Admin Panel</NavLink></li>
           )}

@@ -215,3 +215,50 @@
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border-color);
 }
+
+/* --- Site Access section -------------------------------------------------- */
+
+.radio-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.5rem 0;
+  cursor: pointer;
+}
+
+.radio-option input[type='radio'] {
+  margin-top: 0.25rem;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+.radio-option strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.option-description {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  margin-top: 0.125rem;
+}
+
+.current-mode {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  margin: 0.5rem 0 0;
+}
+
+.setting-item legend {
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 0 0 0.25rem;
+}
+
+.setting-item fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+}

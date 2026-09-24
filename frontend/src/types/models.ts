@@ -144,6 +144,12 @@ export interface RegistrationSettings {
   enabled: boolean;
 }
 
+/** Public site configuration the frontend loads before rendering. */
+export interface SiteConfig {
+  accessMode: 'public' | 'private';
+  allowRegistration: boolean;
+}
+
 export interface AdminUser {
   id: number;
   username: string;

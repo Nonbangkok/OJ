@@ -9,6 +9,11 @@ const Settings = () => { // Renamed component
     isLoadingRegistration,
     registrationError,
     registrationSuccess,
+    siteAccessMode,
+    isSavingAccessMode,
+    accessModeError,
+    accessModeSuccess,
+    handleSiteAccessModeChange,
     databaseFile,
     isExporting,
     isImporting,
@@ -26,6 +31,48 @@ const Settings = () => { // Renamed component
   return (
     <div className={styles['settings-container']}>
       <h2>Admin Settings</h2>
+
+      {/* Site Access */}
+      <div className={styles['section-card']}>
+        <h3>Site Access</h3>
+        {accessModeError && <p className={styles['error-message']}>{accessModeError}</p>}
+        {accessModeSuccess && <p className={styles['success-message']}>{accessModeSuccess}</p>}
+
+        <fieldset className={styles['setting-item']} disabled={isSavingAccessMode}>
+          <legend>Website access</legend>
+          <label className={styles['radio-option']} htmlFor="site-access-mode-public">
+            <input
+              type="radio"
+              id="site-access-mode-public"
+              name="site-access-mode"
+              value="public"
+              checked={siteAccessMode === 'public'}
+              onChange={() => handleSiteAccessModeChange('public')}
+            />
+            <strong>Public</strong>
+            <em className={styles['option-description']}>
+              Visitors can browse public OJ content without signing in.
+              Submitting and personal actions still require authentication.
+            </em>
+          </label>
+          <label className={styles['radio-option']} htmlFor="site-access-mode-private">
+            <input
+              type="radio"
+              id="site-access-mode-private"
+              name="site-access-mode"
+              value="private"
+              checked={siteAccessMode === 'private'}
+              onChange={() => handleSiteAccessModeChange('private')}
+            />
+            <strong>Private</strong>
+            <em className={styles['option-description']}>
+              Users must sign in before accessing OJ content.
+            </em>
+          </label>
+        </fieldset>
+
+        <p className={styles['current-mode']}>Current mode: {siteAccessMode === 'private' ? 'Private' : 'Public'}</p>
+      </div>
 
       {/* Registration Settings */}
       <div className={styles['section-card']}>

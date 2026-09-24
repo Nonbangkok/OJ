@@ -5,6 +5,7 @@ import type {
   MeResponse,
   RegisterResponse,
   RegistrationSettingsResponse,
+  SiteConfigResponse,
 } from '../types';
 import type { LoginRequest, RegisterRequest } from '../types';
 
@@ -36,6 +37,11 @@ const authService = {
 
   getRegistrationSettings: async (): Promise<RegistrationSettingsResponse> => {
     const response = await api.get<RegistrationSettingsResponse>('/settings/registration');
+    return response.data;
+  },
+
+  getSiteConfig: async (): Promise<SiteConfigResponse> => {
+    const response = await api.get<SiteConfigResponse>('/site-config');
     return response.data;
   },
 };

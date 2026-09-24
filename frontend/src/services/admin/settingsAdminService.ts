@@ -7,6 +7,7 @@ import type {
   JobStartResponse,
   RegistrationSettingsResponse,
   RegistrationSettingsUpdateResponse,
+  SiteAccessModeUpdateResponse,
   UploadProgressResponse,
 } from '../../types';
 
@@ -18,6 +19,16 @@ const settingsAdminService = {
 
   updateRegistrationSettings: async (enabled: boolean): Promise<RegistrationSettingsUpdateResponse> => {
     const response = await api.put<RegistrationSettingsUpdateResponse>('/admin/settings/registration', { enabled });
+    return response.data;
+  },
+
+  getSiteAccessMode: async (): Promise<{ accessMode: 'public' | 'private' }> => {
+    const response = await api.get<{ accessMode: 'public' | 'private' }>('/admin/settings/site-access');
+    return response.data;
+  },
+
+  updateSiteAccessMode: async (accessMode: 'public' | 'private'): Promise<SiteAccessModeUpdateResponse> => {
+    const response = await api.put<SiteAccessModeUpdateResponse>('/admin/settings/site-access', { accessMode });
     return response.data;
   },
 

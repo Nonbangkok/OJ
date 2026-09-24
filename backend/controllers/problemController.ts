@@ -1,5 +1,6 @@
 import express, { Request, Response, Router } from 'express';
 import { requireAuth, requireStaffOrAdmin } from '../middleware/auth';
+import { requirePublicAccess } from '../middleware/siteAccess';
 import { diskUpload, memoryUpload } from '../middleware/upload';
 import archiver from 'archiver';
 import { processBatchUpload } from '../services/batchUploadService';
@@ -81,13 +82,14 @@ router.get('/problems-with-stats', requireAuth,
 }));
 
 // Problem API Endpoints
-router.get('/problems', asyncHandler(async (_req: Request, res: Response) => {
+router.get('/problems', requirePublicAccess, asyncHandler(async (_req: Request, res: Response) => {
   const problems = await getVisibleProblems();
   res.json(problems);
 }));
 
 // Public details
 router.get('/problems/:id',
+  requirePublicAccess,
   validateRequest({ params: idParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);

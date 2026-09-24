@@ -8,6 +8,11 @@ import { errorHandler } from '../middleware/errorHandler';
 
 // Mock Dependencies
 jest.mock('../db');
+jest.mock('../services/siteSettingsService', () => ({
+    getSiteAccessMode: jest.fn().mockResolvedValue('public'),
+    updateSiteAccessMode: jest.fn(),
+    resetSiteAccessModeCache: jest.fn(),
+}));
 jest.mock('../services/problemMigration');
 jest.mock('../services/similarityService');
 jest.mock('../middleware/auth', () => ({

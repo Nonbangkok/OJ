@@ -1,6 +1,7 @@
 import express, { Request, Response, Router } from 'express';
 import * as problemMigration from '../services/problemMigration';
 import { requireAuth, requireStaffOrAdmin } from '../middleware/auth';
+import { requirePublicAccess } from '../middleware/siteAccess';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { ContestCreateRequestBody, ContestUpdateRequestBody, MoveContestProblemsRequestBody } from '../types/api';
 import { validateRequest } from '../middleware/validation';
@@ -31,7 +32,7 @@ import {
 const router: Router = express.Router();
 
 // List all contests
-router.get('/contests', asyncHandler(async (req: Request, res: Response) => {
+router.get('/contests', requirePublicAccess, asyncHandler(async (req: Request, res: Response) => {
   const { userId } = req.session;
   const contests = await listContests(userId);
   res.json(contests);
@@ -51,6 +52,7 @@ router.get('/admin/contests/available-problems', requireAuth, requireStaffOrAdmi
 
 // Get contest details
 router.get('/contests/:id',
+  requirePublicAccess,
   validateRequest({ params: contestIdParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);

@@ -111,6 +111,10 @@ export const updateRegistrationSettingSchema = z.object({
   enabled: z.boolean(),
 });
 
+export const updateSiteAccessModeSchema = z.object({
+  accessMode: z.enum(['public', 'private']),
+});
+
 // Contest schemas
 export const contestIdParamSchema = idParamSchema;
 

@@ -14,6 +14,7 @@ import { problemCategoriesSql } from './0012ProblemCategories';
 import { problemCollectionsSql } from './0014ProblemCollections';
 import { dropCollectionDescriptionSql } from './0015DropCollectionDescription';
 import { userProblemRewardsSql } from './0016UserProblemRewards';
+import { siteAccessModeSql } from './0017SiteAccessMode';
 import { problemDifficultySql } from './0013ProblemDifficulty';
 
 export const coreMigrations: readonly Migration[] = Object.freeze([
@@ -43,4 +44,5 @@ export const migrations: readonly Migration[] = Object.freeze([
   { version: '0014_problem_collections', sql: problemCollectionsSql },
   { version: '0015_drop_collection_description', sql: dropCollectionDescriptionSql },
   { version: '0016_user_problem_rewards', sql: userProblemRewardsSql },
+  { version: '0017_site_access_mode', sql: siteAccessModeSql },
 ]);

@@ -13,11 +13,15 @@ import { getErrorMessage } from '../utils/error';
 
 interface SettingsState {
   registrationEnabled: boolean;
+  /** 'private' gates all OJ content behind login; 'public' keeps the
+   *  historical open browsing. Loaded once before the app renders. */
+  accessMode: 'public' | 'private';
 }
 
 export interface SettingsContextValue extends SettingsState {
   isLoading: boolean;
   refreshSettings: () => Promise<void>;
+  isPrivateMode: boolean;
 }
 
 interface SettingsProviderProps {
@@ -37,19 +41,27 @@ export const useSettings = (): SettingsContextValue => {
 };
 
 export const SettingsProvider = ({ children }: SettingsProviderProps) => {
-  const [settings, setSettings] = useState<SettingsState>({ registrationEnabled: false });
+  // Defaults mirror the backend's safe fallbacks: registration on, public
+  // mode — so a failed fetch keeps the site browsable and the login page
+  // reachable rather than locking guests out on a config hiccup.
+  const [settings, setSettings] = useState<SettingsState>({
+    registrationEnabled: true,
+    accessMode: 'public',
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchSettings = useCallback(async (): Promise<void> => {
     try {
-      const data = await authService.getRegistrationSettings();
+      const data = await authService.getSiteConfig();
       setSettings({
-        registrationEnabled: data.enabled,
+        registrationEnabled: data.allowRegistration,
+        accessMode: data.accessMode,
       });
     } catch (error) {
       console.error(getErrorMessage(error, 'Failed to fetch system settings.'));
       setSettings({
-        registrationEnabled: false,
+        registrationEnabled: true,
+        accessMode: 'public',
       });
     } finally {
       setIsLoading(false);
@@ -65,6 +77,7 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
       ...settings,
       isLoading,
       refreshSettings: fetchSettings,
+      isPrivateMode: settings.accessMode === 'private',
     }),
     [settings, isLoading, fetchSettings]
   );

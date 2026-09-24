@@ -13,6 +13,7 @@ import {
   RegistrationStatusResponse,
 } from '../types/api';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
+import { getSiteAccessMode } from '../services/siteSettingsService';
 import { validateRequest } from '../middleware/validation';
 import { authLimiter } from '../middleware/rateLimit';
 import { loginSchema, registerSchema } from '../schemas/requestSchemas';
@@ -108,6 +109,27 @@ router.get(
     }
 
     res.json({ enabled: result.rows[0].setting_value === 'true' });
+  }),
+);
+
+/**
+ * PUBLIC site configuration the frontend needs before it can render:
+ * which access mode the site is in and whether self-registration is open.
+ * Contains nothing sensitive — safe for unauthenticated visitors.
+ */
+router.get(
+  '/site-config',
+  asyncHandler(async (_req: Request, res: Response) => {
+    const [accessMode, registrationResult] = await Promise.all([
+      getSiteAccessMode(),
+      db.query<{ setting_value: string }>(
+        "SELECT setting_value FROM system_settings WHERE setting_key = 'registration_enabled'",
+      ),
+    ]);
+    const allowRegistration =
+      registrationResult.rows.length === 0 || registrationResult.rows[0].setting_value === 'true';
+
+    res.json({ accessMode, allowRegistration });
   }),
 );
 

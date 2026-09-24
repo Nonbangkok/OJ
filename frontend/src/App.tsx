@@ -24,6 +24,7 @@ import ContestProblems from './pages/contest/ContestProblems';
 import ContestSubmissions from './pages/contest/ContestSubmissions';
 import ContestScoreboard from './pages/contest/ContestScoreboard';
 import { SettingsProvider } from './context/SettingsContext';
+import PrivateRoute from './components/shared/PrivateRoute';
 
 // Admin Pages
 import UserManagement from './features/admin/users/UserManagement';
@@ -68,15 +69,17 @@ const Layout = () => {
         {/* Standard routes wrapped in MainLayout */}
         <Route element={<MainLayout />}>
           <Route path="/" element={<Home />} />
-          <Route path="/problems" element={<Problems />} />
+          {/* Site-private mode: guests get the shared auth-required screen
+              (with post-login returnTo) instead of these content pages. */}
+          <Route path="/problems" element={<PrivateRoute><Problems /></PrivateRoute>} />
           {/* Note: ProblemDetail is used by both layouts, so we keep it duplicated for now */}
-          <Route path="/problems/:problemId" element={<ProblemDetail />} />
-          <Route path="/scoreboard" element={<Scoreboard />} />
-          <Route path="/submissions" element={<Submissions />} />
-          <Route path="/profile/:username" element={<UserProfile />} />
+          <Route path="/problems/:problemId" element={<PrivateRoute><ProblemDetail /></PrivateRoute>} />
+          <Route path="/scoreboard" element={<PrivateRoute><Scoreboard /></PrivateRoute>} />
+          <Route path="/submissions" element={<PrivateRoute><Submissions /></PrivateRoute>} />
+          <Route path="/profile/:username" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/contests" element={<Contests />} />
+          <Route path="/contests" element={<PrivateRoute><Contests /></PrivateRoute>} />
         </Route>
 
         {/* Admin routes with their own layout */}
@@ -103,7 +106,7 @@ const Layout = () => {
         </Route>
 
         {/* Contest routes with their own self-contained layout */}
-        <Route path="/contests/:contestId" element={<ContestLayout />}>
+        <Route path="/contests/:contestId" element={<PrivateRoute><ContestLayout /></PrivateRoute>}>
           <Route index element={<ContestDetail />} />
           <Route path="problems" element={<ContestProblems />} />
           <Route path="problems/:problemId" element={<ProblemDetail />} />

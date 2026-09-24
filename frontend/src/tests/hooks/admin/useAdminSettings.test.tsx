@@ -9,7 +9,7 @@ jest.mock('../../../services/adminService');
 describe('useAdminSettings', () => {
     const mockRefreshSettings = jest.fn();
     const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <SettingsContext.Provider value={{ refreshSettings: mockRefreshSettings, isLoading: false, registrationEnabled: true }}>
+        <SettingsContext.Provider value={{ refreshSettings: mockRefreshSettings, isLoading: false, registrationEnabled: true, accessMode: 'public', isPrivateMode: false }}>
             {children}
         </SettingsContext.Provider>
     );

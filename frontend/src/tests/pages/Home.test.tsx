@@ -18,6 +18,19 @@ jest.mock('../../context/AuthContext', () => ({
   useAuth: () => ({ user: mockAuthUser, isLoading: false, login: jest.fn(), logout: jest.fn() }),
 }));
 
+// Mutable so private/public-mode landing tests can flip it per case.
+let mockIsPrivateMode = false;
+let mockRegistrationEnabled = true;
+jest.mock('../../context/SettingsContext', () => ({
+  useSettings: () => ({
+    registrationEnabled: mockRegistrationEnabled,
+    accessMode: mockIsPrivateMode ? 'private' : 'public',
+    isPrivateMode: mockIsPrivateMode,
+    isLoading: false,
+    refreshSettings: jest.fn(),
+  }),
+}));
+
 const mockProfile = {
   problemsSolved: 12,
   currentStreak: 7,
@@ -291,6 +304,8 @@ describe('Home Page (logged out)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockAuthUser = null;
+    mockIsPrivateMode = false;
+    mockRegistrationEnabled = true;
   });
 
   it('renders a simple welcome with Browse Problems and login CTA, no dashboard content', () => {
@@ -304,5 +319,25 @@ describe('Home Page (logged out)', () => {
     expect(screen.queryByText(/day streak/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /another quote/i })).not.toBeInTheDocument();
     expect(userService.getProfile).not.toHaveBeenCalled();
+  });
+
+  it('PRIVATE mode shows the private landing without a Browse Problems CTA', () => {
+    mockIsPrivateMode = true;
+    renderHome();
+
+    expect(screen.getByText(/This Grader is private/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Browse Problems' })).not.toBeInTheDocument();
+    // Registration on -> Create account offered.
+    expect(screen.getByRole('button', { name: 'Create account' })).toBeInTheDocument();
+  });
+
+  it('PRIVATE mode hides Create account when registration is disabled', () => {
+    mockIsPrivateMode = true;
+    mockRegistrationEnabled = false;
+    renderHome();
+
+    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create account' })).not.toBeInTheDocument();
   });
 });

@@ -7,6 +7,8 @@ jest.mock('../../services/authService');
 jest.mock('../../context/SettingsContext', () => ({
     useSettings: () => ({
         registrationEnabled: true,
+        accessMode: 'public',
+        isPrivateMode: false,
         isLoading: false
     })
 }));

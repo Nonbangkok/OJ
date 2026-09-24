@@ -10,6 +10,11 @@ const useAdminSettings = () => {
     const [registrationError, setRegistrationError] = useState('');
     const [registrationSuccess, setRegistrationSuccess] = useState('');
 
+    const [siteAccessMode, setSiteAccessMode] = useState<'public' | 'private'>('public');
+    const [isSavingAccessMode, setIsSavingAccessMode] = useState(false);
+    const [accessModeError, setAccessModeError] = useState('');
+    const [accessModeSuccess, setAccessModeSuccess] = useState('');
+
     // Use context for refreshing global settings
     const { refreshSettings } = useSettings();
 
@@ -31,6 +36,16 @@ const useAdminSettings = () => {
             }
         };
         fetchRegistrationSettings();
+
+        const fetchSiteAccessMode = async () => {
+            try {
+                const data = await adminService.getSiteAccessMode();
+                setSiteAccessMode(data.accessMode);
+            } catch (err) {
+                setAccessModeError('Failed to fetch site access mode.');
+            }
+        };
+        fetchSiteAccessMode();
     }, []);
 
     const handleRegistrationToggle = async () => {
@@ -45,6 +60,25 @@ const useAdminSettings = () => {
             setTimeout(() => setRegistrationSuccess(''), UI_TIMEOUTS.SUCCESS_MESSAGE_SHORT);
         } catch (err) {
             setRegistrationError('Failed to update registration settings.');
+        }
+    };
+
+    const handleSiteAccessModeChange = async (mode: 'public' | 'private') => {
+        setAccessModeError('');
+        setAccessModeSuccess('');
+        setIsSavingAccessMode(true);
+        try {
+            await adminService.updateSiteAccessMode(mode);
+            setSiteAccessMode(mode);
+            setAccessModeSuccess(`Site access mode set to ${mode}.`);
+            // Propagate to the app-wide context so the navbar / routes react
+            // immediately without a reload.
+            await refreshSettings();
+            setTimeout(() => setAccessModeSuccess(''), UI_TIMEOUTS.SUCCESS_MESSAGE_SHORT);
+        } catch (err) {
+            setAccessModeError('Failed to update site access mode.');
+        } finally {
+            setIsSavingAccessMode(false);
         }
     };
 
@@ -162,6 +196,11 @@ const useAdminSettings = () => {
         databaseError,
         databaseSuccess,
         handleRegistrationToggle,
+        siteAccessMode,
+        isSavingAccessMode,
+        accessModeError,
+        accessModeSuccess,
+        handleSiteAccessModeChange,
         handleExportDatabase,
         handleFileChange,
         handleImportDatabase

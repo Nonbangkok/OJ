@@ -6,6 +6,11 @@ import * as analyticsService from '../services/analyticsQueryService';
 
 // Mock dependencies — same pattern as adminController.test.ts
 jest.mock('../db');
+jest.mock('../services/siteSettingsService', () => ({
+    getSiteAccessMode: jest.fn().mockResolvedValue('public'),
+    updateSiteAccessMode: jest.fn(),
+    resetSiteAccessModeCache: jest.fn(),
+}));
 jest.mock('../services/analyticsQueryService', () => ({
     getOverviewAnalytics: jest.fn().mockResolvedValue({ kpis: {}, dailySeries: [] }),
     listUsersForAnalytics: jest.fn().mockResolvedValue([]),
