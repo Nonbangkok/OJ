@@ -8,6 +8,14 @@ import {
 import { REALTIME } from '../../config/constants';
 
 jest.mock('../../services/contestService');
+
+// The hook skips the realtime stream for guests; default to a logged-in
+// user so existing subscription tests keep exercising that path.
+// Stable user reference so the SSE effect's dependency doesn't churn.
+const mockUser = { id: 1, username: 'tester', role: 'user' as const };
+jest.mock('../../context/AuthContext', () => ({
+  useAuth: () => ({ user: mockUser, isLoading: false, login: jest.fn(), logout: jest.fn() }),
+}));
 jest.mock('../../services/realtimeService', () => ({
   isRealtimeSupported: jest.fn(() => true),
   subscribeSubmissions: jest.fn(() => jest.fn()),

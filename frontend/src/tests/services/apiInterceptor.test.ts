@@ -21,7 +21,8 @@ describe('session expiry interceptor', () => {
     expect(() => api.interceptors.response.handlers[0].rejected(error)).toThrow();
   };
 
-  it('redirects to /login with a return path on a bare 401', () => {
+  it('redirects to /login with a return path on a bare 401 when a session existed', () => {
+    window.sessionStorage.setItem('oj:had-session', '1');
     const api = makeInstance();
 
     reject(api, {
@@ -29,6 +30,18 @@ describe('session expiry interceptor', () => {
     });
 
     expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/login?expired=1&returnTo=%2F');
+  });
+
+  it('does NOT redirect a guest who never had a session', () => {
+    // A first-visit guest hitting an auth-required endpoint is a normal
+    // guest state, not a session expiry.
+    const api = makeInstance();
+
+    reject(api, {
+      response: { status: 401 }, config: { url: '/problems' },
+    });
+
+    expect(replaceStateSpy).not.toHaveBeenCalled();
   });
 
   it('does not redirect when the 401 came from the login endpoint itself', () => {
@@ -60,6 +73,7 @@ describe('session expiry interceptor', () => {
   });
 
   it('marks the redirect once per expiry to avoid a loop between mounts', () => {
+    window.sessionStorage.setItem('oj:had-session', '1');
     const api = makeInstance();
 
     reject(api, {

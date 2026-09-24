@@ -112,3 +112,35 @@ describe('siteSettingsService', () => {
         expect(query).toHaveBeenCalledTimes(1);
     });
 });
+
+
+describe('public access matrix (route middleware wiring)', () => {
+    // These pin the middleware wiring on the routes that must be
+    // PUBLIC-readable but PRIVATE-protected — the enforcement contract the
+    // E2E matrix in the spec exercises against the live stack.
+    const fs = require('fs');
+    const path = require('path');
+
+    const read = (rel: string): string =>
+        fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
+
+    it('submissions list + global scoreboard ride requirePublicAccess, not requireAuth', () => {
+        const source = read('controllers/submissionController.ts');
+        expect(source).toMatch(/'\/submissions',\s*\n\s*\/\/ PUBLIC[\s\S]*?requirePublicAccess/);
+        expect(source).toMatch(/'\/scoreboard',[\s\S]*?requirePublicAccess/);
+        // Source code stays behind authentication.
+        expect(source).toMatch(/'\/submissions\/:id',\s*\n?\s*requireAuth/);
+    });
+
+    it('contest scoreboard rides requirePublicAccess, not requireAuth', () => {
+        const source = read('controllers/contestController.ts');
+        expect(source).toMatch(/'\/contests\/:id\/scoreboard', requirePublicAccess/);
+        // Joining a contest stays behind authentication.
+        expect(source).toMatch(/'\/contests\/:id\/join', requireAuth/);
+    });
+
+    it('guest submissions degrade personal views to an empty public feed', () => {
+        const source = read('services/submissionQueryService.ts');
+        expect(source).toContain('isGuest && (filter');
+    });
+});

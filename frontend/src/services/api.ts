@@ -39,6 +39,13 @@ export const installSessionExpiryInterceptor = (instance: AxiosInstance): void =
       throw error;
     }
 
+    // A guest who never had a session hitting an auth-required endpoint is a
+    // normal guest state — surface the error to the caller, never the
+    // session-expiry redirect. "Expired" means a session previously existed.
+    if (window.sessionStorage.getItem('oj:had-session') !== '1') {
+      throw error;
+    }
+
     // Guard against a redirect loop when several in-flight requests all
     // fail at once after the session died: only the first one navigates.
     if (window.sessionStorage.getItem(SESSION_EXPIRY_KEY) === '1') {

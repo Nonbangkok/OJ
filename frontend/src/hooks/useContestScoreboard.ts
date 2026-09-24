@@ -9,6 +9,7 @@ import type {
   ContestScoreboardEntry,
 } from '../types';
 import { getErrorStatus } from '../utils/error';
+import { useAuth } from '../context/AuthContext';
 import { formatDateTime as formatDateTimeShared } from '../utils/formatters';
 
 type ScoreValue = ContestProblemScore | null;
@@ -28,6 +29,10 @@ interface UseContestScoreboardResult {
 }
 
 const useContestScoreboard = (contestId?: string | number): UseContestScoreboardResult => {
+  // Guests (PUBLIC mode) never subscribe to the realtime stream: the SSE
+  // endpoint requires a session, and its 401 would be pure console noise.
+  // The polling fallback covers them.
+  const { user } = useAuth();
   const [contest, setContest] = useState<Contest | null>(null);
   const [scoreboard, setScoreboard] = useState<ContestScoreboardEntry[]>([]);
   const [problems, setProblems] = useState<ContestProblem[]>([]);
@@ -97,7 +102,7 @@ const useContestScoreboard = (contestId?: string | number): UseContestScoreboard
   // final scoreboard). Subscribed regardless of contest status so the final
   // migration event at contest end still arrives.
   useEffect(() => {
-    if (!contestId || !isRealtimeSupported()) {
+    if (!contestId || !user || !isRealtimeSupported()) {
       return undefined;
     }
     const unsubscribe = subscribeScoreboard(contestId, () => {
@@ -106,7 +111,7 @@ const useContestScoreboard = (contestId?: string | number): UseContestScoreboard
       onStreamDown: () => setRealtimeDown(true),
     });
     return unsubscribe;
-  }, [contestId, fetchScoreboard]);
+  }, [contestId, fetchScoreboard, user]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;

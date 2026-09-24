@@ -42,6 +42,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const data = await authService.checkLogin();
       if (data.isAuthenticated) {
+        // Mark that a session existed at load time — the api 401 interceptor
+        // uses this to distinguish "session expired mid-session" (redirect to
+        // the expired-login flow) from a guest hitting an auth-required
+        // endpoint (a normal guest state, never an expiry).
+        window.sessionStorage.setItem('oj:had-session', '1');
         setUser(data.user);
       } else {
         setUser(null);

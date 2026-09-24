@@ -6,6 +6,10 @@ import contestService from '../../services/contestService';
 jest.mock('../../services/contestService');
 
 // Mock ThemeContext to prevent useTheme errors from LoadingPage
+jest.mock('../../context/AuthContext', () => ({
+    useAuth: () => ({ user: { id: 2, username: 'user2', role: 'user' }, isLoading: false, login: jest.fn(), logout: jest.fn() }),
+}));
+
 jest.mock('../../context/ThemeContext', () => ({
     useTheme: jest.fn(() => ({ theme: 'light' })),
 }));

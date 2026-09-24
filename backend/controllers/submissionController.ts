@@ -1,5 +1,6 @@
 import express, { Request, Response, Router } from 'express';
 import { requireAuth } from '../middleware/auth';
+import { requirePublicAccess } from '../middleware/siteAccess';
 import { memoryUpload } from '../middleware/upload';
 import { processContestSubmission, processSubmission } from '../services/submissionService';
 import { USER_ROLES } from '../constants';
@@ -69,16 +70,23 @@ router.post(
 
 router.get(
   '/submissions',
-  requireAuth,
+  // PUBLIC mode: guests may read the sanitized public feed (the list DTO
+  // carries no source code, logs, or private metadata — those live behind
+  // /submissions/:id which stays requireAuth). PRIVATE mode: 401 for guests.
+  requirePublicAccess,
   validateRequest({ query: submissionsQuerySchema }),
   asyncHandler(async (req: Request, res: Response) => {
     const { userId, role } = req.session;
-    if (!userId) {
-      throw new AppError('Authentication required', 401);
-    }
 
-    const isStaffOrAdmin = role === USER_ROLES.ADMIN || role === USER_ROLES.STAFF;
-    const submissions = await getSubmissions(req.query as SubmissionListQuery, userId, isStaffOrAdmin);
+    // Guest context: the public feed only. Personal filters and the
+    // staff-only problem/user filters are meaningless without a user.
+    const isStaffOrAdmin = !!userId
+      && (role === USER_ROLES.ADMIN || role === USER_ROLES.STAFF);
+    const submissions = await getSubmissions(
+      req.query as SubmissionListQuery,
+      userId ?? 0,
+      isStaffOrAdmin,
+    );
     res.json(submissions);
   }),
 );
@@ -144,7 +152,9 @@ router.get(
 
 router.get(
   '/scoreboard',
-  requireAuth,
+  // Public read-only in PUBLIC mode (sanitized DTO: username, avatar flag,
+  // score, solved count); PRIVATE mode still requires authentication.
+  requirePublicAccess,
   asyncHandler(async (_req: Request, res: Response) => {
     const scoreboard = await getGlobalScoreboard();
     res.json(scoreboard);

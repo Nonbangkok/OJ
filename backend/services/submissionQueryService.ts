@@ -90,10 +90,12 @@ export const validateAndQueueSubmission = async (
 
 export const getSubmissions = async (
     queryInput: SubmissionListQuery,
+    /** Submitting user; 0 for unauthenticated guests (public feed only). */
     userId: number,
     isStaffOrAdmin: boolean,
 ): Promise<SubmissionListRow[]> => {
     const { filter, problemId, contestId, filterProblemId, filterUserId } = queryInput;
+    const isGuest = userId === 0;
 
     let queryText: string;
     const params: unknown[] = [];
@@ -122,6 +124,12 @@ export const getSubmissions = async (
     }
 
     const sourceAlias = contestId ? 'cs' : 's';
+
+    // Guests (PUBLIC mode) see only the default public feed: personal
+    // filters, per-problem views, and contest feeds all require a user.
+    if (isGuest && (filter === 'mine' || problemId || contestId)) {
+        return [];
+    }
 
     if (filter === 'mine') {
         params.push(userId);

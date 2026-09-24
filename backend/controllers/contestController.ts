@@ -88,8 +88,9 @@ router.post('/contests/:id/join', requireAuth,
   res.json({ message: 'Successfully joined contest' });
 }));
 
-// Get contest scoreboard
-router.get('/contests/:id/scoreboard', requireAuth,
+// Get contest scoreboard — public read-only in PUBLIC mode (viewing a
+// scoreboard never requires contest participation; joining/submitting do).
+router.get('/contests/:id/scoreboard', requirePublicAccess,
   validateRequest({ params: contestIdParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
