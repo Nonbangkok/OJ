@@ -6,7 +6,7 @@
 }
 
 /* Trigger identifies the user only: avatar + username + chevron. No border —
-   hover alone signals it's interactive. */
+   a subtle lift + tint on hover signals it's interactive. */
 .trigger {
   display: flex;
   align-items: center;
@@ -19,11 +19,20 @@
   padding: 0.1875rem 0.625rem 0.1875rem 0.1875rem;
   cursor: pointer;
   color: var(--text-primary);
-  transition: background-color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.15s ease;
 }
 
 .trigger:hover {
   background-color: var(--background-secondary);
+  color: var(--accent-primary);
+  transform: scale(1.03);
+}
+
+.trigger:active {
+  transform: scale(0.98);
 }
 
 .trigger:focus-visible {
@@ -158,6 +167,15 @@
 
 /* Narrow screens: keep the avatar + chevron, drop the username text before
    the control can collide with the nav links. */
+/* Users who opt out of motion keep the tint, lose the scale. */
+@media (prefers-reduced-motion: reduce) {
+  .trigger,
+  .trigger:active {
+    transform: none;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+}
+
 @media (max-width: 560px) {
   .username {
     display: none;
