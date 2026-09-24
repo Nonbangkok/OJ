@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowsClockwise } from '@phosphor-icons/react';
+import { ArrowsClockwise, Fire } from '@phosphor-icons/react';
 
 import { Button } from '../../components/ui';
 import StatusBadge from '../../components/shared/StatusBadge';
@@ -10,6 +10,7 @@ import problemService from '../../services/problemService';
 import userService from '../../services/userService';
 import useHomeQuotes from '../../hooks/useHomeQuotes';
 import { formatTimeAgo } from '../../utils/formatters';
+import { difficultyBand } from '../../utils/constants';
 import type { Contest, ProblemSummary, UserProgression } from '../../types';
 import styles from './Home.module.css';
 
@@ -49,6 +50,24 @@ const pickRandomProblem = (problems: ProblemSummary[]): ProblemSummary | null =>
   return pool[Math.floor(Math.random() * pool.length)];
 };
 
+const pickSuggestedProblem = (
+  problems: ProblemSummary[],
+): ProblemSummary | null => {
+  // All caught up: suggest one unsolved, never-attempted problem — a real next
+  // action rather than an empty state. Falls back to any unsolved, then null.
+  const neverTried = problems.filter(
+    (problem) => !problem.latest_submission_at && (problem.best_score ?? 0) < 100,
+  );
+  if (neverTried.length > 0) {
+    return neverTried[Math.floor(Math.random() * neverTried.length)];
+  }
+  const unsolved = problems.filter((problem) => (problem.best_score ?? 0) < 100);
+  if (unsolved.length > 0) {
+    return unsolved[Math.floor(Math.random() * unsolved.length)];
+  }
+  return null;
+};
+
 const pickContest = (contests: Contest[]): Contest | null => {
   // Prefer a running contest (soonest end), else the nearest scheduled by start.
   const running = contests
@@ -82,8 +101,6 @@ const contestCountdown = (contest: Contest, now: Date): string => {
   const label = contest.status === 'running' ? 'Ends in' : 'Starts in';
   return `${label} ${parts.join(' ')}`;
 };
-
-const formatStreak = (days: number): string => (days === 1 ? '1 day' : `${days} days`);
 
 const Home = () => {
   const { user } = useAuth();
@@ -146,13 +163,11 @@ const Home = () => {
     [problems],
   );
 
-  const handleContinueSolving = () => {
-    if (unfinishedProblem) {
-      navigate(`/problems/${unfinishedProblem.id}`);
-    } else {
-      navigate('/problems');
-    }
-  };
+  // All caught up: a concrete suggestion instead of an empty message.
+  const suggestedProblem = useMemo(
+    () => (problems && !unfinishedProblem ? pickSuggestedProblem(problems) : null),
+    [problems, unfinishedProblem],
+  );
 
   const handleRandomProblem = () => {
     const target = problems ? pickRandomProblem(problems) : null;
@@ -185,122 +200,135 @@ const Home = () => {
 
   const progression = profileSummary?.progression;
 
+  const problemCard = unfinishedProblem ?? suggestedProblem;
+  const problemIsSuggestion = !unfinishedProblem && suggestedProblem !== null;
+
   return (
     <div className={styles['home-container']}>
+      {/* Hero — open, no card. Whitespace and type carry the hierarchy. */}
       <section className={styles.hero}>
         <div className={styles['hero-text']}>
           <h1 className={styles['hero-title']}>Welcome back, {user.username}</h1>
-          <p className={styles['hero-subtitle']}>Ready for another problem?</p>
           {progression && (
             <p className={styles['hero-tier']}>
               {progression.tier} · Level {progression.level}
             </p>
           )}
+          <p className={styles['hero-subtitle']}>Ready for another challenge?</p>
         </div>
         <div className={styles['hero-actions']}>
-          <Button variant="primary" onClick={handleContinueSolving}>
-            {unfinishedProblem ? 'Continue Solving' : 'Start Solving'}
-          </Button>
-          <Button variant="secondary" onClick={() => navigate('/problems')}>
-            Browse Problems
-          </Button>
+          {unfinishedProblem ? (
+            <Button variant="primary" onClick={() => navigate(`/problems/${unfinishedProblem.id}`)}>
+              Continue Solving
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => navigate('/problems')}>
+              Browse Problems
+            </Button>
+          )}
           <Button variant="secondary" onClick={handleRandomProblem}>
             Random Problem
           </Button>
         </div>
       </section>
 
+      {/* Progress strip — one muted line, not three cards. */}
       {profileSummary && (
-        <section className={styles['stat-grid']}>
-          <div className={styles['stat-card']}>
-            <span className={styles['stat-label']}>Problems Solved</span>
-            <span className={styles['stat-value']}>{profileSummary.problemsSolved}</span>
-          </div>
-          <div className={styles['stat-card']}>
-            <span className={styles['stat-label']}>Current Streak</span>
-            <span className={styles['stat-value']}>{formatStreak(profileSummary.currentStreak)}</span>
-          </div>
-          <div className={styles['stat-card']}>
-            <span className={styles['stat-label']}>Experience</span>
-            <span className={styles['stat-value']}>
-              {progression ? `${progression.totalXp.toLocaleString()} XP · Level ${progression.level}` : '—'}
-            </span>
-            {progression && (
-              <div
-                className={styles['level-progress']}
-                role="progressbar"
-                aria-label={`XP to next level: ${progression.levelProgress.remaining} XP remaining`}
-                aria-valuemin={0}
-                aria-valuemax={progression.levelProgress.required}
-                aria-valuenow={progression.levelProgress.current}
-              >
-                <div
-                  className={styles['level-progress-fill']}
-                  style={{ width: `${progression.levelProgress.percentage}%` }}
-                />
-              </div>
-            )}
+        <p className={styles['summary-strip']}>
+          <span>{profileSummary.problemsSolved} solved</span>
+          <span className={styles['summary-separator']} aria-hidden="true">·</span>
+          <span className={styles['summary-streak']}>
+            <Fire size={14} weight="fill" aria-hidden="true" />
+            {profileSummary.currentStreak} day streak
+          </span>
+          {progression && (
+            <>
+              <span className={styles['summary-separator']} aria-hidden="true">·</span>
+              <span>Level {progression.level} · {progression.totalXp.toLocaleString()} XP</span>
+            </>
+          )}
+        </p>
+      )}
+
+      <hr className={styles.rule} aria-hidden="true" />
+
+      {/* Main content: the problem to work on. A card is warranted here —
+          it represents an actual object, not a container for text. */}
+      {problemCard && (
+        <section className={styles['problem-section']}>
+          <h2 className={styles['section-title']}>
+            {problemIsSuggestion ? 'Try something new' : 'Continue where you left off'}
+          </h2>
+          <div className={styles['problem-card']}>
+            <div className={styles['problem-main']}>
+              <p className={styles['problem-title']}>{problemCard.title}</p>
+              <p className={styles['problem-meta']}>
+                <span className={styles['problem-id']}>{problemCard.id}</span>
+                {problemCard.difficulty != null && difficultyBand(problemCard.difficulty) != null && (
+                  <span
+                    className={styles[`difficulty-chip-${difficultyBand(problemCard.difficulty)}`]}
+                    aria-label={`Difficulty ${problemCard.difficulty}`}
+                  >
+                    {problemCard.difficulty}
+                  </span>
+                )}
+                {unfinishedProblem && (
+                  <>
+                    <span>
+                      {Number(unfinishedProblem.submission_count ?? 0) === 1
+                        ? '1 attempt'
+                        : `${Number(unfinishedProblem.submission_count ?? 0)} attempts`}
+                    </span>
+                    <span>Last tried {formatTimeAgo(unfinishedProblem.latest_submission_at)}</span>
+                  </>
+                )}
+              </p>
+            </div>
+            <Button
+              variant={problemIsSuggestion ? 'secondary' : 'primary'}
+              onClick={() => navigate(`/problems/${problemCard.id}`)}
+            >
+              {problemIsSuggestion ? 'Solve Problem' : 'Continue'} →
+            </Button>
           </div>
         </section>
       )}
 
-      {(unfinishedProblem !== null || (problems !== null && problems.length > 0) || contest !== null) && (
-        <section className={styles['duo-row']}>
-          {unfinishedProblem ? (
-            <div className={styles['duo-card']}>
-              <h2 className={styles['card-title']}>Continue where you left off</h2>
-              <p className={styles['problem-title']}>{unfinishedProblem.title}</p>
-              <p className={styles['problem-meta']}>
-                <span className={styles['problem-id']}>{unfinishedProblem.id}</span>
-                {unfinishedProblem.difficulty != null && (
-                  <span>Difficulty {unfinishedProblem.difficulty}</span>
-                )}
-                <span>
-                  {Number(unfinishedProblem.submission_count ?? 0) === 1
-                    ? '1 attempt'
-                    : `${Number(unfinishedProblem.submission_count ?? 0)} attempts`}
-                </span>
-                <span>Last tried {formatTimeAgo(unfinishedProblem.latest_submission_at)}</span>
-              </p>
-              <Button variant="primary" onClick={() => navigate(`/problems/${unfinishedProblem.id}`)}>
-                Continue →
-              </Button>
-            </div>
-          ) : problems !== null && problems.length > 0 ? (
-            <div className={styles['duo-card']}>
-              <h2 className={styles['card-title']}>Pick your next challenge</h2>
-              <p className={styles['problem-meta']}>
-                You have no unfinished problems — every attempted problem is solved.
-              </p>
-              <Button variant="primary" onClick={() => navigate('/problems')}>
-                Find a Problem
-              </Button>
-            </div>
-          ) : null}
-          {contest && (
-            <div className={styles['duo-card']}>
-              <div className={styles['contest-header']}>
-                <h2 className={styles['card-title']}>Contest</h2>
-                <StatusBadge status={contest.status} />
-              </div>
+      {/* Caught up with nothing to suggest (everything solved): a light
+          positive line, not a big empty card. */}
+      {!problemCard && problems !== null && problems.length > 0 && (
+        <p className={styles['caught-up']}>
+          {"You’re all caught up — every problem is solved. Enjoy the calm."}
+        </p>
+      )}
+
+      {contest && (
+        <section className={styles['contest-section']}>
+          <h2 className={styles['section-title']}>
+            {contest.status === 'running' ? 'Active Contest' : 'Upcoming Contest'}
+          </h2>
+          <div className={styles['contest-row']}>
+            <div className={styles['contest-main']}>
               <p className={styles['problem-title']}>{contest.title}</p>
               <p className={styles['problem-meta']}>
+                <StatusBadge status={contest.status} />
                 <span>{contestCountdown(contest, now)}</span>
               </p>
-              <Button variant="secondary" onClick={() => navigate(`/contests/${contest.id}`)}>
-                Open Contest →
-              </Button>
             </div>
-          )}
+            <Button variant="secondary" onClick={() => navigate(`/contests/${contest.id}`)}>
+              Open Contest →
+            </Button>
+          </div>
         </section>
       )}
 
-      <section className={styles['quote-card']}>
+      {/* Quote — pure typography, no box. */}
+      <section className={styles['quote-section']} aria-label="Coding quote">
         <p
           data-testid="home-quote"
           className={`${styles['quote-text']} ${isFading ? styles.fading : ''}`}
         >
-          {currentQuote}
+          “{currentQuote}”
         </p>
         <button
           type="button"

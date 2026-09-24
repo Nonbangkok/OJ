@@ -57,23 +57,25 @@ describe('Home Page (logged in)', () => {
     renderHome();
 
     expect(screen.getByText('Welcome back, testuser')).toBeInTheDocument();
-    expect(screen.getByText('Ready for another problem?')).toBeInTheDocument();
+    expect(screen.getByText('Ready for another challenge?')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText('Specialist · Level 12')).toBeInTheDocument();
     });
   });
 
-  it('renders the three stat cards', async () => {
+  it('renders the compact progress summary strip, not stat cards', async () => {
     renderHome();
 
     await waitFor(() => {
-      expect(screen.getByText('Problems Solved')).toBeInTheDocument();
+      expect(screen.getByText('12 solved')).toBeInTheDocument();
     });
-    expect(screen.getByText('12')).toBeInTheDocument();
-    expect(screen.getByText('Current Streak')).toBeInTheDocument();
-    expect(screen.getByText('7 days')).toBeInTheDocument();
-    expect(screen.getByText('2,840 XP · Level 12')).toBeInTheDocument();
+    expect(screen.getByText('7 day streak')).toBeInTheDocument();
+    expect(screen.getByText('Level 12 · 2,840 XP')).toBeInTheDocument();
+    // The old three-card labels are gone.
+    expect(screen.queryByText('Problems Solved')).not.toBeInTheDocument();
+    expect(screen.queryByText('Current Streak')).not.toBeInTheDocument();
+    expect(screen.queryByText('Experience')).not.toBeInTheDocument();
   });
 
   it('shows the most recently attempted-but-unsolved problem in Continue where you left off', async () => {
@@ -109,11 +111,31 @@ describe('Home Page (logged in)', () => {
     expect(screen.getByText('2 attempts')).toBeInTheDocument();
     expect(screen.getByText(/Last tried/)).toBeInTheDocument();
     expect(screen.getByText('Continue →')).toBeInTheDocument();
+    // The hero primary CTA is Continue Solving when a problem is unfinished.
+    expect(screen.getByRole('button', { name: 'Continue Solving' })).toBeInTheDocument();
     // The older unsolved problem is not the featured one.
     expect(screen.queryByText('Ancient Message')).not.toBeInTheDocument();
   });
 
-  it('shows the pick-next-challenge state when no unfinished problem exists', async () => {
+  it('suggests an unsolved problem under "Try something new" when fully caught up on attempts', async () => {
+    jest.mocked(problemService.getAllWithStats).mockResolvedValue([
+      { ...baseProblem, best_score: 100, submission_count: '3', latest_submission_at: '2026-09-01T00:00:00Z' },
+      { ...baseProblem, id: 'fresh-one', title: 'A Fresh Challenge', best_score: null, submission_count: null, latest_submission_at: null },
+    ] as never);
+
+    renderHome();
+
+    await waitFor(() => {
+      expect(screen.getByText('Try something new')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Continue where you left off')).not.toBeInTheDocument();
+    expect(screen.getByText('A Fresh Challenge')).toBeInTheDocument();
+    expect(screen.getByText('Solve Problem →')).toBeInTheDocument();
+    // The hero primary CTA is Browse Problems when nothing is unfinished.
+    expect(screen.getByRole('button', { name: 'Browse Problems' })).toBeInTheDocument();
+  });
+
+  it('shows a light caught-up line when every problem is already solved', async () => {
     jest.mocked(problemService.getAllWithStats).mockResolvedValue([
       { ...baseProblem, best_score: 100, submission_count: '3', latest_submission_at: '2026-09-01T00:00:00Z' },
     ] as never);
@@ -121,10 +143,9 @@ describe('Home Page (logged in)', () => {
     renderHome();
 
     await waitFor(() => {
-      expect(screen.getByText('Pick your next challenge')).toBeInTheDocument();
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
     });
-    expect(screen.queryByText('Continue where you left off')).not.toBeInTheDocument();
-    expect(screen.getByText('Find a Problem')).toBeInTheDocument();
+    expect(screen.queryByText('Try something new')).not.toBeInTheDocument();
   });
 
   it('renders the running contest with a countdown and open action', async () => {
@@ -257,9 +278,10 @@ describe('Home Page (logged in)', () => {
       expect(screen.getByText('Welcome back, testuser')).toBeInTheDocument();
     });
     await waitFor(() => {
-      expect(screen.queryByText('Problems Solved')).not.toBeInTheDocument();
+      expect(screen.queryByText('12 solved')).not.toBeInTheDocument();
     });
-    expect(screen.getByText('Start Solving')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Browse Problems' })).toBeInTheDocument();
+    expect(screen.queryByText('Start Solving')).not.toBeInTheDocument();
   });
 });
 
@@ -277,7 +299,7 @@ describe('Home Page (logged out)', () => {
     expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
 
     // Dashboard content is for logged-in users only.
-    expect(screen.queryByText('Current Streak')).not.toBeInTheDocument();
+    expect(screen.queryByText(/day streak/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /another quote/i })).not.toBeInTheDocument();
     expect(userService.getProfile).not.toHaveBeenCalled();
   });

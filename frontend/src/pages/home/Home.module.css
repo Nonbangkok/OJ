@@ -1,23 +1,23 @@
+/* Editorial Home — whitespace and type carry the hierarchy; borders only
+   appear on actual objects (the problem card). The hero, progress strip and
+   quote are intentionally unboxed. */
+
 .home-container {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  padding: 0.5rem 0 2rem;
+  gap: 1.75rem;
+  padding: 1rem 0 2.5rem;
 }
 
-/* ---------- Hero ---------- */
+/* ---------- Hero (open, no card) ---------- */
 
 .hero {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 1.5rem;
+  gap: 1.5rem 2rem;
   flex-wrap: wrap;
-  background-color: var(--surface-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--surface-elevation);
-  padding: 1.75rem 1.5rem;
+  padding: 1.5rem 0 0;
 }
 
 .hero-text {
@@ -28,12 +28,7 @@
   margin: 0;
   font-size: var(--font-size-page-title);
   color: var(--text-primary);
-}
-
-.hero-subtitle {
-  margin: 0.375rem 0 0;
-  font-size: var(--font-size-section-title);
-  color: var(--text-secondary);
+  letter-spacing: -0.02em;
 }
 
 .hero-tier {
@@ -43,92 +38,87 @@
   color: var(--accent-primary);
 }
 
+.hero-subtitle {
+  margin: 0.5rem 0 0;
+  font-size: var(--font-size-section-title);
+  color: var(--text-secondary);
+}
+
 .hero-actions {
   display: flex;
+  align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+  padding-bottom: 0.25rem;
 }
 
-/* ---------- Stat cards ---------- */
+/* ---------- Progress summary strip ---------- */
 
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
+.summary-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.375rem 0.75rem;
+  margin: 0;
+  font-size: var(--font-size-card-title);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
-.stat-card {
+.summary-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.summary-streak svg {
+  color: var(--accent-primary);
+}
+
+.summary-separator {
+  color: var(--text-muted);
+}
+
+/* ---------- Section rules & titles ---------- */
+
+.rule {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 0.25rem 0 0;
+  width: 100%;
+}
+
+.section-title {
+  margin: 0 0 0.75rem;
+  font-size: var(--font-size-card-title);
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+
+/* ---------- Problem card (an object: boxed) ---------- */
+
+.problem-section,
+.contest-section {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+}
+
+.problem-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
   background-color: var(--surface-elevated);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  box-shadow: var(--surface-elevation);
   padding: 1rem 1.25rem;
   min-width: 0;
 }
 
-.stat-label {
-  font-size: var(--font-size-metadata);
-  color: var(--text-muted);
-}
-
-.stat-value {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.level-progress {
-  height: 6px;
-  border-radius: 3px;
-  background-color: var(--border-color);
-  overflow: hidden;
-  margin-top: 0.25rem;
-}
-
-.level-progress-fill {
-  height: 100%;
-  border-radius: 3px;
-  background-color: var(--accent-primary);
-  transition: width 0.3s ease;
-}
-
-/* ---------- Continue / Contest row ---------- */
-
-.duo-row {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
-  align-items: stretch;
-}
-
-.duo-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-  background-color: var(--surface-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--surface-elevation);
-  padding: 1.25rem;
+.problem-main {
   min-width: 0;
-}
-
-.card-title {
-  margin: 0;
-  font-size: var(--font-size-card-title);
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
-.contest-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
 }
 
 .problem-title {
@@ -141,40 +131,79 @@
 
 .problem-meta {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 0.375rem 0.75rem;
-  margin: 0;
+  margin: 0.375rem 0 0;
   font-size: var(--font-size-metadata);
   color: var(--text-secondary);
 }
 
 .problem-id {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  color: var(--text-muted);
 }
 
-.duo-card > button {
-  margin-top: auto;
+/* Difficulty chips — same recipe as the Problems page. */
+[class*='difficulty-chip-'] {
+  display: inline-block;
+  padding: 0.08rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+  line-height: 1.5;
 }
 
-/* ---------- Quote card ---------- */
+.difficulty-chip-1 { background-color: var(--difficulty-band-1); }
+.difficulty-chip-2 { background-color: var(--difficulty-band-2); }
+.difficulty-chip-3 { background-color: var(--difficulty-band-3); }
+.difficulty-chip-4 { background-color: var(--difficulty-band-4); }
+.difficulty-chip-5 { background-color: var(--difficulty-band-5); }
 
-.quote-card {
+/* ---------- Caught-up line (all problems solved) ---------- */
+
+.caught-up {
+  margin: 0;
+  font-size: var(--font-size-card-title);
+  color: var(--text-secondary);
+}
+
+.caught-up-hint {
+  color: var(--text-muted);
+}
+
+/* ---------- Contest row (lighter than the problem card) ---------- */
+
+.contest-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  background-color: var(--surface-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--surface-elevation);
-  padding: 1rem 1.5rem;
+  gap: 1.25rem;
+  padding: 0.125rem 0.25rem;
+  min-width: 0;
+}
+
+.contest-main {
+  min-width: 0;
+}
+
+/* ---------- Quote (pure typography, no box) ---------- */
+
+.quote-section {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 0.75rem 0.25rem;
 }
 
 .quote-text {
   margin: 0;
   font-style: italic;
   font-size: var(--font-size-card-title);
-  color: var(--text-primary);
+  color: var(--text-secondary);
   transition: opacity 0.3s ease-in-out;
   min-width: 0;
 }
@@ -215,26 +244,12 @@
   align-items: center;
   text-align: center;
   gap: 1rem;
-  background-color: var(--surface-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--surface-elevation);
   padding: 3rem 1.5rem;
   max-width: 640px;
   margin: 4rem auto;
 }
 
 /* ---------- Responsive ---------- */
-
-@media (max-width: 900px) {
-  .stat-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .duo-row {
-    grid-template-columns: 1fr;
-  }
-}
 
 @media (max-width: 640px) {
   .hero {
@@ -244,18 +259,22 @@
 
   .hero-actions {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .hero-actions > button {
     width: 100%;
   }
 
-  .stat-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .quote-card {
+  .problem-card,
+  .contest-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .quote-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
   }
 }
