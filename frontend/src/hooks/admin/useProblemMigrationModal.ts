@@ -122,7 +122,12 @@ const useProblemMigrationModal = (contest, onSuccess) => {
         handleSelectAvailable,
         handleSelectContest,
         handleSelectAllAvailable,
-        handleSelectAllContest
+        handleSelectAllContest,
+        // Direct setters for the panel-level "Select all visible" checkbox:
+        // it computes the next selected set in one update (not N toggles) so
+        // the tri-state always reflects the real selection immediately.
+        setSelectedAvailable,
+        setSelectedContest
     };
 };
 

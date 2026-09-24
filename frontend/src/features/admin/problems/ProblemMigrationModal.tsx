@@ -29,7 +29,7 @@ const ProblemPanel = ({
   problems,
   selected,
   onToggle,
-  onSelectAllVisible,
+  onSetSelected,
   disabled,
   searchPlaceholder,
   search,
@@ -44,6 +44,27 @@ const ProblemPanel = ({
       || problem.id.toLowerCase().includes(query));
   }, [problems, query]);
 
+  // Tri-state for "Select all visible": unchecked / indeterminate / checked
+  // over the CURRENT search results. Selections outside the results are
+  // untouched by the toggle.
+  const visibleSelectedCount = visible.reduce(
+    (count, problem) => count + (selected.includes(problem.id) ? 1 : 0), 0);
+  const allVisibleSelected = visible.length > 0 && visibleSelectedCount === visible.length;
+  const someVisibleSelected = visibleSelectedCount > 0 && !allVisibleSelected;
+
+  const toggleAllVisible = () => {
+    if (allVisibleSelected) {
+      // Deselect only the visible problems; hidden selections stay.
+      const visibleIds = new Set(visible.map(problem => problem.id));
+      onSetSelected(selected.filter(id => !visibleIds.has(id)));
+    } else {
+      // Select every visible problem (union with any hidden selections).
+      const ids = new Set(selected);
+      visible.forEach(problem => ids.add(problem.id));
+      onSetSelected([...ids]);
+    }
+  };
+
   return (
     <section className={modalStyles.pickPanel}>
       <header className={modalStyles.pickPanelHead}>
@@ -55,21 +76,23 @@ const ProblemPanel = ({
         </h3>
         {disabled ? null : (
           <div className={modalStyles.pickPanelTools}>
-            <button
-              type="button"
-              className={modalStyles.pickLinkButton}
-              onClick={onSelectAllVisible}
-              disabled={visible.length === 0}
-            >
-              {visible.every(problem => selected.includes(problem.id)) && visible.length > 0
-                ? 'Deselect all visible'
-                : 'Select all visible'}
-            </button>
+            <label className={modalStyles.pickSelectAll}>
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                ref={input => {
+                  if (input) input.indeterminate = someVisibleSelected;
+                }}
+                onChange={toggleAllVisible}
+                disabled={visible.length === 0}
+              />
+              Select all visible
+            </label>
             {selected.length > 0 && (
               <button
                 type="button"
                 className={modalStyles.pickLinkButton}
-                onClick={() => selected.forEach(onToggle)}
+                onClick={() => onSetSelected([])}
               >
                 Clear selection
               </button>
@@ -127,8 +150,8 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
     handleMoveToMain,
     handleSelectAvailable,
     handleSelectContest,
-    handleSelectAllAvailable,
-    handleSelectAllContest
+    setSelectedAvailable,
+    setSelectedContest
   } = useProblemMigrationModal(contest, onSuccess);
 
   const canMoveProblems = contest.status === 'scheduled' || contest.status === 'running';
@@ -137,30 +160,6 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
   // selection set is independent of what is currently visible).
   const [availableSearch, setAvailableSearch] = useState('');
   const [contestSearch, setContestSearch] = useState('');
-
-  // Select-all scopes to the currently visible (filtered) rows only.
-  const selectAllVisibleAvailable = () => {
-    const query = availableSearch.trim().toLowerCase();
-    const visible = query
-      ? availableProblems.filter(problem =>
-          problem.title.toLowerCase().includes(query)
-          || problem.id.toLowerCase().includes(query))
-      : availableProblems;
-    visible.forEach(problem => {
-      if (!selectedAvailable.includes(problem.id)) handleSelectAvailable(problem.id);
-    });
-  };
-  const selectAllVisibleContest = () => {
-    const query = contestSearch.trim().toLowerCase();
-    const visible = query
-      ? contestProblems.filter(problem =>
-          problem.title.toLowerCase().includes(query)
-          || problem.id.toLowerCase().includes(query))
-      : contestProblems;
-    visible.forEach(problem => {
-      if (!selectedContest.includes(problem.id)) handleSelectContest(problem.id);
-    });
-  };
 
   if (loading) return <LoadingPage />;
 
@@ -191,7 +190,7 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
           problems={availableProblems}
           selected={selectedAvailable}
           onToggle={handleSelectAvailable}
-          onSelectAllVisible={selectAllVisibleAvailable}
+          onSetSelected={setSelectedAvailable}
           disabled={!canMoveProblems}
           searchPlaceholder="Search by ID or title…"
           search={availableSearch}
@@ -224,7 +223,7 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
           problems={contestProblems}
           selected={selectedContest}
           onToggle={handleSelectContest}
-          onSelectAllVisible={selectAllVisibleContest}
+          onSetSelected={setSelectedContest}
           disabled={!canMoveProblems}
           searchPlaceholder="Search contest problems…"
           search={contestSearch}

@@ -500,3 +500,25 @@
     justify-content: center;
   }
 }
+
+/* "Select all visible" tri-state checkbox label in the panel header. */
+.pickSelectAll {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pickSelectAll:has(input:focus-visible) {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.pickSelectAll:has(input:disabled) {
+  color: var(--text-muted);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
