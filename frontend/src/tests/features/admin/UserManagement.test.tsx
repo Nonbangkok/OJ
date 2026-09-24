@@ -62,25 +62,24 @@ describe('UserManagement Component', () => {
         await waitFor(() => {
             const rows = screen.getAllByRole('row');
 
-            // Row 1: Nonbangkok (System Admin/Self)
+            // Row 1: Nonbangkok (System Admin/Self) — every action disabled.
             const adminRow = rows.find(r => r.textContent.includes('Nonbangkok'));
-            const adminActions = within(adminRow).queryAllByRole('button');
-            expect(adminActions.length).toBe(0);
+            const adminEdit = within(adminRow).getByRole('button', { name: /^edit$/i });
+            expect(adminEdit).toBeDisabled();
 
-            // Row 2: user1 (Regular user)
+            // Row 2: user1 (Regular user) — Edit enabled, Delete reachable
+            // through the overflow menu.
             const userRow = rows.find(r => r.textContent.includes('user1'));
-            const userActions = within(userRow).getAllByRole('button');
-            expect(userActions.length).toBeGreaterThan(0);
-            expect(within(userRow).getByText(/edit/i)).toBeInTheDocument();
-            expect(within(userRow).getByText(/delete/i)).toBeInTheDocument();
+            const userEdit = within(userRow).getByRole('button', { name: /^edit$/i });
+            expect(userEdit).toBeEnabled();
         });
     });
 
     it('opens and closes AddUserModal', async () => {
         renderUserManagement();
 
-        await waitFor(() => screen.getByText('Create New User'));
-        fireEvent.click(screen.getByText('Create New User'));
+        await waitFor(() => screen.getByText('+ New User'));
+        fireEvent.click(screen.getByText('+ New User'));
 
         expect(screen.getByRole('heading', { name: /create new user/i })).toBeInTheDocument();
 
@@ -97,7 +96,8 @@ describe('UserManagement Component', () => {
         await waitFor(() => screen.getByText('user1'));
 
         const userRow = screen.getAllByRole('row').find(r => r.textContent.includes('user1'));
-        fireEvent.click(within(userRow).getByText(/delete/i));
+        fireEvent.click(within(userRow).getByRole('button', { name: /row actions for user1/i }));
+        fireEvent.click(within(userRow).getByRole('menuitem', { name: 'Delete' }));
 
         expect(screen.getByText(/confirm deletion/i)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: /confirm/i }));

@@ -670,3 +670,12 @@
     align-items: flex-start;
   }
 }
+
+/* Shared compact empty state for management tables. */
+.empty-state {
+  margin: 0;
+  padding: 1.5rem 1rem;
+  color: var(--text-secondary);
+  text-align: center;
+  font-size: var(--font-size-metadata);
+}

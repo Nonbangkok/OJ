@@ -95,8 +95,8 @@ describe('ContestManagement Component', () => {
     it('opens ContestModal for creating new contest', async () => {
         renderContestManagement();
 
-        await waitFor(() => screen.getByText('Create New Contest'));
-        fireEvent.click(screen.getByText('Create New Contest'));
+        await waitFor(() => screen.getByText('+ New Contest'));
+        fireEvent.click(screen.getByText('+ New Contest'));
 
         expect(screen.getByText(/create contest/i)).toBeInTheDocument();
     });
@@ -125,8 +125,9 @@ describe('ContestManagement Component', () => {
 
         await waitFor(() => screen.getByText('Contest 2'));
         const c2Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 2'));
-        const deleteBtn = within(c2Row).getByRole('button', { name: /delete/i });
-        expect(deleteBtn).toBeDisabled();
+        fireEvent.click(within(c2Row).getByRole('button', { name: /row actions for Contest 2/i }));
+        const deleteItem = within(c2Row).getByRole('menuitem', { name: 'Delete' });
+        expect(deleteItem).toBeDisabled();
     });
 
     it('handles contest deletion for non-running contests', async () => {
@@ -135,7 +136,8 @@ describe('ContestManagement Component', () => {
 
         await waitFor(() => screen.getByText('Contest 1'));
         const c1Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 1'));
-        fireEvent.click(within(c1Row).getByText(/delete/i));
+        fireEvent.click(within(c1Row).getByRole('button', { name: /row actions for Contest 1/i }));
+        fireEvent.click(within(c1Row).getByRole('menuitem', { name: 'Delete' }));
 
         expect(screen.getByText(/are you sure you want to delete this contest/i)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
@@ -150,9 +152,10 @@ describe('ContestManagement Component', () => {
 
         await waitFor(() => screen.getByText('Contest 3'));
         const c3Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 3'));
-        const rejudgeBtn = within(c3Row).getByRole('button', { name: /rejudge/i });
-        expect(rejudgeBtn).toBeDisabled();
-        expect(rejudgeBtn).toHaveAttribute('title', 'Finished contest — its scoreboard is frozen. Rejudge its problems individually instead.');
+        fireEvent.click(within(c3Row).getByRole('button', { name: /row actions for Contest 3/i }));
+        const rejudgeItem = within(c3Row).getByRole('menuitem', { name: 'Rejudge' });
+        expect(rejudgeItem).toBeDisabled();
+        expect(rejudgeItem).toHaveAttribute('title', 'Finished contest — its scoreboard is frozen. Rejudge its problems individually instead.');
     });
 
     it('opens the rejudge confirm dialog and reports queued/skipped counts', async () => {
@@ -161,7 +164,8 @@ describe('ContestManagement Component', () => {
 
         await waitFor(() => screen.getByText('Contest 2'));
         const c2Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 2'));
-        fireEvent.click(within(c2Row).getByRole('button', { name: /rejudge/i }));
+        fireEvent.click(within(c2Row).getByRole('button', { name: /row actions for Contest 2/i }));
+        fireEvent.click(within(c2Row).getByRole('menuitem', { name: 'Rejudge' }));
 
         // Confirm dialog explains the consequences in plain language.
         expect(screen.getByText(/re-runs every submission for contest "contest 2"/i)).toBeInTheDocument();

@@ -1,8 +1,118 @@
+import { useMemo, useState } from 'react';
 import useProblemMigrationModal from '../../../hooks/admin/useProblemMigrationModal';
-import formStyles from '../../../components/styles/Form.module.css';
 import modalStyles from '../shared/ModalLayout.module.css';
 import LoadingPage from '../../../components/shared/LoadingPage';
-import { Dialog } from '../../../components/ui/Dialog';
+import { Button, Dialog } from '../../../components/ui';
+
+/** One compact problem row: title + muted ID with a real checkbox. */
+const ProblemRow = ({ problem, checked, disabled, onToggle, ariaLabel }) => (
+  <li className={modalStyles.pickRow}>
+    <label className={modalStyles.pickRowLabel}>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={onToggle}
+        aria-label={ariaLabel}
+      />
+      <span className={modalStyles.pickRowBody}>
+        <span className={modalStyles.pickRowTitle}>{problem.title}</span>
+        <span className={modalStyles.pickRowId}>{problem.id}</span>
+      </span>
+    </label>
+  </li>
+);
+
+/** One searchable panel of problems with its own selection set. */
+const ProblemPanel = ({
+  title,
+  problems,
+  selected,
+  onToggle,
+  onSelectAllVisible,
+  disabled,
+  searchPlaceholder,
+  search,
+  onSearch,
+  emptyMessage,
+}) => {
+  const query = search.trim().toLowerCase();
+  const visible = useMemo(() => {
+    if (!query) return problems;
+    return problems.filter(problem =>
+      problem.title.toLowerCase().includes(query)
+      || problem.id.toLowerCase().includes(query));
+  }, [problems, query]);
+
+  return (
+    <section className={modalStyles.pickPanel}>
+      <header className={modalStyles.pickPanelHead}>
+        <h3>
+          {title} ({problems.length})
+          {selected.length > 0 && (
+            <span className={modalStyles.pickSelectedCount}> · {selected.length} selected</span>
+          )}
+        </h3>
+        {disabled ? null : (
+          <div className={modalStyles.pickPanelTools}>
+            <button
+              type="button"
+              className={modalStyles.pickLinkButton}
+              onClick={onSelectAllVisible}
+              disabled={visible.length === 0}
+            >
+              {visible.every(problem => selected.includes(problem.id)) && visible.length > 0
+                ? 'Deselect all visible'
+                : 'Select all visible'}
+            </button>
+            {selected.length > 0 && (
+              <button
+                type="button"
+                className={modalStyles.pickLinkButton}
+                onClick={() => selected.forEach(onToggle)}
+              >
+                Clear selection
+              </button>
+            )}
+          </div>
+        )}
+      </header>
+      <input
+        type="search"
+        className={modalStyles.pickSearch}
+        placeholder={searchPlaceholder}
+        value={search}
+        onChange={(event) => onSearch(event.target.value)}
+        aria-label={searchPlaceholder}
+      />
+      {query && (
+        <p className={modalStyles.pickResultCount}>
+          {visible.length} of {problems.length} problems
+        </p>
+      )}
+      <ul className={modalStyles.pickList}>
+        {visible.length === 0 ? (
+          <li className={modalStyles.pickEmpty}>
+            {query
+              ? `No problems match "${query}".`
+              : emptyMessage}
+          </li>
+        ) : (
+          visible.map(problem => (
+            <ProblemRow
+              key={problem.id}
+              problem={problem}
+              checked={selected.includes(problem.id)}
+              disabled={disabled}
+              onToggle={() => onToggle(problem.id)}
+              ariaLabel={`Select problem ${problem.id}`}
+            />
+          ))
+        )}
+      </ul>
+    </section>
+  );
+};
 
 const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
   const {
@@ -23,6 +133,35 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
 
   const canMoveProblems = contest.status === 'scheduled' || contest.status === 'running';
 
+  // Per-panel search; selections survive searching by design (each panel's
+  // selection set is independent of what is currently visible).
+  const [availableSearch, setAvailableSearch] = useState('');
+  const [contestSearch, setContestSearch] = useState('');
+
+  // Select-all scopes to the currently visible (filtered) rows only.
+  const selectAllVisibleAvailable = () => {
+    const query = availableSearch.trim().toLowerCase();
+    const visible = query
+      ? availableProblems.filter(problem =>
+          problem.title.toLowerCase().includes(query)
+          || problem.id.toLowerCase().includes(query))
+      : availableProblems;
+    visible.forEach(problem => {
+      if (!selectedAvailable.includes(problem.id)) handleSelectAvailable(problem.id);
+    });
+  };
+  const selectAllVisibleContest = () => {
+    const query = contestSearch.trim().toLowerCase();
+    const visible = query
+      ? contestProblems.filter(problem =>
+          problem.title.toLowerCase().includes(query)
+          || problem.id.toLowerCase().includes(query))
+      : contestProblems;
+    visible.forEach(problem => {
+      if (!selectedContest.includes(problem.id)) handleSelectContest(problem.id);
+    });
+  };
+
   if (loading) return <LoadingPage />;
 
   return (
@@ -31,199 +170,70 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
       onClose={onClose}
       title={`Manage Contest Problems — ${contest.title}`}
       wide
+      footer={<Button variant="secondary" onClick={onClose}>Close</Button>}
     >
-        {error && (
-          <div className={formStyles['error-message']}>
-            <h3>Error: {error}</h3>
-          </div>
-        )}
-
-        {contest.status !== 'scheduled' && contest.status !== 'running' && (
-          <div className={modalStyles.migrationModalWarning}>
-            Problems can only be modified for scheduled or running contests.
-            This contest is currently {contest.status}.
-          </div>
-        )}
-
-        <div className={modalStyles.migrationModalGrid}>
-          {/* Available Problems */}
-          <div className={modalStyles.migrationPanel}>
-            <div className={modalStyles.migrationPanelHeader}>
-              <h3>Available Problems ({availableProblems.length})</h3>
-              {canMoveProblems && availableProblems.length > 0 && (
-                <button
-                  onClick={handleSelectAllAvailable}
-                  className={modalStyles.migrationSelectAllButton}
-                >
-                  {selectedAvailable.length === availableProblems.length ? 'Deselect All' : 'Select All'}
-                </button>
-              )}
-            </div>
-
-            <div className={modalStyles.migrationProblemList}>
-              {availableProblems.length === 0 ? (
-                <div className={modalStyles.migrationEmptyList}>
-                  <h3>No Available Problems</h3>
-                </div>
-              ) : (
-                availableProblems.map(problem => {
-                  const itemClasses = [
-                    modalStyles.migrationProblemItem,
-                    canMoveProblems ? modalStyles.enabled : modalStyles.disabled,
-                    selectedAvailable.includes(problem.id) ? modalStyles.selected : ''
-                  ].join(' ');
-
-                  return (
-                    <div
-                      key={problem.id}
-                      className={itemClasses}
-                      role="button"
-                      tabIndex={canMoveProblems ? 0 : -1}
-                      aria-pressed={selectedAvailable.includes(problem.id)}
-                      onClick={() => canMoveProblems && handleSelectAvailable(problem.id)}
-                      onKeyDown={(e) => {
-                        if (canMoveProblems && (e.key === 'Enter' || e.key === ' ')) {
-                          e.preventDefault();
-                          handleSelectAvailable(problem.id);
-                        }
-                      }}
-                    >
-                      <div className={modalStyles.migrationProblemDetails}>
-                        <h4 className={modalStyles.migrationProblemTitle}>
-                          {problem.title}
-                        </h4>
-                        <p className={modalStyles.migrationProblemAuthor}>by {problem.author}</p>
-                      </div>
-                      {canMoveProblems && (
-                        <div className={modalStyles.migrationProblemCheckboxContainer}>
-                          <input
-                            type="checkbox"
-                            checked={selectedAvailable.includes(problem.id)}
-                            onChange={() => handleSelectAvailable(problem.id)}
-                            onClick={e => e.stopPropagation()}
-                            className={modalStyles.migrationProblemCheckbox}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Migration Controls */}
-          <div className={modalStyles.migrationControls}>
-            <div className={modalStyles.migrationControlsButtons}>
-              <button
-                onClick={handleMoveToContest}
-                disabled={!canMoveProblems || selectedAvailable.length === 0 || migrationLoading}
-                className={`${modalStyles.migrationControlButton} ${modalStyles.migrationControlToAdd}`}
-                title="Move selected problems to contest"
-              >
-                <small className={modalStyles.migrationControlButtonText}>Add to Contest</small>
-              </button>
-
-              <button
-                onClick={() => handleMoveToMain()}
-                disabled={!canMoveProblems || selectedContest.length === 0 || migrationLoading}
-                className={`${modalStyles.migrationControlButton} ${modalStyles.migrationControlToRemove}`}
-                title="Move selected problems back to main pool"
-              >
-                <small className={modalStyles.migrationControlButtonText}>Remove from Contest</small>
-              </button>
-            </div>
-
-            <div className={modalStyles.migrationSelectionCountContainer}>
-              <div className={modalStyles.migrationSelectionCountText}>
-                {selectedAvailable.length} selected from available
-              </div>
-              <div className={modalStyles.migrationSelectionCountText}>
-                {selectedContest.length} selected from contest
-              </div>
-            </div>
-          </div>
-
-          {/* Contest Problems */}
-          <div className={modalStyles.migrationPanel}>
-            <div className={modalStyles.migrationPanelHeader}>
-              <div>
-                <h3>Contest Problems ({contestProblems.length})</h3>
-              </div>
-              {canMoveProblems && contestProblems.length > 0 && (
-                <button
-                  onClick={handleSelectAllContest}
-                  className={modalStyles.migrationSelectAllButton}
-                >
-                  {selectedContest.length === contestProblems.length ? 'Deselect All' : 'Select All'}
-                </button>
-              )}
-            </div>
-
-            <div className={modalStyles.migrationProblemList}>
-              {contestProblems.length === 0 ? (
-                <div className={modalStyles.migrationEmptyList}>
-                  <h3>No Contest Problems</h3>
-                  <p>No problems have been assigned to this contest yet</p>
-                </div>
-              ) : (
-                contestProblems.map((problem) => {
-                  const itemClasses = [
-                    modalStyles.migrationProblemItem,
-                    canMoveProblems ? modalStyles.enabled : modalStyles.disabled,
-                    selectedContest.includes(problem.id) ? modalStyles.selected : ''
-                  ].join(' ');
-
-                  return (
-                    <div
-                      key={problem.id}
-                      className={itemClasses}
-                      role="button"
-                      tabIndex={canMoveProblems ? 0 : -1}
-                      aria-pressed={selectedContest.includes(problem.id)}
-                      onClick={() => canMoveProblems && handleSelectContest(problem.id)}
-                      onKeyDown={(e) => {
-                        if (canMoveProblems && (e.key === 'Enter' || e.key === ' ')) {
-                          e.preventDefault();
-                          handleSelectContest(problem.id);
-                        }
-                      }}
-                    >
-                      <div className={modalStyles.migrationProblemDetails}>
-                        <h4 className={modalStyles.migrationProblemTitle}>
-                          {problem.title}
-                        </h4>
-                        <p className={modalStyles.migrationProblemAuthor}>by {problem.author}</p>
-                      </div>
-                      {canMoveProblems && (
-                        <div className={modalStyles.migrationProblemCheckboxContainer}>
-                          <input
-                            type="checkbox"
-                            checked={selectedContest.includes(problem.id)}
-                            onChange={() => handleSelectContest(problem.id)}
-                            onClick={e => e.stopPropagation()}
-                            className={modalStyles.migrationProblemCheckbox}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
+      {error && (
+        <div role="alert" className={modalStyles.migrationModalWarning}>
+          {error}
         </div>
+      )}
 
-        <div className={modalStyles.migrationFooter}>
-          <button
-            onClick={onClose}
-            className={modalStyles.migrationCloseButton}
+      {contest.status !== 'scheduled' && contest.status !== 'running' && (
+        <div className={modalStyles.migrationModalWarning}>
+          Problems can only be modified for scheduled or running contests.
+          This contest is currently {contest.status}.
+        </div>
+      )}
+
+      <div className={modalStyles.pickGrid}>
+        <ProblemPanel
+          title="Available Problems"
+          problems={availableProblems}
+          selected={selectedAvailable}
+          onToggle={handleSelectAvailable}
+          onSelectAllVisible={selectAllVisibleAvailable}
+          disabled={!canMoveProblems}
+          searchPlaceholder="Search by ID or title…"
+          search={availableSearch}
+          onSearch={setAvailableSearch}
+          emptyMessage="No available problems."
+        />
+
+        <div className={modalStyles.pickControls}>
+          <Button
+            size="compact"
+            disabled={!canMoveProblems || selectedAvailable.length === 0 || migrationLoading}
+            onClick={handleMoveToContest}
+            title="Move selected problems to the contest"
           >
-            Close
-          </button>
+            Add{selectedAvailable.length > 0 ? ` ${selectedAvailable.length}` : ''} to Contest →
+          </Button>
+          <Button
+            size="compact"
+            variant="secondary"
+            disabled={!canMoveProblems || selectedContest.length === 0 || migrationLoading}
+            onClick={() => handleMoveToMain()}
+            title="Move selected problems back to the main pool"
+          >
+            ← Remove{selectedContest.length > 0 ? ` ${selectedContest.length}` : ''}
+          </Button>
         </div>
+
+        <ProblemPanel
+          title="Contest Problems"
+          problems={contestProblems}
+          selected={selectedContest}
+          onToggle={handleSelectContest}
+          onSelectAllVisible={selectAllVisibleContest}
+          disabled={!canMoveProblems}
+          searchPlaceholder="Search contest problems…"
+          search={contestSearch}
+          onSearch={setContestSearch}
+          emptyMessage="No problems in this contest yet. Select problems from the left and add them to the contest."
+        />
+      </div>
     </Dialog>
   );
-}
+};
 
-export default ProblemMigrationModal; 
+export default ProblemMigrationModal;
