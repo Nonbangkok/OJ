@@ -41,8 +41,21 @@
   transition: background-color 0.2s ease;
 }
 
-.table td {
+/* One consistent row height for every body row: the cell's padding (24px)
+   plus a 36px content band. Text-only rows and rows with action buttons
+   end up identical. */
+.table tbody td {
   height: 36px;
+  box-sizing: content-box;
+}
+
+/* Action buttons inside a table cell fit the row band instead of
+   stretching it. .oj-button is the stable class every ui Button carries
+   (CSS-module hashes differ per file). */
+.table td :global(.oj-button) {
+  height: 36px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .table tbody tr:last-child td {

@@ -53,7 +53,7 @@ export function Button({
     <button
       {...props}
       type={type}
-      className={[styles.button, styles[variant], styles[size], className].filter(Boolean).join(' ')}
+      className={['oj-button', styles.button, styles[variant], styles[size], className].filter(Boolean).join(' ')}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       aria-describedby={describedBy}
