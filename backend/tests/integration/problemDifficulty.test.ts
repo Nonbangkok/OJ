@@ -50,25 +50,27 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     });
 
     it('includes Unrated problems when no difficulty filter is selected', async () => {
-      const problems = await getProblemsWithStatsForUser(1);
-      expect(problems.map(p => p.id)).toEqual(['easy', 'hard', 'insane', 'mid', 'unrated']);
-      expect(problems.map(p => p.difficulty)).toEqual([800, 2500, 3300, 1500, null]);
+      const page = await getProblemsWithStatsForUser(1);
+      expect(page.problems.map(p => p.id)).toEqual(['easy', 'hard', 'insane', 'mid', 'unrated']);
+      expect(page.problems.map(p => p.difficulty)).toEqual([800, 2500, 3300, 1500, null]);
+      expect(page.hasMore).toBe(false);
+      expect(page.nextCursor).toBeNull();
     });
 
     it('filters by difficultyMin and difficultyMax (inclusive), excluding Unrated', async () => {
       const minOnly = await getProblemsWithStatsForUser(1, { difficultyMin: 1500 });
-      expect(minOnly.map(p => p.id)).toEqual(['hard', 'insane', 'mid']);
+      expect(minOnly.problems.map(p => p.id)).toEqual(['hard', 'insane', 'mid']);
       const maxOnly = await getProblemsWithStatsForUser(1, { difficultyMax: 1500 });
-      expect(maxOnly.map(p => p.id)).toEqual(['easy', 'mid']);
+      expect(maxOnly.problems.map(p => p.id)).toEqual(['easy', 'mid']);
       const both = await getProblemsWithStatsForUser(1, { difficultyMin: 900, difficultyMax: 2600 });
-      expect(both.map(p => p.id)).toEqual(['hard', 'mid']);
+      expect(both.problems.map(p => p.id)).toEqual(['hard', 'mid']);
     });
 
     it('sorts by difficulty with NULLS LAST in both directions', async () => {
       const asc = await getProblemsWithStatsForUser(1, { sort: 'difficulty', order: 'asc' });
-      expect(asc.map(p => p.id)).toEqual(['easy', 'mid', 'hard', 'insane', 'unrated']);
+      expect(asc.problems.map(p => p.id)).toEqual(['easy', 'mid', 'hard', 'insane', 'unrated']);
       const desc = await getProblemsWithStatsForUser(1, { sort: 'difficulty', order: 'desc' });
-      expect(desc.map(p => p.id)).toEqual(['insane', 'hard', 'mid', 'easy', 'unrated']);
+      expect(desc.problems.map(p => p.id)).toEqual(['insane', 'hard', 'mid', 'easy', 'unrated']);
     });
 
     it('returns 400 for out-of-scale difficulty query params', async () => {

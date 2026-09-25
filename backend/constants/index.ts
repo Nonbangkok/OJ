@@ -120,6 +120,17 @@ export const ADMIN_USER_LIST_CONFIG = {
 } as const;
 
 /**
+ * User-facing problem list (GET /problems-with-stats). The endpoint pages
+ * through the visible standalone pool with keyset pagination; the defaults
+ * keep one "Show More" batch a single round trip while bounding the
+ * response size.
+ */
+export const PROBLEM_LIST_CONFIG = {
+    DEFAULT_LIMIT: 20,
+    MAX_LIMIT: 100,
+} as const;
+
+/**
  * Admin testcase viewer (GET /admin/problems/:id/testcases). The metadata
  * list stays cheap for any problem size (sizes computed in SQL, content
  * never fetched); a single case fetched with ?caseNumber= is truncated in

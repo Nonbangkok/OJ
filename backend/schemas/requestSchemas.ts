@@ -7,6 +7,7 @@ import {
   PROBLEM_DIFFICULTY_MAX,
   PROBLEM_DIFFICULTY_MIN,
   PROBLEM_DIFFICULTY_STEP,
+  PROBLEM_LIST_CONFIG,
   PROBLEM_VALIDATION,
   STATEMENT_ASSET,
   STRING_LIMITS,
@@ -214,9 +215,14 @@ export const collectionVisibilityBodySchema = z.object({
 }).strict();
 
 /**
- * Difficulty filtering/sorting for the user-facing problem list
- * (/problems-with-stats). difficultyMin/Max are inclusive and exclude Unrated
- * (NULL) problems; sort=difficulty puts NULLs last in both directions.
+ * Difficulty filtering/sorting plus keyset pagination for the user-facing
+ * problem list (/problems-with-stats). difficultyMin/Max are inclusive and
+ * exclude Unrated (NULL) problems; sort=difficulty puts NULLs last in both
+ * directions. `search` matches id/title (ILIKE, server-side); `category`
+ * filters by one category from the closed list, or the literal
+ * 'Uncategorized' for problems with no categories. `cursor` is the opaque
+ * next-page token returned by the previous response — it encodes the last
+ * row's sort key and is only valid for the same sort/order.
  */
 const difficultyBound = z.coerce.number().int()
   .min(PROBLEM_DIFFICULTY_MIN)
@@ -229,6 +235,10 @@ export const problemsWithStatsQuerySchema = z.object({
   difficultyMax: difficultyBound.optional(),
   sort: z.enum(['difficulty']).optional(),
   order: z.enum(['asc', 'desc']).optional(),
+  search: z.string().trim().max(STRING_LIMITS.TITLE).optional(),
+  category: z.enum(['Uncategorized', ...PROBLEM_CATEGORIES] as [string, ...string[]]).optional(),
+  limit: z.coerce.number().int().min(1).max(PROBLEM_LIST_CONFIG.MAX_LIMIT).optional(),
+  cursor: z.string().min(1).max(2048).optional(),
 }).refine(
   ({ difficultyMin, difficultyMax }) =>
     difficultyMin === undefined || difficultyMax === undefined || difficultyMin <= difficultyMax,

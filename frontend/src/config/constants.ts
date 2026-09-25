@@ -34,3 +34,13 @@ export const UI_TIMEOUTS = {
 export const UI_CONFIG = {
   DEFAULT_EDITOR_FONT_SIZE: 16,
 } as const;
+
+/**
+ * Problems page incremental loading. PAGE_SIZE is the server-side batch
+ * ("Show More" fetches exactly this many problems); SEARCH_DEBOUNCE_MS
+ * throttles the server-side search so typing does not spam requests.
+ */
+export const PROBLEMS_PAGE = {
+  PAGE_SIZE: 20,
+  SEARCH_DEBOUNCE_MS: 300,
+} as const;

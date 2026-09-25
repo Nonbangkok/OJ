@@ -14,6 +14,7 @@ import {
   getProblemPdfWithAccess,
   getProblemTestcases,
   getProblemsWithStatsForUser,
+  getPublicProblemCategoryCounts,
   getVisibleProblems,
   replaceProblemTestcasesFromZip,
   updateProblem,
@@ -73,16 +74,29 @@ router.get('/problems-with-stats', requirePublicAccess,
   // PRIVATE mode is still enforced by requirePublicAccess above.
   const userId = req.user?.id ?? null;
   // validateRequest writes Zod defaults/coercions back into req.query.
-  const { difficultyMin, difficultyMax, sort, order } = req.query as unknown as {
+  const { difficultyMin, difficultyMax, sort, order, search, category, limit, cursor } = req.query as unknown as {
     difficultyMin?: number; difficultyMax?: number; sort?: 'difficulty'; order?: 'asc' | 'desc';
+    search?: string; category?: string; limit?: number; cursor?: string;
   };
-  const problems = await getProblemsWithStatsForUser(userId, {
+  const page = await getProblemsWithStatsForUser(userId, {
     ...(difficultyMin !== undefined ? { difficultyMin } : {}),
     ...(difficultyMax !== undefined ? { difficultyMax } : {}),
     ...(sort !== undefined ? { sort } : {}),
     ...(order !== undefined ? { order } : {}),
+    ...(search !== undefined && search !== '' ? { search } : {}),
+    ...(category !== undefined ? { category } : {}),
+    ...(limit !== undefined ? { limit } : {}),
+    ...(cursor !== undefined ? { cursor } : {}),
   });
-  res.json(problems);
+  res.json(page);
+}));
+
+// Global category tab counts for the problem list (visible, standalone
+// problems only) — one cheap aggregate, independent of the paginated list
+// so the tabs stay correct while pages stream in. Must be registered before
+// the parameterised /problems/:id route.
+router.get('/problems/categories', requirePublicAccess, asyncHandler(async (_req: Request, res: Response) => {
+  res.json(await getPublicProblemCategoryCounts());
 }));
 
 // Problem API Endpoints

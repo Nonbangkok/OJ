@@ -192,6 +192,24 @@ export interface ProblemStatsRow {
   best_submission_results: unknown;
 }
 
+/** One page of the user-facing problem list (GET /problems-with-stats). */
+export interface ProblemsPage {
+  problems: ProblemStatsRow[];
+  /** Opaque token for the next page; null when this is the last page. */
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+/**
+ * Global category tab counts for the public problem list (visible,
+ * standalone problems only).
+ */
+export interface ProblemCategoryCounts {
+  categories: Array<{ name: string; count: number }>;
+  uncategorized: number;
+  total: number;
+}
+
 // ---------------------------------------------------------------------------
 // problemQueryService
 // ---------------------------------------------------------------------------
