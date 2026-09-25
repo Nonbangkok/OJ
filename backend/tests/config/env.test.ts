@@ -66,4 +66,38 @@ describe('runtime environment configuration', () => {
       CORS_ORIGINS: 'not-a-url',
     })).toThrow(/CORS_ORIGINS/);
   });
+
+  // AUTH-007: production must not boot with insecure session cookies.
+  it('refuses production startup without COOKIE_SECURE', () => {
+    expect(() => envModule.parseRuntimeEnv!({
+      ...requiredEnv,
+      NODE_ENV: 'production',
+      // COOKIE_SECURE unset -> defaults to false
+    })).toThrow(/COOKIE_SECURE/);
+
+    expect(() => envModule.parseRuntimeEnv!({
+      ...requiredEnv,
+      NODE_ENV: 'production',
+      COOKIE_SECURE: 'false',
+    })).toThrow(/COOKIE_SECURE/);
+  });
+
+  it('accepts production startup with COOKIE_SECURE=true', () => {
+    const parsed = envModule.parseRuntimeEnv!({
+      ...requiredEnv,
+      NODE_ENV: 'production',
+      COOKIE_SECURE: 'true',
+    });
+
+    expect(parsed.COOKIE_SECURE).toBe(true);
+  });
+
+  it('keeps the insecure default outside production (dev HTTP stack)', () => {
+    const parsed = envModule.parseRuntimeEnv!({
+      ...requiredEnv,
+      NODE_ENV: 'development',
+    });
+
+    expect(parsed.COOKIE_SECURE).toBe(false);
+  });
 });

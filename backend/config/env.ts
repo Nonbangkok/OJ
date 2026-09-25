@@ -48,6 +48,19 @@ export const parseRuntimeEnv = (input: NodeJS.ProcessEnv) => {
     throw new Error(`Invalid environment configuration: ${invalidKeys}`);
   }
 
+  // AUTH-007: refuse to boot in production with insecure session cookies.
+  // COOKIE_SECURE defaults to false (the dev stack runs plain HTTP), so a
+  // production deployment that forgets to set it would hand out cookies the
+  // browser happily transmits over plain HTTP. Fail loudly at startup
+  // instead of silently issuing insecure sessions.
+  if (parsedEnv.data.NODE_ENV === 'production' && !parsedEnv.data.COOKIE_SECURE) {
+    throw new Error(
+      'Invalid environment configuration: COOKIE_SECURE must be "true" when NODE_ENV=production '
+        + '(session cookies would otherwise be transmitted over plain HTTP). '
+        + 'Set COOKIE_SECURE=true (or NODE_ENV=development for local HTTP stacks).',
+    );
+  }
+
   return parsedEnv.data;
 };
 
