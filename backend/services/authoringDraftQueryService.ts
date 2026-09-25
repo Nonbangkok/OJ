@@ -38,6 +38,7 @@ export type ProblemDraftListRow = Pick<
   | 'id'
   | 'problem_id'
   | 'title'
+  | 'author_profile_id'
   | 'author_aka_name'
   | 'status'
   | 'revision'
@@ -148,7 +149,7 @@ export const listProblemDrafts = async (
 ): Promise<ProblemDraftListRow[]> => {
   const result = await database.query<ProblemDraftListRow>(`
     SELECT
-      id, problem_id, title, author_aka_name, status, revision,
+      id, problem_id, title, author_profile_id, author_aka_name, status, revision,
       verified_revision, created_by, created_at, updated_at
     FROM problem_drafts
     ORDER BY updated_at DESC, id ASC

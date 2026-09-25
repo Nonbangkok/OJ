@@ -53,6 +53,7 @@ const toDraftSummaryResponse = (draft: ProblemDraftListRow) => ({
   id: draft.id,
   problemId: draft.problem_id,
   title: draft.title,
+  authorProfileId: draft.author_profile_id,
   authorAkaName: draft.author_aka_name,
   status: draft.status,
   revision: draft.revision,

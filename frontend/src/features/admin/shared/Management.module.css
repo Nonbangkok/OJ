@@ -473,6 +473,39 @@
 }
 
 /* Filter bar: one quiet row of scope controls, a breath below the header. */
+/* Segmented scope toggle (e.g. All drafts | My drafts) — same visual
+   language as the submissions scope control. */
+.filter-segment {
+  display: inline-flex;
+  gap: 0.25rem;
+  background-color: var(--background-tertiary);
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+}
+
+.filter-segment-btn {
+  padding: 0.375rem 0.875rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background-color: transparent;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-segment-btn.active {
+  background-color: var(--background-primary);
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.filter-segment-btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
 .filter-bar {
   display: flex;
   align-items: center;
