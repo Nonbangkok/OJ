@@ -151,6 +151,7 @@ describe('submissionQueryService visibility (PROBLEM-001 / SUB-001 / SUB-002)', 
 
         it('accepts a submission while the contest is genuinely inside its window', async () => {
             query
+                .mockResolvedValueOnce({ rows: [{ exists: 1 }] })  // testcase exists (DB-06)
                 .mockResolvedValueOnce({ rows: [contestRow(new Date(Date.now() - 3600_000), new Date(Date.now() + 3600_000))] })
                 .mockResolvedValueOnce({ rows: [{ exists: 1 }] })  // participant
                 .mockResolvedValueOnce({ rows: [{ exists: 1 }] })  // problem in contest
@@ -164,9 +165,11 @@ describe('submissionQueryService visibility (PROBLEM-001 / SUB-001 / SUB-002)', 
         it('rejects a submission after end_time even while status is still running (end_time+ε)', async () => {
             // The scheduler has not ticked yet: status says running, but the
             // clock is past end_time by a second.
-            query.mockResolvedValueOnce({
-                rows: [contestRow(new Date(Date.now() - 7200_000), new Date(Date.now() - 1000))],
-            });
+            query
+                .mockResolvedValueOnce({ rows: [{ exists: 1 }] })  // testcase exists (DB-06)
+                .mockResolvedValueOnce({
+                    rows: [contestRow(new Date(Date.now() - 7200_000), new Date(Date.now() - 1000))],
+                });
 
             await expect(validateAndQueueSubmission(payload, 5)).rejects.toMatchObject({
                 statusCode: 400,
@@ -175,9 +178,11 @@ describe('submissionQueryService visibility (PROBLEM-001 / SUB-001 / SUB-002)', 
         });
 
         it('rejects a submission before start_time (start_time-ε)', async () => {
-            query.mockResolvedValueOnce({
-                rows: [contestRow(new Date(Date.now() + 1000), new Date(Date.now() + 7200_000))],
-            });
+            query
+                .mockResolvedValueOnce({ rows: [{ exists: 1 }] })  // testcase exists (DB-06)
+                .mockResolvedValueOnce({
+                    rows: [contestRow(new Date(Date.now() + 1000), new Date(Date.now() + 7200_000))],
+                });
 
             await expect(validateAndQueueSubmission(payload, 5)).rejects.toMatchObject({
                 statusCode: 400,
