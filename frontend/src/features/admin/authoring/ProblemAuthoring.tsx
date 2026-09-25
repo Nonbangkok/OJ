@@ -12,6 +12,7 @@ import MetadataFields from './MetadataFields';
 import DraftWorkspace from './DraftWorkspace';
 import StatementEditor from './StatementEditor';
 import AuthorProfiles from './AuthorProfiles';
+import AiDocs from './AiDocs';
 import styles from './Authoring.module.css';
 
 const initialFields: DraftFields = {
@@ -132,6 +133,9 @@ function DraftList() {
         <div className={styles.actions}>
           <Link className={styles.actionLink} to="/admin/authoring/profiles">
             Author profiles
+          </Link>
+          <Link className={styles.actionLink} to="/admin/authoring/ai-docs">
+            AI Docs
           </Link>
           <Button onClick={() => { setCreateError(''); setCreating(true); }}>New draft</Button>
         </div>
@@ -341,6 +345,10 @@ function ProfilesPage() {
   );
 }
 
+function AiDocsPage() {
+  return <AiDocs />;
+}
+
 export default function ProblemAuthoring({ editorMode = false }: { editorMode?: boolean }) {
   const { user, isLoading } = useAuth();
   const { draftId } = useParams();
@@ -352,6 +360,7 @@ export default function ProblemAuthoring({ editorMode = false }: { editorMode?: 
     return draftId ? <StatementEditor key={draftId} id={draftId} /> : <DraftList />;
   }
   if (location.pathname === '/admin/authoring/profiles') return <ProfilesPage />;
+  if (location.pathname === '/admin/authoring/ai-docs') return <AiDocsPage />;
   if (draftId) return <DraftWorkspace key={draftId} id={draftId} />;
   return <DraftList />;
 }

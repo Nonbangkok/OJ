@@ -1,0 +1,232 @@
+/* AI Docs tab — a typography-led reference page. Shares the authoring page
+   frame (width, color, type scale) but reads as a document: generous
+   measure, quiet rules between sections, code in the app's dark editor
+   palette (the same look as CodeEditor / generator template <pre>). */
+
+.docs {
+  box-sizing: border-box;
+  width: min(100%, 1200px);
+  margin: 1.5rem auto;
+  padding: 0 1.5rem;
+  text-align: left;
+  color: var(--text-primary);
+}
+.docs > * {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.backLink {
+  display: inline-block;
+  font-size: 0.875rem;
+  text-decoration: none;
+  color: var(--text-secondary);
+}
+.backLink:hover {
+  color: var(--accent-primary);
+}
+
+/* Header: title + summary on the left, the copy action pinned right. */
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  margin: 0.75rem 0 1.25rem;
+}
+.headerText {
+  min-width: 0;
+  flex: 1 1 24rem;
+}
+.headerText h1 {
+  font-size: var(--font-size-page-title);
+  margin: 0 0 0.4rem;
+}
+.headerText p {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.headerActions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.copyError {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid var(--status-danger);
+  background: var(--danger-tint-bg, var(--background-secondary));
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+/* Table of contents: a quiet index card above the body. */
+.toc {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--background-secondary);
+  padding: 0.85rem 1.1rem;
+  margin-bottom: 2rem;
+}
+.toc ol {
+  margin: 0;
+  padding: 0 0 0 1.3rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.5rem;
+}
+.toc a {
+  color: var(--accent-primary);
+  text-decoration: none;
+  font-size: 0.925rem;
+}
+.toc a:hover {
+  text-decoration: underline;
+}
+
+/* The document body: one article column with a comfortable measure. */
+.body {
+  max-width: 56rem;
+}
+.body section {
+  margin-bottom: 2.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-color);
+  scroll-margin-top: 5.5rem;
+}
+.body section:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+.body h2 {
+  font-size: var(--font-size-section-title);
+  margin: 0.5rem 0 0.9rem;
+}
+.body h3 {
+  font-size: 1.05rem;
+  margin: 1.6rem 0 0.6rem;
+}
+.body h4 {
+  font-size: 1rem;
+  margin: 1.2rem 0 0.5rem;
+}
+.body p {
+  margin: 0.7rem 0;
+  line-height: 1.65;
+  max-width: 75ch;
+}
+.docList {
+  margin: 0.7rem 0;
+  padding-left: 1.4rem;
+  display: grid;
+  gap: 0.45rem;
+  max-width: 75ch;
+}
+.docListItem {
+  line-height: 1.55;
+}
+
+/* Inline code: the app's help-list convention (bordered chip). */
+.body p code,
+.body li code,
+.body td code {
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--background-tertiary);
+  font-family: 'Inconsolata', monospace;
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+}
+
+/* Code blocks: the app's dark editor palette, same as the generator
+   reference <pre> and the code editor. The <pre> scrolls horizontally so
+   long curl lines never overflow the page. */
+.codeBlock {
+  margin: 0.9rem 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--editor-border, var(--border-color));
+  border-radius: var(--radius-sm);
+  background: var(--editor-bg);
+  color: var(--editor-text);
+  font-family: 'Inconsolata', monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.codeBlock code {
+  background: none;
+  border: none;
+  padding: 0;
+  white-space: pre;
+}
+
+/* Tables: the bordered panel look; first column is a code column. Wide
+   tables scroll inside their own region instead of the page. */
+.tableWrap {
+  margin: 0.9rem 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  overflow-x: auto;
+}
+.tableWrap table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 34rem;
+}
+.tableWrap th,
+.tableWrap td {
+  text-align: left;
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: top;
+  line-height: 1.5;
+}
+.tableWrap thead th {
+  background: var(--background-tertiary);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+.tableWrap tbody tr:last-child td {
+  border-bottom: none;
+}
+.tableWrap tbody tr:hover td {
+  background: var(--background-hover);
+}
+.tableWrap td code {
+  white-space: nowrap;
+}
+
+/* Small screens: tighten the frame, the header stacks, the TOC becomes a
+   vertical list, and code/tables keep their own scroll. */
+@media (max-width: 640px) {
+  .docs {
+    margin: 0.5rem auto;
+    padding: 0 0.75rem;
+  }
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .headerText h1 {
+    font-size: 1.4rem;
+  }
+  .headerActions {
+    justify-content: flex-start;
+  }
+  .toc ol {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .body {
+    max-width: none;
+  }
+}
