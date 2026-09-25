@@ -229,6 +229,7 @@ export type AdminUpdateUserResult =
   | { kind: 'ok'; data: AdminCreatedUserRow };
 
 export type AdminDeleteUserResult =
+  | { kind: 'not_found' }
   | { kind: 'protected_user' }
   | { kind: 'ok' };
 

@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { randomInt } from 'crypto';
 import * as db from '../db';
-import { USER_ROLES } from '../constants';
+import { ADMIN_USER_LIST_CONFIG, USER_ROLES } from '../constants';
 import { isUniqueViolation } from '../utils/dbErrors';
 import {
   AdminAuthorListRow,
@@ -25,9 +25,40 @@ const buildRandomPassword = (passwordLength: number): string => {
   return password;
 };
 
-export const getAdminUsers = async (): Promise<AdminUserListRow[]> => {
-  const result = await db.query<AdminUserListRow>('SELECT id, username, role, created_at FROM users ORDER BY id');
-  return result.rows;
+export interface AdminUsersPage {
+  users: AdminUserListRow[];
+  /** Total user count, so the UI can page without over-fetching. */
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/**
+ * Admin user list (ADMIN-008). Previously returned the entire table in one
+ * response; now paginated. `limit` is capped at ADMIN_USER_LIST_MAX_LIMIT.
+ */
+export const getAdminUsers = async (
+  page: number = 1,
+  limit: number = ADMIN_USER_LIST_CONFIG.DEFAULT_LIMIT,
+): Promise<AdminUsersPage> => {
+  const safePage = Math.max(1, Math.floor(page));
+  const safeLimit = Math.min(Math.max(1, Math.floor(limit)), ADMIN_USER_LIST_CONFIG.MAX_LIMIT);
+  const offset = (safePage - 1) * safeLimit;
+
+  const [rowsResult, countResult] = await Promise.all([
+    db.query<AdminUserListRow>(
+      'SELECT id, username, role, created_at FROM users ORDER BY id LIMIT $1 OFFSET $2',
+      [safeLimit, offset],
+    ),
+    db.query<{ total: string }>('SELECT COUNT(*) AS total FROM users'),
+  ]);
+
+  return {
+    users: rowsResult.rows,
+    total: Number(countResult.rows[0]?.total ?? 0),
+    page: safePage,
+    limit: safeLimit,
+  };
 };
 
 export const createAdminUser = async (
@@ -114,8 +145,10 @@ export const updateAdminUser = async (
 
 export const deleteAdminUser = async (userId: string): Promise<AdminDeleteUserResult> => {
   const userToDelete = await db.query('SELECT username FROM users WHERE id = $1', [userId]);
+  // ADMIN-007: deleting a nonexistent id previously reported success —
+  // surface it as not_found so the controller can answer 404.
   if (userToDelete.rows.length === 0) {
-    return { kind: 'ok' };
+    return { kind: 'not_found' };
   }
   if (userToDelete.rows[0].username === PROTECTED_ADMIN_USERNAME) {
     return { kind: 'protected_user' };

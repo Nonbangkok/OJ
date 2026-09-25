@@ -15,6 +15,7 @@ import {
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
 import {
+  adminUsersQuerySchema,
   analyticsContestIdParamSchema,
   analyticsProblemIdParamSchema,
   batchCreateUsersSchema,
@@ -48,9 +49,13 @@ import { getSiteAccessMode, updateSiteAccessMode } from '../services/siteSetting
 const router: Router = express.Router();
 
 // Admin API Endpoints
-router.get('/admin/users', requireAuth, requireAdmin, asyncHandler(async (_req: Request, res: Response) => {
-  const users = await getAdminUsers();
-  res.json(users);
+router.get('/admin/users', requireAuth, requireAdmin,
+  validateRequest({ query: adminUsersQuerySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  // ADMIN-008: paged list (defaults: page 1, 100 rows) + total count.
+  const { page, limit } = req.query as unknown as { page: number; limit: number };
+  const result = await getAdminUsers(page, limit);
+  res.json(result);
 }));
 
 router.post('/admin/users', requireAuth, requireAdmin,
@@ -97,6 +102,9 @@ router.delete('/admin/users/:id', requireAuth, requireAdmin,
   }
 
   const deleteResult = await deleteAdminUser(id);
+  if (deleteResult.kind === 'not_found') {
+    throw new AppError('User not found.', 404);
+  }
   if (deleteResult.kind === 'protected_user') {
     throw new AppError('The "Nonbangkok" account cannot be deleted.', 403);
   }

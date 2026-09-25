@@ -172,12 +172,12 @@ describe('adminQueryService', () => {
     expect(result).toEqual({ kind: 'protected_user' });
   });
 
-  it('deleteAdminUser should return ok when user does not exist', async () => {
+  it('deleteAdminUser should return not_found when user does not exist (ADMIN-007)', async () => {
     (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 
     const result = await deleteAdminUser('99');
 
-    expect(result).toEqual({ kind: 'ok' });
+    expect(result).toEqual({ kind: 'not_found' });
   });
 
   it('deleteAdminUser should delete submissions, sessions, and the user atomically (AUTH-002/003, DB-04)', async () => {
@@ -323,15 +323,35 @@ describe('adminQueryService', () => {
     expect(enabled).toBe(false);
   });
 
-  it('should list admin users and authors', async () => {
-    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ id: 1, username: 'admin', role: 'admin' }] });
+  it('should list admin users (paged, ADMIN-008) and authors', async () => {
+    // First getAdminUsers query: the page of rows; second: the COUNT.
+    (db.query as jest.Mock)
+        .mockResolvedValueOnce({ rows: [{ id: 1, username: 'admin', role: 'admin' }] })
+        .mockResolvedValueOnce({ rows: [{ total: '1' }] });
     const users = await getAdminUsers();
+
+    expect(users.users.length).toBe(1);
+    expect(users.total).toBe(1);
+    expect(users.page).toBe(1);
 
     (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ id: 2, username: 'staff' }] });
     const authors = await getAuthors();
 
-    expect(users.length).toBe(1);
     expect(authors.length).toBe(1);
+  });
+
+  it('paginates the admin user list with LIMIT/OFFSET (ADMIN-008)', async () => {
+    (db.query as jest.Mock)
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ total: '250' }] });
+
+    const result = await getAdminUsers(3, 100);
+
+    const [listSql, listParams] = (db.query as jest.Mock).mock.calls[0];
+    expect(listSql).toContain('LIMIT $1 OFFSET $2');
+    // (3 - 1) * 100 = 200 skipped.
+    expect(listParams).toEqual([100, 200]);
+    expect(result.total).toBe(250);
   });
 
   it('updateRegistrationEnabled should execute update query', async () => {

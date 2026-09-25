@@ -110,6 +110,16 @@ export const SUBMISSION_QUERY_CONFIG = {
 } as const;
 
 /**
+ * Admin user list pagination (ADMIN-008). The endpoint previously returned
+ * the whole users table; the defaults keep the first page a single round
+ * trip while bounding the response size.
+ */
+export const ADMIN_USER_LIST_CONFIG = {
+    DEFAULT_LIMIT: 100,
+    MAX_LIMIT: 500,
+} as const;
+
+/**
  * Connection-pool tuning (DB-10). The default pg pool (max 10) has no
  * explicit budget against the judge pipeline + request load, and API queries
  * run with no statement timeout at all — a runaway query holds a pool slot
