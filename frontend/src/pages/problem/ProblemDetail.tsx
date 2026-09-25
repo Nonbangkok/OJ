@@ -18,7 +18,6 @@ const ProblemDetail = () => {
     contest,
     loading,
     error,
-    hiddenProblemInfo,
     activeView,
     setActiveView,
     navRef,
@@ -43,24 +42,6 @@ const ProblemDetail = () => {
 
   if (loading) return <LoadingPage />;
   if (error) return <div className={styles['error-message']}>{error}</div>;
-  if (hiddenProblemInfo) {
-    return (
-      <div className={styles['problem-detail-container']}>
-        <div className={styles['hidden-problem-container']}>
-          <div className={styles['hidden-problem-header']}>
-            <h2>Problem is hidden by Admin</h2>
-            <div className={styles['hidden-problem-info']}>
-              <p><strong>Problem ID:</strong> {hiddenProblemInfo.problemId}</p>
-              <p><strong>Title:</strong> {hiddenProblemInfo.title}</p>
-            </div>
-          </div>
-          <div className={styles['hidden-problem-message']}>
-            <p>{hiddenProblemInfo.detail}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
   if (!problem) return <div className={styles['error-message']}>Problem not found.</div>;
   const renderContent = () => {
     switch (activeView) {
@@ -112,6 +93,14 @@ const ProblemDetail = () => {
             <h2>{problem.title}</h2>
             <p className={styles['problem-id']}>{problem.id}</p>
             {problem.author && <p className={styles['problem-author']}>Author: {problem.author}</p>}
+            {/* Staff context: hidden problems now return 404 for everyone
+                else, so only staff can reach this page with is_visible=false
+                and they get an inline indicator instead of the old 403 body. */}
+            {problem.is_visible === false && (
+              <p className={styles['hidden-problem-indicator']}>
+                This problem is currently hidden — it is only visible to staff.
+              </p>
+            )}
 
             <div className={styles['problem-meta']}>
               <span>Time Limit: {problem.time_limit_ms} ms</span>

@@ -53,20 +53,14 @@ describe('useProblemDetail Hook', () => {
         expect(result.current.problem).toEqual(mockProblem);
     });
 
-    it('handles hidden problem (403)', async () => {
+    it('treats a hidden problem (404, no title disclosure) as not found', async () => {
         (jest.mocked(useParams) as jest.Mock).mockReturnValue({ problemId: '1' });
-        const error = new Error('Forbidden') as Error & {
-            response?: { status?: number; data?: { message?: string; problemId?: string; title?: string; detail?: string } };
+        // PROBLEM-002: hidden problems return the same 404 shape as
+        // nonexistent ones — no dedicated hidden state remains.
+        const error = new Error('Not Found') as Error & {
+            response?: { status?: number; data?: { message?: string } };
         };
-        error.response = {
-            status: 403,
-            data: {
-                message: 'Problem is hidden',
-                problemId: '1',
-                title: 'Hidden',
-                detail: 'Detailed info'
-            }
-        };
+        error.response = { status: 404, data: { message: 'Problem not found' } };
         (jest.mocked(problemService.getDetails) as jest.Mock).mockRejectedValueOnce(error);
 
         const { result } = renderHook(() => useProblemDetail());
@@ -75,11 +69,7 @@ describe('useProblemDetail Hook', () => {
             expect(result.current.loading).toBe(false);
         });
 
-        expect(result.current.hiddenProblemInfo).toEqual({
-            problemId: '1',
-            title: 'Hidden',
-            detail: 'Detailed info'
-        });
+        expect(result.current.error).toBe('Problem 1 not found.');
     });
 
     it('handles problem not found (404)', async () => {

@@ -5,18 +5,11 @@ import contestService from '../services/contestService';
 import { getErrorStatus, toApiLikeError } from '../utils/error';
 import type { Contest, ProblemDetail, ProblemSummary, SliderStyle } from '../types';
 
-interface HiddenProblemInfo {
-  problemId: string;
-  title: string;
-  detail: string;
-}
-
 export const useProblemDetail = () => {
   const { contestId, problemId } = useParams();
   const [problem, setProblem] = useState<(ProblemDetail & Partial<ProblemSummary>) | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [hiddenProblemInfo, setHiddenProblemInfo] = useState<HiddenProblemInfo | null>(null);
   const [activeView, setActiveView] = useState('statement');
   const [contest, setContest] = useState<Contest | null>(null);
   const navRef = useRef<HTMLElement | null>(null);
@@ -41,16 +34,11 @@ export const useProblemDetail = () => {
         }
       } catch (err) {
         const apiError = toApiLikeError(err);
-        if (
-          getErrorStatus(err) === 403 &&
-          apiError.response?.data?.message === 'Problem is hidden'
-        ) {
-          setHiddenProblemInfo({
-            problemId: String(apiError.response?.data?.problemId ?? ''),
-            title: String(apiError.response?.data?.title ?? ''),
-            detail: String(apiError.response?.data?.detail ?? ''),
-          });
-        } else if (getErrorStatus(err) === 404) {
+        // Hidden problems now come back as 404 (same shape as nonexistent),
+        // so there is no dedicated hidden-problem state for regular users —
+        // only staff ever see a hidden problem's detail, with is_visible
+        // riding along in the 200 body.
+        if (getErrorStatus(err) === 404) {
           setError(`Problem ${problemId} not found.`);
         } else {
           const responseMessage = apiError.response?.data?.message;
@@ -109,7 +97,6 @@ export const useProblemDetail = () => {
     contest,
     loading,
     error,
-    hiddenProblemInfo,
     activeView,
     setActiveView,
     navRef,
