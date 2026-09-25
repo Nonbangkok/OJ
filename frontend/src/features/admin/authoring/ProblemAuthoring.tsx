@@ -181,33 +181,40 @@ function DraftList() {
 
           {/* Discovery toolbar — a filter over the single collaborative list.
               Every author still sees and can edit every draft under All drafts. */}
-          <div className={shared['filter-bar']}>
-            <input
-              type="search"
-              className={shared['filter-search']}
-              placeholder="Search by ID or title…"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              aria-label="Search drafts by ID or title"
-            />
-            <div className={shared['filter-segment']} role="group" aria-label="Draft scope">
-              <button
-                type="button"
-                className={`${shared['filter-segment-btn']} ${scope === 'all' ? shared.active : ''}`}
-                aria-pressed={scope === 'all'}
-                onClick={() => setScope('all')}
-              >
-                All drafts
-              </button>
-              <button
-                type="button"
-                className={`${shared['filter-segment-btn']} ${scope === 'mine' ? shared.active : ''}`}
-                aria-pressed={scope === 'mine'}
-                onClick={() => setScope('mine')}
-              >
-                My drafts
-              </button>
+          <div className={`${styles.draftsToolbar}`}>
+            {/* Row 1: search + scope toggle sit together, no labels needed —
+                the placeholder and button text carry the meaning. */}
+            <div className={`${shared['filter-bar']} ${styles.draftsToolbarRow}`}>
+              <input
+                type="search"
+                className={shared['filter-search']}
+                placeholder="Search by ID or title…"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                aria-label="Search drafts by ID or title"
+              />
+              <div className={shared['filter-segment']} role="group" aria-label="Draft scope">
+                <button
+                  type="button"
+                  className={`${shared['filter-segment-btn']} ${scope === 'all' ? shared.active : ''}`}
+                  aria-pressed={scope === 'all'}
+                  onClick={() => setScope('all')}
+                >
+                  All drafts
+                </button>
+                <button
+                  type="button"
+                  className={`${shared['filter-segment-btn']} ${scope === 'mine' ? shared.active : ''}`}
+                  aria-pressed={scope === 'mine'}
+                  onClick={() => setScope('mine')}
+                >
+                  My drafts
+                </button>
+              </div>
             </div>
+            {/* Row 2: labeled filters on one aligned line (label beside its
+                select, consistent heights, shared gap rhythm). */}
+            <div className={shared['filter-bar']}>
             <label className={shared['filter-control']}>
               <span className={shared['filter-label']}>Author</span>
               <select
@@ -247,6 +254,7 @@ function DraftList() {
                 ))}
               </select>
             </label>
+            </div>
           </div>
 
           <OverflowTable label="Saved drafts">

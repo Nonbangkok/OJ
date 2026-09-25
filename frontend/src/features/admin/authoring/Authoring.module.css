@@ -246,6 +246,36 @@
   margin: 1rem 0;
   overflow: hidden;
 }
+
+/* Draft-list toolbar rhythm: the section head, the grouped filter toolbar,
+   and the table below each get their own breathing room instead of running
+   together. The toolbar wraps as one block between head and table. */
+.draftsToolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Inside the toolbar, search keeps a capped useful width instead of
+   stretching across the row. */
+.draftsToolbar .filter-search {
+  flex: 0 1 22rem;
+  min-width: 12rem;
+}
+
+/* Row 1 (search + segmented toggle): both controls are the same height,
+   but input vs div baseline quirks shift center alignment by a pixel or
+   two — bottom-align pins them to one visual baseline. */
+.draftsToolbarRow {
+  align-items: flex-end;
+}
+
+.draftsToolbar + * {
+  margin-top: 0; /* the table provides its own padding; keep the border as
+                    the separator rather than extra margins */
+}
 .panelHead {
   display: flex;
   flex-wrap: wrap;

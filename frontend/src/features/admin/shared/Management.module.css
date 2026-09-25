@@ -481,6 +481,15 @@
   background-color: var(--background-tertiary);
   padding: 0.25rem;
   border-radius: var(--radius-md);
+  /* Match the shared 2.1rem control height (34px) so segmented groups align
+     on the same baseline as search inputs and selects in grouped toolbars. */
+  box-sizing: border-box;
+  height: 2.1rem;
+}
+
+.filter-segment .filter-segment-btn {
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .filter-segment-btn {
@@ -512,6 +521,49 @@
   flex-wrap: wrap;
   gap: 0.75rem;
   margin-top: 0.75rem;
+}
+
+/* Grouped variant: the toolbar reads as distinct groups (search, scope
+   toggle, each labeled filter) separated by a wider rhythm, instead of one
+   uniformly dense row. Groups wrap as units. */
+.filter-bar-grouped {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+}
+
+/* Search inside a grouped bar keeps a useful but capped width so it never
+   dominates the row. The flex item is the wrapping stacked group, so the
+   sizing rides on the group and the input fills it. */
+.filter-bar-grouped .filter-search-group {
+  flex: 0 1 22rem;
+  min-width: 12rem;
+}
+
+.filter-bar-grouped .filter-search {
+  flex: none;
+  width: 100%;
+}
+
+/* Stacked label-over-control variant for grouped toolbars: labels sit on
+   their own line (0.5rem above the control) so every select aligns on the
+   same top/bottom edges. */
+.filter-control-stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.filter-control-stacked select {
+  box-sizing: border-box;
+  height: 2.1rem;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-color);
+  background-color: var(--background-primary);
+  color: var(--text-primary);
 }
 
 /* All filter controls share one height (2.1rem box) so the row aligns on a
