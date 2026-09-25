@@ -102,7 +102,7 @@ describe('UserManagement Component', () => {
 
         const userRow = screen.getAllByRole('row').find(r => r.textContent.includes('user1'));
         fireEvent.click(within(userRow).getByRole('button', { name: /row actions for user1/i }));
-        fireEvent.click(within(userRow).getByRole('menuitem', { name: 'Delete' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
 
         expect(screen.getByText(/confirm deletion/i)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
@@ -128,7 +128,7 @@ describe('UserManagement Component', () => {
 
         const userRow = screen.getAllByRole('row').find(r => r.textContent.includes('user1'));
         fireEvent.click(within(userRow).getByRole('button', { name: /row actions for user1/i }));
-        fireEvent.click(within(userRow).getByRole('menuitem', { name: 'Reset password' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Reset password' }));
 
         expect(
             screen.getByRole('heading', { name: 'Reset Password — user1' }),
@@ -145,7 +145,7 @@ describe('UserManagement Component', () => {
         const adminRow = screen.getAllByRole('row').find(r => r.textContent.includes('Nonbangkok'));
         fireEvent.click(within(adminRow).getByRole('button', { name: /row actions for Nonbangkok/i }));
         expect(
-            within(adminRow).getByRole('menuitem', { name: 'Reset password' }),
+            screen.getByRole('menuitem', { name: 'Reset password' }),
         ).toBeDisabled();
     });
 });

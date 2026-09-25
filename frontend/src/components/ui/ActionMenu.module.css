@@ -55,13 +55,16 @@
   font-size: 0.7rem;
 }
 
-/* Anchored dropdown: elevated surface, same tokens as the app's popovers. */
+/* Portaled dropdown: rendered into document.body above the navbar (z-100)
+   and sticky headers, but below modal dialogs (z-1000). Same surface tokens
+   as the app's popovers. position: fixed + left/top are set inline from the
+   trigger's getBoundingClientRect(); the width is intrinsic to the menu, so
+   it never depends on the table column width. */
 .menu {
-  position: absolute;
-  top: calc(100% + 0.25rem);
-  right: 0;
-  z-index: 60;
+  position: fixed;
+  z-index: 200;
   min-width: 11rem;
+  max-width: 20rem;
   display: flex;
   flex-direction: column;
   padding: 0.3rem;
