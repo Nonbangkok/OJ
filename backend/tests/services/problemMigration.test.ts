@@ -171,6 +171,32 @@ describe('Problem Migration Service', () => {
             expect(publishRealtime).toHaveBeenCalledWith({ type: 'scoreboard_update', contestId: 1 });
         });
 
+        it('awards XP for migrated Accepted solves inside the transaction (SCORE-002/DB-03)', async () => {
+            (mockClient.query as jest.Mock).mockImplementation(async (text: string) => {
+                if (String(text).includes('SELECT id, status FROM contests')) {
+                    return { rows: [{ id: 1, status: 'finishing' }] };
+                }
+                if (String(text).includes('INSERT INTO submissions')) {
+                    return { rows: [{ id: 10 }] };
+                }
+                return { rows: [] };
+            });
+
+            await migrateSubmissionsAfterContest(1);
+
+            const awardCall = (mockClient.query as jest.Mock).mock.calls
+                .map((c: unknown[]) => c)
+                .find(([text]) => String(text).includes('INSERT INTO user_problem_rewards'));
+            expect(awardCall).toBeDefined();
+            const [awardSql, awardParams] = awardCall as [string, unknown[]];
+            // Idempotent: same conflict target as awardSolveReward.
+            expect(awardSql).toContain('ON CONFLICT (user_id, problem_id) DO NOTHING');
+            // Mirrors the live judge pipeline: Accepted at a full score only.
+            expect(awardSql).toContain('overall_status = $2');
+            expect(awardSql).toContain('score >= $3');
+            expect(awardParams).toEqual([1, 'Accepted', 100]);
+        });
+
         it('should not publish when the migration rolls back', async () => {
             (mockClient.query as jest.Mock).mockImplementation(async (text: string) => {
                 if (String(text).includes('SELECT id, status FROM contests')) {

@@ -1,8 +1,9 @@
 import * as db from '../db';
 import { PoolClient } from 'pg';
-import { CONTEST_STATUS } from '../constants';
+import { CONTEST_STATUS, SUBMISSION_QUERY_CONFIG, SUBMISSION_STATUS } from '../constants';
 import { logger } from '../utils/logger';
 import { ContestRow } from '../types/models';
+import { solveRewardXpSql } from './progressionService';
 import { publishRealtime } from './realtimeHub';
 import {
   AvailableContestProblemRow,
@@ -222,6 +223,28 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
       WHERE contest_id = $1
       RETURNING id
     `, [contestId]);
+
+    // SCORE-002/DB-03: award XP for the migrated Accepted solves, inside the
+    // same transaction. Idempotent like awardSolveReward (unique constraint
+    // on (user_id, problem_id), ON CONFLICT DO NOTHING), so pairs the live
+    // judge pipeline already rewarded during the contest are left untouched
+    // and re-running a migration can never double-award. Mirrors the live
+    // pipeline's condition: Accepted with a full score.
+    await client.query(`
+      INSERT INTO user_problem_rewards (user_id, problem_id, xp_awarded, difficulty_snapshot, awarded_at)
+      SELECT DISTINCT ON (cs.user_id, cs.problem_id)
+             cs.user_id, cs.problem_id,
+             ${solveRewardXpSql},
+             p.difficulty,
+             cs.submitted_at
+      FROM contest_submissions cs
+      JOIN problems p ON p.id = cs.problem_id
+      WHERE cs.contest_id = $1
+        AND cs.overall_status = $2
+        AND cs.score >= $3
+        AND cs.user_id IS NOT NULL
+      ON CONFLICT (user_id, problem_id) DO NOTHING
+    `, [contestId, SUBMISSION_STATUS.ACCEPTED, SUBMISSION_QUERY_CONFIG.FULL_PROBLEM_SCORE]);
 
     // Clean up contest submissions (optional - could keep for historical data)
     await client.query(

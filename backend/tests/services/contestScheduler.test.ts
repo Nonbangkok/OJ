@@ -16,6 +16,10 @@ describe('Contest Scheduler Service', () => {
         console.error = jest.fn();
         (contestScheduler as any).isRunning = false;
         (contestScheduler as any).checkInterval = null;
+        (contestScheduler as any).migrationFailures = new Map();
+        // Default: no contests to process (individual tests override with
+        // mockResolvedValueOnce chains).
+        (db.query as jest.Mock).mockResolvedValue({ rows: [] });
     });
 
     describe('start / stop', () => {
@@ -66,36 +70,106 @@ describe('Contest Scheduler Service', () => {
 
             (db.query as jest.Mock)
                 .mockResolvedValueOnce({ rows: [] }) // start scheduled (none)
-                .mockResolvedValueOnce({ rows: [{ id: 2, title: 'Contest 2' }] }) // end running
+                .mockResolvedValueOnce({ rows: [{ id: 2, title: 'Contest 2', status: 'running' }] }) // end running
                 .mockResolvedValueOnce({}); // UPDATE to finishing
 
             (migrateSubmissionsAfterContest as jest.Mock).mockResolvedValueOnce({});
 
             await contestScheduler.checkContestStatus();
 
-            expect(db.query).toHaveBeenNthCalledWith(3, expect.stringContaining('UPDATE contests\n          SET status = \'finishing\''), [2]);
+            expect(db.query).toHaveBeenNthCalledWith(3, expect.stringMatching(/UPDATE contests\s+SET status = 'finishing'/), [2]);
             expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(2);
 
             jest.useRealTimers();
         });
 
-        it('should still mark contest as finished if migration fails', async () => {
+        it('keeps a failed migration in finishing and retries it on the next tick (XSYS-006/CONTEST-004)', async () => {
             const mockNow = new Date('2025-01-01T15:00:00Z');
             jest.useFakeTimers().setSystemTime(mockNow);
 
+            // Tick 1: running contest whose migration fails.
             (db.query as jest.Mock)
-                .mockResolvedValueOnce({ rows: [] })
-                .mockResolvedValueOnce({ rows: [{ id: 3, title: 'Contest 3' }] })
-                .mockResolvedValueOnce({}) // finishing
-                .mockResolvedValueOnce({}); // fallback to finished
+                .mockResolvedValueOnce({ rows: [] }) // start scheduled (none)
+                .mockResolvedValueOnce({ rows: [{ id: 3, title: 'Contest 3', status: 'running' }] })
+                .mockResolvedValueOnce({}); // UPDATE to finishing
 
-            const error = new Error('Migration failed');
-            (migrateSubmissionsAfterContest as jest.Mock).mockRejectedValueOnce(error);
+            (migrateSubmissionsAfterContest as jest.Mock).mockRejectedValueOnce(new Error('Migration failed'));
 
             await contestScheduler.checkContestStatus();
 
-            expect(console.error).toHaveBeenCalledWith(expect.stringContaining('contest migration failed'));
-            expect(db.query).toHaveBeenNthCalledWith(4, expect.stringContaining('UPDATE contests\n            SET status = \'finished\''), [3]);
+            // The contest is NEVER flipped to finished on failure — that is
+            // the bug this fixes. Only three queries ran.
+            expect(db.query).toHaveBeenCalledTimes(3);
+            const allSql = (db.query as jest.Mock).mock.calls.map((c) => String(c[0]));
+            expect(allSql.some((sql) => sql.includes("'finished'"))).toBe(false);
+            // The dev-mode logger flattens message + fields into one line.
+            expect(console.error).toHaveBeenCalledWith(
+                expect.stringMatching(
+                    /contest migration failed - will retry on next tick .*contestId=3 .*attempt=1 /
+                ),
+            );
+
+            // Tick 2: the contest comes back as 'finishing' and the
+            // migration is retried, this time successfully.
+            (db.query as jest.Mock).mockClear();
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] }); // start scheduled (none)
+            (migrateSubmissionsAfterContest as jest.Mock).mockClear();
+            (migrateSubmissionsAfterContest as jest.Mock).mockResolvedValueOnce({});
+
+            // Re-select returns the same contest, now finishing.
+            (db.query as jest.Mock).mockReset();
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [] }) // start scheduled (none)
+                .mockResolvedValueOnce({ rows: [{ id: 3, title: 'Contest 3', status: 'finishing' }] });
+
+            await contestScheduler.checkContestStatus();
+
+            expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(3);
+            // A finishing contest is not re-flipped to finishing.
+            const updateCalls = (db.query as jest.Mock).mock.calls
+                .map((c) => String(c[0]))
+                .filter((sql) => sql.includes('UPDATE contests'));
+            expect(updateCalls).toHaveLength(0);
+
+            jest.useRealTimers();
+        });
+
+        it('stops auto-retrying after the retry budget is exhausted and leaves the contest in finishing', async () => {
+            const mockNow = new Date('2025-01-01T15:00:00Z');
+            jest.useFakeTimers().setSystemTime(mockNow);
+
+            for (let attempt = 1; attempt <= 5; attempt += 1) {
+                (db.query as jest.Mock).mockReset();
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce({ rows: [] }) // start scheduled (none)
+                    .mockResolvedValueOnce({ rows: [{ id: 4, title: 'Contest 4', status: attempt === 1 ? 'running' : 'finishing' }] })
+                    .mockResolvedValueOnce({}); // UPDATE to finishing (first tick only)
+                (migrateSubmissionsAfterContest as jest.Mock).mockReset();
+                (migrateSubmissionsAfterContest as jest.Mock).mockRejectedValueOnce(new Error('Migration failed'));
+
+                await contestScheduler.checkContestStatus();
+            }
+
+            // The 5th failure logged the permanent ERROR, still without
+            // flipping the contest to finished.
+            expect(console.error).toHaveBeenCalledWith(
+                expect.stringMatching(
+                    /contest migration failed permanently - contest left in finishing status.*contestId=4 .*attempts=5 /
+                ),
+            );
+
+            // Tick 6: exhausted — the migration is not attempted again.
+            (db.query as jest.Mock).mockReset();
+            (migrateSubmissionsAfterContest as jest.Mock).mockClear();
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [] })
+                .mockResolvedValueOnce({ rows: [{ id: 4, title: 'Contest 4', status: 'finishing' }] });
+
+            await contestScheduler.checkContestStatus();
+
+            expect(migrateSubmissionsAfterContest).not.toHaveBeenCalled();
+            const allSql = (db.query as jest.Mock).mock.calls.map((c) => String(c[0]));
+            expect(allSql.some((sql) => sql.includes("'finished'"))).toBe(false);
 
             jest.useRealTimers();
         });
@@ -110,7 +184,7 @@ describe('Contest Scheduler Service', () => {
             (migrateSubmissionsAfterContest as jest.Mock).mockImplementationOnce(() => firstTickGate);
             (db.query as jest.Mock)
                 .mockResolvedValueOnce({ rows: [] }) // start scheduled (none)
-                .mockResolvedValueOnce({ rows: [{ id: 7, title: 'Slow Contest' }] }) // end running
+                .mockResolvedValueOnce({ rows: [{ id: 7, title: 'Slow Contest', status: 'running' }] }) // end running
                 .mockResolvedValueOnce({}); // UPDATE to finishing
 
             const firstTick = contestScheduler.checkContestStatus();

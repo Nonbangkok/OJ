@@ -98,6 +98,15 @@ export const getLevelProgress = (totalXP: number): LevelProgress => {
 };
 
 /**
+ * SQL expression computing the XP for a problem's difficulty, mirroring
+ * calculateProblemXP. Used by the in-transaction award paths that cannot
+ * call awardSolveReward (bulk INSERT..SELECT). `p.difficulty` must be the
+ * problems-row difficulty column (aliased `p`).
+ */
+export const solveRewardXpSql = `CASE WHEN p.difficulty IS NULL THEN ${XP_PROGRESSION.UNRATED_PROBLEM_XP}
+       ELSE GREATEST(0, ROUND(${XP_PROGRESSION.BASE_XP} * POWER(p.difficulty::numeric / ${XP_PROGRESSION.BASE_DIFFICULTY}, ${XP_PROGRESSION.DIFFICULTY_EXPONENT}))) END`;
+
+/**
  * Attempt to record the FIRST-solve reward for a user/problem pair.
  *
  * Idempotent and race-safe: the database unique constraint on
@@ -265,8 +274,7 @@ export const backfillSolveRewards = async (): Promise<number> => {
       new_rewards AS (
         INSERT INTO user_problem_rewards (user_id, problem_id, xp_awarded, difficulty_snapshot, awarded_at)
         SELECT fs.user_id, fs.problem_id,
-               CASE WHEN p.difficulty IS NULL THEN $1
-                    ELSE ROUND(20 * POWER(p.difficulty::numeric / 800, 1.5)) END,
+               ${solveRewardXpSql},
                p.difficulty,
                fs.first_ac_at
         FROM first_solves fs
@@ -275,7 +283,7 @@ export const backfillSolveRewards = async (): Promise<number> => {
         RETURNING 1
       )
       SELECT COUNT(*)::int AS inserted FROM new_rewards
-    `, [XP_PROGRESSION.UNRATED_PROBLEM_XP]);
+    `);
 
     return result.rows[0]?.inserted ?? 0;
 };
