@@ -248,5 +248,53 @@ describe('Problem Migration Service', () => {
 
             expect(publishRealtime).not.toHaveBeenCalled();
         });
+
+        it('snapshots every participant, zero-scored included (CONTEST-007)', async () => {
+            (mockClient.query as jest.Mock).mockImplementation(async (text: string) => {
+                if (String(text).includes('SELECT id, status FROM contests')) {
+                    return { rows: [{ id: 1, status: 'finishing' }] };
+                }
+                if (String(text).includes('INSERT INTO submissions')) {
+                    return { rows: [{ id: 10 }] };
+                }
+                return { rows: [] };
+            });
+
+            await migrateSubmissionsAfterContest(1);
+
+            const scoreboardCall = (mockClient.query as jest.Mock).mock.calls
+                .map((c: unknown[]) => c)
+                .find(([text]) => String(text).includes('INSERT INTO contest_scoreboards'));
+            expect(scoreboardCall).toBeDefined();
+            const [sql] = scoreboardCall as [string, unknown[]];
+            // The driver table is contest_participants (LEFT JOIN scores), so
+            // participants with no submissions still get a scoreboard row.
+            expect(sql).toContain('FROM contest_participants cp');
+            expect(sql).toContain('LEFT JOIN UserTotalScores uts');
+            expect(sql).toContain("COALESCE(uts.total_score, 0)");
+            expect(sql).not.toContain('JOIN contest_participants cp ON cp.user_id = uts.user_id');
+        });
+
+        it('writes detailed_scores in the live scoreboard shape (CONTEST-008)', async () => {
+            (mockClient.query as jest.Mock).mockImplementation(async (text: string) => {
+                if (String(text).includes('SELECT id, status FROM contests')) {
+                    return { rows: [{ id: 1, status: 'finishing' }] };
+                }
+                if (String(text).includes('INSERT INTO submissions')) {
+                    return { rows: [{ id: 10 }] };
+                }
+                return { rows: [] };
+            });
+
+            await migrateSubmissionsAfterContest(1);
+
+            const scoreboardCall = (mockClient.query as jest.Mock).mock.calls
+                .map((c: unknown[]) => c)
+                .find(([text]) => String(text).includes('INSERT INTO contest_scoreboards'));
+            const [sql] = scoreboardCall as [string, unknown[]];
+            // {problemId: {score}} — same shape the live scoreboard serves.
+            expect(sql).toContain("jsonb_object_agg(ubs.problem_id, jsonb_build_object('score', ubs.best_score))");
+            expect(sql).not.toContain('jsonb_object_agg(ubs.problem_id, ubs.best_score)');
+        });
     });
 });

@@ -216,7 +216,15 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
       ON CONFLICT (contest_id, problem_id) DO NOTHING
     `, [contestId]);
 
-    // Generate final scoreboard and store it
+    // Generate final scoreboard and store it.
+    //
+    // CONTEST-007: source from contest_participants (not the submission
+    // aggregate), so participants who never submitted still get a row with
+    // zero — matching the live scoreboard, which lists every participant.
+    //
+    // CONTEST-008: detailed_scores uses the live scoreboard's shape
+    // ({problemId: {score}}) rather than the historical bare-number map, so
+    // both variants parse identically client-side.
     const scoreboardResult = await client.query(`
       WITH UserBestScores AS (
         SELECT
@@ -232,15 +240,21 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
         SELECT
           ubs.user_id,
           SUM(ubs.best_score) AS total_score,
-          jsonb_object_agg(ubs.problem_id, ubs.best_score) AS detailed_scores,
+          jsonb_object_agg(ubs.problem_id, jsonb_build_object('score', ubs.best_score)) AS detailed_scores,
           MAX(ubs.latest_score_time) AS last_score_improvement_time
         FROM UserBestScores ubs
         GROUP BY ubs.user_id
       )
       INSERT INTO contest_scoreboards (contest_id, user_id, total_score, detailed_scores, last_score_improvement_time)
-      SELECT $1, uts.user_id, uts.total_score, uts.detailed_scores, uts.last_score_improvement_time
-      FROM UserTotalScores uts
-      JOIN contest_participants cp ON cp.user_id = uts.user_id AND cp.contest_id = $1
+      SELECT
+        $1,
+        cp.user_id,
+        COALESCE(uts.total_score, 0),
+        COALESCE(uts.detailed_scores, '{}'::jsonb),
+        COALESCE(uts.last_score_improvement_time, cp.joined_at)
+      FROM contest_participants cp
+      LEFT JOIN UserTotalScores uts ON uts.user_id = cp.user_id
+      WHERE cp.contest_id = $1
       RETURNING *
     `, [contestId]);
 
