@@ -43,7 +43,9 @@ describe('ContestDetail Page', () => {
             end_time: '2026-01-02T00:00:00Z',
             participant_count: '5'
         };
-        jest.mocked(contestService.getById).mockResolvedValueOnce(mockContest);
+        // The detail hook polls, so a Once-mock would be consumed by the
+        // refetch and leave the page in its error state.
+        jest.mocked(contestService.getById).mockResolvedValue(mockContest as never);
 
         render(<BrowserRouter><ContestDetail /></BrowserRouter>);
 
@@ -52,7 +54,7 @@ describe('ContestDetail Page', () => {
         });
     });
 
-    it('shows a compact summary line with counts and a View Problems action', async () => {
+    it('shows compact metadata, live progress, and a solving action', async () => {
         const mockContest = {
             id: 1, title: 'Test Contest', status: 'running' as const,
             description: null,
@@ -62,15 +64,66 @@ describe('ContestDetail Page', () => {
             end_time: '2026-01-02T00:00:00Z',
             participant_count: '5'
         };
-        jest.mocked(contestService.getById).mockResolvedValueOnce(mockContest);
+        jest.mocked(contestService.getById).mockResolvedValue(mockContest as never);
+        // Per-user problem summaries power the "X / N solved" progress block.
+        jest.mocked(contestService.getProblems).mockResolvedValue([
+            { id: 'P1', title: 'Problem 1', author: null, best_score: 100, submission_count: '1' },
+            { id: 'P2', title: 'Problem 2', author: null, best_score: 0, submission_count: '0' },
+        ] as never);
 
         render(<BrowserRouter><ContestDetail /></BrowserRouter>);
 
         await waitFor(() => {
             expect(screen.getByText('5 participants')).toBeInTheDocument();
             expect(screen.getByText('1 problem')).toBeInTheDocument();
-            expect(screen.getByText('View Problems')).toBeInTheDocument();
+            expect(screen.getByText('Your progress')).toBeInTheDocument();
+            expect(screen.getByText('1 / 1 solved')).toBeInTheDocument();
+            expect(screen.getByText('100 points')).toBeInTheDocument();
+            expect(screen.getByText('Continue Solving')).toBeInTheDocument();
         });
+
+        // The thin solved-progress bar reflects solved/total (1 of 1 here).
+        const bar = screen.getByRole('progressbar');
+        expect(bar).toHaveAttribute('aria-valuemin', '0');
+        expect(bar).toHaveAttribute('aria-valuemax', '1');
+        expect(bar).toHaveAttribute('aria-valuenow', '1');
+        expect(bar).toHaveAttribute(
+            'aria-label',
+            'Problems solved: 1 of 1'
+        );
+    });
+
+    it('offers Start Solving when nothing is solved yet', async () => {
+        const mockContest = {
+            id: 1, title: 'Test Contest', status: 'running' as const,
+            description: null,
+            problems: [
+                { id: 'P1', title: 'Problem 1', author: null },
+                { id: 'P2', title: 'Problem 2', author: null },
+            ],
+            is_participant: true,
+            start_time: '2026-01-01T00:00:00Z',
+            end_time: '2026-01-02T00:00:00Z',
+            participant_count: '5'
+        };
+        jest.mocked(contestService.getById).mockResolvedValue(mockContest as never);
+        jest.mocked(contestService.getProblems).mockResolvedValue([
+            { id: 'P1', title: 'Problem 1', author: null, best_score: 0, submission_count: '0' },
+            { id: 'P2', title: 'Problem 2', author: null, best_score: null, submission_count: null },
+        ] as never);
+
+        render(<BrowserRouter><ContestDetail /></BrowserRouter>);
+
+        await waitFor(() => {
+            expect(screen.getByText('0 / 2 solved')).toBeInTheDocument();
+            expect(screen.getByText('0 points')).toBeInTheDocument();
+            expect(screen.getByText('Start Solving')).toBeInTheDocument();
+        });
+
+        // Zero solved still renders the bar, just empty (0 of 2).
+        const bar = screen.getByRole('progressbar');
+        expect(bar).toHaveAttribute('aria-valuemax', '2');
+        expect(bar).toHaveAttribute('aria-valuenow', '0');
     });
 
     it('shows error if fetch fails', async () => {

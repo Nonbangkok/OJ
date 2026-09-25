@@ -25,6 +25,8 @@
 }
 
 .hero-text {
+  /* Grows to push the action group to the right edge of the container. */
+  flex: 1;
   min-width: 0;
 }
 
@@ -53,6 +55,8 @@
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+  /* Pin to the right edge of the hero; wraps below the text when narrow. */
+  margin-left: auto;
   padding-bottom: 0.25rem;
 }
 

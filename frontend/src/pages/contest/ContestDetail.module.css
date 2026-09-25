@@ -1,9 +1,28 @@
-/* Contest home: typography-led, no stat cards. The contest identity is
-   stated once here; the navbar carries it everywhere else. */
+/* Contest home: a wide, typography-led overview — no stat cards. The contest
+   identity is stated once here; the navbar carries it everywhere else.
+   Page width is the shared 1200px contest container.
 
+   Composition (top → bottom): identity row (title + status left, the live
+   timing fact anchored right) → description → muted schedule line → compact
+   counts row → whitespace → user progress (stats, thin bar, right-aligned
+   action). Spacing, not a divider, separates contest facts from the user's
+   own state. */
+
+/* Width comes from the shared `.container` main in ContestLayout (1200px),
+   the same width the problems table and scoreboard use. */
 .container {
   padding-top: 3rem;
-  max-width: 720px;
+}
+
+/* Top row: identity on the left, the live timing fact (remaining time /
+   starts-in / ended) flush right on the title's line. */
+.top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  column-gap: 1.5rem;
+  row-gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .header {
@@ -11,7 +30,7 @@
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
-  margin-bottom: 0.75rem;
+  min-width: 0;
 }
 
 .title {
@@ -22,33 +41,122 @@
   overflow-wrap: break-word;
 }
 
+.topTiming {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .description {
   color: var(--text-secondary);
-  margin: 0 0 1rem;
+  margin: 0.75rem 0 1.5rem;
   font-size: 1.05rem;
   line-height: 1.6;
 }
 
-/* One compact summary line: dates · remaining · counts. */
-.metaLine {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: 0.625rem;
-  row-gap: 0.25rem;
-  margin: 0 0 1.75rem;
+/* The schedule window, demoted to quiet secondary metadata. */
+.schedule {
+  margin: 0;
   color: var(--text-secondary);
   font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
 }
 
-.metaSeparator {
-  color: var(--text-muted);
+/* Compact metadata: one quiet line of counts. */
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.625rem;
+  row-gap: 0.25rem;
+  margin-top: 0.5rem;
 }
 
-.remaining {
-  color: var(--warning-color);
+.metaItem {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.metaDot {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* Progress / action block. Whitespace above is the only separation from
+   the contest facts — no hard divider. */
+.actionBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin-top: 3rem;
+}
+
+.progressLabel {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.875rem;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.progressStats {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.625rem;
+  row-gap: 0.25rem;
+}
+
+.progressSolved {
+  color: var(--text-primary);
+  font-size: 1.15rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.progressDot {
+  color: var(--text-muted);
+  font-size: 1.15rem;
+}
+
+.progressScore {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The bar fills the left/middle; the action sits right on the same row. */
+.progressRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: 1.5rem;
+  row-gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.progressBar {
+  display: block;
+  flex: 1 1 240px;
+  height: 6px;
+  border-radius: 3px;
+  background-color: var(--background-tertiary);
+  overflow: hidden;
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background-color: var(--accent-primary);
+  transition: width 0.3s ease;
 }
 
 /* Subtle primary action: shared Button look, not a giant pill. */
@@ -85,6 +193,7 @@
   font: inherit;
   font-weight: 600;
   font-size: 0.95rem;
+  align-self: flex-start;
 }
 
 .joinButton:disabled {
@@ -94,9 +203,16 @@
 
 /* Registered-but-not-started: a quiet note, not a centered card. */
 .waitingNote {
-  margin: 0;
+  margin: 3rem 0 0;
   color: var(--text-secondary);
   font-size: 0.95rem;
+}
+
+@media (max-width: 768px) {
+  /* Stack the timing fact below the title rather than pinning it right. */
+  .topTiming {
+    white-space: normal;
+  }
 }
 
 @media (max-width: 480px) {

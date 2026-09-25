@@ -12,5 +12,7 @@ export { Input, Select, Textarea } from './FormControls';
 export type { InputProps, SelectProps, TextareaProps } from './FormControls';
 export { OverflowTable } from './OverflowTable';
 export type { OverflowTableProps } from './OverflowTable';
+export { SegmentedControl } from './SegmentedControl';
+export type { SegmentedControlProps, SegmentedOption } from './SegmentedControl';
 export { StatusBadge } from './StatusBadge';
 export type { StatusBadgeProps } from './StatusBadge';

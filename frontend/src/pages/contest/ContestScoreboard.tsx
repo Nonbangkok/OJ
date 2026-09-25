@@ -7,6 +7,17 @@ import tableStyles from '../../components/styles/Table.module.css';
 import LoadingPage from '../../components/shared/LoadingPage';
 import { useAuth } from '../../context/AuthContext';
 import { formatDateTime } from '../../utils/formatters';
+import type { CSSProperties } from 'react';
+
+/** Leading-column plan (px), fed to the CSS module through the --sb-*
+ *  custom properties set on the table. The media query in the module swaps
+ *  in narrower values (and its own narrow table-width calc) below 900px. */
+const COL_WIDTHS = {
+  rank: 72,
+  participant: 260,
+  total: 104,
+  problem: 100,
+} as const;
 
 const ContestScoreboard = () => {
   const { contestId } = useParams();
@@ -25,6 +36,20 @@ const ContestScoreboard = () => {
   // Compact "Updated 01:11" — the verbose timestamp is unnecessary here.
   const formatUpdated = (value: Date) =>
     formatDateTime(value, { month: undefined, day: undefined, year: undefined });
+
+  // Fixed layout only honors the per-column px widths when the table width
+  // equals their sum: with a keyword width (100%, max-content) Chromium
+  // re-distributes and the columns drift off the plan. So the width is
+  // computed from the problem count and expressed with the custom
+  // properties below; the media query in the CSS module swaps in the
+  // narrow-viewport numbers, so JS never needs to know the viewport.
+  const tableStyle = {
+    '--sb-leading': `${COL_WIDTHS.rank + COL_WIDTHS.participant + COL_WIDTHS.total}px`,
+    '--sb-problem': `${COL_WIDTHS.problem}px`,
+    '--sb-leading-narrow': '320px',
+    '--sb-problem-narrow': '96px',
+    '--sb-problem-count': String(problems.length),
+  } as CSSProperties;
 
   if (loading) return <LoadingPage />;
 
@@ -55,7 +80,7 @@ const ContestScoreboard = () => {
         </div>
       ) : (
         <div className={tableStyles['table-container']}>
-          <table className={`${tableStyles.table} ${styles.scoreboardTable}`}>
+          <table className={`${tableStyles.table} ${styles.scoreboardTable}`} style={tableStyle}>
             <thead>
               <tr>
                 <th className={styles.colRank}>Rank</th>
@@ -83,14 +108,17 @@ const ContestScoreboard = () => {
                     ].filter(Boolean).join(' ')}
                   >
                     <td className={styles.colRank}>{rank}</td>
-                    <td className={styles.colParticipant}>
+                    <td
+                      className={styles.colParticipant}
+                      title={participant.username}
+                    >
                       <span className={styles['user-cell']}>
                         <UserAvatar
                           username={participant.username}
                           hasAvatar={participant.has_avatar}
                           size={24}
                         />
-                        {participant.username}
+                        <span className={styles.userName}>{participant.username}</span>
                       </span>
                     </td>
                     <td className={styles.colTotal}>

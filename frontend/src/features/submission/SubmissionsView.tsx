@@ -7,7 +7,7 @@ import { useSubmissions } from '../../hooks/useSubmissions';
 import { getStatusClass, canViewCode, formatDateTime } from '../../utils/formatters';
 import tableStyles from '../../components/styles/Table.module.css';
 import LoadingPage from '../../components/shared/LoadingPage';
-import { Button } from '../../components/ui';
+import { Button, SegmentedControl } from '../../components/ui';
 import { USER_ROLES, getLanguageDisplayName } from '../../utils/constants';
 import type { AuthUser } from '../../types';
 
@@ -101,22 +101,23 @@ const SubmissionsView = ({
                     <h1>{title}</h1>
                     {!problemId && (
                         <div className={styles['filter-buttons']} role="toolbar" aria-label="Submission filters">
-                            <button
-                                className={`${styles['filter-btn']} ${filter === 'all' ? styles.active : ''}`}
-                                onClick={() => setFilter('all')}
-                            >
-                                All Submissions
-                            </button>
-                            <button
-                                className={`${styles['filter-btn']} ${filter === 'mine' ? styles.active : ''}`}
-                                onClick={() => setFilter('mine')}
-                            >
-                                My Submissions
-                            </button>
+                            <SegmentedControl<'all' | 'mine'>
+                                options={[
+                                    { value: 'all', label: 'All Submissions' },
+                                    { value: 'mine', label: 'My Submissions' },
+                                ]}
+                                value={filter}
+                                onChange={setFilter}
+                                aria-label="Submission scope"
+                            />
 
-                            {/* Admin/Staff Filters — username filter is redundant while
-                                "My Submissions" scopes the list to the current user. */}
-                            {currentUser && (currentUser.role === USER_ROLES.ADMIN || currentUser.role === USER_ROLES.STAFF) && filter === 'all' && (
+                            {/* Admin/Staff filters. Every control keeps its layout
+                                slot in both scopes: while "My Submissions" is active
+                                the username filter is redundant (the list is already
+                                scoped to the current user), so it renders disabled
+                                with an explanatory placeholder instead of
+                                disappearing — the toolbar never shifts. */}
+                            {currentUser && (currentUser.role === USER_ROLES.ADMIN || currentUser.role === USER_ROLES.STAFF) && (
                                 <>
                                     <div className={styles['filter-input-wrapper']} ref={problemInputRef}>
                                         <input
@@ -148,8 +149,13 @@ const SubmissionsView = ({
                                             onChange={handleUserChange}
                                             onFocus={() => filterUserId && setShowUserSuggestions(true)}
                                             className={styles['filter-input']}
+                                            disabled={filter === 'mine'}
+                                            title={filter === 'mine' ? 'Scoped to your submissions while "My Submissions" is active' : undefined}
+                                            {...(filter === 'mine'
+                                                ? { placeholder: `Current user: ${currentUser.username}` }
+                                                : {})}
                                         />
-                                        {showUserSuggestions && userSuggestions.length > 0 && (
+                                        {filter === 'all' && showUserSuggestions && userSuggestions.length > 0 && (
                                             <ul className={styles['suggestions-list']}>
                                                 {userSuggestions.map(u => (
                                                     <li key={u.username}>
@@ -162,9 +168,14 @@ const SubmissionsView = ({
                                         )}
                                     </div>
 
-                                    <button className={styles['filter-btn']} onClick={handleApplyFilters}>
-                                        Apply Filters
-                                    </button>
+                                    <Button
+                                        variant="secondary"
+                                        size="compact"
+                                        className={styles['apply-filters-btn']}
+                                        onClick={handleApplyFilters}
+                                    >
+                                        Apply
+                                    </Button>
                                 </>
                             )}
                         </div>

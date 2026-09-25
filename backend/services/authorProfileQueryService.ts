@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import type { QueryResultRow } from 'pg';
 import * as db from '../db';
 import { AuthorProfileRow } from '../types/authoring';
+import { isUniqueViolation } from '../utils/dbErrors';
 
 export type AuthorProfileDatabase = {
   query<T extends QueryResultRow = QueryResultRow>(
@@ -54,16 +55,8 @@ export type UpdateAuthorProfileResult =
   | { kind: 'not_found' }
   | { kind: 'duplicate_user_link' };
 
-type DatabaseConstraintError = {
-  code?: string;
-  constraint?: string;
-};
-
-const isDuplicateUserLink = (error: unknown): boolean => {
-  const databaseError = error as DatabaseConstraintError;
-  return databaseError?.code === '23505'
-    && databaseError.constraint === 'author_profiles_user_id_key';
-};
+const isDuplicateUserLink = (error: unknown): boolean =>
+  isUniqueViolation(error, 'author_profiles_user_id_key');
 
 const EDITABLE_PROFILE_FIELDS: readonly (keyof EditableAuthorProfileFields)[] = [
   'user_id',

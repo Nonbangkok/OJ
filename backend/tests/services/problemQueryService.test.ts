@@ -39,6 +39,33 @@ describe('problemQueryService difficulty handling', () => {
     expect(query.mock.calls[0][1]).toContain(1200);
   });
 
+  it("returns 'duplicate_id' when the problem ID hits the unique constraint", async () => {
+    query.mockRejectedValueOnce({ code: '23505', constraint: 'problems_pkey' });
+
+    await expect(createProblem({
+      id: 'p1',
+      title: 'T',
+      author: 'A',
+      categories: [],
+      time_limit_ms: 1000,
+      memory_limit_mb: 64,
+    })).resolves.toBe('duplicate_id');
+  });
+
+  it('rethrows non-unique-violation errors from problem create', async () => {
+    const failure = new Error('connection refused');
+    query.mockRejectedValueOnce(failure);
+
+    await expect(createProblem({
+      id: 'p1',
+      title: 'T',
+      author: 'A',
+      categories: [],
+      time_limit_ms: 1000,
+      memory_limit_mb: 64,
+    })).rejects.toBe(failure);
+  });
+
   it('keeps difficulty tri-state on update (undefined = unchanged, null = clear)', async () => {
     const clientQuery = jest.fn().mockResolvedValue({ rows: [{ id: 'p1' }] });
     const poolConnect = db.pool.connect as unknown as jest.Mock;

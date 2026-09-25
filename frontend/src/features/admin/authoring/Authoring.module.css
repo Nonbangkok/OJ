@@ -247,34 +247,101 @@
   overflow: hidden;
 }
 
-/* Draft-list toolbar rhythm: the section head, the grouped filter toolbar,
-   and the table below each get their own breathing room instead of running
-   together. The toolbar wraps as one block between head and table. */
+/* Draft-list toolbar: sits OUTSIDE the Drafts panel, on one row between the
+   page header and the panel. Search is the flexible control (capped so it
+   never dominates); everything else keeps its natural width and the shared
+   2.1rem control height, so the whole row aligns on one baseline.
+
+   The page-wide `.authoring label/input/select` rules below are tuned for
+   the stacked metadata forms and OUT-SPECIFY the shared filter classes
+   (which is why the old in-panel toolbar stacked its controls). These
+   toolbar rules chain the ancestor class so they win those ties and render
+   inline. */
 .draftsToolbar {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.875rem 1rem 1rem;
-  border-bottom: 1px solid var(--border-color);
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin: 1.5rem 0 1.25rem;
 }
 
-/* Inside the toolbar, search keeps a capped useful width instead of
-   stretching across the row. */
-.draftsToolbar .filter-search {
-  flex: 0 1 22rem;
-  min-width: 12rem;
+/* Search: same look as the shared filter-search but the flexible row member
+   — grows to absorb free space, floored at ~280px and capped at ~420px so
+   it never dominates or forces the other filters to wrap. */
+.draftsToolbar input[type='search'] {
+  flex: 1 1 17.5rem;
+  min-width: 17.5rem;
+  max-width: 26.25rem;
+  box-sizing: border-box;
+  height: 2.1rem;
+  padding: 0 0.75rem;
+  margin: 0;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-color);
+  background-color: var(--background-primary);
+  color: var(--text-primary);
 }
 
-/* Row 1 (search + segmented toggle): both controls are the same height,
-   but input vs div baseline quirks shift center alignment by a pixel or
-   two — bottom-align pins them to one visual baseline. */
-.draftsToolbarRow {
-  align-items: flex-end;
+/* Labeled filters: label inline beside its select (visually secondary text),
+   one 2.1rem control height, no form-field margins. Selects are capped so a
+   very long author name cannot blow out the row. */
+.draftsToolbar .draftsFilter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  min-width: 0;
+  font-weight: 400;
 }
 
-.draftsToolbar + * {
-  margin-top: 0; /* the table provides its own padding; keep the border as
-                    the separator rather than extra margins */
+.draftsToolbar .draftsFilter select {
+  display: inline-block;
+  box-sizing: border-box;
+  width: auto;
+  /* Capped so a very long option label (e.g. an author aka) cannot blow the
+     one-row desktop layout — the closed select truncates, the dropdown list
+     still shows full names. */
+  max-width: 10rem;
+  height: 2.1rem;
+  padding: 0 0.5rem;
+  margin: 0;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-color);
+  background-color: var(--background-primary);
+  color: var(--text-primary);
+}
+
+/* Tablet and below: let the row wrap into clean groups instead of shrinking
+   text — each label + select pair stays glued together as one unit. */
+@media (max-width: 900px) {
+  .draftsToolbar {
+    gap: 0.75rem 1rem;
+  }
+}
+
+/* Mobile: full vertical stack — search spans the width, each filter is a
+   full-width row, and the segmented toggle stays compact and tappable. */
+@media (max-width: 640px) {
+  .draftsToolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  .draftsToolbar input[type='search'] {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+  .draftsToolbar .draftsFilter {
+    width: 100%;
+  }
+  .draftsToolbar .draftsFilter select {
+    flex: 1;
+  }
+  .draftsToolbar .draftsScope {
+    align-self: flex-start;
+  }
 }
 .panelHead {
   display: flex;

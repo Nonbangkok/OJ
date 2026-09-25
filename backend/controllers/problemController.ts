@@ -167,8 +167,11 @@ router.post('/admin/problems', requireAuth, requireStaffOrAdmin,
   validateRequest({ body: createProblemSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const { id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb } = req.body as CreateProblemRequestBody;
-  const createdProblem = await createProblem({ id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb });
-  res.status(201).json(createdProblem);
+  const createResult = await createProblem({ id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb });
+  if (createResult === 'duplicate_id') {
+    throw new AppError(`Problem ID '${id}' already exists.`, 409);
+  }
+  res.status(201).json(createResult);
 }));
 
 router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,

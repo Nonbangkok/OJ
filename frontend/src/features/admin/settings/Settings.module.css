@@ -1,44 +1,180 @@
-.settings-container {
-  background-color: var(--background-secondary);
-  padding: 1.5rem 2rem;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-}
+/* Settings page — section-based layout (typography + dividers, no nested
+   cards). Spacing scale: 2rem page title → first section, 2.5rem between
+   sections, 0.25–0.5rem title → description. */
 
-.settings-container h3 {
-  margin-top: 0;
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.75rem;
-}
-
-.setting-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.setting-item label {
-  font-weight: 500;
+.page {
+  text-align: left;
   color: var(--text-primary);
 }
 
-/* The switch - the box around the slider */
-.toggle-switch {
+.page > * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.pageTitle {
+  font-size: var(--font-size-page-title);
+  margin: 0 0 2rem;
+}
+
+/* --- Sections ------------------------------------------------------------- */
+
+.section + .section {
+  border-top: 1px solid var(--border-color);
+  padding-top: 2.5rem;
+  margin-top: 2.5rem;
+}
+
+.sectionTitle {
+  font-size: var(--font-size-section-title);
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+}
+
+.sectionDescription {
+  color: var(--text-muted);
+  font-size: var(--font-size-metadata);
+  margin: 0 0 1.5rem;
+}
+
+.groupTitle {
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 0;
+  margin: 0 0 0.75rem;
+}
+
+/* --- Status messages ------------------------------------------------------ */
+
+.statusMessage {
+  border-radius: var(--radius-md);
+  padding: 0.625rem 0.875rem;
+  font-size: var(--font-size-metadata);
+  margin: 0 0 1rem;
+}
+
+.statusError {
+  color: var(--error-text);
+  background-color: var(--background-error);
+}
+
+.statusSuccess {
+  color: var(--text-success);
+  background-color: var(--background-success);
+}
+
+/* --- Site Access ---------------------------------------------------------- */
+
+.accessGroup {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.accessOptions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.accessOption {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 0.625rem;
+  align-items: start;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.accessOption:hover {
+  border-color: var(--accent-primary);
+}
+
+.accessOption input[type='radio'] {
+  grid-row: 1;
+  margin: 0.2rem 0 0;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+.accessOptionSelected {
+  border-color: var(--accent-primary);
+  background-color: color-mix(in srgb, var(--accent-primary) 6%, transparent);
+  box-shadow: 0 0 0 1px var(--accent-primary);
+}
+
+.optionTitle {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.optionDescription {
+  grid-column: 2;
+  color: var(--text-muted);
+  font-size: var(--font-size-metadata);
+  line-height: 1.5;
+  margin-top: 0.25rem;
+}
+
+.currentMode {
+  color: var(--text-muted);
+  font-size: var(--font-size-metadata);
+  margin: 0.75rem 0 0;
+}
+
+/* --- Setting rows (Registration, Database export) -------------------------- */
+
+.settingRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.25rem 0;
+}
+
+.settingText {
+  flex: 1;
+  min-width: 0;
+}
+
+.settingTitle {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.settingDescription {
+  color: var(--text-muted);
+  font-size: var(--font-size-metadata);
+  line-height: 1.5;
+  margin: 0.25rem 0 0;
+}
+
+/* --- Toggle switch -------------------------------------------------------- */
+
+.toggleSwitch {
   position: relative;
   display: inline-block;
+  flex-shrink: 0;
   width: 50px;
   height: 28px;
 }
 
-/* Hide default HTML checkbox */
-.toggle-switch input {
+.toggleSwitch input {
   opacity: 0;
   width: 0;
   height: 0;
 }
 
-/* The slider */
-.slider {
+.toggleTrack {
   position: absolute;
   cursor: pointer;
   top: 0;
@@ -46,11 +182,11 @@
   right: 0;
   bottom: 0;
   background-color: var(--action-disabled-bg);
-  -webkit-transition: 0.4s;
-  transition: 0.4s;
+  border-radius: 34px;
+  transition: 0.2s;
 }
 
-.slider:before {
+.toggleTrack::before {
   position: absolute;
   content: '';
   height: 20px;
@@ -58,207 +194,127 @@
   left: 4px;
   bottom: 4px;
   background-color: white;
-  -webkit-transition: 0.4s;
-  transition: 0.4s;
+  border-radius: 50%;
+  transition: 0.2s;
 }
 
-.toggle-switch input:checked + .slider {
+.toggleSwitch input:checked + .toggleTrack {
   background-color: var(--accent-primary);
 }
 
-.toggle-switch input:focus + .slider {
-  box-shadow: 0 0 1px var(--accent-primary);
+.toggleSwitch input:focus-visible + .toggleTrack {
+  outline: 3px solid var(--action-focus-ring);
+  outline-offset: 2px;
 }
 
-.toggle-switch input:checked + .slider:before {
-  -webkit-transform: translateX(22px);
-  -ms-transform: translateX(22px);
+.toggleSwitch input:checked + .toggleTrack::before {
   transform: translateX(22px);
 }
 
-/* Rounded sliders */
-.slider.round {
-  border-radius: 34px;
+/* --- Danger zone (database import) ---------------------------------------- */
+
+.dangerZone {
+  margin-top: 1.75rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--status-danger) 35%, transparent);
+  border-radius: var(--radius-md);
+  background-color: var(--danger-tint-bg);
 }
 
-.slider.round:before {
-  border-radius: 50%;
+.dangerZoneTitle {
+  font-size: var(--font-size-metadata);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--status-danger);
+  margin: 0 0 0.75rem;
 }
 
-.settings-container h2 {
-  margin-bottom: 2rem;
-  color: var(--text-primary);
-  text-align: center;
+.dangerZone .settingTitle {
+  margin-bottom: 0.25rem;
 }
 
-.section-card {
-  background-color: var(--background-darker);
-  padding: 1.5rem;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  margin-bottom: 2rem;
+.dangerActions {
+  margin-top: 1rem;
 }
 
-.section-card h3 {
-  margin-top: 0;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.setting-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 0;
-  border-bottom: 1px dashed var(--border-color-light);
-}
-
-.setting-item:last-child {
-  border-bottom: none;
-}
-
-.setting-item > div {
-  flex-grow: 1;
-  color: var(--text-primary);
-}
-
-.action-button {
-  background-color: var(--accent-primary);
-  color: white;
-  border: none;
-  padding: 0.6rem 1rem;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  font-size: 0.9rem;
-  margin-left: 1rem;
-}
-
-.action-button:hover:not(:disabled) {
-  background-color: var(--accent-hover);
-}
-
-.action-button:disabled {
-  background-color: var(--action-disabled-bg);
-  cursor: not-allowed;
-}
-
-.import-button {
-  background-color: var(--button-danger-bg);
-}
-
-.import-button:hover:not(:disabled) {
-  background-color: var(--button-danger-hover);
-}
-
-.file-input {
-  flex-grow: 1;
-  margin-left: 1rem;
-  margin-right: 1rem;
+.fileInput {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 1rem;
   padding: 0.5rem;
   border: 1px solid var(--border-color);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   background-color: var(--input-bg);
   color: var(--text-primary);
 }
 
-.file-input::file-selector-button {
-  background-color: var(--background-light);
+.fileInput::file-selector-button {
+  background-color: var(--background-tertiary);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
   padding: 0.5rem 0.8rem;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   margin-right: 0.8rem;
+  font: inherit;
 }
 
-.file-input::file-selector-button:hover {
-  background-color: var(--background-hover);
+.fileInput::file-selector-button:hover {
+  background-color: var(--background-secondary);
 }
 
-.warning-message {
-  color: var(--text-warning);
-  font-size: 0.85rem;
-  margin-top: 0.5rem;
-  padding: 0.5rem 0;
-  text-align: center;
-}
-
-.error-message {
-  color: var(--text-error);
-  background-color: var(--background-error);
-  padding: 0.75rem;
-  border-radius: 5px;
-  margin-bottom: 1rem;
-  text-align: center;
-}
-
-.success-message {
-  color: var(--text-success);
-  background-color: var(--background-success);
-  padding: 0.75rem;
-  border-radius: 5px;
-  margin-bottom: 1rem;
-  text-align: center;
-}
-
-/* Ensure padding is consistent */
-.settings-container {
-  padding: 2rem;
-}
-
-/* Adjust h3 for the new h2 */
-.settings-container h3 {
-  margin-top: 1rem;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-/* --- Site Access section -------------------------------------------------- */
-
-.radio-option {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.625rem;
-  padding: 0.5rem 0;
-  cursor: pointer;
-}
-
-.radio-option input[type='radio'] {
-  margin-top: 0.25rem;
-  accent-color: var(--accent-primary);
-  cursor: pointer;
-}
-
-.radio-option strong {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.option-description {
-  display: block;
-  color: var(--text-muted);
-  font-size: 0.8125rem;
-  line-height: 1.45;
-  margin-top: 0.125rem;
-}
-
-.current-mode {
-  color: var(--text-muted);
-  font-size: 0.8125rem;
-  margin: 0.5rem 0 0;
-}
-
-.setting-item legend {
+.selectedFile {
   color: var(--text-secondary);
-  font-weight: 600;
-  padding: 0 0 0.25rem;
+  font-size: var(--font-size-metadata);
+  margin: 0.5rem 0 0;
+  overflow-wrap: anywhere;
 }
 
-.setting-item fieldset {
-  border: none;
+/* --- Import confirmation modal --------------------------------------------- */
+
+.modalFileLabel {
   margin: 0;
-  padding: 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.confirmPhraseInput {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0.75rem;
+  padding: 0.625rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--input-bg);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.confirmPhraseInput:focus-visible {
+  outline: 3px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+/* --- Responsive ------------------------------------------------------------ */
+
+@media (max-width: 768px) {
+  .accessOptions {
+    grid-template-columns: 1fr;
+  }
+
+  .settingRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .settingRow > .toggleSwitch {
+    align-self: flex-start;
+  }
+
+  .dangerActions > * {
+    width: 100%;
+  }
 }

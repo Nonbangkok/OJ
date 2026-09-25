@@ -334,6 +334,24 @@ describe('Problem Controller', () => {
             );
         });
 
+        it('should return 409 when the problem ID already exists', async () => {
+            const duplicateProblem = {
+                id: 'P1',
+                title: 'Duplicate',
+                author: 'Author 1',
+                time_limit_ms: 1000,
+                memory_limit_mb: 256
+            };
+            (db.query as jest.Mock).mockRejectedValueOnce({ code: '23505', constraint: 'problems_pkey' });
+
+            const res = await request(app)
+                .post('/admin/problems')
+                .send(duplicateProblem);
+
+            expect(res.status).toBe(409);
+            expect(res.body.message).toBe("Problem ID 'P1' already exists.");
+        });
+
         it('should treat an empty array as uncategorized and normalize the set', async () => {
             const newProblem = {
                 id: 'P4b',

@@ -1,5 +1,6 @@
 import * as db from '../db';
 import { query } from '../db';
+import { isUniqueViolation } from '../utils/dbErrors';
 
 /** A collection row plus the derived problem summary shown in the admin UI. */
 export interface CollectionWithStats {
@@ -127,6 +128,3 @@ export const setCollectionVisibility = async (
     client.release();
   }
 };
-
-const isUniqueViolation = (error: unknown): boolean =>
-  typeof error === 'object' && error !== null && 'code' in error && (error as { code: string }).code === '23505';

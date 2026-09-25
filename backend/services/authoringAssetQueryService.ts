@@ -4,6 +4,7 @@ import * as db from '../db';
 import { STATEMENT_ASSET } from '../constants';
 import { ProblemDraftAssetRow, ProblemDraftRow } from '../types/authoring';
 import { PreparedStatementAsset } from './statementAssetService';
+import { isUniqueViolation } from '../utils/dbErrors';
 
 export type StatementAssetMetadataRow = Omit<ProblemDraftAssetRow, 'content'>;
 
@@ -52,16 +53,8 @@ type DraftAdvanceResult =
   | { kind: 'advanced'; draft: ProblemDraftRow }
   | DraftMutationFailure;
 
-type DatabaseConstraintError = {
-  code?: string;
-  constraint?: string;
-};
-
-const isDuplicateAssetFilename = (error: unknown): boolean => {
-  const databaseError = error as DatabaseConstraintError;
-  return databaseError?.code === '23505'
-    && databaseError.constraint === 'problem_draft_assets_draft_id_filename_key';
-};
+const isDuplicateAssetFilename = (error: unknown): boolean =>
+  isUniqueViolation(error, 'problem_draft_assets_draft_id_filename_key');
 
 const advanceDraftRevision = async (
   client: AssetQueryClient,

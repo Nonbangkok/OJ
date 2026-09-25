@@ -84,4 +84,35 @@ describe('ConfirmationModal', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('requires the exact confirmation phrase before enabling the confirm button', async () => {
+    const onConfirm = jest.fn();
+    render(
+      <ConfirmationModal
+        isOpen
+        onClose={jest.fn()}
+        onConfirm={onConfirm}
+        title="Import database?"
+        message="This will permanently replace all existing database data."
+        confirmText="Import Database"
+        confirmationPhrase="IMPORT"
+      />
+    );
+
+    const confirmButton = screen.getByRole('button', { name: 'Import Database' });
+    const phraseInput = screen.getByLabelText('Type IMPORT to confirm');
+
+    // Confirm starts disabled; typing the wrong phrase keeps it disabled.
+    expect(confirmButton).toBeDisabled();
+    fireEvent.change(phraseInput, { target: { value: 'import' } });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.click(confirmButton);
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    // The exact phrase unlocks it.
+    fireEvent.change(phraseInput, { target: { value: 'IMPORT' } });
+    expect(confirmButton).toBeEnabled();
+    fireEvent.click(confirmButton);
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
 });

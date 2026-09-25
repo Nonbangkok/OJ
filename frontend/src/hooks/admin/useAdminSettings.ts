@@ -132,10 +132,9 @@ const useAdminSettings = () => {
             return;
         }
 
-        if (!window.confirm("WARNING: Importing a database will PERMANENTLY DELETE all existing data and replace it with the content of the uploaded file. Are you absolutely sure you want to proceed? This action cannot be undone.")) {
-            return;
-        }
-
+        // The destructive-confirmation step lives in the UI layer
+        // (ConfirmationModal with type-to-confirm) — by the time this runs,
+        // the user has already confirmed the import.
         setIsImporting(true);
         setDatabaseError('');
         setDatabaseSuccess('');

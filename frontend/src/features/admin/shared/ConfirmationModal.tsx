@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Dialog } from '../../../components/ui';
+import type React from 'react';
+import { Button, Dialog, Field, Input } from '../../../components/ui';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -10,6 +11,13 @@ interface ConfirmationModalProps {
   confirmText?: string;
   confirmStyle?: 'danger' | 'default';
   objectName?: string;
+  /** Extra content rendered between the message and the footer (e.g. the
+   *  selected-file label for database imports). */
+  children?: React.ReactNode;
+  /** When set, the confirm button stays disabled until the user types this
+   *  exact phrase into the confirmation input (type-to-confirm guard for
+   *  highly destructive actions). */
+  confirmationPhrase?: string;
 }
 
 const ConfirmationModal = ({
@@ -20,11 +28,24 @@ const ConfirmationModal = ({
   message,
   confirmText = 'Confirm',
   confirmStyle = 'danger',
+  children,
+  confirmationPhrase,
 }: ConfirmationModalProps) => {
   const cancelRef = useRef<HTMLElement | null>(null);
   const pendingRef = useRef(false);
   const mountedRef = useRef(true);
   const [isPending, setIsPending] = useState(false);
+  const [phraseInput, setPhraseInput] = useState('');
+  const requiresPhrase = Boolean(confirmationPhrase);
+  const phraseMatches = !requiresPhrase || phraseInput === confirmationPhrase;
+
+  // Reset the type-to-confirm input each time the dialog opens so a
+  // previously confirmed phrase never carries over to a new confirmation.
+  useEffect(() => {
+    if (isOpen) {
+      setPhraseInput('');
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -37,7 +58,7 @@ const ConfirmationModal = ({
   if (!isOpen) return null;
 
   const handleConfirm = async () => {
-    if (pendingRef.current) {
+    if (pendingRef.current || !phraseMatches) {
       return;
     }
 
@@ -81,7 +102,7 @@ const ConfirmationModal = ({
           <Button
             variant={confirmStyle === 'danger' ? 'destructive' : 'primary'}
             onClick={handleConfirm}
-            disabled={isPending}
+            disabled={isPending || !phraseMatches}
             loading={isPending}
             loadingLabel="Working…"
           >
@@ -89,7 +110,21 @@ const ConfirmationModal = ({
           </Button>
         </>
       }
-    />
+    >
+      {children}
+      {requiresPhrase && (
+        <Field label={`Type ${confirmationPhrase} to confirm`}>
+          {({ id }) => (
+            <Input
+              id={id}
+              value={phraseInput}
+              onChange={(event) => setPhraseInput(event.target.value)}
+              autoComplete="off"
+            />
+          )}
+        </Field>
+      )}
+    </Dialog>
   );
 };
 

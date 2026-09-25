@@ -1,0 +1,54 @@
+/* Segmented scope toggle — the shared visual language of the authoring
+   "All drafts | My drafts" control, extracted so non-admin surfaces can
+   use it too. The selected segment reads through background/contrast
+   (not an underline): the active button lifts to the page background
+   with a soft shadow, while inactive segments sit quietly on the darker
+   well. Works in both themes through the background tokens. */
+
+.segment {
+  display: inline-flex;
+  gap: 0.25rem;
+  background-color: var(--background-tertiary);
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+  /* Match the shared 2.1rem control height (34px) so segmented groups
+     align on the same baseline as search inputs and selects. */
+  box-sizing: border-box;
+  height: 2.1rem;
+}
+
+.segmentBtn {
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 0.875rem;
+  padding-right: 0.875rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background-color: transparent;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+}
+
+.segmentBtn:hover {
+  color: var(--text-primary);
+}
+
+.segmentBtn.active {
+  background-color: var(--background-primary);
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.segmentBtn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.segmentBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}

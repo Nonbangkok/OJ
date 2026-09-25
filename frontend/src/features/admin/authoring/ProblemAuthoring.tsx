@@ -173,49 +173,44 @@ function DraftList() {
       {loading ? (
         <p role="status">Loading drafts…</p>
       ) : (
-        <section className={styles.panel}>
-          <div className={styles.panelHead}>
-            <h3>Drafts</h3>
-            <p>{visibleDrafts.length === drafts.length ? `${drafts.length} saved` : `${visibleDrafts.length} of ${drafts.length}`}</p>
-          </div>
-
+        <>
           {/* Discovery toolbar — a filter over the single collaborative list.
-              Every author still sees and can edit every draft under All drafts. */}
-          <div className={`${styles.draftsToolbar}`}>
-            {/* Row 1: search + scope toggle sit together, no labels needed —
-                the placeholder and button text carry the meaning. */}
-            <div className={`${shared['filter-bar']} ${styles.draftsToolbarRow}`}>
-              <input
-                type="search"
-                className={shared['filter-search']}
-                placeholder="Search by ID or title…"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                aria-label="Search drafts by ID or title"
-              />
-              <div className={shared['filter-segment']} role="group" aria-label="Draft scope">
-                <button
-                  type="button"
-                  className={`${shared['filter-segment-btn']} ${scope === 'all' ? shared.active : ''}`}
-                  aria-pressed={scope === 'all'}
-                  onClick={() => setScope('all')}
-                >
-                  All drafts
-                </button>
-                <button
-                  type="button"
-                  className={`${shared['filter-segment-btn']} ${scope === 'mine' ? shared.active : ''}`}
-                  aria-pressed={scope === 'mine'}
-                  onClick={() => setScope('mine')}
-                >
-                  My drafts
-                </button>
-              </div>
+              Every author still sees and can edit every draft under All drafts.
+              Lives outside the Drafts panel so the panel stays a pure list. */}
+          <div className={styles.draftsToolbar}>
+            <input
+              type="search"
+              className={styles.draftsSearch}
+              placeholder="Search by ID or title…"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              aria-label="Search drafts by ID or title"
+            />
+            <div
+              className={`${shared['filter-segment']} ${styles.draftsScope}`}
+              role="group"
+              aria-label="Draft scope"
+            >
+              <button
+                type="button"
+                className={`${shared['filter-segment-btn']} ${scope === 'all' ? shared.active : ''}`}
+                aria-pressed={scope === 'all'}
+                onClick={() => setScope('all')}
+              >
+                All drafts
+              </button>
+              <button
+                type="button"
+                className={`${shared['filter-segment-btn']} ${scope === 'mine' ? shared.active : ''}`}
+                aria-pressed={scope === 'mine'}
+                onClick={() => setScope('mine')}
+              >
+                My drafts
+              </button>
             </div>
-            {/* Row 2: labeled filters on one aligned line (label beside its
-                select, consistent heights, shared gap rhythm). */}
-            <div className={shared['filter-bar']}>
-            <label className={shared['filter-control']}>
+            {/* Labeled filters: label inline beside its select, one height,
+                one baseline — the whole toolbar reads as a single row. */}
+            <label className={`${shared['filter-control']} ${styles.draftsFilter}`}>
               <span className={shared['filter-label']}>Author</span>
               <select
                 value={authorFilter}
@@ -228,7 +223,7 @@ function DraftList() {
                 ))}
               </select>
             </label>
-            <label className={shared['filter-control']}>
+            <label className={`${shared['filter-control']} ${styles.draftsFilter}`}>
               <span className={shared['filter-label']}>Status</span>
               <select
                 value={statusFilter}
@@ -242,7 +237,7 @@ function DraftList() {
                 <option value="published">Published</option>
               </select>
             </label>
-            <label className={shared['filter-control']}>
+            <label className={`${shared['filter-control']} ${styles.draftsFilter}`}>
               <span className={shared['filter-label']}>Sort</span>
               <select
                 value={sort}
@@ -254,10 +249,15 @@ function DraftList() {
                 ))}
               </select>
             </label>
-            </div>
           </div>
 
-          <OverflowTable label="Saved drafts">
+          <section className={styles.panel}>
+            <div className={styles.panelHead}>
+              <h3>Drafts</h3>
+              <p>{visibleDrafts.length === drafts.length ? `${drafts.length} saved` : `${visibleDrafts.length} of ${drafts.length}`}</p>
+            </div>
+
+            <OverflowTable label="Saved drafts">
             <table>
               <thead>
                 <tr>
@@ -324,7 +324,8 @@ function DraftList() {
               <p className={styles.panelBody}>No drafts match the current filters.</p>
             )}
           </OverflowTable>
-        </section>
+          </section>
+        </>
       )}
     </section>
   );

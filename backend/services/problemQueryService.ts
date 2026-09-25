@@ -10,6 +10,7 @@ import {
   ReplaceProblemTestcasesFromZipResult,
 } from '../types/service';
 import { fullyPairedCaseNumbers, pairZippedTestcaseFiles } from './testcaseZipPairing';
+import { isUniqueViolation } from '../utils/dbErrors';
 
 /**
  * Run `body` inside a single transaction. BEGIN/COMMIT/ROLLBACK on a dedicated
@@ -150,12 +151,19 @@ export const getProblemPdfWithAccess = async (
   return result.rows[0] ?? null;
 };
 
-export const createProblem = async (payload: CreateProblemRequestBody): Promise<ProblemRow> => {
-  const result = await db.query<ProblemRow>(
-    'INSERT INTO problems (id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb) VALUES ($1, $2, $3, $4::text[], $5, $6, $7, $8) RETURNING *',
-    [payload.id, payload.title, payload.author, [...payload.categories ?? []], payload.difficulty ?? null, payload.collection_id ?? null, payload.time_limit_ms, payload.memory_limit_mb]
-  );
-  return result.rows[0];
+export const createProblem = async (
+  payload: CreateProblemRequestBody,
+): Promise<'duplicate_id' | ProblemRow> => {
+  try {
+    const result = await db.query<ProblemRow>(
+      'INSERT INTO problems (id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb) VALUES ($1, $2, $3, $4::text[], $5, $6, $7, $8) RETURNING *',
+      [payload.id, payload.title, payload.author, [...payload.categories ?? []], payload.difficulty ?? null, payload.collection_id ?? null, payload.time_limit_ms, payload.memory_limit_mb]
+    );
+    return result.rows[0];
+  } catch (error) {
+    if (isUniqueViolation(error)) return 'duplicate_id';
+    throw error;
+  }
 };
 
 export const updateProblem = async (

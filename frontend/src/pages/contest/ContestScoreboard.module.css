@@ -1,8 +1,26 @@
 /* Scoreboard matrix: same shared table as everywhere else, plus sticky
-   leading columns for wide contests and semantic (non-button) score cells. */
+   leading columns for wide contests and semantic (non-button) score cells.
 
+   Column plan (table-layout: fixed, widths set on th cells):
+     Rank        72px    centered
+     Participant 260px   left, avatar + username, ellipsis on overflow
+     Score       104px   centered
+     Problems    100px   centered
+   The fixed layout keeps the participant column from absorbing the table;
+   wide contests scroll horizontally inside the shared table-container with
+   the three leading columns staying put. */
+
+/* Fixed layout with the table width computed by the component
+   (`calc(leading + N * problem)`, exposed as the --sb-* custom properties)
+   so the leading columns land on their exact planned px widths — keyword
+   widths (100% / max-content) let the browser redistribute and drift them.
+   min-width:100% stretches short contests to the container, with the slack
+   landing on the auto problem columns; wide contests scroll horizontally
+   inside the shared table-container with the leading columns sticking. */
 .scoreboardTable {
   table-layout: fixed;
+  width: calc(var(--sb-leading, 436px) + var(--sb-problem-count, 0) * var(--sb-problem, 100px));
+  min-width: 100%;
 }
 
 /* Leading columns stay visible while problem columns scroll horizontally.
@@ -23,30 +41,70 @@
   z-index: 3;
 }
 
+/* Alignment: the shared `.table th, .table td` centers everything (0,1,1);
+   these two-class selectors win and pin the plan — Participant left, the
+   numeric columns centered. */
+.scoreboardTable th.colRank,
+.scoreboardTable td.colRank {
+  text-align: center;
+}
+
+.scoreboardTable th.colParticipant,
+.scoreboardTable td.colParticipant {
+  text-align: left;
+}
+
+.scoreboardTable th.colTotal,
+.scoreboardTable td.colTotal {
+  text-align: center;
+}
+
+.scoreboardTable th.colProblem,
+.scoreboardTable td.colProblem {
+  text-align: center;
+}
+
 .colRank {
   left: 0;
-  width: 64px;
+  width: 72px;
 }
 
 .colParticipant {
-  left: 64px;
-  min-width: 180px;
-  text-align: left;
-  /* Cover the gap between this sticky cell and the next one. */
-  box-shadow: inset -1px 0 var(--border-color);
-  clip-path: inset(0 -1px 0 0);
+  left: 72px;
+  width: 260px;
+  max-width: 260px;
 }
 
 .colTotal {
-  left: 244px;
-  width: 84px;
+  left: 332px;
+  width: 104px;
   font-variant-numeric: tabular-nums;
+}
+
+/* Problem columns are `auto` so they absorb the slack when min-width
+   stretches a short contest to the container — while in wide contests the
+   calc() table width leaves exactly --sb-problem per auto column. Either
+   way the leading columns stay pinned to their planned px widths. */
+.colProblem {
+  width: auto;
+  text-align: center;
+}
+
+/* Column-group separation (low weight, shared border token): heavier after
+   Rank, Participant, and Score — the group boundaries — and barely-there
+   between problem columns. Inset shadows instead of borders so the sticky
+   cells don't double-stroke; clip-path keeps the trailing edge inside the
+   cell's painted box for the sticky ones. */
+.colRank,
+.colParticipant,
+.colTotal {
   box-shadow: inset -1px 0 var(--border-color);
   clip-path: inset(0 -1px 0 0);
 }
 
-.colProblem {
-  width: 84px;
+.colProblem:not(:last-child) {
+  box-shadow: inset -1px 0 color-mix(in srgb, var(--border-color) 45%, transparent);
+  clip-path: inset(0 -1px 0 0);
 }
 
 .problemId {
@@ -54,12 +112,29 @@
   font-size: 0.9rem;
   color: var(--text-primary);
   word-break: break-word;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
 }
 
 .user-cell {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
+}
+
+/* Long usernames truncate with an ellipsis; the full name stays available
+   through the title attribute set on the cell. */
+.user-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
 .totalScore {
@@ -125,4 +200,29 @@
 
 .noData p {
   margin: 0;
+}
+
+/* Narrower viewports: shave the leading columns so the participant column
+   (the widest fixed one) still leaves room for problem columns. The table
+   width switches to the narrow calc in the same query; the leading columns
+   here sum to --sb-leading-narrow (320px). */
+@media (max-width: 900px) {
+  .scoreboardTable {
+    width: calc(var(--sb-leading-narrow, 320px) + var(--sb-problem-count, 0) * var(--sb-problem-narrow, 96px));
+  }
+
+  .colRank {
+    width: 56px;
+  }
+
+  .colParticipant {
+    left: 56px;
+    width: 180px;
+    max-width: 180px;
+  }
+
+  .colTotal {
+    left: 236px;
+    width: 84px;
+  }
 }
