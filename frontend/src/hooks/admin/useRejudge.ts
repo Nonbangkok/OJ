@@ -30,9 +30,12 @@ const buildFeedback = (target: RejudgeTarget, result: RejudgeResponse): RejudgeF
   const skippedSuffix = result.skipped > 0
     ? ` (${result.skipped} skipped — no stored code)`
     : '';
+  const busySuffix = result.busy && result.busy > 0
+    ? ` (${result.busy} already being judged — skipped)`
+    : '';
   return {
     visible: true,
-    message: `Rejudge queued for ${result.queued} submissions${skippedSuffix}.`,
+    message: `Rejudge queued for ${result.queued} submissions${skippedSuffix}${busySuffix}.`,
     type: 'success',
   };
 };
