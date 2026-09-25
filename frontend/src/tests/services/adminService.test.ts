@@ -3,7 +3,7 @@ import adminService from '../../services/adminService';
 import type { AxiosResponse } from 'axios';
 import type {
     AdminProblemDetailResponse,
-    AdminUsersResponse,
+    AdminUsersPageResponse,
     ApiMessageResponse,
     ContestProblemsMutationResponse,
     RegistrationSettingsUpdateResponse,
@@ -19,11 +19,16 @@ describe('adminService', () => {
     });
 
     describe('User Management', () => {
-        it('getUsers calls api.get with correct path', async () => {
-            const mockData: AdminUsersResponse = [{ id: 1, username: 'admin', role: 'admin' }];
+        it('getUsers calls api.get with the paged user-list path (ADMIN-008)', async () => {
+            const mockData: AdminUsersPageResponse = {
+                users: [{ id: 1, username: 'admin', role: 'admin' }],
+                total: 1,
+                page: 1,
+                limit: 100,
+            };
             jest.mocked(api.get).mockResolvedValueOnce({ data: mockData });
             const result = await adminService.getUsers();
-            expect(api.get).toHaveBeenCalledWith('/admin/users');
+            expect(api.get).toHaveBeenCalledWith('/admin/users', { params: undefined });
             expect(result).toEqual(mockData);
         });
 

@@ -37,7 +37,12 @@ describe('UserManagement Component', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         (jest.mocked(useAuth) as jest.Mock).mockReturnValue({ user: mockCurrentUser, isLoading: false, login: jest.fn(), logout: jest.fn() });
-        (jest.mocked(adminService.getUsers) as jest.Mock).mockResolvedValue(mockUsers);
+        (jest.mocked(adminService.getUsers) as jest.Mock).mockResolvedValue({
+            users: mockUsers,
+            total: mockUsers.length,
+            page: 1,
+            limit: 100,
+        });
     });
 
     it('renders loading state initially', () => {

@@ -14,8 +14,11 @@ describe('useUserManagement', () => {
         { id: 2, username: 'user1', role: 'user' }
     ];
 
+    // ADMIN-008: the list endpoint returns a paged payload, not a bare array.
+    const mockPage = { users: mockUsers, total: mockUsers.length, page: 1, limit: 100 };
+
     it('fetches users on mount', async () => {
-        (jest.mocked(adminService.getUsers) as jest.Mock).mockResolvedValueOnce(mockUsers);
+        (jest.mocked(adminService.getUsers) as jest.Mock).mockResolvedValueOnce(mockPage);
 
         const { result } = renderHook(() => useUserManagement());
 
@@ -27,11 +30,13 @@ describe('useUserManagement', () => {
         });
 
         expect(result.current.users).toEqual(mockUsers);
-        expect(adminService.getUsers).toHaveBeenCalledTimes(1);
+        expect(result.current.total).toBe(mockUsers.length);
+        expect(result.current.page).toBe(1);
+        expect(adminService.getUsers).toHaveBeenCalledWith({ page: 1, limit: 100 });
     });
 
     it('handles user deletion correctly', async () => {
-        (jest.mocked(adminService.getUsers) as jest.Mock).mockResolvedValueOnce(mockUsers);
+        (jest.mocked(adminService.getUsers) as jest.Mock).mockResolvedValueOnce(mockPage);
 
         // allow initial fetch
         const { result } = renderHook(() => useUserManagement());

@@ -67,7 +67,13 @@ export type UserSearchResponse = UserSuggestion[];
 
 export type GlobalScoreboardResponse = GlobalScoreboardEntry[];
 
-export type AdminUsersResponse = AdminUser[];
+/** Paged admin user list (ADMIN-008): rows + total count + paging echo. */
+export interface AdminUsersPageResponse {
+  users: AdminUser[];
+  total: number;
+  page: number;
+  limit: number;
+}
 export type AdminAuthorsResponse = Array<Pick<AdminUser, 'id' | 'username'>>;
 export type AdminCreateUserResponse = AdminUser;
 export type AdminUpdateUserResponse = AdminUser;

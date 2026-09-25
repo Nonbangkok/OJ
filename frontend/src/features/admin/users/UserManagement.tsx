@@ -8,12 +8,15 @@ import BatchUserCreation from './BatchUserCreation';
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 import { ActionMenu, Button, StatusBadge } from '../../../components/ui';
+import { USER_PAGE_SIZE } from '../../../hooks/admin/useUserManagement';
 import { APP_CONSTANTS } from '../../../utils/constants';
 import LoadingPage from '../../../components/shared/LoadingPage';
 
 const UserManagement = () => {
   const {
     users,
+    page,
+    total,
     loading,
     error,
     editingUser,
@@ -23,6 +26,7 @@ const UserManagement = () => {
     isAddModalOpen,
     setIsAddModalOpen,
     fetchUsers,
+    goToPage,
     handleEdit,
     handleDeleteClick,
     handleConfirmDelete,
@@ -49,6 +53,12 @@ const UserManagement = () => {
       return user.username.toLowerCase().includes(query);
     });
   }, [users, roleFilter, search]);
+
+  // ADMIN-008: server-side paging. The search/role filters above apply
+  // within the fetched page; the pager walks the full user table.
+  const pageCount = Math.max(1, Math.ceil(total / USER_PAGE_SIZE));
+  const rangeStart = total === 0 ? 0 : (page - 1) * USER_PAGE_SIZE + 1;
+  const rangeEnd = Math.min(page * USER_PAGE_SIZE, total);
 
   if (loading) return <LoadingPage />;
   if (error) return <div className="error-message">{error}</div>;
@@ -144,6 +154,31 @@ const UserManagement = () => {
             <p className={styles['empty-state']}>No users found.</p>
           )}
         </div>
+
+        {/* --- Pagination (ADMIN-008) ------------------------------------ */}
+        {pageCount > 1 && (
+          <div className={styles['filter-bar']} role="navigation" aria-label="User list pages">
+            <Button
+              variant="secondary"
+              size="compact"
+              disabled={page <= 1 || loading}
+              onClick={() => goToPage(page - 1)}
+            >
+              Prev
+            </Button>
+            <span aria-live="polite">
+              {rangeStart}–{rangeEnd} of {total}
+            </span>
+            <Button
+              variant="secondary"
+              size="compact"
+              disabled={page >= pageCount || loading}
+              onClick={() => goToPage(page + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        )}
 
         {editingUser && (
           <EditUserModal

@@ -5,6 +5,7 @@ import { EventEmitter } from 'events';
 import adminRouter from '../controllers/adminController';
 import * as db from '../db';
 import { runMigrationsFromPool } from '../scripts/migrate';
+import { errorHandler } from '../middleware/errorHandler';
 
 // Mock Dependencies
 jest.mock('../db', () => {
@@ -75,6 +76,7 @@ describe('Admin Controller', () => {
             next();
         });
         app.use('/', adminRouter);
+        app.use(errorHandler);
         jest.clearAllMocks();
     });
 
@@ -113,16 +115,44 @@ describe('Admin Controller', () => {
     });
 
     describe('GET /admin/users', () => {
-        it('should return a list of non-root users', async () => {
-            (db.query as jest.Mock).mockResolvedValueOnce({
-                rows: [{ id: 2, username: 'user1', role: 'user' }]
-            });
+        it('should return a paged user list with a total count (ADMIN-008)', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ id: 2, username: 'user1', role: 'user' }] })
+                .mockResolvedValueOnce({ rows: [{ total: '1' }] });
 
             const res = await request(app).get('/admin/users');
 
             expect(res.status).toBe(200);
-            expect(res.body.length).toBe(1);
-            expect(res.body[0].username).toBe('user1');
+            expect(res.body.users.length).toBe(1);
+            expect(res.body.users[0].username).toBe('user1');
+            expect(res.body.total).toBe(1);
+            expect(res.body.page).toBe(1);
+            expect(res.body.limit).toBe(100);
+        });
+
+        it('should pass page/limit through and reject bad values (ADMIN-008)', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValue({ rows: [] })
+                .mockResolvedValue({ rows: [{ total: '0' }] });
+
+            const ok = await request(app).get('/admin/users?page=2&limit=50');
+            expect(ok.status).toBe(200);
+            expect(ok.body.page).toBe(2);
+            expect(ok.body.limit).toBe(50);
+
+            const tooHigh = await request(app).get('/admin/users?limit=501');
+            expect(tooHigh.status).toBe(400);
+            const zero = await request(app).get('/admin/users?page=0');
+            expect(zero.status).toBe(400);
+        });
+
+        it('should return 404 when deleting a nonexistent user (ADMIN-007)', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+
+            const res = await request(app).delete('/admin/users/999');
+
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('User not found.');
         });
     });
 

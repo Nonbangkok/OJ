@@ -4,15 +4,21 @@ import type {
   AdminAuthorsResponse,
   AdminCreateUserResponse,
   AdminUpdateUserResponse,
-  AdminUsersResponse,
+  AdminUsersPageResponse,
   ApiMessageResponse,
   BatchCreateUsersResponse,
 } from '../../types';
 import type { BatchCreateUsersRequest, CreateUserRequest, UpdateUserRequest } from '../../types';
 
+/** Query params for the paged admin user list (ADMIN-008). */
+export interface AdminUsersQuery {
+  page?: number;
+  limit?: number;
+}
+
 const usersAdminService = {
-  getUsers: async (): Promise<AdminUsersResponse> => {
-    const response = await api.get<AdminUsersResponse>('/admin/users');
+  getUsers: async (query?: AdminUsersQuery): Promise<AdminUsersPageResponse> => {
+    const response = await api.get<AdminUsersPageResponse>('/admin/users', { params: query });
     return response.data;
   },
 
