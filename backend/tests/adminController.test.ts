@@ -10,24 +10,25 @@ import { errorHandler } from '../middleware/errorHandler';
 // Mock Dependencies
 jest.mock('../db', () => {
     const query = jest.fn();
+    // AUTH-004: withTransaction forwards to query by default so per-test
+    // query mocks keep working inside transactional services (the global
+    // setup does the same for the auto-mocked db module).
+    const withTransaction = jest.fn(async (body: (client: { query: typeof query }) => Promise<unknown>) => {
+        const client = { query };
+        await client.query('BEGIN');
+        try {
+            const result = await body(client);
+            await client.query('COMMIT');
+            return result;
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        }
+    });
     return {
         query,
         pool: { query, connect: jest.fn() },
-        // AUTH-004: withTransaction forwards to query by default so per-test
-        // query mocks keep working inside transactional services (the global
-        // setup does the same for the auto-mocked db module).
-        withTransaction: jest.fn(async (body: (client: { query: typeof query }) => Promise<unknown>) => {
-            const client = { query: (...args: unknown[]) => query(...(args as [string, unknown[]?])) };
-            await client.query('BEGIN');
-            try {
-                const result = await body(client);
-                await client.query('COMMIT');
-                return result;
-            } catch (error) {
-                await client.query('ROLLBACK');
-                throw error;
-            }
-        }),
+        withTransaction,
         // DB-10: the import flow runs migrations on a dedicated unlimited pool.
         createMigrationsPool: jest.fn(() => ({ connect: jest.fn(async () => ({ query, release: jest.fn() })), end: jest.fn() })),
     };
