@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { seedSchema } from '../authoring/protocol';
 import {
+  ADMIN_USER_LIST_CONFIG,
   AUTHORING_VALIDATION,
   PROBLEM_CATEGORIES,
   PROBLEM_DIFFICULTY_MAX,
@@ -9,6 +10,7 @@ import {
   PROBLEM_VALIDATION,
   STATEMENT_ASSET,
   STRING_LIMITS,
+  SUBMISSION_QUERY_CONFIG,
   SUBMISSION_VALIDATION,
   SUPPORTED_LANGUAGES,
   USER_ROLES,
@@ -71,8 +73,17 @@ const positiveIntegerFromForm = z.preprocess(
 );
 
 // Common schemas
+// :id params for the users/submissions/contests tables (SERIAL ids). A
+// non-numeric id previously reached Postgres as-is and blew up as a 500
+// cast error (SUB-003); rejecting it here returns a 400 before any query.
 export const idParamSchema = z.object({
-  id: nonEmptyString,
+  id: z.coerce.number().int().positive(),
+});
+
+// :id params for problem routes — problems use VARCHAR(50) string ids
+// (e.g. "aplusb"), so this stays a string schema.
+export const problemIdParamSchema = z.object({
+  id: nonEmptyString.max(50),
 });
 
 export const usernameParamSchema = z.object({
@@ -102,6 +113,13 @@ export const updateAdminUserSchema = z.object({
   role: z.enum([USER_ROLES.USER, USER_ROLES.STAFF, USER_ROLES.ADMIN]),
 });
 
+// ADMIN-008: paged admin user list. Defaults keep page 1 at the default limit.
+export const adminUsersQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(ADMIN_USER_LIST_CONFIG.MAX_LIMIT)
+    .default(ADMIN_USER_LIST_CONFIG.DEFAULT_LIMIT),
+}).strict();
+
 export const batchCreateUsersSchema = z.object({
   prefix: nonEmptyString.max(STRING_LIMITS.PREFIX),
   count: z.number().int().min(1).max(USER_VALIDATION.BATCH_MAX_COUNT),
@@ -119,7 +137,7 @@ export const updateSiteAccessModeSchema = z.object({
 export const contestIdParamSchema = idParamSchema;
 
 export const contestProblemParamsSchema = z.object({
-  id: nonEmptyString,
+  id: z.coerce.number().int().positive(),
   problemId: nonEmptyString,
 });
 
@@ -346,6 +364,10 @@ export const updateProblemDraftSchema = z.object({
 );
 
 // Submission schemas
+// Highest page requestable on the submissions list. Guards pathological
+// offsets; combined with LIST_LIMIT this reaches the newest 100k submissions.
+export const SUBMISSION_QUERY_PAGE_MAX = 500;
+
 export const submitSchema = z.object({
   problemId: nonEmptyString,
   language: z.enum(SUPPORTED_LANGUAGES),
@@ -359,7 +381,10 @@ export const submissionsQuerySchema = z.object({
   contestId: optionalTrimmedString,
   filterProblemId: optionalTrimmedString,
   filterUserId: optionalTrimmedString,
-});
+  // SUB-004: page-based access past the hard 200-row cap. Page 1 (default)
+  // is the previous behavior; the cap per page stays at LIST_LIMIT.
+  page: z.coerce.number().int().min(1).max(SUBMISSION_QUERY_PAGE_MAX).default(1),
+}).strict();
 
 export const searchQuerySchema = z.object({
   q: optionalTrimmedString,

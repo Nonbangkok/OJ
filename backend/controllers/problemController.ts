@@ -40,7 +40,7 @@ import { getErrorMessage } from '../utils/errorMessage';
 import { validateRequest } from '../middleware/validation';
 import {
   createProblemSchema,
-  idParamSchema,
+  problemIdParamSchema,
   problemExportSchema,
   problemsWithStatsQuerySchema,
   progressIdParamSchema,
@@ -92,7 +92,7 @@ router.get('/problems', requirePublicAccess, asyncHandler(async (_req: Request, 
 // Public details
 router.get('/problems/:id',
   requirePublicAccess,
-  validateRequest({ params: idParamSchema }),
+  validateRequest({ params: problemIdParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const problemDetail = await getProblemDetail(id);
@@ -115,7 +115,7 @@ router.get('/problems/:id',
 
 // Admin details - guaranteed to return everything
 router.get('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
-  validateRequest({ params: idParamSchema }),
+  validateRequest({ params: problemIdParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const problemDetail = await getProblemDetail(id);
@@ -126,7 +126,7 @@ router.get('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
 }));
 
 router.get('/problems/:id/pdf', requirePublicAccess,
-  validateRequest({ params: idParamSchema }),
+  validateRequest({ params: problemIdParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
 
@@ -167,7 +167,7 @@ router.post('/admin/problems', requireAuth, requireStaffOrAdmin,
 }));
 
 router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
-  validateRequest({ params: idParamSchema, body: updateProblemSchema }),
+  validateRequest({ params: problemIdParamSchema, body: updateProblemSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const oldId = String(req.params.id);
   const { id: newId, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb } = req.body as UpdateProblemRequestBody;
@@ -192,7 +192,7 @@ router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
 }));
 
 router.delete('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
-  validateRequest({ params: idParamSchema }),
+  validateRequest({ params: problemIdParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const deleted = await deleteProblem(id);
@@ -208,7 +208,7 @@ router.get('/admin/problems', requireAuth, requireStaffOrAdmin, asyncHandler(asy
 }));
 
 router.put('/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin,
-  validateRequest({ params: idParamSchema, body: updateProblemVisibilitySchema }),
+  validateRequest({ params: problemIdParamSchema, body: updateProblemVisibilitySchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const { isVisible } = req.body as UpdateProblemVisibilityRequestBody;
@@ -300,7 +300,7 @@ router.get('/admin/problems/batch-upload-progress/:progressId', requireAuth, req
 });
 
 router.post('/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin,
-  validateRequest({ params: idParamSchema }),
+  validateRequest({ params: problemIdParamSchema }),
   memoryUpload.fields([
   { name: 'problemPdf', maxCount: 1 },
   { name: 'testcasesZip', maxCount: 1 }
