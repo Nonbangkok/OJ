@@ -106,12 +106,12 @@ router.get(
     // Server-side role enforcement: the filter UI is staff/admin-only, but
     // the endpoint itself is reachable by every authenticated user, so the
     // visibility predicate must not trust the client (PROBLEM-001).
-    const { userId, role } = req.session;
-    if (!userId) {
+    const user = req.user;
+    if (!user) {
       throw new AppError('Authentication required', 401);
     }
 
-    const problems = await searchProblems(q, { userId, role: role ?? USER_ROLES.USER }, contestId);
+    const problems = await searchProblems(q, { userId: user.id, role: user.role }, contestId);
     res.json(problems);
   }),
 );
