@@ -276,6 +276,8 @@ export interface SubmissionListQuery {
     contestId?: string;
     filterProblemId?: string;
     filterUserId?: string;
+    /** 1-based page over the LIST_LIMIT-capped feed (SUB-004). */
+    page?: number;
 }
 
 export interface SearchQuery {

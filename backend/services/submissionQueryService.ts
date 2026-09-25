@@ -123,6 +123,12 @@ export const getSubmissions = async (
     const { filter, problemId, contestId, filterProblemId, filterUserId } = queryInput;
     const isGuest = userId === 0;
 
+    // SUB-004: page 1 (the default) reproduces the previous single-page
+    // behavior; higher pages offset past the cap so older history is
+    // reachable. The page bound is enforced by submissionsQuerySchema.
+    const page = queryInput.page && queryInput.page >= 1 ? Math.floor(queryInput.page) : 1;
+    const offset = (page - 1) * SUBMISSION_QUERY_CONFIG.LIST_LIMIT;
+
     // Guests (PUBLIC mode) see only the default public feed: personal
     // filters, per-problem views, and contest feeds all require a user.
     if (isGuest && (filter === 'mine' || problemId || contestId)) {
@@ -205,7 +211,7 @@ export const getSubmissions = async (
         queryText += ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    queryText += ` ORDER BY ${sourceAlias}.submitted_at DESC LIMIT ${SUBMISSION_QUERY_CONFIG.LIST_LIMIT}`;
+    queryText += ` ORDER BY ${sourceAlias}.submitted_at DESC LIMIT ${SUBMISSION_QUERY_CONFIG.LIST_LIMIT} OFFSET ${offset}`;
     const result = await db.query<SubmissionListRow>(queryText, params);
     return result.rows;
 };

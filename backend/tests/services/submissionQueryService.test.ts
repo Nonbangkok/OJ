@@ -41,6 +41,25 @@ describe('submissionQueryService visibility (PROBLEM-001 / SUB-001 / SUB-002)', 
             expect(sql).toContain('s.user_id = $1');
             expect(params).toEqual([5]);
         });
+
+        it('pages past the 200-row cap with an OFFSET (SUB-004)', async () => {
+            await getSubmissions({ page: 1 }, 5, false);
+            const [sqlPage1] = query.mock.calls[0];
+            expect(sqlPage1).toContain('OFFSET 0');
+
+            await getSubmissions({ page: 3 }, 5, false);
+            const [sqlPage3] = query.mock.calls[1];
+            // (3 - 1) * 200 = 400 skipped rows.
+            expect(sqlPage3).toContain('OFFSET 400');
+            expect(sqlPage3).toContain('LIMIT 200');
+        });
+
+        it('treats a missing page as page 1 (default behavior preserved, SUB-004)', async () => {
+            await getSubmissions({}, 5, false);
+
+            const [sql] = query.mock.calls[0];
+            expect(sql).toContain('OFFSET 0');
+        });
     });
 
     describe('getSubmissions contest feed', () => {
