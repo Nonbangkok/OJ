@@ -75,6 +75,25 @@ describe('adminQueryService', () => {
     });
   });
 
+  it('createAdminUser plumbs the admin role through to the INSERT', async () => {
+    (db.query as jest.Mock)
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ id: 8, username: 'root2', role: 'admin', created_at: new Date() }],
+      });
+
+    const result = await createAdminUser('root2', 'password', 'admin', 10);
+
+    expect(db.query).toHaveBeenLastCalledWith(
+      'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id, username, role, created_at',
+      ['root2', 'hash-password', 'admin'],
+    );
+    expect(result).toEqual({
+      kind: 'ok',
+      data: { id: 8, username: 'root2', role: 'admin' },
+    });
+  });
+
   it('updateAdminUser should block protected account', async () => {
     (db.query as jest.Mock)
       .mockResolvedValueOnce({}) // BEGIN

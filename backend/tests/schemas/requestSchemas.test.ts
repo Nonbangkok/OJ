@@ -104,6 +104,27 @@ describe('requestSchemas size & validation caps', () => {
 
   });
 
+  describe('createAdminUserSchema role enum', () => {
+    // The endpoint sits behind requireAdmin, so allowing role 'admin' on
+    // create (mirroring updateAdminUserSchema) does not widen the
+    // authorization surface: an admin could already grant it via update.
+    it('accepts user, staff, and admin roles', () => {
+      for (const role of ['user', 'staff', 'admin']) {
+        expect(createAdminUserSchema.safeParse({ username: 'validuser', password: 'secret123', role }).success).toBe(true);
+      }
+    });
+
+    it('rejects an unknown role', () => {
+      expect(createAdminUserSchema.safeParse({ username: 'validuser', password: 'secret123', role: 'superadmin' }).success).toBe(false);
+      expect(createAdminUserSchema.safeParse({ username: 'validuser', password: 'secret123', role: 'Admin' }).success).toBe(false); // case-sensitive
+    });
+
+    it('enforces the password minimum on admin create', () => {
+      const shortPass = 'a'.repeat(USER_VALIDATION.MIN_PASSWORD_LENGTH - 1);
+      expect(createAdminUserSchema.safeParse({ username: 'validuser', password: shortPass, role: 'admin' }).success).toBe(false);
+    });
+  });
+
   describe('problem & batch caps', () => {
     it('rejects an over-long problem title/author', () => {
       const valid = { id: 'p1', title: 'T', author: 'A', time_limit_ms: 1000, memory_limit_mb: 64 };

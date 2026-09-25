@@ -116,10 +116,13 @@ export const adminResetUserPasswordSchema = z.object({
 });
 
 // Admin schemas
+// The create endpoint sits behind requireAdmin, so allowing role 'admin'
+// here (mirroring updateAdminUserSchema) does not widen the authorization
+// surface — an admin can already grant admin via the update route.
 export const createAdminUserSchema = z.object({
   username: z.string().trim().min(USER_VALIDATION.MIN_USERNAME_LENGTH).max(STRING_LIMITS.USERNAME),
   password: z.string().min(USER_VALIDATION.MIN_PASSWORD_LENGTH).max(STRING_LIMITS.PASSWORD),
-  role: z.enum([USER_ROLES.USER, USER_ROLES.STAFF]),
+  role: z.enum([USER_ROLES.USER, USER_ROLES.STAFF, USER_ROLES.ADMIN]),
 });
 
 export const updateAdminUserSchema = z.object({
