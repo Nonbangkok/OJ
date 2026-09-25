@@ -101,6 +101,20 @@ export const loginSchema = z.object({
   password: nonEmptyString.max(STRING_LIMITS.PASSWORD),
 });
 
+// AUTH-004: self-service password change. The current password is verified
+// against the stored bcrypt hash before the new one is accepted; the new
+// password carries the same policy as registration.
+export const changePasswordSchema = z.object({
+  currentPassword: nonEmptyString.max(STRING_LIMITS.PASSWORD),
+  newPassword: z.string().min(USER_VALIDATION.MIN_PASSWORD_LENGTH).max(STRING_LIMITS.PASSWORD),
+});
+
+// AUTH-004: admin-set password reset — the admin supplies the new password
+// directly (no email infrastructure exists for a temp-password flow).
+export const adminResetUserPasswordSchema = z.object({
+  newPassword: z.string().min(USER_VALIDATION.MIN_PASSWORD_LENGTH).max(STRING_LIMITS.PASSWORD),
+});
+
 // Admin schemas
 export const createAdminUserSchema = z.object({
   username: z.string().trim().min(USER_VALIDATION.MIN_USERNAME_LENGTH).max(STRING_LIMITS.USERNAME),
