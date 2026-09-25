@@ -3,7 +3,7 @@
 import readline from 'readline';
 import bcrypt from 'bcrypt';
 import * as db from '../db';
-import { SECURITY_CONFIG, USER_ROLES } from '../constants';
+import { SECURITY_CONFIG, USER_ROLES, USER_VALIDATION } from '../constants';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -57,8 +57,8 @@ async function createAdmin(): Promise<void> {
 
   const password = await askPassword(`Enter password for ${username}: `);
 
-  if (password.length < 6) {
-    console.error('Password must be at least 6 characters long.');
+  if (password.length < USER_VALIDATION.MIN_PASSWORD_LENGTH) {
+    console.error(`Password must be at least ${USER_VALIDATION.MIN_PASSWORD_LENGTH} characters long.`);
     rl.close();
     return;
   }

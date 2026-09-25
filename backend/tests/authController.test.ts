@@ -73,6 +73,39 @@ describe('Auth Controller', () => {
             expect(res.status).toBe(400);
             expect(res.body.message).toBe('Username already exists');
         });
+
+        // AUTH-005: the Zod cap must match users.username VARCHAR(50) so a
+        // 51–64 char name gets a 400 instead of a 500 on the INSERT.
+        it('should register a 50-char username (column limit)', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ setting_value: 'true' }] });
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ id: 1, username: 'u'.repeat(50) }] });
+
+            const res = await request(app)
+                .post('/register')
+                .send({ username: 'u'.repeat(50), password: 'password123' });
+
+            expect(res.status).toBe(201);
+        });
+
+        it('should return 400 for a 51-char username (past the column limit)', async () => {
+            const res = await request(app)
+                .post('/register')
+                .send({ username: 'u'.repeat(51), password: 'password123' });
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Validation failed');
+        });
+
+        // AUTH-009: registration requires the raised minimum password length.
+        it('should return 400 for a 7-char password (below the 8-char minimum)', async () => {
+            const res = await request(app)
+                .post('/register')
+                .send({ username: 'testuser', password: '1234567' });
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Validation failed');
+        });
     });
 
     describe('GET /settings/registration', () => {

@@ -36,7 +36,7 @@ export const UPLOAD_STATUS = {
 
 export const USER_VALIDATION = {
     MIN_USERNAME_LENGTH: 3,
-    MIN_PASSWORD_LENGTH: 6,
+    MIN_PASSWORD_LENGTH: 8,
     BATCH_MAX_COUNT: 100,
     RANDOM_PASSWORD_LENGTH: 16,
 } as const;
@@ -364,7 +364,9 @@ export const RATE_LIMIT_CONFIG = {
 
 // Generous-but-finite caps for otherwise unbounded user-supplied strings.
 export const STRING_LIMITS = {
-    USERNAME: 64,
+    // Must match users.username VARCHAR(50) (migrations/0001CoreSchema.ts) —
+    // a larger cap passes Zod but 500s on the INSERT.
+    USERNAME: 50,
     PASSWORD: 256,
     PREFIX: 64,
     TITLE: 256,

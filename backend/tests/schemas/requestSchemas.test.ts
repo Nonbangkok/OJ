@@ -2,8 +2,10 @@ import {
   submitSchema,
   registerSchema,
   loginSchema,
+  createAdminUserSchema,
   createProblemSchema,
   batchCreateUsersSchema,
+  updateAdminUserSchema,
 } from '../../schemas/requestSchemas';
 import { SUBMISSION_VALIDATION, STRING_LIMITS, SUPPORTED_LANGUAGES, USER_VALIDATION } from '../../constants';
 
@@ -84,6 +86,22 @@ describe('requestSchemas size & validation caps', () => {
       const username = 'u'.repeat(STRING_LIMITS.USERNAME + 1);
       expect(loginSchema.safeParse({ username, password: 'pw' }).success).toBe(false);
     });
+
+    // AUTH-005: the cap must match users.username VARCHAR(50) — a 51–64 char
+    // name passed Zod but 500s on the INSERT.
+    it('accepts a username of exactly the VARCHAR(50) limit', () => {
+      const username = 'u'.repeat(STRING_LIMITS.USERNAME);
+      expect(STRING_LIMITS.USERNAME).toBe(50);
+      expect(registerSchema.safeParse({ username, password: 'secret123' }).success).toBe(true);
+    });
+
+    it('rejects a username one char past the VARCHAR(50) limit', () => {
+      const username = 'u'.repeat(STRING_LIMITS.USERNAME + 1);
+      expect(registerSchema.safeParse({ username, password: 'secret123' }).success).toBe(false);
+      expect(createAdminUserSchema.safeParse({ username, password: 'secret123', role: 'staff' }).success).toBe(false);
+      expect(updateAdminUserSchema.safeParse({ username, role: 'staff' }).success).toBe(false);
+    });
+
   });
 
   describe('problem & batch caps', () => {
