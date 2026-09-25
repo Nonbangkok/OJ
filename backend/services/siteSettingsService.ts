@@ -64,3 +64,56 @@ export const resetSiteAccessModeCache = (): void => {
     cachedMode = null;
     cachedAt = 0;
 };
+
+/**
+ * Self-service password changes (PUT /profile/password). When 'false',
+ * only admins may change their own password; user/staff must ask an
+ * admin for a reset. The admin reset route is NOT gated by this setting.
+ * Default 'true' preserves the historical behavior.
+ */
+const PASSWORD_CHANGE_ENABLED_KEY = 'password_change_enabled';
+
+let cachedPasswordChangeEnabled: boolean | null = null;
+let cachedPasswordChangeAt = 0;
+
+/** Whether users/staff may change their own password. Defaults to true
+ *  (the historical behavior) when no row exists yet. */
+export const getPasswordChangeEnabled = async (): Promise<boolean> => {
+    if (
+        cachedPasswordChangeEnabled !== null &&
+        Date.now() - cachedPasswordChangeAt < CACHE_TTL_MS
+    ) {
+        return cachedPasswordChangeEnabled;
+    }
+
+    const result = await query<{ setting_value: string }>(
+        'SELECT setting_value FROM system_settings WHERE setting_key = $1',
+        [PASSWORD_CHANGE_ENABLED_KEY],
+    );
+    const enabled =
+        result.rows.length === 0 || result.rows[0].setting_value === 'true';
+
+    cachedPasswordChangeEnabled = enabled;
+    cachedPasswordChangeAt = Date.now();
+    return enabled;
+};
+
+/** Update the setting and refresh the cache immediately so the change
+ *  takes effect on the very next request. */
+export const updatePasswordChangeEnabled = async (enabled: boolean): Promise<void> => {
+    await query(
+        `INSERT INTO system_settings (setting_key, setting_value)
+         VALUES ($1, $2)
+         ON CONFLICT (setting_key) DO UPDATE SET setting_value = $2`,
+        [PASSWORD_CHANGE_ENABLED_KEY, enabled.toString()],
+    );
+
+    cachedPasswordChangeEnabled = enabled;
+    cachedPasswordChangeAt = Date.now();
+};
+
+/** Test hook: drop the cache so the next read hits the DB. */
+export const resetPasswordChangeEnabledCache = (): void => {
+    cachedPasswordChangeEnabled = null;
+    cachedPasswordChangeAt = 0;
+};

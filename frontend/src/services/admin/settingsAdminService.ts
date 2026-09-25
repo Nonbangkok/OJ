@@ -5,6 +5,7 @@ import api, { largeUploadApi } from '../api';
 import type {
   ApiMessageResponse,
   JobStartResponse,
+  PasswordChangeSettingsResponse,
   RegistrationSettingsResponse,
   RegistrationSettingsUpdateResponse,
   SiteAccessModeUpdateResponse,
@@ -19,6 +20,16 @@ const settingsAdminService = {
 
   updateRegistrationSettings: async (enabled: boolean): Promise<RegistrationSettingsUpdateResponse> => {
     const response = await api.put<RegistrationSettingsUpdateResponse>('/admin/settings/registration', { enabled });
+    return response.data;
+  },
+
+  getPasswordChangeSettings: async (): Promise<PasswordChangeSettingsResponse> => {
+    const response = await api.get<PasswordChangeSettingsResponse>('/admin/settings/password-change');
+    return response.data;
+  },
+
+  updatePasswordChangeSettings: async (enabled: boolean): Promise<ApiMessageResponse> => {
+    const response = await api.put<ApiMessageResponse>('/admin/settings/password-change', { enabled });
     return response.data;
   },
 

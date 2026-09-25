@@ -144,10 +144,16 @@ export interface RegistrationSettings {
   enabled: boolean;
 }
 
+export interface PasswordChangeSettings {
+  enabled: boolean;
+}
+
 /** Public site configuration the frontend loads before rendering. */
 export interface SiteConfig {
   accessMode: 'public' | 'private';
   allowRegistration: boolean;
+  /** When false, user/staff cannot change their own password; admins always can. */
+  passwordChangeEnabled: boolean;
 }
 
 export interface AdminUser {

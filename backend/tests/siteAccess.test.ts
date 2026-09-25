@@ -19,6 +19,9 @@ import {
     getSiteAccessMode,
     updateSiteAccessMode,
     resetSiteAccessModeCache,
+    getPasswordChangeEnabled,
+    updatePasswordChangeEnabled,
+    resetPasswordChangeEnabledCache,
 } from '../services/siteSettingsService';
 
 const buildApp = (withSessionUser: boolean): Express => {
@@ -108,6 +111,48 @@ describe('siteSettingsService', () => {
         );
         // The next read must see the new mode without touching the DB.
         expect(await getSiteAccessMode()).toBe('private');
+        expect(query).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('password change setting (siteSettingsService)', () => {
+    beforeEach(() => {
+        resetPasswordChangeEnabledCache();
+        query.mockReset();
+    });
+
+    it('defaults to enabled when the setting row does not exist yet', async () => {
+        query.mockResolvedValue({ rows: [] });
+        expect(await getPasswordChangeEnabled()).toBe(true);
+    });
+
+    it('reads the stored value and caches it within the TTL', async () => {
+        query.mockResolvedValue({ rows: [{ setting_value: 'false' }] });
+        expect(await getPasswordChangeEnabled()).toBe(false);
+        expect(await getPasswordChangeEnabled()).toBe(false);
+        // Cache absorbs the second read — only one DB round-trip.
+        expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    it('rereads after the cache is reset (setting changes propagate)', async () => {
+        query.mockResolvedValueOnce({ rows: [{ setting_value: 'true' }] });
+        expect(await getPasswordChangeEnabled()).toBe(true);
+
+        query.mockResolvedValueOnce({ rows: [{ setting_value: 'false' }] });
+        resetPasswordChangeEnabledCache();
+        expect(await getPasswordChangeEnabled()).toBe(false);
+    });
+
+    it('updatePasswordChangeEnabled upserts and refreshes the cache immediately', async () => {
+        query.mockResolvedValue({ rows: [] });
+
+        await updatePasswordChangeEnabled(false);
+        expect(query).toHaveBeenCalledWith(
+            expect.stringContaining('ON CONFLICT (setting_key) DO UPDATE'),
+            ['password_change_enabled', 'false'],
+        );
+        // The next read must see the new value without touching the DB.
+        expect(await getPasswordChangeEnabled()).toBe(false);
         expect(query).toHaveBeenCalledTimes(1);
     });
 });

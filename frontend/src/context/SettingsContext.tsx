@@ -16,6 +16,9 @@ interface SettingsState {
   /** 'private' gates all OJ content behind login; 'public' keeps the
    *  historical open browsing. Loaded once before the app renders. */
   accessMode: 'public' | 'private';
+  /** When false, user/staff cannot change their own password (admins
+   *  always can). Used to hide the "Change Password" menu entry. */
+  passwordChangeEnabled: boolean;
 }
 
 export interface SettingsContextValue extends SettingsState {
@@ -47,6 +50,7 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
   const [settings, setSettings] = useState<SettingsState>({
     registrationEnabled: true,
     accessMode: 'public',
+    passwordChangeEnabled: true,
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -56,12 +60,14 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
       setSettings({
         registrationEnabled: data.allowRegistration,
         accessMode: data.accessMode,
+        passwordChangeEnabled: data.passwordChangeEnabled,
       });
     } catch (error) {
       console.error(getErrorMessage(error, 'Failed to fetch system settings.'));
       setSettings({
         registrationEnabled: true,
         accessMode: 'public',
+        passwordChangeEnabled: true,
       });
     } finally {
       setIsLoading(false);

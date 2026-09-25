@@ -7,6 +7,16 @@ import AdminNavbar from '../../../layouts/admin/AdminNavbar';
 import { USER_ROLES } from '../../../utils/constants';
 
 jest.mock('../../../context/AuthContext', () => ({ useAuth: jest.fn() }));
+jest.mock('../../../context/SettingsContext', () => ({
+  useSettings: () => ({
+    registrationEnabled: true,
+    accessMode: 'public',
+    passwordChangeEnabled: true,
+    isPrivateMode: false,
+    isLoading: false,
+    refreshSettings: jest.fn(),
+  }),
+}));
 jest.mock('../../../context/ThemeContext', () => ({ useTheme: jest.fn() }));
 jest.mock('../../../assets/logo512.png', () => 'light-logo');
 jest.mock('../../../assets/logo512_darkmode.png', () => 'dark-logo');

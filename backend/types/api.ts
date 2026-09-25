@@ -109,6 +109,10 @@ export interface UpdateRegistrationSettingRequestBody {
     enabled: boolean;
 }
 
+export interface UpdatePasswordChangeSettingRequestBody {
+    enabled: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Admin rejudge
 // ---------------------------------------------------------------------------

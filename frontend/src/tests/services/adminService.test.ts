@@ -176,6 +176,20 @@ describe('adminService', () => {
             expect(result.enabled).toBe(true);
         });
 
+        it('getPasswordChangeSettings calls api.get with the password-change path', async () => {
+            jest.mocked(api.get).mockResolvedValueOnce({ data: { enabled: true } });
+            const result = await adminService.getPasswordChangeSettings();
+            expect(api.get).toHaveBeenCalledWith('/admin/settings/password-change');
+            expect(result.enabled).toBe(true);
+        });
+
+        it('updatePasswordChangeSettings calls api.put with the new value', async () => {
+            jest.mocked(api.put).mockResolvedValueOnce({ data: { message: 'Password change setting updated successfully.' } });
+            const result = await adminService.updatePasswordChangeSettings(false);
+            expect(api.put).toHaveBeenCalledWith('/admin/settings/password-change', { enabled: false });
+            expect(result.message).toBe('Password change setting updated successfully.');
+        });
+
         it('exportDatabase calls api.post with responseType blob', async () => {
             const response = {
                 data: new Blob(['sql-dump']),

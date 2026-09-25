@@ -7,6 +7,7 @@ import ChangePasswordDialog from '../../components/user/ChangePasswordDialog';
 import ProblemSolvingProfile from '../../features/user/ProblemSolvingProfile';
 import LoadingPage from '../../components/shared/LoadingPage';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import userService from '../../services/userService';
 import {
   ACHIEVEMENT_CATALOG,
@@ -44,6 +45,7 @@ const formatAcDate = (iso: string | null): string =>
 const UserProfile = () => {
   const { username } = useParams<{ username: string }>();
   const { user } = useAuth();
+  const { passwordChangeEnabled } = useSettings();
   const [profile, setProfile] = useState<Awaited<ReturnType<typeof userService.getProfile>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -203,7 +205,7 @@ const UserProfile = () => {
         </div>
       </div>
 
-      {isOwnProfile && (
+      {isOwnProfile && (passwordChangeEnabled || user?.role === 'admin') && (
         <div className={styles['account-section']}>
           <div className={styles['account-info']}>
             <h2>Account</h2>

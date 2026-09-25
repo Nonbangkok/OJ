@@ -10,6 +10,18 @@ import { errorHandler } from '../middleware/errorHandler';
 
 // Mock the database
 jest.mock('../db');
+// Site settings service: default enabled=true keeps every pre-existing
+// password-change test on the historical behavior; gate tests override it.
+jest.mock('../services/siteSettingsService', () => ({
+    getSiteAccessMode: jest.fn().mockResolvedValue('public'),
+    updateSiteAccessMode: jest.fn(),
+    resetSiteAccessModeCache: jest.fn(),
+    getPasswordChangeEnabled: jest.fn().mockResolvedValue(true),
+    updatePasswordChangeEnabled: jest.fn(),
+    resetPasswordChangeEnabledCache: jest.fn(),
+}));
+
+import { getPasswordChangeEnabled, getSiteAccessMode } from '../services/siteSettingsService';
 
 describe('Auth Controller', () => {
     let app: Express;
@@ -25,6 +37,10 @@ describe('Auth Controller', () => {
         }));
         app.use('/', authRouter);
         jest.resetAllMocks();
+        // resetAllMocks drops the jest.mock factory implementations —
+        // re-seed the defaults (historical behavior) every test.
+        (getPasswordChangeEnabled as jest.Mock).mockResolvedValue(true);
+        (getSiteAccessMode as jest.Mock).mockResolvedValue('public');
     });
 
     describe('POST /register', () => {
@@ -161,6 +177,22 @@ describe('Auth Controller', () => {
 
             expect(res.status).toBe(200);
             expect(res.body).toEqual({ enabled: false });
+        });
+    });
+
+    describe('GET /site-config', () => {
+        it('exposes the password-change flag alongside access mode and registration', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ setting_value: 'true' }] });
+            (getPasswordChangeEnabled as jest.Mock).mockResolvedValueOnce(false);
+
+            const res = await request(app).get('/site-config');
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual({
+                accessMode: 'public',
+                allowRegistration: true,
+                passwordChangeEnabled: false,
+            });
         });
     });
 
@@ -329,7 +361,7 @@ describe('Auth Controller', () => {
             );
         };
 
-        const buildAppWithUser = () => {
+        const buildAppWithUser = (role: 'user' | 'staff' | 'admin' = 'user') => {
             const appWithUser = express();
             appWithUser.use(express.json());
             appWithUser.use(session({
@@ -338,7 +370,7 @@ describe('Auth Controller', () => {
                 saveUninitialized: false,
             }));
             appWithUser.use((req: Request, _res: Response, next: NextFunction) => {
-                req.user = { id: 7, username: 'changer', role: 'user', hasAvatar: false };
+                req.user = { id: 7, username: 'changer', role, hasAvatar: false };
                 next();
             });
             appWithUser.use('/', authRouter);
@@ -353,6 +385,75 @@ describe('Auth Controller', () => {
 
             expect(res.status).toBe(401);
             expect(res.body.message).toBe('Authentication required');
+        });
+
+        it('allows a regular user while password changes are enabled (default)', async () => {
+            (getPasswordChangeEnabled as jest.Mock).mockResolvedValueOnce(true);
+            const hashedPassword = await bcrypt.hash('password123', 10);
+            (db.query as jest.Mock).mockResolvedValue({ rowCount: 1 });
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ password_hash: hashedPassword }] });
+
+            const res = await request(buildAppWithUser('user'))
+                .put('/profile/password')
+                .send({ currentPassword: 'password123', newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(200);
+        });
+
+        it('returns 403 for a regular user when password changes are disabled', async () => {
+            (getPasswordChangeEnabled as jest.Mock).mockResolvedValueOnce(false);
+
+            const res = await request(buildAppWithUser('user'))
+                .put('/profile/password')
+                .send({ currentPassword: 'password123', newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(403);
+            expect(res.body.message).toBe('Password changes are currently managed by administrators.');
+            // Rejected before any password work happens.
+            expect(db.query).not.toHaveBeenCalled();
+        });
+
+        it('returns 403 for a staff member when password changes are disabled', async () => {
+            (getPasswordChangeEnabled as jest.Mock).mockResolvedValueOnce(false);
+
+            const res = await request(buildAppWithUser('staff'))
+                .put('/profile/password')
+                .send({ currentPassword: 'password123', newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(403);
+            expect(res.body.message).toBe('Password changes are currently managed by administrators.');
+        });
+
+        it('still lets an admin change their own password when disabled', async () => {
+            (getPasswordChangeEnabled as jest.Mock).mockResolvedValueOnce(false);
+            const hashedPassword = await bcrypt.hash('password123', 10);
+            (db.query as jest.Mock).mockResolvedValue({ rowCount: 1 });
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ password_hash: hashedPassword }] });
+
+            const res = await request(buildAppWithUser('admin'))
+                .put('/profile/password')
+                .send({ currentPassword: 'password123', newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(200);
+            expect(res.body.message).toBe(
+                'Password changed successfully. Other sessions have been signed out.',
+            );
+        });
+
+        it('lets an admin change their own password while enabled too', async () => {
+            (getPasswordChangeEnabled as jest.Mock).mockResolvedValueOnce(true);
+            const hashedPassword = await bcrypt.hash('password123', 10);
+            (db.query as jest.Mock).mockResolvedValue({ rowCount: 1 });
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ password_hash: hashedPassword }] });
+
+            const res = await request(buildAppWithUser('admin'))
+                .put('/profile/password')
+                .send({ currentPassword: 'password123', newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(200);
         });
 
         it('should reject a weak new password with 400', async () => {

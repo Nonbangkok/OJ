@@ -11,6 +11,7 @@ import type {
   ProblemSuggestion,
   ProblemSummary,
   RegistrationSettings,
+  PasswordChangeSettings,
   SubmissionDetail,
   SubmissionSummary,
   UploadProgress,
@@ -127,6 +128,8 @@ export interface BatchUploadStartResponse {
 export type UploadProgressResponse = UploadProgress;
 
 export type RegistrationSettingsResponse = RegistrationSettings;
+
+export type PasswordChangeSettingsResponse = PasswordChangeSettings;
 
 export type SiteConfigResponse = SiteConfig;
 

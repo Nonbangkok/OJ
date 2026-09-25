@@ -11,6 +11,7 @@ import {
 } from '@phosphor-icons/react';
 
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import { useTheme } from '../../context/ThemeContext';
 import ChangePasswordDialog from '../user/ChangePasswordDialog';
 
@@ -19,6 +20,7 @@ import styles from './NavbarUserMenu.module.css';
 const NavbarUserMenu = () => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { passwordChangeEnabled } = useSettings();
   const [open, setOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -106,6 +108,9 @@ const NavbarUserMenu = () => {
             <UserCircle size={16} aria-hidden="true" />
             My Profile
           </Link>
+          {/* Admins keep self-service password change even when the setting
+              is off; user/staff lose it. */}
+          {(passwordChangeEnabled || user.role === 'admin') && (
           <button
             type="button"
             role="menuitem"
@@ -118,6 +123,7 @@ const NavbarUserMenu = () => {
             <Key size={16} aria-hidden="true" />
             Change Password
           </button>
+          )}
           {(user.role === 'admin' || user.role === 'staff') && (
             <Link to="/admin/settings" role="menuitem" className={styles['menu-item']} onClick={close}>
               <Gear size={16} aria-hidden="true" />

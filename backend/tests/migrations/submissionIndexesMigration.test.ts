@@ -22,6 +22,7 @@ describe('submission indexes migration', () => {
       '0016_user_problem_rewards',
       '0017_site_access_mode',
       '0018_integrity_fixes',
+      '0019_password_change_enabled',
     ]);
   });
 
