@@ -338,6 +338,21 @@ describe('Judge Service', () => {
             expect(result.results[0].memoryKb).toBe(400000);
         });
 
+        it('JUDGE-002: a CLEAN exit with peak RSS over the effective limit is MLE (slack no longer masks it)', async () => {
+            setupProblem();
+            mockExecOnce((cb) => {
+                // The program finished and exited 0, but measured peak RSS
+                // (300MB) is over the 256MB effective limit — inside the
+                // RLIMIT_AS slack, so the OS never killed it.
+                cb(null, '', 'TIME_USED:0.100+0.020 MEM_USED:307200');
+            });
+
+            const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
+
+            expect(result.overallStatus).toBe(SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED);
+            expect(result.results[0].memoryKb).toBe(307200);
+        });
+
         it('JUDGE-002: the old stderr "memory" substring heuristic no longer fabricates MLE', async () => {
             setupProblem();
             mockExecOnce((cb) => {

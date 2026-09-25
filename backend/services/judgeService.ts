@@ -145,15 +145,14 @@ async function runSingleCase(
       }
 
       // 2. MLE, classified by evidence (JUDGE-002): the wrapper-measured
-      //    peak RSS exceeded the effective memory limit, or the program died
-      //    from a hard SIGKILL (OOM / over-limit kill — RLIMIT_AS violations
-      //    surface as allocation failure, so a high-RSS crash also lands
-      //    here via the MEM_USED check). The REAL measured MEM_USED is
-      //    reported; the old code fabricated limit*1024.
-      if (
-        executionError !== null
-        && (memoryKb > memoryLimitMb * 1024 || programSignalExitCode === JUDGE_CONFIG.SIGKILL)
-      ) {
+      //    peak RSS exceeded the effective memory limit — checked on EVERY
+      //    outcome, clean exit included, so the RLIMIT_AS slack (which only
+      //    exists to keep the loader/UBSan overhead from killing borderline
+      //    programs) can no longer let an over-limit run pass as a verdict
+      //    (the audit's "32MB slack unchecked") — or the program died from
+      //    a hard SIGKILL (OOM / over-limit kill). The REAL measured
+      //    MEM_USED is reported; the old code fabricated limit*1024.
+      if (memoryKb > memoryLimitMb * 1024 || programSignalExitCode === JUDGE_CONFIG.SIGKILL) {
         return resolve({
           status: SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED,
           timeMs,
