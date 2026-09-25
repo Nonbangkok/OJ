@@ -22,7 +22,32 @@ export type DatabaseImportCommand = Exclude<ReturnType<typeof buildDatabaseImpor
 
 type ImportProgress = { status: string; message: string; token: string };
 
+/**
+ * ADMIN-006: how long a finished import's progress entry stays queryable.
+ * The admin UI polls while an import runs; once it is completed/failed the
+ * entry is only useful for a final status read, so it is pruned after this
+ * TTL to keep the in-memory map from growing without bound across imports.
+ */
+const IMPORT_PROGRESS_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** When each progress entry was last written — drives TTL pruning. */
+const importProgressUpdatedAt = new Map<string, number>();
+
 const importProgressMap = new Map<string, ImportProgress>();
+
+/** Drop entries for finished jobs older than the TTL (ADMIN-006). */
+const pruneStaleImportProgress = (now = Date.now()): void => {
+  for (const [jobId, progress] of importProgressMap) {
+    if (progress.status !== 'completed' && progress.status !== 'failed') {
+      continue;
+    }
+    const updatedAt = importProgressUpdatedAt.get(jobId);
+    if (updatedAt !== undefined && now - updatedAt > IMPORT_PROGRESS_TTL_MS) {
+      importProgressMap.delete(jobId);
+      importProgressUpdatedAt.delete(jobId);
+    }
+  }
+};
 
 const unlinkIfExists = async (filePath: string): Promise<void> => {
   if (!fs.existsSync(filePath)) {
@@ -106,6 +131,7 @@ export const startDatabaseImport = async (
 
   const setProgress = (status: string, message: string): void => {
     importProgressMap.set(jobId, { status, message, token });
+    importProgressUpdatedAt.set(jobId, Date.now());
   };
 
   void (async () => {
@@ -157,6 +183,8 @@ export const getDatabaseImportProgress = (
   jobId: string,
   providedToken: unknown,
 ): DatabaseImportProgress | 'unauthorized' => {
+  pruneStaleImportProgress();
+
   const progress = importProgressMap.get(jobId);
   if (!progress) {
     return null;

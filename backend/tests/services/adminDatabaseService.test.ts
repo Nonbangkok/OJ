@@ -11,7 +11,7 @@ import {
   isMaintenanceActive,
   maintenanceGate,
 } from '../../services/maintenanceMode';
-import { startDatabaseImport } from '../../services/adminDatabaseService';
+import { startDatabaseImport, getDatabaseImportProgress } from '../../services/adminDatabaseService';
 
 jest.mock('../../db', () => {
   const query = jest.fn();
@@ -161,5 +161,29 @@ describe('startDatabaseImport (DB-05 / ADMIN-003)', () => {
     expect(result).toEqual({ kind: 'unsupported_extension' });
     expect(isMaintenanceActive()).toBe(false);
     expect(dropAllTablesForImport).not.toHaveBeenCalled();
+  });
+
+  it('prunes completed import progress entries after the TTL (ADMIN-006)', async () => {
+    jest.useFakeTimers();
+    try {
+      const started = await startDatabaseImport('backup.sql', '/tmp/backup.sql');
+      expect(started.kind).toBe('ok');
+      if (started.kind !== 'ok') return;
+      const { jobId, token } = started;
+      await flushMicrotasks();
+      // The import resolved (mocked success): status is 'completed'.
+
+      // Freshly completed — still readable with its token.
+      expect(getDatabaseImportProgress(jobId, token)).toEqual({
+        status: 'completed',
+        message: 'Database imported successfully.',
+      });
+
+      // After the TTL the entry is gone: unknown job → null.
+      jest.advanceTimersByTime(24 * 60 * 60 * 1000 + 1000);
+      expect(getDatabaseImportProgress(jobId, token)).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
