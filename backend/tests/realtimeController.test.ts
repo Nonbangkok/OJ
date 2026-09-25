@@ -201,6 +201,39 @@ describe('Realtime Controller', () => {
 
             expect(stream.body()).not.toContain('"submissionId":99');
         });
+
+        it('never carries source code (or any code-adjacent field) in the payload', async () => {
+            const { stream } = await openStream(7, '/realtime/submissions');
+
+            publishRealtime({
+                type: 'submission_update',
+                submissionId: 42,
+                table: 'submissions',
+                overall_status: 'Accepted',
+                score: 100,
+                user_id: 7,
+                xp_awarded: 25,
+            });
+
+            const text = await stream.waitFor('"submissionId":42');
+
+            // Snapshot the exact serialized payload: status/score/ids/XP only.
+            // The submission_update event is a ping, not a transport — the
+            // client refetches the authoritative (authz-checked) payload from
+            // /submissions/:id. If a field ever leaks in here (code, results,
+            // logs), this test fails on the key set.
+            const dataLine = text
+                .split('\n')
+                .find((line) => line.startsWith('data: '));
+            expect(dataLine).toBeDefined();
+            const payload = JSON.parse(dataLine!.slice('data: '.length));
+            expect(Object.keys(payload).sort()).toEqual(
+                ['overall_status', 'score', 'submissionId', 'table', 'type', 'user_id', 'xp_awarded'].sort()
+            );
+            expect(JSON.stringify(payload)).not.toMatch(/code|results|stderr|stdout/i);
+
+            await stream.close();
+        });
     });
 
     describe('GET /realtime/contests/:id', () => {

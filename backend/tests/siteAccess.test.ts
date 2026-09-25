@@ -138,6 +138,21 @@ describe('public access matrix (route middleware wiring)', () => {
         expect(source).toMatch(/'\/contests\/:id\/join', requireAuth/);
     });
 
+    it('contest list rides requirePublicAccess, not requireAuth', () => {
+        const source = read('controllers/contestController.ts');
+        expect(source).toMatch(/'\/contests', requirePublicAccess/);
+    });
+
+    it('problem browsing routes ride requirePublicAccess, not requireAuth', () => {
+        const source = read('controllers/problemController.ts');
+        expect(source).toMatch(/'\/problems-with-stats', requirePublicAccess/);
+        expect(source).toMatch(/'\/problems', requirePublicAccess/);
+        expect(source).toMatch(/'\/problems\/:id',\s*\n\s*requirePublicAccess/);
+        expect(source).toMatch(/'\/problems\/:id\/pdf', requirePublicAccess/);
+        // Admin problem management stays behind staff/admin auth.
+        expect(source).toMatch(/'\/admin\/problems', requireAuth, requireStaffOrAdmin/);
+    });
+
     it('guest submissions degrade personal views to an empty public feed', () => {
         const source = read('services/submissionQueryService.ts');
         expect(source).toContain('isGuest && (filter');
