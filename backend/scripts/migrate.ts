@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import { pool } from '../db';
+import { createMigrationsPool } from '../db';
 import { migrations as registeredMigrations } from '../migrations';
 import {
   Migration,
@@ -29,13 +29,16 @@ export const runMigrationsFromPool = async (
 };
 
 export const migrateAndClose = async (
-  databasePool: Pick<Pool, 'connect' | 'end'> = pool,
+  databasePool?: Pick<Pool, 'connect' | 'end'>,
   migrations: readonly Migration[] = registeredMigrations,
 ): Promise<string[]> => {
+  // Default to a dedicated pool without the API statement_timeout (DB-10):
+  // migration index builds may legitimately run longer than API queries.
+  const poolToUse = databasePool ?? createMigrationsPool();
   try {
-    return await runMigrationsFromPool(databasePool, migrations);
+    return await runMigrationsFromPool(poolToUse, migrations);
   } finally {
-    await databasePool.end();
+    await poolToUse.end();
   }
 };
 

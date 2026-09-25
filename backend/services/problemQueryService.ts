@@ -196,6 +196,14 @@ export const updateProblem = async (
     if (oldId !== payload.id) {
       await client.query('UPDATE contest_problems SET problem_id = $1 WHERE problem_id = $2', [payload.id, oldId]);
       await client.query('UPDATE contest_submissions SET problem_id = $1 WHERE problem_id = $2', [payload.id, oldId]);
+      // XSYS-008: the remaining problem_id references have no foreign key
+      // (rewards must survive problem deletion; provenance/drafts predate
+      // FK-able schemas), so a rename must cascade to them explicitly —
+      // otherwise Recently Solved keeps stale ids and the authoring republish
+      // guard stops finding the live problem.
+      await client.query('UPDATE user_problem_rewards SET problem_id = $1 WHERE problem_id = $2', [payload.id, oldId]);
+      await client.query('UPDATE authoring_published_problems SET problem_id = $1 WHERE problem_id = $2', [payload.id, oldId]);
+      await client.query('UPDATE problem_drafts SET problem_id = $1 WHERE problem_id = $2', [payload.id, oldId]);
     }
 
     return result.rows[0];

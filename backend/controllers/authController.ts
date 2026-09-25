@@ -23,6 +23,7 @@ import {
 } from '../middleware/rateLimit';
 import { loginSchema, registerSchema } from '../schemas/requestSchemas';
 import { getUserTierAndLevel } from '../services/progressionService';
+import { isUniqueViolation } from '../utils/dbErrors';
 import { logger } from '../utils/logger';
 
 const router: Router = express.Router();
@@ -81,22 +82,37 @@ router.post(
       return;
     }
 
-    const existingUser = await db.query<Pick<UserRow, 'id'>>('SELECT id FROM users WHERE username = $1', [username]);
+    // DB-08/AUTH-006: usernames are unique case-insensitively (unique index
+    // on LOWER(username), migration 0018) so lookalike accounts ("Alice" vs
+    // "alice") cannot exist. Pre-check case-insensitively and treat an
+    // INSERT race on the index the same way.
+    const existingUser = await db.query<Pick<UserRow, 'id'>>(
+      'SELECT id FROM users WHERE LOWER(username) = LOWER($1)',
+      [username],
+    );
     if (existingUser.rows.length > 0) {
       res.status(400).json({ message: 'Username already exists' });
       return;
     }
 
     const hashedPassword = await bcrypt.hash(password, SECURITY_CONFIG.SALT_ROUNDS);
-    const result = await db.query<Pick<UserPublicProfileDTO, 'id' | 'username'>>(
-      'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username',
-      [username, hashedPassword],
-    );
+    try {
+      const result = await db.query<Pick<UserPublicProfileDTO, 'id' | 'username'>>(
+        'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username',
+        [username, hashedPassword],
+      );
 
-    res.status(201).json({
-      message: 'User registered successfully',
-      user: result.rows[0],
-    });
+      res.status(201).json({
+        message: 'User registered successfully',
+        user: result.rows[0],
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        res.status(400).json({ message: 'Username already exists' });
+        return;
+      }
+      throw error;
+    }
   }),
 );
 

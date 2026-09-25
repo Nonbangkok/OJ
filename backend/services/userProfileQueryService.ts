@@ -1,5 +1,5 @@
 import { query } from '../db';
-import { PROFILE_ACTIVITY_WINDOW_DAYS, SUBMISSION_QUERY_CONFIG, SUBMISSION_STATUS, ACHIEVEMENTS, PROBLEM_CATEGORIES} from '../constants';
+import { ANALYTICS_TIMEZONE, PROFILE_ACTIVITY_WINDOW_DAYS, SUBMISSION_QUERY_CONFIG, SUBMISSION_STATUS, ACHIEVEMENTS, PROBLEM_CATEGORIES} from '../constants';
 import { computeStreaks } from '../utils/streaks';
 import { getRecentRewards, getUserProgression, RecentReward, UserProgression } from './progressionService';
 
@@ -106,7 +106,7 @@ export const getUserProfileStats = async (
         COALESCE(
           (SELECT jsonb_agg(jsonb_build_object('day', day, 'count', day_count) ORDER BY day)
            FROM (
-             SELECT to_char(submitted_at::date, 'YYYY-MM-DD') AS day, COUNT(*) AS day_count
+             SELECT to_char((submitted_at AT TIME ZONE '${ANALYTICS_TIMEZONE}')::date, 'YYYY-MM-DD') AS day, COUNT(*) AS day_count
              FROM user_submissions
              WHERE submitted_at >= NOW() - ($2 || ' days')::interval
              GROUP BY 1

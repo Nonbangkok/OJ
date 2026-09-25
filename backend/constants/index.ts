@@ -109,6 +109,29 @@ export const SUBMISSION_QUERY_CONFIG = {
     EXPORT_MAX_ROWS: 10000,
 } as const;
 
+/**
+ * Connection-pool tuning (DB-10). The default pg pool (max 10) has no
+ * explicit budget against the judge pipeline + request load, and API queries
+ * run with no statement timeout at all — a runaway query holds a pool slot
+ * forever. MAX_CONNECTIONS covers the API (MAX_CONCURRENT_JUDGES judges only
+ * touch the DB between testcase runs) plus migrations/admin jobs.
+ * STATEMENT_TIMEOUT_MS is generous (heavy analytics UNIONs over both
+ * submission pools take seconds, not minutes) — it is a backstop against
+ * stuck queries, not a performance governor. Migrations run on a dedicated
+ * pool without the timeout (see db.createMigrationsPool).
+ */
+export const DATABASE_POOL = {
+    MAX_CONNECTIONS: 20,
+    STATEMENT_TIMEOUT_MS: 60_000,
+} as const;
+
+/**
+ * The local timezone day-bucketing is computed in (ANALYSIS-002/SCORE-006).
+ * The contest scheduler runs on Asia/Bangkok; analytics and profile heatmaps
+ * bucket on the same zone so a "day" means the same thing everywhere.
+ */
+export const ANALYTICS_TIMEZONE = 'Asia/Bangkok';
+
 export const JUDGE_CONFIG = {
     EXEC_MAX_BUFFER: 50 * 1024 * 1024, // 50MB
     TIMEOUT_BUFFER_MS: 500,

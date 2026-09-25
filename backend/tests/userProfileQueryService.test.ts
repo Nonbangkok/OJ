@@ -23,4 +23,21 @@ describe('getUserProfileStats SQL shape', () => {
     expect(source).not.toContain('LEFT JOIN user_submissions us ON true');
     expect(source).toContain('FROM user_submissions');
   });
+
+  it('buckets daily activity in the site timezone (ANALYSIS-002/SCORE-006)', () => {
+    // The heatmap must use the same zone as the streak computation and the
+    // contest scheduler (Asia/Bangkok), not the DB session default (UTC).
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fs = require('fs');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.join(__dirname, '..', 'services', 'userProfileQueryService.ts'),
+      'utf8',
+    );
+
+    expect(source).toContain("(submitted_at AT TIME ZONE '${ANALYTICS_TIMEZONE}')");
+    // The old UTC-dependent cast must be gone.
+    expect(source).not.toContain('submitted_at::date');
+  });
 });

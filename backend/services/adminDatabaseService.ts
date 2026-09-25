@@ -1,9 +1,10 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import { env } from '../config/env';
-import { pool } from '../db';
+import { createMigrationsPool, pool } from '../db';
 import { runMigrationsFromPool } from '../scripts/migrate';
 import { getErrorMessage } from '../utils/errorMessage';
+import { logger } from '../utils/logger';
 import { runCommand, SpawnCommand } from '../utils/runCommand';
 import {
   buildDatabaseExportCommand,
@@ -11,6 +12,8 @@ import {
   buildDatabaseImportCommand,
 } from './adminSystemService';
 import { dropAllTablesForImport } from './adminQueryService';
+import { beginMaintenanceMode, endMaintenanceMode } from './maintenanceMode';
+import contestScheduler from './contestScheduler';
 
 // Database import/export process orchestration. The import-progress map and
 // per-job tokens live here so the controller stays a thin routing layer.
@@ -48,15 +51,29 @@ const isValidImportToken = (expected: string, provided: unknown): boolean => {
 };
 
 export type StartedDatabaseImport = {
+  kind: 'ok';
   jobId: string;
   token: string;
 };
+
+/**
+ * ADMIN-003: exports exclude user_sessions, so a restored database has no
+ * session table even though migration 0001 (which creates it) is recorded as
+ * applied in the restored schema_migrations. Recreate it explicitly so
+ * logins work immediately after an import.
+ */
+const ENSURE_USER_SESSIONS_SQL = `
+CREATE TABLE IF NOT EXISTS user_sessions (
+  sid VARCHAR PRIMARY KEY,
+  sess JSON NOT NULL,
+  expire TIMESTAMPTZ NOT NULL
+)`;
 
 /** Validate the uploaded dump and start the asynchronous import; the caller responds 202. */
 export const startDatabaseImport = async (
   originalFilename: string,
   dumpFilePath: string,
-): Promise<StartedDatabaseImport | { kind: 'unsupported_extension' }> => {
+): Promise<StartedDatabaseImport | { kind: 'unsupported_extension' } | { kind: 'import_in_progress' }> => {
   const importCommandResult = buildDatabaseImportCommand(
     originalFilename,
     dumpFilePath,
@@ -71,6 +88,18 @@ export const startDatabaseImport = async (
     return { kind: 'unsupported_extension' };
   }
 
+  // DB-05: exactly one import may run at a time. The maintenance-mode flag is
+  // the claim: a second import while the schema is being dropped/restored
+  // would interleave destructively.
+  if (!beginMaintenanceMode()) {
+    await unlinkIfExists(dumpFilePath);
+    return { kind: 'import_in_progress' };
+  }
+
+  // The contest scheduler must not tick against a schema that is being
+  // dropped and recreated (DB-05).
+  contestScheduler.pause();
+
   const jobId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   const token = crypto.randomBytes(32).toString('hex');
   importProgressMap.set(jobId, { status: 'pending', message: 'Database import queued.', token });
@@ -82,25 +111,39 @@ export const startDatabaseImport = async (
   void (async () => {
     try {
       setProgress('uploading', 'Preparing database import.');
-      console.log('Dropping existing tables before import...');
+      logger.warn('database import started - maintenance mode active, dropping schema');
       await dropAllTablesForImport();
 
       setProgress('uploading', 'Importing database dump. This may take several minutes.');
       await runCommand(importCommandResult);
 
       setProgress('migrating', 'Applying database migrations to the restored data.');
-      await runMigrationsFromPool(pool);
+      // DB-10: migrations run on a dedicated pool without the API
+      // statement_timeout — index builds on a restored dump may exceed it.
+      const migrationsPool = createMigrationsPool();
+      try {
+        await runMigrationsFromPool(migrationsPool);
+      } finally {
+        await migrationsPool.end();
+      }
+
+      // ADMIN-003 follow-up: the dump has no user_sessions table; recreate
+      // it (migration 0001 is already recorded as applied).
+      await pool.query(ENSURE_USER_SESSIONS_SQL);
 
       setProgress('completed', 'Database imported successfully.');
+      logger.info('database import completed');
     } catch (error: unknown) {
-      console.error('Error during database import:', error);
+      logger.error('database import failed', { err: error });
       setProgress('failed', `Failed to import database: ${getErrorMessage(error)}`);
     } finally {
+      contestScheduler.resume();
+      endMaintenanceMode();
       await unlinkIfExists(dumpFilePath);
     }
   })();
 
-  return { jobId, token };
+  return { kind: 'ok', jobId, token };
 };
 
 export type DatabaseImportProgress = { status: string; message: string } | null;

@@ -31,6 +31,18 @@ export const validateAndQueueSubmission = async (
         throw new AppError('Problem ID, language, and code are required.', 400);
     }
 
+    // DB-06/JUDGE-010: a problem with zero testcases cannot be judged — every
+    // submission against one would land as System Error. Fail at submit time
+    // with an actionable message instead. Separate step so it composes with
+    // the other submit gates.
+    const testcaseResult = await db.query<ExistsRow>(
+        'SELECT 1 AS exists FROM testcases WHERE problem_id = $1 LIMIT 1',
+        [problemId],
+    );
+    if (testcaseResult.rows.length === 0) {
+        throw new AppError('This problem has no test cases yet. Submissions are disabled until test cases are uploaded.', 400);
+    }
+
     if (contestId) {
         const contestResult = await db.query<ContestRuntimeRow>(
             'SELECT id, status, start_time, end_time FROM contests WHERE id = $1',

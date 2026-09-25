@@ -72,6 +72,34 @@ describe('analyticsQueryService.getOverviewAnalytics', () => {
         expect(String(firstCall[0])).toContain('UNION ALL');
     });
 
+    it('applies the time window to the top problems/submitters/contests queries (ANALYSIS-001)', async () => {
+        mockQuery.mockReset();
+        mockQuery.mockResolvedValue({ rows: [] } as never);
+        await getOverviewAnalytics(30);
+
+        // Queries 6/7/8 are topProblems, topSubmitters, contestStats.
+        const [topProblemsSql, topProblemsParams] = mockQuery.mock.calls[5];
+        expect(String(topProblemsSql)).toContain("WHERE s.submitted_at >= NOW() - ($1 || ' days')::interval");
+        expect(topProblemsParams).toEqual([30]);
+
+        const [topSubmittersSql, topSubmittersParams] = mockQuery.mock.calls[6];
+        expect(String(topSubmittersSql)).toContain("WHERE s.submitted_at >= NOW() - ($1 || ' days')::interval");
+        expect(topSubmittersParams).toEqual([30]);
+
+        const [contestStatsSql, contestStatsParams] = mockQuery.mock.calls[7];
+        expect(String(contestStatsSql)).toContain("cs.submitted_at >= NOW() - ($1 || ' days')::interval");
+        expect(contestStatsParams).toEqual([30]);
+    });
+
+    it('buckets the daily series in the site timezone (ANALYSIS-002)', async () => {
+        mockQuery.mockReset();
+        mockQuery.mockResolvedValue({ rows: [] } as never);
+        await getOverviewAnalytics(30);
+
+        const dailySql = String(mockQuery.mock.calls[3][0]);
+        expect(dailySql).toContain("AT TIME ZONE 'Asia/Bangkok'");
+    });
+
     it('defaults avg_score to 0 when null', async () => {
         mockQuery.mockReset();
         mockQuery.mockResolvedValue({ rows: [] } as never)
@@ -184,6 +212,14 @@ describe('analyticsQueryService.getUserAnalytics', () => {
         expect(result?.languageBreakdown).toEqual([{ language: 'cpp', count: 20 }]);
         expect(result?.cumulativeSolved).toEqual([{ day: '2026-09-19', solved: 4 }]);
         expect(result?.solvedByCategory).toEqual([{ category: 'math', solved: 3, attempted: 5 }]);
+
+        // ANALYSIS-002/SCORE-006: day and hour buckets use the site timezone,
+        // matching the contest scheduler, not the DB session (UTC).
+        // Query order: user lookup (0), KPIs (1), daily (2), hour (3).
+        const dailySql = String(mockQuery.mock.calls[2][0]);
+        expect(dailySql).toContain("date_trunc('day', submitted_at AT TIME ZONE 'Asia/Bangkok')");
+        const hourSql = String(mockQuery.mock.calls[3][0]);
+        expect(hourSql).toContain("EXTRACT(HOUR FROM submitted_at AT TIME ZONE 'Asia/Bangkok')");
     });
 });
 

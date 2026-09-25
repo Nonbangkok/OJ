@@ -88,7 +88,10 @@ export const listContests = async (userId?: number): Promise<ContestListRow[]> =
     return result.rows;
 };
 
-export const getContestDetail = async (id: string, userId?: number): Promise<(ContestDetailRow & { problems: ContestProblemsSummaryRow[]; is_participant: boolean }) | null> => {
+export const getContestDetail = async (
+    id: string,
+    viewer?: { id: number; role: string },
+): Promise<(ContestDetailRow & { problems: ContestProblemsSummaryRow[]; is_participant: boolean }) | null> => {
     const contestResult = await db.query<ContestDetailRow>(
         `
         SELECT
@@ -110,9 +113,14 @@ export const getContestDetail = async (id: string, userId?: number): Promise<(Co
     const contest = contestResult.rows[0];
 
     let isParticipant = false;
-    if (userId) {
-        isParticipant = await isContestParticipant(id, userId);
+    if (viewer) {
+        isParticipant = await isContestParticipant(id, viewer.id);
     }
+
+    // Problem titles are participant-only intel while the contest runs —
+    // the same gate the problem search applies (Phase 3 semantics). Staff
+    // keep the full list; finished contests expose the frozen snapshot.
+    const isStaffOrAdmin = viewer?.role === 'admin' || viewer?.role === 'staff';
 
     let problems: ContestProblemsSummaryRow[] = [];
     if (contest.status === CONTEST_STATUS.RUNNING || contest.status === CONTEST_STATUS.FINISHED) {
@@ -125,7 +133,7 @@ export const getContestDetail = async (id: string, userId?: number): Promise<(Co
                 [id],
             );
             problems = problemsResult.rows;
-        } else {
+        } else if (isStaffOrAdmin || isParticipant) {
             const problemsResult = await db.query<ContestProblemsSummaryRow>(
                 `SELECT id, title, author
                  FROM problems
@@ -157,8 +165,15 @@ export const moveSingleProblemToMainSystem = async (
         return { kind: 'invalid_status' };
     }
 
+    // XSYS-004: restore the pre-contest visibility snapshot (hidden problems
+    // stay hidden, visible ones come back visible) and clear the snapshot.
     const updateResult = await db.query<Pick<ProblemRow, 'id' | 'title'>>(
-        'UPDATE problems SET contest_id = NULL WHERE id = $1 AND contest_id = $2 RETURNING id, title',
+        `UPDATE problems
+         SET contest_id = NULL,
+             is_visible = COALESCE(is_visible_before_contest, TRUE),
+             is_visible_before_contest = NULL
+         WHERE id = $1 AND contest_id = $2
+         RETURNING id, title`,
         [problemId, contestId],
     );
     if (!updateResult.rows[0]) {
@@ -223,10 +238,19 @@ export const deleteContest = async (contestId: string): Promise<'deleted' | 'not
 
     // Detaching problems and deleting the contest must be atomic: a crash in
     // between would leave problems pointing at a contest that no longer exists.
+    // XSYS-004: restoring problems on delete also restores their pre-contest
+    // visibility snapshot so they do not stay hidden forever.
     const client = await db.pool.connect();
     try {
         await client.query('BEGIN');
-        await client.query('UPDATE problems SET contest_id = NULL WHERE contest_id = $1', [contestId]);
+        await client.query(
+            `UPDATE problems
+             SET contest_id = NULL,
+                 is_visible = COALESCE(is_visible_before_contest, TRUE),
+                 is_visible_before_contest = NULL
+             WHERE contest_id = $1`,
+            [contestId],
+        );
         await client.query('DELETE FROM contests WHERE id = $1', [contestId]);
         await client.query('COMMIT');
     } catch (error) {

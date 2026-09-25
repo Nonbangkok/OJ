@@ -150,7 +150,7 @@ const Settings = () => {
           <h3 className={styles.dangerZoneTitle}>Danger Zone</h3>
           <div className={styles.settingTitle}>Import Database</div>
           <p className={styles.settingDescription}>
-            Importing a database replaces all existing data. This action cannot be undone.
+            Importing a database drops all existing tables before the uploaded dump is restored, the site enters maintenance mode until it finishes, and everyone (including you) must log in again afterwards. This action cannot be undone.
           </p>
 
           <input

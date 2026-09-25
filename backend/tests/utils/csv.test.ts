@@ -1,4 +1,4 @@
-import { buildCsvFileName, escapeCsvField, toCsv } from '../../utils/csv';
+import { buildCsvFileName, escapeCsvField, toCsv, toCsvCell } from '../../utils/csv';
 
 describe('csv utils', () => {
   describe('escapeCsvField', () => {
@@ -45,11 +45,37 @@ describe('csv utils', () => {
     it('escapes malicious cell content', () => {
       const csv = toCsv(['formula'], [['=SUM(A1:A2)\",evil']]);
 
-      expect(csv).toBe('formula\r\n"=SUM(A1:A2)"",evil"\r\n');
+      // ANALYSIS-006: formula-prefixed cells are also neutralized with a
+      // leading quote so Excel cannot execute them.
+      expect(csv).toBe('formula\r\n"\'=SUM(A1:A2)"",evil"\r\n');
     });
 
     it('handles an empty rows array', () => {
       expect(toCsv(['id'], [])).toBe('id\r\n');
+    });
+  });
+
+  describe('formula injection guard (ANALYSIS-006)', () => {
+    it('prefixes cells that start with a formula trigger character', () => {
+      expect(toCsvCell('=1+1')).toBe("'=1+1");
+      expect(toCsvCell('+cmd|/C calc')).toBe("'+cmd|/C calc");
+      expect(toCsvCell('@SUM(A1)')).toBe("'@SUM(A1)");
+      expect(toCsvCell('-2+3|!A0')).toBe("'-2+3|!A0");
+      expect(toCsvCell('\tINJECT')).toBe("'\tINJECT");
+      // CR is also a quoting trigger, so the guard lands inside the quotes.
+      expect(toCsvCell('\rINJECT')).toBe('"\'\rINJECT"');
+    });
+
+    it('prefixes before quoting, so quoted payloads stay neutralized', () => {
+      expect(toCsvCell('=SUM(A1),"evil"')).toBe('"\'=SUM(A1),""evil"""');
+    });
+
+    it('leaves ordinary values and negative numbers untouched', () => {
+      expect(toCsvCell('alice')).toBe('alice');
+      expect(toCsvCell('Accepted')).toBe('Accepted');
+      expect(toCsvCell(-5)).toBe('-5');
+      expect(toCsvCell('-0.5')).toBe("'-0.5"); // string '-0.5' still guarded
+      expect(toCsvCell(0)).toBe('0');
     });
   });
 

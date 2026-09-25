@@ -67,6 +67,11 @@ export const buildDatabaseExportCommand = (
     '-p', databasePort,
     '-U', databaseUser,
     '-d', databaseName,
+    // ADMIN-003: never export session rows — the dump would otherwise embed
+    // live connect.sid values (including the exporting admin's) that a
+    // restore would resurrect. Post-import everyone re-logs in, which is the
+    // correct behavior anyway.
+    '--exclude-table=user_sessions',
     '-F', 'p',
     '-f', dumpFilePath,
   ],

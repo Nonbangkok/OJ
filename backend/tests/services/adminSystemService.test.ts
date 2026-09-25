@@ -65,7 +65,7 @@ describe('adminSystemService', () => {
   });
 
   describe('buildDatabaseExportCommand', () => {
-    it('should build pg_dump command', () => {
+    it('should build pg_dump command that excludes session rows (ADMIN-003)', () => {
       const command = buildDatabaseExportCommand(
         '/tmp/db_backup.sql',
         'oj_db',
@@ -82,6 +82,9 @@ describe('adminSystemService', () => {
         '-p', '5432',
         '-U', 'postgres',
         '-d', 'oj_db',
+        // Live connect.sid values (including the exporting admin's) must not
+        // be embedded in the dump.
+        '--exclude-table=user_sessions',
         '-F', 'p',
         '-f', '/tmp/db_backup.sql',
       ]);

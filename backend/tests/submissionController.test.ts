@@ -66,6 +66,7 @@ describe('Submission Controller', () => {
         });
 
         it('should accept a python submission', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ 1: 1 }] }); // Testcase exists check (DB-06)
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ 1: 1 }] }); // Problem exists check
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ id: 303 }] }); // Insertion result
 
@@ -79,6 +80,7 @@ describe('Submission Controller', () => {
         });
 
         it('should accept a valid regular submission', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ 1: 1 }] }); // Testcase exists check (DB-06)
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ 1: 1 }] }); // Problem exists check
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ id: 101 }] }); // Insertion result
 
@@ -92,6 +94,7 @@ describe('Submission Controller', () => {
         });
 
         it('should return 400 if problem is not available', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ 1: 1 }] }); // Testcase exists check (DB-06)
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] }); // Problem not found or invisible
 
             const res = await request(app)
@@ -102,8 +105,23 @@ describe('Submission Controller', () => {
             expect(res.body.message).toBe('Problem is not available for submission.');
         });
 
+        it('should return 400 when the problem has no test cases (DB-06/JUDGE-010)', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] }); // Testcase check: none
+
+            const res = await request(app)
+                .post('/submit')
+                .send({ problemId: 'EMPTY', language: 'cpp', code: '#include <iostream>' });
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toContain('no test cases yet');
+            // Nothing was queued or inserted.
+            expect(processSubmission).not.toHaveBeenCalled();
+            expect(db.query).toHaveBeenCalledTimes(1);
+        });
+
         it('should accept a valid contest submission and queue contest judge', async () => {
             (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ 1: 1 }] }) // testcase exists check (DB-06)
                 .mockResolvedValueOnce({
                     rows: [{ id: 1, status: 'running', start_time: new Date(Date.now() - 3600_000), end_time: new Date(Date.now() + 3600_000) }]
                 }) // contest exists + running
@@ -124,6 +142,7 @@ describe('Submission Controller', () => {
 
         it('should return 403 when user is not a contest participant', async () => {
             (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ 1: 1 }] }) // testcase exists check (DB-06)
                 .mockResolvedValueOnce({
                     rows: [{ id: 1, status: 'running', start_time: new Date(Date.now() - 3600_000), end_time: new Date(Date.now() + 3600_000) }]
                 })
@@ -138,9 +157,11 @@ describe('Submission Controller', () => {
         });
 
         it('should return 400 when contest is not running', async () => {
-            (db.query as jest.Mock).mockResolvedValueOnce({
-                rows: [{ id: 1, status: 'scheduled', start_time: new Date(Date.now() - 3600_000), end_time: new Date(Date.now() + 3600_000) }]
-            });
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ 1: 1 }] }) // testcase exists check (DB-06)
+                .mockResolvedValueOnce({
+                    rows: [{ id: 1, status: 'scheduled', start_time: new Date(Date.now() - 3600_000), end_time: new Date(Date.now() + 3600_000) }]
+                });
 
             const res = await request(app)
                 .post('/submit')
