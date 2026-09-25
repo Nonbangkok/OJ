@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { PencilSimple } from '@phosphor-icons/react';
 
 import ActivityHeatmap from '../../components/user/ActivityHeatmap';
+import ChangePasswordDialog from '../../components/user/ChangePasswordDialog';
 import ProblemSolvingProfile from '../../features/user/ProblemSolvingProfile';
 import LoadingPage from '../../components/shared/LoadingPage';
 import { useAuth } from '../../context/AuthContext';
@@ -46,6 +47,7 @@ const UserProfile = () => {
   const [profile, setProfile] = useState<Awaited<ReturnType<typeof userService.getProfile>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -201,6 +203,22 @@ const UserProfile = () => {
         </div>
       </div>
 
+      {isOwnProfile && (
+        <div className={styles['account-section']}>
+          <div className={styles['account-info']}>
+            <h2>Account</h2>
+            <p>Change your sign-in password. Other sessions will be signed out.</p>
+          </div>
+          <button
+            type="button"
+            className={styles['change-password-button']}
+            onClick={() => setIsChangePasswordOpen(true)}
+          >
+            Change Password
+          </button>
+        </div>
+      )}
+
       {profile.recentRewards?.length > 0 && (
         <div className={styles.section}>
           <h2>Recently Solved</h2>
@@ -345,6 +363,13 @@ const UserProfile = () => {
           </div>
         )}
       </div>
+
+      {isOwnProfile && (
+        <ChangePasswordDialog
+          open={isChangePasswordOpen}
+          onClose={() => setIsChangePasswordOpen(false)}
+        />
+      )}
     </div>
   );
 };

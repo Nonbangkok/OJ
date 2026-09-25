@@ -11,6 +11,17 @@ export interface RegisterRequest {
   password: string;
 }
 
+/** AUTH-004: self-service password change (current password required). */
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+/** AUTH-004: admin-set password reset (no current password needed). */
+export interface AdminResetPasswordRequest {
+  newPassword: string;
+}
+
 export interface SubmitRequest {
   problemId: string;
   language: 'cpp' | 'python';

@@ -41,6 +41,17 @@ export interface LoginRequestBody {
     password: string;
 }
 
+// AUTH-004: self-service password change (any authenticated role).
+export interface ChangePasswordRequestBody {
+    currentPassword: string;
+    newPassword: string;
+}
+
+// AUTH-004: admin-set password reset for another user.
+export interface AdminResetUserPasswordRequestBody {
+    newPassword: string;
+}
+
 export interface RegisterSuccessResponse {
     message: string;
     user: Pick<UserPublicProfileDTO, 'id' | 'username'>;

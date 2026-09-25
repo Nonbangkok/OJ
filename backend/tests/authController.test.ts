@@ -6,6 +6,7 @@ import * as db from '../db';
 import bcrypt from 'bcrypt';
 import { RATE_LIMIT_CONFIG } from '../constants';
 import { recordLoginFailure, resetLoginFailureTracker } from '../middleware/rateLimit';
+import { errorHandler } from '../middleware/errorHandler';
 
 // Mock the database
 jest.mock('../db');
@@ -296,6 +297,164 @@ describe('Auth Controller', () => {
 
             expect(res.status).toBe(200);
             expect(res.body.message).toBe('Logout successful');
+        });
+    });
+
+    describe('PUT /profile/password (AUTH-004)', () => {
+        // db is auto-mocked in this file, so db.withTransaction would be a
+        // no-op stub. Re-wire it to the real transaction dance (connect ->
+        // BEGIN/COMMIT/ROLLBACK) with the client's statements forwarded to
+        // db.query, so queued per-test mocks keep working inside the
+        // transaction body.
+        const forwardTransactions = () => {
+            (db.pool.connect as jest.Mock).mockImplementation(async () => ({
+                query: (...args: unknown[]) => (db.query as jest.Mock)(...(args as [])),
+                release: jest.fn(),
+            }));
+            (db.withTransaction as unknown as jest.Mock).mockImplementation(
+                async (body: (client: { query: (...args: unknown[]) => unknown }) => Promise<unknown>) => {
+                    const client = {
+                        query: (...args: unknown[]) => (db.query as jest.Mock)(...(args as [])),
+                    };
+                    await client.query('BEGIN');
+                    try {
+                        const result = await body(client);
+                        await client.query('COMMIT');
+                        return result;
+                    } catch (error) {
+                        await client.query('ROLLBACK');
+                        throw error;
+                    }
+                },
+            );
+        };
+
+        const buildAppWithUser = () => {
+            const appWithUser = express();
+            appWithUser.use(express.json());
+            appWithUser.use(session({
+                secret: 'test-secret',
+                resave: false,
+                saveUninitialized: false,
+            }));
+            appWithUser.use((req: Request, _res: Response, next: NextFunction) => {
+                req.user = { id: 7, username: 'changer', role: 'user', hasAvatar: false };
+                next();
+            });
+            appWithUser.use('/', authRouter);
+            appWithUser.use(errorHandler);
+            return appWithUser;
+        };
+
+        it('should require authentication', async () => {
+            const res = await request(app)
+                .put('/profile/password')
+                .send({ currentPassword: 'password123', newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(401);
+            expect(res.body.message).toBe('Authentication required');
+        });
+
+        it('should reject a weak new password with 400', async () => {
+            const res = await request(buildAppWithUser())
+                .put('/profile/password')
+                .send({ currentPassword: 'password123', newPassword: 'short' });
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Validation failed');
+        });
+
+        it('should reject a missing current password with 400', async () => {
+            const res = await request(buildAppWithUser())
+                .put('/profile/password')
+                .send({ newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Validation failed');
+        });
+
+        it('should return 401 when the current password is wrong', async () => {
+            const hashedPassword = await bcrypt.hash('password123', 10);
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ password_hash: hashedPassword }]
+            });
+
+            const res = await request(buildAppWithUser())
+                .put('/profile/password')
+                .send({ currentPassword: 'wrongpassword', newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(401);
+            expect(res.body.message).toBe('Current password is incorrect');
+        });
+
+        it('should change the password and delete only the OTHER sessions', async () => {
+            forwardTransactions();
+            const hashedPassword = await bcrypt.hash('password123', 10);
+            // 1. SELECT password_hash (once); BEGIN/UPDATE/DELETE/COMMIT fall
+            //    through to the default resolved value.
+            (db.query as jest.Mock)
+                .mockResolvedValue({ rowCount: 1 })
+                .mockResolvedValueOnce({ rows: [{ password_hash: hashedPassword }] });
+
+            const res = await request(buildAppWithUser())
+                .put('/profile/password')
+                .send({ currentPassword: 'password123', newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(200);
+            expect(res.body.message).toBe(
+                'Password changed successfully. Other sessions have been signed out.',
+            );
+
+            const calls = (db.query as jest.Mock).mock.calls;
+            // The new password must be stored bcrypt-hashed, never in plaintext.
+            const update = calls.find(([sql]) => String(sql).startsWith('UPDATE users SET password_hash'));
+            expect(update).toBeDefined();
+            expect(String(update![1][0])).not.toBe('newpassword45');
+            await expect(bcrypt.compare('newpassword45', String(update![1][0]))).resolves.toBe(true);
+            expect(update![1][1]).toBe(7);
+
+            // Session invalidation keeps the CURRENT session and drops the rest.
+            const sessionDelete = calls.find(([sql]) => String(sql).startsWith('DELETE FROM user_sessions'));
+            expect(sessionDelete![0]).toBe(
+                "DELETE FROM user_sessions WHERE sess->>'userId' = $1 AND sid <> $2",
+            );
+            expect(sessionDelete![1][0]).toBe('7');
+            expect(typeof sessionDelete![1][1]).toBe('string');
+
+            const sqls = calls.map(([sql]) => String(sql));
+            expect(sqls).toContain('BEGIN');
+            expect(sqls).toContain('COMMIT');
+        });
+
+        it('should roll back the password update if session deletion fails', async () => {
+            forwardTransactions();
+            const hashedPassword = await bcrypt.hash('password123', 10);
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ password_hash: hashedPassword }] })
+                .mockResolvedValueOnce({})   // BEGIN
+                .mockResolvedValueOnce({})   // UPDATE users
+                .mockRejectedValueOnce(new Error('session store gone')); // DELETE -> rollback
+
+            const res = await request(buildAppWithUser())
+                .put('/profile/password')
+                .send({ currentPassword: 'password123', newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(500);
+
+            const sqls = (db.query as jest.Mock).mock.calls.map(([sql]) => String(sql));
+            expect(sqls).toContain('ROLLBACK');
+            expect(sqls).not.toContain('COMMIT');
+        });
+
+        it('should return 404 when the user row vanished mid-request', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+
+            const res = await request(buildAppWithUser())
+                .put('/profile/password')
+                .send({ currentPassword: 'password123', newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Account not found.');
         });
     });
 

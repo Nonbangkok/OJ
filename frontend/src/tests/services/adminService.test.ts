@@ -54,6 +54,18 @@ describe('adminService', () => {
             await adminService.deleteUser(1);
             expect(api.delete).toHaveBeenCalledWith('/admin/users/1');
         });
+
+        it('resetUserPassword calls api.put with the password-reset path (AUTH-004)', async () => {
+            const response: ApiMessageResponse = {
+                message: 'Password reset for user 2. They will need to sign in again.',
+            };
+            jest.mocked(api.put).mockResolvedValueOnce({ data: response });
+            const result = await adminService.resetUserPassword(2, { newPassword: 'newpassword45' });
+            expect(api.put).toHaveBeenCalledWith('/admin/users/2/password', {
+                newPassword: 'newpassword45',
+            });
+            expect(result).toEqual(response);
+        });
     });
 
     describe('Problem Management', () => {

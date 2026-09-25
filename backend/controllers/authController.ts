@@ -4,6 +4,7 @@ import * as db from '../db';
 import { SECURITY_CONFIG } from '../constants';
 import { UserPublicProfileDTO, UserRow } from '../types/models';
 import {
+  ChangePasswordRequestBody,
   LoginRequestBody,
   LoginSuccessResponse,
   MeResponse,
@@ -13,7 +14,9 @@ import {
   RegistrationStatusResponse,
 } from '../types/api';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
+import { requireAuth } from '../middleware/auth';
 import { getSiteAccessMode } from '../services/siteSettingsService';
+import { changeOwnPassword } from '../services/adminQueryService';
 import { validateRequest } from '../middleware/validation';
 import {
   authLimiter,
@@ -21,7 +24,7 @@ import {
   isLoginLocked,
   recordLoginFailure,
 } from '../middleware/rateLimit';
-import { loginSchema, registerSchema } from '../schemas/requestSchemas';
+import { changePasswordSchema, loginSchema, registerSchema } from '../schemas/requestSchemas';
 import { getUserTierAndLevel } from '../services/progressionService';
 import { isUniqueViolation } from '../utils/dbErrors';
 import { logger } from '../utils/logger';
@@ -234,6 +237,40 @@ router.post('/logout', asyncHandler(async (req: Request, res: Response<MessageRe
   await destroySession(req);
   res.json({ message: 'Logout successful' });
 }));
+
+/**
+ * AUTH-004: self-service password change for any authenticated role.
+ *
+ * Verifies the current password against the stored bcrypt hash, updates it,
+ * and signs out every OTHER session of the user (the current session is kept
+ * so this device stays signed in). The endpoint's own bcrypt compare is a
+ * natural cost throttle and is additionally covered by the general API
+ * limiter; no separate limiter is applied (note in the audit trail).
+ */
+router.put(
+  '/profile/password',
+  requireAuth,
+  validateRequest({ body: changePasswordSchema }),
+  asyncHandler(async (req: Request, res: Response<MessageResponse>) => {
+    const { currentPassword, newPassword } = req.body as ChangePasswordRequestBody;
+
+    const result = await changeOwnPassword(
+      req.user!.id,
+      currentPassword,
+      newPassword,
+      req.sessionID,
+    );
+    if (result.kind === 'not_found') {
+      throw new AppError('Account not found.', 404);
+    }
+    if (result.kind === 'wrong_password') {
+      throw new AppError('Current password is incorrect', 401);
+    }
+
+    logger.info('password changed', { userId: req.user!.id });
+    res.json({ message: 'Password changed successfully. Other sessions have been signed out.' });
+  }),
+);
 
 router.get('/me', asyncHandler(async (req: Request, res: Response<MeResponse>) => {
   if (req.user) {

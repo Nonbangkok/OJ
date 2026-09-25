@@ -233,6 +233,18 @@ export type AdminDeleteUserResult =
   | { kind: 'protected_user' }
   | { kind: 'ok' };
 
+// AUTH-004: self-service password change outcome.
+export type ChangePasswordResult =
+  | { kind: 'not_found' }
+  | { kind: 'wrong_password' }
+  | { kind: 'ok' };
+
+// AUTH-004: admin-set password reset outcome.
+export type AdminResetPasswordResult =
+  | { kind: 'not_found' }
+  | { kind: 'protected_user' }
+  | { kind: 'ok' };
+
 export interface BatchUserBuildInput {
   prefix: string;
   count: number;

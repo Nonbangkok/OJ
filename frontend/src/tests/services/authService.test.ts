@@ -55,4 +55,22 @@ describe('Auth Service', () => {
         expect(api.get).toHaveBeenCalledWith('/settings/registration');
         expect(result).toEqual(mockData);
     });
+
+    it('changePassword sends both passwords to the profile endpoint (AUTH-004)', async () => {
+        const mockData = {
+            message: 'Password changed successfully. Other sessions have been signed out.',
+        };
+        jest.mocked(api.put).mockResolvedValueOnce({ data: mockData });
+
+        const result = await authService.changePassword({
+            currentPassword: 'oldpassword1',
+            newPassword: 'newpassword45',
+        });
+
+        expect(api.put).toHaveBeenCalledWith('/profile/password', {
+            currentPassword: 'oldpassword1',
+            newPassword: 'newpassword45',
+        });
+        expect(result).toEqual(mockData);
+    });
 });

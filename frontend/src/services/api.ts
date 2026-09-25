@@ -38,7 +38,10 @@ export const clearSessionExpiryRedirect = (): void => {
 /**
  * Send the user to the login page (with a way back) when any API call
  * returns a bare 401 — i.e. the session cookie expired mid-session.
- * A 401 from /login itself (wrong credentials) is not an expiry.
+ * A 401 from /login itself (wrong credentials) is not an expiry, and neither
+ * is a 401 from /profile/password: the backend answers "Current password is
+ * incorrect" there while the session itself is still perfectly valid, and
+ * the change-password dialog surfaces that error inline (AUTH-004).
  *
  * Redirecting via history.replaceState + reload instead of react-router
  * navigation keeps this module free of React/context imports (avoiding a
@@ -49,7 +52,7 @@ export const installSessionExpiryInterceptor = (instance: AxiosInstance): void =
     const status = error.response?.status;
     const requestUrl = error.config?.url ?? '';
 
-    if (status !== 401 || requestUrl.includes('/login')) {
+    if (status !== 401 || requestUrl.includes('/login') || requestUrl.includes('/profile/password')) {
       throw error;
     }
 

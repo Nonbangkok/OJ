@@ -1,15 +1,18 @@
 import bcrypt from 'bcrypt';
 import { randomInt } from 'crypto';
 import * as db from '../db';
-import { ADMIN_USER_LIST_CONFIG, USER_ROLES } from '../constants';
+import { ADMIN_USER_LIST_CONFIG, SECURITY_CONFIG, USER_ROLES } from '../constants';
 import { isUniqueViolation } from '../utils/dbErrors';
+import { UserRow } from '../types/models';
 import {
   AdminAuthorListRow,
   AdminCreateUserResult,
   AdminDeleteUserResult,
+  AdminResetPasswordResult,
   AdminUpdateUserResult,
   AdminUserListRow,
   BatchUserBuildInput,
+  ChangePasswordResult,
   CreateBatchUsersResult,
   RegistrationSettingRow,
 } from '../types/service';
@@ -166,6 +169,87 @@ export const deleteAdminUser = async (userId: string): Promise<AdminDeleteUserRe
     await client.query('DELETE FROM users WHERE id = $1', [userId]);
   });
   return { kind: 'ok' };
+};
+
+/**
+ * AUTH-004: self-service password change.
+ *
+ * Verifies the current password against the stored bcrypt hash, then in one
+ * transaction updates the hash and deletes every OTHER stored session of the
+ * user (connect-pg-simple rows matched by `sess->>'userId'`, the same pattern
+ * as updateAdminUser/deleteAdminUser) — the caller's own session (by sid) is
+ * kept so they stay signed in on this device while every other device is
+ * signed out.
+ */
+export const changeOwnPassword = async (
+  userId: number,
+  currentPassword: string,
+  newPassword: string,
+  currentSessionId: string,
+): Promise<ChangePasswordResult> => {
+  const result = await db.query<Pick<UserRow, 'password_hash'>>(
+    'SELECT password_hash FROM users WHERE id = $1',
+    [userId],
+  );
+  if (result.rows.length === 0) {
+    // Revalidation keeps req.user in sync with the users table, so this is
+    // only reachable if the row vanished mid-request — but answer it
+    // explicitly rather than failing on rows[0].
+    return { kind: 'not_found' } as const;
+  }
+
+  const isValid = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
+  if (!isValid) {
+    return { kind: 'wrong_password' } as const;
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, SECURITY_CONFIG.SALT_ROUNDS);
+  await db.withTransaction(async (client) => {
+    await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [
+      hashedPassword,
+      userId,
+    ]);
+    await client.query(
+      "DELETE FROM user_sessions WHERE sess->>'userId' = $1 AND sid <> $2",
+      [String(userId), currentSessionId],
+    );
+  });
+  return { kind: 'ok' } as const;
+};
+
+/**
+ * AUTH-004: admin-set password reset. The admin supplies the new password
+ * directly (no email infrastructure for a temp-password flow). Sets the hash
+ * and deletes ALL of the target user's stored sessions in one transaction so
+ * every device — including the target's current one — must re-authenticate.
+ *
+ * The protected "Nonbangkok" account mirrors updateAdminUser/deleteAdminUser:
+ * its credentials can only be changed through its own self-service flow.
+ */
+export const resetAdminUserPassword = async (
+  userId: string,
+  newPassword: string,
+): Promise<AdminResetPasswordResult> => {
+  return db.withTransaction(async (client) => {
+    const target = await client.query<Pick<UserRow, 'username'>>(
+      'SELECT username FROM users WHERE id = $1',
+      [userId],
+    );
+    if (target.rows.length === 0) {
+      return { kind: 'not_found' } as const;
+    }
+    if (target.rows[0].username === PROTECTED_ADMIN_USERNAME) {
+      return { kind: 'protected_user' } as const;
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, SECURITY_CONFIG.SALT_ROUNDS);
+    await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [
+      hashedPassword,
+      userId,
+    ]);
+    await client.query("DELETE FROM user_sessions WHERE sess->>'userId' = $1", [userId]);
+    return { kind: 'ok' } as const;
+  });
 };
 
 export const createBatchUsers = async (input: BatchUserBuildInput): Promise<CreateBatchUsersResult> => {

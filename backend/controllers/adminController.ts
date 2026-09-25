@@ -3,6 +3,7 @@ import { requireAuth, requireAdmin, requireStaffOrAdmin } from '../middleware/au
 import { CONTEST_STATUS, USER_VALIDATION, SECURITY_CONFIG } from '../constants';
 import { diskUpload } from '../middleware/upload';
 import {
+  AdminResetUserPasswordRequestBody,
   BatchCreateUsersRequestBody,
   BatchCreateUsersSuccessResponse,
   CreateAdminUserRequestBody,
@@ -15,6 +16,7 @@ import {
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
 import {
+  adminResetUserPasswordSchema,
   adminUsersQuerySchema,
   analyticsContestIdParamSchema,
   analyticsProblemIdParamSchema,
@@ -41,6 +43,7 @@ import {
   getAdminUsers,
   getAuthors,
   getRegistrationEnabled,
+  resetAdminUserPassword,
   updateAdminUser,
   updateRegistrationEnabled,
 } from '../services/adminQueryService';
@@ -90,6 +93,28 @@ router.put('/admin/users/:id', requireAuth, requireAdmin,
     throw new AppError('Username is already taken.', 409);
   }
   res.json(updateResult.data);
+}));
+
+// AUTH-004: admin-set password reset. The admin supplies the new password
+// directly (no email infrastructure for a temp-password flow). ALL of the
+// target's sessions — including their current one — are deleted, so they must
+// sign in again. Resetting your own password here also signs you out; admins
+// should use the self-service flow (PUT /profile/password) for their own
+// account instead.
+router.put('/admin/users/:id/password', requireAuth, requireAdmin,
+  validateRequest({ params: idParamSchema, body: adminResetUserPasswordSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const { newPassword } = req.body as AdminResetUserPasswordRequestBody;
+
+  const resetResult = await resetAdminUserPassword(id, newPassword);
+  if (resetResult.kind === 'not_found') {
+    throw new AppError('User not found.', 404);
+  }
+  if (resetResult.kind === 'protected_user') {
+    throw new AppError('The "Nonbangkok" account password can only be changed by its owner.', 403);
+  }
+  res.json({ message: `Password reset for user ${id}. They will need to sign in again.` });
 }));
 
 router.delete('/admin/users/:id', requireAuth, requireAdmin,

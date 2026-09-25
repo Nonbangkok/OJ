@@ -8,7 +8,12 @@ import type {
   ApiMessageResponse,
   BatchCreateUsersResponse,
 } from '../../types';
-import type { BatchCreateUsersRequest, CreateUserRequest, UpdateUserRequest } from '../../types';
+import type {
+  AdminResetPasswordRequest,
+  BatchCreateUsersRequest,
+  CreateUserRequest,
+  UpdateUserRequest,
+} from '../../types';
 
 /** Query params for the paged admin user list (ADMIN-008). */
 export interface AdminUsersQuery {
@@ -32,6 +37,19 @@ const usersAdminService = {
     userData: UpdateUserRequest,
   ): Promise<AdminUpdateUserResponse> => {
     const response = await api.put<AdminUpdateUserResponse>(`/admin/users/${userId}`, userData);
+    return response.data;
+  },
+
+  /**
+   * AUTH-004: admin-set password reset. Sets the new password directly and
+   * signs the target out of every device (all their sessions are deleted
+   * server-side, including the current one).
+   */
+  resetUserPassword: async (
+    userId: string | number,
+    data: AdminResetPasswordRequest,
+  ): Promise<ApiMessageResponse> => {
+    const response = await api.put<ApiMessageResponse>(`/admin/users/${userId}/password`, data);
     return response.data;
   },
 

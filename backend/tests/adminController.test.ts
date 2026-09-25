@@ -10,9 +10,25 @@ import { errorHandler } from '../middleware/errorHandler';
 // Mock Dependencies
 jest.mock('../db', () => {
     const query = jest.fn();
+    // AUTH-004: withTransaction forwards to query by default so per-test
+    // query mocks keep working inside transactional services (the global
+    // setup does the same for the auto-mocked db module).
+    const withTransaction = jest.fn(async (body: (client: { query: typeof query }) => Promise<unknown>) => {
+        const client = { query };
+        await client.query('BEGIN');
+        try {
+            const result = await body(client);
+            await client.query('COMMIT');
+            return result;
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        }
+    });
     return {
         query,
         pool: { query, connect: jest.fn() },
+        withTransaction,
         // DB-10: the import flow runs migrations on a dedicated unlimited pool.
         createMigrationsPool: jest.fn(() => ({ connect: jest.fn(async () => ({ query, release: jest.fn() })), end: jest.fn() })),
     };
@@ -153,6 +169,113 @@ describe('Admin Controller', () => {
 
             expect(res.status).toBe(404);
             expect(res.body.message).toBe('User not found.');
+        });
+    });
+
+    describe('PUT /admin/users/:id/password (AUTH-004)', () => {
+        // The reset runs inside db.withTransaction; the global setup mocks
+        // connect() to forward client statements to db.query, so queued
+        // per-test mocks apply inside the transaction body too.
+        const resetPassword = (id: number | string, body: object) =>
+            request(app).put(`/admin/users/${id}/password`).send(body);
+
+        it('should reject a weak new password with 400', async () => {
+            const res = await resetPassword(2, { newPassword: 'short' });
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Validation failed');
+        });
+
+        it('should reject a non-numeric id with 400', async () => {
+            const res = await resetPassword('abc', { newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(400);
+        });
+
+        it('should reset the password and delete ALL of the target sessions', async () => {
+            const bcrypt = jest.requireActual('bcrypt');
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({}) // BEGIN
+                // SELECT username inside the transaction
+                .mockResolvedValueOnce({ rows: [{ username: 'user1' }] })
+                .mockResolvedValue({ rowCount: 1 }); // UPDATE / DELETE / COMMIT
+
+            const res = await resetPassword(2, { newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(200);
+            expect(res.body.message).toBe('Password reset for user 2. They will need to sign in again.');
+
+            const calls = (db.query as jest.Mock).mock.calls;
+            const update = calls.find(([sql]) => String(sql).startsWith('UPDATE users SET password_hash'));
+            expect(update).toBeDefined();
+            // Stored bcrypt-hashed, never plaintext.
+            await expect(bcrypt.compare('newpassword45', String(update![1][0]))).resolves.toBe(true);
+            expect(update![1][1]).toBe('2');
+
+            // ALL sessions of the target are dropped (no sid exclusion).
+            const sessionDelete = calls.find(([sql]) => String(sql).startsWith('DELETE FROM user_sessions'));
+            expect(sessionDelete![0]).toBe("DELETE FROM user_sessions WHERE sess->>'userId' = $1");
+            expect(sessionDelete![1]).toEqual(['2']);
+
+            const sqls = calls.map(([sql]) => String(sql));
+            expect(sqls).toContain('BEGIN');
+            expect(sqls).toContain('COMMIT');
+        });
+
+        it('should return 404 for a nonexistent target', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({}) // BEGIN
+                .mockResolvedValueOnce({ rows: [] }); // SELECT
+
+            const res = await resetPassword(999, { newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('User not found.');
+        });
+
+        it('should refuse to reset the protected "Nonbangkok" account', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({}) // BEGIN
+                .mockResolvedValueOnce({ rows: [{ username: 'Nonbangkok' }] }); // SELECT
+
+            const res = await resetPassword(1, { newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(403);
+            expect(res.body.message).toBe(
+                'The "Nonbangkok" account password can only be changed by its owner.',
+            );
+            // No password write may happen for the protected account.
+            const sqls = (db.query as jest.Mock).mock.calls.map(([sql]) => String(sql));
+            expect(sqls.some((sql) => sql.startsWith('UPDATE users SET password_hash'))).toBe(false);
+        });
+
+        it('should allow an admin to reset their own password here (all sessions die, admin must re-login)', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({}) // BEGIN
+                .mockResolvedValueOnce({ rows: [{ username: 'admin' }] }) // SELECT
+                .mockResolvedValue({ rowCount: 1 }); // UPDATE / DELETE / COMMIT
+
+            const res = await resetPassword(1, { newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(200);
+            const sessionDelete = (db.query as jest.Mock).mock.calls
+                .find(([sql]) => String(sql).startsWith('DELETE FROM user_sessions'));
+            expect(sessionDelete![1]).toEqual(['1']);
+        });
+
+        it('should roll back when session deletion fails', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({}) // BEGIN
+                .mockResolvedValueOnce({ rows: [{ username: 'user1' }] }) // SELECT
+                .mockResolvedValueOnce({}) // UPDATE users
+                .mockRejectedValueOnce(new Error('session store gone')); // DELETE
+
+            const res = await resetPassword(2, { newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(500);
+            const sqls = (db.query as jest.Mock).mock.calls.map(([sql]) => String(sql));
+            expect(sqls).toContain('ROLLBACK');
+            expect(sqls).not.toContain('COMMIT');
         });
     });
 
