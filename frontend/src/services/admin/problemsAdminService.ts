@@ -8,6 +8,8 @@ import type {
   BatchUploadStartResponse,
   ProblemMutationResponse,
   RejudgeResponse,
+  TestcaseListResponse,
+  TestcaseViewResponse,
   UploadProgressResponse,
 } from '../../types';
 import type { CreateProblemRequest, UpdateProblemRequest } from '../../types';
@@ -57,6 +59,21 @@ const problemsAdminService = {
 
   getProblemDetail: async (problemId: string): Promise<AdminProblemDetailResponse> => {
     const response = await api.get<AdminProblemDetailResponse>(`/admin/problems/${problemId}`);
+    return response.data;
+  },
+
+  // Testcase viewer — staff-only content. The default call lists metadata
+  // (case numbers + sizes) only; a caseNumber fetches one full case,
+  // API-truncated past 1 MiB per side.
+  getProblemTestcases: async (problemId: string): Promise<TestcaseListResponse> => {
+    const response = await api.get<TestcaseListResponse>(`/admin/problems/${problemId}/testcases`);
+    return response.data;
+  },
+
+  getProblemTestcase: async (problemId: string, caseNumber: number): Promise<TestcaseViewResponse> => {
+    const response = await api.get<TestcaseViewResponse>(`/admin/problems/${problemId}/testcases`, {
+      params: { caseNumber },
+    });
     return response.data;
   },
 

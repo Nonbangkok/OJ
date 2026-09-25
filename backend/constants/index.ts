@@ -120,6 +120,20 @@ export const ADMIN_USER_LIST_CONFIG = {
 } as const;
 
 /**
+ * Admin testcase viewer (GET /admin/problems/:id/testcases). The metadata
+ * list stays cheap for any problem size (sizes computed in SQL, content
+ * never fetched); a single case fetched with ?caseNumber= is truncated in
+ * the API when either side exceeds MAX_CASE_BYTES, because shipping a full
+ * 64MB testcase (the per-file upload cap) into a browser tab freezes it.
+ * Truncated responses carry `truncated: true` plus the true sizes so the
+ * UI can tell the admin exactly what was cut.
+ */
+export const TESTCASE_VIEWER_CONFIG = {
+    // Per-side (input / output) truncation cap for single-case responses.
+    MAX_CASE_BYTES: 1024 * 1024, // 1 MiB
+} as const;
+
+/**
  * Connection-pool tuning (DB-10). The default pg pool (max 10) has no
  * explicit budget against the judge pipeline + request load, and API queries
  * run with no statement timeout at all — a runaway query holds a pool slot

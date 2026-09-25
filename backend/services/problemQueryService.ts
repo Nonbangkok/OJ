@@ -1,14 +1,18 @@
 import * as db from '../db';
 import { PoolClient } from 'pg';
 import unzipper from 'unzipper';
-import { AdminProblemRow, ProblemDetailDTO, ProblemRow } from '../types/models';
+import { AdminProblemRow, ProblemDetailDTO, ProblemRow, TestcaseRow } from '../types/models';
 import { CreateProblemRequestBody, UpdateProblemRequestBody } from '../types/api';
 import {
   ProblemExportBundle,
   ProblemExportTestcaseRow,
   ProblemStatsRow,
   ReplaceProblemTestcasesFromZipResult,
+  TestcaseMetadataRow,
+  TestcaseView,
+  TestcaseViewPart,
 } from '../types/service';
+import { TESTCASE_VIEWER_CONFIG } from '../constants';
 import { fullyPairedCaseNumbers, pairZippedTestcaseFiles } from './testcaseZipPairing';
 import { isUniqueViolation } from '../utils/dbErrors';
 
@@ -324,5 +328,89 @@ export const getProblemExportBundle = async (problemId: string): Promise<Problem
   return {
     problem,
     testcases: testcasesResult.rows,
+  };
+};
+
+// --- Admin testcase viewer -----------------------------------------------
+
+const problemExists = async (problemId: string): Promise<boolean> => {
+  const result = await db.query<Pick<ProblemRow, 'id'>>('SELECT id FROM problems WHERE id = $1', [problemId]);
+  return result.rows.length > 0;
+};
+
+/**
+ * Byte size of a UTF-8 string, matching what `length(X::bytea)` reports in
+ * SQL for the metadata list.
+ */
+const utf8ByteLength = (value: string): number => Buffer.byteLength(value, 'utf-8');
+
+/**
+ * One side of a testcase, truncated to TESTCASE_VIEWER_CONFIG.MAX_CASE_BYTES
+ * in the API: a full 64MB testcase (the per-file upload cap) shipped to a
+ * browser tab freezes it, and case content is never judge-relevant at that
+ * size — an admin eyeballing test data needs the head of the file, not all
+ * 64MB. The true byte size always travels with the part so the UI can label
+ * exactly what was cut.
+ */
+const toTestcaseViewPart = (content: string): TestcaseViewPart => {
+  const bytes = utf8ByteLength(content);
+  if (bytes <= TESTCASE_VIEWER_CONFIG.MAX_CASE_BYTES) {
+    return { bytes, truncated: false, content };
+  }
+  // Slice by bytes, then drop a possibly-split trailing multi-byte character.
+  const head = Buffer.from(content, 'utf-8').subarray(0, TESTCASE_VIEWER_CONFIG.MAX_CASE_BYTES).toString('utf-8');
+  return { bytes, truncated: true, content: head };
+};
+
+/**
+ * Admin testcase viewer data (staff-only; JUDGE-011 keeps testcase content
+ * away from contestants). Two levels so problems with hundreds of large
+ * cases stay cheap:
+ *  - no caseNumber: metadata only — sizes computed in SQL (OCTET_LENGTH on
+ *    the bytea representation), content columns never read.
+ *  - caseNumber: one full case, each side API-truncated past 1 MiB.
+ * Existence is checked first so a missing problem 404s regardless of the
+ * requested case.
+ */
+export const getProblemTestcases = async (
+  problemId: string,
+  caseNumber?: number,
+): Promise<
+  | { kind: 'not_found' }
+  | { kind: 'ok'; testcases: TestcaseMetadataRow[] }
+  | { kind: 'case_not_found' }
+  | { kind: 'ok_case'; testcase: TestcaseView }
+> => {
+  if (!(await problemExists(problemId))) {
+    return { kind: 'not_found' };
+  }
+
+  if (caseNumber === undefined) {
+    const result = await db.query<TestcaseMetadataRow>(
+      `SELECT case_number,
+              OCTET_LENGTH(input_data::bytea) AS input_bytes,
+              OCTET_LENGTH(output_data::bytea) AS output_bytes
+       FROM testcases WHERE problem_id = $1 ORDER BY case_number ASC`,
+      [problemId],
+    );
+    return { kind: 'ok', testcases: result.rows };
+  }
+
+  const result = await db.query<Pick<TestcaseRow, 'case_number' | 'input_data' | 'output_data'>>(
+    'SELECT case_number, input_data, output_data FROM testcases WHERE problem_id = $1 AND case_number = $2',
+    [problemId, caseNumber],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    return { kind: 'case_not_found' };
+  }
+
+  return {
+    kind: 'ok_case',
+    testcase: {
+      caseNumber: row.case_number,
+      input: toTestcaseViewPart(row.input_data),
+      output: toTestcaseViewPart(row.output_data),
+    },
   };
 };
