@@ -73,7 +73,7 @@ const router = Router();
 
 /** Stream the session user's own submission status transitions. */
 router.get('/realtime/submissions', requireAuth, (req: Request, res: Response) => {
-    const userId = req.user?.id ?? req.session.userId;
+    const userId = req.user?.id;
     attachStream(req, res, (event): boolean => {
         if (event.type !== 'submission_update') return false;
         const submission: SubmissionUpdateEvent = event;

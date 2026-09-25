@@ -41,7 +41,7 @@ router.post(
   memoryUpload.none(),
   validateRequest({ body: submitSchema }),
   asyncHandler(async (req: Request, res: Response<SubmitSuccessResponse | MessageResponse>) => {
-    const { userId } = req.session;
+    const userId = req.user?.id;
     if (!userId) {
       throw new AppError('Authentication required', 401);
     }
@@ -76,7 +76,8 @@ router.get(
   requirePublicAccess,
   validateRequest({ query: submissionsQuerySchema }),
   asyncHandler(async (req: Request, res: Response) => {
-    const { userId, role } = req.session;
+    const userId = req.user?.id ?? null;
+    const role = req.user?.role;
 
     // Guest context: the public feed only. Personal filters and the
     // staff-only problem/user filters are meaningless without a user.
@@ -130,7 +131,8 @@ router.get(
   asyncHandler(async (req: Request, res: Response<SubmissionDetailRow | ContestSubmissionDetailRow | MessageResponse>) => {
     const id = String(req.params.id);
     const contestId = typeof req.query.contestId === 'string' ? req.query.contestId : undefined;
-    const { userId, role } = req.session;
+    const userId = req.user?.id;
+    const role = req.user?.role;
     if (!userId) {
       throw new AppError('Authentication required', 401);
     }

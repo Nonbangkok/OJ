@@ -26,7 +26,7 @@ export const requirePublicAccess = async (
 ): Promise<void> => {
     try {
         const mode = await getSiteAccessMode();
-        if (mode === 'private' && !(req.user?.id || req.session.userId)) {
+        if (mode === 'private' && !req.user?.id) {
             throw new AppError('Authentication required', 401);
         }
         next();

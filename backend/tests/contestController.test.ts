@@ -16,17 +16,12 @@ jest.mock('../services/siteSettingsService', () => ({
 jest.mock('../services/problemMigration');
 jest.mock('../services/similarityService');
 jest.mock('../middleware/auth', () => ({
-    requireStaffOrAdmin: (req: Request, res: Response, next: NextFunction) => {
-        if (req.session) {
-            req.session.role = 'admin';
-        }
+    requireStaffOrAdmin: (req: Request, _res: Response, next: NextFunction) => {
+        req.user = { id: 1, username: 'user1', role: 'admin', hasAvatar: false };
         next();
     },
-    requireAuth: (req: Request, res: Response, next: NextFunction) => {
-        if (req.session) {
-            req.session.userId = 1;
-            req.session.role = 'user';
-        }
+    requireAuth: (req: Request, _res: Response, next: NextFunction) => {
+        req.user = { id: 1, username: 'user1', role: 'user', hasAvatar: false };
         next();
     }
 }));
@@ -42,11 +37,9 @@ describe('Contest Controller', () => {
             resave: false,
             saveUninitialized: false,
         }));
-        app.use((req: Request, res: Response, next: NextFunction) => {
-            if (req.session) {
-                req.session.userId = 1;
-                req.session.role = 'admin';
-            }
+        app.use((req: Request, _res: Response, next: NextFunction) => {
+            // Handlers read the user context (req.user), not raw session fields.
+            req.user = { id: 1, username: 'user1', role: 'admin', hasAvatar: false };
             next();
         });
         app.use('/', contestRouter);

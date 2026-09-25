@@ -3,8 +3,8 @@ import * as db from '../db';
 
 declare module 'express-session' {
     interface SessionData {
-        userId: number;
-        role: string;
+        userId?: number;
+        role?: string;
     }
 }
 

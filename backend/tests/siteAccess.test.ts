@@ -27,8 +27,7 @@ const buildApp = (withSessionUser: boolean): Express => {
     server.use(session({ secret: 'test-secret', resave: false, saveUninitialized: false }));
     if (withSessionUser) {
         server.use((req, _res, next) => {
-            req.session.userId = 7;
-            req.session.role = 'user';
+            req.user = { id: 7, username: 'user7', role: 'user', hasAvatar: false };
             next();
         });
     }

@@ -15,11 +15,8 @@ jest.mock('../services/siteSettingsService', () => ({
 }));
 jest.mock('../services/submissionService');
 jest.mock('../middleware/auth', () => ({
-    requireAuth: (req: Request, res: Response, next: NextFunction) => {
-        if (req.session) {
-            req.session.userId = 1;
-            req.session.role = 'user';
-        }
+    requireAuth: (req: Request, _res: Response, next: NextFunction) => {
+        req.user = { id: 1, username: 'user1', role: 'user', hasAvatar: false };
         next();
     }
 }));
@@ -35,11 +32,9 @@ describe('Submission Controller', () => {
             resave: false,
             saveUninitialized: false,
         }));
-        app.use((req: Request, res: Response, next: NextFunction) => {
-            if (req.session) {
-                req.session.userId = 1;
-                req.session.role = 'user';
-            }
+        // Handlers read the user context (req.user), not raw session fields.
+        app.use((req: Request, _res: Response, next: NextFunction) => {
+            req.user = { id: 1, username: 'user1', role: 'user', hasAvatar: false };
             next();
         });
         app.use('/', submissionRouter);

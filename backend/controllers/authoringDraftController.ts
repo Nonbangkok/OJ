@@ -234,7 +234,7 @@ router.post('/admin/authoring/drafts',
       solution_cpp: body.solutionCpp,
       generator_cpp: body.generatorCpp,
       template_version: body.templateVersion,
-      created_by: req.user?.id ?? req.session.userId ?? null,
+      created_by: req.user?.id ?? null,
     });
     res.status(201).json(toDraftDetailResponse(created));
   }));

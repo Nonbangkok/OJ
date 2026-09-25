@@ -32,8 +32,7 @@ describe('Rejudge admin routes', () => {
         }));
         if (role !== null) {
             server.use((req, _res, next) => {
-                req.session.userId = 1;
-                req.session.role = role;
+                req.user = { id: 1, username: 'user1', role: role as 'user', hasAvatar: false };
                 next();
             });
         }

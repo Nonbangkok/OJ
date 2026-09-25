@@ -33,7 +33,7 @@ const router: Router = express.Router();
 
 // List all contests
 router.get('/contests', requirePublicAccess, asyncHandler(async (req: Request, res: Response) => {
-  const { userId } = req.session;
+  const userId = req.user?.id;
   const contests = await listContests(userId);
   res.json(contests);
 }));
@@ -56,7 +56,7 @@ router.get('/contests/:id',
   validateRequest({ params: contestIdParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const { userId } = req.session;
+  const userId = req.user?.id;
   const contest = await getContestDetail(id, userId);
   if (!contest) {
     throw new AppError('Contest not found', 404);
@@ -69,7 +69,7 @@ router.post('/contests/:id/join', requireAuth,
   validateRequest({ params: contestIdParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const { userId } = req.session;
+  const userId = req.user?.id;
   if (!userId) {
     throw new AppError('Authentication required', 401);
   }
@@ -106,7 +106,7 @@ router.post('/admin/contests', requireAuth, requireStaffOrAdmin,
   validateRequest({ body: contestBodySchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const { title, description, startTime, endTime } = req.body as ContestCreateRequestBody;
-  const { userId } = req.session;
+  const userId = req.user?.id;
 
   if (new Date(endTime) <= new Date(startTime)) {
     throw new AppError('End time must be after start time', 400);
@@ -215,7 +215,7 @@ router.get('/contests/:id/problems', requireAuth,
   validateRequest({ params: contestIdParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const { userId } = req.session;
+  const userId = req.user?.id;
   if (!userId) {
     throw new AppError('Authentication required', 401);
   }
@@ -240,7 +240,7 @@ router.get('/contests/:id/problems/:problemId', requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
   const contestId = String(req.params.id);
   const problemId = String(req.params.problemId);
-  const { userId } = req.session;
+  const userId = req.user?.id;
   if (!userId) {
     throw new AppError('Authentication required', 401);
   }
@@ -267,7 +267,7 @@ router.get('/contests/:id/problems/:problemId/pdf', requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
   const contestId = String(req.params.id);
   const problemId = String(req.params.problemId);
-  const { userId } = req.session;
+  const userId = req.user?.id;
   if (!userId) {
     throw new AppError('Authentication required', 401);
   }

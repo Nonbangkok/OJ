@@ -12,22 +12,16 @@ jest.mock('../scripts/migrate', () => ({
     runMigrationsFromPool: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('../middleware/auth', () => ({
-    requireStaffOrAdmin: (req: Request, res: Response, next: NextFunction) => {
-        if (req.session) {
-            req.session.role = 'admin';
-        }
+    requireStaffOrAdmin: (req: Request, _res: Response, next: NextFunction) => {
+        req.user = { id: 1, username: 'admin', role: 'admin', hasAvatar: false };
         next();
     },
-    requireAdmin: (req: Request, res: Response, next: NextFunction) => {
-        if (req.session) {
-            req.session.role = 'admin';
-        }
+    requireAdmin: (req: Request, _res: Response, next: NextFunction) => {
+        req.user = { id: 1, username: 'admin', role: 'admin', hasAvatar: false };
         next();
     },
-    requireAuth: (req: Request, res: Response, next: NextFunction) => {
-        if (req.session) {
-            req.session.userId = 1;
-        }
+    requireAuth: (req: Request, _res: Response, next: NextFunction) => {
+        req.user = { id: 1, username: 'admin', role: 'admin', hasAvatar: false };
         next();
     }
 }));
@@ -67,11 +61,9 @@ describe('Admin Controller', () => {
             resave: false,
             saveUninitialized: false,
         }));
-        app.use((req: Request, res: Response, next: NextFunction) => {
-            if (req.session) {
-                req.session.userId = 1;
-                req.session.role = 'admin';
-            }
+        // Self-edit/self-delete guards in the controller read req.user.
+        app.use((req: Request, _res: Response, next: NextFunction) => {
+            req.user = { id: 1, username: 'admin', role: 'admin', hasAvatar: false };
             next();
         });
         app.use('/', adminRouter);

@@ -13,7 +13,7 @@ const app = (role?: string, enabled = true) => {
   const a = express();
   a.use(express.json());
   a.use(session({ secret: 'test', resave: false, saveUninitialized: false }));
-  a.use((req, _res, next) => { if (role) { req.session.role = role; req.session.userId = 1; } next(); });
+  a.use((req, _res, next) => { if (role) { req.user = { id: 1, username: 'user1', role: role as 'user', hasAvatar: false }; } next(); });
   a.use(createAuthoringJobRouter(enabled));
   a.use(errorHandler);
   return a;

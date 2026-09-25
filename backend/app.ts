@@ -5,7 +5,7 @@ import pgSession from 'connect-pg-simple';
 import { pool } from './db';
 import { env, parseRuntimeEnv } from './config/env';
 import { AUTHORING_VALIDATION, SECURITY_CONFIG } from './constants';
-import { attachRequestUser } from './middleware/requestContext';
+import { attachRequestUser, revalidateSessionUser } from './middleware/requestContext';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { generalApiLimiter } from './middleware/rateLimit';
 import adminRoutes from './controllers/adminController';
@@ -89,6 +89,10 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
     sessionMiddleware(req, res, next);
   });
 
+  // Revalidate the session's user snapshot against the users row on every
+  // authenticated request (deleted user -> unauthenticated, role/username
+  // changes take effect immediately), then map it to req.user.
+  app.use(revalidateSessionUser);
   app.use(attachRequestUser);
   app.use(generalApiLimiter);
 

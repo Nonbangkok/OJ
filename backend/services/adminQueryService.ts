@@ -80,6 +80,11 @@ export const updateAdminUser = async (
     return { kind: 'not_found' };
   }
 
+  // ADMIN-001: drop the edited user's stored sessions so the change is not
+  // visible only through per-request revalidation. connect-pg-simple stores
+  // sessions as JSONB, so match on the embedded userId.
+  await db.query("DELETE FROM user_sessions WHERE sess->>'userId' = $1", [userId]);
+
   const { id, role: updatedRole } = updatedUser.rows[0];
   return {
     kind: 'ok',
@@ -97,6 +102,10 @@ export const deleteAdminUser = async (userId: string): Promise<AdminDeleteUserRe
   }
 
   await db.query('DELETE FROM submissions WHERE user_id = $1', [userId]);
+  // AUTH-002/003: kill the deleted user's sessions at the source. Per-request
+  // revalidation already treats a missing users row as unauthenticated; this
+  // also clears the stored rows so the sessions cannot outlive the account.
+  await db.query("DELETE FROM user_sessions WHERE sess->>'userId' = $1", [userId]);
   await db.query('DELETE FROM users WHERE id = $1', [userId]);
   return { kind: 'ok' };
 };

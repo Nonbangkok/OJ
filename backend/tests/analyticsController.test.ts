@@ -38,12 +38,9 @@ const buildApp = (forbidden = false): Express => {
         saveUninitialized: false,
     }));
     app.use((req: Request, _res: Response, next: NextFunction) => {
-        if (req.session) {
-            req.session.userId = 1;
-            // requireStaffOrAdmin reads req.session.role; 'staff' exercises the
-            // allowed path, 'user' the rejected one (no middleware mocking needed).
-            req.session.role = forbidden ? 'user' : 'staff';
-        }
+        // Auth middleware (requireAuth/requireStaffOrAdmin) reads req.user —
+        // 'staff' exercises the allowed path, 'user' the rejected one.
+        req.user = { id: 1, username: 'user1', role: forbidden ? 'user' : 'staff', hasAvatar: false };
         next();
     });
     app.use('/', analyticsRouter);

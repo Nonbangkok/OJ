@@ -85,13 +85,14 @@ describe('adminQueryService', () => {
     expect(result).toEqual({ kind: 'duplicate_username' });
   });
 
-  it('updateAdminUser should update user successfully', async () => {
+  it('updateAdminUser should update user successfully and invalidate their sessions (ADMIN-001)', async () => {
     (db.query as jest.Mock)
       .mockResolvedValueOnce({ rows: [{ username: 'old-name' }] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [{ id: 1, username: 'new-name', role: 'staff', created_at: new Date() }],
-      });
+      })
+      .mockResolvedValueOnce({});
 
     const result = await updateAdminUser('1', 'new-name', 'staff');
 
@@ -99,6 +100,13 @@ describe('adminQueryService', () => {
       kind: 'ok',
       data: { id: 1, username: 'new-name', role: 'staff' },
     });
+    // The edited user's stored sessions are dropped so role changes apply
+    // immediately (connect-pg-simple stores userId inside JSONB sess).
+    expect(db.query).toHaveBeenNthCalledWith(
+      4,
+      "DELETE FROM user_sessions WHERE sess->>'userId' = $1",
+      ['1'],
+    );
   });
 
   it('deleteAdminUser should return protected_user for Nonbangkok', async () => {
@@ -117,9 +125,10 @@ describe('adminQueryService', () => {
     expect(result).toEqual({ kind: 'ok' });
   });
 
-  it('deleteAdminUser should delete submissions and user', async () => {
+  it('deleteAdminUser should delete submissions, sessions, and the user (AUTH-002/003)', async () => {
     (db.query as jest.Mock)
       .mockResolvedValueOnce({ rows: [{ username: 'normal-user' }] })
+      .mockResolvedValueOnce({})
       .mockResolvedValueOnce({})
       .mockResolvedValueOnce({});
 
@@ -127,7 +136,8 @@ describe('adminQueryService', () => {
 
     expect(result).toEqual({ kind: 'ok' });
     expect(db.query).toHaveBeenNthCalledWith(2, 'DELETE FROM submissions WHERE user_id = $1', ['2']);
-    expect(db.query).toHaveBeenNthCalledWith(3, 'DELETE FROM users WHERE id = $1', ['2']);
+    expect(db.query).toHaveBeenNthCalledWith(3, "DELETE FROM user_sessions WHERE sess->>'userId' = $1", ['2']);
+    expect(db.query).toHaveBeenNthCalledWith(4, 'DELETE FROM users WHERE id = $1', ['2']);
   });
 
   it('createBatchUsers should rollback and return duplicate_username when collision occurs', async () => {

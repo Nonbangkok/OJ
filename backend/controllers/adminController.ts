@@ -70,7 +70,7 @@ router.put('/admin/users/:id', requireAuth, requireAdmin,
   const id = String(req.params.id);
   const { username, role } = req.body as UpdateAdminUserRequestBody;
 
-  if (req.session.userId === Number(id)) {
+  if (req.user?.id === Number(id)) {
     throw new AppError('Admins cannot edit their own account.', 403);
   }
 
@@ -92,7 +92,7 @@ router.delete('/admin/users/:id', requireAuth, requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
 
-  if (req.session.userId === Number(id)) {
+  if (req.user?.id === Number(id)) {
     throw new AppError('Admins cannot delete their own account.', 403);
   }
 

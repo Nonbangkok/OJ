@@ -15,22 +15,16 @@ jest.mock('../services/siteSettingsService', () => ({
     resetSiteAccessModeCache: jest.fn(),
 }));
 jest.mock('../middleware/auth', () => ({
-    requireAuth: (req: Request, res: Response, next: NextFunction) => {
-        if (req.session) {
-            req.session.userId = 1;
-        }
+    requireAuth: (req: Request, _res: Response, next: NextFunction) => {
+        req.user = { id: 1, username: 'user1', role: 'user', hasAvatar: false };
         next();
     },
-    requireAdmin: (req: Request, res: Response, next: NextFunction) => {
-        if (req.session) {
-            req.session.role = 'admin';
-        }
+    requireAdmin: (req: Request, _res: Response, next: NextFunction) => {
+        req.user = { id: 1, username: 'user1', role: 'admin', hasAvatar: false };
         next();
     },
-    requireStaffOrAdmin: (req: Request, res: Response, next: NextFunction) => {
-        if (req.session) {
-            req.session.role = 'admin';
-        }
+    requireStaffOrAdmin: (req: Request, _res: Response, next: NextFunction) => {
+        req.user = { id: 1, username: 'user1', role: 'admin', hasAvatar: false };
         next();
     }
 }));
@@ -62,12 +56,9 @@ describe('Problem Controller', () => {
             resave: false,
             saveUninitialized: false,
         }));
-        // We need to set the session role for tests that check it manually in the controller
-        app.use((req: Request, res: Response, next: NextFunction) => {
-            if (req.session) {
-                req.session.userId = 1;
-                req.session.role = 'admin';
-            }
+        // Visibility checks in the controller read req.user.role.
+        app.use((req: Request, _res: Response, next: NextFunction) => {
+            req.user = { id: 1, username: 'user1', role: 'admin', hasAvatar: false };
             next();
         });
         app.use('/', problemRouter);
@@ -164,10 +155,7 @@ describe('Problem Controller', () => {
                 saveUninitialized: false,
             }));
             appAsUser.use((req: Request, _res: Response, next: NextFunction) => {
-                if (req.session) {
-                    req.session.userId = 2;
-                    req.session.role = 'user';
-                }
+                req.user = { id: 2, username: 'user2', role: 'user', hasAvatar: false };
                 next();
             });
             appAsUser.use('/', problemRouter);
@@ -211,10 +199,7 @@ describe('Problem Controller', () => {
                 saveUninitialized: false,
             }));
             roleApp.use((req: Request, _res: Response, next: NextFunction) => {
-                if (req.session) {
-                    req.session.userId = userId;
-                    req.session.role = role;
-                }
+                req.user = { id: userId, username: `user${userId}`, role: role as 'user', hasAvatar: false };
                 next();
             });
             roleApp.use('/', problemRouter);

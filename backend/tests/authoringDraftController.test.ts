@@ -61,8 +61,7 @@ const createTestApp = (role?: 'user' | 'staff' | 'admin'): Express => {
   app.use(session({ secret: 'test-secret', resave: false, saveUninitialized: false }));
   app.use((req: Request, _res: Response, next: NextFunction) => {
     if (role) {
-      req.session.userId = 7;
-      req.session.role = role;
+      req.user = { id: 7, username: 'user7', role, hasAvatar: false };
     }
     next();
   });

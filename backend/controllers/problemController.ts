@@ -69,7 +69,7 @@ router.get('/problems-with-stats', requirePublicAccess,
   // user-keyed CTEs simply come back empty for a null userId, so guests
   // receive the visible-problem list with no private data attached.
   // PRIVATE mode is still enforced by requirePublicAccess above.
-  const userId = req.session.userId ?? null;
+  const userId = req.user?.id ?? null;
   // validateRequest writes Zod defaults/coercions back into req.query.
   const { difficultyMin, difficultyMax, sort, order } = req.query as unknown as {
     difficultyMin?: number; difficultyMax?: number; sort?: 'difficulty'; order?: 'asc' | 'desc';
@@ -100,7 +100,7 @@ router.get('/problems/:id',
     throw new AppError('Problem not found', 404);
   }
 
-  const isStaffOrAdmin = req.session.role === USER_ROLES.ADMIN || req.session.role === USER_ROLES.STAFF;
+  const isStaffOrAdmin = req.user?.role === USER_ROLES.ADMIN || req.user?.role === USER_ROLES.STAFF;
 
   if (!problemDetail.is_visible && !isStaffOrAdmin) {
     // Kept inline (not AppError): the response carries hidden-problem context
@@ -143,7 +143,7 @@ router.get('/problems/:id/pdf', requirePublicAccess,
     throw new AppError('Problem PDF not found.', 404);
   }
 
-  const isStaffOrAdmin = req.session.role === USER_ROLES.ADMIN || req.session.role === USER_ROLES.STAFF;
+  const isStaffOrAdmin = req.user?.role === USER_ROLES.ADMIN || req.user?.role === USER_ROLES.STAFF;
   if ((!problem.is_visible || problem.contest_id !== null) && !isStaffOrAdmin) {
     // Kept inline for the same reason as the hidden-problem 403 above.
     return res.status(403).json({

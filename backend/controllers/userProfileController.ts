@@ -78,7 +78,7 @@ router.put('/profile/avatar',
     }
 
     const avatarPng = await normalizeUpload(req.file);
-    const { userId } = req.session;
+    const userId = req.user?.id;
     if (!userId) {
       throw new AppError('Authentication required', 401);
     }
