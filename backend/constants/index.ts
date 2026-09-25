@@ -112,6 +112,11 @@ export const SUBMISSION_QUERY_CONFIG = {
 export const JUDGE_CONFIG = {
     EXEC_MAX_BUFFER: 50 * 1024 * 1024, // 50MB
     TIMEOUT_BUFFER_MS: 500,
+    // Grace period after the wall-clock limit before a judge execution is
+    // SIGKILLed outright (RUNNER-004). GNU `timeout` runs with `-k` using this
+    // grace, and the Node-side kill escalation backs it up: a program that
+    // ignores SIGTERM can no longer hold a judge slot indefinitely.
+    KILL_GRACE_MS: 2000,
     TLE_EXIT_CODE: 124,
     // CPU-time slack (seconds) added on top of the wall-clock limit before the
     // in-process RLIMIT_CPU hard-kills the program. The `timeout` command still
@@ -131,6 +136,22 @@ export const JUDGE_CONFIG = {
     SANDBOX_PATH: '/usr/bin:/bin',
     // Maximum number of submissions compiled/run concurrently; excess are queued.
     MAX_CONCURRENT_JUDGES: 3,
+    // --- Sandbox identities (RUNNER-003 / RUNNER-006) ---
+    // Compiles and testcase runs of one submission share an identity (uid and
+    // matching gid) drawn from this rotating pool, so no two LIVE submissions
+    // share an identity. Distinct uids make RLIMIT_NPROC independent per
+    // submission (one submission forking toward its cap cannot starve a
+    // concurrent one), and identity-owned files/directories are private to
+    // their submission. The pool must stay comfortably larger than
+    // MAX_CONCURRENT_JUDGES.
+    SANDBOX_UID_BASE: 60000,
+    SANDBOX_UID_POOL_SIZE: 16,
+    // --- Compile-step resource caps (RUNNER-005), mirroring the authoring
+    // compiler's prlimit recipe ---
+    PRLIMIT_PATH: '/usr/bin/prlimit',
+    COMPILE_AS_LIMIT_BYTES: 768 * 1024 * 1024,  // RLIMIT_AS: 768MB address space
+    COMPILE_NPROC_LIMIT: 128,                   // RLIMIT_NPROC for the compile uid
+    COMPILE_FSIZE_LIMIT_BYTES: 64 * 1024 * 1024, // RLIMIT_FSIZE: 64MB (output binary + temp)
 } as const;
 
 // --- Submission languages ---
@@ -162,16 +183,17 @@ export interface RunnableCommand {
  * Per-language "prepare" recipe: how a submission's source is turned into a
  * runnable command. Every language defines
  *  - `sourceExtension`  — file suffix for the written source,
- *  - `checkCommand(src, out)` — the compile/verification phase command (g++
- *    for C++, `python3 -m py_compile` for Python — a fast syntax check whose
- *    failure maps to Compilation Error),
+ *  - `checkCommand(src, out)` — the compile/verification phase invocation
+ *    (g++ for C++, `python3 -m py_compile` for Python — a fast syntax check
+ *    whose failure maps to Compilation Error), as an argv array: the compile
+ *    is executed WITHOUT a shell (see submissionService's bounded compile),
  *  - `runCommand(src | out)` — what the judge executes,
  *  - `compiledArtifactPath(out)` — the produced artifact to chmod/unlink, or
  *    null for interpreted languages that produce none.
  */
 export const LANGUAGE_PREPARE: Record<SubmissionLanguage, {
     sourceExtension: string;
-    checkCommand: (sourcePath: string, outputPath: string) => string;
+    checkCommand: (sourcePath: string, outputPath: string) => RunnableCommand;
     runCommand: (path: string) => RunnableCommand;
     compiledArtifactPath: (outputPath: string) => string | null;
 }> = {
@@ -179,15 +201,17 @@ export const LANGUAGE_PREPARE: Record<SubmissionLanguage, {
         sourceExtension: '.cpp',
         // UndefinedBehaviorSanitizer reliably catches signed integer overflow
         // as a runtime error.
-        checkCommand: (sourcePath, outputPath) =>
-            `g++ -std=c++20 -fsanitize=signed-integer-overflow ${sourcePath} -o ${outputPath}`,
+        checkCommand: (sourcePath, outputPath) => ({
+            command: 'g++',
+            args: ['-std=c++20', '-fsanitize=signed-integer-overflow', sourcePath, '-o', outputPath],
+        }),
         runCommand: (binaryPath) => ({ command: binaryPath, args: [] }),
         compiledArtifactPath: (outputPath) => outputPath,
     },
     python: {
         sourceExtension: '.py',
         // No compile step — verify syntax only. Stdlib interpreter, stdlib only.
-        checkCommand: (sourcePath) => `python3 -m py_compile ${sourcePath}`,
+        checkCommand: (sourcePath) => ({ command: 'python3', args: ['-m', 'py_compile', sourcePath] }),
         // Absolute interpreter path: the sandbox wrapper execs this directly
         // via execv(), which does NO PATH lookup — a bare "python3" would
         // fail with ENOENT. The Dockerfile asserts python3 lives at
