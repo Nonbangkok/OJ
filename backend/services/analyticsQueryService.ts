@@ -1,5 +1,5 @@
 import { query } from '../db';
-import { SUBMISSION_STATUS } from '../constants';
+import { ANALYTICS_TIMEZONE, SUBMISSION_STATUS } from '../constants';
 
 export interface OverviewKpi {
   current: number;
@@ -136,7 +136,7 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
       SELECT overall_status, submitted_at FROM contest_submissions
     )
     SELECT
-      to_char(date_trunc('day', submitted_at), 'YYYY-MM-DD') AS day,
+      to_char(date_trunc('day', submitted_at AT TIME ZONE '${ANALYTICS_TIMEZONE}'), 'YYYY-MM-DD') AS day,
       COUNT(*) AS total,
       COUNT(*) FILTER (WHERE overall_status = '${SUBMISSION_STATUS.ACCEPTED}') AS accepted
     FROM all_submissions
@@ -158,11 +158,14 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
     ORDER BY count DESC`,
     [windowDays]);
 
+  // ANALYSIS-001: the "top" lists respect the selected time window, like
+  // every other overview query (they previously aggregated all time even
+  // when a window was selected).
   const topProblemsResult = await query<TopProblemRow>(`
     WITH all_submissions AS (
-      SELECT problem_id, overall_status FROM submissions
+      SELECT problem_id, overall_status, submitted_at FROM submissions
       UNION ALL
-      SELECT problem_id, overall_status FROM contest_submissions
+      SELECT problem_id, overall_status, submitted_at FROM contest_submissions
     )
     SELECT
       p.id AS problem_id,
@@ -171,16 +174,17 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
       COUNT(*) FILTER (WHERE s.overall_status = '${SUBMISSION_STATUS.ACCEPTED}') AS accepted
     FROM all_submissions s
     JOIN problems p ON p.id = s.problem_id
+    WHERE s.submitted_at >= NOW() - ($1 || ' days')::interval
     GROUP BY p.id, p.title
     ORDER BY submissions DESC
     LIMIT 10`,
-    []);
+    [windowDays]);
 
   const topSubmittersResult = await query<TopSubmitterRow>(`
     WITH all_submissions AS (
-      SELECT user_id, problem_id, overall_status FROM submissions
+      SELECT user_id, problem_id, overall_status, submitted_at FROM submissions
       UNION ALL
-      SELECT user_id, problem_id, overall_status FROM contest_submissions
+      SELECT user_id, problem_id, overall_status, submitted_at FROM contest_submissions
     )
     SELECT
       u.id AS user_id,
@@ -189,23 +193,25 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
       COUNT(DISTINCT s.problem_id) FILTER (WHERE s.overall_status = '${SUBMISSION_STATUS.ACCEPTED}') AS solved
     FROM all_submissions s
     JOIN users u ON u.id = s.user_id
+    WHERE s.submitted_at >= NOW() - ($1 || ' days')::interval
     GROUP BY u.id, u.username
     ORDER BY submissions DESC
     LIMIT 10`,
-    []);
+    [windowDays]);
 
   const contestStatsResult = await query<ContestStatRow>(`
     SELECT
       c.id AS contest_id,
       c.title,
       c.status,
-      (SELECT COUNT(*) FROM contest_submissions cs WHERE cs.contest_id = c.id) AS submissions,
+      (SELECT COUNT(*) FROM contest_submissions cs
+       WHERE cs.contest_id = c.id AND cs.submitted_at >= NOW() - ($1 || ' days')::interval) AS submissions,
       (SELECT COUNT(*) FROM contest_scoreboards sb WHERE sb.contest_id = c.id) AS participants,
       (SELECT AVG(sb.total_score) FROM contest_scoreboards sb WHERE sb.contest_id = c.id) AS avg_score
     FROM contests c
     ORDER BY c.start_time DESC
     LIMIT 10`,
-    []);
+    [windowDays]);
 
   return {
     kpis: {
@@ -377,7 +383,7 @@ export const getUserAnalytics = async (userId: number): Promise<UserAnalytics | 
     [userId]);
 
   const dailyResult = await query<DayCountRow>(`
-    SELECT to_char(date_trunc('day', submitted_at), 'YYYY-MM-DD') AS day, COUNT(*) AS count
+    SELECT to_char(date_trunc('day', submitted_at AT TIME ZONE '${ANALYTICS_TIMEZONE}'), 'YYYY-MM-DD') AS day, COUNT(*) AS count
     FROM (
       SELECT submitted_at FROM submissions WHERE user_id = $1
       UNION ALL
@@ -388,7 +394,7 @@ export const getUserAnalytics = async (userId: number): Promise<UserAnalytics | 
     [userId]);
 
   const hourResult = await query<HourCountRow>(`
-    SELECT EXTRACT(HOUR FROM submitted_at)::int AS hour, COUNT(*) AS count
+    SELECT EXTRACT(HOUR FROM submitted_at AT TIME ZONE '${ANALYTICS_TIMEZONE}')::int AS hour, COUNT(*) AS count
     FROM (
       SELECT submitted_at FROM submissions WHERE user_id = $1
       UNION ALL
@@ -433,7 +439,7 @@ export const getUserAnalytics = async (userId: number): Promise<UserAnalytics | 
       GROUP BY problem_id
     )
     SELECT
-      to_char(date_trunc('day', first_solved_at), 'YYYY-MM-DD') AS day,
+      to_char(date_trunc('day', first_solved_at AT TIME ZONE '${ANALYTICS_TIMEZONE}'), 'YYYY-MM-DD') AS day,
       COUNT(*) AS solved
     FROM first_solves
     GROUP BY 1
@@ -529,7 +535,7 @@ export const getProblemAnalytics = async (problemId: string): Promise<ProblemAna
 
   const dailyResult = await query<ProblemDailyRow>(`
     SELECT
-      to_char(date_trunc('day', submitted_at), 'YYYY-MM-DD') AS day,
+      to_char(date_trunc('day', submitted_at AT TIME ZONE '${ANALYTICS_TIMEZONE}'), 'YYYY-MM-DD') AS day,
       COUNT(*) AS total,
       COUNT(*) FILTER (WHERE overall_status = '${SUBMISSION_STATUS.ACCEPTED}') AS accepted
     FROM (
