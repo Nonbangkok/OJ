@@ -106,15 +106,25 @@ export const deleteCollection = async (id: number): Promise<boolean> => {
  * Flip the existing is_visible state of every problem in a collection, in one
  * transaction — the same column (and therefore the same visibility system)
  * the individual and global toggles write to.
- * Returns the number of problems updated so callers can confirm intent.
+ * Returns the number of problems updated, or null when the collection itself
+ * does not exist (mirrors updateCollection/deleteCollection so the route can
+ * 404 instead of reporting a bogus "0 problems" success — PROBLEM-005).
  */
 export const setCollectionVisibility = async (
   collectionId: number,
   isVisible: boolean,
-): Promise<number> => {
+): Promise<number | null> => {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
+    const existsResult = await client.query(
+      'SELECT id FROM collections WHERE id = $1',
+      [collectionId],
+    );
+    if (existsResult.rows.length === 0) {
+      await client.query('COMMIT');
+      return null;
+    }
     const result = await client.query(
       'UPDATE problems SET is_visible = $2 WHERE collection_id = $1',
       [collectionId, isVisible],

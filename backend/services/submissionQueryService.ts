@@ -1,5 +1,5 @@
 import * as db from '../db';
-import { CONTEST_STATUS, SUBMISSION_QUERY_CONFIG, SUBMISSION_STATUS } from '../constants';
+import { CONTEST_STATUS, SUBMISSION_QUERY_CONFIG, SUBMISSION_STATUS, USER_ROLES } from '../constants';
 import {
     ContestRuntimeRow,
     ContestSubmissionDetailRow,
@@ -14,6 +14,7 @@ import {
     IdTitlePair,
     QueueSubmissionResult,
     SearchUserRow,
+    SearchViewer,
     SubmissionListRow,
 } from '../types/service';
 
@@ -97,11 +98,32 @@ export const getSubmissions = async (
     const { filter, problemId, contestId, filterProblemId, filterUserId } = queryInput;
     const isGuest = userId === 0;
 
+    // Guests (PUBLIC mode) see only the default public feed: personal
+    // filters, per-problem views, and contest feeds all require a user.
+    if (isGuest && (filter === 'mine' || problemId || contestId)) {
+        return [];
+    }
+
     let queryText: string;
     const params: unknown[] = [];
     const conditions: string[] = [];
 
     if (contestId) {
+        // Per-submission contest feeds are participant/staff-only in every
+        // contest status — the PUBLIC-mode policy (719c944) opened frozen
+        // scoreboard RESULTS, not submission streams (SUB-002). A
+        // nonexistent contest reads as 404 rather than an empty 200.
+        const contestResult = await db.query<Pick<ContestRuntimeRow, 'status'>>(
+            'SELECT status FROM contests WHERE id = $1',
+            [contestId],
+        );
+        if (contestResult.rows.length === 0) {
+            throw new AppError('Contest not found.', 404);
+        }
+        if (!isStaffOrAdmin && !(await isContestParticipant(contestId, userId))) {
+            throw new AppError('You must join this contest to view its submissions.', 403);
+        }
+
         queryText = `
             SELECT
               cs.id, u.username, cs.problem_id, p.title AS problem_title,
@@ -121,15 +143,16 @@ export const getSubmissions = async (
             JOIN users u ON s.user_id = u.id
             JOIN problems p ON s.problem_id = p.id
         `;
+        // The general feed only carries submissions whose problem is
+        // publicly listed — submissions to hidden or contest problems must
+        // not surface for viewers who cannot see the problem (PROBLEM-001).
+        // Staff/admin keep the unfiltered view for moderation.
+        if (!isStaffOrAdmin) {
+            conditions.push('p.is_visible = true AND p.contest_id IS NULL');
+        }
     }
 
     const sourceAlias = contestId ? 'cs' : 's';
-
-    // Guests (PUBLIC mode) see only the default public feed: personal
-    // filters, per-problem views, and contest feeds all require a user.
-    if (isGuest && (filter === 'mine' || problemId || contestId)) {
-        return [];
-    }
 
     if (filter === 'mine') {
         params.push(userId);
@@ -162,14 +185,25 @@ export const getSubmissions = async (
     return result.rows;
 };
 
-export const searchProblems = async (queryText: string, contestId?: string): Promise<IdTitlePair[]> => {
+export const searchProblems = async (
+    queryText: string,
+    viewer: SearchViewer,
+    contestId?: string,
+): Promise<IdTitlePair[]> => {
     if (!queryText.trim()) {
         return [];
     }
 
+    // Staff/admin search the whole catalog (the filter UI is staff-only
+    // anyway); everyone else must never enumerate hidden or contest
+    // problems (PROBLEM-001).
+    const isStaffOrAdmin = viewer.role === USER_ROLES.ADMIN || viewer.role === USER_ROLES.STAFF;
+
     if (!contestId) {
         const result = await db.query<IdTitlePair>(
-            'SELECT id, title FROM problems WHERE id ILIKE $1 OR title ILIKE $1 LIMIT 10',
+            isStaffOrAdmin
+                ? 'SELECT id, title FROM problems WHERE id ILIKE $1 OR title ILIKE $1 LIMIT 10'
+                : 'SELECT id, title FROM problems WHERE (id ILIKE $1 OR title ILIKE $1) AND is_visible = true AND contest_id IS NULL LIMIT 10',
             [`%${queryText}%`],
         );
         return result.rows;
@@ -180,6 +214,12 @@ export const searchProblems = async (queryText: string, contestId?: string): Pro
         [contestId],
     );
     if (contestResult.rows.length === 0) {
+        return [];
+    }
+
+    // Contest problem titles are participant-only intel while the contest
+    // runs — staff keep full search (PROBLEM-001).
+    if (!isStaffOrAdmin && !(await isContestParticipant(contestId, viewer.userId))) {
         return [];
     }
 

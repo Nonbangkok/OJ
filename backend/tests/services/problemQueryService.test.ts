@@ -3,6 +3,7 @@ import {
   createProblem,
   getProblemsWithStatsForUser,
   updateProblem,
+  updateProblemPdf,
 } from '../../services/problemQueryService';
 
 jest.mock('../../db', () => ({
@@ -130,5 +131,13 @@ describe('problemQueryService difficulty handling', () => {
       memory_limit_mb: 64,
     });
     expect(query.mock.calls[0][1]).toContain(null);
+  });
+
+  it('reports not_found when the PDF update matches no problem (PROBLEM-004)', async () => {
+    query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    await expect(updateProblemPdf('nope', Buffer.from('%PDF-1.4'))).resolves.toBe('not_found');
+
+    query.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'p1' }] });
+    await expect(updateProblemPdf('p1', Buffer.from('%PDF-1.4'))).resolves.toBe('ok');
   });
 });

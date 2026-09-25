@@ -146,7 +146,7 @@ describe('Problem Controller', () => {
             expect(res.body.message).toBe('Problem not found');
         });
 
-        it('should return 403 when hidden problem is requested by regular user', async () => {
+        it('should return 404 (no title disclosure) when hidden problem is requested by regular user', async () => {
             const appAsUser = express();
             appAsUser.use(express.json());
             appAsUser.use(session({
@@ -173,10 +173,34 @@ describe('Problem Controller', () => {
                 }]
             });
 
+            // PROBLEM-002: hidden reads exactly like nonexistent — no 403
+            // oracle, no title/problemId in the body.
             const res = await request(appAsUser).get('/problems/P2');
-            expect(res.status).toBe(403);
-            expect(res.body.message).toBe('Problem is hidden');
-            expect(res.body.problemId).toBe('P2');
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Problem not found');
+            expect(res.body.title).toBeUndefined();
+            expect(res.body.problemId).toBeUndefined();
+            expect(res.body.detail).toBeUndefined();
+        });
+
+        it('should return hidden problem detail to staff (not a 404)', async () => {
+            const mockProblem = {
+                id: 'P2',
+                title: 'Hidden',
+                author: 'A',
+                time_limit_ms: 1000,
+                memory_limit_mb: 256,
+                has_pdf: false,
+                is_visible: false,
+                contest_id: null,
+            };
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [mockProblem] });
+
+            // Default app session is admin (set in beforeEach).
+            const res = await request(app).get('/problems/P2');
+            expect(res.status).toBe(200);
+            expect(res.body.id).toBe('P2');
+            expect(res.body.title).toBe('Hidden');
         });
     });
 
@@ -227,26 +251,27 @@ describe('Problem Controller', () => {
             expect(db.query).toHaveBeenCalledTimes(1);
         });
 
-        it('should return 403 when a regular user requests a hidden problem PDF', async () => {
+        it('should return 404 (no oracle) when a regular user requests a hidden problem PDF', async () => {
             (db.query as jest.Mock).mockResolvedValueOnce({
                 rows: [{ ...visibleProblemRow, id: 'P2', is_visible: false }]
             });
 
             const res = await request(buildAppAsRole('user', 2)).get('/problems/P2/pdf');
 
-            expect(res.status).toBe(403);
-            expect(res.body.message).toBe('Problem is hidden');
+            // PROBLEM-002: same shape as a nonexistent problem's PDF.
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Problem PDF not found.');
             expect(db.query).toHaveBeenCalledTimes(1);
         });
 
-        it('should return 403 when a regular user requests a contest problem PDF', async () => {
+        it('should return 404 when a regular user requests a contest problem PDF', async () => {
             (db.query as jest.Mock).mockResolvedValueOnce({
                 rows: [{ ...visibleProblemRow, id: 'P3', is_visible: true, contest_id: 42 }]
             });
 
             const res = await request(buildAppAsRole('user', 2)).get('/problems/P3/pdf');
 
-            expect(res.status).toBe(403);
+            expect(res.status).toBe(404);
             expect(db.query).toHaveBeenCalledTimes(1);
         });
 
@@ -473,6 +498,111 @@ describe('Problem Controller', () => {
             const res = await request(app).post('/admin/problems/P1/upload');
             expect(res.status).toBe(400);
             expect(res.body.message).toBe('No files uploaded.');
+        });
+
+        it('should return 404 when uploading a PDF to a nonexistent problem', async () => {
+            // memoryUpload mock passes files through via headers-free path;
+            // inject the parsed file directly by pre-setting req.files.
+            const appWithFiles = express();
+            appWithFiles.use(express.json());
+            appWithFiles.use(session({
+                secret: 'test-secret',
+                resave: false,
+                saveUninitialized: false,
+            }));
+            appWithFiles.use((req: Request, _res: Response, next: NextFunction) => {
+                if (req.session) {
+                    req.session.userId = 1;
+                    req.session.role = 'admin';
+                }
+                // Mimic memoryUpload.fields: attach a valid PDF buffer.
+                req.files = {
+                    problemPdf: [{ buffer: Buffer.from('%PDF-1.4 mock') } as Express.Multer.File],
+                };
+                next();
+            });
+            appWithFiles.use('/', problemRouter);
+            appWithFiles.use(errorHandler);
+
+            // updateProblemPdf now checks rowCount: 0 matching rows -> not_found.
+            (db.query as jest.Mock).mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+            const res = await request(appWithFiles).post('/admin/problems/NOPE/upload');
+
+            // PROBLEM-004: no more silent 200 for a nonexistent problem.
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Problem not found');
+        });
+
+        it('should return 200 when a PDF is uploaded to an existing problem', async () => {
+            const appWithFiles = express();
+            appWithFiles.use(express.json());
+            appWithFiles.use(session({
+                secret: 'test-secret',
+                resave: false,
+                saveUninitialized: false,
+            }));
+            appWithFiles.use((req: Request, _res: Response, next: NextFunction) => {
+                if (req.session) {
+                    req.session.userId = 1;
+                    req.session.role = 'admin';
+                }
+                req.files = {
+                    problemPdf: [{ buffer: Buffer.from('%PDF-1.4 mock') } as Express.Multer.File],
+                };
+                next();
+            });
+            appWithFiles.use('/', problemRouter);
+            appWithFiles.use(errorHandler);
+
+            (db.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'P1' }] });
+
+            const res = await request(appWithFiles).post('/admin/problems/P1/upload');
+
+            expect(res.status).toBe(200);
+            expect(res.body.message).toBe('Files processed successfully.');
+        });
+    });
+
+    describe('PUT /admin/collections/:id/visibility', () => {
+        it('should return 404 when the collection does not exist', async () => {
+            // setCollectionVisibility existence check: SELECT collections -> [],
+            // then COMMIT inside the same transaction (client queries forward
+            // to db.query via the pool.connect mock).
+            (db.query as jest.Mock).mockImplementation(async (text: string) => {
+                if (text.includes('SELECT id FROM collections')) {
+                    return { rows: [] };
+                }
+                return { rows: [], rowCount: 0 };
+            });
+
+            const res = await request(app)
+                .put('/admin/collections/9999/visibility')
+                .send({ isVisible: false });
+
+            // PROBLEM-005: 0-problem success masked a nonexistent collection.
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Collection not found');
+        });
+
+        it('should report the updated problem count for an existing collection', async () => {
+            (db.query as jest.Mock).mockImplementation(async (text: string) => {
+                if (text.includes('SELECT id FROM collections')) {
+                    return { rows: [{ id: 7 }] };
+                }
+                if (text.includes('UPDATE problems')) {
+                    return { rowCount: 3 };
+                }
+                return { rows: [] };
+            });
+
+            const res = await request(app)
+                .put('/admin/collections/7/visibility')
+                .send({ isVisible: false });
+
+            expect(res.status).toBe(200);
+            expect(res.body.updated).toBe(3);
+            expect(res.body.message).toBe('3 problems hidden');
         });
     });
 });

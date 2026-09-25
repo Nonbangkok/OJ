@@ -65,9 +65,11 @@ const ContestNavbar = () => {
               <li onMouseEnter={handleItemMouseEnter}>
                 <NavLink to={`/contests/${contestId}/problems`}>Problems</NavLink>
               </li>
-              <li onMouseEnter={handleItemMouseEnter}>
-                <NavLink to={`/contests/${contestId}/submissions`}>Submissions</NavLink>
-              </li>
+              {contest.is_participant && (
+                <li onMouseEnter={handleItemMouseEnter}>
+                  <NavLink to={`/contests/${contestId}/submissions`}>Submissions</NavLink>
+                </li>
+              )}
             </>
           )}
           <li onMouseEnter={handleItemMouseEnter}>

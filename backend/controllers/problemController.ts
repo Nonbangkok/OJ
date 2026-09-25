@@ -103,15 +103,10 @@ router.get('/problems/:id',
   const isStaffOrAdmin = req.user?.role === USER_ROLES.ADMIN || req.user?.role === USER_ROLES.STAFF;
 
   if (!problemDetail.is_visible && !isStaffOrAdmin) {
-    // Kept inline (not AppError): the response carries hidden-problem context
-    // fields at the top level for the UI; the shared error envelope would nest
-    // them under `details`.
-    return res.status(403).json({
-      detail: 'This problem has been hidden by administrators and is not accessible to regular users.',
-      problemId: id,
-      title: problemDetail.title || 'Hidden Problem',
-      message: 'Problem is hidden',
-    });
+    // Hidden problems are indistinguishable from nonexistent ones for
+    // non-staff callers: a 403 with the title in the body was an enumeration
+    // oracle (PROBLEM-002). Staff still get the full detail below.
+    throw new AppError('Problem not found', 404);
   }
 
   const { is_visible, contest_id, ...problemData } = problemDetail;
@@ -145,12 +140,9 @@ router.get('/problems/:id/pdf', requirePublicAccess,
 
   const isStaffOrAdmin = req.user?.role === USER_ROLES.ADMIN || req.user?.role === USER_ROLES.STAFF;
   if ((!problem.is_visible || problem.contest_id !== null) && !isStaffOrAdmin) {
-    // Kept inline for the same reason as the hidden-problem 403 above.
-    return res.status(403).json({
-      detail: 'This problem has been hidden by administrators and is not accessible to regular users.',
-      problemId: id,
-      message: 'Problem is hidden',
-    });
+    // Same non-enumeration rule as GET /problems/:id (PROBLEM-002): hidden
+    // and contest problems read as plain 404s to non-staff callers.
+    throw new AppError('Problem PDF not found.', 404);
   }
 
   if (!problem.problem_pdf) {
@@ -274,6 +266,9 @@ router.put('/admin/collections/:id/visibility', requireAuth, requireStaffOrAdmin
   asyncHandler(async (req: Request, res: Response) => {
     const { isVisible } = req.body as { isVisible: boolean };
     const updated = await setCollectionVisibility(Number(req.params.id), isVisible);
+    if (updated === null) {
+      throw new AppError('Collection not found', 404);
+    }
     res.json({
       message: `${updated} problem${updated === 1 ? '' : 's'} ${isVisible ? 'shown' : 'hidden'}`,
       updated,
@@ -325,13 +320,19 @@ router.post('/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin,
   }
 
   if (problemPdfFile) {
-    await updateProblemPdf(id, problemPdfFile.buffer);
+    const pdfResult = await updateProblemPdf(id, problemPdfFile.buffer);
+    if (pdfResult === 'not_found') {
+      throw new AppError('Problem not found', 404);
+    }
   }
 
   if (testcasesZipFile) {
     const replaceResult = await replaceProblemTestcasesFromZip(id, testcasesZipFile.buffer);
     if (replaceResult.kind === 'no_valid_pairs') {
       throw new AppError('No valid testcase pairs (.in/.out or input/output) found in the ZIP file.', 400);
+    }
+    if (replaceResult.kind === 'not_found') {
+      throw new AppError('Problem not found', 404);
     }
   }
 
