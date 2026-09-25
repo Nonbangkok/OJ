@@ -72,6 +72,15 @@ interface ContestStatRow {
 /** Large enough window standing in for "all time" in day-based intervals. */
 const ALL_TIME_WINDOW_DAYS = 36500;
 
+/**
+ * ANALYSIS-007: ILIKE treats user-supplied `%` and `_` as wildcards, so a
+ * search like "100%" matches far more than intended. Backslash-escape both
+ * (Postgres LIKE escape character). Backslashes in the search term are not
+ * special for LIKE itself, but escaping them too keeps the term literal.
+ */
+const escapeLikePattern = (search: string): string =>
+  search.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+
 const toNum = (v: string | number | null | undefined): number => (v === null || v === undefined ? 0 : Number(v));
 
 /** Aggregate rows always return one row, but stay defensive for empty results. */
@@ -340,7 +349,7 @@ export const listUsersForAnalytics = async (
     GROUP BY u.id, u.username, u.role
     ORDER BY ${sortExpr} ${direction} NULLS LAST, u.username ASC
     LIMIT $2 OFFSET $3`,
-    [search, limit, offset]);
+    [escapeLikePattern(search), limit, offset]);
 
   return result.rows.map((r) => ({
     userId: r.user_id,
@@ -739,7 +748,9 @@ export const getContestAnalytics = async (contestId: number): Promise<ContestAna
     JOIN contests c ON c.id = cs.contest_id
     WHERE cs.contest_id = $1
     GROUP BY 1
-    ORDER BY 1`,
+    -- ANALYSIS-004: sort by the numeric hour, not the 'H10' string (which
+    -- sorted lexicographically and put H10 before H2).
+    ORDER BY MIN(FLOOR(EXTRACT(EPOCH FROM (submitted_at - c.start_time)) / 3600)::int)`,
     [contestId]);
 
   const problemResult = await query<ContestProblemRow>(`
@@ -887,7 +898,7 @@ export const listProblemsForAnalytics = async (
     WHERE p.title ILIKE '%' || $1 || '%' OR p.id ILIKE '%' || $1 || '%'
     ORDER BY ${sortExpr} ${direction} NULLS LAST, p.id ASC
     LIMIT $2 OFFSET $3`,
-    [search, limit, offset]);
+    [escapeLikePattern(search), limit, offset]);
 
   return result.rows.map((r) => ({
     problemId: r.problem_id,

@@ -166,6 +166,25 @@ describe('analyticsQueryService.listUsersForAnalytics', () => {
             lastActive: '2026-09-19T10:00:00Z',
         }]);
     });
+
+    it('escapes LIKE wildcards in the search term (ANALYSIS-007)', async () => {
+        mockQuery.mockResolvedValue({ rows: [] } as never);
+
+        const searchParamOf = (callIndex: number): unknown =>
+            (mockQuery.mock.calls[callIndex] as unknown[])[1];
+
+        await listUsersForAnalytics('100%', 25, 0);
+
+        // % must reach Postgres escaped, so it matches the literal "100%"
+        // instead of "100<anything>".
+        expect(searchParamOf(0)).toEqual(['100\\%', 25, 0]);
+
+        await listUsersForAnalytics('a_b', 25, 0);
+        expect((searchParamOf(1) as unknown[])[0]).toBe('a\\_b');
+
+        await listUsersForAnalytics('plain', 25, 0);
+        expect((searchParamOf(2) as unknown[])[0]).toBe('plain');
+    });
 });
 
 describe('analyticsQueryService.getUserAnalytics', () => {
@@ -344,6 +363,22 @@ describe('analyticsQueryService.getContestAnalytics', () => {
             { username: 'bob', totalScore: 300, solved: 3 },
         ]);
     });
+
+    it('orders the timeline buckets by numeric hour, not lexicographically (ANALYSIS-004)', async () => {
+        mockQuery.mockResolvedValueOnce({ rows: [{ contest_id: 1 }] } as never)
+            .mockResolvedValueOnce({ rows: [{ participants: '0' }] } as never)
+            .mockResolvedValueOnce({ rows: [] } as never)
+            .mockResolvedValueOnce({ rows: [] } as never)
+            .mockResolvedValueOnce({ rows: [] } as never);
+
+        await getContestAnalytics(1);
+
+        const timelineSql = String(mockQuery.mock.calls[2][0]);
+        // The ORDER BY must key on the numeric hour expression, so H2 lands
+        // before H10 (the 'H10' string sorts before 'H2').
+        expect(timelineSql).toMatch(/ORDER BY MIN\(FLOOR\(EXTRACT\(EPOCH/i);
+        expect(timelineSql).not.toMatch(/ORDER BY 1\b/);
+    });
 });
 
 
@@ -385,6 +420,14 @@ describe('analyticsQueryService.listProblemsForAnalytics', () => {
         await listProblemsForAnalytics('', 50, 0, 'acRate', 'asc');
 
         expect(String(mockQuery.mock.calls[0][0])).toContain('ac_rate ASC');
+    });
+
+    it('escapes LIKE wildcards in the search term (ANALYSIS-007)', async () => {
+        mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+        await listProblemsForAnalytics('50%_off', 50, 0);
+
+        expect(mockQuery.mock.calls[0][1]).toEqual(['50\\%\\_off', 50, 0]);
     });
 });
 
