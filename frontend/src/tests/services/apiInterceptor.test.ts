@@ -54,6 +54,20 @@ describe('session expiry interceptor', () => {
     expect(replaceStateSpy).not.toHaveBeenCalled();
   });
 
+  it('does not redirect when the 401 is a wrong current password, not an expiry (AUTH-004)', () => {
+    // The backend answers 401 "Current password is incorrect" from
+    // /profile/password while the session is still valid; the change-password
+    // dialog surfaces that inline instead of bouncing the user to /login.
+    window.sessionStorage.setItem('oj:had-session', '1');
+    const api = makeInstance();
+
+    reject(api, {
+      response: { status: 401 }, config: { url: '/profile/password' },
+    });
+
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+  });
+
   it('does not redirect on other status codes', () => {
     const api = makeInstance();
 
