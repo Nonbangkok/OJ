@@ -88,6 +88,7 @@ describe('User Profile Page', () => {
             isLoading: false,
             login: jest.fn(),
             logout: jest.fn(),
+            refreshUser: jest.fn(),
         });
     });
 
@@ -143,6 +144,7 @@ describe('User Profile Page', () => {
             isLoading: false,
             login: jest.fn(),
             logout: jest.fn(),
+            refreshUser: jest.fn(),
         });
         renderPage();
         await waitFor(() => expect(screen.getByRole('heading', { name: /tester/ })).toBeInTheDocument());
@@ -153,6 +155,7 @@ describe('User Profile Page', () => {
             isLoading: false,
             login: jest.fn(),
             logout: jest.fn(),
+            refreshUser: jest.fn(),
         });
         renderPage();
         await waitFor(() => expect(screen.getByRole('button', { name: /change avatar/i })).toBeInTheDocument());
@@ -170,6 +173,7 @@ describe('User Profile Page', () => {
             isLoading: false,
             login: jest.fn(),
             logout: jest.fn(),
+            refreshUser: jest.fn(),
         });
         renderPage();
 

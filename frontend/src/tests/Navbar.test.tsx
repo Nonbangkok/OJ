@@ -34,6 +34,7 @@ describe('Navbar Component', () => {
       isLoading: false,
       login: jest.fn(),
       logout: mockLogout,
+      refreshUser: jest.fn(),
     });
     mockIsPrivateMode = false;
     jest.mocked(useSettings).mockReturnValue({
@@ -77,6 +78,7 @@ describe('Navbar Component', () => {
       isLoading: false,
       login: jest.fn(),
       logout: mockLogout,
+      refreshUser: jest.fn(),
     });
 
     render(<Navbar />);
@@ -91,6 +93,7 @@ describe('Navbar Component', () => {
       isLoading: false,
       login: jest.fn(),
       logout: mockLogout,
+      refreshUser: jest.fn(),
     });
 
     render(<Navbar />);
@@ -106,6 +109,7 @@ describe('Navbar Component', () => {
       isLoading: false,
       login: jest.fn(),
       logout: mockLogout,
+      refreshUser: jest.fn(),
     });
 
     render(<Navbar />);
@@ -119,6 +123,7 @@ describe('Navbar Component', () => {
       isLoading: false,
       login: jest.fn(),
       logout: mockLogout,
+      refreshUser: jest.fn(),
     });
 
     render(<Navbar />);
@@ -135,6 +140,7 @@ describe('Navbar Component', () => {
       isLoading: false,
       login: jest.fn(),
       logout: jest.fn(),
+      refreshUser: jest.fn(),
     });
     jest.mocked(useTheme).mockReturnValue({
       theme: 'light',

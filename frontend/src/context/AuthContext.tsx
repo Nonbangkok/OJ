@@ -17,6 +17,12 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (userData: AuthUser) => void;
   logout: () => Promise<void>;
+  /**
+   * Re-fetch /me and update the context user. Used when server-side state
+   * changed outside a login (e.g. XP level-up on a realtime event) so the
+   * navbar tier badge stays current (SCORE-008).
+   */
+  refreshUser: () => Promise<void>;
 }
 
 interface AuthProviderProps {
@@ -82,9 +88,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    await checkLoggedIn();
+  }, [checkLoggedIn]);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ user, isLoading, login, logout }),
-    [user, isLoading, login, logout]
+    () => ({ user, isLoading, login, logout, refreshUser }),
+    [user, isLoading, login, logout, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{!isLoading && children}</AuthContext.Provider>;

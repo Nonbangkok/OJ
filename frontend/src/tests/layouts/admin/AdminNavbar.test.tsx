@@ -37,6 +37,7 @@ const renderNavbar = (
     isLoading: false,
     login: jest.fn(),
     logout: mockLogout,
+            refreshUser: jest.fn(),
   });
 
   return render(

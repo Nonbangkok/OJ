@@ -29,8 +29,10 @@ const lastSubscribeCall = (): {
   return { listener, options };
 };
 
-const mockAuth = (user: object | null) => {
-    jest.mocked(useAuth).mockReturnValue({ user, isLoading: false } as ReturnType<typeof useAuth>);
+const mockAuth = (user: object | null, refreshUser: () => Promise<void> = jest.fn()) => {
+    jest.mocked(useAuth).mockReturnValue(
+        { user, isLoading: false, refreshUser } as ReturnType<typeof useAuth>
+    );
 };
 
 describe('useSubmissions', () => {
@@ -245,6 +247,64 @@ describe('useSubmissions', () => {
                 expect((jest.mocked(submissionService.getAll) as jest.Mock).mock.calls.length)
                     .toBeGreaterThan(initialCalls);
             });
+        });
+
+        it('refetches /me on an xp_awarded event so the navbar tier updates (SCORE-008)', async () => {
+            const refreshUser = jest.fn().mockResolvedValue(undefined);
+            mockAuth(mockUser, refreshUser);
+            (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
+
+            const { result } = renderHook(() => useSubmissions(undefined, undefined));
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            const { listener } = lastSubscribeCall();
+            act(() => {
+                listener({
+                    type: 'submission_update',
+                    submissionId: 1,
+                    table: 'submissions',
+                    overall_status: 'Accepted',
+                    score: 100,
+                    user_id: 1,
+                    xp_awarded: 46,
+                });
+            });
+
+            await waitFor(() => expect(refreshUser).toHaveBeenCalledTimes(1));
+        });
+
+        it('does not refetch /me on events without an XP reward (SCORE-008)', async () => {
+            const refreshUser = jest.fn().mockResolvedValue(undefined);
+            mockAuth(mockUser, refreshUser);
+            (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
+
+            const { result } = renderHook(() => useSubmissions(undefined, undefined));
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            const { listener } = lastSubscribeCall();
+            act(() => {
+                // Accepted but an already-solved problem: no xp_awarded.
+                listener({
+                    type: 'submission_update',
+                    submissionId: 2,
+                    table: 'submissions',
+                    overall_status: 'Accepted',
+                    score: 100,
+                    user_id: 1,
+                });
+                listener({
+                    type: 'submission_update',
+                    submissionId: 3,
+                    table: 'submissions',
+                    overall_status: 'Wrong Answer',
+                    score: 0,
+                    user_id: 1,
+                    xp_awarded: 0,
+                });
+            });
+
+            await waitFor(() => expect(result.current.lastRealtimeEvent?.submissionId).toBe(3));
+            expect(refreshUser).not.toHaveBeenCalled();
         });
 
         it('uses the slow fallback interval while the stream is up', async () => {

@@ -22,6 +22,7 @@ describe('NavbarUserMenu', () => {
             isLoading: false,
             login: jest.fn(),
             logout: mockLogout,
+            refreshUser: jest.fn(),
         });
         jest.mocked(useTheme).mockReturnValue({
             theme: 'light',
@@ -48,6 +49,7 @@ describe('NavbarUserMenu', () => {
             isLoading: false,
             login: jest.fn(),
             logout: mockLogout,
+            refreshUser: jest.fn(),
         });
         renderMenu();
 
@@ -62,6 +64,7 @@ describe('NavbarUserMenu', () => {
             isLoading: false,
             login: jest.fn(),
             logout: mockLogout,
+            refreshUser: jest.fn(),
         });
         renderMenu();
         fireEvent.click(screen.getByRole('button', { name: /open user menu/i }));
@@ -89,6 +92,7 @@ describe('NavbarUserMenu', () => {
             isLoading: false,
             login: jest.fn(),
             logout: mockLogout,
+            refreshUser: jest.fn(),
         });
         renderMenu();
         fireEvent.click(screen.getByRole('button', { name: /open user menu/i }));
@@ -159,6 +163,7 @@ describe('NavbarUserMenu', () => {
             isLoading: false,
             login: jest.fn(),
             logout: mockLogout,
+            refreshUser: jest.fn(),
         });
         renderMenu();
 

@@ -24,7 +24,8 @@ export const useSubmissions = (
 ) => {
   const [submissions, setSubmissions] = useState<SubmissionSummary[]>([]);
   // Session user comes from AuthContext — no extra /me request per page.
-  const { user: currentUser } = useAuth();
+  // refreshUser is pulled in for SCORE-008 (see the SSE effect below).
+  const { user: currentUser, refreshUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<SubmissionFilter>('all');
@@ -106,11 +107,19 @@ export const useSubmissions = (
     const unsubscribe = subscribeSubmissions((payload) => {
       setLastRealtimeEvent(payload);
       void fetchData();
+      // SCORE-008: a positive xp_awarded means the user's total XP just
+      // changed — the navbar tier/level badge rides on the AuthContext
+      // user, which was fetched at bootstrap. Refetch /me so a level-up
+      // shows without a manual reload. Only on the reward event, not every
+      // status transition.
+      if (typeof payload.xp_awarded === 'number' && payload.xp_awarded > 0) {
+        void refreshUser();
+      }
     }, {
       onStreamDown: () => setRealtimeDown(true),
     });
     return unsubscribe;
-  }, [currentUser, fetchData]);
+  }, [currentUser, fetchData, refreshUser]);
 
   // 3. Polling for Pending Submissions (fallback safety net — SSE only
   //    lowers latency, polling stays the correctness floor)
