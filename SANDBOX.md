@@ -63,6 +63,64 @@ flood memory with diagnostics. A timeout surfaces as a normal compile failure.
 - `cap_drop: ["ALL"]`
 - `pids_limit: 256` (cgroup-level fork-bomb containment)
 - `mem_reservation: 512m`, `mem_limit: 1g`
+- `init: true` (zombie/orphan reaping below pid 1 — npm is not an init)
+
+## Phase 0 runner lockdown (security audit RUNNER findings)
+
+The audit pass added the following layers on top of the items above.
+
+### 5. Unprivileged, prlimit-capped, shell-less compile (RUNNER-001 / RUNNER-005)
+g++ no longer runs as root or through a shell. The compile is executed via
+`runBoundedChildProcess` (`backend/utils/sandboxProcess.ts`, mirroring the
+authoring runner's `process.ts`): `spawn()` without a shell, dropped to a
+per-submission sandbox uid (pool `60000..60015`, gid 65534) when the backend
+runs as root, wrapped in `prlimit --as --cpu --nproc --fsize --core=0`
+(the authoring compiler recipe), env-stripped, with a hard wall-clock timeout
+and output cap that SIGKILL the whole process group. A macro-include of
+`/proc/1/environ` therefore fails: the sandboxed g++ cannot read root-only
+files, and no secrets are in its environment to begin with. The include guard
+(`compileGuard.ts`) is hardened as a second layer — it now rejects macro
+includes (`#define E "/proc/1/environ"` + `#include E`), string-concatenated
+paths, and backslash-newline-continuation-hidden paths.
+
+### 6. Per-submission workspaces (RUNNER-003 / RUNNER-006)
+Every submission gets a private `mkdtemp` workspace under
+`<os.tmpdir()>/oj-submissions/`, owned by its sandbox identity (uid = gid,
+pool 60000..60015) with mode **0711** — owner full access, everyone else
+traverse-only: a rival submission can *reach* a file by exact name but can
+neither list the directory nor read the files (source 0600, binary 0750,
+both identity-owned). The workspace is `rm -rf`'d in the pipeline's finally
+block.
+
+Because RLIMIT_NPROC is enforced **per uid**, concurrent submissions run
+under *distinct* pool identities — the compile and all testcase runs of one
+submission share one identity (passed from `submissionService` through
+`judge()` into `time_wrapper` as a new argv parameter), while a concurrently
+judged submission gets a different one. A submission forking toward its
+process cap can no longer starve a concurrent legitimate submission (the old
+behavior: everything ran as nobody/65534 and shared one NPROC budget of 64).
+
+### 7. TLE SIGKILL escalation (RUNNER-004)
+The judge's wall-clock command is now `timeout -k <grace>s <limit>s ...`
+(KILL_GRACE_MS = 2s): after the limit GNU timeout sends SIGTERM, then SIGKILLs
+a process that ignores it. A Node-side escalation timer
+(`JUDGE_CONFIG.TIMEOUT_BUFFER_MS + KILL_GRACE_MS` after the limit) force-kills
+the whole process group as a backstop, so a SIGTERM-ignoring sleeper can no
+longer hold a judge slot (3 of which would stall all judging).
+
+### 8. seccomp socket-deny in time_wrapper (RUNNER-002, partial)
+`time_wrapper.c` now installs a seccomp filter (recipe copied from
+`backend/authoring/sandbox.c`) that denies `socket`, `socketpair`, `unshare`,
+`setns`, `ptrace`, and `mount` for the untrusted program. A submitted binary
+can no longer TCP-connect to the database or any in-stack service from inside
+the backend container, and cannot escape its identity through namespaces.
+**Container-level follow-up (still open):** the seccomp layer denies socket
+creation but not other network-adjacent behaviour (e.g. inherited fds), and it
+does not bind the *compile* step. The full fix remains the dedicated
+`network_mode: none` judge container sketched below — the minimal seccomp
+mitigation was chosen for Phase 0 because moving compile+run into a separate
+compose service (queue/transport, results plumbing) is an architectural change
+that belongs to its own phase.
 
 ### Why the backend container still runs as root
 See the long comment in `backend/Dockerfile`. In short: the per-submission

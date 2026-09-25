@@ -1,8 +1,7 @@
 import * as db from '../db';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { judge } from './judgeService';
 import { ContestSubmissionRow, SubmissionRow } from '../types/models';
 import { CompileCommandError } from '../types/service';
@@ -17,24 +16,52 @@ import { findForbiddenInclude } from '../utils/compileGuard';
 import { logger } from '../utils/logger';
 import { publishRealtime } from './realtimeHub';
 import { awardSolveReward } from './progressionService';
+import {
+  canDropPrivileges,
+  nextSandboxIdentity,
+  prlimitWrap,
+  runBoundedChildProcess,
+  SandboxIdentity,
+} from '../utils/sandboxProcess';
 
-const execPromise = promisify(exec);
-
-// Guard the compile step against compiler bombs / pathological sources that
-// could otherwise hang the single-threaded judge worker indefinitely. A
-// timeout kills runaway g++ invocations; maxBuffer caps compiler output so a
-// flood of diagnostics cannot exhaust memory. A timeout surfaces as a normal
-// compile failure (caught below) rather than crashing the process.
-//
-// `env` is stripped to a minimal PATH so a malicious source cannot exfiltrate
-// the backend's secrets at COMPILE time — e.g. `#include "/proc/self/environ"`
-// would otherwise make g++ quote the environment (DATABASE_URL / PGPASSWORD /
-// SECRET_KEY) back in its error output. (The run step is already env-stripped.)
-const COMPILE_EXEC_OPTIONS = {
-  timeout: JUDGE_CONFIG.COMPILE_TIMEOUT_MS,
-  maxBuffer: JUDGE_CONFIG.COMPILE_MAX_BUFFER,
-  env: { PATH: JUDGE_CONFIG.SANDBOX_PATH } as unknown as NodeJS.ProcessEnv,
-};
+/**
+ * Compile (or syntax-check) a submission as an unprivileged uid under prlimit
+ * caps (JUDGE_CONFIG.COMPILE_TIMEOUT_MS wall clock, COMPILE_MAX_BUFFER output
+ * cap, and the prlimit address-space/process/file-size limits from
+ * `prlimitWrap`), never through a shell, and with a whole-process-group
+ * SIGKILL on any limit. A runaway g++ therefore cannot hang the judge worker
+ * or flood memory, and a timeout surfaces as a normal compile failure.
+ *
+ * `env` is stripped to a minimal PATH so a malicious source cannot exfiltrate
+ * the backend's secrets at COMPILE time either — g++ never inherits
+ * DATABASE_URL / PGPASSWORD / SECRET_KEY, so it cannot quote them back in a
+ * Compilation Error diagnostic even via `#include "/proc/self/environ"`.
+ * (RUNNER-001 / RUNNER-005; the run step is env-stripped too.)
+ *
+ * `command` / `args` reference the source and output by paths RELATIVE to
+ * `cwd` (the per-submission build directory) so diagnostics carry no server
+ * directories at all.
+ */
+async function runBoundedCompile(
+  cwd: string,
+  command: string,
+  args: readonly string[],
+  sandbox: SandboxIdentity
+): Promise<{ ok: boolean; stderr: string }> {
+  const sandboxEnv = {
+    PATH: JUDGE_CONFIG.SANDBOX_PATH,
+    LANG: 'C.UTF-8',
+    TMPDIR: cwd,
+  } as unknown as NodeJS.ProcessEnv;
+  const result = await runBoundedChildProcess(command, args, {
+    cwd,
+    env: sandboxEnv,
+    ...(canDropPrivileges() ? { uid: sandbox.uid, gid: sandbox.gid } : {}),
+    timeoutMs: JUDGE_CONFIG.COMPILE_TIMEOUT_MS,
+    maxBufferBytes: JUDGE_CONFIG.COMPILE_MAX_BUFFER,
+  });
+  return { ok: result.exitCode === 0, stderr: result.stderr || result.stdout };
+}
 
 /** The neutral name substituted for the internal temp source path in
  *  compiler/checker output so server filesystem paths are not disclosed. */
@@ -46,12 +73,22 @@ const SANITIZED_SOURCE_NAME: Record<SubmissionLanguage, string> = {
 /**
  * Replace the internal temporary source path in compiler/checker output with a
  * neutral name so server filesystem paths are not disclosed to submitters.
+ * Both the bare source filename and its per-submission directory form are
+ * neutralized (compiles run with cwd = the submission directory, so g++
+ * diagnostics can print either).
  */
 export function sanitizeCompilerStderr(stderr: string | undefined, sourcePath: string, language: SubmissionLanguage = 'cpp'): string {
   if (!stderr) {
     return 'Compilation failed';
   }
-  return sourcePath ? stderr.split(sourcePath).join(SANITIZED_SOURCE_NAME[language]) : stderr;
+  const neutralName = SANITIZED_SOURCE_NAME[language];
+  return sourcePath
+    ? stderr
+        .split(sourcePath)
+        .join(neutralName)
+        .split(path.join(path.dirname(sourcePath), neutralName))
+        .join(neutralName)
+    : stderr;
 }
 
 const FORBIDDEN_INCLUDE_MESSAGE = (target: string): string =>
@@ -95,6 +132,10 @@ async function runSubmissionPipeline(
   table: 'submissions' | 'contest_submissions',
   filePrefix: string
 ): Promise<void> {
+  // Absolute path of the per-submission workspace directory; cleaned in the
+  // finally block (RUNNER-003).
+  let workspaceDir = '';
+  // Absolute paths of the source and (potential) binary inside the workspace.
   let filePath = '';
   let outputPath = '';
   // Owner of the submission — needed by the System Error handler below, so it
@@ -126,15 +167,39 @@ async function runSubmissionPipeline(
 
     const prepare = LANGUAGE_PREPARE[submissionLanguage];
     const uniqueId = `${filePrefix}_${submissionId}_${Date.now()}`;
-    filePath = path.join(__dirname, 'submissions', `${uniqueId}${prepare.sourceExtension}`);
-    outputPath = path.join(__dirname, 'submissions', `${uniqueId}.out`);
-    const submissionsDir = path.join(__dirname, 'submissions');
 
-    if (!fs.existsSync(submissionsDir)) {
-      fs.mkdirSync(submissionsDir, { recursive: true });
+    // Per-submission sandbox identity (RUNNER-006): the compile and every
+    // testcase run of THIS submission share one pool uid+gid, distinct from
+    // any concurrently judged submission's. RLIMIT_NPROC is per-uid, so
+    // forking budgets stay independent, and file ownership gives the
+    // workspace its privacy below.
+    const sandbox = nextSandboxIdentity();
+
+    // Per-submission workspace (RUNNER-003): every submission gets a private
+    // directory under os.tmpdir(), owned by its sandbox identity with mode
+    // 0711 — owner rwx, everyone else traverse-only (x) with NO list (r).
+    // The sandboxed program can reach its own files by name but cannot
+    // readdir a rival submission's workspace; files inside are 0600/0750
+    // owner-only, so even known names cannot be read.
+    const submissionsRoot = path.join(fs.realpathSync(os.tmpdir()), 'oj-submissions');
+    await fs.promises.mkdir(submissionsRoot, { recursive: true, mode: 0o755 });
+    workspaceDir = await fs.promises.mkdtemp(path.join(submissionsRoot, `${uniqueId}_`));
+    try {
+      await fs.promises.chown(workspaceDir, sandbox.uid, sandbox.gid);
+    } catch {
+      // Unprivileged dev runs cannot chown; root-only hardening above.
     }
+    await fs.promises.chmod(workspaceDir, 0o711);
+
+    const sourceName = `solution${prepare.sourceExtension}`;
+    const binaryName = 'solution.out';
+    filePath = path.join(workspaceDir, sourceName);
+    outputPath = path.join(workspaceDir, binaryName);
+
     // Reject sources that try to read files outside the submission via #include
-    // before compiling — closes the compile-time arbitrary file-read vector.
+    // before compiling — a first line of defence against the compile-time
+    // arbitrary file-read vector (the compile also runs unprivileged, see
+    // runBoundedCompile).
     const forbiddenInclude = findForbiddenInclude(code);
     if (forbiddenInclude) {
       await db.query(
@@ -148,24 +213,38 @@ async function runSubmissionPipeline(
       return;
     }
 
-    // Keep the source readable (0644) so the unprivileged judge user (`nobody`,
-    // after time_wrapper's privilege drop) can read it — equivalent to how the
-    // compiled C++ binary is handed over.
-    await fs.promises.writeFile(filePath, code, { mode: 0o644 });
+    // The source is owned by the submission's sandbox identity with mode
+    // 0600: readable by the sandboxed compile/run of THIS submission only —
+    // another submission's uid cannot read it even by name, and the
+    // traverse-only workspace keeps it out of any directory listing.
+    await fs.promises.writeFile(filePath, code, { mode: 0o600 });
+    try {
+      await fs.promises.chown(filePath, sandbox.uid, sandbox.gid);
+    } catch {
+      // Unprivileged dev runs cannot chown; root-only hardening above.
+    }
 
     // Language-agnostic "prepare" phase: compile (C++) or syntax-check
-    // (Python via py_compile). A failure maps to Compilation Error with the
-    // sanitized stderr shown to the submitter.
-    const checkCommand = prepare.checkCommand(filePath, outputPath);
-    try {
-      await execPromise(checkCommand, COMPILE_EXEC_OPTIONS);
-    } catch (compileError: unknown) {
-      const error = compileError as CompileCommandError;
-      logger.warn('submission compile failed', { submissionId, table, language: submissionLanguage, stderr: error.stderr });
+    // (Python via py_compile), as the submission's sandbox identity under
+    // prlimit caps and a hard wall-clock/output kill (RUNNER-001 / RUNNER-005).
+    // A failure maps to Compilation Error with the sanitized stderr shown to
+    // the submitter. Paths are relative to the workspace so diagnostics carry
+    // no server directories at all.
+    const check = prepare.checkCommand(sourceName, binaryName);
+    const compileCommand = prlimitWrap(check.command, check.args);
+    const compile = await runBoundedCompile(workspaceDir, compileCommand.command, compileCommand.args, sandbox);
+    if (!compile.ok) {
+      logger.warn('submission compile failed', { submissionId, table, language: submissionLanguage, stderr: compile.stderr });
       await db.query(
         `UPDATE ${table} SET overall_status = '${SUBMISSION_STATUS.COMPILATION_ERROR}', results = $1 WHERE id = $2`,
         [
-          JSON.stringify([{ status: SUBMISSION_STATUS.COMPILATION_ERROR, output: sanitizeCompilerStderr(error.stderr, filePath, submissionLanguage) }]),
+          JSON.stringify([{
+            status: SUBMISSION_STATUS.COMPILATION_ERROR,
+            output: sanitizeCompilerStderr(compile.stderr, sourceName, submissionLanguage)
+              // Defence-in-depth: diagnostics may still embed absolute paths
+              // from include resolution; strip any that slipped through.
+              .replace(/\/[^\s:]*oj-submissions\/[^\s:]+/g, SANITIZED_SOURCE_NAME[submissionLanguage]),
+          }]),
           submissionId,
         ]
       );
@@ -181,15 +260,18 @@ async function runSubmissionPipeline(
 
     // Compiled languages run the produced artifact; interpreted languages run
     // the source through their interpreter. The judge applies per-language
-    // limit multipliers from here on.
+    // limit multipliers from here on. g++ wrote the binary as the sandbox
+    // identity already; 0750 keeps it owner+group only (the group IS the same
+    // identity — one uid per submission — so this is effectively owner-only).
     const artifactPath = prepare.compiledArtifactPath(outputPath);
     if (artifactPath) {
-      await fs.promises.chmod(artifactPath, 0o755);
+      await fs.promises.chmod(artifactPath, 0o750);
     }
     const judgeResult = await judge(
       problem_id,
       prepare.runCommand(artifactPath ?? filePath),
-      submissionLanguage
+      submissionLanguage,
+      sandbox
     );
 
     const { results, score, overallStatus, maxTimeMs, maxMemoryKb } = judgeResult;
@@ -244,11 +326,12 @@ async function runSubmissionPipeline(
       logger.error('failed to record system-error status', { submissionId, table, err: dbError });
     }
   } finally {
-    fs.unlink(filePath, (err) => { if (err) logger.warn('failed to delete submission source', { submissionId, err }); });
-    // Compiled languages leave a binary to clean up; interpreted ones never
-    // create one, so skip the unlink (its ENOENT would be pure log noise).
-    if (LANGUAGE_PREPARE[submissionLanguage].compiledArtifactPath(outputPath)) {
-      fs.unlink(outputPath, (err) => { if (err) logger.warn('failed to delete submission binary', { submissionId, err }); });
+    // Remove the whole per-submission workspace (source, binary, compiler
+    // scratch). One recursive rmtree replaces the per-file unlinks.
+    if (workspaceDir) {
+      fs.rm(workspaceDir, { recursive: true, force: true }, (err) => {
+        if (err) logger.warn('failed to delete submission workspace', { submissionId, err });
+      });
     }
   }
 }

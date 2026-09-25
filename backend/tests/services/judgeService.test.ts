@@ -115,9 +115,57 @@ describe('Judge Service', () => {
         expect(cp.exec).toHaveBeenCalledTimes(1);
         const cmd = (cp.exec as unknown as jest.Mock).mock.calls[0][0];
         expect(cmd).toContain('time_wrapper');
-        // Wrapper argv layout: exe, then limits, THEN the runnable's args —
-        // limits must never leak into the child program's argv.
-        expect(cmd).toMatch(/time_wrapper \/usr\/bin\/python3 \d+ \d+ \/tmp\/s\.py/);
+        // Wrapper argv layout: exe, then limits, then the sandbox uid, THEN
+        // the runnable's args — none of them may leak into the child argv.
+        expect(cmd).toMatch(/time_wrapper \/usr\/bin\/python3 \d+ \d+ \d+ \/tmp\/s\.py/);
+    });
+
+    it('kills a judge execution that outlives its limits (RUNNER-004 SIGKILL escalation)', async () => {
+        jest.useFakeTimers();
+        try {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ time_limit_ms: 1000, memory_limit_mb: 256 }] });
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ case_number: 1, input_data: '', output_data: '' }] });
+
+            // A SIGTERM-ignoring sleeper: exec starts, the wall-clock limit
+            // fires, and the escalation timer must SIGKILL the group.
+            const killGroup = jest.fn();
+            (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, opts, cb) => {
+                const child = {
+                    pid: 4242,
+                    exitCode: null,
+                    stdin: { write: jest.fn(), end: jest.fn(), on: jest.fn() },
+                    on: jest.fn(),
+                    kill: jest.fn(),
+                };
+                // The direct child never settles on its own (the sleeper ate
+                // SIGTERM). Fire the process-group SIGKILL interception.
+                const originalKill = process.kill.bind(process);
+                (process.kill as unknown as jest.Mock) = killGroup.mockImplementation(
+                    (pid, signal) => originalKill(pid, signal)
+                );
+                // Simulate the escalation path: after the grace period the
+                // group kill fires, the shell dies, and exec reports TLE.
+                setTimeout(() => {
+                    const tleError = new Error('Command failed') as Error & { code: number };
+                    tleError.code = JUDGE_CONFIG.TLE_EXIT_CODE;
+                    cb(tleError, '', '');
+                }, 10);
+                return child;
+            });
+
+            const judgePromise = judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
+            // Advance past the exec timeout + kill grace: the escalation
+            // timer must have fired the group SIGKILL by then.
+            const deadline = 1000 + JUDGE_CONFIG.TIMEOUT_BUFFER_MS + JUDGE_CONFIG.KILL_GRACE_MS;
+            await jest.advanceTimersByTimeAsync(deadline + 100);
+            const result = await judgePromise;
+
+            expect(result.overallStatus).toBe(SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED);
+            // The escalation SIGKILLed the whole process group.
+            expect(killGroup).toHaveBeenCalledWith(-4242, 'SIGKILL');
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it('computes effective limits from the language multipliers (python: time x4, memory x2)', async () => {
@@ -137,9 +185,11 @@ describe('Judge Service', () => {
         const call = (cp.exec as unknown as jest.Mock).mock.calls[0];
         const [cmd, opts] = call;
 
-        // The `timeout` wall-clock and in-command limits use effective time.
+        // The `timeout` wall-clock and in-command limits use effective time,
+        // with a SIGKILL grace after the limit (RUNNER-004).
         const effectiveTimeMs = 1000 * LANGUAGE_LIMITS.python.timeMultiplier;
-        expect(cmd).toContain(`timeout ${effectiveTimeMs / 1000}s`);
+        const killGraceS = Math.max(1, Math.ceil(JUDGE_CONFIG.KILL_GRACE_MS / 1000));
+        expect(cmd).toContain(`timeout -k ${killGraceS}s ${effectiveTimeMs / 1000}s`);
         // RLIMIT_AS = effective memory + slack; RLIMIT_CPU = ceil(effective seconds) + slack.
         const effectiveMemoryMb = 256 * LANGUAGE_LIMITS.python.memoryMultiplier;
         const expectedAsLimitMb = effectiveMemoryMb + JUDGE_CONFIG.MEMORY_LIMIT_SLACK_MB;
@@ -166,7 +216,7 @@ describe('Judge Service', () => {
         const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
 
         const [cmd, opts] = (cp.exec as unknown as jest.Mock).mock.calls[0];
-        expect(cmd).toContain('timeout 1s');
+        expect(cmd).toContain(`timeout -k ${Math.max(1, Math.ceil(JUDGE_CONFIG.KILL_GRACE_MS / 1000))}s 1s`);
         expect(cmd).toContain(`${256 + JUDGE_CONFIG.MEMORY_LIMIT_SLACK_MB} ${1 + JUDGE_CONFIG.CPU_LIMIT_SLACK_S}`);
         expect(opts.timeout).toBe(1000 + JUDGE_CONFIG.TIMEOUT_BUFFER_MS);
         expect(result.timeLimitMs).toBe(1000);

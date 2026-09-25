@@ -62,6 +62,8 @@ services:
       - authoring-jobs:/jobs
     networks:
       - oj-network
+    # Reap orphans/zombies below pid 1 (RUNNER-009) — npm is not an init.
+    init: true
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:3000/health/ready >/dev/null"]

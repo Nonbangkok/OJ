@@ -36,15 +36,20 @@ describe('language constants', () => {
 
         it('compiles C++ with the exact g++ flags used today', () => {
             expect(LANGUAGE_PREPARE.cpp.sourceExtension).toBe('.cpp');
-            // The command template references the source and output paths.
-            expect(LANGUAGE_PREPARE.cpp.checkCommand('/src/s.cpp', '/out/s.out'))
-                .toBe('g++ -std=c++20 -fsanitize=signed-integer-overflow /src/s.cpp -o /out/s.out');
+            // The compile invocation is a shell-less argv array referencing
+            // the source and output paths.
+            expect(LANGUAGE_PREPARE.cpp.checkCommand('/src/s.cpp', '/out/s.out')).toEqual({
+                command: 'g++',
+                args: ['-std=c++20', '-fsanitize=signed-integer-overflow', '/src/s.cpp', '-o', '/out/s.out'],
+            });
         });
 
         it('syntax-checks Python via py_compile', () => {
             expect(LANGUAGE_PREPARE.python.sourceExtension).toBe('.py');
-            expect(LANGUAGE_PREPARE.python.checkCommand('/src/s.py', '/out/s.out'))
-                .toBe('python3 -m py_compile /src/s.py');
+            expect(LANGUAGE_PREPARE.python.checkCommand('/src/s.py', '/out/s.out')).toEqual({
+                command: 'python3',
+                args: ['-m', 'py_compile', '/src/s.py'],
+            });
         });
 
         it('runs the C++ binary directly and Python through the interpreter', () => {

@@ -39,6 +39,42 @@ describe('findForbiddenInclude', () => {
     const code = '#include <iostream>\n#include "/proc/self/environ"\n#include "/etc/shadow"';
     expect(findForbiddenInclude(code)).toBe('/proc/self/environ');
   });
+
+  // --- RUNNER-001 bypass forms --------------------------------------------
+  // The literal-only regex was bypassable via macro includes and
+  // backslash-newline continuation; these must all be rejected now.
+
+  it('rejects macro includes whose #define body is an absolute path', () => {
+    expect(findForbiddenInclude('#define E "/proc/1/environ"\n#include E')).toBe('/proc/1/environ');
+  });
+
+  it('rejects macro includes built from concatenated string literals', () => {
+    expect(findForbiddenInclude('#define E "/proc/" "1/environ"\n#include E')).toBe('/proc/1/environ');
+  });
+
+  it('rejects macro include chains where the path is defined in pieces', () => {
+    expect(findForbiddenInclude('#define A "/proc/1/"\n#define B A "environ"\n#include B')).toBe('/proc/1/');
+  });
+
+  it('rejects absolute paths hidden behind backslash-newline continuation', () => {
+    const continued = '#include "/et\\\nc/passwd"';
+    expect(findForbiddenInclude(continued)).toBe('/etc/passwd');
+    const macroContinued = '#define P "/et\\\nc/passwd"\n#include P';
+    expect(findForbiddenInclude(macroContinued)).toBe('/etc/passwd');
+  });
+
+  it('rejects traversal paths hidden in #define bodies', () => {
+    expect(findForbiddenInclude('#define H "../../app/.env"\n#include H')).toBe('../../app/.env');
+  });
+
+  it('still allows benign macro includes and defines', () => {
+    // A macro include with no dangerous define in the file.
+    expect(findForbiddenInclude('#include E')).toBeNull();
+    // Ordinary non-path defines (numbers, type aliases, strings without / or ..).
+    expect(findForbiddenInclude('#define N 100\n#define X std::vector<int>\n#define NAME "problem"\n#include <iostream>')).toBeNull();
+    // Comment between directive parts must not splice into a path.
+    expect(findForbiddenInclude('#include <ios/* comment */tream>')).toBeNull();
+  });
 });
 
 describe('sanitizeCompilerStderr', () => {
