@@ -77,4 +77,34 @@ describe('ScoreboardTable', () => {
         expect(screen.queryByAltText("bob's avatar")).not.toBeInTheDocument();
         expect(screen.getByText('B')).toBeInTheDocument(); // fallback initial
     });
+
+    it('gives tied totals the same rank and skips the next rank (SCORE-003)', () => {
+        const tied = [
+            { username: 'alice', has_avatar: false, problems_solved: 10, total_score: 1000 },
+            { username: 'bob', has_avatar: false, problems_solved: 8, total_score: 1000 },
+            { username: 'charlie', has_avatar: false, problems_solved: 6, total_score: 600 },
+        ];
+
+        render(<MemoryRouter><ScoreboardTable scoreboard={tied} /></MemoryRouter>);
+
+        const rows = screen.getAllByRole('row');
+        // Header + 3 data rows; the rank is the first cell of each row.
+        const rankCells = rows.slice(1).map(row => row.querySelector('td')?.textContent);
+        expect(rankCells).toEqual(['1', '1', '3']);
+    });
+
+    it('gives every tied user at a medal rank the medal for that rank (SCORE-003)', () => {
+        const tied = [
+            { username: 'alice', has_avatar: false, problems_solved: 10, total_score: 1000 },
+            { username: 'bob', has_avatar: false, problems_solved: 8, total_score: 1000 },
+        ];
+
+        render(<MemoryRouter><ScoreboardTable scoreboard={tied} /></MemoryRouter>);
+
+        // Both share rank 1 → both get gold; nobody gets silver for index 2.
+        const medals = document.querySelectorAll('svg[class*="medal"]');
+        expect(medals.length).toBe(2);
+        const classes = [...medals].map((el) => el.getAttribute('class') ?? '');
+        expect(classes.every((cls) => cls.includes('medal-gold'))).toBe(true);
+    });
 });
