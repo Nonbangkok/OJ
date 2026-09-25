@@ -66,9 +66,12 @@ export const moveProblemsToContest = async (contestId: number, problemIds: strin
       throw new Error(`Problems already in contest: ${problemsInContest.map((problem) => problem.id).join(', ')}`);
     }
 
-    // Move problems to contest
+    // Move problems to contest. XSYS-004: snapshot each problem's current
+    // visibility so every exit path can restore exactly what was there
+    // before, instead of force-publishing hidden problems (bulk move-back)
+    // or leaving them invisible forever (single move-back, contest delete).
     const updateResult = await client.query<ProblemIdentityRow>(
-      'UPDATE problems SET contest_id = $1, is_visible = FALSE WHERE id = ANY($2) RETURNING id, title',
+      'UPDATE problems SET contest_id = $1, is_visible = FALSE, is_visible_before_contest = is_visible WHERE id = ANY($2) RETURNING id, title',
       [contestId, problemIds]
     );
 
@@ -111,8 +114,15 @@ export const moveProblemsBackToMain = async (contestId: number, problemIds: stri
       throw new Error('Contest not found');
     }
 
-    // Build query dynamically
-    let queryText = 'UPDATE problems SET contest_id = NULL, is_visible = TRUE WHERE contest_id = $1';
+    // Build query dynamically. XSYS-004: restore the pre-contest visibility
+    // snapshot (legacy rows without a snapshot fall back to visible, matching
+    // the historical behavior) and clear the snapshot.
+    let queryText = `
+      UPDATE problems
+      SET contest_id = NULL,
+          is_visible = COALESCE(is_visible_before_contest, TRUE),
+          is_visible_before_contest = NULL
+      WHERE contest_id = $1`;
     const queryParams: Array<number | string[]> = [contestId];
 
     if (problemIds && problemIds.length > 0) {

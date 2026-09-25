@@ -56,8 +56,8 @@ router.get('/contests/:id',
   validateRequest({ params: contestIdParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const userId = req.user?.id;
-  const contest = await getContestDetail(id, userId);
+  const viewer = req.user ? { id: req.user.id, role: req.user.role } : undefined;
+  const contest = await getContestDetail(id, viewer);
   if (!contest) {
     throw new AppError('Contest not found', 404);
   }
