@@ -68,15 +68,14 @@ const useUserManagement = () => {
         }
     };
 
+    // Re-throw so AddUserModal can surface the failure inline (duplicate
+    // username, validation error…) while keeping the dialog open. Setting
+    // the page-level `error` here would unmount the whole management view
+    // and silently dismiss the modal with the typed values.
     const handleAddNewUser = async (newUserData) => {
-        try {
-            await adminService.createUser(newUserData);
-            setIsAddModalOpen(false);
-            fetchUsers();
-        } catch (err) {
-            setError(err.response?.data?.message || 'Failed to create user.');
-            console.error(err);
-        }
+        await adminService.createUser(newUserData);
+        setIsAddModalOpen(false);
+        fetchUsers();
     };
 
     return {

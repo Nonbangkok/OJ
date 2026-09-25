@@ -10,6 +10,21 @@ export const APP_CONSTANTS = {
   LARGE_UPLOAD_WARNING_BYTES: 100 * 1024 * 1024,
 } as const;
 
+/**
+ * Account validation limits, mirroring the backend USER_VALIDATION /
+ * STRING_LIMITS constants so client-side checks match server-side Zod
+ * schemas exactly (see backend/constants/index.ts).
+ */
+export const USER_VALIDATION = {
+  MIN_USERNAME_LENGTH: 3,
+  MIN_PASSWORD_LENGTH: 8,
+} as const;
+
+export const STRING_LIMITS = {
+  USERNAME: 50,
+  PASSWORD: 256,
+} as const;
+
 export const USER_ROLES = {
   USER: 'user',
   STAFF: 'staff',
