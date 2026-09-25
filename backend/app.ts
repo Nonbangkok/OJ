@@ -8,6 +8,7 @@ import { AUTHORING_VALIDATION, SECURITY_CONFIG } from './constants';
 import { attachRequestUser, revalidateSessionUser } from './middleware/requestContext';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { generalApiLimiter } from './middleware/rateLimit';
+import { maintenanceGate } from './services/maintenanceMode';
 import adminRoutes from './controllers/adminController';
 import authRoutes from './controllers/authController';
 import problemRoutes from './controllers/problemController';
@@ -60,6 +61,11 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
   // Health checks intentionally run before session middleware so liveness does
   // not depend on the database-backed session store.
   app.use('/', healthRoutes);
+
+  // DB-05: while a database import runs, every other request must fail fast
+  // with 503 instead of erroring against a half-dropped schema. Health checks
+  // and the token-authenticated import-progress endpoint stay reachable.
+  app.use(maintenanceGate);
 
   const sessionStore = options.sessionStore ?? new PgStore({
     pool,

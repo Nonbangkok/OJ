@@ -12,11 +12,16 @@ class ContestScheduler {
   // per-minute tick double-process the same contest. `isRunning` only guards
   // start(), not the tick.
   private tickInProgress: boolean;
+  // DB-05: while a database import runs, the schema is being dropped and
+  // recreated — ticks would only produce errors. Pausing keeps the cron task
+  // registered; ticks are skipped until resume().
+  private paused: boolean;
 
   constructor() {
     this.isRunning = false;
     this.checkInterval = null;
     this.tickInProgress = false;
+    this.paused = false;
   }
 
   // Start the scheduler
@@ -44,6 +49,17 @@ class ContestScheduler {
     logger.info('contest scheduler started - checking every minute');
   }
 
+  /** DB-05: skip ticks while a database import holds the schema hostage. */
+  pause(): void {
+    this.paused = true;
+    logger.warn('contest scheduler paused (database maintenance)');
+  }
+
+  resume(): void {
+    this.paused = false;
+    logger.info('contest scheduler resumed');
+  }
+
   // Stop the scheduler
   stop(): void {
     if (this.checkInterval) {
@@ -58,6 +74,10 @@ class ContestScheduler {
   async checkContestStatus(): Promise<void> {
     if (this.tickInProgress) {
       logger.debug('contest scheduler tick already in progress - skipping');
+      return;
+    }
+    if (this.paused) {
+      logger.debug('contest scheduler paused - skipping tick');
       return;
     }
 

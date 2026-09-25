@@ -7,7 +7,15 @@ import * as db from '../db';
 import { runMigrationsFromPool } from '../scripts/migrate';
 
 // Mock Dependencies
-jest.mock('../db');
+jest.mock('../db', () => {
+    const query = jest.fn();
+    return {
+        query,
+        pool: { query, connect: jest.fn() },
+        // DB-10: the import flow runs migrations on a dedicated unlimited pool.
+        createMigrationsPool: jest.fn(() => ({ connect: jest.fn(async () => ({ query, release: jest.fn() })), end: jest.fn() })),
+    };
+});
 jest.mock('../scripts/migrate', () => ({
     runMigrationsFromPool: jest.fn().mockResolvedValue([]),
 }));
@@ -191,7 +199,10 @@ describe('Admin Controller', () => {
             await new Promise<void>((resolve) => setImmediate(resolve));
             await new Promise<void>((resolve) => setImmediate(resolve));
 
-            expect(runMigrationsFromPool).toHaveBeenCalledWith(db.pool);
+            // DB-10: migrations run on a dedicated pool (no statement_timeout),
+            // not the shared app pool.
+            expect(runMigrationsFromPool).toHaveBeenCalledTimes(1);
+            expect(runMigrationsFromPool).not.toHaveBeenCalledWith(db.pool);
 
             const progress = await request(app)
                 .get(`/admin/database/import-progress/${start.body.jobId}`)
