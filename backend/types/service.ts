@@ -144,6 +144,16 @@ export interface QueueSubmissionResult {
   isContestSubmission: boolean;
 }
 
+/**
+ * Requester context for search endpoints — the visibility predicate is
+ * role-dependent (staff/admin search the full catalog, users only the
+ * publicly listed problems).
+ */
+export interface SearchViewer {
+  userId: number;
+  role: string;
+}
+
 export interface SubmissionListRow {
   id: number;
   username: string;
@@ -195,6 +205,7 @@ export interface ProblemExportBundle {
 
 export type ReplaceProblemTestcasesFromZipResult =
   | { kind: 'no_valid_pairs' }
+  | { kind: 'not_found' }
   | { kind: 'ok'; insertedCount: number };
 
 // ---------------------------------------------------------------------------

@@ -17,8 +17,10 @@ jest.mock('../services/submissionService');
 jest.mock('../middleware/auth', () => ({
     requireAuth: (req: Request, res: Response, next: NextFunction) => {
         if (req.session) {
-            req.session.userId = 1;
-            req.session.role = 'user';
+            // Keep an explicitly staged role (staff/admin apps below) instead
+            // of stomping it — the default stays a regular user.
+            req.session.userId = req.session.userId ?? 1;
+            req.session.role = req.session.role ?? 'user';
         }
         next();
     }
@@ -164,6 +166,11 @@ describe('Submission Controller', () => {
 
             expect(res.status).toBe(200);
             expect(res.body).toEqual(mockSubmissions);
+            // PROBLEM-001: non-staff feed filters hidden/contest problems.
+            expect(db.query).toHaveBeenCalledWith(
+                expect.stringContaining('p.is_visible = true AND p.contest_id IS NULL'),
+                [],
+            );
         });
 
         it('should return filtered submissions for mine filter', async () => {
@@ -176,6 +183,65 @@ describe('Submission Controller', () => {
             expect(res.status).toBe(200);
             expect(res.body.length).toBe(1);
         });
+
+        it('should reject a contest feed for a non-participant (SUB-002)', async () => {
+            // 1. contest exists, 2. participant check -> not a participant
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ status: 'running' }] })
+                .mockResolvedValueOnce({ rows: [] });
+
+            const res = await request(app).get('/submissions?contestId=1');
+
+            expect(res.status).toBe(403);
+            expect(res.body.message).toBe('You must join this contest to view its submissions.');
+        });
+
+        it('should return 404 for a contest feed when the contest does not exist', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+
+            const res = await request(app).get('/submissions?contestId=999');
+
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Contest not found.');
+        });
+
+        it('should return a contest feed for a participant', async () => {
+            const mockRows = [{ id: 5, username: 'u1', problem_id: 'CP1' }];
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ status: 'running' }] }) // contest exists
+                .mockResolvedValueOnce({ rows: [{ exists: 1 }] }) // participant
+                .mockResolvedValueOnce({ rows: mockRows }); // feed rows
+
+            const res = await request(app).get('/submissions?contestId=1');
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual(mockRows);
+        });
+
+        it('should return 200 for staff on a contest feed without a participant row', async () => {
+            const staffApp = express();
+            staffApp.use(express.json());
+            staffApp.use(session({ secret: 'test-secret', resave: false, saveUninitialized: false }));
+            staffApp.use((req: Request, res: Response, next: NextFunction) => {
+                if (req.session) {
+                    req.session.userId = 1;
+                    req.session.role = 'staff';
+                }
+                next();
+            });
+            staffApp.use('/', submissionRouter);
+            staffApp.use(errorHandler);
+
+            const mockRows = [{ id: 5, username: 'u1', problem_id: 'CP1' }];
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ status: 'running' }] })
+                .mockResolvedValueOnce({ rows: mockRows });
+
+            const res = await request(staffApp).get('/submissions?contestId=1');
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual(mockRows);
+        });
     });
 
     describe('GET /search/problems', () => {
@@ -185,6 +251,96 @@ describe('Submission Controller', () => {
             expect(res.status).toBe(200);
             expect(res.body).toEqual([]);
             expect(db.query).not.toHaveBeenCalled();
+        });
+
+        it('restricts the default search to visible, non-contest problems for regular users (PROBLEM-001)', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ id: 'P1', title: 'Public Problem' }],
+            });
+
+            const res = await request(app).get('/search/problems?q=prob');
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual([{ id: 'P1', title: 'Public Problem' }]);
+            const [sql, params] = (db.query as jest.Mock).mock.calls[0];
+            expect(sql).toContain('is_visible = true AND contest_id IS NULL');
+            expect(params).toEqual(['%prob%']);
+        });
+
+        it('searches the full catalog for staff (PROBLEM-001)', async () => {
+            const staffApp = express();
+            staffApp.use(express.json());
+            staffApp.use(session({ secret: 'test-secret', resave: false, saveUninitialized: false }));
+            staffApp.use((req: Request, res: Response, next: NextFunction) => {
+                if (req.session) {
+                    req.session.userId = 1;
+                    req.session.role = 'staff';
+                }
+                next();
+            });
+            staffApp.use('/', submissionRouter);
+            staffApp.use(errorHandler);
+
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ id: 'DRAFT1', title: 'Draft' }],
+            });
+
+            const res = await request(staffApp).get('/search/problems?q=dr');
+
+            expect(res.status).toBe(200);
+            const [sql] = (db.query as jest.Mock).mock.calls[0];
+            expect(sql).not.toContain('is_visible = true');
+            expect(res.body).toEqual([{ id: 'DRAFT1', title: 'Draft' }]);
+        });
+
+        it('hides contest-problem search from non-participants (PROBLEM-001)', async () => {
+            // 1. contest exists (status running), 2. participant check -> no.
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ status: 'running' }] })
+                .mockResolvedValueOnce({ rows: [] });
+
+            const res = await request(app).get('/search/problems?q=apl&contestId=1');
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual([]);
+            // Only the contest + participant lookups ran — no problem query.
+            expect(db.query).toHaveBeenCalledTimes(2);
+        });
+
+        it('returns contest problems to a participant', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ status: 'running' }] }) // contest exists
+                .mockResolvedValueOnce({ rows: [{ exists: 1 }] }) // participant
+                .mockResolvedValueOnce({ rows: [{ id: 'aplusb', title: 'A Plus B' }] });
+
+            const res = await request(app).get('/search/problems?q=apl&contestId=1');
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual([{ id: 'aplusb', title: 'A Plus B' }]);
+        });
+
+        it('returns contest problems to staff without a participant row', async () => {
+            const staffApp = express();
+            staffApp.use(express.json());
+            staffApp.use(session({ secret: 'test-secret', resave: false, saveUninitialized: false }));
+            staffApp.use((req: Request, res: Response, next: NextFunction) => {
+                if (req.session) {
+                    req.session.userId = 1;
+                    req.session.role = 'admin';
+                }
+                next();
+            });
+            staffApp.use('/', submissionRouter);
+            staffApp.use(errorHandler);
+
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ status: 'finished' }] }) // contest exists
+                .mockResolvedValueOnce({ rows: [{ id: 'aplusb', title: 'A Plus B' }] }); // snapshot search
+
+            const res = await request(staffApp).get('/search/problems?q=apl&contestId=1');
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual([{ id: 'aplusb', title: 'A Plus B' }]);
         });
     });
 
