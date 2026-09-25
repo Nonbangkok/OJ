@@ -115,7 +115,11 @@ const useContestScoreboard = (contestId?: string | number): UseContestScoreboard
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
-    if (contest?.status === 'running') {
+    // XSYS-012: keep polling through 'finishing' too — the scoreboard is
+    // still live there (final submissions land, then the migration rewrites
+    // it). Stopping at 'running' left the page silently stale for the whole
+    // finishing window, especially for guests who never get SSE pings.
+    if (contest?.status === 'running' || contest?.status === 'finishing') {
       const intervalMs = realtimeDown
         ? REALTIME.SCOREBOARD_POLL_WHEN_STREAM_DOWN_MS
         : REALTIME.SCOREBOARD_FALLBACK_POLL_MS;

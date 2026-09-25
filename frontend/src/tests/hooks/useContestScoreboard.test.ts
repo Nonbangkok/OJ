@@ -205,6 +205,29 @@ describe('useContestScoreboard', () => {
             }
         });
 
+        it('keeps polling while the contest is finishing (XSYS-012)', async () => {
+            jest.useFakeTimers();
+            try {
+                const finishingContest = { ...mockContest, status: 'finishing' };
+                (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValue(finishingContest);
+                (jest.mocked(contestService.getScoreboard) as jest.Mock).mockResolvedValue(mockScoreboardData);
+
+                const { result } = renderHook(() => useContestScoreboard(mockContestId));
+                await act(async () => {});
+                expect(result.current.loading).toBe(false);
+
+                // The safety-net poll must fire during 'finishing' — final
+                // verdicts and the migration rewrite still land there.
+                const callsBefore = getScoreboardCalls();
+                act(() => {
+                    jest.advanceTimersByTime(REALTIME.SCOREBOARD_FALLBACK_POLL_MS);
+                });
+                expect(getScoreboardCalls()).toBeGreaterThan(callsBefore);
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
         it('does not subscribe when EventSource is unavailable', async () => {
             (jest.mocked(isRealtimeSupported) as jest.Mock).mockReturnValue(false);
             (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce(runningContest);
