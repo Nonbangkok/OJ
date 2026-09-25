@@ -77,6 +77,38 @@ describe('Auth Controller', () => {
             expect(res.body.message).toBe('Username already exists');
         });
 
+        // DB-08/AUTH-006: uniqueness is case-insensitive — a case variant of
+        // an existing username must be rejected, not create a lookalike.
+        it('should return 400 for a case-variant of an existing username', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ setting_value: 'true' }] });
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ id: 1, username: 'testuser' }] });
+
+            const res = await request(app)
+                .post('/register')
+                .send({ username: 'TestUser', password: 'password123' });
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Username already exists');
+            expect(db.query).toHaveBeenCalledWith(
+                'SELECT id FROM users WHERE LOWER(username) = LOWER($1)',
+                ['TestUser'],
+            );
+        });
+
+        it('should map an INSERT unique-violation race to 400 (DB-08)', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ setting_value: 'true' }] })
+                .mockResolvedValueOnce({ rows: [] })
+                .mockRejectedValueOnce({ code: '23505', constraint: 'users_username_lower_unique' });
+
+            const res = await request(app)
+                .post('/register')
+                .send({ username: 'raced-user', password: 'password123' });
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Username already exists');
+        });
+
         // AUTH-005: the Zod cap must match users.username VARCHAR(50) so a
         // 51–64 char name gets a 400 instead of a 500 on the INSERT.
         it('should register a 50-char username (column limit)', async () => {
