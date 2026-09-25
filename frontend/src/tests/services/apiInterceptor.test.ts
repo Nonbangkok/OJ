@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance } from 'axios';
-import { installSessionExpiryInterceptor } from '../../services/api';
+import { clearSessionExpiryRedirect, installSessionExpiryInterceptor } from '../../services/api';
 
 const replaceStateSpy = jest.spyOn(window.history, 'replaceState').mockImplementation(() => undefined);
 
@@ -84,5 +84,33 @@ describe('session expiry interceptor', () => {
     });
 
     expect(replaceStateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // AUTH-008: the one-shot loop-guard must re-arm after a successful login,
+  // or a second session expiry in the same tab never redirects.
+  it('re-arms the redirect after clearSessionExpiryRedirect (successful login)', () => {
+    window.sessionStorage.setItem('oj:had-session', '1');
+    const api = makeInstance();
+
+    // First expiry: sets the guard and navigates once.
+    reject(api, {
+      response: { status: 401 }, config: { url: '/me' },
+    });
+    expect(replaceStateSpy).toHaveBeenCalledTimes(1);
+
+    // While the guard is set, further 401s are swallowed...
+    reject(api, {
+      response: { status: 401 }, config: { url: '/problems' },
+    });
+    expect(replaceStateSpy).toHaveBeenCalledTimes(1);
+
+    // ...the user logs in (AuthContext.login clears the flag)...
+    clearSessionExpiryRedirect();
+
+    // ...and a second expiry later in the same tab redirects again.
+    reject(api, {
+      response: { status: 401 }, config: { url: '/problems' },
+    });
+    expect(replaceStateSpy).toHaveBeenCalledTimes(2);
   });
 });

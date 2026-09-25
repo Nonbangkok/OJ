@@ -22,6 +22,20 @@ export const getLargeUploadBaseUrl = (): string => largeUploadApi.defaults.baseU
 const SESSION_EXPIRY_KEY = 'oj:session-expiry-redirect';
 
 /**
+ * Re-arm the session-expiry redirect (AUTH-008).
+ *
+ * The interceptor sets a one-shot loop-guard flag before redirecting to
+ * /login so several concurrently-failing requests don't trigger repeated
+ * reloads. Without clearing it, a second session expiry later in the same
+ * tab would be silently swallowed. Called on successful login (AuthContext)
+ * and when the module loads on a non-/login page — both points where the
+ * user is demonstrably past the expired-session state.
+ */
+export const clearSessionExpiryRedirect = (): void => {
+  window.sessionStorage.removeItem(SESSION_EXPIRY_KEY);
+};
+
+/**
  * Send the user to the login page (with a way back) when any API call
  * returns a bare 401 — i.e. the session cookie expired mid-session.
  * A 401 from /login itself (wrong credentials) is not an expiry.
@@ -65,7 +79,7 @@ installSessionExpiryInterceptor(largeUploadApi);
 
 // Clear the loop-guard flag once the user has landed somewhere after login.
 if (window.location.pathname !== '/login') {
-  window.sessionStorage.removeItem(SESSION_EXPIRY_KEY);
+  clearSessionExpiryRedirect();
 }
 
 export default api;

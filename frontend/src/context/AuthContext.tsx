@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import authService from '../services/authService';
+import { clearSessionExpiryRedirect } from '../services/api';
 import type { AuthUser } from '../types';
 
 interface AuthContextValue {
@@ -63,6 +64,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, [checkLoggedIn]);
 
   const login = useCallback((userData: AuthUser) => {
+    // A fresh session exists again, so re-arm the session-expiry redirect
+    // (AUTH-008): without this the second expiry in the same tab would not
+    // redirect because the one-shot loop-guard flag never reset.
+    clearSessionExpiryRedirect();
+    window.sessionStorage.setItem('oj:had-session', '1');
     setUser(userData);
   }, []);
 
