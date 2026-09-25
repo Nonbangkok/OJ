@@ -12,6 +12,7 @@ import {
   getProblemDetail,
   getProblemExportBundle,
   getProblemPdfWithAccess,
+  getProblemTestcases,
   getProblemsWithStatsForUser,
   getVisibleProblems,
   replaceProblemTestcasesFromZip,
@@ -42,6 +43,7 @@ import {
   createProblemSchema,
   problemIdParamSchema,
   problemExportSchema,
+  problemTestcasesQuerySchema,
   problemsWithStatsQuerySchema,
   progressIdParamSchema,
   updateProblemSchema,
@@ -222,6 +224,30 @@ router.put('/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin,
     problem: updatedProblem
   });
 }));
+
+// Admin testcase viewer (JUDGE-011: testcase content is staff-only — never
+// exposed on any user-facing route). Default response is metadata only
+// (case numbers + sizes); ?caseNumber=N fetches one full case, truncated
+// server-side past TESTCASE_VIEWER_CONFIG.MAX_CASE_BYTES per side.
+router.get('/admin/problems/:id/testcases', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: problemIdParamSchema, query: problemTestcasesQuerySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = String(req.params.id);
+    const { caseNumber } = req.query as unknown as { caseNumber?: number };
+
+    const result = await getProblemTestcases(id, caseNumber);
+    if (result.kind === 'not_found') {
+      throw new AppError('Problem not found', 404);
+    }
+    if (result.kind === 'case_not_found') {
+      throw new AppError(`Testcase ${caseNumber} not found for problem ${id}`, 404);
+    }
+    if (result.kind === 'ok') {
+      res.json({ testcases: result.testcases, total: result.testcases.length });
+      return;
+    }
+    res.json(result.testcase);
+  }));
 
 // Problem Collections (organizational groups; visibility stays on problems)
 router.get('/admin/collections', requireAuth, requireStaffOrAdmin, asyncHandler(async (_req: Request, res: Response) => {

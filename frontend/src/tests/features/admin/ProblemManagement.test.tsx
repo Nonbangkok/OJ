@@ -181,4 +181,29 @@ describe('ProblemManagement Component', () => {
         });
         expect(await screen.findByText(/rejudge failed on the server/i)).toBeInTheDocument();
     });
+
+    it('opens the testcases dialog from a row action and expands a case', async () => {
+        (jest.mocked(adminService.getProblemTestcases) as jest.Mock).mockResolvedValueOnce({
+            testcases: [{ case_number: 1, input_bytes: 10, output_bytes: 20 }],
+            total: 1,
+        });
+        (jest.mocked(adminService.getProblemTestcase) as jest.Mock).mockResolvedValueOnce({
+            caseNumber: 1,
+            input: { bytes: 10, truncated: false, content: '1 2' },
+            output: { bytes: 20, truncated: false, content: '3' },
+        });
+        renderProblemManagement();
+
+        await waitFor(() => screen.getByText('Problem 1'));
+        const p1Row = screen.getAllByRole('row').find(r => r.textContent.includes('Problem 1'));
+        fireEvent.click(within(p1Row).getByRole('button', { name: /row actions for P1/i }));
+        fireEvent.click(within(p1Row).getByRole('menuitem', { name: 'View Testcases' }));
+
+        expect(await screen.findByText('Testcases: P1')).toBeInTheDocument();
+        expect(screen.getByText('1 testcase')).toBeInTheDocument();
+
+        fireEvent.click(await screen.findByRole('button', { name: /#1/i }));
+        expect(await screen.findByText('1 2')).toBeInTheDocument();
+        expect(adminService.getProblemTestcase).toHaveBeenCalledWith('P1', 1);
+    });
 });

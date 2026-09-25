@@ -228,6 +228,15 @@ export const progressIdParamSchema = z.object({
   progressId: nonEmptyString,
 });
 
+/**
+ * Single-case selection for the admin testcase viewer
+ * (GET /admin/problems/:id/testcases). Absent => metadata-only list;
+ * present => one full case (subject to TESTCASE_VIEWER_CONFIG truncation).
+ */
+export const problemTestcasesQuerySchema = z.object({
+  caseNumber: z.coerce.number().int().positive().optional(),
+}).strict();
+
 export const problemExportSchema = z.object({
   problemIds: z.array(nonEmptyString).min(1),
 });

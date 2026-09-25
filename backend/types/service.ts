@@ -208,6 +208,35 @@ export type ReplaceProblemTestcasesFromZipResult =
   | { kind: 'not_found' }
   | { kind: 'ok'; insertedCount: number };
 
+// --- Admin testcase viewer (GET /admin/problems/:id/testcases) -----------
+
+/** Metadata row: case identity + content sizes, never the content itself. */
+export interface TestcaseMetadataRow {
+  case_number: number;
+  input_bytes: number;
+  output_bytes: number;
+}
+
+/** One side (input or output) of a fetched testcase, API-truncated. */
+export interface TestcaseViewPart {
+  /** True content size in bytes (before any truncation). */
+  bytes: number;
+  truncated: boolean;
+  content: string;
+}
+
+export interface TestcaseView {
+  caseNumber: number;
+  input: TestcaseViewPart;
+  output: TestcaseViewPart;
+}
+
+export type GetProblemTestcasesResult =
+  | { kind: 'not_found' }
+  | { kind: 'ok'; testcases: TestcaseMetadataRow[] }
+  | { kind: 'case_not_found' }
+  | { kind: 'ok_case'; testcase: TestcaseView };
+
 // ---------------------------------------------------------------------------
 // adminQueryService
 // ---------------------------------------------------------------------------

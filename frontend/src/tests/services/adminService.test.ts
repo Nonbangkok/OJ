@@ -105,6 +105,29 @@ describe('adminService', () => {
             expect(api.post).toHaveBeenCalledWith('/admin/rejudge/problem/P1');
             expect(result).toEqual(response);
         });
+
+        it('getProblemTestcases calls api.get with the metadata path (no params)', async () => {
+            const response = {
+                testcases: [{ case_number: 1, input_bytes: 5, output_bytes: 6 }],
+                total: 1,
+            };
+            jest.mocked(api.get).mockResolvedValueOnce({ data: response });
+            const result = await adminService.getProblemTestcases('aplusb');
+            expect(api.get).toHaveBeenCalledWith('/admin/problems/aplusb/testcases');
+            expect(result).toEqual(response);
+        });
+
+        it('getProblemTestcase passes caseNumber as a query param', async () => {
+            const response = {
+                caseNumber: 3,
+                input: { bytes: 5, truncated: false, content: 'in' },
+                output: { bytes: 6, truncated: false, content: 'out' },
+            };
+            jest.mocked(api.get).mockResolvedValueOnce({ data: response });
+            const result = await adminService.getProblemTestcase('aplusb', 3);
+            expect(api.get).toHaveBeenCalledWith('/admin/problems/aplusb/testcases', { params: { caseNumber: 3 } });
+            expect(result).toEqual(response);
+        });
     });
 
     describe('Contest Management', () => {

@@ -85,6 +85,34 @@ export interface BatchCreateUsersResponse extends ApiMessageResponse {
 export type AdminProblemsResponse = AdminProblem[];
 export type AdminProblemDetailResponse = ProblemDetail;
 
+// --- Admin testcase viewer (GET /admin/problems/:id/testcases) -----------
+
+/** Metadata row of the default (list) response — never carries content. */
+export interface TestcaseMetadataResponse {
+  case_number: number;
+  input_bytes: number;
+  output_bytes: number;
+}
+
+export interface TestcaseListResponse {
+  testcases: TestcaseMetadataResponse[];
+  total: number;
+}
+
+/** One side (input or output) of a single fetched case. */
+export interface TestcaseViewPart {
+  /** True content size in bytes (before API truncation). */
+  bytes: number;
+  truncated: boolean;
+  content: string;
+}
+
+export interface TestcaseViewResponse {
+  caseNumber: number;
+  input: TestcaseViewPart;
+  output: TestcaseViewPart;
+}
+
 export interface ProblemExportResponse extends ApiMessageResponse {
   data?: Blob;
 }

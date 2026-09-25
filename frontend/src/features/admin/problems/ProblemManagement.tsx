@@ -3,6 +3,7 @@ import useProblemManagement from '../../../hooks/admin/useProblemManagement';
 import useRejudge from '../../../hooks/admin/useRejudge';
 import ProblemModal from './ProblemModal';
 import CollectionsDialog from './CollectionsDialog';
+import TestcasesDialog from './TestcasesDialog';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import RejudgeFeedbackBox from '../shared/RejudgeFeedbackBox';
 import adminService from '../../../services/adminService';
@@ -81,6 +82,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
   const [collections, setCollections] = useState<CollectionWithStats[]>([]);
   const [collectionFilter, setCollectionFilter] = useState<string>('all');
   const [collectionsOpen, setCollectionsOpen] = useState(false);
+  const [testcasesProblem, setTestcasesProblem] = useState<{ id: string } | null>(null);
   const [collectionConfirm, setCollectionConfirm] = useState<{ id: number; name: string; count: number; isVisible: boolean } | null>(null);
   const [moveConfirm, setMoveConfirm] = useState<{ collectionId: number | null; name: string } | null>(null);
 
@@ -374,6 +376,12 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
                           onClick: () => handleRejudgeClick({ kind: 'problem', id: problem.id, title: problem.title }),
                         },
                         {
+                          key: 'testcases',
+                          label: 'View Testcases',
+                          title: 'Inspect this problem\'s testcase data (input/output per case)',
+                          onClick: () => setTestcasesProblem({ id: problem.id }),
+                        },
+                        {
                           key: 'toggle-visibility',
                           label: problem.is_visible ? 'Hide Problem' : 'Show Problem',
                           onClick: () => handleToggleVisibility(problem.id, problem.is_visible),
@@ -399,6 +407,10 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
         onClose={() => setCollectionsOpen(false)}
         onChanged={refreshAfterCollectionChange}
         collections={collections}
+      />
+      <TestcasesDialog
+        problem={testcasesProblem}
+        onClose={() => setTestcasesProblem(null)}
       />
       {collectionConfirm && (
         <ConfirmationModal
