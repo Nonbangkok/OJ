@@ -525,7 +525,7 @@ describe('Submission Service', () => {
             await processSubmission(1);
         };
 
-        it('creates a per-submission workspace under the OS tmpdir, owned by the sandbox identity with mode 0711', async () => {
+        it('creates a per-submission workspace under the OS tmpdir with mode 0711 and NEVER chowns (hotfix 2026-09)', async () => {
             await runHappyPath();
 
             const mkdtempCalls = (fs.promises.mkdtemp as jest.Mock).mock.calls;
@@ -537,14 +537,14 @@ describe('Submission Service', () => {
             expect(prefix).not.toContain('dist');
             expect(prefix).not.toContain('services');
 
-            // The workspace is chowned to the submission's sandbox identity...
-            const chownCalls = (fs.promises.chown as jest.Mock).mock.calls;
-            const workspaceChown = chownCalls.find(([target]: [string]) =>
-                String(target).includes('oj-submissions') && !String(target).endsWith('.cpp') && !String(target).endsWith('.out'));
-            expect(workspaceChown).toBeDefined();
-            const [, uid, gid] = workspaceChown;
-            expect(uid).toBeGreaterThanOrEqual(JUDGE_CONFIG.SANDBOX_UID_BASE);
-            expect(gid).toBe(uid);
+            // HOTFIX 2026-09: `chown` is GONE from the pipeline entirely. The
+            // production container has no CAP_CHOWN (cap_drop ALL + only
+            // SETUID/SETGID), so the old root-writes-then-chowns flow failed
+            // silently and left every submission a Compilation Error. In the
+            // privileged path ownership is BY CONSTRUCTION (uid-dropped
+            // create/write, see the regression test below); in the dev path
+            // there is simply no ownership change. Either way: no chown call.
+            expect(fs.promises.chown).not.toHaveBeenCalled();
 
             // ...and locked to 0711: owner full access, others traverse-only
             // (can reach a known file by name but cannot list the directory).
@@ -554,7 +554,7 @@ describe('Submission Service', () => {
             expect(workspaceChmod).toBeDefined();
         });
 
-        it('writes the source 0600 owned by the sandbox identity, not 0644 in a shared dir', async () => {
+        it('writes the source 0600 (dev path), not 0644 in a shared dir', async () => {
             await runHappyPath();
 
             const writeCalls = (fs.promises.writeFile as jest.Mock).mock.calls;
@@ -564,13 +564,8 @@ describe('Submission Service', () => {
             expect(String(target)).toMatch(/solution\.cpp$/);
             expect(opts.mode).toBe(0o600);
 
-            // Ownership follows the sandbox identity.
-            const chownCalls = (fs.promises.chown as jest.Mock).mock.calls;
-            const sourceChown = chownCalls.find(([target]: [string]) => String(target).endsWith('.cpp'));
-            expect(sourceChown).toBeDefined();
-            const [, uid, gid] = sourceChown;
-            expect(uid).toBeGreaterThanOrEqual(JUDGE_CONFIG.SANDBOX_UID_BASE);
-            expect(gid).toBe(uid);
+            // HOTFIX 2026-09: ownership by construction, never chown.
+            expect(fs.promises.chown).not.toHaveBeenCalled();
         });
 
         it('keeps the compiled binary owner-only executable (0750, identity-owned)', async () => {
@@ -609,6 +604,163 @@ describe('Submission Service', () => {
             const [target, opts] = rmCalls[0];
             expect(String(target)).toContain('oj-submissions');
             expect(opts).toEqual(expect.objectContaining({ recursive: true, force: true }));
+        });
+    });
+
+    describe('by-construction workspace ownership (hotfix 2026-09)', () => {
+        // REGRESSION TEST for the exact production failure mode: the runner
+        // lockdown container (cap_drop ALL + SETUID/SETGID only) has no
+        // CAP_CHOWN, so root's chown of the workspace/source failed silently,
+        // the source stayed root-owned 0600, and the uid-dropped g++ died
+        // with "cc1plus: fatal error: solution.cpp: Permission denied" —
+        // EVERY submission was a Compilation Error.
+        //
+        // The fix: when privileges can be dropped, the workspace directory
+        // and its files are created by uid-dropped children, so the sandbox
+        // identity owns them BY CONSTRUCTION and chown is never called. These
+        // tests simulate the container's capability environment (Linux-root
+        // where chown WOULD fail with EPERM) by mocking canDropPrivileges to
+        // true and a chown that rejects — then assert the pipeline still
+        // compiles via the by-construction path.
+        let spawnCalls: Array<[string, string[], Record<string, unknown>]>;
+
+        beforeEach(() => {
+            spawnCalls = [];
+            // Simulate the production container: Linux, root, uid-drop ready.
+            const sandboxProcess = jest.requireActual('../../utils/sandboxProcess');
+            jest.spyOn(sandboxProcess, 'canDropPrivileges').mockReturnValue(true);
+            // Even if anything DID try to chown, it fails like the container.
+            (fs.promises.chown as jest.Mock).mockImplementation(async () => {
+                const e = new Error('EPERM: operation not permitted, chown') as NodeJS.ErrnoException;
+                e.code = 'EPERM';
+                throw e;
+            });
+            // mktemp -d reports the workspace path on stdout; dd/chmod/rm
+            // succeed; the compile (prlimit -- g++) exits 0.
+            (cp.spawn as unknown as jest.Mock).mockImplementation(
+                (command: string, args: string[], options: Record<string, unknown>) => {
+                    spawnCalls.push([command, args, options]);
+                    const handlers: Record<string, (...a: unknown[]) => void> = {};
+                    const child = {
+                        pid: 1111,
+                        stdin: {
+                            on: jest.fn(),
+                            end: jest.fn(),
+                        },
+                        stdout: { on: (_e: string, fn: (...a: unknown[]) => void) => { handlers.stdout = fn; } },
+                        stderr: { on: (_e: string, fn: (...a: unknown[]) => void) => { handlers.stderr = fn; } },
+                        on: (event: string, fn: (...a: unknown[]) => void) => { handlers[event] = fn; },
+                        kill: jest.fn(),
+                    };
+                    setImmediate(() => {
+                        // mktemp prints the created directory path.
+                        if (command === 'mktemp') handlers.stdout?.(Buffer.from('/tmp/oj-submissions/sub_1_1_testws\n'));
+                        handlers.stdout?.(Buffer.from(''));
+                        handlers.stderr?.(Buffer.from(''));
+                        handlers.close?.(0, null);
+                    });
+                    return child;
+                }
+            );
+        });
+
+        const runContainerPipeline = async (): Promise<void> => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}) // UPDATE Running
+                .mockResolvedValueOnce({ rowCount: 1 }); // final UPDATE (landed)
+            (judge as jest.Mock).mockResolvedValueOnce({
+                results: [], score: 100, overallStatus: 'Accepted', maxTimeMs: 1, maxMemoryKb: 1024
+            });
+            await processSubmission(1);
+        };
+
+        it('compiles successfully even though chown fails with EPERM (the container capability environment)', async () => {
+            await runContainerPipeline();
+
+            // The verdict must NOT be Compilation Error — the exact bug was
+            // every submission dying at the compile step.
+            const ceUpdate = (db.query as jest.Mock).mock.calls.find(
+                ([sql]: [string]) => typeof sql === 'string' && sql.includes("'Compilation Error'")
+            );
+            expect(ceUpdate).toBeUndefined();
+            // Compile succeeded -> judge ran and the final verdict landed.
+            expect(judge).toHaveBeenCalledTimes(1);
+            const finalUpdate = (db.query as jest.Mock).mock.calls[3];
+            expect(String(finalUpdate[0])).toContain('overall_status');
+            expect(finalUpdate[1][0]).toBe('Accepted');
+
+            // ...and the pipeline NEVER relied on chown (which would EPERM).
+            expect(fs.promises.chown).not.toHaveBeenCalled();
+        });
+
+        it('creates the workspace and writes the source via uid-dropped children (ownership by construction)', async () => {
+            await runContainerPipeline();
+
+            // Helper spawns run as the sandbox identity with a stripped env.
+            const uidDropped = spawnCalls.filter(([, , opts]) =>
+                typeof opts.uid === 'number' && opts.uid >= JUDGE_CONFIG.SANDBOX_UID_BASE);
+            expect(uidDropped.length).toBeGreaterThanOrEqual(4);
+
+            // 1) the workspace dir is created by a uid-dropped `mktemp -d`
+            //    (uid-owned from the instant it exists — no chown needed).
+            const mktemp = spawnCalls.find(([cmd, args]) => cmd === 'mktemp' && args.includes('-d'));
+            expect(mktemp).toBeDefined();
+            expect(mktemp![2].uid as number).toBeGreaterThanOrEqual(JUDGE_CONFIG.SANDBOX_UID_BASE);
+            expect(mktemp![1].join(' ')).toContain('oj-submissions');
+            // No shell anywhere in the helper path.
+            expect(mktemp![2].shell).toBeUndefined();
+
+            // 2) the source content reaches the workspace via stdin of a
+            //    uid-dropped `dd` (not root's fs.writeFile + chown).
+            const dd = spawnCalls.find(([cmd]) => cmd === 'dd');
+            expect(dd).toBeDefined();
+            expect(dd![2].uid as number).toBeGreaterThanOrEqual(JUDGE_CONFIG.SANDBOX_UID_BASE);
+            expect(dd![1].join(' ')).toContain('solution.cpp');
+
+            // 3) modes are applied by the owner (uid-dropped chmod), never by
+            //    root's fs.chmod (which would EPERM on uid-owned files).
+            const chmodCalls = spawnCalls.filter(([cmd]) => cmd === 'chmod');
+            expect(chmodCalls.length).toBeGreaterThanOrEqual(3); // 711 dir, 600 src, 750 out
+            const modes = chmodCalls.map(([, args]) => args[0]).sort();
+            expect(modes).toEqual(expect.arrayContaining(['600', '711', '750']));
+
+            // 4) the compile itself is uid-dropped (as before Phase 0).
+            const prlimit = spawnCalls.find(([cmd]) => cmd === JUDGE_CONFIG.PRLIMIT_PATH);
+            expect(prlimit).toBeDefined();
+            expect(prlimit![2].uid as number).toBeGreaterThanOrEqual(JUDGE_CONFIG.SANDBOX_UID_BASE);
+
+            // 5) cleanup removes the uid-owned workspace as its owner.
+            const rm = spawnCalls.find(([cmd]) => cmd === 'rm');
+            expect(rm).toBeDefined();
+            expect(rm![1]).toEqual(expect.arrayContaining(['-rf']));
+            expect(rm![2].uid as number).toBeGreaterThanOrEqual(JUDGE_CONFIG.SANDBOX_UID_BASE);
+        });
+
+        it('falls back to the dev path (mkdtemp + writeFile, no uid drop) when privileges cannot be dropped', async () => {
+            const sandboxProcess = jest.requireActual('../../utils/sandboxProcess');
+            (sandboxProcess.canDropPrivileges as jest.Mock).mockReturnValue(false);
+
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}) // UPDATE Running
+                .mockResolvedValueOnce({ rowCount: 1 }); // final UPDATE (landed)
+            (judge as jest.Mock).mockResolvedValueOnce({
+                results: [], score: 100, overallStatus: 'Accepted', maxTimeMs: 1, maxMemoryKb: 1024
+            });
+
+            await processSubmission(1);
+
+            // Dev path: root/current-user mkdtemp + writeFile, no helper spawns.
+            expect(fs.promises.mkdtemp).toHaveBeenCalled();
+            expect(fs.promises.writeFile).toHaveBeenCalled();
+            const helperCmds = spawnCalls.map(([cmd]) => cmd);
+            expect(helperCmds).not.toContain('mktemp');
+            expect(helperCmds).not.toContain('dd');
+            expect(judge).toHaveBeenCalledTimes(1);
+            expect(fs.promises.chown).not.toHaveBeenCalled();
         });
     });
 

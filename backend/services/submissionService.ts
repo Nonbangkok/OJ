@@ -19,10 +19,14 @@ import { awardSolveReward } from './progressionService';
 import { enqueueTrackedJudgeTask } from './judgeQueue';
 import {
   canDropPrivileges,
+  chmodSandboxPath,
+  createSandboxWorkspace,
   nextSandboxIdentity,
   prlimitWrap,
+  removeSandboxWorkspace,
   runBoundedChildProcess,
   SandboxIdentity,
+  writeSandboxFile,
 } from '../utils/sandboxProcess';
 
 /**
@@ -145,6 +149,13 @@ async function runSubmissionPipeline(
   // Language also escapes the try: the finally-block cleanup needs to know
   // whether this submission produced a compiled binary at all.
   let submissionLanguage: SubmissionLanguage = 'cpp';
+  // Whether this pipeline run took the by-construction sandbox path (uid-dropped
+  // workspace operations). The finally-block cleanup needs it: a uid-owned
+  // workspace can only be removed as its owner in the lockdown container.
+  // `cleanupIdentity` holds the sandbox identity even if the pipeline threw
+  // after drawing it from the pool (defaults to the dev path until then).
+  let privileged = false;
+  let cleanupIdentity: SandboxIdentity | null = null;
 
   try {
     const subRes = await db.query<SubmissionRow | ContestSubmissionRow>(
@@ -175,6 +186,7 @@ async function runSubmissionPipeline(
     // forking budgets stay independent, and file ownership gives the
     // workspace its privacy below.
     const sandbox = nextSandboxIdentity();
+    cleanupIdentity = sandbox;
 
     // Per-submission workspace (RUNNER-003): every submission gets a private
     // directory under os.tmpdir(), owned by its sandbox identity with mode
@@ -182,15 +194,25 @@ async function runSubmissionPipeline(
     // The sandboxed program can reach its own files by name but cannot
     // readdir a rival submission's workspace; files inside are 0600/0750
     // owner-only, so even known names cannot be read.
-    const submissionsRoot = path.join(fs.realpathSync(os.tmpdir()), 'oj-submissions');
-    await fs.promises.mkdir(submissionsRoot, { recursive: true, mode: 0o755 });
-    workspaceDir = await fs.promises.mkdtemp(path.join(submissionsRoot, `${uniqueId}_`));
-    try {
-      await fs.promises.chown(workspaceDir, sandbox.uid, sandbox.gid);
-    } catch {
-      // Unprivileged dev runs cannot chown; root-only hardening above.
+    //
+    // Hotfix 2026-09 (by-construction ownership): in the lockdown container
+    // root has NO CAP_CHOWN/FOWNER/DAC_OVERRIDE, so the old root-creates-
+    // then-chowns flow silently left the workspace root-owned and every
+    // compile died with "Permission denied". When privileges CAN be dropped
+    // (production), the workspace is created and every file in it is written
+    // by uid-dropped children — the sandbox identity owns it BY CONSTRUCTION
+    // and `chown` is never called. The dev path (no uid drop available)
+    // keeps the plain mkdtemp/write flow.
+    const privilegedRun = canDropPrivileges();
+    privileged = privilegedRun;
+    if (privilegedRun) {
+      workspaceDir = await createSandboxWorkspace(`${uniqueId}_`, { sandbox, context: uniqueId });
+    } else {
+      const submissionsRoot = path.join(fs.realpathSync(os.tmpdir()), 'oj-submissions');
+      await fs.promises.mkdir(submissionsRoot, { recursive: true, mode: 0o755 });
+      workspaceDir = await fs.promises.mkdtemp(path.join(submissionsRoot, `${uniqueId}_`));
+      await fs.promises.chmod(workspaceDir, 0o711);
     }
-    await fs.promises.chmod(workspaceDir, 0o711);
 
     const sourceName = `solution${prepare.sourceExtension}`;
     const binaryName = 'solution.out';
@@ -218,11 +240,13 @@ async function runSubmissionPipeline(
     // 0600: readable by the sandboxed compile/run of THIS submission only —
     // another submission's uid cannot read it even by name, and the
     // traverse-only workspace keeps it out of any directory listing.
-    await fs.promises.writeFile(filePath, code, { mode: 0o600 });
-    try {
-      await fs.promises.chown(filePath, sandbox.uid, sandbox.gid);
-    } catch {
-      // Unprivileged dev runs cannot chown; root-only hardening above.
+    // In the by-construction path the uid-dropped `dd` write makes it
+    // identity-owned from creation (no chown — root cannot chown in the
+    // lockdown container; see sandboxProcess.ts).
+    if (privileged) {
+      filePath = await writeSandboxFile(workspaceDir, sourceName, code, { sandbox, context: uniqueId });
+    } else {
+      await fs.promises.writeFile(filePath, code, { mode: 0o600 });
     }
 
     // Language-agnostic "prepare" phase: compile (C++) or syntax-check
@@ -266,7 +290,15 @@ async function runSubmissionPipeline(
     // identity — one uid per submission — so this is effectively owner-only).
     const artifactPath = prepare.compiledArtifactPath(outputPath);
     if (artifactPath) {
-      await fs.promises.chmod(artifactPath, 0o750);
+      // The artifact is owned by the sandbox identity (g++ wrote it as that
+      // uid, or the dev-path compile produced it as this user). Root cannot
+      // chmod uid-owned files in the lockdown container (no CAP_FOWNER), so
+      // the mode tightening runs as the owner.
+      if (privileged) {
+        await chmodSandboxPath(artifactPath, '750', { sandbox, context: uniqueId });
+      } else {
+        await fs.promises.chmod(artifactPath, 0o750);
+      }
     }
     const judgeResult = await judge(
       problem_id,
@@ -339,11 +371,18 @@ async function runSubmissionPipeline(
     }
   } finally {
     // Remove the whole per-submission workspace (source, binary, compiler
-    // scratch). One recursive rmtree replaces the per-file unlinks.
+    // scratch). One recursive rmtree replaces the per-file unlinks. In the
+    // by-construction path the workspace is uid-owned and root cannot remove
+    // it (no CAP_DAC_OVERRIDE in the lockdown container) — the cleanup runs
+    // as the owner. Never fatal (mirrors the old fire-and-forget fs.rm).
     if (workspaceDir) {
-      fs.rm(workspaceDir, { recursive: true, force: true }, (err) => {
-        if (err) logger.warn('failed to delete submission workspace', { submissionId, err });
-      });
+      if (privileged) {
+        await removeSandboxWorkspace(workspaceDir, { sandbox: cleanupIdentity!, context: `submission ${submissionId}` });
+      } else {
+        fs.rm(workspaceDir, { recursive: true, force: true }, (err) => {
+          if (err) logger.warn('failed to delete submission workspace', { submissionId, err });
+        });
+      }
     }
   }
 }

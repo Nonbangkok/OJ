@@ -202,6 +202,20 @@ export const JUDGE_CONFIG = {
     // MAX_CONCURRENT_JUDGES.
     SANDBOX_UID_BASE: 60000,
     SANDBOX_UID_POOL_SIZE: 16,
+    // By-construction workspace ownership (hotfix 2026-09): the container
+    // backend runs with cap_drop ALL + only SETUID/SETGID — root there CANNOT
+    // chown/chmod/remove files owned by the sandbox uid (no CAP_CHOWN /
+    // CAP_FOWNER / CAP_DAC_OVERRIDE), which silently broke every compile after
+    // the Phase 0 lockdown (chown failures were swallowed, leaving the source
+    // root-owned 0600 that the uid-dropped g++ could not read). The fix: the
+    // sandbox identity owns its workspace BY CONSTRUCTION — every workspace
+    // operation (create/write/chmod/remove) runs as a uid-dropped child.
+    // Parent dir mode: sticky + group/world write, NO world read (others
+    // cannot list workspaces; owners reach their own by name).
+    SANDBOX_PARENT_DIR_MODE: 0o1733,
+    // Wall-clock/output caps for the uid-dropped workspace helper spawns.
+    WORKSPACE_OP_TIMEOUT_MS: 5000,
+    WORKSPACE_OP_MAX_BUFFER: 64 * 1024,
     // --- Compile-step resource caps (RUNNER-005), mirroring the authoring
     // compiler's prlimit recipe ---
     PRLIMIT_PATH: '/usr/bin/prlimit',

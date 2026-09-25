@@ -83,14 +83,48 @@ files, and no secrets are in its environment to begin with. The include guard
 includes (`#define E "/proc/1/environ"` + `#include E`), string-concatenated
 paths, and backslash-newline-continuation-hidden paths.
 
-### 6. Per-submission workspaces (RUNNER-003 / RUNNER-006)
-Every submission gets a private `mkdtemp` workspace under
+### 6. Per-submission workspaces (RUNNER-003 / RUNNER-006) — ownership BY CONSTRUCTION
+Every submission gets a private workspace under
 `<os.tmpdir()>/oj-submissions/`, owned by its sandbox identity (uid = gid,
 pool 60000..60015) with mode **0711** — owner full access, everyone else
 traverse-only: a rival submission can *reach* a file by exact name but can
 neither list the directory nor read the files (source 0600, binary 0750,
 both identity-owned). The workspace is `rm -rf`'d in the pipeline's finally
 block.
+
+**Hotfix 2026-09 — why ownership is "by construction":** the lockdown
+container runs with `cap_drop: ALL` + only `SETUID`/`SETGID`, so root inside
+it has **no `CAP_CHOWN`** (and no `CAP_FOWNER`/`CAP_DAC_OVERRIDE` either).
+The original Phase 0 flow — root creates the workspace with `mkdtemp`, writes
+the source with `fs.writeFile`, then `chown`s both to the sandbox uid — broke
+silently in production: both `chown` calls failed with `EPERM`, the failures
+were swallowed by design ("unprivileged dev runs cannot chown"), the source
+stayed root-owned at mode 0600, and the uid-dropped g++ died with
+`cc1plus: fatal error: solution.cpp: Permission denied`. Every submission
+returned Compilation Error. Unit tests never caught it because the dev path
+(non-Linux / non-root) skips the uid-drop entirely.
+
+The fix (see `backend/utils/sandboxProcess.ts`): when `canDropPrivileges()`
+is true, **every workspace operation runs as a uid-dropped, bounded,
+shell-less, env-stripped child** — so the sandbox identity owns its workspace
+from the instant anything exists, and `chown` is never called:
+
+| operation | mechanism |
+|---|---|
+| workspace create | uid-dropped `mktemp -d` (mode 0700), then uid-dropped `chmod 711` |
+| source write | content piped on stdin to a uid-dropped `tee`, then uid-dropped `chmod 600` |
+| artifact chmod | uid-dropped `chmod 750` (root cannot chmod uid-owned files — no `CAP_FOWNER`) |
+| cleanup | uid-dropped `rm -rf` (root cannot remove uid-owned dirs — no `CAP_DAC_OVERRIDE`) |
+
+The parent `<tmpdir>/oj-submissions` is root-owned at mode **1733**
+(sticky + group/world write, no world read): sandbox uids can create their
+own workspaces inside, cannot list each other's, and the sticky bit (as in
+`/tmp` itself) stops one uid renaming another's workspace away.
+
+This deliberately does **not** add `CAP_CHOWN` to the compose service: the
+by-construction design needs no extra privilege and works regardless of the
+container's capability set. (It was verified live in a production-caps
+container via `backend/scripts/verifyHotfix.ts` — `node dist/scripts/verifyHotfix.js`.)
 
 Because RLIMIT_NPROC is enforced **per uid**, concurrent submissions run
 under *distinct* pool identities — the compile and all testcase runs of one

@@ -4,6 +4,8 @@ import {
   prlimitAvailable,
   prlimitWrap,
   runBoundedChildProcess,
+  runSandboxProcess,
+  sandboxSubmissionsRoot,
 } from '../../utils/sandboxProcess';
 import { JUDGE_CONFIG } from '../../constants';
 
@@ -16,6 +18,7 @@ import { JUDGE_CONFIG } from '../../constants';
  */
 jest.mock('fs', () => ({
   existsSync: jest.fn(() => true),
+  realpathSync: jest.fn(() => '/tmp'),
 }));
 
 describe('sandboxProcess', () => {
@@ -150,6 +153,61 @@ describe('sandboxProcess', () => {
       });
       expect(result.spawnError).toBe(true);
       expect(result.exitCode).toBeNull();
+    });
+  });
+
+  describe('runSandboxProcess (stdin payload — the by-construction write mechanism)', () => {
+    // Hotfix 2026-09: the uid-dropped workspace writes files by piping
+    // content to a shell-less child's stdin. These run REAL child processes
+    // (/bin/sh stands in for the uid-dropped tee) to verify the stdin plumbing.
+    it('delivers the stdin payload to the child and captures its output', async () => {
+      // `cat` echoes the payload: proves the stdin write actually lands.
+      const result = await runSandboxProcess('/bin/sh', ['-c', 'cat'], {
+        timeoutMs: 5000,
+        maxBufferBytes: 1024,
+        stdin: 'int main(){}',
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toBe('int main(){}');
+      expect(result.timedOut).toBe(false);
+    });
+
+    it('does not fail the run when the child exits before reading stdin (EPIPE is not the verdict)', async () => {
+      // The child ignores stdin and exits immediately; the stdin write hits
+      // EPIPE, which must be swallowed — the exit code remains the verdict.
+      const result = await runSandboxProcess('/bin/sh', ['-c', 'echo done'], {
+        timeoutMs: 5000,
+        maxBufferBytes: 1024,
+        stdin: 'a'.repeat(1024 * 1024), // large enough to fill the pipe
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.trim()).toBe('done');
+    });
+
+    it('keeps stdin ignored when no payload is given (back-compat with runBoundedChildProcess)', async () => {
+      const result = await runSandboxProcess('/bin/sh', ['-c', 'echo ok'], {
+        timeoutMs: 5000,
+        maxBufferBytes: 1024,
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.trim()).toBe('ok');
+    });
+  });
+
+  describe('by-construction workspace ownership (hotfix 2026-09)', () => {
+    it('roots all workspaces under <tmpdir>/oj-submissions', () => {
+      const root = sandboxSubmissionsRoot();
+      expect(root).toContain('oj-submissions');
+    });
+
+    it('bounds every workspace helper spawn with tight caps and a stripped env', () => {
+      // The helper spawns must not run unbounded or with inherited secrets:
+      // constants-level contract check (the spawn options themselves are
+      // verified end-to-end in submissionService.test.ts).
+      expect(JUDGE_CONFIG.WORKSPACE_OP_TIMEOUT_MS).toBeLessThanOrEqual(5000);
+      expect(JUDGE_CONFIG.WORKSPACE_OP_MAX_BUFFER).toBeLessThanOrEqual(64 * 1024);
+      // Parent dir: sticky + writable by sandbox uids, unreadable by others.
+      expect(JUDGE_CONFIG.SANDBOX_PARENT_DIR_MODE).toBe(0o1733);
     });
   });
 });
