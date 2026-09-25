@@ -77,6 +77,30 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
   const [search, setSearch] = useState('');
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'visible' | 'hidden'>('all');
 
+  // Author options derive from the loaded problems (same pattern as
+  // collections): distinct non-empty authors, sorted alphabetically. Rows
+  // with a NULL/empty author group under a "No author" option when present.
+  const NO_AUTHOR = '__none__';
+  const [authorFilter, setAuthorFilter] = useState<string>('all');
+  const authorOptions = useMemo(() => {
+    const names = new Set<string>();
+    let hasUnauthored = false;
+    for (const problem of problems) {
+      const author = problem.author?.trim();
+      if (author) names.add(author);
+      else hasUnauthored = true;
+    }
+    const sorted = [...names].sort((a, b) => a.localeCompare(b));
+    return hasUnauthored ? [...sorted, NO_AUTHOR] : sorted;
+  }, [problems]);
+  const authorLabel = (value: string) => (value === NO_AUTHOR ? 'No author' : value);
+  // If the selected author disappears from the data (e.g. its only problem
+  // was deleted), fall back to 'all' so the control never shows a phantom
+  // selection.
+  const activeAuthorFilter = authorFilter !== 'all' && authorOptions.includes(authorFilter)
+    ? authorFilter
+    : 'all';
+
   // --- Collections --------------------------------------------------------
   const [collections, setCollections] = useState<CollectionWithStats[]>([]);
   const [collectionFilter, setCollectionFilter] = useState<string>('all');
@@ -96,7 +120,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     return fetchProblems();
   };
 
-  // Filters compose: search (ID/title) x collection x visibility.
+  // Filters compose: search (ID/title) x collection x visibility x author.
   const visibleProblems = useMemo(() => {
     const query = search.trim().toLowerCase();
     return problems.filter(problem => {
@@ -104,10 +128,14 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
       if (collectionFilter !== 'all' && collectionFilter !== 'none' && problem.collection_id !== Number(collectionFilter)) return false;
       if (visibilityFilter === 'visible' && !problem.is_visible) return false;
       if (visibilityFilter === 'hidden' && problem.is_visible) return false;
+      if (activeAuthorFilter !== 'all') {
+        const author = problem.author?.trim();
+        if (activeAuthorFilter === NO_AUTHOR ? Boolean(author) : author !== activeAuthorFilter) return false;
+      }
       if (!query) return true;
       return problem.id.toLowerCase().includes(query) || problem.title.toLowerCase().includes(query);
     });
-  }, [problems, collectionFilter, visibilityFilter, search]);
+  }, [problems, collectionFilter, visibilityFilter, activeAuthorFilter, search]);
 
   const filteredCollection = collections.find(c => c.id === Number(collectionFilter));
 
@@ -189,6 +217,19 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
             <option value="all">All</option>
             <option value="visible">Visible</option>
             <option value="hidden">Hidden</option>
+          </select>
+        </label>
+        <label className={styles['filter-control']}>
+          <span className={styles['filter-label']}>Author</span>
+          <select
+            value={activeAuthorFilter}
+            onChange={(event) => setAuthorFilter(event.target.value)}
+            aria-label="Filter problems by author"
+          >
+            <option value="all">All Authors</option>
+            {authorOptions.map(author => (
+              <option key={author} value={author}>{authorLabel(author)}</option>
+            ))}
           </select>
         </label>
         {/* Global, low-frequency actions live behind one quiet menu. */}
