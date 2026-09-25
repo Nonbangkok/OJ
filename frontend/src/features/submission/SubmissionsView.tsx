@@ -100,7 +100,7 @@ const SubmissionsView = ({
                 <div className={styles['submissions-header']}>
                     <h1>{title}</h1>
                     {!problemId && (
-                        <div className={styles['filter-buttons']}>
+                        <div className={styles['filter-buttons']} role="toolbar" aria-label="Submission filters">
                             <button
                                 className={`${styles['filter-btn']} ${filter === 'all' ? styles.active : ''}`}
                                 onClick={() => setFilter('all')}
@@ -114,8 +114,9 @@ const SubmissionsView = ({
                                 My Submissions
                             </button>
 
-                            {/* Admin/Staff Filters */}
-                            {currentUser && (currentUser.role === USER_ROLES.ADMIN || currentUser.role === USER_ROLES.STAFF) && (
+                            {/* Admin/Staff Filters — username filter is redundant while
+                                "My Submissions" scopes the list to the current user. */}
+                            {currentUser && (currentUser.role === USER_ROLES.ADMIN || currentUser.role === USER_ROLES.STAFF) && filter === 'all' && (
                                 <>
                                     <div className={styles['filter-input-wrapper']} ref={problemInputRef}>
                                         <input

@@ -1,219 +1,106 @@
+/* Contest home: typography-led, no stat cards. The contest identity is
+   stated once here; the navbar carries it everywhere else. */
+
 .container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
+  padding-top: 3rem;
+  max-width: 720px;
 }
 
-.loading {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--text-secondary);
-  font-size: 1.2rem;
-}
-
-.error {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--text-secondary);
-}
-
-.error h3 {
-  color: var(--status-danger);
-  margin-bottom: 20px;
-}
-
-.backLink {
-  color: var(--accent-primary);
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.2s ease;
-}
-
-.backLink:hover {
-  color: var(--accent-primary-hover);
-  text-decoration: underline;
-}
-
-/* Contest Header */
-.contestHeader {
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 30px;
-  margin-bottom: 30px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-.titleSection {
+.header {
   display: flex;
   align-items: center;
-  gap: 20px;
-  margin-bottom: 20px;
+  gap: 1rem;
   flex-wrap: wrap;
+  margin-bottom: 0.75rem;
 }
 
-.contestTitle {
-  color: var(--text-primary);
+.title {
   margin: 0;
   font-size: var(--font-size-page-title);
   font-weight: 700;
-  flex: 1;
-  min-width: 300px;
+  color: var(--text-primary);
+  overflow-wrap: break-word;
 }
 
-.contestDescription {
+.description {
   color: var(--text-secondary);
-  margin: 0;
-  font-size: 1.1rem;
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
   line-height: 1.6;
 }
 
-/* Contest Info */
-.contestInfo {
-  margin-bottom: 30px;
-}
-
-.infoGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-}
-
-.infoCard {
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 20px;
-  text-align: center;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.infoCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-}
-
-.infoLabel {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.infoValue {
-  color: var(--text-primary);
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.timeRemaining {
-  color: var(--warning-color, #f57c00);
-  font-weight: 700;
-}
-
-/* Join Section */
-.joinSection {
+/* One compact summary line: dates · remaining · counts. */
+.metaLine {
   display: flex;
-  justify-content: center;
-  margin-top: 20px;
-  margin-bottom: 30px;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.625rem;
+  row-gap: 0.25rem;
+  margin: 0 0 1.75rem;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.joinButton {
-  padding: 14px 40px;
-  border-radius: var(--radius-md);
-  background: var(--accent-primary);
-  color: white;
+.metaSeparator {
+  color: var(--text-muted);
+}
+
+.remaining {
+  color: var(--warning-color);
   font-weight: 600;
-  font-size: 1.1rem;
+}
+
+/* Subtle primary action: shared Button look, not a giant pill. */
+.primaryAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1.25rem;
+  min-height: 2.25rem;
+  border-radius: var(--radius-sm);
+  background: var(--action-primary-background);
+  color: var(--action-primary-foreground);
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+}
+
+.primaryAction:hover {
+  background: var(--action-primary-hover-background);
+  color: var(--action-primary-foreground);
+}
+
+.primaryAction:focus-visible {
+  outline: 3px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Join keeps its button semantics but the same visual weight. */
+.joinButton {
+  composes: primaryAction;
   border: none;
   cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.joinButton:hover:not(:disabled) {
-  background: var(--accent-primary-hover);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.95rem;
 }
 
 .joinButton:disabled {
-  opacity: 0.7;
+  opacity: 0.65;
   cursor: not-allowed;
-  filter: grayscale(1);
 }
 
-/* Status Messages */
-.waitingMessage {
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 40px;
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-.waitingIcon {
-  font-size: 3rem;
-  margin-bottom: 20px;
-}
-
-.waitingMessage h3 {
-  color: var(--text-primary);
-  margin-bottom: 15px;
-  font-size: 1.4rem;
-}
-
-.waitingMessage p {
+/* Registered-but-not-started: a quiet note, not a centered card. */
+.waitingNote {
+  margin: 0;
   color: var(--text-secondary);
-  margin-bottom: 10px;
-  line-height: 1.5;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .container {
-    padding: 15px;
-  }
-
-  .contestHeader {
-    padding: 20px;
-  }
-
-  .contestTitle {
-    font-size: var(--font-size-page-title);
-  }
-
-  .titleSection {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 15px;
-  }
-
-  .infoGrid {
-    grid-template-columns: 1fr;
-  }
+  font-size: 0.95rem;
 }
 
 @media (max-width: 480px) {
   .container {
-    padding: 10px;
-  }
-
-  .contestHeader {
-    padding: 16px;
-  }
-
-  .contestTitle {
-    font-size: 1.5rem;
-  }
-
-  .waitingMessage {
-    padding: 20px;
-  }
-
-  .joinButton {
-    width: 100%;
-    padding: 12px 20px;
+    padding-top: 2rem;
   }
 }

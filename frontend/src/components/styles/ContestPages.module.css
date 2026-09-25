@@ -1,0 +1,52 @@
+/* Shared contest-page chrome. Contest pages deliberately have no shell
+   layout below the navbar — consistency comes from these shared classes
+   (page width comes from the `.container` main in ContestLayout). */
+
+.page {
+  padding-top: 0.75rem;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: var(--font-size-page-title);
+  color: var(--text-primary);
+}
+
+/* Secondary header content: "Updated 01:11" and friends. */
+.pageAside {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.error {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+}
+
+.errorTitle {
+  color: var(--status-danger);
+  margin-bottom: 20px;
+}
+
+.backLink {
+  color: var(--accent-primary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.backLink:hover {
+  color: var(--accent-primary-hover);
+  text-decoration: underline;
+}

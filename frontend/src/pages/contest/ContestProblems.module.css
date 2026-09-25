@@ -1,0 +1,71 @@
+/* Contest problems: a compact table, not tall cards. Column alignment
+   overrides the shared table's centered defaults (`.table td` is 0,1,1, so
+   the two-class selectors below win regardless of module load order) —
+   problem identity reads better left-aligned, the rest stays centered. */
+
+.contestTable th.colProblem,
+.contestTable td.colProblem {
+  text-align: left;
+  width: 45%;
+}
+
+.colAction {
+  width: 110px;
+}
+
+.problemTitle {
+  display: block;
+  color: var(--text-primary);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.problemTitle:hover {
+  color: var(--accent-primary);
+  text-decoration: underline;
+}
+
+.problemId {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
+}
+
+/* Muted dash for unavailable fields. */
+.noData {
+  color: var(--text-muted);
+}
+
+/* Subtle action link: consistent with the rest of Grader's quiet actions. */
+.actionLink {
+  color: var(--accent-primary);
+  text-decoration: none;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.actionLink:hover {
+  text-decoration: underline;
+}
+
+.actionLink:focus-visible {
+  outline: 3px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+.empty {
+  text-align: center;
+  padding: 4rem 1rem;
+  color: var(--text-secondary);
+}
+
+.empty h3 {
+  color: var(--text-primary);
+  margin: 0 0 0.5rem;
+}
+
+.empty p {
+  margin: 0;
+}

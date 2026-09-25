@@ -1,139 +1,52 @@
-.container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 20px;
-}
+/* Scoreboard matrix: same shared table as everywhere else, plus sticky
+   leading columns for wide contests and semantic (non-button) score cells. */
 
-.loading {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--text-secondary);
-  font-size: 1.2rem;
-}
-
-.error {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--text-secondary);
-}
-
-.error h3 {
-  color: var(--status-danger);
-  margin-bottom: 20px;
-}
-
-.backLink {
-  color: var(--accent-primary);
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.2s ease;
-  padding: 8px 12px;
-  border-radius: 6px;
-}
-
-.backLink:hover {
-  color: var(--accent-primary-hover);
-  background: var(--bg-secondary);
-}
-
-/* No Data */
-.noData {
-  text-align: center;
-  padding: 80px 20px;
-  color: var(--text-secondary);
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-}
-
-.noDataIcon {
-  font-size: 4rem;
-  margin-bottom: 20px;
-}
-
-.noData h3 {
-  color: var(--text-primary);
-  margin-bottom: 10px;
-  font-size: 1.5rem;
-}
-
-/* Problem Cells Specific Styles */
-.problemScore {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 8px 0px;
-  border-radius: 6px;
-  min-height: 30px;
-  justify-content: center;
-  font-size: 0.9rem;
-}
-
-.problemScore.solved {
-  background: var(--contest-badge-running-bg);
-  color: var(--contest-badge-running-fg);
-  border: 1px solid var(--contest-badge-running-border);
-}
-
-.problemScore.partial {
-  background: var(--contest-badge-finishing-bg);
-  color: var(--contest-badge-finishing-fg);
-  border: 1px solid var(--contest-badge-finishing-border);
-}
-
-.score {
-  font-weight: 700;
-  font-size: 1rem;
-}
-
-.noAttempt {
-  /* Make no-attempt cells have the same dimensions and layout as score cells */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 0px;
-  border-radius: 6px;
-  min-height: 30px;
-  font-size: 0.9rem;
-
-  /* Original styles */
-  color: var(--text-secondary);
-  font-weight: 500;
-  opacity: 0.6;
-}
-
-.refreshInfo {
-  text-align: right;
-  margin-bottom: 1rem;
-}
-
-.refreshInfo p {
-  color: var(--text-secondary);
-  margin: 0;
-  font-size: 0.9rem;
-}
-
-/* New Scoreboard Table Styles */
 .scoreboardTable {
   table-layout: fixed;
-  width: 100%;
 }
 
-.scoreboardTable th {
-  text-align: center;
-  vertical-align: middle;
-  width: 0%;
+/* Leading columns stay visible while problem columns scroll horizontally.
+   The header must match the body cells' background so rows don't show
+   through the sticky cells above them. */
+.colRank,
+.colParticipant,
+.colTotal {
+  position: sticky;
+  background-color: var(--background-secondary);
+  z-index: 2;
 }
 
-.problemHeader {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 0;
-  line-height: 1.3;
+.scoreboardTable thead .colRank,
+.scoreboardTable thead .colParticipant,
+.scoreboardTable thead .colTotal {
+  background-color: var(--background-tertiary);
+  z-index: 3;
+}
+
+.colRank {
+  left: 0;
+  width: 64px;
+}
+
+.colParticipant {
+  left: 64px;
+  min-width: 180px;
+  text-align: left;
+  /* Cover the gap between this sticky cell and the next one. */
+  box-shadow: inset -1px 0 var(--border-color);
+  clip-path: inset(0 -1px 0 0);
+}
+
+.colTotal {
+  left: 244px;
+  width: 84px;
+  font-variant-numeric: tabular-nums;
+  box-shadow: inset -1px 0 var(--border-color);
+  clip-path: inset(0 -1px 0 0);
+}
+
+.colProblem {
+  width: 84px;
 }
 
 .problemId {
@@ -147,4 +60,69 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.totalScore {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Score cells are data, not buttons: subtle semantic color only. */
+.score {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.score.solved {
+  color: var(--status-success);
+  font-weight: 700;
+}
+
+.score.partial {
+  color: var(--text-primary);
+}
+
+.noAttempt {
+  color: var(--text-muted);
+}
+
+/* Medal tints for the top three (shared medal tokens). */
+.rank1 {
+  background-color: color-mix(in srgb, var(--medal-gold) 12%, transparent);
+}
+
+.rank2 {
+  background-color: color-mix(in srgb, var(--medal-silver) 12%, transparent);
+}
+
+.rank3 {
+  background-color: color-mix(in srgb, var(--medal-bronze) 12%, transparent);
+}
+
+/* Subtle current-user highlight that stacks with medal tints. */
+.currentUser {
+  box-shadow: inset 3px 0 0 var(--accent-primary);
+  background-color: color-mix(in srgb, var(--accent-primary) 6%, transparent);
+}
+
+/* No Data */
+.noData {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--text-secondary);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+}
+
+.noData h3 {
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  font-size: 1.5rem;
+}
+
+.noData p {
+  margin: 0;
 }

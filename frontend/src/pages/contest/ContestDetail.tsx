@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import styles from './ContestDetail.module.css';
+import shared from '../../components/styles/ContestPages.module.css';
 import { formatDateTime, getRemainingTime } from '../../utils/formatters';
 import StatusBadge from '../../components/shared/StatusBadge';
 import useContestDetail from '../../hooks/useContestDetail';
@@ -16,100 +17,76 @@ const ContestDetail = () => {
 
   if (loading) return <LoadingPage />;
 
-  if (error) {
+  if (error || !contest) {
     return (
-      <div className={styles.container}>
-        <div className={styles.error}>
-          <h3>Error: {error}</h3>
-          <Link to="/contests" className={styles.backLink}>
-            ← Back to Contests
-          </Link>
-        </div>
+      <div className={shared.error}>
+        <h3 className={shared.errorTitle}>{error || 'Contest not found'}</h3>
+        <Link to="/contests" className={shared.backLink}>
+          ← Back to Contests
+        </Link>
       </div>
     );
   }
 
-  if (!contest) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.error}>
-          <h3>Contest not found</h3>
-          <Link to="/contests" className={styles.backLink}>
-            ← Back to Contests
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const problemCount = contest.problems?.length ?? 0;
+  const showJoin = !contest.is_participant && contest.status !== 'finished';
 
   return (
     <div className={styles.container}>
-      {/* Contest Header */}
-      <div className={styles.contestHeader}>
+      {/* Primary: title + status. The navbar already identifies the contest;
+         this page only needs the identity once, as typography. */}
+      <div className={styles.header}>
+        <h1 className={styles.title}>{contest.title}</h1>
+        <StatusBadge status={contest.status} />
+      </div>
 
-        <div className={styles.titleSection}>
-          <h1 className={styles.contestTitle}>{contest.title}</h1>
-          <StatusBadge status={contest.status} />
-        </div>
+      {contest.description && (
+        <p className={styles.description}>{contest.description}</p>
+      )}
 
-        {contest.description && (
-          <p className={styles.contestDescription}>{contest.description}</p>
+      {/* Secondary: one compact summary line instead of stat cards. */}
+      <p className={styles.metaLine}>
+        <span>
+          {formatDateTime(contest.start_time)} → {formatDateTime(contest.end_time)}
+        </span>
+        <span className={styles.metaSeparator} aria-hidden="true">·</span>
+        {contest.status === 'running' && (
+          <>
+            <span className={styles.remaining}>{getRemainingTime(contest.end_time)}</span>
+            <span className={styles.metaSeparator} aria-hidden="true">·</span>
+          </>
         )}
-      </div>
+        <span>
+          {contest.participant_count || 0} participant{Number(contest.participant_count) === 1 ? '' : 's'}
+        </span>
+        {problemCount > 0 && (
+          <>
+            <span className={styles.metaSeparator} aria-hidden="true">·</span>
+            <span>{problemCount} problem{problemCount === 1 ? '' : 's'}</span>
+          </>
+        )}
+      </p>
 
-      {/* Contest Info */}
-      <div className={styles.contestInfo}>
-        <div className={styles.infoGrid}>
-          <div className={styles.infoCard}>
-            <div className={styles.infoLabel}>Start Time</div>
-            <div className={styles.infoValue}>
-              {formatDateTime(contest.start_time)}
-            </div>
-          </div>
-
-          <div className={styles.infoCard}>
-            <div className={styles.infoLabel}>End Time</div>
-            <div className={styles.infoValue}>{formatDateTime(contest.end_time)}</div>
-          </div>
-
-          {contest.status === 'running' && (
-            <div className={styles.infoCard}>
-              <div className={styles.infoLabel}>Time Remaining</div>
-              <div className={`${styles.infoValue} ${styles.timeRemaining}`}>
-                {getRemainingTime(contest.end_time)}
-              </div>
-            </div>
-          )}
-
-          <div className={styles.infoCard}>
-            <div className={styles.infoLabel}>Participants</div>
-            <div className={styles.infoValue}>
-              {contest.participant_count || 0} people
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Join/Waiting Section */}
-      {!contest.is_participant && contest.status !== 'finished' && (
-        <div className={styles.joinSection}>
-          <button onClick={handleJoinContest} disabled={joining} className={styles.joinButton}>
-            {joining ? 'Joining...' : 'Join Contest'}
-          </button>
-        </div>
+      {/* Action: one primary action, no giant buttons. */}
+      {showJoin ? (
+        <button onClick={handleJoinContest} disabled={joining} className={styles.joinButton}>
+          {joining ? 'Joining...' : 'Join Contest'}
+        </button>
+      ) : contest.status === 'running' ? (
+        <Link to={`/contests/${contest.id}/problems`} className={styles.primaryAction}>
+          View Problems
+        </Link>
+      ) : contest.status === 'scheduled' && contest.is_participant ? (
+        <p className={styles.waitingNote}>
+          You are registered. The contest starts {formatDateTime(contest.start_time)} — check back then.
+        </p>
+      ) : (
+        <Link to={`/contests/${contest.id}/scoreboard`} className={styles.primaryAction}>
+          View Scoreboard
+        </Link>
       )}
-
-      {contest.status === 'scheduled' && contest.is_participant && (
-        <div className={styles.waitingMessage}>
-          <div className={styles.waitingIcon}>⏳</div>
-          <h3>Waiting for contest to start</h3>
-          <p>The contest will start on {formatDateTime(contest.start_time)}</p>
-          <p>You have registered to participate. Please check back when the contest begins.</p>
-        </div>
-      )}
-
     </div>
   );
 }
 
-export default ContestDetail; 
+export default ContestDetail;

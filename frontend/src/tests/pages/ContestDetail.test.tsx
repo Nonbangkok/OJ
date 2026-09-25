@@ -52,6 +52,27 @@ describe('ContestDetail Page', () => {
         });
     });
 
+    it('shows a compact summary line with counts and a View Problems action', async () => {
+        const mockContest = {
+            id: 1, title: 'Test Contest', status: 'running' as const,
+            description: null,
+            problems: [{ id: 'P1', title: 'Problem 1', author: null }],
+            is_participant: true,
+            start_time: '2026-01-01T00:00:00Z',
+            end_time: '2026-01-02T00:00:00Z',
+            participant_count: '5'
+        };
+        jest.mocked(contestService.getById).mockResolvedValueOnce(mockContest);
+
+        render(<BrowserRouter><ContestDetail /></BrowserRouter>);
+
+        await waitFor(() => {
+            expect(screen.getByText('5 participants')).toBeInTheDocument();
+            expect(screen.getByText('1 problem')).toBeInTheDocument();
+            expect(screen.getByText('View Problems')).toBeInTheDocument();
+        });
+    });
+
     it('shows error if fetch fails', async () => {
         jest.mocked(contestService.getById).mockRejectedValueOnce(new Error('Fetch failed'));
 

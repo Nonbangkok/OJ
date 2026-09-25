@@ -60,4 +60,60 @@ describe('ContestProblems Page', () => {
             expect(screen.getByText('Problem 1')).toBeInTheDocument();
         });
     });
+
+    it('labels unattempted problems Unsolved with a Solve action', async () => {
+        const mockProblems = [{ id: 'P1', title: 'Problem 1', author: null }];
+        jest.mocked(contestService.getProblems).mockResolvedValue(mockProblems);
+
+        render(
+            <BrowserRouter>
+                <ContestProblems />
+            </BrowserRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('Unsolved')).toBeInTheDocument();
+            expect(screen.getByText('Solve →')).toBeInTheDocument();
+        });
+    });
+
+    it('labels attempted problems Attempted with attempts and best score', async () => {
+        const mockProblems = [{
+            id: 'P2', title: 'Problem 2', author: null,
+            submission_count: '2', best_score: 40,
+        }];
+        jest.mocked(contestService.getProblems).mockResolvedValue(mockProblems);
+
+        render(
+            <BrowserRouter>
+                <ContestProblems />
+            </BrowserRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('Attempted')).toBeInTheDocument();
+            expect(screen.getByText('Continue →')).toBeInTheDocument();
+            expect(screen.getByText('40')).toBeInTheDocument();
+            expect(screen.getByText('2')).toBeInTheDocument();
+        });
+    });
+
+    it('labels fully solved problems Solved with a View action', async () => {
+        const mockProblems = [{
+            id: 'P3', title: 'Problem 3', author: null,
+            submission_count: '1', best_score: 100,
+        }];
+        jest.mocked(contestService.getProblems).mockResolvedValue(mockProblems);
+
+        render(
+            <BrowserRouter>
+                <ContestProblems />
+            </BrowserRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('Solved')).toBeInTheDocument();
+            expect(screen.getByText('View →')).toBeInTheDocument();
+        });
+    });
 });
