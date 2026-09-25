@@ -51,6 +51,7 @@ const isValidImportToken = (expected: string, provided: unknown): boolean => {
 };
 
 export type StartedDatabaseImport = {
+  kind: 'ok';
   jobId: string;
   token: string;
 };
@@ -142,7 +143,7 @@ export const startDatabaseImport = async (
     }
   })();
 
-  return { jobId, token };
+  return { kind: 'ok', jobId, token };
 };
 
 export type DatabaseImportProgress = { status: string; message: string } | null;

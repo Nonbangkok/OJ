@@ -134,20 +134,20 @@ router.post('/admin/database/import', requireAuth, requireAdmin, diskUpload.sing
   }
 
   const startResult = await startDatabaseImport(req.file.originalname, req.file.path);
-  if (startResult.kind === 'unsupported_extension') {
-    return res.status(400).json({ message: 'Unsupported file type. Only .sql, .dump, or .tar files are allowed.' });
+  if (startResult.kind === 'ok') {
+    res.status(202).json({
+      message: 'Database import started. Check progress endpoint for status updates.',
+      jobId: startResult.jobId,
+      token: startResult.token,
+    });
+    return;
   }
-  // DB-05: the import drops and recreates the whole schema; a second import
-  // running concurrently would interleave destructively.
   if (startResult.kind === 'import_in_progress') {
+    // DB-05: the import drops and recreates the whole schema; a second import
+    // running concurrently would interleave destructively.
     return res.status(409).json({ message: 'A database import is already in progress. Wait for it to finish before starting another.' });
   }
-
-  res.status(202).json({
-    message: 'Database import started. Check progress endpoint for status updates.',
-    jobId: startResult.jobId,
-    token: startResult.token,
-  });
+  return res.status(400).json({ message: 'Unsupported file type. Only .sql, .dump, or .tar files are allowed.' });
 });
 
 // No session middleware runs for this path (server.ts skips it because the import

@@ -109,7 +109,7 @@ describe('startDatabaseImport (DB-05 / ADMIN-003)', () => {
     );
 
     const first = await startDatabaseImport('backup.sql', '/tmp/backup.sql');
-    expect(first).not.toHaveProperty('kind');
+    expect(first).toMatchObject({ kind: 'ok', jobId: expect.any(String), token: expect.any(String) });
 
     const second = await startDatabaseImport('backup2.sql', '/tmp/backup2.sql');
     expect(second).toEqual({ kind: 'import_in_progress' });
@@ -122,7 +122,7 @@ describe('startDatabaseImport (DB-05 / ADMIN-003)', () => {
   it('activates maintenance mode, pauses the scheduler, and cleans up on success', async () => {
     const result = await startDatabaseImport('backup.sql', '/tmp/backup.sql');
 
-    expect(result).not.toHaveProperty('kind');
+    expect(result).toMatchObject({ kind: 'ok', jobId: expect.any(String), token: expect.any(String) });
     // Maintenance + scheduler pause are claimed synchronously before the
     // background work starts.
     expect(isMaintenanceActive()).toBe(true);

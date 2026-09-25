@@ -1,4 +1,5 @@
 import * as db from '../db';
+import { DATABASE_POOL } from '../constants';
 
 describe('Database Module', () => {
     beforeEach(() => {
@@ -20,5 +21,49 @@ describe('Database Module', () => {
 
         expect(db.pool.query).toHaveBeenCalledWith(text, params);
         expect(result).toBe(mockResult);
+    });
+
+    it('sizes the app pool explicitly and applies a statement timeout (DB-10)', () => {
+        expect(db.appPoolOptions.max).toBe(DATABASE_POOL.MAX_CONNECTIONS);
+        expect(db.appPoolOptions.max).toBeGreaterThanOrEqual(20);
+        expect(db.appPoolOptions.options).toBe(
+            `-c statement_timeout=${DATABASE_POOL.STATEMENT_TIMEOUT_MS}`,
+        );
+    });
+
+    it('runs a transaction body with BEGIN/COMMIT and releases the client (DB-04)', async () => {
+        const client = {
+            query: jest.fn().mockResolvedValue({ rows: [] }),
+            release: jest.fn(),
+        };
+        (db.pool.connect as jest.Mock).mockResolvedValueOnce(client);
+
+        const result = await db.withTransaction(async (c) => {
+            await c.query('SELECT 1');
+            return 'done';
+        });
+
+        expect(result).toBe('done');
+        expect(client.query.mock.calls.map(([sql]) => sql)).toEqual(['BEGIN', 'SELECT 1', 'COMMIT']);
+        expect(client.release).toHaveBeenCalledTimes(1);
+    });
+
+    it('rolls back and rethrows when the transaction body fails (DB-04)', async () => {
+        const client = {
+            query: jest.fn()
+                .mockResolvedValueOnce({})
+                .mockRejectedValueOnce(new Error('boom')),
+            release: jest.fn(),
+        };
+        (db.pool.connect as jest.Mock).mockResolvedValueOnce(client);
+
+        await expect(db.withTransaction(async () => {
+            throw new Error('boom');
+        })).rejects.toThrow('boom');
+
+        const sqls = client.query.mock.calls.map(([sql]) => sql);
+        expect(sqls).toContain('ROLLBACK');
+        expect(sqls).not.toContain('COMMIT');
+        expect(client.release).toHaveBeenCalledTimes(1);
     });
 });

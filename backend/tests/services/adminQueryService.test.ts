@@ -284,6 +284,29 @@ describe('adminQueryService', () => {
     expect(releaseMock).toHaveBeenCalled();
   });
 
+  it('createBatchUsers checks collisions case-insensitively (DB-08)', async () => {
+    const queryMock = jest.fn()
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [{}] }) // case-variant collision on user1
+      .mockResolvedValueOnce({}); // ROLLBACK
+    const releaseMock = jest.fn();
+    (db.pool.connect as jest.Mock).mockResolvedValue({ query: queryMock, release: releaseMock });
+
+    const result = await createBatchUsers({
+      prefix: 'Team',
+      count: 1,
+      saltRounds: 10,
+      passwordLength: 4,
+    });
+
+    expect(result).toEqual({ kind: 'duplicate_username', username: 'Team-01' });
+    expect(queryMock).toHaveBeenCalledWith(
+      'SELECT 1 FROM users WHERE LOWER(username) = LOWER($1)',
+      ['Team-01'],
+    );
+    expect(queryMock).toHaveBeenCalledWith('ROLLBACK');
+  });
+
   it('getRegistrationEnabled should default to true when setting is missing', async () => {
     (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 
