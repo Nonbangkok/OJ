@@ -3,6 +3,7 @@ import { exec } from 'child_process';
 import { SUBMISSION_STATUS, JUDGE_CONFIG, LANGUAGE_LIMITS, SubmissionLanguage } from '../constants';
 import { RunnableCommand } from '../constants';
 import { logger } from '../utils/logger';
+import { nextSandboxIdentity, SandboxIdentity } from '../utils/sandboxProcess';
 import {
   ExecutionError,
   JudgeProblemLimitsRow,
@@ -15,7 +16,8 @@ async function runSingleCase(
   runnable: RunnableCommand,
   input: string,
   timeLimitMs: number,
-  memoryLimitMb: number
+  memoryLimitMb: number,
+  sandbox: SandboxIdentity
 ): Promise<RunResult> {
   return new Promise((resolve) => {
     // Using custom C wrapper for microsecond precision
@@ -28,16 +30,21 @@ async function runSingleCase(
     // submission's language (already multiplied by LANGUAGE_LIMITS).
     const asLimitMb = memoryLimitMb + JUDGE_CONFIG.MEMORY_LIMIT_SLACK_MB;
     const cpuLimitS = Math.ceil(timeLimitMs / 1000) + JUDGE_CONFIG.CPU_LIMIT_SLACK_S;
+    // `timeout -k` grace: after the wall-clock limit, GNU timeout sends
+    // SIGTERM then — if the program is still alive after this many seconds —
+    // SIGKILL. Without the escalation a SIGTERM-ignoring sleeper holds its
+    // judge slot forever (RUNNER-004).
+    const killGraceS = Math.max(1, Math.ceil(JUDGE_CONFIG.KILL_GRACE_MS / 1000));
 
     // Use timeout command which is reliable on Linux. The wrapper now also
     // applies setrlimit() + privilege-drop on the untrusted binary itself.
     // The runnable (compiled binary, or `python3 <src>`) uses internally
     // generated paths, which never contain shell metacharacters.
-    // Wrapper argv layout: [wrapper] [exe] [mem_mb] [cpu_s] [extra args...] —
-    // limits come BEFORE the runnable's own args, or the wrapper would feed
-    // them to the child as program arguments.
+    // Wrapper argv layout: [wrapper] [exe] [mem_mb] [cpu_s] [uid] [args...] —
+    // limits and the sandbox uid come BEFORE the runnable's own args, or the
+    // wrapper would feed them to the child as program arguments.
     const runnableArgs = runnable.args.join(' ');
-    const command = `timeout ${timeLimitMs / 1000}s ${timeCommand} ${runnable.command} ${asLimitMb} ${cpuLimitS} ${runnableArgs}`.trim();
+    const command = `timeout -k ${killGraceS}s ${timeLimitMs / 1000}s ${timeCommand} ${runnable.command} ${asLimitMb} ${cpuLimitS} ${sandbox.uid} ${runnableArgs}`.trim();
     // Strip the backend's environment from the executed user code so a
     // submission cannot read DATABASE_URL/PGPASSWORD/SECRET_KEY via getenv().
     // Only a minimal PATH is exposed (needed for the `timeout` lookup).
@@ -48,7 +55,11 @@ async function runSingleCase(
       timeout: timeLimitMs + JUDGE_CONFIG.TIMEOUT_BUFFER_MS,
       maxBuffer: JUDGE_CONFIG.EXEC_MAX_BUFFER, // 50MB
       shell: '/bin/bash',
-      env: sandboxEnv
+      env: sandboxEnv,
+      // Node-side backstop to the `timeout -k` chain (RUNNER-004): if the
+      // process group somehow outlives the exec timeout (e.g. `timeout`
+      // itself wedged), kill it hard instead of leaking the judge slot.
+      killSignal: 'SIGKILL' as const,
     };
 
     let hasEpipError = false;
@@ -134,6 +145,32 @@ async function runSingleCase(
       }
     });
 
+    // Node-side kill escalation (RUNNER-004). The exec `timeout` above fires
+    // SIGKILL at timeLimitMs + TIMEOUT_BUFFER_MS, but `killSignal` applies to
+    // the shell `timeout` runs under — if anything in that chain ignores or
+    // misses the signal, the promise would never settle and the judge slot
+    // would leak. This unconditional SIGKILL of the whole process group at
+    // the exec timeout + grace guarantees the callback path always runs.
+    const escalationTimer = setTimeout(() => {
+      if (child.pid && child.exitCode === null) {
+        logger.warn('judge execution outlived its limits — force killing process group', {
+          runnable: runnable.command, pid: child.pid, timeLimitMs,
+        });
+        try {
+          process.kill(-child.pid, 'SIGKILL');
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException).code !== 'ESRCH') {
+            logger.warn('judge kill-escalation failed', { runnable: runnable.command, err });
+          }
+        }
+      }
+    }, timeLimitMs + JUDGE_CONFIG.TIMEOUT_BUFFER_MS + JUDGE_CONFIG.KILL_GRACE_MS);
+    // The timer must never hold the event loop open by itself: normally it is
+    // cleared on close, but if the callback path already resolved without a
+    // close event this keeps a lone pending escalation from blocking exit.
+    escalationTimer.unref?.();
+    child.on('close', () => clearTimeout(escalationTimer));
+
     child.stdin?.write(input);
     child.stdin?.end();
   });
@@ -142,7 +179,8 @@ async function runSingleCase(
 export async function judge(
   problemId: string,
   runnable: RunnableCommand,
-  language: SubmissionLanguage
+  language: SubmissionLanguage,
+  sandboxIdentity?: SandboxIdentity
 ): Promise<JudgeResult> {
   try {
     const problemRes = await db.query<JudgeProblemLimitsRow>(
@@ -172,10 +210,16 @@ export async function judge(
     }
 
     const results: JudgeResult['results'] = [];
+    // Per-submission sandbox identity (RUNNER-006): every testcase of this
+    // submission runs as the SAME identity the compile used (passed in by
+    // the pipeline; a standalone invocation draws a fresh one from the pool).
+    // Distinct identities across concurrent submissions keep their
+    // RLIMIT_NPROC budgets independent.
+    const sandbox = sandboxIdentity ?? nextSandboxIdentity();
     for (let i = 0; i < testcases.length; i++) {
       const { case_number, input_data, output_data } = testcases[i];
 
-      const runResult = await runSingleCase(runnable, input_data, effectiveTimeMs, effectiveMemoryMb);
+      const runResult = await runSingleCase(runnable, input_data, effectiveTimeMs, effectiveMemoryMb, sandbox);
 
       // Now, compare output
       if (runResult.status === SUBMISSION_STATUS.PENDING) {
