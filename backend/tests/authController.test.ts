@@ -4,6 +4,8 @@ import session from 'express-session';
 import authRouter from '../controllers/authController';
 import * as db from '../db';
 import bcrypt from 'bcrypt';
+import { RATE_LIMIT_CONFIG } from '../constants';
+import { recordLoginFailure, resetLoginFailureTracker } from '../middleware/rateLimit';
 
 // Mock the database
 jest.mock('../db');
@@ -12,6 +14,7 @@ describe('Auth Controller', () => {
     let app: Express;
 
     beforeEach(() => {
+        resetLoginFailureTracker();
         app = express();
         app.use(express.json());
         app.use(session({
@@ -234,6 +237,24 @@ describe('Auth Controller', () => {
 
             expect(unknownRes.status).toBe(wrongPassRes.status);
             expect(unknownRes.body.message).toBe(wrongPassRes.body.message);
+        });
+
+        it('should return 429 while the account is locked out (AUTH-001)', async () => {
+            // The per-account lockout is IP-independent: rotate the source IP
+            // all you like, the username bucket is still full.
+            for (let i = 0; i < RATE_LIMIT_CONFIG.LOGIN_FAILURE_MAX; i++) {
+                recordLoginFailure('locked-user');
+            }
+
+            const res = await request(app)
+                .post('/login')
+                .set('X-Forwarded-For', '10.9.9.9') // a "fresh" spoofed IP
+                .send({ username: 'locked-user', password: 'password123' });
+
+            expect(res.status).toBe(429);
+            expect(res.body.message).toBe('Too many failed login attempts. Please try again later.');
+            // Locked before any DB lookup.
+            expect(db.query).not.toHaveBeenCalled();
         });
     });
 

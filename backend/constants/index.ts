@@ -357,6 +357,14 @@ export const RATE_LIMIT_CONFIG = {
     // Auth endpoints (login/register) — protect against brute force.
     AUTH_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
     AUTH_MAX: 10,
+    // Per-account login throttle (AUTH-001): a failed-password counter per
+    // username that locks the account out. IP rotation defeats pure IP
+    // keying, so the per-account counter is the load-bearing defense; the
+    // window/memory caps keep the in-memory map bounded.
+    LOGIN_FAILURE_WINDOW_MS: 15 * 60 * 1000, // failures expire after 15 minutes
+    LOGIN_FAILURE_MAX: 10, // ...within the window
+    LOGIN_LOCKOUT_MS: 15 * 60 * 1000, // lockout duration once MAX is hit
+    LOGIN_TRACKER_MAX_ACCOUNTS: 10_000, // eviction cap for the tracker map
     // Submission endpoint — protect against submission spam DoS.
     SUBMIT_WINDOW_MS: 60 * 1000, // 1 minute
     SUBMIT_MAX: 30,

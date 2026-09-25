@@ -15,7 +15,12 @@ import {
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { getSiteAccessMode } from '../services/siteSettingsService';
 import { validateRequest } from '../middleware/validation';
-import { authLimiter } from '../middleware/rateLimit';
+import {
+  authLimiter,
+  clearLoginFailures,
+  isLoginLocked,
+  recordLoginFailure,
+} from '../middleware/rateLimit';
 import { loginSchema, registerSchema } from '../schemas/requestSchemas';
 import { getUserTierAndLevel } from '../services/progressionService';
 import { logger } from '../utils/logger';
@@ -140,6 +145,16 @@ router.post(
   asyncHandler(async (req: Request, res: Response<LoginSuccessResponse | MessageResponse>) => {
     const { username, password } = req.body as LoginRequestBody;
 
+    // Per-account throttle (AUTH-001): IP-keyed limiting alone is defeated by
+    // rotating spoofed IPs; after too many failures for one username the
+    // account is locked out regardless of source. Checked before the DB hit
+    // so a locked account costs (almost) nothing to reject.
+    if (isLoginLocked(username)) {
+      logger.warn('login blocked', { reason: 'account_lockout', username });
+      res.status(429).json({ message: 'Too many failed login attempts. Please try again later.' });
+      return;
+    }
+
     const result = await db.query<UserRow & { has_avatar: boolean }>(
       'SELECT *, (avatar_png IS NOT NULL) AS has_avatar FROM users WHERE username = $1',
       [username],
@@ -148,6 +163,7 @@ router.post(
       // Use a single neutral message for both unknown-username and wrong-password
       // failures so the endpoint does not leak which usernames exist.
       logger.warn('login failed', { reason: 'unknown_username', username });
+      recordLoginFailure(username);
       res.status(401).json({ message: 'Invalid username or password' });
       return;
     }
@@ -156,9 +172,12 @@ router.post(
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
       logger.warn('login failed', { reason: 'wrong_password', username });
+      recordLoginFailure(username);
       res.status(401).json({ message: 'Invalid username or password' });
       return;
     }
+
+    clearLoginFailures(username);
 
     // Regenerate the session on successful authentication to prevent session
     // fixation: any pre-login session id is discarded and a fresh cookie is issued.
