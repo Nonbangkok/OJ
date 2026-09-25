@@ -22,7 +22,7 @@ import {
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
 import { submitLimiter } from '../middleware/rateLimit';
-import { enqueueJudgeTask } from '../services/judgeQueue';
+import { enqueueTrackedJudgeTask } from '../services/judgeQueue';
 import {
   idParamSchema,
   searchQuerySchema,
@@ -59,12 +59,22 @@ router.post(
 
     // Dispatch the actual compile/run work through the judge concurrency gate so
     // that at most JUDGE_CONFIG.MAX_CONCURRENT_JUDGES run at once; excess queue.
+    // The tracked variant registers the row as in-flight for its whole
+    // queued+running lifetime, so rejudge can refuse to double-judge it
+    // (JUDGE-004) and contest-end migration can drain it (JUDGE-005).
     if (queueResult.isContestSubmission) {
-      enqueueJudgeTask(() => processContestSubmission(queueResult.submissionId));
+      enqueueTrackedJudgeTask(
+        () => processContestSubmission(queueResult.submissionId),
+        { table: 'contest_submissions', submissionId: queueResult.submissionId },
+        Number(submissionPayload.contestId),
+      );
       return;
     }
 
-    enqueueJudgeTask(() => processSubmission(queueResult.submissionId));
+    enqueueTrackedJudgeTask(
+      () => processSubmission(queueResult.submissionId),
+      { table: 'submissions', submissionId: queueResult.submissionId },
+    );
   }),
 );
 

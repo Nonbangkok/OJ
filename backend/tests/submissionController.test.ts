@@ -105,7 +105,7 @@ describe('Submission Controller', () => {
         it('should accept a valid contest submission and queue contest judge', async () => {
             (db.query as jest.Mock)
                 .mockResolvedValueOnce({
-                    rows: [{ id: 1, status: 'running', start_time: new Date(), end_time: new Date() }]
+                    rows: [{ id: 1, status: 'running', start_time: new Date(Date.now() - 3600_000), end_time: new Date(Date.now() + 3600_000) }]
                 }) // contest exists + running
                 .mockResolvedValueOnce({ rows: [{ exists: 1 }] }) // participant check
                 .mockResolvedValueOnce({ rows: [{ exists: 1 }] }) // problem in contest
@@ -125,7 +125,7 @@ describe('Submission Controller', () => {
         it('should return 403 when user is not a contest participant', async () => {
             (db.query as jest.Mock)
                 .mockResolvedValueOnce({
-                    rows: [{ id: 1, status: 'running', start_time: new Date(), end_time: new Date() }]
+                    rows: [{ id: 1, status: 'running', start_time: new Date(Date.now() - 3600_000), end_time: new Date(Date.now() + 3600_000) }]
                 })
                 .mockResolvedValueOnce({ rows: [] }); // participant check
 
@@ -139,7 +139,7 @@ describe('Submission Controller', () => {
 
         it('should return 400 when contest is not running', async () => {
             (db.query as jest.Mock).mockResolvedValueOnce({
-                rows: [{ id: 1, status: 'scheduled', start_time: new Date(), end_time: new Date() }]
+                rows: [{ id: 1, status: 'scheduled', start_time: new Date(Date.now() - 3600_000), end_time: new Date(Date.now() + 3600_000) }]
             });
 
             const res = await request(app)

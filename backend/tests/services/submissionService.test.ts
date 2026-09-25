@@ -1,4 +1,4 @@
-import { processSubmission, processContestSubmission } from '../../services/submissionService';
+import { processSubmission, processContestSubmission, sweepOrphanedSubmissions } from '../../services/submissionService';
 import * as db from '../../db';
 import fs from 'fs';
 import path from 'path';
@@ -6,11 +6,15 @@ import cp from 'child_process';
 import { judge } from '../../services/judgeService';
 import { publishRealtime } from '../../services/realtimeHub';
 import { awardSolveReward } from '../../services/progressionService';
+import { enqueueTrackedJudgeTask } from '../../services/judgeQueue';
 import { JUDGE_CONFIG } from '../../constants';
 
 jest.mock('../../db');
 jest.mock('../../services/realtimeHub', () => ({
     publishRealtime: jest.fn(),
+}));
+jest.mock('../../services/judgeQueue', () => ({
+    enqueueTrackedJudgeTask: jest.fn(),
 }));
 jest.mock('../../services/progressionService', () => ({
     awardSolveReward: jest.fn(),
@@ -80,7 +84,7 @@ describe('Submission Service', () => {
                 .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code: 'int main(){}', language: 'cpp' }] }) // SELECT
                 .mockResolvedValueOnce({}) // UPDATE Compiling
                 .mockResolvedValueOnce({}) // UPDATE Running
-                .mockResolvedValueOnce({}); // UPDATE final results
+                .mockResolvedValueOnce({ rowCount: 1 }); // UPDATE final results (landed)
 
             (judge as jest.Mock).mockResolvedValueOnce({
                 results: [{ testCase: 1, status: 'Accepted' }],
@@ -169,7 +173,7 @@ describe('Submission Service', () => {
                 .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code: 'int main(){}', language: 'cpp' }] }) // SELECT
                 .mockResolvedValueOnce({}) // UPDATE Compiling
                 .mockResolvedValueOnce({}) // UPDATE Running
-                .mockResolvedValueOnce({}); // UPDATE final results
+                .mockResolvedValueOnce({ rowCount: 1 }); // UPDATE final results (landed)
 
             (judge as jest.Mock).mockResolvedValueOnce({
                 results: [{ testCase: 1, status: 'Accepted' }],
@@ -192,7 +196,7 @@ describe('Submission Service', () => {
                 .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
                 .mockResolvedValueOnce({}) // UPDATE Compiling
                 .mockResolvedValueOnce({}) // UPDATE Running
-                .mockResolvedValueOnce({}); // UPDATE final results
+                .mockResolvedValueOnce({ rowCount: 1 }); // UPDATE final results (landed)
 
             (judge as jest.Mock).mockResolvedValueOnce({
                 results: [{ testCase: 1, status: 'Accepted' }],
@@ -274,7 +278,7 @@ describe('Submission Service', () => {
                 .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', contest_id: 9, user_id: 42, code: 'int main(){}', language: 'cpp' }] })
                 .mockResolvedValueOnce({}) // UPDATE Compiling
                 .mockResolvedValueOnce({}) // UPDATE Running
-                .mockResolvedValueOnce({}); // UPDATE final results
+                .mockResolvedValueOnce({ rowCount: 1 }); // UPDATE final results (landed)
 
             (judge as jest.Mock).mockResolvedValueOnce({
                 results: [{ testCase: 1, status: 'Accepted' }],
@@ -307,7 +311,7 @@ describe('Submission Service', () => {
                 .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
                 .mockResolvedValueOnce({}) // UPDATE Compiling
                 .mockResolvedValueOnce({}) // UPDATE Running
-                .mockResolvedValueOnce({}); // UPDATE final results
+                .mockResolvedValueOnce({ rowCount: 1 }); // UPDATE final results (landed)
 
             (judge as jest.Mock).mockResolvedValueOnce({
                 results: [{ testCase: 1, status: 'Accepted' }],
@@ -337,7 +341,7 @@ describe('Submission Service', () => {
                 .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
                 .mockResolvedValueOnce({}) // UPDATE Compiling
                 .mockResolvedValueOnce({}) // UPDATE Running
-                .mockResolvedValueOnce({}); // UPDATE final results
+                .mockResolvedValueOnce({ rowCount: 1 }); // UPDATE final results (landed)
 
             (judge as jest.Mock).mockResolvedValueOnce({
                 results: [{ testCase: 1, status: 'Accepted' }],
@@ -365,7 +369,7 @@ describe('Submission Service', () => {
                 .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
                 .mockResolvedValueOnce({}) // UPDATE Compiling
                 .mockResolvedValueOnce({}) // UPDATE Running
-                .mockResolvedValueOnce({}); // UPDATE final results
+                .mockResolvedValueOnce({ rowCount: 1 }); // UPDATE final results (landed)
 
             (judge as jest.Mock).mockResolvedValueOnce({
                 results: [{ testCase: 1, status: 'Accepted' }],
@@ -415,7 +419,7 @@ describe('Submission Service', () => {
                 .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code: 'print("hi")', language: 'python' }] }) // SELECT
                 .mockResolvedValueOnce({}) // UPDATE Compiling
                 .mockResolvedValueOnce({}) // UPDATE Running
-                .mockResolvedValueOnce({}); // UPDATE final results
+                .mockResolvedValueOnce({ rowCount: 1 }); // UPDATE final results (landed)
 
             (judge as jest.Mock).mockResolvedValueOnce({
                 results: [{ testCase: 1, status: 'Accepted' }],
@@ -492,7 +496,7 @@ describe('Submission Service', () => {
                 .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code: 'print(1)', language: 'python' }] })
                 .mockResolvedValueOnce({}) // UPDATE Compiling
                 .mockResolvedValueOnce({}) // UPDATE Running
-                .mockResolvedValueOnce({}); // UPDATE final results
+                .mockResolvedValueOnce({ rowCount: 1 }); // UPDATE final results (landed)
 
             (judge as jest.Mock).mockResolvedValueOnce({
                 results: [], score: 0, overallStatus: 'Accepted', maxTimeMs: 0, maxMemoryKb: 0
@@ -514,7 +518,7 @@ describe('Submission Service', () => {
                 .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
                 .mockResolvedValueOnce({}) // UPDATE Compiling
                 .mockResolvedValueOnce({}) // UPDATE Running
-                .mockResolvedValueOnce({}); // UPDATE final results
+                .mockResolvedValueOnce({ rowCount: 1 }); // UPDATE final results (landed)
             (judge as jest.Mock).mockResolvedValueOnce({
                 results: [], score: 0, overallStatus: 'Accepted', maxTimeMs: 0, maxMemoryKb: 0
             });
@@ -605,6 +609,96 @@ describe('Submission Service', () => {
             const [target, opts] = rmCalls[0];
             expect(String(target)).toContain('oj-submissions');
             expect(opts).toEqual(expect.objectContaining({ recursive: true, force: true }));
+        });
+    });
+
+    describe('stale-verdict guard (JUDGE-004)', () => {
+        it('discards a judge result when the final UPDATE matches no judgeable row (rowCount 0)', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}) // UPDATE Running
+                .mockResolvedValueOnce({ rowCount: 0 }); // final UPDATE: row gone/terminal
+
+            (judge as jest.Mock).mockResolvedValueOnce({
+                results: [{ testCase: 1, status: 'Accepted' }],
+                score: 100,
+                overallStatus: 'Accepted',
+                maxTimeMs: 10,
+                maxMemoryKb: 2048
+            });
+
+            await processSubmission(1);
+
+            // The final UPDATE is CONDITIONAL on a judgeable status.
+            const finalSql = (db.query as jest.Mock).mock.calls[3][0] as string;
+            expect(finalSql).toContain("overall_status IN ('Pending', 'Compiling', 'Running')");
+
+            // A discarded verdict must not publish, ping the scoreboard, or
+            // award XP — a stale run steps aside entirely.
+            expect(publishRealtime).toHaveBeenCalledTimes(2); // Compiling + Running only
+            expect(awardSolveReward).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('startup sweep for orphaned submissions (JUDGE-003 / DB-13)', () => {
+        // The sweep dispatches through the tracked judge queue; capture tasks.
+        let sweepTasks: Array<() => Promise<void>>;
+        beforeEach(() => {
+            sweepTasks = [];
+            (enqueueTrackedJudgeTask as unknown as jest.Mock).mockImplementation(
+                (task: () => Promise<void>) => { sweepTasks.push(task); }
+            );
+        });
+
+        it('re-enqueues Pending rows and marks Compiling/Running rows System Error, in both pools', async () => {
+            (db.query as jest.Mock)
+                // submissions pool
+                .mockResolvedValueOnce({ rows: [{ id: 11, contest_id: null }, { id: 12, contest_id: null }] }) // Pending
+                .mockResolvedValueOnce({ rowCount: 2 })                                                      // Compiling/Running
+                // contest_submissions pool
+                .mockResolvedValueOnce({ rows: [{ id: 21, contest_id: 5 }] })                                // Pending
+                .mockResolvedValueOnce({ rowCount: 1 });                                                     // Compiling/Running
+
+            const result = await sweepOrphanedSubmissions();
+
+            expect(result).toEqual({ requeued: 3, systemErrored: 3 });
+            expect(sweepTasks).toHaveLength(3);
+
+            // Pending re-enqueue: a SELECT, not a destructive reset.
+            const pendingSql = (db.query as jest.Mock).mock.calls[0][0] as string;
+            expect(pendingSql).toContain('SELECT id');
+            expect(pendingSql).toContain("overall_status = 'Pending'");
+
+            // Stuck rows land a terminal System Error with a clear message.
+            const stuckSql = (db.query as jest.Mock).mock.calls[1][0] as string;
+            expect(stuckSql).toContain("overall_status IN ('Compiling', 'Running')");
+            expect(stuckSql).toContain("'System Error'");
+            const stuckResults = (db.query as jest.Mock).mock.calls[1][1][0] as string;
+            expect(stuckResults).toContain('interrupted by a server restart');
+
+            // The enqueued tasks dispatch into the right pipelines: each
+            // pipeline's first query SELECTs its row by id from the right
+            // table (subsequent queries return no rows, ending the pipeline).
+            (db.query as jest.Mock).mockResolvedValue({ rows: [] });
+            await Promise.all(sweepTasks.map((task) => task()));
+            const selectCalls = (db.query as jest.Mock).mock.calls
+                .filter(([sql]: [string]) => sql.startsWith('SELECT * FROM'));
+            expect(selectCalls).toEqual(expect.arrayContaining([
+                ['SELECT * FROM submissions WHERE id = $1', [11]],
+                ['SELECT * FROM submissions WHERE id = $1', [12]],
+                ['SELECT * FROM contest_submissions WHERE id = $1', [21]],
+            ]));
+        });
+
+        it('is a no-op when nothing is orphaned', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValue({ rows: [], rowCount: 0 });
+
+            const result = await sweepOrphanedSubmissions();
+
+            expect(result).toEqual({ requeued: 0, systemErrored: 0 });
+            expect(sweepTasks).toHaveLength(0);
         });
     });
 });

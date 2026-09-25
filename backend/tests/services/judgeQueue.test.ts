@@ -1,4 +1,12 @@
-import { enqueueJudgeTask, getJudgeQueueStats } from '../../services/judgeQueue';
+import {
+  enqueueJudgeTask,
+  enqueueTrackedJudgeTask,
+  getContestInFlightCount,
+  getJudgeQueueStats,
+  isSubmissionInFlight,
+  resetInFlightTracking,
+  waitForContestJudgesToDrain,
+} from '../../services/judgeQueue';
 import { JUDGE_CONFIG } from '../../constants';
 
 /**
@@ -120,5 +128,79 @@ describe('judgeQueue concurrency gate', () => {
     gate.resolve();
     await flush();
     expect(getJudgeQueueStats()).toEqual({ running: 0, queued: 0 });
+  });
+
+  describe('tracked tasks + in-flight registry (JUDGE-004/005)', () => {
+    beforeEach(() => {
+      resetInFlightTracking();
+    });
+
+    it('marks a submission in-flight while queued and running, released on settle', async () => {
+      const gate = deferred();
+      const key = { table: 'submissions' as const, submissionId: 7 };
+      enqueueTrackedJudgeTask(async () => { await gate.promise; }, key);
+
+      // Registered immediately (queued counts as in-flight).
+      expect(isSubmissionInFlight(key)).toBe(true);
+      await flush();
+      expect(isSubmissionInFlight(key)).toBe(true);
+
+      gate.resolve();
+      await flush();
+      await flush();
+      expect(isSubmissionInFlight(key)).toBe(false);
+    });
+
+    it('releases the in-flight registration even when the task throws', async () => {
+      const key = { table: 'contest_submissions' as const, submissionId: 9 };
+      enqueueTrackedJudgeTask(async () => { throw new Error('boom'); }, key, 3);
+
+      await flush();
+      await flush();
+      expect(isSubmissionInFlight(key)).toBe(false);
+      expect(getContestInFlightCount(3)).toBe(0);
+    });
+
+    it('tracks per-contest counts for drain coordination and releases them', async () => {
+      expect(getContestInFlightCount(5)).toBe(0);
+      const gates = [deferred(), deferred()];
+      enqueueTrackedJudgeTask(async () => { await gates[0].promise; }, { table: 'contest_submissions', submissionId: 1 }, 5);
+      enqueueTrackedJudgeTask(async () => { await gates[1].promise; }, { table: 'contest_submissions', submissionId: 2 }, 5);
+      // A standalone-pool row with no contest is not counted anywhere.
+      const standaloneGate = deferred();
+      enqueueTrackedJudgeTask(async () => { await standaloneGate.promise; }, { table: 'submissions', submissionId: 3 });
+
+      await flush();
+      expect(getContestInFlightCount(5)).toBe(2);
+
+      gates[0].resolve();
+      await flush();
+      expect(getContestInFlightCount(5)).toBe(1);
+
+      gates[1].resolve();
+      standaloneGate.resolve();
+      await flush();
+      expect(getContestInFlightCount(5)).toBe(0);
+    });
+
+    it('waits for a contest to drain and resolves once idle', async () => {
+      const gate = deferred();
+      enqueueTrackedJudgeTask(async () => { await gate.promise; }, { table: 'contest_submissions', submissionId: 1 }, 8);
+
+      const draining = waitForContestJudgesToDrain(8, 5000);
+      gate.resolve();
+      await expect(draining).resolves.toBe(true);
+    });
+
+    it('resolve false when the drain timeout elapses with judges still running', async () => {
+      const gate = deferred();
+      enqueueTrackedJudgeTask(async () => { await gate.promise; }, { table: 'contest_submissions', submissionId: 1 }, 9);
+
+      const draining = waitForContestJudgesToDrain(9, 0);
+      await expect(draining).resolves.toBe(false);
+
+      gate.resolve();
+      await flush();
+    });
   });
 });

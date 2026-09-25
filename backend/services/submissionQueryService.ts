@@ -41,6 +41,19 @@ export const validateAndQueueSubmission = async (
         }
 
         const contest = contestResult.rows[0];
+        // Wall-clock gate (XSYS-003 / CONTEST-001): the scheduler-updated
+        // status is the display/backstop, not the authority — it only ticks
+        // once a minute, so between end_time and the next tick (or worse,
+        // when the scheduler lags) submissions would still be accepted on
+        // status alone. Same pattern as joinContest: compare the clock to
+        // start_time/end_time directly.
+        const now = new Date();
+        if (now < new Date(contest.start_time)) {
+            throw new AppError('The contest has not started yet.', 400);
+        }
+        if (now >= new Date(contest.end_time)) {
+            throw new AppError('The contest has ended.', 400);
+        }
         if (contest.status !== CONTEST_STATUS.RUNNING) {
             throw new AppError(`Contest is not running. Current status: ${contest.status}`, 400);
         }

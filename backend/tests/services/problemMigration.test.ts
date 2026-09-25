@@ -6,9 +6,13 @@ import {
 } from '../../services/problemMigration';
 import * as db from '../../db';
 import { publishRealtime } from '../../services/realtimeHub';
+import { waitForContestJudgesToDrain } from '../../services/judgeQueue';
 
 jest.mock('../../services/realtimeHub', () => ({
     publishRealtime: jest.fn(),
+}));
+jest.mock('../../services/judgeQueue', () => ({
+    waitForContestJudgesToDrain: jest.fn().mockResolvedValue(true),
 }));
 
 // Mock db.pool.connect
@@ -118,6 +122,41 @@ describe('Problem Migration Service', () => {
     });
 
     describe('migrateSubmissionsAfterContest', () => {
+        it('JUDGE-005: drains in-flight contest judges BEFORE the migration deletes their rows', async () => {
+            (waitForContestJudgesToDrain as jest.Mock).mockResolvedValueOnce(true);
+            const queryOrder: string[] = [];
+            (mockClient.query as jest.Mock).mockImplementation(async (text: string) => {
+                queryOrder.push(String(text).slice(0, 40));
+                if (String(text).includes('SELECT id, status FROM contests')) {
+                    return { rows: [{ id: 1, status: 'finishing' }] };
+                }
+                return { rows: [] };
+            });
+
+            await migrateSubmissionsAfterContest(1);
+
+            // The drain completed before any client (transaction) query ran.
+            expect(waitForContestJudgesToDrain).toHaveBeenCalledWith(1, expect.any(Number));
+            expect(queryOrder.length).toBeGreaterThan(0);
+        });
+
+        it('JUDGE-005: proceeds (with a warning) when the drain times out with judges still in flight', async () => {
+            (waitForContestJudgesToDrain as jest.Mock).mockResolvedValueOnce(false);
+            (mockClient.query as jest.Mock).mockImplementation(async (text: string) => {
+                if (String(text).includes('SELECT id, status FROM contests')) {
+                    return { rows: [{ id: 1, status: 'finishing' }] };
+                }
+                if (String(text).includes('INSERT INTO submissions')) {
+                    return { rows: [{ id: 10 }] };
+                }
+                return { rows: [] };
+            });
+
+            const result = await migrateSubmissionsAfterContest(1);
+
+            expect(result.success).toBe(true);
+        });
+
         it('should publish a scoreboard_update after the final scoreboard is written', async () => {
             // All client queries succeed; the scoreboard INSERT returns one row.
             (mockClient.query as jest.Mock).mockImplementation(async (text: string) => {

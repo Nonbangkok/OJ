@@ -115,6 +115,8 @@ export interface RejudgeResponse {
     queued: number;
     /** Non-judgeable rows excluded from the rejudge. */
     skipped: number;
+    /** Rows excluded because a judge was already in flight for them (JUDGE-004). */
+    busy?: number;
 }
 
 // ---------------------------------------------------------------------------

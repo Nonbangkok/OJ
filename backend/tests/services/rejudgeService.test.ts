@@ -1,11 +1,14 @@
 import { rejudgeContest, rejudgeProblem } from '../../services/rejudgeService';
 import * as db from '../../db';
-import { enqueueJudgeTask } from '../../services/judgeQueue';
+import { enqueueTrackedJudgeTask, isSubmissionInFlight } from '../../services/judgeQueue';
 import { processContestSubmission, processSubmission } from '../../services/submissionService';
 import { logger } from '../../utils/logger';
 
 jest.mock('../../db');
-jest.mock('../../services/judgeQueue', () => ({ enqueueJudgeTask: jest.fn() }));
+jest.mock('../../services/judgeQueue', () => ({
+    enqueueTrackedJudgeTask: jest.fn(),
+    isSubmissionInFlight: jest.fn(() => false),
+}));
 jest.mock('../../services/submissionService', () => ({
     processSubmission: jest.fn(),
     processContestSubmission: jest.fn(),
@@ -21,7 +24,7 @@ describe('Rejudge Service', () => {
 
     beforeEach(() => {
         queuedTasks = [];
-        (enqueueJudgeTask as jest.Mock).mockImplementation((task: JudgeTask) => {
+        (enqueueTrackedJudgeTask as jest.Mock).mockImplementation((task: JudgeTask) => {
             queuedTasks.push(task);
         });
     });
@@ -36,7 +39,7 @@ describe('Rejudge Service', () => {
 
             const result = await rejudgeProblem('P1');
 
-            expect(result).toEqual({ queued: 3, skipped: 1 });
+            expect(result).toEqual({ queued: 3, skipped: 1, busy: 0 });
 
             // Standalone pool: judgeable rows reset to Pending with results cleared.
             expect(db.query).toHaveBeenNthCalledWith(1,
@@ -54,7 +57,7 @@ describe('Rejudge Service', () => {
                 ['Pending', 'P1']);
 
             // Every judgeable row goes through the existing judge queue.
-            expect(enqueueJudgeTask).toHaveBeenCalledTimes(3);
+            expect(enqueueTrackedJudgeTask).toHaveBeenCalledTimes(3);
             for (const task of queuedTasks) {
                 await task();
             }
@@ -89,7 +92,7 @@ describe('Rejudge Service', () => {
             const result = await rejudgeProblem('P1');
 
             expect(result.queued).toBe(501);
-            expect(enqueueJudgeTask).toHaveBeenCalledTimes(501);
+            expect(enqueueTrackedJudgeTask).toHaveBeenCalledTimes(501);
             expect(logger.warn).toHaveBeenCalledWith('large rejudge batch queued',
                 expect.objectContaining({ scope: 'problem', queued: 501 }));
         });
@@ -105,6 +108,47 @@ describe('Rejudge Service', () => {
 
             expect(logger.warn).not.toHaveBeenCalled();
         });
+
+        it('JUDGE-004: skips rows whose judge is already in flight (busy), never double-queuing them', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ id: 1, contest_id: null }, { id: 2, contest_id: null }] })
+                .mockResolvedValueOnce({ rows: [{ count: 0 }] })
+                .mockResolvedValueOnce({ rows: [] })
+                .mockResolvedValueOnce({ rows: [{ count: 0 }] });
+            // Row 1 is being judged right now.
+            (isSubmissionInFlight as jest.Mock).mockImplementation(
+                (key: { table: string; submissionId: number }) =>
+                    key.table === 'submissions' && key.submissionId === 1
+            );
+
+            const result = await rejudgeProblem('P1');
+
+            expect(result).toEqual({ queued: 1, skipped: 0, busy: 1 });
+            expect(enqueueTrackedJudgeTask).toHaveBeenCalledTimes(1);
+            for (const task of queuedTasks) {
+                await task();
+            }
+            // Only the NOT-in-flight row is dispatched.
+            expect(processSubmission).toHaveBeenCalledWith(2);
+            expect(processSubmission).not.toHaveBeenCalledWith(1);
+        });
+
+        it('JUDGE-004: rejects a concurrent rejudge of the same problem with 409', async () => {
+            (db.query as jest.Mock).mockImplementation(async () => ({ rows: [] }));
+
+            // Hold the first rejudge open on its first DB call.
+            let releaseFirst: () => void = () => {};
+            const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+            (db.query as jest.Mock).mockImplementationOnce(async () => { await firstGate; return { rows: [] }; });
+
+            const first = rejudgeProblem('P1');
+            const second = rejudgeProblem('P1');
+
+            await expect(second).rejects.toMatchObject({ statusCode: 409 });
+
+            releaseFirst();
+            await first;
+        });
     });
 
     describe('rejudgeContest', () => {
@@ -115,7 +159,7 @@ describe('Rejudge Service', () => {
 
             const result = await rejudgeContest(9);
 
-            expect(result).toEqual({ queued: 2, skipped: 2 });
+            expect(result).toEqual({ queued: 2, skipped: 2, busy: 0 });
 
             // Exactly one reset + one skip count; the standalone pool is never read.
             expect(db.query).toHaveBeenCalledTimes(2);
@@ -133,7 +177,7 @@ describe('Rejudge Service', () => {
             expect(updateSql).not.toContain('UPDATE submissions');
             expect(countSql).not.toContain('FROM submissions');
 
-            expect(enqueueJudgeTask).toHaveBeenCalledTimes(2);
+            expect(enqueueTrackedJudgeTask).toHaveBeenCalledTimes(2);
             for (const task of queuedTasks) {
                 await task();
             }

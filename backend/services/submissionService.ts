@@ -16,6 +16,7 @@ import { findForbiddenInclude } from '../utils/compileGuard';
 import { logger } from '../utils/logger';
 import { publishRealtime } from './realtimeHub';
 import { awardSolveReward } from './progressionService';
+import { enqueueTrackedJudgeTask } from './judgeQueue';
 import {
   canDropPrivileges,
   nextSandboxIdentity,
@@ -275,12 +276,23 @@ async function runSubmissionPipeline(
     );
 
     const { results, score, overallStatus, maxTimeMs, maxMemoryKb } = judgeResult;
-    await db.query(
+    // Conditional final write (JUDGE-004): the verdict only lands while the
+    // row is still in a non-terminal state this pipeline put it in. A stale
+    // run (e.g. a judge that outlived a rejudge's fresh verdict, or a
+    // contest_submissions row already migrated/deleted at contest end) must
+    // not overwrite a newer terminal verdict — rowCount 0 means step aside.
+    const finalUpdate = await db.query(
       `UPDATE ${table}
        SET overall_status = $1, score = $2, results = $3, max_time_ms = $4, max_memory_kb = $5
-       WHERE id = $6`,
+       WHERE id = $6 AND overall_status IN ('${SUBMISSION_STATUS.PENDING}', '${SUBMISSION_STATUS.COMPILING}', '${SUBMISSION_STATUS.RUNNING}')`,
       [overallStatus, score, JSON.stringify(results), maxTimeMs, maxMemoryKb, submissionId]
     );
+    if ((finalUpdate.rowCount ?? 0) === 0) {
+      logger.warn('stale judge result discarded — row is no longer in a judgeable state', {
+        submissionId, table, overallStatus,
+      });
+      return;
+    }
 
     // First Accepted solve earns XP exactly once — awardSolveReward is
     // idempotent (unique constraint on user_problem_rewards), so rejudges
@@ -343,4 +355,80 @@ export async function processSubmission(submissionId: number): Promise<void> {
 // Process contest submissions (same pipeline, different table)
 export async function processContestSubmission(submissionId: number): Promise<void> {
   await runSubmissionPipeline(submissionId, 'contest_submissions', 'contest');
+}
+
+/**
+ * JUDGE-003 / DB-13: boot sweep for submissions orphaned by a restart.
+ *
+ * The judge queue is in-memory, so a backend restart abandons every
+ * submission stuck in a non-terminal state (Pending/Compiling/Running) in
+ * BOTH pools — without this sweep they poll as "processing" forever.
+ *
+ * Policy (documented design choice):
+ *  - `Pending` rows never started judging (the queue died before their task
+ *    ran), so they are re-enqueued through the normal pipeline — best UX,
+ *    and safe because nothing was ever written for them beyond the INSERT.
+ *  - `Compiling`/`Running` rows were mid-flight: their per-submission
+ *    workspaces (source + binary) were process-local and are gone after the
+ *    restart, so the pipeline cannot resume them. Re-running from the stored
+ *    code would be possible but would silently DOUBLE judge work and race
+ *    any lingering state; instead they are marked System Error with an
+ *    explicit "interrupted by server restart" result so the submitter knows
+ *    to resubmit. (A `judge_epoch` column would allow faithful re-enqueue;
+ *    deferred — see the Phase 2 report.)
+ *
+ * The contest pool's rows additionally carry a `contest_id`, so re-enqueued
+ * Pending rows stay tracked per-contest for the migration drain (JUDGE-005).
+ * Must run AFTER migrations and BEFORE the app starts accepting traffic;
+ * idempotent (terminal rows never match).
+ */
+export async function sweepOrphanedSubmissions(): Promise<{
+  requeued: number;
+  systemErrored: number;
+}> {
+  let requeued = 0;
+  let systemErrored = 0;
+
+  const pools = [
+    { table: 'submissions' as const, process: processSubmission },
+    { table: 'contest_submissions' as const, process: processContestSubmission },
+  ];
+
+  for (const { table, process } of pools) {
+    // Pending rows: re-enqueue (they never started). A plain SELECT —
+    // resetting them to their current status would be a no-op write.
+    const pendingRes = await db.query<{ id: number; contest_id: number | null }>(
+      `SELECT id${table === 'contest_submissions' ? ', contest_id' : ', NULL::integer AS contest_id'}
+       FROM ${table}
+       WHERE overall_status = '${SUBMISSION_STATUS.PENDING}'`,
+      []
+    );
+    for (const row of pendingRes.rows) {
+      enqueueTrackedJudgeTask(
+        () => process(row.id),
+        { table, submissionId: row.id },
+        table === 'contest_submissions' ? row.contest_id ?? undefined : undefined
+      );
+      requeued += 1;
+    }
+
+    // Compiling/Running rows: the pipeline cannot resume them — terminal
+    // System Error with an explicit interruption message.
+    const stuckRes = await db.query(
+      `UPDATE ${table}
+       SET overall_status = '${SUBMISSION_STATUS.SYSTEM_ERROR}',
+           results = $1
+       WHERE overall_status IN ('${SUBMISSION_STATUS.COMPILING}', '${SUBMISSION_STATUS.RUNNING}')`,
+      [JSON.stringify([{
+        status: SUBMISSION_STATUS.SYSTEM_ERROR,
+        output: 'Judging was interrupted by a server restart. Please resubmit.',
+      }])]
+    );
+    systemErrored += stuckRes.rowCount ?? 0;
+  }
+
+  if (requeued > 0 || systemErrored > 0) {
+    logger.info('startup submission sweep', { requeued, systemErrored });
+  }
+  return { requeued, systemErrored };
 }

@@ -1,4 +1,4 @@
-import { getSubmissions, searchProblems } from '../../services/submissionQueryService';
+import { getSubmissions, searchProblems, validateAndQueueSubmission } from '../../services/submissionQueryService';
 import * as db from '../../db';
 
 jest.mock('../../db');
@@ -135,6 +135,54 @@ describe('submissionQueryService visibility (PROBLEM-001 / SUB-001 / SUB-002)', 
 
             expect(result).toEqual([{ id: 'aplusb', title: 'A Plus B' }]);
             expect(query).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    describe('validateAndQueueSubmission contest wall-clock gate (XSYS-003 / CONTEST-001)', () => {
+        const payload = {
+            problemId: 'CP1',
+            language: 'cpp' as const,
+            code: 'int main(){}',
+            contestId: '1',
+        };
+        const contestRow = (start: Date, end: Date) => ({
+            id: 1, status: 'running', start_time: start, end_time: end,
+        });
+
+        it('accepts a submission while the contest is genuinely inside its window', async () => {
+            query
+                .mockResolvedValueOnce({ rows: [contestRow(new Date(Date.now() - 3600_000), new Date(Date.now() + 3600_000))] })
+                .mockResolvedValueOnce({ rows: [{ exists: 1 }] })  // participant
+                .mockResolvedValueOnce({ rows: [{ exists: 1 }] })  // problem in contest
+                .mockResolvedValueOnce({ rows: [{ id: 202 }] });   // insert
+
+            const result = await validateAndQueueSubmission(payload, 5);
+
+            expect(result).toEqual({ submissionId: 202, isContestSubmission: true });
+        });
+
+        it('rejects a submission after end_time even while status is still running (end_time+ε)', async () => {
+            // The scheduler has not ticked yet: status says running, but the
+            // clock is past end_time by a second.
+            query.mockResolvedValueOnce({
+                rows: [contestRow(new Date(Date.now() - 7200_000), new Date(Date.now() - 1000))],
+            });
+
+            await expect(validateAndQueueSubmission(payload, 5)).rejects.toMatchObject({
+                statusCode: 400,
+                message: 'The contest has ended.',
+            });
+        });
+
+        it('rejects a submission before start_time (start_time-ε)', async () => {
+            query.mockResolvedValueOnce({
+                rows: [contestRow(new Date(Date.now() + 1000), new Date(Date.now() + 7200_000))],
+            });
+
+            await expect(validateAndQueueSubmission(payload, 5)).rejects.toMatchObject({
+                statusCode: 400,
+                message: 'The contest has not started yet.',
+            });
         });
     });
 });

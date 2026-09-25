@@ -1,9 +1,10 @@
 import * as db from '../db';
 import { PoolClient } from 'pg';
-import { CONTEST_STATUS } from '../constants';
+import { CONTEST_STATUS, JUDGE_CONFIG } from '../constants';
 import { logger } from '../utils/logger';
 import { ContestRow } from '../types/models';
 import { publishRealtime } from './realtimeHub';
+import { waitForContestJudgesToDrain } from './judgeQueue';
 import {
   AvailableContestProblemRow,
   ContestMigrationResult,
@@ -166,6 +167,29 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
     if (contest.status !== CONTEST_STATUS.FINISHING) {
       throw new Error('Contest must be in finishing status to migrate submissions');
     }
+
+    // JUDGE-005 / XSYS-001/002: contest_submissions rows are DELETED below.
+    // If a judge is still in flight for this contest, its final UPDATE would
+    // hit zero rows and the verdict would be lost forever (the migrated copy
+    // in `submissions` would stay pre-verdict). Drain in-flight judges FIRST
+    // — bounded by CONTEST_MIGRATION_DRAIN_TIMEOUT_MS so a stuck judge can
+    // never hang the scheduler tick. On timeout the migration proceeds
+    // (status must still advance); the straggler's verdict is discarded by
+    // the pipeline's conditional final UPDATE (rowCount 0 → stale).
+    // Note: the drain runs BEFORE the transaction opens so the pool client
+    // is not held while waiting.
+    const drained = await waitForContestJudgesToDrain(
+      contestId,
+      JUDGE_CONFIG.CONTEST_MIGRATION_DRAIN_TIMEOUT_MS
+    );
+    if (!drained) {
+      logger.warn('contest migration proceeding with judges still in flight — their verdicts will be discarded', {
+        contestId,
+        inFlight: true,
+      });
+    }
+
+
 
     // First, save the problems snapshot for this contest
     await client.query(`

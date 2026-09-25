@@ -2,6 +2,7 @@ import { createApp } from './app';
 import { env } from './config/env';
 import contestScheduler from './services/contestScheduler';
 import { startAuthoringCoordinator } from './services/authoringJobCoordinator';
+import { sweepOrphanedSubmissions } from './services/submissionService';
 import { logger } from './utils/logger';
 
 const app = createApp();
@@ -18,6 +19,14 @@ if (env.AUTHORING_JOBS_DIR) {
 }
 app.listen(port, () => {
   logger.info('server listening', { port });
+
+  // JUDGE-003 / DB-13: recover submissions orphaned in a non-terminal state
+  // by the previous process (the judge queue is in-memory). Pending rows are
+  // re-enqueued; Compiling/Running rows are marked System Error. Runs after
+  // listen so a sweep failure never blocks startup; failures are logged.
+  sweepOrphanedSubmissions().catch((error) => {
+    logger.error('startup submission sweep failed', { err: error });
+  });
 
   // Start Contest Scheduler
   try {
