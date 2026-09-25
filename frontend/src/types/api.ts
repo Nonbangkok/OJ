@@ -48,6 +48,19 @@ export interface RegisterResponse extends ApiMessageResponse {
 }
 
 export type ProblemsWithStatsResponse = ProblemSummary[];
+/** One page of the problem list (GET /problems-with-stats). */
+export interface ProblemsWithStatsPageResponse {
+  problems: ProblemSummary[];
+  /** Opaque token for the next page; null when this is the last page. */
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+/** Global category tab counts for the public problem list. */
+export interface ProblemCategoryCountsResponse {
+  categories: Array<{ name: string; count: number }>;
+  uncategorized: number;
+  total: number;
+}
 export type ProblemDetailResponse = ProblemDetail;
 export type ContestProblemDetailResponse = ProblemDetail;
 

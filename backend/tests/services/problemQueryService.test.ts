@@ -2,6 +2,7 @@ import * as db from '../../db';
 import {
   createProblem,
   getProblemsWithStatsForUser,
+  getPublicProblemCategoryCounts,
   updateProblem,
   updateProblemPdf,
 } from '../../services/problemQueryService';
@@ -23,6 +24,141 @@ describe('problemQueryService difficulty handling', () => {
     await getProblemsWithStatsForUser(1);
     expect(query).toHaveBeenCalledTimes(1);
     expect(query.mock.calls[0][0]).toContain('p.difficulty');
+  });
+
+  describe('paginated problem list (Show More)', () => {
+    const row = (id: string, difficulty: number | null = null) => ({
+      id, title: id, author: null, categories: [], difficulty,
+      best_score: null, submission_count: null, latest_submission_at: null,
+      latest_submission_status: null, best_submission_status: null, best_submission_results: null,
+    });
+
+    it('applies LIMIT in SQL (limit + 1 rows fetched, batch selected first)', async () => {
+      await getProblemsWithStatsForUser(1, { limit: 20 });
+      const sql = query.mock.calls[0][0] as string;
+      // The batch CTE pages in SQL — filters, ORDER BY and LIMIT all inside.
+      expect(sql).toMatch(/WITH batch AS \(\s*SELECT p\.id/);
+      expect(sql).toMatch(/ORDER BY p\.id\s*LIMIT \$\d+/);
+      // limit + 1 is the parameterized fetch bound.
+      expect(query.mock.calls[0][1]).toContain(21);
+      // Stats CTEs are restricted to the batch's problem ids.
+      expect(sql).toContain('s.problem_id IN (SELECT id FROM batch)');
+    });
+
+    it('returns hasMore/nextCursor from the extra row and drops it', async () => {
+      const rows = Array.from({ length: 3 }, (_, i) => row(`p${i}`));
+      query.mockResolvedValueOnce({ rows });
+
+      const page = await getProblemsWithStatsForUser(1, { limit: 2 });
+
+      expect(page.problems.map(p => p.id)).toEqual(['p0', 'p1']);
+      expect(page.hasMore).toBe(true);
+      expect(typeof page.nextCursor).toBe('string');
+      // The cursor is opaque: base64url JSON of the last row's sort key.
+      const decoded = JSON.parse(Buffer.from(page.nextCursor!, 'base64url').toString('utf8'));
+      expect(decoded).toEqual({ s: '', o: 'asc', id: 'p1', d: null });
+    });
+
+    it('returns hasMore false and no cursor on the last page', async () => {
+      query.mockResolvedValueOnce({ rows: [row('a'), row('b')] });
+
+      const page = await getProblemsWithStatsForUser(1, { limit: 5 });
+
+      expect(page.problems).toHaveLength(2);
+      expect(page.hasMore).toBe(false);
+      expect(page.nextCursor).toBeNull();
+    });
+
+    it('builds keyset predicates per sort mode and follows the cursor id direction', async () => {
+      // Default order: id strictly greater.
+      await getProblemsWithStatsForUser(1, { limit: 20, cursor: Buffer.from(JSON.stringify({ s: '', o: 'asc', id: 'x', d: null })).toString('base64url') });
+      expect(query.mock.calls[0][0]).toContain('p.id > $');
+      query.mockClear();
+
+      // Difficulty asc after a rated cursor: greater difficulty, ties by id,
+      // plus every Unrated row (NULLS LAST).
+      await getProblemsWithStatsForUser(1, {
+        limit: 20, sort: 'difficulty', order: 'asc',
+        cursor: Buffer.from(JSON.stringify({ s: 'difficulty', o: 'asc', id: 'x', d: 1500 })).toString('base64url'),
+      });
+      const ascSql = query.mock.calls[0][0] as string;
+      expect(ascSql).toContain('p.difficulty > $');
+      expect(ascSql).toContain('p.id > $');
+      expect(ascSql).toContain('p.difficulty IS NULL');
+      query.mockClear();
+
+      // Difficulty desc after a rated cursor: lesser difficulty, ties by id.
+      await getProblemsWithStatsForUser(1, {
+        limit: 20, sort: 'difficulty', order: 'desc',
+        cursor: Buffer.from(JSON.stringify({ s: 'difficulty', o: 'desc', id: 'x', d: 1500 })).toString('base64url'),
+      });
+      const descSql = query.mock.calls[0][0] as string;
+      expect(descSql).toContain('p.difficulty < $');
+      expect(descSql).toContain('p.id < $');
+      query.mockClear();
+
+      // Difficulty desc after an Unrated cursor: only Unrated rows remain.
+      await getProblemsWithStatsForUser(1, {
+        limit: 20, sort: 'difficulty', order: 'desc',
+        cursor: Buffer.from(JSON.stringify({ s: 'difficulty', o: 'desc', id: 'x', d: null })).toString('base64url'),
+      });
+      expect(query.mock.calls[0][0]).toContain('p.difficulty IS NULL AND p.id < $');
+    });
+
+    it('rejects a cursor issued for a different sort mode', async () => {
+      const cursor = Buffer.from(JSON.stringify({ s: '', o: 'asc', id: 'x', d: null })).toString('base64url');
+      await expect(getProblemsWithStatsForUser(1, { sort: 'difficulty', order: 'asc', cursor }))
+        .rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('rejects an undecodable cursor', async () => {
+      await expect(getProblemsWithStatsForUser(1, { cursor: 'not-a-cursor' }))
+        .rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('composes search, category and difficulty filters before pagination', async () => {
+      await getProblemsWithStatsForUser(1, {
+        limit: 20, search: '100% _x', category: 'Graph', difficultyMin: 1000,
+      });
+      const sql = query.mock.calls[0][0] as string;
+      expect(sql).toContain('p.id ILIKE $');
+      expect(sql).toContain('p.title ILIKE $');
+      expect(sql).toContain('p.categories @> ARRAY[$');
+      expect(sql).toContain('p.difficulty >= $');
+      // % and _ are escaped so they stay literal (ANALYSIS-007 pattern).
+      expect(query.mock.calls[0][1]).toContain('%100\\% \\_x%');
+    });
+
+    it('treats the Uncategorized category filter as cardinality = 0', async () => {
+      await getProblemsWithStatsForUser(1, { limit: 20, category: 'Uncategorized' });
+      expect(query.mock.calls[0][0]).toContain('cardinality(p.categories) = 0');
+    });
+
+    it('rejects an out-of-range limit', async () => {
+      await expect(getProblemsWithStatsForUser(1, { limit: 0 })).rejects.toMatchObject({ statusCode: 400 });
+      await expect(getProblemsWithStatsForUser(1, { limit: 101 })).rejects.toMatchObject({ statusCode: 400 });
+    });
+  });
+
+  describe('public category counts', () => {
+    it('aggregates per-category counts plus totals over visible standalone problems', async () => {
+      query.mockImplementation(async (sql: string) => {
+        if (sql.includes('unnest')) {
+          return { rows: [{ name: 'Graph', count: 3 }, { name: 'Math', count: 1 }] };
+        }
+        return { rows: [{ total: 6, uncategorized: 2 }] };
+      });
+
+      const counts = await getPublicProblemCategoryCounts();
+
+      expect(counts).toEqual({
+        categories: [{ name: 'Graph', count: 3 }, { name: 'Math', count: 1 }],
+        uncategorized: 2,
+        total: 6,
+      });
+      const categorySql = query.mock.calls.find(([sql]) => String(sql).includes('unnest'))![0] as string;
+      expect(categorySql).toContain('p.is_visible = true AND p.contest_id IS NULL');
+    });
   });
 
   it('inserts difficulty on problem create', async () => {
