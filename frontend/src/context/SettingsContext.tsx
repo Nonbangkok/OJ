@@ -72,6 +72,19 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
     void fetchSettings();
   }, [fetchSettings]);
 
+  // XSYS-011: registration/site-access settings were fetched once on mount,
+  // so a toggle made by an admin in another tab never reached already-open
+  // tabs (a stale "registration open" message, or a closed site reading as
+  // open). Refetch on window focus — cheap, and catches the common
+  // "came back to this tab" case.
+  useEffect(() => {
+    const onWindowFocus = () => {
+      void fetchSettings();
+    };
+    window.addEventListener('focus', onWindowFocus);
+    return () => window.removeEventListener('focus', onWindowFocus);
+  }, [fetchSettings]);
+
   const value = useMemo<SettingsContextValue>(
     () => ({
       ...settings,
