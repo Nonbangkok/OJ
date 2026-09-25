@@ -118,6 +118,21 @@ export const JUDGE_CONFIG = {
     // ignores SIGTERM can no longer hold a judge slot indefinitely.
     KILL_GRACE_MS: 2000,
     TLE_EXIT_CODE: 124,
+    // Exit-code base a POSIX shell (and time_wrapper) uses to report a child
+    // that DIED FROM A SIGNAL: 128 + signal number. The wrapper reports the
+    // program's death this way, so e.g. 137 = SIGKILL, 139 = SIGSEGV,
+    // 152 = SIGXCPU (RLIMIT_CPU backstop).
+    SIGNAL_EXIT_BASE: 128,
+    SIGKILL: 9,
+    SIGXCPU: 24,
+    // time_wrapper telemetry tokens (see scripts/time_wrapper.c). Parsed for
+    // time/memory figures; WRAPPER_TELEMETRY_STRIP removes them from any
+    // stderr shown to submitters (JUDGE-001). Token-based (not line-based):
+    // when a program's own output lacks a trailing newline the tokens
+    // concatenate onto that line, so whole-line filtering misses them.
+    WRAPPER_TIME_REPORT: /TIME_USED:([0-9.+]+)/,
+    WRAPPER_MEM_REPORT: /MEM_USED:(\d+)/,
+    WRAPPER_TELEMETRY_STRIP: /\s*TIME_USED:[0-9.+]+\s*MEM_USED:\d+\s*|\s*(?:TIME_USED:[0-9.+]+|MEM_USED:\d+)\s*/g,
     // CPU-time slack (seconds) added on top of the wall-clock limit before the
     // in-process RLIMIT_CPU hard-kills the program. The `timeout` command still
     // owns wall-clock TLE detection; this is a defence-in-depth backstop against

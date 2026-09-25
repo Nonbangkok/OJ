@@ -248,16 +248,179 @@ describe('Judge Service', () => {
 
         const mockChild = { stdin: { write: jest.fn(), end: jest.fn(), on: jest.fn() }, on: jest.fn() };
         (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, opts, cb) => {
+            // JUDGE-002 evidence: the wrapper measured peak RSS over the
+            // effective limit (python: 256MB * 2 = 512MB -> 600000KB used).
             const mleError = new Error('Command failed') as any;
-            mleError.signal = 'SIGSEGV';
-            cb(mleError, '', 'MemoryError');
+            mleError.code = 1;
+            cb(mleError, '', 'TIME_USED:0.100+0.020 MEM_USED:600000');
             return mockChild;
         });
 
         const result = await judge('P1', { command: '/usr/bin/python3', args: ['/tmp/s.py'] }, 'python');
 
         expect(result.overallStatus).toBe(SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED);
-        expect(result.results[0].memoryKb).toBe(256 * LANGUAGE_LIMITS.python.memoryMultiplier * 1024);
+        // The REAL wrapper-measured figure is reported, not a fabricated
+        // limit*1024 (JUDGE-002).
+        expect(result.results[0].memoryKb).toBe(600000);
+    });
+
+    describe('verdict classification evidence (JUDGE-001/002/006/008)', () => {
+        const setupProblem = () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ time_limit_ms: 1000, memory_limit_mb: 256 }] });
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ case_number: 1, input_data: '', output_data: '' }] });
+        };
+
+        const mockExecOnce = (impl: (cb: Function, child: unknown) => void) => {
+            const mockChild = { stdin: { write: jest.fn(), end: jest.fn(), on: jest.fn() }, on: jest.fn() };
+            (cp.exec as unknown as jest.Mock).mockImplementationOnce((_cmd: string, _opts: unknown, cb: Function) => {
+                impl(cb, mockChild);
+                return mockChild;
+            });
+            return mockChild;
+        };
+
+        it('JUDGE-001: RE output contains no server paths, wrapper telemetry, or "Command failed" prefix', async () => {
+            setupProblem();
+            mockExecOnce((cb) => {
+                // The exact leak shape from the audit: Node's Command failed
+                // message carries the full wrapper invocation; the wrapper's
+                // telemetry concatenates onto the program's unterminated
+                // stderr line.
+                const err = new Error(
+                    'Command failed: timeout 1s ./scripts/time_wrapper /usr/src/app/dist/services/submissions/sub_265_1697...out 288 2'
+                ) as Error & { code: number };
+                err.code = 1;
+                cb(err, '', 'bad stuffTIME_USED:0.050+0.010 MEM_USED:2880');
+            });
+
+            const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
+
+            expect(result.overallStatus).toBe(SUBMISSION_STATUS.RUNTIME_ERROR);
+            const output = result.results[0].output ?? '';
+            expect(output).not.toContain('Command failed');
+            expect(output).not.toContain('/usr/src/app');
+            expect(output).not.toContain('time_wrapper');
+            expect(output).not.toContain('TIME_USED');
+            expect(output).not.toContain('MEM_USED');
+            // The program's own stderr survives sanitization.
+            expect(output).toContain('bad stuff');
+        });
+
+        it('JUDGE-002: SIGSEGV with no memory evidence is a Runtime Error, not MLE', async () => {
+            setupProblem();
+            mockExecOnce((cb) => {
+                // A wild-pointer crash: exit 128+11 (SIGSEGV) reported by the
+                // wrapper, but peak RSS (1200KB) far below the 256MB limit.
+                const err = new Error('Command failed') as Error & { code: number };
+                err.code = 128 + 11; // SIGSEGV
+                cb(err, '', 'TIME_USED:0.010+0.000 MEM_USED:1200');
+            });
+
+            const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
+
+            expect(result.overallStatus).toBe(SUBMISSION_STATUS.RUNTIME_ERROR);
+        });
+
+        it('JUDGE-002: a hard SIGKILL of the program is MLE with the real MEM_USED reported', async () => {
+            setupProblem();
+            mockExecOnce((cb) => {
+                // OOM-style kill: wrapper reports the program died from
+                // SIGKILL (exit 137) with the true peak RSS.
+                const err = new Error('Command failed') as Error & { code: number };
+                err.code = 128 + 9; // SIGKILL
+                cb(err, '', 'TIME_USED:0.200+0.050 MEM_USED:400000');
+            });
+
+            const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
+
+            expect(result.overallStatus).toBe(SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED);
+            // The REAL measured figure, never the fabricated limit*1024.
+            expect(result.results[0].memoryKb).toBe(400000);
+        });
+
+        it('JUDGE-002: the old stderr "memory" substring heuristic no longer fabricates MLE', async () => {
+            setupProblem();
+            mockExecOnce((cb) => {
+                // A program that merely PRINTS the word "memory" on stderr
+                // and exits 1: must be a plain Runtime Error.
+                const err = new Error('Command failed') as Error & { code: number };
+                err.code = 1;
+                cb(err, '', 'TIME_USED:0.010+0.000 MEM_USED:1200\nout of memory is a myth');
+            });
+
+            const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
+
+            expect(result.overallStatus).toBe(SUBMISSION_STATUS.RUNTIME_ERROR);
+            expect(result.results[0].memoryKb).toBe(1200);
+        });
+
+        it('JUDGE-006: a clean-exiting program with a spurious stdin EPIPE gets its real verdict', async () => {
+            setupProblem();
+            const mockChild = mockExecOnce((cb) => {
+                // Program exits 0 and never reads its large stdin — Node
+                // fires an EPIPE error event on the stdin stream, but the
+                // exec callback sees NO error.
+                cb(null, '', '');
+            });
+            // Fire the spurious EPIPE BEFORE the callback resolves (the async
+            // flag race from the audit finding).
+            const stdinHandler = (mockChild.stdin.on as jest.Mock).mock.calls
+                .find(([event]: [string]) => event === 'error')?.[1] as
+                ((err: NodeJS.ErrnoException) => void) | undefined;
+            stdinHandler?.(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }));
+
+            const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
+
+            // Exit 0 with empty output vs empty expected: Accepted — the
+            // program's REAL verdict, NOT the spurious Runtime Error.
+            expect(result.overallStatus).toBe(SUBMISSION_STATUS.ACCEPTED);
+        });
+
+        it('JUDGE-008: a program that exits 124 itself is a Runtime Error, not TLE', async () => {
+            setupProblem();
+            mockExecOnce((cb) => {
+                // Program called exit(124). Evidence against a real timeout:
+                // the wrapper survived to print its telemetry line, and the
+                // run finished well inside the 1000ms limit.
+                const err = new Error('Command failed') as Error & { code: number };
+                err.code = 124;
+                cb(err, '', 'TIME_USED:0.010+0.000 MEM_USED:1200');
+            });
+
+            const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
+
+            expect(result.overallStatus).toBe(SUBMISSION_STATUS.RUNTIME_ERROR);
+        });
+
+        it('JUDGE-008: exit 124 with NO wrapper telemetry and past the limit is a real TLE', async () => {
+            setupProblem();
+            mockExecOnce((cb) => {
+                // `timeout` SIGTERMed the wrapper at the wall-clock limit:
+                // exit 124, no TIME_USED line, and the run took >= the limit.
+                const err = new Error('Command failed') as Error & { code: number };
+                err.code = 124;
+                setTimeout(() => cb(err, '', ''), 1100);
+            });
+
+            const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
+
+            expect(result.overallStatus).toBe(SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED);
+        });
+
+        it('JUDGE-008: the wrapper\'s RLIMIT_CPU backstop (SIGXCPU) is a TLE', async () => {
+            setupProblem();
+            mockExecOnce((cb) => {
+                // Busy-loop killed by RLIMIT_CPU: the wrapper reports the
+                // program died from SIGXCPU as exit 128+24.
+                const err = new Error('Command failed') as Error & { code: number };
+                err.code = 128 + 24; // SIGXCPU
+                cb(err, '', 'TIME_USED:1.900+0.010 MEM_USED:1200');
+            });
+
+            const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
+
+            expect(result.overallStatus).toBe(SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED);
+        });
     });
 
     it('strips secrets from the executed program environment (sandbox env-strip)', async () => {

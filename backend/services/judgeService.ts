@@ -12,6 +12,23 @@ import {
   RunResult,
 } from '../types/service';
 
+/**
+ * Human-facing description of a failed run, built ONLY from the exit
+ * signal/code (JUDGE-001). `error.message` is deliberately never used: it is
+ * Node's `Command failed: <full command line>` string, which discloses the
+ * server's wrapper path, the binary's absolute filesystem path, and the
+ * judge's limit arguments to the submitter.
+ */
+const describeCrash = (error: ExecutionError): string => {
+  if (error.signal) {
+    return `Program terminated by signal ${error.signal}`;
+  }
+  if (typeof error.code === 'number') {
+    return `Program exited with code ${error.code}`;
+  }
+  return 'Program terminated unexpectedly';
+};
+
 async function runSingleCase(
   runnable: RunnableCommand,
   input: string,
@@ -62,20 +79,24 @@ async function runSingleCase(
       killSignal: 'SIGKILL' as const,
     };
 
+    // Set when an EPIPE/child-error event was observed — supplementary
+    // evidence for the Runtime Error message, never the verdict itself.
     let hasEpipError = false;
-    let epipErrorMessage = '';
+    const startedAt = Date.now();
 
     const child = exec(command, executionOptions, (error, stdout, stderr) => {
       let timeMs = -1;
       let memoryKb = -1;
       let programOutput = stdout;
       let programStderr = stderr;
+      // Whether the wrapper managed to report its telemetry line — a wrapper
+      // killed by `timeout`'s SIGTERM at the wall-clock limit never does.
+      let timeMatchFound = false;
 
       if (stderr) {
-        const timeRegex = /TIME_USED:([0-9.+]+)/;
-        const memRegex = /MEM_USED:(\d+)/;
-        const timeMatch = stderr.match(timeRegex);
-        const memMatch = stderr.match(memRegex);
+        const timeMatch = stderr.match(JUDGE_CONFIG.WRAPPER_TIME_REPORT);
+        const memMatch = stderr.match(JUDGE_CONFIG.WRAPPER_MEM_REPORT);
+        timeMatchFound = timeMatch !== null;
 
         if (timeMatch) {
           try {
@@ -88,50 +109,92 @@ async function runSingleCase(
         }
         if (memMatch) memoryKb = parseInt(memMatch[1], 10);
 
-        // Clean stderr for reporting
-        programStderr = stderr.split('\n').filter(line => !line.includes('MEM_USED') && !line.includes('TIME_USED')).join('\n').trim();
+        // Clean stderr for reporting (JUDGE-001): strip the wrapper's
+        // telemetry TOKENS — not lines — so the report survives the
+        // concatenation case (`...out 288 2TIME_USED:...`).
+        programStderr = stderr.replace(JUDGE_CONFIG.WRAPPER_TELEMETRY_STRIP, ' ').trim();
       }
 
-      // 1. Check for TLE first (timeout command exit code 124)
       const executionError = error as ExecutionError | null;
-      if (executionError && executionError.code === JUDGE_CONFIG.TLE_EXIT_CODE) {
+      // Signal-vs-exit evidence (JUDGE-008): the command runs under a shell,
+      // so `executionError.signal` describes the SHELL (only set when the
+      // Node-side kill escalation SIGKILLed it), while the wrapper reports
+      // the PROGRAM's death as its own exit code 128+signal.
+      const programSignalExitCode = typeof executionError?.code === 'number'
+        && executionError.code > JUDGE_CONFIG.SIGNAL_EXIT_BASE
+        ? executionError.code - JUDGE_CONFIG.SIGNAL_EXIT_BASE
+        : null;
+
+      // GNU `timeout` exits 124 both when IT kills the command at the limit
+      // and when the command happens to exit 124 by itself. Two pieces of
+      // evidence separate them: (a) a wrapper killed by timeout's SIGTERM
+      // never prints its TIME_USED/MEM_USED line, and (b) a genuine timeout
+      // cannot fire before the wall-clock limit has elapsed.
+      const elapsedMs = Date.now() - startedAt;
+      const timeoutEvidence = !timeMatchFound || elapsedMs >= timeLimitMs;
+
+      // 1. TLE: the wall-clock limit killed the run — `timeout` exit 124
+      //    with timeout evidence, the wrapper's RLIMIT_CPU backstop
+      //    (SIGXCPU), or the Node-side SIGKILL escalation (RUNNER-004).
+      if (
+        (executionError !== null && executionError.code === JUDGE_CONFIG.TLE_EXIT_CODE && timeoutEvidence)
+        || (executionError !== null && executionError.signal === 'SIGKILL')
+        || programSignalExitCode === JUDGE_CONFIG.SIGXCPU
+      ) {
         return resolve({ status: SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED, timeMs: timeLimitMs, memoryKb });
       }
 
-      // 2. Check for EPIPE (program crashed while receiving input)
-      if (hasEpipError) {
-        // Only treat as RE if it's not a TLE (which we checked above)
+      // 2. MLE, classified by evidence (JUDGE-002): the wrapper-measured
+      //    peak RSS exceeded the effective memory limit, or the program died
+      //    from a hard SIGKILL (OOM / over-limit kill — RLIMIT_AS violations
+      //    surface as allocation failure, so a high-RSS crash also lands
+      //    here via the MEM_USED check). The REAL measured MEM_USED is
+      //    reported; the old code fabricated limit*1024.
+      if (
+        executionError !== null
+        && (memoryKb > memoryLimitMb * 1024 || programSignalExitCode === JUDGE_CONFIG.SIGKILL)
+      ) {
         return resolve({
-          status: SUBMISSION_STATUS.RUNTIME_ERROR,
-          output: epipErrorMessage || 'Program crashed while receiving input',
+          status: SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED,
           timeMs,
-          memoryKb
+          memoryKb: memoryKb >= 0 ? memoryKb : memoryLimitMb * 1024,
         });
       }
 
-      // 3. Check for other errors (MLE, SIGSEGV, generic RE)
+      // 3. Runtime Error: every other failure — SIGSEGV/SIGABRT with no
+      //    memory evidence, a sandbox-denied syscall (SIGSYS), and a
+      //    program's OWN exit(124) (no timeout evidence → falls through the
+      //    TLE branch; JUDGE-008). The output shown to the submitter is the
+      //    telemetry-stripped program stderr, or a neutral signal/exit-code
+      //    description — never `error.message`, which is Node's
+      //    "Command failed: <full command line>" leak (JUDGE-001).
       if (executionError) {
-        // Did it run out of memory?
-        if (executionError.signal === 'SIGSEGV' || (stderr && stderr.toLowerCase().includes('memory'))) {
-          return resolve({ status: SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED, timeMs, memoryKb: memoryLimitMb * 1024 });
-        }
-        // For other errors, treat as Runtime Error
+        const crashNote = hasEpipError && !programStderr
+          ? 'Program exited before reading all input (EPIPE on stdin)'
+          : '';
         return resolve({
           status: SUBMISSION_STATUS.RUNTIME_ERROR,
-          output: programStderr || executionError.message || 'Program terminated unexpectedly',
+          output: programStderr || crashNote || describeCrash(executionError),
           timeMs,
           memoryKb
         });
       }
 
+      // 4. Success (PENDING here = "ran fine", the caller compares output).
+      //    An EPIPE event alone is NOT a Runtime Error (JUDGE-006): a
+      //    clean-exiting program that ignores its (large) stdin makes the
+      //    judge's stdin write fail spuriously, and the exec callback can
+      //    run before the stdin error handler (async flag race). Only a
+      //    real failure (non-null error above) turns EPIPE into evidence.
       resolve({ status: SUBMISSION_STATUS.PENDING, output: programOutput, timeMs, memoryKb });
     });
 
-    // Prevent EPIPE errors from crashing the main process.
+    // Prevent EPIPE errors from crashing the main process. The flag is only
+    // EVIDENCE for the Runtime Error message — it never drives the verdict
+    // by itself (JUDGE-006).
     child.stdin?.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EPIPE') {
         hasEpipError = true;
-        epipErrorMessage = `Program crashed while receiving input: ${err.message}`;
         logger.warn('EPIPE on stdin while feeding testcase input', { runnable: runnable.command, err: err.message });
       }
     });
@@ -139,10 +202,7 @@ async function runSingleCase(
     // Also catch errors on the child process itself
     child.on('error', (err) => {
       logger.warn('judge child process error', { runnable: runnable.command, err });
-      if (!hasEpipError) {
-        hasEpipError = true;
-        epipErrorMessage = `Process error: ${err.message}`;
-      }
+      hasEpipError = true;
     });
 
     // Node-side kill escalation (RUNNER-004). The exec `timeout` above fires
@@ -240,7 +300,15 @@ export async function judge(
         output: runResult.status !== SUBMISSION_STATUS.ACCEPTED && runResult.status !== SUBMISSION_STATUS.WRONG_ANSWER ? runResult.output : undefined,
       });
 
-      // Stop on first non-Accepted result for immediate feedback
+      // PRODUCT SEMANTICS — stop-on-first-failure (JUDGE-007). Judging stops
+      // at the first non-Accepted case and the remaining cases are marked
+      // 'Skipped'. Consequently `score` is the PREFIX ratio (passed-so-far /
+      // total), not the fraction of cases that would pass if all were run.
+      // This is deliberate design: it gives immediate feedback and bounds
+      // judge work, but means e.g. a WA on case 1 of 10 scores 0 regardless
+      // of cases 2–10. Changing this (run all cases, score = passed/total)
+      // is a product decision, not a bug fix — if changed, the frontend's
+      // per-case results display already supports showing every case.
       if (runResult.status !== SUBMISSION_STATUS.ACCEPTED) {
         // To show all results, comment out the loop break.
         // For now, let's fill the rest with 'Skipped' to show the user there are more.
