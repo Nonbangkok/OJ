@@ -231,8 +231,20 @@ export const updateProblemVisibility = async (
   return result.rows[0] ?? null;
 };
 
-export const updateProblemPdf = async (problemId: string, pdfBuffer: Buffer): Promise<void> => {
-  await db.query('UPDATE problems SET problem_pdf = $1 WHERE id = $2', [pdfBuffer, problemId]);
+export const updateProblemPdf = async (
+  problemId: string,
+  pdfBuffer: Buffer,
+): Promise<'not_found' | 'ok'> => {
+  const result = await db.query(
+    'UPDATE problems SET problem_pdf = $1 WHERE id = $2 RETURNING id',
+    [pdfBuffer, problemId],
+  );
+  // UPDATE on a nonexistent problem used to be a silent no-op (200 with 0
+  // rows written) — surface it so the admin route can 404 (PROBLEM-004).
+  if ((result.rowCount ?? 0) === 0) {
+    return 'not_found';
+  }
+  return 'ok';
 };
 
 export const replaceProblemTestcasesFromZip = async (
@@ -257,6 +269,16 @@ export const replaceProblemTestcasesFromZip = async (
       input: await pair.in!.buffer(),
       output: await pair.out!.buffer(),
     });
+  }
+
+  // The zip pairs exist, but they must land somewhere: refuse the silent
+  // no-op on a nonexistent problem (PROBLEM-004).
+  const existsResult = await db.query<Pick<ProblemRow, 'id'>>(
+    'SELECT id FROM problems WHERE id = $1',
+    [problemId],
+  );
+  if (existsResult.rows.length === 0) {
+    return { kind: 'not_found' };
   }
 
   return withTransaction(async (client) => {
