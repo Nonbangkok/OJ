@@ -6,6 +6,7 @@ import adminRouter from '../controllers/adminController';
 import * as db from '../db';
 import { runMigrationsFromPool } from '../scripts/migrate';
 import { errorHandler } from '../middleware/errorHandler';
+import { resetPasswordChangeEnabledCache } from '../services/siteSettingsService';
 
 // Mock Dependencies
 jest.mock('../db', () => {
@@ -127,6 +128,62 @@ describe('Admin Controller', () => {
             expect(res.status).toBe(200);
             expect(res.body.message).toBe('Registration setting updated successfully.');
             expect(db.query).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('GET /admin/settings/password-change', () => {
+        beforeEach(() => {
+            resetPasswordChangeEnabledCache();
+        });
+
+        it('should return the setting (default true on a missing row)', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+
+            const res = await request(app).get('/admin/settings/password-change');
+
+            expect(res.status).toBe(200);
+            expect(res.body.enabled).toBe(true);
+        });
+
+        it('should return enabled=false when the setting is false', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ setting_value: 'false' }] });
+
+            const res = await request(app).get('/admin/settings/password-change');
+
+            expect(res.status).toBe(200);
+            expect(res.body.enabled).toBe(false);
+        });
+    });
+
+    describe('PUT /admin/settings/password-change', () => {
+        beforeEach(() => {
+            resetPasswordChangeEnabledCache();
+        });
+
+        it('should update the setting successfully', async () => {
+            (db.query as jest.Mock).mockResolvedValue({ rowCount: 1 });
+
+            const res = await request(app)
+                .put('/admin/settings/password-change')
+                .send({ enabled: false });
+
+            expect(res.status).toBe(200);
+            expect(res.body.message).toBe('Password change setting updated successfully.');
+            // Upsert (INSERT ... ON CONFLICT), and the cache is refreshed so
+            // no read-back query is needed.
+            expect(db.query).toHaveBeenCalledTimes(1);
+            const [sql, params] = (db.query as jest.Mock).mock.calls[0];
+            expect(String(sql)).toContain('ON CONFLICT (setting_key) DO UPDATE');
+            expect(params).toEqual(['password_change_enabled', 'false']);
+        });
+
+        it('should reject an invalid body with 400', async () => {
+            const res = await request(app)
+                .put('/admin/settings/password-change')
+                .send({ enabled: 'yes' });
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Validation failed');
         });
     });
 
@@ -261,6 +318,22 @@ describe('Admin Controller', () => {
             const sessionDelete = (db.query as jest.Mock).mock.calls
                 .find(([sql]) => String(sql).startsWith('DELETE FROM user_sessions'));
             expect(sessionDelete![1]).toEqual(['1']);
+        });
+
+        it('is NOT gated by the password_change_enabled setting (admin reset keeps working while self-service is off)', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({}) // BEGIN
+                .mockResolvedValueOnce({ rows: [{ username: 'user1' }] }) // SELECT
+                .mockResolvedValue({ rowCount: 1 }); // UPDATE / DELETE / COMMIT
+
+            const res = await resetPassword(2, { newPassword: 'newpassword45' });
+
+            expect(res.status).toBe(200);
+            // The reset route must never consult the password_change_enabled
+            // setting — no system_settings read at all.
+            const settingReads = (db.query as jest.Mock).mock.calls
+                .filter(([sql]) => String(sql).includes('system_settings'));
+            expect(settingReads).toHaveLength(0);
         });
 
         it('should roll back when session deletion fails', async () => {

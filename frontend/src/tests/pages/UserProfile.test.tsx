@@ -3,9 +3,11 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import UserProfile from '../../pages/user/UserProfile';
 import userService from '../../services/userService';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 
 jest.mock('../../services/userService');
 jest.mock('../../context/AuthContext');
+jest.mock('../../context/SettingsContext');
 
 // Mock LoadingPage to control the loading text
 jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading Profile...</div>);
@@ -89,6 +91,14 @@ describe('User Profile Page', () => {
             login: jest.fn(),
             logout: jest.fn(),
             refreshUser: jest.fn(),
+        });
+        jest.mocked(useSettings).mockReturnValue({
+            registrationEnabled: true,
+            accessMode: 'public',
+            passwordChangeEnabled: true,
+            isPrivateMode: false,
+            isLoading: false,
+            refreshSettings: jest.fn(),
         });
     });
 
@@ -185,6 +195,53 @@ describe('User Profile Page', () => {
         const clickSpy = jest.spyOn(fileInput, 'click').mockImplementation(() => { });
         fireEvent.click(avatarButton);
         expect(clickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('hides the Change Password section on your own profile when the setting is disabled', async () => {
+        jest.mocked(userService.getProfile).mockResolvedValue(profileData);
+        jest.mocked(useAuth).mockReturnValue({
+            user: { id: 3, username: 'tester', role: 'user', hasAvatar: false },
+            isLoading: false,
+            login: jest.fn(),
+            logout: jest.fn(),
+            refreshUser: jest.fn(),
+        });
+        jest.mocked(useSettings).mockReturnValue({
+            registrationEnabled: true,
+            accessMode: 'public',
+            passwordChangeEnabled: false,
+            isPrivateMode: false,
+            isLoading: false,
+            refreshSettings: jest.fn(),
+        });
+
+        renderPage();
+        await waitFor(() => expect(screen.getByRole('heading', { name: 'tester' })).toBeInTheDocument());
+
+        expect(screen.queryByRole('button', { name: /change password/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: 'Account' })).not.toBeInTheDocument();
+    });
+
+    it('keeps the Change Password section for an admin when the setting is disabled', async () => {
+        jest.mocked(userService.getProfile).mockResolvedValue(profileData);
+        jest.mocked(useAuth).mockReturnValue({
+            user: { id: 3, username: 'tester', role: 'admin', hasAvatar: false },
+            isLoading: false,
+            login: jest.fn(),
+            logout: jest.fn(),
+            refreshUser: jest.fn(),
+        });
+        jest.mocked(useSettings).mockReturnValue({
+            registrationEnabled: true,
+            accessMode: 'public',
+            passwordChangeEnabled: false,
+            isPrivateMode: false,
+            isLoading: false,
+            refreshSettings: jest.fn(),
+        });
+
+        renderPage();
+        expect(await screen.findByRole('button', { name: /change password/i })).toBeInTheDocument();
     });
 
     it('shows an error message when the profile cannot be loaded', async () => {

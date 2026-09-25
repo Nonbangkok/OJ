@@ -9,7 +9,7 @@ jest.mock('../../../services/adminService');
 describe('useAdminSettings', () => {
     const mockRefreshSettings = jest.fn();
     const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <SettingsContext.Provider value={{ refreshSettings: mockRefreshSettings, isLoading: false, registrationEnabled: true, accessMode: 'public', isPrivateMode: false }}>
+        <SettingsContext.Provider value={{ refreshSettings: mockRefreshSettings, isLoading: false, registrationEnabled: true, accessMode: 'public', passwordChangeEnabled: true, isPrivateMode: false }}>
             {children}
         </SettingsContext.Provider>
     );
@@ -18,6 +18,7 @@ describe('useAdminSettings', () => {
         jest.clearAllMocks();
         // Default mocks
         (jest.mocked(adminService.getRegistrationSettings) as jest.Mock).mockResolvedValue({ enabled: true });
+        (jest.mocked(adminService.getPasswordChangeSettings) as jest.Mock).mockResolvedValue({ enabled: true });
     });
 
     it('fetches registration status on mount', async () => {
@@ -46,6 +47,33 @@ describe('useAdminSettings', () => {
 
         expect(adminService.updateRegistrationSettings).toHaveBeenCalledWith(false);
         expect(result.current.isRegistrationEnabled).toBe(false);
+        expect(mockRefreshSettings).toHaveBeenCalled();
+    });
+
+    it('fetches the password change setting on mount', async () => {
+        (jest.mocked(adminService.getPasswordChangeSettings) as jest.Mock).mockResolvedValue({ enabled: false });
+
+        const { result } = renderHook(() => useAdminSettings(), { wrapper });
+
+        await waitFor(() => expect(result.current.isPasswordChangeEnabled).toBe(false));
+        expect(adminService.getPasswordChangeSettings).toHaveBeenCalledTimes(1);
+    });
+
+    it('handles toggling the password change setting', async () => {
+        (jest.mocked(adminService.updatePasswordChangeSettings) as jest.Mock).mockResolvedValueOnce({
+            message: 'Password change setting updated successfully.',
+        });
+
+        const { result } = renderHook(() => useAdminSettings(), { wrapper });
+
+        await waitFor(() => expect(result.current.isLoadingRegistration).toBe(false));
+
+        await act(async () => {
+            await result.current.handlePasswordChangeToggle();
+        });
+
+        expect(adminService.updatePasswordChangeSettings).toHaveBeenCalledWith(false);
+        expect(result.current.isPasswordChangeEnabled).toBe(false);
         expect(mockRefreshSettings).toHaveBeenCalled();
     });
 

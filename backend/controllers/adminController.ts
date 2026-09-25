@@ -11,6 +11,7 @@ import {
   RejudgeProblemParams,
   RejudgeResponse,
   UpdateAdminUserRequestBody,
+  UpdatePasswordChangeSettingRequestBody,
   UpdateRegistrationSettingRequestBody,
 } from '../types/api';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
@@ -26,6 +27,7 @@ import {
   updateAdminUserSchema,
   updateRegistrationSettingSchema,
   updateSiteAccessModeSchema,
+  updatePasswordChangeSettingSchema,
 } from '../schemas/requestSchemas';
 import { getContestStatusById } from '../services/contestAccess';
 import { rejudgeContest, rejudgeProblem } from '../services/rejudgeService';
@@ -47,7 +49,12 @@ import {
   updateAdminUser,
   updateRegistrationEnabled,
 } from '../services/adminQueryService';
-import { getSiteAccessMode, updateSiteAccessMode } from '../services/siteSettingsService';
+import {
+  getPasswordChangeEnabled,
+  getSiteAccessMode,
+  updatePasswordChangeEnabled,
+  updateSiteAccessMode,
+} from '../services/siteSettingsService';
 
 const router: Router = express.Router();
 
@@ -272,6 +279,19 @@ router.put('/admin/settings/site-access', requireAuth, requireAdmin,
   const { accessMode } = req.body as { accessMode: 'public' | 'private' };
   await updateSiteAccessMode(accessMode);
   res.status(200).json({ message: 'Site access mode updated successfully.' });
+}));
+
+router.get('/admin/settings/password-change', requireAuth, requireAdmin, asyncHandler(async (_req: Request, res: Response) => {
+  const enabled = await getPasswordChangeEnabled();
+  res.json({ enabled });
+}));
+
+router.put('/admin/settings/password-change', requireAuth, requireAdmin,
+  validateRequest({ body: updatePasswordChangeSettingSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const { enabled } = req.body as UpdatePasswordChangeSettingRequestBody;
+  await updatePasswordChangeEnabled(enabled);
+  res.status(200).json({ message: 'Password change setting updated successfully.' });
 }));
 
 export default router;

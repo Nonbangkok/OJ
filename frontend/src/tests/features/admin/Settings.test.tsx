@@ -17,6 +17,7 @@ const renderSettings = () =>
                 isLoading: false,
                 registrationEnabled: true,
                 accessMode: 'public',
+                passwordChangeEnabled: true,
                 isPrivateMode: false,
             }}
         >
@@ -29,6 +30,7 @@ describe('Settings page', () => {
         jest.clearAllMocks();
         (jest.mocked(adminService.getRegistrationSettings) as jest.Mock).mockResolvedValue({ enabled: true });
         (jest.mocked(adminService.getSiteAccessMode) as jest.Mock).mockResolvedValue({ accessMode: 'public' });
+        (jest.mocked(adminService.getPasswordChangeSettings) as jest.Mock).mockResolvedValue({ enabled: true });
     });
 
     describe('registration toggle', () => {
@@ -114,6 +116,60 @@ describe('Settings page', () => {
             await waitFor(() => {
                 expect(adminService.updateSiteAccessMode).toHaveBeenCalledWith('private');
             });
+        });
+    });
+
+    describe('password change toggle', () => {
+        it('renders the toggle as on when password changes are enabled', async () => {
+            renderSettings();
+
+            const toggle = await screen.findByRole('checkbox', { name: 'Allow password changes' });
+            expect(toggle).toBeChecked();
+        });
+
+        it('renders the toggle as off when the fetched setting is disabled', async () => {
+            (jest.mocked(adminService.getPasswordChangeSettings) as jest.Mock).mockResolvedValue({ enabled: false });
+
+            renderSettings();
+
+            const toggle = await screen.findByRole('checkbox', { name: 'Allow password changes' });
+            expect(toggle).not.toBeChecked();
+        });
+
+        it('toggling calls the update service and refreshes the app-wide settings', async () => {
+            (jest.mocked(adminService.updatePasswordChangeSettings) as jest.Mock).mockResolvedValueOnce({
+                message: 'Password change setting updated successfully.',
+            });
+
+            renderSettings();
+
+            const toggle = await screen.findByRole('checkbox', { name: 'Allow password changes' });
+            await userEvent.click(toggle);
+
+            await waitFor(() => {
+                expect(adminService.updatePasswordChangeSettings).toHaveBeenCalledWith(false);
+            });
+            await waitFor(() => {
+                expect(toggle).not.toBeChecked();
+            });
+            expect(mockRefreshSettings).toHaveBeenCalled();
+        });
+
+        it('shows an error and keeps the current state when the update fails', async () => {
+            (jest.mocked(adminService.updatePasswordChangeSettings) as jest.Mock).mockRejectedValueOnce(
+                new Error('network')
+            );
+
+            renderSettings();
+
+            const toggle = await screen.findByRole('checkbox', { name: 'Allow password changes' });
+            await userEvent.click(toggle);
+
+            await waitFor(() => {
+                expect(screen.getByText('Failed to update password change settings.')).toBeInTheDocument();
+            });
+            expect(toggle).toBeChecked();
+            expect(mockRefreshSettings).not.toHaveBeenCalled();
         });
     });
 });

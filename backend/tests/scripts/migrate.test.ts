@@ -155,6 +155,7 @@ describe('migration command', () => {
       '0016_user_problem_rewards',
       '0017_site_access_mode',
       '0018_integrity_fixes',
+      '0019_password_change_enabled',
     ]);
     expect(calls).toContainEqual({
       text: expect.stringContaining('CREATE TABLE author_profiles'),

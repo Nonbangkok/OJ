@@ -2,9 +2,11 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import NavbarUserMenu from '../../components/navbar/NavbarUserMenu';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import { useTheme } from '../../context/ThemeContext';
 
 jest.mock('../../context/AuthContext');
+jest.mock('../../context/SettingsContext');
 jest.mock('../../context/ThemeContext', () => ({
     useTheme: jest.fn(),
 }));
@@ -23,6 +25,14 @@ describe('NavbarUserMenu', () => {
             login: jest.fn(),
             logout: mockLogout,
             refreshUser: jest.fn(),
+        });
+        jest.mocked(useSettings).mockReturnValue({
+            registrationEnabled: true,
+            accessMode: 'public',
+            passwordChangeEnabled: true,
+            isPrivateMode: false,
+            isLoading: false,
+            refreshSettings: jest.fn(),
         });
         jest.mocked(useTheme).mockReturnValue({
             theme: 'light',
@@ -183,5 +193,47 @@ describe('NavbarUserMenu', () => {
         expect(screen.queryByRole('menuitem', { name: /change password/i })).not.toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Change Password' })).toBeInTheDocument();
         expect(screen.getByLabelText(/current password/i)).toBeInTheDocument();
+    });
+
+    it('hides Change Password for a regular user when the setting is disabled', () => {
+        jest.mocked(useSettings).mockReturnValue({
+            registrationEnabled: true,
+            accessMode: 'public',
+            passwordChangeEnabled: false,
+            isPrivateMode: false,
+            isLoading: false,
+            refreshSettings: jest.fn(),
+        });
+
+        renderMenu();
+        fireEvent.click(screen.getByRole('button', { name: /open user menu/i }));
+
+        expect(screen.queryByRole('menuitem', { name: /change password/i })).not.toBeInTheDocument();
+        // The rest of the menu is untouched.
+        expect(screen.getByRole('menuitem', { name: /my profile/i })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: /log out/i })).toBeInTheDocument();
+    });
+
+    it('keeps Change Password for an admin when the setting is disabled', () => {
+        jest.mocked(useAuth).mockReturnValue({
+            user: { id: 1, username: 'admin', role: 'admin', hasAvatar: false },
+            isLoading: false,
+            login: jest.fn(),
+            logout: mockLogout,
+            refreshUser: jest.fn(),
+        });
+        jest.mocked(useSettings).mockReturnValue({
+            registrationEnabled: true,
+            accessMode: 'public',
+            passwordChangeEnabled: false,
+            isPrivateMode: false,
+            isLoading: false,
+            refreshSettings: jest.fn(),
+        });
+
+        renderMenu();
+        fireEvent.click(screen.getByRole('button', { name: /open user menu/i }));
+
+        expect(screen.getByRole('menuitem', { name: /change password/i })).toBeInTheDocument();
     });
 });

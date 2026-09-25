@@ -10,6 +10,10 @@ const useAdminSettings = () => {
     const [registrationError, setRegistrationError] = useState('');
     const [registrationSuccess, setRegistrationSuccess] = useState('');
 
+    const [isPasswordChangeEnabled, setIsPasswordChangeEnabled] = useState(true);
+    const [passwordChangeError, setPasswordChangeError] = useState('');
+    const [passwordChangeSuccess, setPasswordChangeSuccess] = useState('');
+
     const [siteAccessMode, setSiteAccessMode] = useState<'public' | 'private'>('public');
     const [isSavingAccessMode, setIsSavingAccessMode] = useState(false);
     const [accessModeError, setAccessModeError] = useState('');
@@ -46,6 +50,16 @@ const useAdminSettings = () => {
             }
         };
         fetchSiteAccessMode();
+
+        const fetchPasswordChangeSettings = async () => {
+            try {
+                const data = await adminService.getPasswordChangeSettings();
+                setIsPasswordChangeEnabled(data.enabled);
+            } catch (err) {
+                setPasswordChangeError('Failed to fetch password change settings.');
+            }
+        };
+        fetchPasswordChangeSettings();
     }, []);
 
     const handleRegistrationToggle = async () => {
@@ -60,6 +74,21 @@ const useAdminSettings = () => {
             setTimeout(() => setRegistrationSuccess(''), UI_TIMEOUTS.SUCCESS_MESSAGE_SHORT);
         } catch (err) {
             setRegistrationError('Failed to update registration settings.');
+        }
+    };
+
+    const handlePasswordChangeToggle = async () => {
+        setPasswordChangeError('');
+        setPasswordChangeSuccess('');
+        const newStatus = !isPasswordChangeEnabled;
+        try {
+            await adminService.updatePasswordChangeSettings(newStatus);
+            setIsPasswordChangeEnabled(newStatus);
+            setPasswordChangeSuccess(`Password changes have been ${newStatus ? 'enabled' : 'disabled'}.`);
+            await refreshSettings();
+            setTimeout(() => setPasswordChangeSuccess(''), UI_TIMEOUTS.SUCCESS_MESSAGE_SHORT);
+        } catch (err) {
+            setPasswordChangeError('Failed to update password change settings.');
         }
     };
 
@@ -189,6 +218,10 @@ const useAdminSettings = () => {
         isLoadingRegistration,
         registrationError,
         registrationSuccess,
+        isPasswordChangeEnabled,
+        passwordChangeError,
+        passwordChangeSuccess,
+        handlePasswordChangeToggle,
         databaseFile,
         isExporting,
         isImporting,

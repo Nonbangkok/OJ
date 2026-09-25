@@ -39,6 +39,7 @@ describe('Navbar Component', () => {
     mockIsPrivateMode = false;
     jest.mocked(useSettings).mockReturnValue({
       registrationEnabled: true,
+      passwordChangeEnabled: true,
       accessMode: mockIsPrivateMode ? 'private' : 'public',
       isPrivateMode: mockIsPrivateMode,
       isLoading: false,
@@ -60,6 +61,7 @@ describe('Navbar Component', () => {
   test('does not render register link if registration is disabled', () => {
     jest.mocked(useSettings).mockReturnValue({
       registrationEnabled: false,
+      passwordChangeEnabled: true,
       accessMode: 'public',
       isPrivateMode: false,
       isLoading: false,
@@ -149,6 +151,7 @@ describe('Navbar Component', () => {
     mockIsPrivateMode = true;
     jest.mocked(useSettings).mockReturnValue({
       registrationEnabled: true,
+      passwordChangeEnabled: true,
       accessMode: 'private',
       isPrivateMode: true,
       isLoading: false,

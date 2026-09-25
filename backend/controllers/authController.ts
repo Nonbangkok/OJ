@@ -15,7 +15,7 @@ import {
 } from '../types/api';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { requireAuth } from '../middleware/auth';
-import { getSiteAccessMode } from '../services/siteSettingsService';
+import { getPasswordChangeEnabled, getSiteAccessMode } from '../services/siteSettingsService';
 import { changeOwnPassword } from '../services/adminQueryService';
 import { validateRequest } from '../middleware/validation';
 import {
@@ -138,22 +138,24 @@ router.get(
 
 /**
  * PUBLIC site configuration the frontend needs before it can render:
- * which access mode the site is in and whether self-registration is open.
- * Contains nothing sensitive — safe for unauthenticated visitors.
+ * which access mode the site is in, whether self-registration is open,
+ * and whether self-service password changes are allowed. Contains nothing
+ * sensitive — safe for unauthenticated visitors.
  */
 router.get(
   '/site-config',
   asyncHandler(async (_req: Request, res: Response) => {
-    const [accessMode, registrationResult] = await Promise.all([
+    const [accessMode, registrationResult, passwordChangeEnabled] = await Promise.all([
       getSiteAccessMode(),
       db.query<{ setting_value: string }>(
         "SELECT setting_value FROM system_settings WHERE setting_key = 'registration_enabled'",
       ),
+      getPasswordChangeEnabled(),
     ]);
     const allowRegistration =
       registrationResult.rows.length === 0 || registrationResult.rows[0].setting_value === 'true';
 
-    res.json({ accessMode, allowRegistration });
+    res.json({ accessMode, allowRegistration, passwordChangeEnabled });
   }),
 );
 
@@ -252,6 +254,14 @@ router.put(
   requireAuth,
   validateRequest({ body: changePasswordSchema }),
   asyncHandler(async (req: Request, res: Response<MessageResponse>) => {
+    // Self-service gate: when password_change_enabled is off, only admins
+    // keep self-service (the admin reset route is not gated by this).
+    const passwordChangeEnabled = await getPasswordChangeEnabled();
+    if (!passwordChangeEnabled && req.user!.role !== 'admin') {
+      res.status(403).json({ message: 'Password changes are currently managed by administrators.' });
+      return;
+    }
+
     const { currentPassword, newPassword } = req.body as ChangePasswordRequestBody;
 
     const result = await changeOwnPassword(

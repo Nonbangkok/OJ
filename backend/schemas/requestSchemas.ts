@@ -143,6 +143,10 @@ export const updateRegistrationSettingSchema = z.object({
   enabled: z.boolean(),
 });
 
+export const updatePasswordChangeSettingSchema = z.object({
+  enabled: z.boolean(),
+});
+
 export const updateSiteAccessModeSchema = z.object({
   accessMode: z.enum(['public', 'private']),
 });

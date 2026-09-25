@@ -10,6 +10,10 @@ const Settings = () => {
     isLoadingRegistration,
     registrationError,
     registrationSuccess,
+    isPasswordChangeEnabled,
+    passwordChangeError,
+    passwordChangeSuccess,
+    handlePasswordChangeToggle,
     siteAccessMode,
     isSavingAccessMode,
     accessModeError,
@@ -117,6 +121,40 @@ const Settings = () => {
               aria-label="Allow user registration"
               checked={isRegistrationEnabled}
               onChange={handleRegistrationToggle}
+            />
+            <span className={styles.toggleTrack} aria-hidden="true"></span>
+          </label>
+        </div>
+      </section>
+
+      {/* Password Changes */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Password Changes</h2>
+        <p className={styles.sectionDescription}>Control who can change passwords.</p>
+
+        {passwordChangeError && (
+          <p className={`${styles.statusMessage} ${styles.statusError}`}>{passwordChangeError}</p>
+        )}
+        {passwordChangeSuccess && (
+          <p className={`${styles.statusMessage} ${styles.statusSuccess}`}>{passwordChangeSuccess}</p>
+        )}
+
+        <div className={styles.settingRow}>
+          <div className={styles.settingText}>
+            <label htmlFor="password-change-toggle" className={styles.settingTitle}>
+              Allow password changes
+            </label>
+            <p className={styles.settingDescription}>
+              Users can change their own password. When off, only administrators can reset passwords.
+            </p>
+          </div>
+          <label className={styles.toggleSwitch} htmlFor="password-change-toggle">
+            <input
+              type="checkbox"
+              id="password-change-toggle"
+              aria-label="Allow password changes"
+              checked={isPasswordChangeEnabled}
+              onChange={handlePasswordChangeToggle}
             />
             <span className={styles.toggleTrack} aria-hidden="true"></span>
           </label>
