@@ -1,6 +1,7 @@
 /**
  * Reference template for multi-file generators. Mirrors the runner contract:
- * write 1–10 .txt files into ./input/, read the seed from argv[1] (or
+ * write 1–1000 .txt files into ./input/ (as many as the problem needs),
+ * read the seed from argv[1] (or
  * OJ_SEED) so reruns with the same seed reproduce the same files, exit 0.
  */
 export const GENERATOR_TEMPLATE = `#include <bits/stdc++.h>
@@ -13,7 +14,7 @@ int main(int argc, char** argv) {
     mt19937_64 gen(argc > 1 ? stoull(argv[1]) : 12345ULL);
     uniform_int_distribution<ll> ranN(1, 100);
 
-    // Files must be written into input/ (1–10 files) — the runner collects
+    // Files must be written into input/ (1–1000 files) — the runner collects
     // them as the draft's testcases. Opening a path whose parent folder does
     // not exist fails silently, so check the stream before writing.
     for (int i = 1; i <= 2; i++) {
