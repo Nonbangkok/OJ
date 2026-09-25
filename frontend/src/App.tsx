@@ -41,6 +41,7 @@ import {
   DraftGenerator,
   DraftVerify,
   DraftJobs,
+  DraftAiDocs,
 } from './features/admin/authoring/DraftWorkspace';
 
 // New layout for standard pages
@@ -89,6 +90,7 @@ const Layout = () => {
           <Route path="problems" element={<ProblemManagement />} />
           <Route path="authoring" element={<ProblemAuthoring />} />
           <Route path="authoring/profiles" element={<ProblemAuthoring />} />
+          <Route path="authoring/ai-docs" element={<ProblemAuthoring />} />
           <Route path="authoring/:draftId" element={<ProblemAuthoring />}>
             <Route index element={<DraftMetadata />} />
             <Route path="metadata" element={<DraftMetadata />} />
@@ -98,6 +100,7 @@ const Layout = () => {
             <Route path="generator" element={<DraftGenerator />} />
             <Route path="verify" element={<DraftVerify />} />
             <Route path="jobs" element={<DraftJobs />} />
+            <Route path="ai-docs" element={<DraftAiDocs />} />
           </Route>
           <Route path="authoring/:draftId/editor" element={<ProblemAuthoring editorMode />} />
           <Route path="contests" element={<ContestManagement />} />

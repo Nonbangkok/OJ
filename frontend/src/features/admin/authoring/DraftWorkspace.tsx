@@ -11,6 +11,7 @@ import MetadataFields from './MetadataFields';
 import StatementTab, { PdfPreview } from './StatementTab';
 import TestcaseFiles from './TestcaseFiles';
 import CodeEditor from './CodeEditor';
+import AiDocs from './AiDocs';
 import { GENERATOR_TEMPLATE } from './generatorTemplate';
 import styles from './Authoring.module.css';
 
@@ -22,7 +23,9 @@ const saveStateText: Record<string, string> = {
 };
 
 // Each workspace section is a real URL (…/metadata, …/statement, …), so browser
-// Back/Forward and shared links land on the exact section.
+// Back/Forward and shared links land on the exact section. The AI Docs entry
+// closes the nav: a reference page, not a draft section, but it lives here so
+// it is one click away while authoring.
 const sections = [
   { path: 'metadata', label: 'Metadata' },
   { path: 'statement', label: 'Statement' },
@@ -31,6 +34,7 @@ const sections = [
   { path: 'testcases', label: 'Testcases' },
   { path: 'verify', label: 'Verify & Publish' },
   { path: 'jobs', label: 'History & Logs' },
+  { path: 'ai-docs', label: 'AI Docs' },
 ] as const;
 
 export default function DraftWorkspace({ id }: { id: string }) {
@@ -168,6 +172,7 @@ export const DraftTestcases = TestcasesSection;
 export const DraftGenerator = GeneratorSection;
 export const DraftVerify = VerifySection;
 export const DraftJobs = JobsSection;
+export const DraftAiDocs = AiDocsSection;
 
 function MetadataSection() {
   const { model, draft, form, editorDisabled } = useOutletContext<WorkspaceContext>();
@@ -366,6 +371,11 @@ function JobsSection() {
   return <section className={styles.authoring}>
     <JobHistory jobs={model.jobs} onError={model.onError} />
   </section>;
+}
+
+/** The AI Docs reference page, embedded as the last workspace nav entry. */
+function AiDocsSection() {
+  return <AiDocs embedded />;
 }
 
 function PublishChecklist({ draft, dirty, canPublish, disabled, onVerify, onPublish, onBuildPdf, onGoToTestcases }: {
