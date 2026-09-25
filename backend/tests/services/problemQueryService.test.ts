@@ -67,6 +67,42 @@ describe('problemQueryService difficulty handling', () => {
     })).rejects.toBe(failure);
   });
 
+  it('cascades a problem id rename to every non-FK problem_id reference (XSYS-008)', async () => {
+    const clientQuery = jest.fn().mockImplementation(async (sql: string) => {
+      // SELECT (duplicate-id check) → no conflict; UPDATE problems → one row.
+      if (String(sql).startsWith('SELECT')) {
+        return { rows: [] };
+      }
+      return { rows: [{ id: 'p2' }] };
+    });
+    const poolConnect = db.pool.connect as unknown as jest.Mock;
+    poolConnect.mockResolvedValue({ query: clientQuery, release: jest.fn() });
+
+    await updateProblem('p1', {
+      id: 'p2',
+      title: 'T',
+      author: 'A',
+      categories: [],
+      time_limit_ms: 1000,
+      memory_limit_mb: 64,
+    });
+
+    const cascadeTargets = [
+      'contest_problems',
+      'contest_submissions',
+      'user_problem_rewards',
+      'authoring_published_problems',
+      'problem_drafts',
+    ];
+    for (const table of cascadeTargets) {
+      const call = clientQuery.mock.calls.find(
+        ([sql]) => String(sql) === `UPDATE ${table} SET problem_id = $1 WHERE problem_id = $2`,
+      );
+      expect(call).toBeDefined();
+      expect(call![1]).toEqual(['p2', 'p1']);
+    }
+  });
+
   it('keeps difficulty tri-state on update (undefined = unchanged, null = clear)', async () => {
     const clientQuery = jest.fn().mockResolvedValue({ rows: [{ id: 'p1' }] });
     const poolConnect = db.pool.connect as unknown as jest.Mock;
