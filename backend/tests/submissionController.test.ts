@@ -256,6 +256,20 @@ describe('Submission Controller', () => {
             expect(res.status).toBe(200);
             expect(res.body).toEqual(mockRows);
         });
+
+        it('should accept a page param and reject out-of-range pages (SUB-004)', async () => {
+            (db.query as jest.Mock).mockResolvedValue({ rows: [] });
+
+            const ok = await request(app).get('/submissions?page=2');
+            expect(ok.status).toBe(200);
+
+            const tooHigh = await request(app).get('/submissions?page=501');
+            expect(tooHigh.status).toBe(400);
+            expect(tooHigh.body.message).toBe('Validation failed');
+
+            const zero = await request(app).get('/submissions?page=0');
+            expect(zero.status).toBe(400);
+        });
     });
 
     describe('GET /search/problems', () => {
@@ -362,6 +376,21 @@ describe('Submission Controller', () => {
 
             expect(res.status).toBe(403);
             expect(res.body.message).toBe('You are not authorized to view this submission.');
+        });
+
+        it('should return 400 for a non-numeric id instead of a 500 cast error (SUB-003)', async () => {
+            const res = await request(app).get('/submissions/abc');
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Validation failed');
+            // Rejected before any query runs — no PG cast attempt.
+            expect(db.query).not.toHaveBeenCalled();
+        });
+
+        it('should return 400 for a zero or negative id (SUB-003)', async () => {
+            expect((await request(app).get('/submissions/0')).status).toBe(400);
+            expect((await request(app).get('/submissions/-5')).status).toBe(400);
+            expect(db.query).not.toHaveBeenCalled();
         });
     });
 
