@@ -206,4 +206,77 @@ describe('ProblemManagement Component', () => {
         expect(await screen.findByText('1 2')).toBeInTheDocument();
         expect(adminService.getProblemTestcase).toHaveBeenCalledWith('P1', 1);
     });
+
+    describe('author filter', () => {
+        const authorMockProblems = [
+            { id: 'A1', title: 'Alpha', author: 'Zed', is_visible: true, contest_id: null, contest_status: null },
+            { id: 'A2', title: 'Beta', author: 'Alice', is_visible: false, contest_id: null, contest_status: null },
+            { id: 'A3', title: 'Gamma', author: 'Alice', is_visible: true, contest_id: null, contest_status: null },
+            { id: 'A4', title: 'Delta', author: null, is_visible: true, contest_id: null, contest_status: null },
+            { id: 'A5', title: 'Epsilon', author: '   ', is_visible: true, contest_id: null, contest_status: null },
+        ];
+
+        const renderWithAuthors = async () => {
+            (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(authorMockProblems);
+            renderProblemManagement();
+            await waitFor(() => screen.getByText('Alpha'));
+        };
+
+        it('derives sorted distinct author options and groups empty authors', async () => {
+            await renderWithAuthors();
+
+            const select = screen.getByLabelText('Filter problems by author');
+            const options = within(select).getAllByRole('option').map(o => o.textContent);
+            // Alphabetical, distinct, plus "No author" for null/blank rows.
+            expect(options).toEqual(['All Authors', 'Alice', 'Zed', 'No author']);
+        });
+
+        it('omits the No author option when every problem has an author', async () => {
+            (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(
+                authorMockProblems.filter(p => p.author?.trim()),
+            );
+            renderProblemManagement();
+            await waitFor(() => screen.getByText('Alpha'));
+
+            const select = screen.getByLabelText('Filter problems by author');
+            expect(within(select).queryByRole('option', { name: 'No author' })).not.toBeInTheDocument();
+        });
+
+        it('filters the table by the chosen author', async () => {
+            await renderWithAuthors();
+
+            fireEvent.change(screen.getByLabelText('Filter problems by author'), { target: { value: 'Alice' } });
+
+            expect(screen.getByText('Beta')).toBeInTheDocument();
+            expect(screen.getByText('Gamma')).toBeInTheDocument();
+            expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
+            expect(screen.queryByText('Delta')).not.toBeInTheDocument();
+        });
+
+        it('groups null and blank authors under No author', async () => {
+            await renderWithAuthors();
+
+            fireEvent.change(screen.getByLabelText('Filter problems by author'), { target: { value: '__none__' } });
+
+            expect(screen.getByText('Delta')).toBeInTheDocument();
+            expect(screen.getByText('Epsilon')).toBeInTheDocument();
+            expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
+        });
+
+        it('composes with the visibility and search filters', async () => {
+            await renderWithAuthors();
+
+            fireEvent.change(screen.getByLabelText('Filter problems by author'), { target: { value: 'Alice' } });
+            fireEvent.change(screen.getByLabelText('Filter problems by visibility'), { target: { value: 'visible' } });
+
+            // A2 (Beta) is Alice's hidden problem, so only Gamma remains.
+            expect(screen.getByText('Gamma')).toBeInTheDocument();
+            expect(screen.queryByText('Beta')).not.toBeInTheDocument();
+
+            // Narrow further by search — Gamma's title no longer matches.
+            fireEvent.change(screen.getByLabelText('Search problems'), { target: { value: 'beta' } });
+            expect(screen.queryByText('Gamma')).not.toBeInTheDocument();
+            expect(screen.queryByText('Beta')).not.toBeInTheDocument();
+        });
+    });
 });
