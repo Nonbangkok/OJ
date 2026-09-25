@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import * as db from '../../db';
-import { enqueueJudgeTask } from '../../services/judgeQueue';
+import { enqueueTrackedJudgeTask } from '../../services/judgeQueue';
 import { processContestSubmission, processSubmission } from '../../services/submissionService';
 import { rejudgeContest, rejudgeProblem } from '../../services/rejudgeService';
 import { runMigrationsFromPool } from '../../scripts/migrate';
@@ -10,7 +10,10 @@ jest.unmock('pg');
 jest.mock('../../db', () => ({ query: jest.fn(), pool: { connect: jest.fn() } }));
 // The rejudge service only enqueues; the pipeline itself is unit-tested
 // elsewhere. Capture the enqueued tasks instead of compiling anything.
-jest.mock('../../services/judgeQueue', () => ({ enqueueJudgeTask: jest.fn() }));
+jest.mock('../../services/judgeQueue', () => ({
+    enqueueTrackedJudgeTask: jest.fn(),
+    isSubmissionInFlight: jest.fn(() => false),
+}));
 jest.mock('../../services/submissionService', () => ({
     processSubmission: jest.fn(),
     processContestSubmission: jest.fn(),
@@ -31,7 +34,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
         await pool.query('TRUNCATE contest_submissions, submissions, testcases, problems, contests CASCADE');
         (db.query as jest.Mock).mockImplementation((sql: string, values?: unknown[]) => pool.query(sql, values));
         (db.pool.connect as jest.Mock).mockImplementation(() => pool.connect());
-        (enqueueJudgeTask as jest.Mock).mockClear();
+        (enqueueTrackedJudgeTask as jest.Mock).mockClear();
     });
 
     afterAll(async () => {
@@ -87,8 +90,8 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
 
             const result = await rejudgeProblem('P1');
 
-            expect(result).toEqual({ queued: 2, skipped: 1 });
-            expect(enqueueJudgeTask).toHaveBeenCalledTimes(2);
+            expect(result).toEqual({ queued: 2, skipped: 1, busy: 0 });
+            expect(enqueueTrackedJudgeTask).toHaveBeenCalledTimes(2);
 
             const standalone = (await getRow('submissions', standaloneId)).rows[0];
             expect(standalone.overall_status).toBe('Pending');
@@ -110,7 +113,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
             expect(other.overall_status).toBe('Accepted');
 
             // The enqueued tasks target the right pipelines.
-            const tasks = (enqueueJudgeTask as jest.Mock).mock.calls.map((call) => call[0] as () => Promise<void>);
+            const tasks = (enqueueTrackedJudgeTask as jest.Mock).mock.calls.map((call) => call[0] as () => Promise<void>);
             await Promise.all(tasks.map((task) => task()));
             expect(processSubmission).toHaveBeenCalledWith(standaloneId);
             expect(processContestSubmission).toHaveBeenCalledWith(contestId1);
@@ -128,8 +131,8 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
 
             const result = await rejudgeContest(1);
 
-            expect(result).toEqual({ queued: 1, skipped: 0 });
-            expect(enqueueJudgeTask).toHaveBeenCalledTimes(1);
+            expect(result).toEqual({ queued: 1, skipped: 0, busy: 0 });
+            expect(enqueueTrackedJudgeTask).toHaveBeenCalledTimes(1);
 
             const contestSub = (await getRow('contest_submissions', inContest)).rows[0];
             expect(contestSub.overall_status).toBe('Pending');
@@ -141,7 +144,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
             const standaloneRow = (await getRow('submissions', standalone)).rows[0];
             expect(standaloneRow.overall_status).toBe('Accepted');
 
-            const tasks = (enqueueJudgeTask as jest.Mock).mock.calls.map((call) => call[0] as () => Promise<void>);
+            const tasks = (enqueueTrackedJudgeTask as jest.Mock).mock.calls.map((call) => call[0] as () => Promise<void>);
             await Promise.all(tasks.map((task) => task()));
             expect(processContestSubmission).toHaveBeenCalledWith(inContest);
             expect(processSubmission).not.toHaveBeenCalled();
