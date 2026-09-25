@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   CaretDown,
   Gear,
+  Key,
   Moon,
   SignOut,
   Sun,
@@ -11,6 +12,7 @@ import {
 
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import ChangePasswordDialog from '../user/ChangePasswordDialog';
 
 import styles from './NavbarUserMenu.module.css';
 
@@ -18,6 +20,7 @@ const NavbarUserMenu = () => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [open, setOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -103,6 +106,18 @@ const NavbarUserMenu = () => {
             <UserCircle size={16} aria-hidden="true" />
             My Profile
           </Link>
+          <button
+            type="button"
+            role="menuitem"
+            className={styles['menu-item']}
+            onClick={() => {
+              close();
+              setIsChangePasswordOpen(true);
+            }}
+          >
+            <Key size={16} aria-hidden="true" />
+            Change Password
+          </button>
           {(user.role === 'admin' || user.role === 'staff') && (
             <Link to="/admin/settings" role="menuitem" className={styles['menu-item']} onClick={close}>
               <Gear size={16} aria-hidden="true" />
@@ -138,6 +153,11 @@ const NavbarUserMenu = () => {
           </button>
         </div>
       )}
+
+      <ChangePasswordDialog
+        open={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+      />
     </div>
   );
 };

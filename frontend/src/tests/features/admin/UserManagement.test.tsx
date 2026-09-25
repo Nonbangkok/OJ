@@ -120,4 +120,32 @@ describe('UserManagement Component', () => {
             expect(screen.getByText(/failed to fetch users/i)).toBeInTheDocument();
         });
     });
+
+    it('opens the Reset Password modal from the row actions (AUTH-004)', async () => {
+        renderUserManagement();
+
+        await waitFor(() => screen.getByText('user1'));
+
+        const userRow = screen.getAllByRole('row').find(r => r.textContent.includes('user1'));
+        fireEvent.click(within(userRow).getByRole('button', { name: /row actions for user1/i }));
+        fireEvent.click(within(userRow).getByRole('menuitem', { name: 'Reset password' }));
+
+        expect(
+            screen.getByRole('heading', { name: 'Reset Password — user1' }),
+        ).toBeInTheDocument();
+        expect(screen.getByLabelText(/^new password/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/confirm new password/i)).toBeInTheDocument();
+    });
+
+    it('disables the Reset password action for protected users', async () => {
+        renderUserManagement();
+
+        await waitFor(() => screen.getByText('Nonbangkok'));
+
+        const adminRow = screen.getAllByRole('row').find(r => r.textContent.includes('Nonbangkok'));
+        fireEvent.click(within(adminRow).getByRole('button', { name: /row actions for Nonbangkok/i }));
+        expect(
+            within(adminRow).getByRole('menuitem', { name: 'Reset password' }),
+        ).toBeDisabled();
+    });
 });

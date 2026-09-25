@@ -4,10 +4,12 @@ import { useAuth } from '../../../context/AuthContext';
 import EditUserModal from './EditUserModal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import AddUserModal from './AddUserModal';
+import ResetPasswordModal from './ResetPasswordModal';
 import BatchUserCreation from './BatchUserCreation';
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 import { ActionMenu, Button, StatusBadge } from '../../../components/ui';
+import type { AdminUser } from '../../../types';
 import { USER_PAGE_SIZE } from '../../../hooks/admin/useUserManagement';
 import { APP_CONSTANTS } from '../../../utils/constants';
 import LoadingPage from '../../../components/shared/LoadingPage';
@@ -35,6 +37,9 @@ const UserManagement = () => {
   } = useUserManagement();
 
   const { user: currentUser } = useAuth();
+
+  // AUTH-004: target of the pending admin password reset.
+  const [resettingPasswordUser, setResettingPasswordUser] = useState<AdminUser | null>(null);
 
   // --- Filters: username search x role -----------------------------------
   const [search, setSearch] = useState('');
@@ -135,6 +140,12 @@ const UserManagement = () => {
                           label={`Row actions for ${user.username}`}
                           items={[
                             {
+                              key: 'reset-password',
+                              label: 'Reset password',
+                              disabled: !canManage,
+                              onClick: () => setResettingPasswordUser(user),
+                            },
+                            {
                               key: 'delete',
                               label: 'Delete',
                               variant: 'danger',
@@ -198,6 +209,10 @@ const UserManagement = () => {
           isOpen={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
           onSave={handleAddNewUser}
+        />
+        <ResetPasswordModal
+          user={resettingPasswordUser}
+          onClose={() => setResettingPasswordUser(null)}
         />
       </div>
       <BatchUserCreation onUsersCreated={fetchUsers} />

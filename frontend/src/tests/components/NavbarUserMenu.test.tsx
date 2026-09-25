@@ -171,4 +171,17 @@ describe('NavbarUserMenu', () => {
         expect(img).toBeInTheDocument();
         expect(img.getAttribute('src')).toContain('/users/tester/avatar');
     });
+
+    it('opens the change-password dialog from the menu (AUTH-004)', () => {
+        renderMenu();
+        fireEvent.click(screen.getByRole('button', { name: /open user menu/i }));
+
+        const item = screen.getByRole('menuitem', { name: /change password/i });
+        fireEvent.click(item);
+
+        // The dialog takes over from the closed dropdown.
+        expect(screen.queryByRole('menuitem', { name: /change password/i })).not.toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Change Password' })).toBeInTheDocument();
+        expect(screen.getByLabelText(/current password/i)).toBeInTheDocument();
+    });
 });

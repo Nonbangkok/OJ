@@ -1,13 +1,14 @@
 import api from './api';
 
 import type {
+  ApiMessageResponse,
   LoginResponse,
   MeResponse,
   RegisterResponse,
   RegistrationSettingsResponse,
   SiteConfigResponse,
 } from '../types';
-import type { LoginRequest, RegisterRequest } from '../types';
+import type { ChangePasswordRequest, LoginRequest, RegisterRequest } from '../types';
 
 const authService = {
   checkLogin: async (): Promise<MeResponse> => {
@@ -32,6 +33,16 @@ const authService = {
     password: RegisterRequest['password']
   ): Promise<RegisterResponse> => {
     const response = await api.post<RegisterResponse>('/register', { username, password });
+    return response.data;
+  },
+
+  /**
+   * AUTH-004: change the signed-in user's own password. On success every
+   * other session of the user is signed out server-side (this session is
+   * kept). A wrong current password rejects with 401.
+   */
+  changePassword: async (data: ChangePasswordRequest): Promise<ApiMessageResponse> => {
+    const response = await api.put<ApiMessageResponse>('/profile/password', data);
     return response.data;
   },
 
