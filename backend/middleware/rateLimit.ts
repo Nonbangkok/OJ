@@ -1,9 +1,26 @@
 import rateLimit, { ipKeyGenerator, type RateLimitRequestHandler } from 'express-rate-limit';
 import type { Request } from 'express';
-import { RATE_LIMIT_CONFIG } from '../constants';
+import { RATE_LIMIT_CONFIG, USER_ROLES } from '../constants';
 
 // Rate limiting must never interfere with the jest+supertest suite.
 const isTestEnv = (_req: Request): boolean => process.env.NODE_ENV === 'test';
+
+/**
+ * Staff/admin sessions are exempt from the operational rate limiters (general
+ * API + submit). Limiter middleware runs AFTER revalidateSessionUser +
+ * attachRequestUser in app.ts, so req.user.role here is re-synced from the
+ * live users row on this very request — a revoked/demoted account loses the
+ * exemption immediately, and a guest cannot claim a role.
+ *
+ * The auth limiter and the per-account login lockout are deliberately NOT
+ * exempted by this: an unauthenticated caller has no role to check, and
+ * "anyone asserting they are staff" must not unlock brute-force protection
+ * aimed precisely at privileged accounts.
+ */
+export const isPrivilegedUser = (req: Request): boolean => {
+  const role = req.user?.role;
+  return role === USER_ROLES.ADMIN || role === USER_ROLES.STAFF;
+};
 
 const tooManyRequests = (message: string) => ({ message });
 
@@ -38,6 +55,9 @@ export const proxyClientKey = (req: Request): string => {
  * excluded route is an authenticated admin endpoint with its own bounded cost.
  * SSE realtime streams are excluded too — each is one long-lived request per
  * open page, not a request budget item.
+ * Authenticated staff/admin sessions are exempt entirely (see
+ * isPrivilegedUser) — batch tooling and authoring workflows legitimately
+ * exceed a browsing budget.
  */
 const GENERAL_LIMIT_SKIP_PATHS = [
   '/admin/authoring/drafts/', // GET polling + PATCH saves + preview renders
@@ -50,6 +70,7 @@ const GENERAL_LIMIT_SKIP_PATHS = [
 /** Exported for tests: pins the workspace routes excluded from the general limiter. */
 export const skipGeneralLimit = (req: Request): boolean => {
   if (isTestEnv(req)) return true;
+  if (isPrivilegedUser(req)) return true;
   return GENERAL_LIMIT_SKIP_PATHS.some((prefix) => req.path.startsWith(prefix));
 };
 
@@ -80,16 +101,22 @@ export const authLimiter: RateLimitRequestHandler = rateLimit({
   message: tooManyRequests('Too many authentication attempts, please try again later.'),
 });
 
+/** Exported for tests: pins who is exempt from the submit limiter. */
+export const skipSubmitLimit = (req: Request): boolean =>
+  isTestEnv(req) || isPrivilegedUser(req);
+
 /**
  * Strict limiter for the /submit endpoint to mitigate submission-spam DoS.
  * Keyed by authenticated user id when available, otherwise by IP.
+ * Staff/admin sessions are exempt (see isPrivilegedUser) — verifying problem
+ * testcases legitimately means submitting many times in quick succession.
  */
 export const submitLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: RATE_LIMIT_CONFIG.SUBMIT_WINDOW_MS,
   max: RATE_LIMIT_CONFIG.SUBMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: isTestEnv,
+  skip: skipSubmitLimit,
   keyGenerator: (req: Request): string => {
     const userId = req.session?.userId;
     if (typeof userId === 'number') {
