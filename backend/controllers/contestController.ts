@@ -3,7 +3,12 @@ import * as problemMigration from '../services/problemMigration';
 import { requireAuth, requireStaffOrAdmin } from '../middleware/auth';
 import { requirePublicAccess } from '../middleware/siteAccess';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { ContestCreateRequestBody, ContestUpdateRequestBody, MoveContestProblemsRequestBody } from '../types/api';
+import {
+  ContestCreateRequestBody,
+  ContestUpdateRequestBody,
+  MoveContestProblemsRequestBody,
+  UpdateContestVisibilityRequestBody,
+} from '../types/api';
 import { validateRequest } from '../middleware/validation';
 import {
   contestBodySchema,
@@ -11,6 +16,7 @@ import {
   numericContestIdParamSchema,
   contestProblemParamsSchema,
   moveContestProblemsBodySchema,
+  updateContestVisibilitySchema,
 } from '../schemas/requestSchemas';
 import {
   createContest,
@@ -20,6 +26,7 @@ import {
   listContests,
   moveSingleProblemToMainSystem,
   updateContest,
+  updateContestVisibility,
 } from '../services/contestQueryService';
 import { getContestScoreboard } from '../services/contestScoreboardQueryService';
 import { findSimilarContestPairs } from '../services/similarityService';
@@ -38,9 +45,10 @@ router.get('/contests', requirePublicAccess, asyncHandler(async (req: Request, r
   res.json(contests);
 }));
 
-// List all contests for admin
+// List all contests for admin — includes hidden contests (visibility is the
+// end-user access gate, not a management filter).
 router.get('/admin/contests', requireAuth, requireStaffOrAdmin, asyncHandler(async (_req: Request, res: Response) => {
-  const contests = await listContests();
+  const contests = await listContests(undefined, { includeHidden: true });
   res.json(contests);
 }));
 
@@ -74,7 +82,7 @@ router.post('/contests/:id/join', requireAuth,
     throw new AppError('Authentication required', 401);
   }
 
-  const result = await joinContest(id, userId);
+  const result = await joinContest(id, userId, req.user ? { id: req.user.id, role: req.user.role } : undefined);
   if (result === 'not_found') {
     throw new AppError('Contest not found', 404);
   }
@@ -94,7 +102,8 @@ router.get('/contests/:id/scoreboard', requirePublicAccess,
   validateRequest({ params: contestIdParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const scoreboard = await getContestScoreboard(id);
+  const viewer = req.user ? { id: req.user.id, role: req.user.role } : undefined;
+  const scoreboard = await getContestScoreboard(id, viewer);
   if (!scoreboard) {
     throw new AppError('Contest not found', 404);
   }
@@ -139,6 +148,24 @@ router.put('/admin/contests/:id', requireAuth, requireStaffOrAdmin,
     throw new AppError('Contest not found', 404);
   }
   res.json(contest);
+}));
+
+// Update contest visibility (Admin only) — a focused, atomic toggle that
+// never touches status/timing/participants, mirroring the problem route.
+router.put('/admin/contests/:id/visibility', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: contestIdParamSchema, body: updateContestVisibilitySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const { isVisible } = req.body as UpdateContestVisibilityRequestBody;
+
+  const updatedContest = await updateContestVisibility(id, isVisible);
+  if (!updatedContest) {
+    throw new AppError('Contest not found', 404);
+  }
+  res.json({
+    message: `Contest ${id} visibility updated successfully`,
+    contest: updatedContest,
+  });
 }));
 
 // Delete contest (Admin only)
@@ -220,7 +247,7 @@ router.get('/contests/:id/problems', requireAuth,
     throw new AppError('Authentication required', 401);
   }
 
-  const result = await getContestProblemsForParticipant(id, userId);
+  const result = await getContestProblemsForParticipant(id, userId, req.user ? { id: req.user.id, role: req.user.role } : undefined);
   if (result.kind === 'not_found') {
     throw new AppError('Contest not found', 404);
   }
@@ -245,7 +272,7 @@ router.get('/contests/:id/problems/:problemId', requireAuth,
     throw new AppError('Authentication required', 401);
   }
 
-  const result = await getContestProblemDetailForParticipant(contestId, problemId, userId);
+  const result = await getContestProblemDetailForParticipant(contestId, problemId, userId, req.user ? { id: req.user.id, role: req.user.role } : undefined);
   if (result.kind === 'not_found_contest') {
     throw new AppError('Contest not found.', 404);
   }
@@ -272,7 +299,7 @@ router.get('/contests/:id/problems/:problemId/pdf', requireAuth,
     throw new AppError('Authentication required', 401);
   }
 
-  const result = await getContestProblemPdfForParticipant(contestId, problemId, userId);
+  const result = await getContestProblemPdfForParticipant(contestId, problemId, userId, req.user ? { id: req.user.id, role: req.user.role } : undefined);
   if (result.kind === 'not_found_contest') {
     throw new AppError('Contest not found.', 404);
   }

@@ -5,6 +5,12 @@ import realtimeRouter from '../controllers/realtimeController';
 import { publishRealtime, realtimeListenerCount } from '../services/realtimeHub';
 import { errorHandler } from '../middleware/errorHandler';
 
+// The contest scoreboard stream gates on contest visibility; the unit-level
+// stream behavior is independent of that lookup, so pin it open.
+jest.mock('../services/contestAccess', () => ({
+    getVisibleContestStatusById: jest.fn().mockResolvedValue('running'),
+}));
+
 /**
  * SSE controller tests. The streams never end by design, so plain supertest
  * (which awaits a completed response) would hang. Instead each test spins up

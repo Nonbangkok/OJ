@@ -23,7 +23,8 @@ const mockContests = [
         start_time: '2026-01-01T10:00:00Z',
         end_time: '2026-01-01T12:00:00Z',
         participant_count: 5,
-        problem_count: 3
+        problem_count: 3,
+        is_visible: true
     },
     {
         id: 2,
@@ -33,7 +34,8 @@ const mockContests = [
         start_time: '2025-01-01T10:00:00Z',
         end_time: '2026-12-31T12:00:00Z',
         participant_count: 10,
-        problem_count: 5
+        problem_count: 5,
+        is_visible: true
     },
     {
         id: 3,
@@ -43,7 +45,8 @@ const mockContests = [
         start_time: '2024-01-01T10:00:00Z',
         end_time: '2024-01-01T12:00:00Z',
         participant_count: 20,
-        problem_count: 4
+        problem_count: 4,
+        is_visible: false
     }
 ];
 
@@ -176,5 +179,100 @@ describe('ContestManagement Component', () => {
             expect(adminService.rejudgeContest).toHaveBeenCalledWith(2);
         });
         expect(await screen.findByText(/rejudge queued for 6 submissions \(2 skipped — no stored code\)/i)).toBeInTheDocument();
+    });
+
+    it('renders visibility badges per row (Visible/Hidden)', async () => {
+        renderContestManagement();
+
+        await waitFor(() => screen.getByText('Contest 3'));
+        const rows = screen.getAllByRole('row');
+        const c1Row = rows.find(r => r.textContent.includes('Contest 1'));
+        const c3Row = rows.find(r => r.textContent.includes('Contest 3'));
+
+        expect(within(c1Row).getByTitle('Visible — click to hide')).toHaveTextContent('Visible');
+        expect(within(c3Row).getByTitle('Hidden — click to show')).toHaveTextContent('Hidden');
+    });
+
+    it('still lists hidden contests (management shows both)', async () => {
+        renderContestManagement();
+
+        await waitFor(() => {
+            expect(screen.getByText('Contest 3')).toBeInTheDocument();
+        });
+    });
+
+    it('toggles a visible contest to hidden via the row menu and updates the row', async () => {
+        (jest.mocked(adminService.updateContestVisibility) as jest.Mock)
+            .mockResolvedValueOnce({ message: 'ok', contest: { id: 1, title: 'Contest 1', is_visible: false } });
+        renderContestManagement();
+
+        await waitFor(() => screen.getByText('Contest 1'));
+        const c1Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 1'));
+        fireEvent.click(within(c1Row).getByRole('button', { name: /row actions for Contest 1/i }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Hide Contest' }));
+
+        await waitFor(() => {
+            expect(adminService.updateContestVisibility).toHaveBeenCalledWith(1, false);
+        });
+        // Row flips to Hidden without a refetch.
+        const updatedRow = await screen.findAllByRole('row').then(rows =>
+            rows.find(r => r.textContent.includes('Contest 1'))
+        );
+        await waitFor(() => {
+            expect(within(updatedRow).getByTitle('Hidden — click to show')).toHaveTextContent('Hidden');
+        });
+    });
+
+    it('toggles a hidden contest to visible via the row menu and updates the row', async () => {
+        (jest.mocked(adminService.updateContestVisibility) as jest.Mock)
+            .mockResolvedValueOnce({ message: 'ok', contest: { id: 3, title: 'Contest 3', is_visible: true } });
+        renderContestManagement();
+
+        await waitFor(() => screen.getByText('Contest 3'));
+        const c3Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 3'));
+        fireEvent.click(within(c3Row).getByRole('button', { name: /row actions for Contest 3/i }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Show Contest' }));
+
+        await waitFor(() => {
+            expect(adminService.updateContestVisibility).toHaveBeenCalledWith(3, true);
+        });
+        const updatedRow = await screen.findAllByRole('row').then(rows =>
+            rows.find(r => r.textContent.includes('Contest 3'))
+        );
+        await waitFor(() => {
+            expect(within(updatedRow).getByTitle('Visible — click to hide')).toHaveTextContent('Visible');
+        });
+    });
+
+    it('keeps the old state and shows an error when the toggle API fails', async () => {
+        (jest.mocked(adminService.updateContestVisibility) as jest.Mock)
+            .mockRejectedValueOnce({ response: { data: { message: 'Contest not found' } } });
+        renderContestManagement();
+
+        await waitFor(() => screen.getByText('Contest 1'));
+        const c1Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 1'));
+        fireEvent.click(within(c1Row).getByRole('button', { name: /row actions for Contest 1/i }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Hide Contest' }));
+
+        await waitFor(() => {
+            expect(screen.getByText(/error: contest not found/i)).toBeInTheDocument();
+        });
+        // No optimistic lie: the badge still says Visible.
+        const row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 1'));
+        expect(within(row).getByTitle('Visible — click to hide')).toHaveTextContent('Visible');
+    });
+
+    it('toggles visibility by clicking the badge directly', async () => {
+        (jest.mocked(adminService.updateContestVisibility) as jest.Mock)
+            .mockResolvedValueOnce({ message: 'ok', contest: { id: 2, title: 'Contest 2', is_visible: false } });
+        renderContestManagement();
+
+        await waitFor(() => screen.getByText('Contest 2'));
+        const c2Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 2'));
+        fireEvent.click(within(c2Row).getByTitle('Visible — click to hide'));
+
+        await waitFor(() => {
+            expect(adminService.updateContestVisibility).toHaveBeenCalledWith(2, false);
+        });
     });
 });

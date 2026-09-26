@@ -202,6 +202,10 @@ export const updateProblemVisibilitySchema = z.object({
   isVisible: z.boolean(),
 });
 
+export const updateContestVisibilitySchema = z.object({
+  isVisible: z.boolean(),
+}).strict();
+
 // Problem Collections (organizational groups, distinct from categories)
 const collectionName = z.string().trim().min(1).max(100);
 

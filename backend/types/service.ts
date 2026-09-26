@@ -343,6 +343,7 @@ export interface ContestListRow {
   end_time: Date;
   status: string;
   created_at: Date;
+  is_visible: boolean;
   participant_count: string;
   is_participant: boolean;
   problem_count: string;

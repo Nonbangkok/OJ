@@ -8,6 +8,8 @@ import * as db from '../../db';
 jest.mock('../../db');
 jest.mock('../../services/contestAccess', () => ({
   getContestById: jest.fn(),
+  isContestManagementRole: (viewer?: { role?: string }) =>
+    viewer?.role === 'admin' || viewer?.role === 'staff',
   isContestParticipant: jest.fn(),
 }));
 jest.mock('../../services/contestScoreboardQueryService', () => ({
@@ -89,10 +91,11 @@ describe('getContestDetail participant gate (Phase 3 semantics)', () => {
   const contestRow = {
     id: 1, title: 'Contest', description: null, start_time: new Date(),
     end_time: new Date(), status: 'running', created_at: new Date(),
-    created_by: 1, participant_count: 5, created_by_username: 'admin',
+    created_by: 1, is_visible: true, participant_count: 5, created_by_username: 'admin',
   };
 
   it('hides the problems list of a running contest from a non-participant regular user', async () => {
+    getContestById.mockResolvedValueOnce(contestRow);
     query.mockResolvedValueOnce({ rows: [contestRow] }); // contest row
     isContestParticipant.mockResolvedValueOnce(false);
 
@@ -104,6 +107,7 @@ describe('getContestDetail participant gate (Phase 3 semantics)', () => {
   });
 
   it('shows running-contest problems to a participant', async () => {
+    getContestById.mockResolvedValueOnce(contestRow);
     query
       .mockResolvedValueOnce({ rows: [contestRow] }) // contest row
       .mockResolvedValueOnce({ rows: [{ id: 'P1', title: 'Secret Problem', author: null }] });
@@ -115,6 +119,7 @@ describe('getContestDetail participant gate (Phase 3 semantics)', () => {
   });
 
   it('shows running-contest problems to staff regardless of participation', async () => {
+    getContestById.mockResolvedValueOnce(contestRow);
     query
       .mockResolvedValueOnce({ rows: [contestRow] })
       .mockResolvedValueOnce({ rows: [{ id: 'P1', title: 'Secret Problem', author: null }] });
@@ -126,6 +131,7 @@ describe('getContestDetail participant gate (Phase 3 semantics)', () => {
   });
 
   it('keeps finished-contest problems public (frozen snapshot)', async () => {
+    getContestById.mockResolvedValueOnce({ ...contestRow, status: 'finished' });
     query
       .mockResolvedValueOnce({ rows: [{ ...contestRow, status: 'finished' }] })
       .mockResolvedValueOnce({ rows: [{ id: 'P1', title: 'Snapshot', author: null }] });

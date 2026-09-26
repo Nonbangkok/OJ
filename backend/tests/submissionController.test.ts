@@ -204,7 +204,7 @@ describe('Submission Controller', () => {
         it('should reject a contest feed for a non-participant (SUB-002)', async () => {
             // 1. contest exists, 2. participant check -> not a participant
             (db.query as jest.Mock)
-                .mockResolvedValueOnce({ rows: [{ status: 'running' }] })
+                .mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: true }] })
                 .mockResolvedValueOnce({ rows: [] });
 
             const res = await request(app).get('/submissions?contestId=1');
@@ -225,7 +225,7 @@ describe('Submission Controller', () => {
         it('should return a contest feed for a participant', async () => {
             const mockRows = [{ id: 5, username: 'u1', problem_id: 'CP1' }];
             (db.query as jest.Mock)
-                .mockResolvedValueOnce({ rows: [{ status: 'running' }] }) // contest exists
+                .mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: true }] }) // contest exists
                 .mockResolvedValueOnce({ rows: [{ exists: 1 }] }) // participant
                 .mockResolvedValueOnce({ rows: mockRows }); // feed rows
 
@@ -248,7 +248,7 @@ describe('Submission Controller', () => {
 
             const mockRows = [{ id: 5, username: 'u1', problem_id: 'CP1' }];
             (db.query as jest.Mock)
-                .mockResolvedValueOnce({ rows: [{ status: 'running' }] })
+                .mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: true }] })
                 .mockResolvedValueOnce({ rows: mockRows });
 
             const res = await request(staffApp).get('/submissions?contestId=1');
@@ -321,7 +321,7 @@ describe('Submission Controller', () => {
         it('hides contest-problem search from non-participants (PROBLEM-001)', async () => {
             // 1. contest exists (status running), 2. participant check -> no.
             (db.query as jest.Mock)
-                .mockResolvedValueOnce({ rows: [{ status: 'running' }] })
+                .mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: true }] })
                 .mockResolvedValueOnce({ rows: [] });
 
             const res = await request(app).get('/search/problems?q=apl&contestId=1');
@@ -334,7 +334,7 @@ describe('Submission Controller', () => {
 
         it('returns contest problems to a participant', async () => {
             (db.query as jest.Mock)
-                .mockResolvedValueOnce({ rows: [{ status: 'running' }] }) // contest exists
+                .mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: true }] }) // contest exists
                 .mockResolvedValueOnce({ rows: [{ exists: 1 }] }) // participant
                 .mockResolvedValueOnce({ rows: [{ id: 'aplusb', title: 'A Plus B' }] });
 
@@ -356,7 +356,7 @@ describe('Submission Controller', () => {
             staffApp.use(errorHandler);
 
             (db.query as jest.Mock)
-                .mockResolvedValueOnce({ rows: [{ status: 'finished' }] }) // contest exists
+                .mockResolvedValueOnce({ rows: [{ status: 'finished', is_visible: true }] }) // contest exists
                 .mockResolvedValueOnce({ rows: [{ id: 'aplusb', title: 'A Plus B' }] }); // snapshot search
 
             const res = await request(staffApp).get('/search/problems?q=apl&contestId=1');

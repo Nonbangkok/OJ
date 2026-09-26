@@ -67,16 +67,21 @@ describe('Contest Controller', () => {
 
     describe('GET /contests/:id', () => {
         it('should fetch specific contest details based on availability', async () => {
-            // Because our test app sets userId = 1 in the session middleware, 3 queries run:
-            // 1. Contest details
+            // The test app middleware sets role 'admin', so the visibility
+            // pre-check passes even without is_visible on the row.
+            // 1. Visibility pre-check (getContestById)
             (db.query as jest.Mock).mockResolvedValueOnce({
-                rows: [{ id: 1, title: 'Contest 1', status: 'running' }]
+                rows: [{ id: 1, title: 'Contest 1', status: 'running', is_visible: true }]
             });
-            // 2. Participant check
+            // 2. Contest details
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ id: 1, title: 'Contest 1', status: 'running', is_visible: true }]
+            });
+            // 3. Participant check
             (db.query as jest.Mock).mockResolvedValueOnce({
                 rows: [{ 1: 1 }] // user is participating
             });
-            // 3. Problems query (because status is running)
+            // 4. Problems query (because status is running)
             (db.query as jest.Mock).mockResolvedValueOnce({
                 rows: [{ id: 'P1', title: 'Problem 1' }]
             });
@@ -109,7 +114,7 @@ describe('Contest Controller', () => {
 
         it('should return 400 when contest already ended', async () => {
             (db.query as jest.Mock).mockResolvedValueOnce({
-                rows: [{ id: 1, end_time: new Date(Date.now() - 60_000) }]
+                rows: [{ id: 1, end_time: new Date(Date.now() - 60_000), is_visible: true }]
             });
 
             const res = await request(app).post('/contests/1/join');
@@ -121,7 +126,7 @@ describe('Contest Controller', () => {
         it('should return 400 when user already joined', async () => {
             (db.query as jest.Mock)
                 .mockResolvedValueOnce({
-                    rows: [{ id: 1, end_time: new Date(Date.now() + 60_000) }]
+                    rows: [{ id: 1, end_time: new Date(Date.now() + 60_000), is_visible: true }]
                 })
                 .mockResolvedValueOnce({ rowCount: 0 });
 
@@ -134,7 +139,7 @@ describe('Contest Controller', () => {
         it('should join contest successfully', async () => {
             (db.query as jest.Mock)
                 .mockResolvedValueOnce({
-                    rows: [{ id: 1, end_time: new Date(Date.now() + 60_000) }]
+                    rows: [{ id: 1, end_time: new Date(Date.now() + 60_000), is_visible: true }]
                 })
                 .mockResolvedValueOnce({ rowCount: 1 });
 

@@ -89,6 +89,8 @@ export interface Contest extends Record<string, unknown> {
   created_by_username?: string | null;
   problems?: ProblemBase[];
   is_participant?: boolean;
+  /** Administrative publishing gate — independent from status. */
+  is_visible?: boolean;
 }
 
 export interface SubmissionSummary {
