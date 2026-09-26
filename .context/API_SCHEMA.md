@@ -598,6 +598,7 @@
 ### 74. `GET /users/:username/profile`
 - Auth: Public
 - Purpose: โปรไฟล์สาธารณะ — stats, streaks, achievements, category radar, progression (XP/level/tier/global rank), recent XP rewards
+- Semantics (PROFILE-PROBLEM-SCOPE): ทุก stat บน profile คิดจาก **โจทย์ที่ visible อยู่ตอนนี้** (`problems.is_visible = true`) เท่านั้น — solved/attempted/total score/submissions/verdicts/languages/activity heatmap/streak days/achievements/category radar และ `recentRewards` (Recently Solved) ทั้งหมดกรองด้วย scope เดียวกัน **สำหรับทุก viewer รวมถึง admin** (profile semantics ต้อง stable ไม่ขึ้นกับ role ของคนดู) — ซ่อนโจทย์ = ตัวเลข/รายการลดลงทันที, แสดงกลับ = กลับมาเอง (filter เป็น pure query predicate ไม่ mutate ประวัติใด ๆ) / radar ใช้ numerator (solved) กับ denominator (total) universe เดียวกันคือ visible standalone problems (`is_visible = true AND contest_id IS NULL` — โจทย์ที่ถูก assign เข้า contest จะถูก contest migration ซ่อนและกลับมาหลังจบ contest) / โจทย์ที่ถูกลบแล้ว (ไม่มีแถวใน `problems`) ยังแสดงใน `recentRewards` ด้วย title เป็น null / **ข้อยกเว้นเดียว: XP / Level / Tier / Global Rank** คิดจาก `user_problem_rewards` ซึ่งเป็น historical reward ledger — ไม่กรองด้วย is_visible เป็นอันขาด ดังนั้น profile อาจแสดง "Solved: 5" คู่กับ "XP: 1,200" ที่รวม reward ของ solve ที่ถูกซ่อน
 - Response 200: profile object
 - Error 404: user ไม่พบ
 
