@@ -564,6 +564,96 @@ describe('Problem Controller', () => {
         });
     });
 
+    describe('POST /admin/collections', () => {
+        it('creates a collection with a trimmed name and description', async () => {
+            const mockQuery = db.query as jest.Mock;
+            mockQuery.mockResolvedValueOnce({
+                rows: [{ id: 1, name: 'Classical', description: 'Classical set', created_at: new Date(), updated_at: new Date() }],
+            });
+
+            const res = await request(app)
+                .post('/admin/collections')
+                .send({ name: '  Classical  ', description: '  Classical set  ' });
+
+            expect(res.status).toBe(201);
+            expect(res.body.name).toBe('Classical');
+            // The service normalizes the description before the INSERT.
+            expect(mockQuery).toHaveBeenCalledWith(
+                'INSERT INTO collections (name, description) VALUES ($1, $2) RETURNING *',
+                ['Classical', 'Classical set'],
+            );
+        });
+
+        it('maps a duplicate name to 409', async () => {
+            // Unique violation shape for isUniqueViolation.
+            (db.query as jest.Mock).mockRejectedValueOnce({ code: '23505' });
+
+            const res = await request(app)
+                .post('/admin/collections')
+                .send({ name: 'Existing' });
+
+            expect(res.status).toBe(409);
+            expect(res.body.message).toContain('already exists');
+        });
+
+        it('rejects a description longer than 500 characters', async () => {
+            const res = await request(app)
+                .post('/admin/collections')
+                .send({ name: 'Valid Name', description: 'x'.repeat(501) });
+
+            expect(res.status).toBe(400);
+        });
+    });
+
+    describe('PUT /admin/collections/:id', () => {
+        it('updates the name and description together', async () => {
+            const mockQuery = db.query as jest.Mock;
+            mockQuery.mockResolvedValueOnce({
+                rows: [{ id: 7, name: 'Renamed', description: 'New blurb', created_at: new Date(), updated_at: new Date() }],
+            });
+
+            const res = await request(app)
+                .put('/admin/collections/7')
+                .send({ name: 'Renamed', description: 'New blurb' });
+
+            expect(res.status).toBe(200);
+            expect(res.body.name).toBe('Renamed');
+            expect(mockQuery).toHaveBeenCalledWith(
+                'UPDATE collections SET name = $2, description = $3, updated_at = NOW() WHERE id = $1 RETURNING *',
+                [7, 'Renamed', 'New blurb'],
+            );
+        });
+
+        it('still accepts a name-only body (description optional)', async () => {
+            const mockQuery = db.query as jest.Mock;
+            mockQuery.mockResolvedValueOnce({
+                rows: [{ id: 7, name: 'Renamed', description: null, created_at: new Date(), updated_at: new Date() }],
+            });
+
+            const res = await request(app)
+                .put('/admin/collections/7')
+                .send({ name: 'Renamed' });
+
+            expect(res.status).toBe(200);
+            // An absent description normalizes to null, clearing the field.
+            expect(mockQuery).toHaveBeenCalledWith(
+                'UPDATE collections SET name = $2, description = $3, updated_at = NOW() WHERE id = $1 RETURNING *',
+                [7, 'Renamed', null],
+            );
+        });
+
+        it('returns 404 when the collection does not exist', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+
+            const res = await request(app)
+                .put('/admin/collections/9999')
+                .send({ name: 'Ghost' });
+
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Collection not found');
+        });
+    });
+
     describe('PUT /admin/collections/:id/visibility', () => {
         it('should return 404 when the collection does not exist', async () => {
             // setCollectionVisibility existence check: SELECT collections -> [],

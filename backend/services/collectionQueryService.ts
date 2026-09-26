@@ -6,6 +6,7 @@ import { isUniqueViolation } from '../utils/dbErrors';
 export interface CollectionWithStats {
   id: number;
   name: string;
+  description: string | null;
   problem_count: number;
   /** Derived from the member problems' existing visibility — never stored. */
   status: 'empty' | 'all_visible' | 'all_hidden' | 'mixed';
@@ -16,6 +17,7 @@ export interface CollectionWithStats {
 export interface CollectionRow {
   id: number;
   name: string;
+  description: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -36,7 +38,7 @@ export type UpdateCollectionResult =
  */
 export const listCollections = async (): Promise<CollectionWithStats[]> => {
   const result = await query<CollectionWithStats & { is_visible_count: string; total_count: string }>(`
-    SELECT c.id, c.name, c.created_at, c.updated_at,
+    SELECT c.id, c.name, c.description, c.created_at, c.updated_at,
       COUNT(p.id) AS total_count,
       COUNT(p.id) FILTER (WHERE p.is_visible) AS is_visible_count
     FROM collections c
@@ -47,6 +49,7 @@ export const listCollections = async (): Promise<CollectionWithStats[]> => {
   return result.rows.map((row) => ({
     id: row.id,
     name: row.name,
+    description: row.description,
     created_at: row.created_at,
     updated_at: row.updated_at,
     problem_count: Number(row.total_count),
@@ -61,13 +64,20 @@ const deriveStatus = (total: number, visible: number): CollectionWithStats['stat
   return 'mixed';
 };
 
+/** Trim to null: an absent description and an all-whitespace one are equal. */
+const normalizeDescription = (description: string | null | undefined): string | null => {
+  const trimmed = (description ?? '').trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
 export const createCollection = async (
   name: string,
+  description: string | null | undefined = null,
 ): Promise<CreateCollectionResult> => {
   try {
     const result = await query<CollectionRow>(
-      'INSERT INTO collections (name) VALUES ($1) RETURNING *',
-      [name],
+      'INSERT INTO collections (name, description) VALUES ($1, $2) RETURNING *',
+      [name, normalizeDescription(description)],
     );
     return { kind: 'created', collection: result.rows[0] };
   } catch (error) {
@@ -79,11 +89,12 @@ export const createCollection = async (
 export const updateCollection = async (
   id: number,
   name: string,
+  description: string | null | undefined = null,
 ): Promise<UpdateCollectionResult> => {
   try {
     const result = await query<CollectionRow>(
-      'UPDATE collections SET name = $2, updated_at = NOW() WHERE id = $1 RETURNING *',
-      [id, name],
+      'UPDATE collections SET name = $2, description = $3, updated_at = NOW() WHERE id = $1 RETURNING *',
+      [id, name, normalizeDescription(description)],
     );
     if (!result.rows[0]) return { kind: 'not_found' };
     return { kind: 'updated', collection: result.rows[0] };
