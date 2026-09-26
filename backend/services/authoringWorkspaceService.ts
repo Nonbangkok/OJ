@@ -3,7 +3,7 @@ import { createContext, Script, Context } from 'node:vm';
 import { Parser } from 'htmlparser2';
 import path from 'node:path';
 import * as db from '../db';
-import { buildPdfHtml, PDF_TEMPLATE_DIRECTORY, PDF_TEMPLATE_VERSION, taskCodeFromDraft } from '../authoring/pdfTemplate';
+import { buildPdfHtml, PDF_TEMPLATE_DIRECTORY, PDF_TEMPLATE_VERSION } from '../authoring/pdfTemplate';
 import { compileStatementSource } from '../authoring/statementCompiler';
 import { StatementError } from '../authoring/statementSanitizer';
 import { AuthoringJobRow, ProblemDraftAssetRow, ProblemDraftRow } from '../types/authoring';
@@ -150,7 +150,7 @@ export async function previewWorkspaceStatement(id: string, statementHtml: strin
   const bundle = resources();
   // Transform only the trusted shell. Preview has no JavaScript, even when embedded under the app CSP.
   let shell = buildPdfHtml({ templateVersion: draft.template_version, title: draft.title,
-    taskCode: taskCodeFromDraft(draft.problem_id, draft.title), akaName: draft.author_aka_name, realName: draft.author_real_name,
+    taskCode: draft.problem_id, akaName: draft.author_aka_name, realName: draft.author_real_name,
     language: draft.language, countryCode: draft.country_code, statementHtml: '' },
   { templateBaseUrl: templateUrl, assetBaseUrl: 'file:///preview-assets', avatarUrl });
   shell = shell.replace(`<link rel="stylesheet" href="${templateUrl}/vendor/katex.css">`, () => `<style>${bundle.css}</style>`)
