@@ -21,8 +21,13 @@ export interface UserProfileStatsRow {
     longest_streak: number;
     last_ac_date: string | null;
     /** Solved/total counts per category (percentage = solved/total), fixed
-     *  axis order, zero-filled. Totals cover the same visible standalone
-     *  universe the All Problems page lists. */
+     *  axis order, zero-filled. Numerator and denominator share ONE universe:
+     *  currently visible standalone problems (is_visible = true AND
+     *  contest_id IS NULL) — the same universe the All Problems page lists.
+     *  Problems currently assigned to a contest are excluded from BOTH sides
+     *  (the contest migration hides them, and they rejoin both counts
+     *  together after the post-contest migration), so solved can never
+     *  exceed total. */
     categoryStats: Array<{ category: string; solved: number; total: number; percentage: number }>;
     achievements: {
         unlocked: Array<{ id: string; name: string; description: string }>;
@@ -48,6 +53,37 @@ export interface UserAvatarRow {
 /**
  * Aggregates a user's public profile statistics from both the standalone
  * submission pool and the migrated contest submissions.
+ *
+ * Visibility contract (PROFILE-PROBLEM-SCOPE): every problem-scoped stat
+ * below counts only CURRENTLY VISIBLE problems (`problems.is_visible = true`)
+ * — the same canonical field the All Problems page, submission feeds and
+ * problem pages use. Hiding a problem a user already solved drops it from
+ * every count here; showing it again restores the numbers, because the
+ * filter is a pure query predicate — submission rows, best scores, XP
+ * rewards and judge results are never mutated on hide/show. Contests keep
+ * their pre-existing semantics: problems assigned to a running contest are
+ * hidden as standalone problems by the contest migration (is_visible = false
+ * + contest_id set), so they leave the profile until they migrate back.
+ * Concretely, per stat:
+ *
+ * - problems_attempted / problems_solved / total_score / submission_count /
+ *   verdict_counts / language_counts / daily_activity / ac_days (streaks) /
+ *   languages_solved_in / achievements: derived from the user_submissions
+ *   CTE, which inner-joins `problems` on is_visible = true — a hidden
+ *   problem's submissions drop out of all of them at once.
+ * - categoryStats: numerator (solved per category) and denominator (total
+ *   per category) share the same visible standalone universe
+ *   (is_visible = true AND contest_id IS NULL), so solved <= total always
+ *   holds.
+ * - XP / Level / Tier / global rank (progression) are the deliberate
+ *   exception: XP is a historical reward ledger (`user_problem_rewards`)
+ *   and is NEVER recomputed by visibility — the profile can show
+ *   "Solved: 5" with "XP: 1,200" when hidden solves still carry their
+ *   earned rewards.
+ *
+ * The Recently Solved list (getRecentRewards) follows the same
+ * visible-problems scope for every viewer (admin included): profile
+ * semantics are stable and never depend on who is looking.
  */
 export const getUserProfileStats = async (
     username: string,
@@ -61,13 +97,21 @@ export const getUserProfileStats = async (
         category_totals_raw: Record<string, number>;
     }>(`
       WITH user_submissions AS (
-        SELECT problem_id, language, overall_status, score, submitted_at
-        FROM submissions
-        WHERE user_id = (SELECT id FROM users WHERE username = $1)
+        -- PROFILE-PROBLEM-SCOPE: every aggregate below flows through this
+        -- CTE, so the visible-problems filter sits here, once — hidden
+        -- problems drop out of solved/attempted/score/verdicts/languages/
+        -- activity/AC-day streaks and achievements together. The INNER join
+        -- is the whole point: submissions to hidden problems must vanish
+        -- from every stat, and reappear when the problem is shown again.
+        SELECT s.problem_id, s.language, s.overall_status, s.score, s.submitted_at
+        FROM submissions s
+        JOIN problems p ON p.id = s.problem_id AND p.is_visible = true
+        WHERE s.user_id = (SELECT id FROM users WHERE username = $1)
         UNION ALL
-        SELECT problem_id, language, overall_status, score, submitted_at
-        FROM contest_submissions
-        WHERE user_id = (SELECT id FROM users WHERE username = $1)
+        SELECT cs.problem_id, cs.language, cs.overall_status, cs.score, cs.submitted_at
+        FROM contest_submissions cs
+        JOIN problems p ON p.id = cs.problem_id AND p.is_visible = true
+        WHERE cs.user_id = (SELECT id FROM users WHERE username = $1)
       ),
       best_scores AS (
         SELECT problem_id, MAX(score) AS best_score
@@ -233,7 +277,10 @@ export const getUserProfileStats = async (
 
     const [progression, recentRewards] = await Promise.all([
         getUserProgression(row.id),
-        getRecentRewards(row.id),
+        // Same visible-problems scope as the aggregates above, applied for
+        // EVERY viewer (admin included) — profile semantics stay stable
+        // regardless of who is looking.
+        getRecentRewards(row.id, 10),
     ]);
 
     return {

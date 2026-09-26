@@ -101,6 +101,35 @@ describe('GET /users/:username/profile', () => {
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ message: 'User not found' });
   });
+
+  // PROFILE-PROBLEM-SCOPE: every stat (aggregates AND the Recently Solved
+  // listing) is visible-problems-only for EVERY viewer — admin included —
+  // so the controller must NOT forward any viewer role to the service:
+  // profile semantics are stable regardless of who is looking.
+  it.each([
+    ['guest', undefined],
+    ['regular user', 'user'],
+    ['staff', 'staff'],
+    ['admin', 'admin'],
+  ] as const)('computes the same visible-only profile for a %s viewer', async (_label, role) => {
+    (queryService.getUserProfileStats as jest.Mock).mockResolvedValue({
+      id: 3, username: 'tester', role: 'user', has_avatar: false,
+      avatar_updated_at: null, created_at: new Date('2026-01-01T00:00:00.000Z'),
+      problems_attempted: 0, problems_solved: 0, total_score: 0, submission_count: 0,
+      verdict_counts: {}, language_counts: {}, daily_activity: [],
+      current_streak: 0, longest_streak: 0, last_ac_date: null,
+      achievements: { unlocked: [], stats: {
+        problemsSolved: 0, currentStreak: 0, longestStreak: 0,
+        languagesSolvedIn: {}, contestsJoined: 0,
+      } },
+      categoryStats: [], progression: null, recentRewards: [],
+    });
+
+    const res = await request(createTestApp(role)).get('/users/tester/profile');
+
+    expect(res.status).toBe(200);
+    expect(queryService.getUserProfileStats).toHaveBeenCalledWith('tester');
+  });
 });
 
 describe('GET /users/:username/avatar', () => {
