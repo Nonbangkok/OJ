@@ -339,14 +339,10 @@ const Home = () => {
           <h2 className={styles['section-title']}>
             {contest.status === 'running' ? 'Active Contest' : 'Upcoming Contest'}
           </h2>
+          <p className={styles['problem-title']}>{contest.title}</p>
           <div className={styles['contest-row']}>
-            <div className={styles['contest-main']}>
-              <p className={styles['problem-title']}>{contest.title}</p>
-              <p className={styles['problem-meta']}>
-                <StatusBadge status={contest.status} />
-                <span>{contestCountdown(contest, now)}</span>
-              </p>
-            </div>
+            <StatusBadge status={contest.status} />
+            <span>{contestCountdown(contest, now)}</span>
             <button
               type="button"
               className={styles['ghost-action']}

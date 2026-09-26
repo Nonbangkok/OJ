@@ -1,20 +1,21 @@
 /* Problem card: a three-zone grid so every card shares one alignment
    structure regardless of attempt state.
-     [ problem info (1fr) ][ score (220-320px) ][ action (110px) ]
+     [ problem info (1fr) ][ score (240-280px) ][ action (110px) ]
    Zone content is vertically centered as a block; the action button is
    always the same size in the same place, top to bottom across the list. */
 .problem-list-item {
   display: grid;
   grid-template-columns:
     minmax(0, 1fr)
-    minmax(220px, 320px)
+    minmax(240px, 280px)
     110px;
   grid-template-areas: 'info score action';
   /* Zones stretch to the row's full height so every card in the list is the
      same height (an attempted card's submission line sets the row); each
-     zone centers its own content vertically. */
+     zone centers its own content vertically. The compact result column +
+     tight gap make the right side read as one [ result | action ] group. */
   align-items: stretch;
-  column-gap: 1.25rem;
+  column-gap: 0.875rem;
   background-color: var(--background-secondary);
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -269,7 +270,7 @@
   min-width: 0;
   max-width: 100%;
   font-family: 'Inconsolata';
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;

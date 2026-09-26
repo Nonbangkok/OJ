@@ -195,9 +195,12 @@
 
 /* Contest row — the ghost action follows the info instead of being pushed
    to the far edge, keeping the section one compact cluster. */
+/* One baseline: status badge, countdown, and the quiet Open Contest action
+   share a row under the contest title (flex + center, no manual margins). */
 .contest-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0.125rem 0.25rem;
   min-width: 0;
@@ -205,10 +208,6 @@
 
 .contest-row .ghost-action {
   flex-shrink: 0;
-}
-
-.contest-main {
-  min-width: 0;
 }
 
 /* ---------- Quote (pure typography, no box) ---------- */
@@ -273,10 +272,16 @@
     width: 100%;
   }
 
-  .problem-card,
-  .contest-row {
+  .problem-card {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  /* The contest meta row keeps its baseline alignment on narrow screens;
+     items simply wrap to the next line when out of room. */
+  .contest-row {
+    flex-direction: row;
+    align-items: center;
   }
 
   .quote-section {
