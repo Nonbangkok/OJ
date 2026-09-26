@@ -224,17 +224,13 @@ export const updateContestVisibilitySchema = z.object({
 
 // Problem Collections (organizational groups, distinct from categories)
 const collectionName = z.string().trim().min(1).max(STRING_LIMITS.COLLECTION_NAME);
-/** Optional free-text blurb; empty/whitespace-only normalizes to null. */
-const collectionDescription = z.string().trim().max(STRING_LIMITS.COLLECTION_DESCRIPTION).optional().nullable();
 
 export const createCollectionSchema = z.object({
   name: collectionName,
-  description: collectionDescription,
 });
 
 export const updateCollectionSchema = z.object({
   name: collectionName,
-  description: collectionDescription,
 }).strict();
 
 export const collectionIdParamSchema = z.object({

@@ -20,7 +20,7 @@ Schema status for this revision (migrations 0001–0020):
 - Migration `0009_profile_sync` adds `authoring_profile_syncs` / `authoring_profile_sync_items` and the `sync_pdf` job type.
 - Migration `0010_submission_indexes` adds user/problem/submitted_at indexes on both submission pools.
 - Migration `0013_problem_difficulty` adds nullable `difficulty INT` (800–3500, step 100) to `problems`, `problem_drafts`, `authoring_published_problems`.
-- Migration `0014_problem_collections` adds the `collections` table and `problems.collection_id` (0015 later drops the unused `collections.description`).
+- Migration `0014_problem_collections` adds the `collections` table and `problems.collection_id` (0015 later drops the unused `collections.description`; 0021 briefly re-added it for the collections dialog and 0022 dropped it again — collections carry a name only).
 - Migration `0016_user_problem_rewards` adds the XP progression reward table.
 - Migration `0017_site_access_mode` inserts `system_settings.site_access_mode` (default `'public'`).
 - Migration `0018_integrity_fixes` adds `problems.is_visible_before_contest`, the case-insensitive unique index `users_username_lower_unique` on `LOWER(username)`, converts `user_sessions.expire` to `timestamptz`, and repairs a NULL `published_at` on published drafts.

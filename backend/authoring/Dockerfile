@@ -26,6 +26,7 @@ COPY --from=build /build/authoring/templates ./authoring/templates
 COPY --from=build /build/authoring/templates/red-gate-v1/fonts /usr/share/fonts/truetype/authoring
 RUN chmod -R a+rX /runner/authoring/templates /usr/share/fonts/truetype/authoring && fc-cache -f
 COPY --from=build /build/dist/utils/compileGuard.js ./utils/compileGuard.js
+COPY --from=build /build/dist/utils/outputComparison.js ./utils/outputComparison.js
 COPY --from=build /build/authoring/sandbox.c ./sandbox.c
 RUN gcc -Wall -Wextra -Werror sandbox.c -o /usr/local/bin/oj-authoring-sandbox && rm sandbox.c
 # The supervisor owns the spool; only the compiler drops to uid/gid 65534.

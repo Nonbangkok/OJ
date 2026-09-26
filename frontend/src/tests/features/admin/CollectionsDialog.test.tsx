@@ -8,7 +8,6 @@ jest.mock('../../../services/adminService');
 const makeCollection = (overrides: Partial<CollectionWithStats> = {}): CollectionWithStats => ({
     id: 1,
     name: 'Classical Problem',
-    description: null,
     problem_count: 51,
     status: 'all_visible',
     created_at: '2026-01-01T00:00:00Z',
@@ -38,7 +37,7 @@ describe('CollectionsDialog', () => {
         // submit button exists — no Cancel while not editing.
         expect(screen.getByText('Create a collection')).toBeInTheDocument();
         expect(screen.getByLabelText('Name')).toBeInTheDocument();
-        expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
+        expect(screen.queryByLabelText(/description/i)).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Create Collection' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
     });
@@ -66,34 +65,20 @@ describe('CollectionsDialog', () => {
     });
 
     describe('create', () => {
-        it('creates a collection with name and optional description', async () => {
+        it('creates a collection with the entered name', async () => {
             const onChanged = jest.fn();
             (jest.mocked(adminService.createCollection) as jest.Mock).mockResolvedValue({});
             renderDialog([], onChanged);
 
             fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Beginner Set' } });
-            fireEvent.change(screen.getByLabelText(/description/i), {
-                target: { value: 'Warm-up problems' },
-            });
             fireEvent.click(screen.getByRole('button', { name: 'Create Collection' }));
 
             await waitFor(() => {
-                expect(adminService.createCollection).toHaveBeenCalledWith('Beginner Set', 'Warm-up problems');
+                expect(adminService.createCollection).toHaveBeenCalledWith('Beginner Set');
             });
             expect(onChanged).toHaveBeenCalledTimes(1);
         });
 
-        it('sends a null description when the field is left empty', async () => {
-            (jest.mocked(adminService.createCollection) as jest.Mock).mockResolvedValue({});
-            renderDialog();
-
-            fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'No Blurb' } });
-            fireEvent.click(screen.getByRole('button', { name: 'Create Collection' }));
-
-            await waitFor(() => {
-                expect(adminService.createCollection).toHaveBeenCalledWith('No Blurb', '');
-            });
-        });
 
         it('refuses to submit an empty name (required validation)', async () => {
             renderDialog();
@@ -124,10 +109,7 @@ describe('CollectionsDialog', () => {
 
     describe('edit', () => {
         it('switches the form to an explicit edit mode and saves changes', async () => {
-            const collection = makeCollection({
-                description: 'Old blurb',
-                status: 'mixed',
-            });
+            const collection = makeCollection({ status: 'mixed' });
             const onChanged = jest.fn();
             (jest.mocked(adminService.updateCollection) as jest.Mock).mockResolvedValue({});
             renderDialog([collection], onChanged);
@@ -145,13 +127,12 @@ describe('CollectionsDialog', () => {
 
             // The form is prefilled with the collection's current values.
             expect(screen.getByLabelText('Name')).toHaveValue('Classical Problem');
-            expect(screen.getByLabelText(/description/i)).toHaveValue('Old blurb');
 
             fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Renamed' } });
             fireEvent.click(save);
 
             await waitFor(() => {
-                expect(adminService.updateCollection).toHaveBeenCalledWith(1, 'Renamed', 'Old blurb');
+                expect(adminService.updateCollection).toHaveBeenCalledWith(1, 'Renamed');
             });
             expect(onChanged).toHaveBeenCalledTimes(1);
         });

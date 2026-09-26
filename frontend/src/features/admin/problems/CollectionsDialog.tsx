@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Dialog, Field, Input, StatusBadge, Textarea } from '../../../components/ui';
+import { Button, Dialog, Field, Input, StatusBadge } from '../../../components/ui';
 import adminService from '../../../services/adminService';
 import type { CollectionWithStats } from '../../../services/admin/problemsAdminService';
 import styles from './CollectionsDialog.module.css';
@@ -30,14 +30,13 @@ const STATUS_TONE: Record<CollectionWithStats['status'], 'neutral' | 'success' |
  *  read-only — the real visibility lives on the problems themselves. */
 export default function CollectionsDialog({ open, onClose, onChanged, collections }: CollectionsDialogProps) {
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [editing, setEditing] = useState<CollectionWithStats | null>(null);
   const [pendingDelete, setPendingDelete] = useState<CollectionWithStats | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   const reset = () => {
-    setName(''); setDescription(''); setEditing(null); setError('');
+    setName(''); setEditing(null); setError('');
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -46,9 +45,9 @@ export default function CollectionsDialog({ open, onClose, onChanged, collection
     setBusy(true); setError('');
     try {
       if (editing) {
-        await adminService.updateCollection(editing.id, name.trim(), description);
+        await adminService.updateCollection(editing.id, name.trim());
       } else {
-        await adminService.createCollection(name.trim(), description);
+        await adminService.createCollection(name.trim());
       }
       reset();
       await onChanged();
@@ -62,7 +61,6 @@ export default function CollectionsDialog({ open, onClose, onChanged, collection
   const startEdit = (collection: CollectionWithStats) => {
     setEditing(collection);
     setName(collection.name);
-    setDescription(collection.description ?? '');
     setError('');
   };
 
@@ -108,19 +106,6 @@ export default function CollectionsDialog({ open, onClose, onChanged, collection
                 placeholder="Collection name"
                 autoComplete="off"
                 onChange={(event) => setName(event.target.value)}
-              />
-            )}
-          </Field>
-          <Field label="Description" hint="Optional — shown here as a reminder of what this group is for.">
-            {({ id, ...controlProps }) => (
-              <Textarea
-                {...controlProps}
-                id={id}
-                value={description}
-                maxLength={500}
-                rows={2}
-                disabled={busy}
-                onChange={(event) => setDescription(event.target.value)}
               />
             )}
           </Field>
