@@ -31,6 +31,16 @@
   margin-right: 10px; /* Space between logo and text */
 }
 
+/* Brand hover: only the wordmark picks up the accent color — the logo
+   never changes, and no underline/background appears. */
+.nav-brand-name {
+  transition: color 0.18s ease;
+}
+
+.nav-brand:hover .nav-brand-name {
+  color: var(--accent-primary);
+}
+
 .nav-links {
   position: relative; /* Needed for slider positioning */
   display: flex;

@@ -127,7 +127,7 @@ describe('Home Page (logged in)', () => {
     // The hero primary CTA is Continue Solving when a problem is unfinished;
     // Random Problem is a lower-priority ghost action.
     expect(screen.getByRole('button', { name: 'Continue Solving' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Random Problem →' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Random Problem/ })).toBeInTheDocument();
     // The older unsolved problem is not the featured one.
     expect(screen.queryByText('Ancient Message')).not.toBeInTheDocument();
   });
@@ -182,7 +182,7 @@ describe('Home Page (logged in)', () => {
       expect(screen.getByText('Monthly Contest')).toBeInTheDocument();
     });
     expect(screen.getByText(/Ends in 1h/)).toBeInTheDocument();
-    expect(screen.getByText('Open Contest →')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open Contest/ })).toBeInTheDocument();
   });
 
   it('prefers a running contest over a scheduled one', async () => {
@@ -259,7 +259,7 @@ describe('Home Page (logged in)', () => {
     await waitFor(() => {
       expect(screen.getByText('Welcome back, testuser')).toBeInTheDocument();
     });
-    expect(screen.queryByText('Open Contest →')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Open Contest/ })).not.toBeInTheDocument();
     expect(screen.queryByText('Old Contest')).not.toBeInTheDocument();
   });
 

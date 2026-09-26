@@ -1,0 +1,61 @@
+/* Shared quiet action — a low-emphasis inline affordance for secondary
+   actions sitting next to a primary CTA (e.g. "Open Contest →" on Home).
+
+   Class contract:
+     .quietAction  base: neutral at rest (--text-secondary, no background,
+                   no underline), accent blue + a very subtle accent tint on
+                   hover/focus — the hue may move toward blue, per the
+                   semantic color rule, but the action never reads as a
+                   hyperlink at rest.
+     .muted        modifier: even lower emphasis — rests at --text-muted
+                   instead of --text-secondary. Compose alongside the base.
+     .arrow        trailing arrow/glyph span: nudges a few px in the
+                   reading direction on hover/focus. Compose alongside the
+                   base and apply to the arrow element. */
+
+.quietAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  font-size: var(--font-size-metadata);
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.quietAction:hover,
+.quietAction:focus-visible {
+  color: var(--accent-primary);
+  background-color: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+  text-decoration: none;
+}
+
+.quietAction:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Muted variant: quieter than the base at rest, same accent hover. */
+.muted {
+  color: var(--text-muted);
+}
+
+/* Trailing arrow: nudges right (reading direction) on hover/focus. */
+.arrow {
+  transition: transform 0.15s ease;
+}
+
+.quietAction:hover .arrow,
+.quietAction:focus-visible .arrow {
+  transform: translateX(3px);
+}

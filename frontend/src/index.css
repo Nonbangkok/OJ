@@ -98,6 +98,12 @@
   --verdict-pending: #718096;
 
   --status-success-bg: #48bb78;
+  /* Green-action hovers: success buttons stay in the green family instead
+     of flipping to the blue accent. Hover is a brighter green, active
+     (pressed) a darker one. Derived from --status-success-bg
+     (hsl(140 41% 47%)): hover hsl(140 45% 58%), active hsl(140 46% 50%). */
+  --status-success-hover: #64c484;
+  --status-success-active: #45ba6c;
   --status-error-bg: #dc3545;
   --status-warning-bg: #ffc107;
   --status-info-bg: #17a2b8;
@@ -299,6 +305,10 @@
   --box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.4);
 
   --status-success-bg: #198754;
+  /* Dark-mode green hover/active: brightened versions of the darker-theme
+     success green (hover hsl(160 55% 42%), active hsl(160 52% 46%)). */
+  --status-success-hover: #1fa663;
+  --status-success-active: #1b9457;
   --status-warning-bg: #d39e00;
   --shadow-hover: 0 4px 10px rgba(0, 0, 0, 0.4);
 
