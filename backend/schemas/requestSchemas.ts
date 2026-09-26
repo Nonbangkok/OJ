@@ -207,7 +207,7 @@ export const updateContestVisibilitySchema = z.object({
 }).strict();
 
 // Problem Collections (organizational groups, distinct from categories)
-const collectionName = z.string().trim().min(1).max(100);
+const collectionName = z.string().trim().min(1).max(STRING_LIMITS.COLLECTION_NAME);
 
 export const createCollectionSchema = z.object({
   name: collectionName,

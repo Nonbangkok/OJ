@@ -1,5 +1,6 @@
 import * as db from '../db';
 import { query } from '../db';
+import type { PoolClient } from 'pg';
 import { isUniqueViolation } from '../utils/dbErrors';
 
 /** A collection row plus the derived problem summary shown in the admin UI. */
@@ -91,6 +92,36 @@ export const updateCollection = async (
     if (isUniqueViolation(error)) return { kind: 'duplicate_name' };
     throw error;
   }
+};
+
+/**
+ * Resolve a collection by name for problem import (problem ZIP config.json):
+ * reuse the existing collection or create it exactly once. Matching is
+ * case-sensitive, mirroring how collections are created/renamed elsewhere
+ * (the UNIQUE constraint on collections.name is case-sensitive).
+ *
+ * Race-free by construction: a single INSERT ... ON CONFLICT (name) DO UPDATE
+ * statement both finds and creates the row, so two concurrent imports (or two
+ * problems in one batch ZIP referencing the same new name) can never produce
+ * duplicates — the loser of the race resolves to the winner's row instead of
+ * failing on a unique violation.
+ *
+ * Runs on the caller's client (a withTransaction PoolClient from the batch
+ * upload path) so a later problem-persist failure rolls the auto-created
+ * collection back too — no orphan collections. DO UPDATE (not DO NOTHING) is
+ * required for RETURNING to always yield a row.
+ */
+export const resolveCollectionIdByName = async (
+  client: PoolClient,
+  name: string,
+): Promise<number> => {
+  const result = await client.query<Pick<CollectionRow, 'id'>>(
+    `INSERT INTO collections (name) VALUES ($1)
+     ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+     RETURNING id`,
+    [name],
+  );
+  return result.rows[0].id;
 };
 
 /**
