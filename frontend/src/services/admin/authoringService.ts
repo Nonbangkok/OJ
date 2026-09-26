@@ -64,6 +64,12 @@ const authoringService = {
     const response = await api.post<Draft>(`${draftBase(id)}/new-revision`, {});
     return response.data;
   },
+  /** Permanently deletes a draft and its draft-only artifacts. The published
+   *  problem (if any) is never deleted by the backend. */
+  deleteDraft: async (id: string): Promise<{ message: string; problemId: string; wasPublished: boolean }> => {
+    const response = await api.delete<{ message: string; problemId: string; wasPublished: boolean }>(draftBase(id));
+    return response.data;
+  },
   refreshAuthorProfile: async (id: string, expectedRevision: number): Promise<Draft> => {
     const response = await api.post<Draft>(`${draftBase(id)}/refresh-author-profile`, {
       expectedRevision,
@@ -175,6 +181,14 @@ const authoringService = {
     const response = await api.patch<Profile>(
       `${profilesBase}/${encodeURIComponent(id)}`,
       data
+    );
+    return response.data;
+  },
+  /** Deletes an author profile. The backend blocks with 409 while active
+   *  (unpublished) drafts still reference the profile. */
+  deleteProfile: async (id: string): Promise<{ message: string; detachedDrafts: number }> => {
+    const response = await api.delete<{ message: string; detachedDrafts: number }>(
+      `${profilesBase}/${encodeURIComponent(id)}`
     );
     return response.data;
   },

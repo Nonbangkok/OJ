@@ -13,11 +13,11 @@ test('author profiles stay readable across viewports and themes', async ({ page 
   await page.getByRole('link', { name: 'Author profiles', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Author profiles', level: 1 })).toBeVisible();
   await expect(
-    page.getByRole('button', { name: /Edit International Algorithmic Marathon Author/ })
+    page.getByRole('button', { name: 'Row actions for International Algorithmic Marathon Author' })
   ).toBeVisible();
   await expect(
     page.getByRole('button', {
-      name: /Edit Precision Scheduling Collective With Deliberately Long Attribution/,
+      name: 'Row actions for Precision Scheduling Collective With Deliberately Long Attribution',
     })
   ).toBeVisible();
   await waitForStableUi(page);
@@ -26,7 +26,7 @@ test('author profiles stay readable across viewports and themes', async ({ page 
     true
   );
   const metrics = await page
-    .getByRole('button', { name: /Edit International/ })
+    .getByRole('button', { name: 'Row actions for International' })
     .evaluate((button) => {
       const row = button.closest('li')!;
       const identity = row.querySelector('[data-profile-identity]')!;
@@ -36,18 +36,18 @@ test('author profiles stay readable across viewports and themes', async ({ page 
         rowWidth: row.getBoundingClientRect().width,
       };
     });
-  expect(metrics.buttonWidth).toBeLessThan(160);
+  expect(metrics.buttonWidth).toBeLessThan(80);
   expect(metrics.identityWidth).toBeGreaterThan(120);
   if (testInfo.project.name === 'mobile') expect(metrics.rowWidth).toBeLessThanOrEqual(390);
 
-  const longProfileEdit = page.getByRole('button', {
-    name: /Edit Precision Scheduling Collective With Deliberately Long Attribution/,
+  const longProfileActions = page.getByRole('button', {
+    name: 'Row actions for Precision Scheduling Collective With Deliberately Long Attribution',
   });
   if (testInfo.project.name === 'mobile') {
-    // The Edit button can already sit fully inside the viewport while the long row's
-    // attribution text extends past the 844px fold; scroll the whole row into view so
-    // the capture covers it end to end.
-    await longProfileEdit.locator('xpath=ancestor::li[1]').evaluate((row) =>
+    // The actions trigger can already sit fully inside the viewport while the long
+    // row's attribution text extends past the 844px fold; scroll the whole row into
+    // view so the capture covers it end to end.
+    await longProfileActions.locator('xpath=ancestor::li[1]').evaluate((row) =>
       row.scrollIntoView({ block: 'end', inline: 'nearest' })
     );
     await waitForStableUi(page);
@@ -55,8 +55,8 @@ test('author profiles stay readable across viewports and themes', async ({ page 
 
   await expect(page).toHaveScreenshot('author-profiles.png', { animations: 'disabled' });
 
-  await focusByKeyboard(page, longProfileEdit);
-  await expectVisibleFocus(longProfileEdit);
+  await focusByKeyboard(page, longProfileActions);
+  await expectVisibleFocus(longProfileActions);
   await expect(page).toHaveScreenshot('author-profiles-focus.png', { animations: 'disabled' });
 
   if (testInfo.project.name === 'desktop') {

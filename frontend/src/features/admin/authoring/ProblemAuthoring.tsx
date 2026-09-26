@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Button, Dialog, OverflowTable, StatusBadge } from '../../../components/ui';
+import { ActionMenu, Button, Dialog, OverflowTable, StatusBadge } from '../../../components/ui';
 import { useAuth } from '../../../context/AuthContext';
 import authoringService from '../../../services/admin/authoringService';
 import { getErrorMessage } from '../../../utils/error';
@@ -8,6 +8,7 @@ import { formatTimeAgo } from '../../../utils/formatters';
 import { Draft, DraftFields, Profile } from './types';
 import { draftStatus } from './status';
 import shared from '../shared/Management.module.css';
+import ConfirmationModal from '../shared/ConfirmationModal';
 import MetadataFields from './MetadataFields';
 import DraftWorkspace from './DraftWorkspace';
 import StatementEditor from './StatementEditor';
@@ -79,6 +80,7 @@ function DraftList() {
   const [authorFilter, setAuthorFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sort, setSort] = useState<SortKey>(initialPrefs.sort);
+  const [deleting, setDeleting] = useState<Draft | null>(null);
   useEffect(() => {
     let cancelled = false;
     // "My drafts" is server-side: the backend matches the logged-in username
@@ -137,6 +139,24 @@ function DraftList() {
       return a.title.localeCompare(b.title, 'en', { numeric: true, sensitivity: 'base' });
     });
   }, [scopedDrafts, search, authorFilter, statusFilter, sort]);
+
+  const confirmDeleteDraft = async () => {
+    if (!deleting) return;
+    setBusy(true);
+    setError('');
+    try {
+      await authoringService.deleteDraft(deleting.id);
+      setDrafts((current) => current.filter((d) => d.id !== deleting.id));
+      setDeleting(null);
+    } catch (err) {
+      // The server message covers the blocked states (e.g. nothing can block
+      // a draft delete today, but the message is authoritative when present).
+      setError(getErrorMessage(err, 'Could not delete the authoring draft'));
+      setDeleting(null);
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <section className={styles.authoring}>
       <div className={styles.listHead}>
@@ -307,27 +327,46 @@ function DraftList() {
                       </td>
                       <td title={new Date(d.updatedAt).toLocaleString()}>{formatTimeAgo(d.updatedAt)}</td>
                       <td>
-                        {d.status === 'published' && (
-                          <Button
-                            size="compact"
-                            variant="secondary"
-                            disabled={busy}
-                            onClick={async () => {
-                              setBusy(true);
-                              setError('');
-                              try {
-                                await authoringService.startNewRevision(d.id);
-                                navigate(`/admin/authoring/${d.id}`);
-                              } catch (err) {
-                                setError(getErrorMessage(err, 'Could not start a new revision'));
-                              } finally {
-                                setBusy(false);
-                              }
-                            }}
-                          >
-                            Start new revision
-                          </Button>
-                        )}
+                        <div className={shared['row-actions']}>
+                          {d.status === 'published' && (
+                            <Button
+                              size="compact"
+                              variant="secondary"
+                              disabled={busy}
+                              onClick={async () => {
+                                setBusy(true);
+                                setError('');
+                                try {
+                                  await authoringService.startNewRevision(d.id);
+                                  navigate(`/admin/authoring/${d.id}`);
+                                } catch (err) {
+                                  setError(getErrorMessage(err, 'Could not start a new revision'));
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                            >
+                              Start new revision
+                            </Button>
+                          )}
+                          <ActionMenu
+                            label={`Row actions for ${d.problemId}`}
+                            items={[
+                              ...(d.status === 'published' ? [] : [{
+                                key: 'open',
+                                label: 'Open draft',
+                                onClick: () => navigate(`/admin/authoring/${d.id}`),
+                              }]),
+                              {
+                                key: 'delete',
+                                label: 'Delete',
+                                variant: 'danger' as const,
+                                disabled: busy,
+                                onClick: () => setDeleting(d),
+                              },
+                            ]}
+                          />
+                        </div>
                       </td>
                     </tr>
                   );
@@ -346,6 +385,15 @@ function DraftList() {
           </section>
         </>
       )}
+      <ConfirmationModal
+        isOpen={!!deleting}
+        onClose={() => setDeleting(null)}
+        onConfirm={confirmDeleteDraft}
+        title={`Delete draft "${deleting?.problemId}"?`}
+        message="This permanently deletes this authoring draft and its draft-only artifacts. Published problem data must not be deleted."
+        confirmText="Delete Draft"
+        confirmStyle="danger"
+      />
     </section>
   );
 }
