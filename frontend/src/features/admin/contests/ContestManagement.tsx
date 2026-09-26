@@ -32,6 +32,7 @@ const ContestManagement = () => {
     handleEdit,
     handleCreate,
     handleManageProblems,
+    handleToggleVisibility,
     getStatusBadge,
     formatDateTime
   } = useContestManagement(styles);
@@ -123,6 +124,7 @@ const ContestManagement = () => {
               <th className={styles['col-left']}>Start / End</th>
               <th className={styles['col-center']}>Participants</th>
               <th className={styles['col-center']}>Problems</th>
+              <th className={styles['col-center']}>Visibility</th>
               <th className={styles['col-center']}>Actions</th>
             </tr>
           </thead>
@@ -167,6 +169,17 @@ const ContestManagement = () => {
                 </td>
 
                 <td className={styles['col-center']}>
+                  <button
+                    type="button"
+                    className={`${styles['visibility-badge']} ${contest.is_visible ? styles['visibility-visible'] : styles['visibility-hidden']}`}
+                    onClick={() => handleToggleVisibility(contest.id, contest.is_visible)}
+                    title={contest.is_visible ? 'Visible — click to hide' : 'Hidden — click to show'}
+                  >
+                    {contest.is_visible ? 'Visible' : 'Hidden'}
+                  </button>
+                </td>
+
+                <td className={styles['col-center']}>
                   <div className={styles['row-actions']}>
                     <Button
                       size="compact"
@@ -187,6 +200,14 @@ const ContestManagement = () => {
                     <ActionMenu
                       label={`Row actions for ${contest.title}`}
                       items={[
+                        {
+                          key: 'toggle-visibility',
+                          label: contest.is_visible ? 'Hide Contest' : 'Show Contest',
+                          onClick: () => handleToggleVisibility(contest.id, contest.is_visible),
+                          title: contest.is_visible
+                            ? 'Hide this contest from normal users and guests (reversible; status, timing, and data are untouched)'
+                            : 'Make this contest visible to normal users and guests again',
+                        },
                         {
                           key: 'rejudge',
                           label: 'Rejudge',

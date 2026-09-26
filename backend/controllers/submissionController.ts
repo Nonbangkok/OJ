@@ -137,7 +137,12 @@ router.get(
       return;
     }
 
-    const users = await searchUsers(q, contestId);
+    const userId = req.user?.id;
+    const role = req.user?.role;
+    const isStaffOrAdmin = !!userId
+      && (role === USER_ROLES.ADMIN || role === USER_ROLES.STAFF);
+
+    const users = await searchUsers(q, contestId, isStaffOrAdmin);
     res.json(users);
   }),
 );

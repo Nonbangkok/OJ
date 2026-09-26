@@ -144,11 +144,15 @@ export const getSubmissions = async (
         // contest status — the PUBLIC-mode policy (719c944) opened frozen
         // scoreboard RESULTS, not submission streams (SUB-002). A
         // nonexistent contest reads as 404 rather than an empty 200.
-        const contestResult = await db.query<Pick<ContestRuntimeRow, 'status'>>(
-            'SELECT status FROM contests WHERE id = $1',
+        // Hidden contests also read as 404 for non-staff (visibility gate).
+        const contestResult = await db.query<Pick<ContestRuntimeRow, 'status'> & { is_visible: boolean }>(
+            'SELECT status, is_visible FROM contests WHERE id = $1',
             [contestId],
         );
         if (contestResult.rows.length === 0) {
+            throw new AppError('Contest not found.', 404);
+        }
+        if (!contestResult.rows[0].is_visible && !isStaffOrAdmin) {
             throw new AppError('Contest not found.', 404);
         }
         if (!isStaffOrAdmin && !(await isContestParticipant(contestId, userId))) {
@@ -240,11 +244,15 @@ export const searchProblems = async (
         return result.rows;
     }
 
-    const contestResult = await db.query<Pick<ContestRuntimeRow, 'status'>>(
-        'SELECT status FROM contests WHERE id = $1',
+    const contestResult = await db.query<Pick<ContestRuntimeRow, 'status'> & { is_visible: boolean }>(
+        'SELECT status, is_visible FROM contests WHERE id = $1',
         [contestId],
     );
     if (contestResult.rows.length === 0) {
+        return [];
+    }
+    // Hidden contests yield no problem search results for non-staff.
+    if (!contestResult.rows[0].is_visible && !isStaffOrAdmin) {
         return [];
     }
 
@@ -276,7 +284,11 @@ export const searchProblems = async (
     return result.rows;
 };
 
-export const searchUsers = async (queryText: string, contestId?: string): Promise<SearchUserRow[]> => {
+export const searchUsers = async (
+    queryText: string,
+    contestId?: string,
+    isStaffOrAdmin?: boolean,
+): Promise<SearchUserRow[]> => {
     if (!queryText.trim()) {
         return [];
     }
@@ -287,6 +299,17 @@ export const searchUsers = async (queryText: string, contestId?: string): Promis
             [`%${queryText}%`],
         );
         return result.rows;
+    }
+
+    // Hidden contests expose no participant list to normal users.
+    if (!isStaffOrAdmin) {
+        const contestResult = await db.query<Pick<ContestRuntimeRow, 'status'> & { is_visible: boolean }>(
+            'SELECT status, is_visible FROM contests WHERE id = $1',
+            [contestId],
+        );
+        if (contestResult.rows.length === 0 || !contestResult.rows[0].is_visible) {
+            return [];
+        }
     }
 
     const result = await db.query<SearchUserRow>(

@@ -1,7 +1,11 @@
 import * as db from '../db';
 import { ACTIVE_CONTEST_STATUSES, ProblemRow } from '../types/models';
 import { CONTEST_STATUS } from '../constants';
-import { getContestById, getContestStatusById, isContestParticipant } from './contestAccess';
+import {
+    getContestById,
+    isContestManagementRole,
+    isContestParticipant,
+} from './contestAccess';
 import {
     ContestProblemDetailRow,
     ContestProblemDetailResult,
@@ -14,17 +18,25 @@ import {
  * Contestant-facing contest problem access, split out of contestQueryService.
  *
  * Every function follows the same guard sequence:
- * contest exists -> user is a participant -> contest is active
- * -> read from `problems` (running) or the `contest_problems` snapshot
- * (finished). The shared lookups live in contestAccess.
+ * contest exists (and is visible to the viewer) -> user is a participant
+ * -> contest is active -> read from `problems` (running) or the
+ * `contest_problems` snapshot (finished). The shared lookups live in
+ * contestAccess.
  */
 
 export const getContestProblemsForParticipant = async (
     contestId: string,
     userId: number,
+    viewer?: { id: number; role: string },
 ): Promise<ContestProblemsForParticipantResult> => {
     const contest = await getContestById(contestId);
     if (!contest) {
+        return { kind: 'not_found' };
+    }
+
+    // Hidden contests read as not-found for normal users; staff/admin
+    // (e.g. inspecting via direct URL) keep access.
+    if (!contest.is_visible && !isContestManagementRole(viewer)) {
         return { kind: 'not_found' };
     }
 
@@ -104,11 +116,13 @@ export const getContestProblemDetailForParticipant = async (
     contestId: string,
     problemId: string,
     userId: number,
+    viewer?: { id: number; role: string },
 ): Promise<ContestProblemDetailResult> => {
-    const contestStatus = await getContestStatusById(contestId);
-    if (contestStatus === null) {
+    const contest = await getContestById(contestId);
+    if (!contest || (!contest.is_visible && !isContestManagementRole(viewer))) {
         return { kind: 'not_found_contest' };
     }
+    const contestStatus = contest.status;
 
     if (!ACTIVE_CONTEST_STATUSES.includes(contestStatus)) {
         return { kind: 'inactive' };
@@ -143,11 +157,13 @@ export const getContestProblemPdfForParticipant = async (
     contestId: string,
     problemId: string,
     userId: number,
+    viewer?: { id: number; role: string },
 ): Promise<ContestProblemPdfResult> => {
-    const contestStatus = await getContestStatusById(contestId);
-    if (contestStatus === null) {
+    const contest = await getContestById(contestId);
+    if (!contest || (!contest.is_visible && !isContestManagementRole(viewer))) {
         return { kind: 'not_found_contest' };
     }
+    const contestStatus = contest.status;
 
     if (!ACTIVE_CONTEST_STATUSES.includes(contestStatus)) {
         return { kind: 'inactive' };

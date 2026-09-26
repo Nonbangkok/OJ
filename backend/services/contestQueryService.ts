@@ -1,7 +1,7 @@
 import * as db from '../db';
 import { ContestDetailRow, ContestRow, ProblemRow } from '../types/models';
 import { CONTEST_STATUS } from '../constants';
-import { getContestById, isContestParticipant } from './contestAccess';
+import { getContestById, isContestManagementRole, isContestParticipant } from './contestAccess';
 import {
     ContestListRow,
     ContestProblemsSummaryRow,
@@ -20,13 +20,19 @@ export {
     getContestProblemPdfForParticipant,
 } from './contestParticipantQueryService';
 
-export const listContests = async (userId?: number): Promise<ContestListRow[]> => {
+export const listContests = async (
+    userId?: number,
+    options?: { includeHidden?: boolean },
+): Promise<ContestListRow[]> => {
+    // Hidden contests vanish from the public list for guests AND regular
+    // users; only the staff/admin management list passes includeHidden.
+    const includeHidden = options?.includeHidden ?? false;
     if (userId) {
         const result = await db.query<ContestListRow>(
             `
             SELECT
               c.id, c.title, c.description, c.start_time, c.end_time, c.status,
-              c.created_at,
+              c.created_at, c.is_visible,
               COUNT(DISTINCT cp.user_id) AS participant_count,
               CASE WHEN user_participation.user_id IS NOT NULL THEN true ELSE false END AS is_participant,
               CASE
@@ -51,7 +57,8 @@ export const listContests = async (userId?: number): Promise<ContestListRow[]> =
               WHERE contest_id IS NOT NULL
               GROUP BY contest_id
             ) active_problems ON c.id = active_problems.contest_id AND c.status != '${CONTEST_STATUS.FINISHED}'
-            GROUP BY c.id, c.title, c.description, c.start_time, c.end_time, c.status, c.created_at, user_participation.user_id, finished_problems.problem_count, active_problems.problem_count
+            WHERE c.is_visible = true
+            GROUP BY c.id, c.title, c.description, c.start_time, c.end_time, c.status, c.created_at, c.is_visible, user_participation.user_id, finished_problems.problem_count, active_problems.problem_count
             ORDER BY c.start_time DESC
             `,
             [userId],
@@ -62,7 +69,7 @@ export const listContests = async (userId?: number): Promise<ContestListRow[]> =
     const result = await db.query<ContestListRow>(`
         SELECT
           c.id, c.title, c.description, c.start_time, c.end_time, c.status,
-          c.created_at,
+          c.created_at, c.is_visible,
           COUNT(DISTINCT cp.user_id) AS participant_count,
           false AS is_participant,
           CASE
@@ -82,7 +89,8 @@ export const listContests = async (userId?: number): Promise<ContestListRow[]> =
           WHERE contest_id IS NOT NULL
           GROUP BY contest_id
         ) active_problems ON c.id = active_problems.contest_id AND c.status != '${CONTEST_STATUS.FINISHED}'
-        GROUP BY c.id, c.title, c.description, c.start_time, c.end_time, c.status, c.created_at, finished_problems.problem_count, active_problems.problem_count
+        ${includeHidden ? '' : 'WHERE c.is_visible = true'}
+        GROUP BY c.id, c.title, c.description, c.start_time, c.end_time, c.status, c.created_at, c.is_visible, finished_problems.problem_count, active_problems.problem_count
         ORDER BY c.start_time DESC
     `);
     return result.rows;
@@ -92,6 +100,14 @@ export const getContestDetail = async (
     id: string,
     viewer?: { id: number; role: string },
 ): Promise<(ContestDetailRow & { problems: ContestProblemsSummaryRow[]; is_participant: boolean }) | null> => {
+    // Visibility gate first: a hidden contest is indistinguishable from a
+    // nonexistent one for non-staff viewers (same convention as hidden
+    // problems). Staff/admin inspect hidden contests via direct URL.
+    const existing = await getContestById(id);
+    if (!existing || (!existing.is_visible && !isContestManagementRole(viewer))) {
+        return null;
+    }
+
     const contestResult = await db.query<ContestDetailRow>(
         `
         SELECT
@@ -183,9 +199,19 @@ export const moveSingleProblemToMainSystem = async (
     return { kind: 'ok', data: updateResult.rows[0] };
 };
 
-export const joinContest = async (contestId: string, userId: number): Promise<'joined' | 'already_joined' | 'not_found' | 'ended'> => {
+export const joinContest = async (
+    contestId: string,
+    userId: number,
+    viewer?: { id: number; role: string },
+): Promise<'joined' | 'already_joined' | 'not_found' | 'ended'> => {
     const contest = await getContestById(contestId);
     if (!contest) {
+        return 'not_found';
+    }
+
+    // Hidden contests are not joinable by normal users — they cannot even
+    // see them (reads as 404). Staff/admin keep management access.
+    if (!contest.is_visible && !isContestManagementRole(viewer)) {
         return 'not_found';
     }
 
@@ -222,6 +248,20 @@ export const updateContest = async (contestId: string, payload: ContestWritePayl
          WHERE id = $5
          RETURNING *`,
         [payload.title, payload.description, payload.startTime, payload.endTime, contestId],
+    );
+    return result.rows[0] ?? null;
+};
+
+// Focused, atomic visibility toggle — mirrors updateProblemVisibility. Never
+// reads/rewrites the rest of the contest row, so hiding/showing cannot touch
+// status, timing, participants, or submissions.
+export const updateContestVisibility = async (
+    contestId: string,
+    isVisible: boolean,
+): Promise<Pick<ContestRow, 'id' | 'title' | 'is_visible'> | null> => {
+    const result = await db.query<Pick<ContestRow, 'id' | 'title' | 'is_visible'>>(
+        'UPDATE contests SET is_visible = $1 WHERE id = $2 RETURNING id, title, is_visible',
+        [isVisible, contestId],
     );
     return result.rows[0] ?? null;
 };

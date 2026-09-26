@@ -174,6 +174,7 @@ export interface ContestRow {
     status: ContestStatus;
     created_at: Date;
     created_by: number | null;
+    is_visible: boolean;
 }
 
 /** `contests` row augmented with participant count and author username. */

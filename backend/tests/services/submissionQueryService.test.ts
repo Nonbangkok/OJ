@@ -1,4 +1,4 @@
-import { getSubmissions, searchProblems, validateAndQueueSubmission } from '../../services/submissionQueryService';
+import { getSubmissions, searchProblems, searchUsers, validateAndQueueSubmission } from '../../services/submissionQueryService';
 import * as db from '../../db';
 
 jest.mock('../../db');
@@ -65,7 +65,7 @@ describe('submissionQueryService visibility (PROBLEM-001 / SUB-001 / SUB-002)', 
     describe('getSubmissions contest feed', () => {
         it('throws 403 for a non-participant of a running contest', async () => {
             query
-                .mockResolvedValueOnce({ rows: [{ status: 'running' }] })
+                .mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: true }] })
                 .mockResolvedValueOnce({ rows: [] }); // participant check: no
 
             await expect(getSubmissions({ contestId: '3' }, 5, false)).rejects.toMatchObject({
@@ -78,7 +78,7 @@ describe('submissionQueryService visibility (PROBLEM-001 / SUB-001 / SUB-002)', 
             // results, not per-submission feeds — finished contests keep the
             // same participant gate.
             query
-                .mockResolvedValueOnce({ rows: [{ status: 'finished' }] })
+                .mockResolvedValueOnce({ rows: [{ status: 'finished', is_visible: true }] })
                 .mockResolvedValueOnce({ rows: [] }); // participant check: no
 
             await expect(getSubmissions({ contestId: '3' }, 5, false)).rejects.toMatchObject({
@@ -97,13 +97,33 @@ describe('submissionQueryService visibility (PROBLEM-001 / SUB-001 / SUB-002)', 
         it('returns rows for a participant without running a participant query for staff', async () => {
             const rows = [{ id: 1, username: 'u1', problem_id: 'CP1' }];
             query
-                .mockResolvedValueOnce({ rows: [{ status: 'running' }] })
+                .mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: true }] })
                 .mockResolvedValueOnce({ rows }); // feed query (no participant check for staff)
 
             const result = await getSubmissions({ contestId: '3' }, 1, true);
 
             expect(result).toEqual(rows);
             expect(query).toHaveBeenCalledTimes(2);
+        });
+
+        it('reads a hidden contest feed as 404 for a non-staff user', async () => {
+            query.mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: false }] });
+
+            await expect(getSubmissions({ contestId: '3' }, 5, false)).rejects.toMatchObject({
+                statusCode: 404,
+                message: 'Contest not found.',
+            });
+        });
+
+        it('serves a hidden contest feed to staff even without participation', async () => {
+            const rows = [{ id: 1, username: 'u1', problem_id: 'CP1' }];
+            query
+                .mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: false }] })
+                .mockResolvedValueOnce({ rows });
+
+            const result = await getSubmissions({ contestId: '3' }, 1, true);
+
+            expect(result).toEqual(rows);
         });
     });
 
@@ -125,7 +145,7 @@ describe('submissionQueryService visibility (PROBLEM-001 / SUB-001 / SUB-002)', 
 
         it('returns no contest problems for a non-participant of a running contest', async () => {
             query
-                .mockResolvedValueOnce({ rows: [{ status: 'running' }] })
+                .mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: true }] })
                 .mockResolvedValueOnce({ rows: [] }); // participant check: no
 
             const result = await searchProblems('aplusb', { userId: 5, role: 'user' }, '1');
@@ -136,7 +156,7 @@ describe('submissionQueryService visibility (PROBLEM-001 / SUB-001 / SUB-002)', 
 
         it('returns contest problems to a participant of a running contest', async () => {
             query
-                .mockResolvedValueOnce({ rows: [{ status: 'running' }] })
+                .mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: true }] })
                 .mockResolvedValueOnce({ rows: [{ exists: 1 }] }) // participant check: yes
                 .mockResolvedValueOnce({ rows: [{ id: 'aplusb', title: 'A Plus B' }] });
 
@@ -147,13 +167,64 @@ describe('submissionQueryService visibility (PROBLEM-001 / SUB-001 / SUB-002)', 
 
         it('skips the participant check for staff', async () => {
             query
-                .mockResolvedValueOnce({ rows: [{ status: 'running' }] })
+                .mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: true }] })
                 .mockResolvedValueOnce({ rows: [{ id: 'aplusb', title: 'A Plus B' }] });
 
             const result = await searchProblems('aplusb', { userId: 1, role: 'admin' }, '1');
 
             expect(result).toEqual([{ id: 'aplusb', title: 'A Plus B' }]);
             expect(query).toHaveBeenCalledTimes(2);
+        });
+
+        it('returns nothing for a hidden contest even for a participant', async () => {
+            query.mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: false }] });
+
+            const result = await searchProblems('aplusb', { userId: 5, role: 'user' }, '1');
+
+            expect(result).toEqual([]);
+            expect(query).toHaveBeenCalledTimes(1);
+        });
+
+        it('keeps full contest problem search for staff on a hidden contest', async () => {
+            query
+                .mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: false }] })
+                .mockResolvedValueOnce({ rows: [{ id: 'aplusb', title: 'A Plus B' }] });
+
+            const result = await searchProblems('aplusb', { userId: 1, role: 'staff' }, '1');
+
+            expect(result).toEqual([{ id: 'aplusb', title: 'A Plus B' }]);
+        });
+    });
+
+    describe('searchUsers', () => {
+        it('returns no participants of a hidden contest for a normal user', async () => {
+            query.mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: false }] });
+
+            const result = await searchUsers('alice', '1', false);
+
+            expect(result).toEqual([]);
+            expect(query).toHaveBeenCalledTimes(1);
+        });
+
+        it('returns participants of a hidden contest for staff', async () => {
+            query
+                .mockResolvedValueOnce({ rows: [{ id: 7, username: 'alice' }] });
+
+            const result = await searchUsers('alice', '1', true);
+
+            expect(result).toEqual([{ id: 7, username: 'alice' }]);
+            // No visibility pre-check for staff — straight to the user query.
+            expect(String(query.mock.calls[0][0])).toContain('contest_participants');
+        });
+
+        it('returns participants of a visible contest for a normal user', async () => {
+            query
+                .mockResolvedValueOnce({ rows: [{ status: 'running', is_visible: true }] })
+                .mockResolvedValueOnce({ rows: [{ id: 7, username: 'alice' }] });
+
+            const result = await searchUsers('alice', '1', false);
+
+            expect(result).toEqual([{ id: 7, username: 'alice' }]);
         });
     });
 

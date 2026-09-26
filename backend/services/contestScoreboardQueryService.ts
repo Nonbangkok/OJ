@@ -2,6 +2,7 @@ import * as db from '../db';
 import { ContestRow, ContestScoreboardDetailRow } from '../types/models';
 import { CONTEST_STATUS } from '../constants';
 import { ContestScoreboardResponse, ContestScoreboardRow } from '../types/service';
+import { isContestManagementRole } from './contestAccess';
 
 /**
  * Scoreboard computation, split out of contestQueryService.
@@ -12,12 +13,22 @@ import { ContestScoreboardResponse, ContestScoreboardRow } from '../types/servic
  * - anything else (e.g. scheduled): participants with zero scores
  */
 
-export const getContestScoreboard = async (id: string): Promise<ContestScoreboardResponse | null> => {
+export const getContestScoreboard = async (
+    id: string,
+    viewer?: { id: number; role: string },
+): Promise<ContestScoreboardResponse | null> => {
     const contestResult = await db.query<ContestRow>('SELECT * FROM contests WHERE id = $1', [id]);
     if (contestResult.rows.length === 0) {
         return null;
     }
     const contest = contestResult.rows[0];
+
+    // Hidden contests have no scoreboard for normal users/guests — even in
+    // PUBLIC mode, where scoreboards are otherwise guest-readable. The gate
+    // ANDs with site policy; it never replaces it. Staff/admin see through.
+    if (!contest.is_visible && !isContestManagementRole(viewer)) {
+        return null;
+    }
 
     if (contest.status === CONTEST_STATUS.FINISHED) {
         const [scoreboardResult, problemsResult] = await Promise.all([

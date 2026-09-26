@@ -23,6 +23,7 @@ describe('submission indexes migration', () => {
       '0017_site_access_mode',
       '0018_integrity_fixes',
       '0019_password_change_enabled',
+      '0020_contest_visibility',
     ]);
   });
 

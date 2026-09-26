@@ -192,6 +192,10 @@ export interface UpdateProblemVisibilityRequestBody {
     isVisible: boolean;
 }
 
+export interface UpdateContestVisibilityRequestBody {
+    isVisible: boolean;
+}
+
 export interface ProblemExportRequestBody {
     problemIds: string[];
 }

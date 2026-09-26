@@ -166,6 +166,10 @@ export interface ContestProblemsMutationResponse extends ApiMessageResponse {
   movedProblems?: ProblemBase[];
 }
 
+export interface ContestVisibilityMutationResponse extends ApiMessageResponse {
+  contest: Pick<Contest, 'id' | 'title' | 'is_visible'>;
+}
+
 export interface RejudgeResponse {
   /** Submissions accepted for rejudge (reset + enqueued). */
   queued: number;

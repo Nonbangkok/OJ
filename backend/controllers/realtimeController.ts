@@ -7,6 +7,8 @@ import {
     SubmissionUpdateEvent,
     subscribeRealtime,
 } from '../services/realtimeHub';
+import { getVisibleContestStatusById } from '../services/contestAccess';
+import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { REALTIME_CONFIG } from '../constants';
 
 /**
@@ -88,12 +90,20 @@ router.get(
     '/realtime/contests/:id',
     requireAuth,
     validateRequest({ params: numericContestIdParamSchema }),
-    (req: Request, res: Response) => {
+    asyncHandler(async (req: Request, res: Response) => {
         const contestId = Number(req.params.id);
+        // Visibility gate: hidden contests get no event channel for
+        // non-staff (the pings carry no data, but the stream itself would
+        // confirm existence and update timing). Staff keep the stream.
+        const viewer = req.user ? { id: req.user.id, role: req.user.role } : undefined;
+        const status = await getVisibleContestStatusById(String(contestId), viewer);
+        if (status === null) {
+            throw new AppError('Contest not found', 404);
+        }
         attachStream(req, res, (event): boolean =>
             event.type === 'scoreboard_update' && event.contestId === contestId
         );
-    }
+    })
 );
 
 export default router;

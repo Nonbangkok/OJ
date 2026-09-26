@@ -63,6 +63,26 @@ const useContestManagement = (styles) => {
         setIsMigrationModalOpen(true);
     };
 
+    // Visibility toggle — reversible, so no confirmation. The row updates
+    // from the API response on success; on failure the old state stays
+    // (never a badge lying about the server) and the error surfaces.
+    const handleToggleVisibility = async (contestId, currentVisibility) => {
+        try {
+            const response = await adminService.updateContestVisibility(contestId, !currentVisibility);
+            const updated = response.contest;
+            setContests(prev =>
+                prev.map(contest =>
+                    contest.id === contestId
+                        ? { ...contest, is_visible: updated.is_visible }
+                        : contest
+                )
+            );
+        } catch (err) {
+            console.error('Error toggling contest visibility:', err);
+            setError(err.response?.data?.message || 'Failed to update contest visibility.');
+        }
+    };
+
     const getStatusBadge = (status) => {
         if (!styles) return <span>{status}</span>;
 
@@ -108,6 +128,7 @@ const useContestManagement = (styles) => {
         handleEdit,
         handleCreate,
         handleManageProblems,
+        handleToggleVisibility,
         getStatusBadge,
         formatDateTime
     };
