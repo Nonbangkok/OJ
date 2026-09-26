@@ -197,32 +197,7 @@ describe('User Profile Page', () => {
         expect(clickSpy).toHaveBeenCalledTimes(1);
     });
 
-    it('hides the Change Password section on your own profile when the setting is disabled', async () => {
-        jest.mocked(userService.getProfile).mockResolvedValue(profileData);
-        jest.mocked(useAuth).mockReturnValue({
-            user: { id: 3, username: 'tester', role: 'user', hasAvatar: false },
-            isLoading: false,
-            login: jest.fn(),
-            logout: jest.fn(),
-            refreshUser: jest.fn(),
-        });
-        jest.mocked(useSettings).mockReturnValue({
-            registrationEnabled: true,
-            accessMode: 'public',
-            passwordChangeEnabled: false,
-            isPrivateMode: false,
-            isLoading: false,
-            refreshSettings: jest.fn(),
-        });
-
-        renderPage();
-        await waitFor(() => expect(screen.getByRole('heading', { name: 'tester' })).toBeInTheDocument());
-
-        expect(screen.queryByRole('button', { name: /change password/i })).not.toBeInTheDocument();
-        expect(screen.queryByRole('heading', { name: 'Account' })).not.toBeInTheDocument();
-    });
-
-    it('keeps the Change Password section for an admin when the setting is disabled', async () => {
+    it('does not render a Change Password section on the profile (moved to the navbar menu)', async () => {
         jest.mocked(userService.getProfile).mockResolvedValue(profileData);
         jest.mocked(useAuth).mockReturnValue({
             user: { id: 3, username: 'tester', role: 'admin', hasAvatar: false },
@@ -231,17 +206,15 @@ describe('User Profile Page', () => {
             logout: jest.fn(),
             refreshUser: jest.fn(),
         });
-        jest.mocked(useSettings).mockReturnValue({
-            registrationEnabled: true,
-            accessMode: 'public',
-            passwordChangeEnabled: false,
-            isPrivateMode: false,
-            isLoading: false,
-            refreshSettings: jest.fn(),
-        });
 
         renderPage();
-        expect(await screen.findByRole('button', { name: /change password/i })).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByRole('heading', { name: 'tester' })).toBeInTheDocument());
+
+        // The profile page no longer owns password changing — regardless of
+        // role or the password-change setting, nothing password-related
+        // renders here (the navbar user menu is the single entry point).
+        expect(screen.queryByRole('button', { name: /change password/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: 'Account' })).not.toBeInTheDocument();
     });
 
     it('shows an error message when the profile cannot be loaded', async () => {
