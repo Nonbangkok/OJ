@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import styles from './Problems.module.css';
 import { useIncrementalProblems } from '../../hooks/useIncrementalProblems';
 import { useScrollRestore } from '../../hooks/useScrollRestore';
@@ -60,6 +60,12 @@ const Problems = () => {
     loadMore,
   } = useIncrementalProblems(query);
 
+  // True once any first page has finished loading. After that the controls
+  // stay mounted forever — a later query change refreshes only the result
+  // area, so the search input never remounts and typing keeps its focus.
+  const hasLoadedRef = useRef(false);
+  if (!loading && !error) hasLoadedRef.current = true;
+
   // Global category tab counts — one cheap aggregate, independent of the
   // loaded batch, so tabs stay correct while pages stream in.
   useEffect(() => {
@@ -86,8 +92,13 @@ const Problems = () => {
     || difficultyMax !== ''
     || difficultySort !== DIFFICULTY_SORT_NONE;
 
-  if (loading) return <LoadingPage />;
-  if (error) return <div className="error-message">{error}</div>;
+  // The full-page loader is only for the very first load. Every later
+  // refresh (typing in search, changing a filter) keeps the controls
+  // mounted — replacing the page would unmount the search input and drop
+  // the user's focus mid-word. Only the result area shows the refresh.
+  const isInitialLoad = loading && !hasLoadedRef.current;
+  if (isInitialLoad && !error) return <LoadingPage />;
+  if (error && !hasLoadedRef.current) return <div className="error-message">{error}</div>;
 
   return (
     <div className={styles['problems-page-container']}>
@@ -176,6 +187,15 @@ const Problems = () => {
         </div>
       )}
 
+      {/* Result-area refresh indicator: the controls above stay mounted and
+          interactive while this shows (spec: no full-page loading screen
+          between searches). A later refresh keeps the previous batch
+          visible; an empty result area shows the loading line. */}
+      {error && <div className="error-message" role="alert">{error}</div>}
+      {!error && loading && problems.length === 0 && (
+        <p className={styles['results-loading']} role="status">Loading problems…</p>
+      )}
+
       {problems.length > 0 ? (
         <div className={styles['problem-list']}>
           {problems.map(problem => (
@@ -187,15 +207,17 @@ const Problems = () => {
           ))}
         </div>
       ) : (
-        <div className={styles['no-problems-container']}>
-          <div className={styles['no-problems-icon']}>📂</div>
-          <div className={styles['no-problems-title']}>Problem not available.</div>
-          <div className={styles['no-problems-subtext']}>
-            {hasActiveFilters
-              ? 'No problems match the current filter.'
-              : 'Check back later or try refreshing the page.'}
+        !loading && (
+          <div className={styles['no-problems-container']}>
+            <div className={styles['no-problems-icon']}>📂</div>
+            <div className={styles['no-problems-title']}>Problem not available.</div>
+            <div className={styles['no-problems-subtext']}>
+              {hasActiveFilters
+                ? 'No problems match the current filter.'
+                : 'Check back later or try refreshing the page.'}
+            </div>
           </div>
-        </div>
+        )
       )}
 
       {(hasMore || loadMoreError) && (
