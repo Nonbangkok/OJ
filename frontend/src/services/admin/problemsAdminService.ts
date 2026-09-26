@@ -22,6 +22,7 @@ interface UploadFilesResponse extends ApiMessageResponse {
 export interface CollectionWithStats {
   id: number;
   name: string;
+  description: string | null;
   problem_count: number;
   status: 'empty' | 'all_visible' | 'all_hidden' | 'mixed';
   created_at: string;
@@ -118,13 +119,13 @@ const problemsAdminService = {
     return response.data;
   },
 
-  createCollection: async (name: string): Promise<CollectionWithStats> => {
-    const response = await api.post<CollectionWithStats>('/admin/collections', { name });
+  createCollection: async (name: string, description?: string | null): Promise<CollectionWithStats> => {
+    const response = await api.post<CollectionWithStats>('/admin/collections', { name, description: description ?? null });
     return response.data;
   },
 
-  updateCollection: async (id: number, name: string): Promise<CollectionWithStats> => {
-    const response = await api.put<CollectionWithStats>(`/admin/collections/${id}`, { name });
+  updateCollection: async (id: number, name: string, description?: string | null): Promise<CollectionWithStats> => {
+    const response = await api.put<CollectionWithStats>(`/admin/collections/${id}`, { name, description: description ?? null });
     return response.data;
   },
 

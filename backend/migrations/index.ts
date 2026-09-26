@@ -18,6 +18,7 @@ import { siteAccessModeSql } from './0017SiteAccessMode';
 import { integrityFixesSql } from './0018IntegrityFixes';
 import { passwordChangeEnabledSql } from './0019PasswordChangeEnabled';
 import { contestVisibilitySql } from './0020ContestVisibility';
+import { collectionDescriptionSql } from './0021CollectionDescription';
 import { problemDifficultySql } from './0013ProblemDifficulty';
 
 export const coreMigrations: readonly Migration[] = Object.freeze([
@@ -51,4 +52,5 @@ export const migrations: readonly Migration[] = Object.freeze([
   { version: '0018_integrity_fixes', sql: integrityFixesSql },
   { version: '0019_password_change_enabled', sql: passwordChangeEnabledSql },
   { version: '0020_contest_visibility', sql: contestVisibilitySql },
+  { version: '0021_collection_description', sql: collectionDescriptionSql },
 ]);
