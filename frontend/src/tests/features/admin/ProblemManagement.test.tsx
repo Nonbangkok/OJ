@@ -147,7 +147,7 @@ describe('ProblemManagement Component', () => {
         const checkboxes = screen.getAllByRole('checkbox');
         fireEvent.click(checkboxes[1]); // First problem checkbox (index 0 is Select All)
 
-        fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+        fireEvent.click(screen.getByRole('button', { name: /export selected \(1\)/i }));
 
         await waitFor(() => {
             expect(adminService.exportProblems).toHaveBeenCalledWith(['P1']);
@@ -215,6 +215,229 @@ describe('ProblemManagement Component', () => {
         fireEvent.click(await screen.findByRole('button', { name: /#1/i }));
         expect(await screen.findByText('1 2')).toBeInTheDocument();
         expect(adminService.getProblemTestcase).toHaveBeenCalledWith('P1', 1);
+    });
+
+    describe('bulk selection', () => {
+        /** 20 problems: 6 with "01_e" in the id, 14 without. Used by the
+         *  filter-scoped selection tests. */
+        const searchMockProblems = [
+            ...Array.from({ length: 6 }, (_, i) => ({
+                id: `01_e${i + 1}`, title: `Echo ${i + 1}`, author: 'admin',
+                is_visible: true, contest_id: null, contest_status: null,
+            })),
+            ...Array.from({ length: 14 }, (_, i) => ({
+                id: `02_a${i + 1}`, title: `Alpha ${i + 1}`, author: 'admin',
+                is_visible: true, contest_id: null, contest_status: null,
+            })),
+        ];
+
+        const searchPage = (problems) => ({
+            problems,
+            nextCursor: null,
+            hasMore: false,
+            authors: [],
+            hasUnauthoredProblems: false,
+        });
+        const matching = searchMockProblems.filter(p => p.id.startsWith('01_e'));
+
+        const renderWithSearchProblems = async () => {
+            // Initial load: the full 20-problem page. The search box re-queries
+            // the server (debounced), so filtered queries return the 6 matches.
+            (jest.mocked(adminService.getProblems) as jest.Mock).mockImplementation(
+                (query) => {
+                    const term = query && query.search;
+                    // 'zzz-no-match' is the suite's designated no-match term; any
+                    // other non-empty term matches the 01_e fixtures.
+                    const rows = term
+                        ? (term === 'zzz-no-match' ? [] : matching)
+                        : searchMockProblems;
+                    return Promise.resolve(searchPage(rows));
+                },
+            );
+            renderProblemManagement();
+            await waitFor(() => screen.getByText('Echo 1'));
+        };
+
+        /** Types into the server-queried, debounced search box and waits for the
+         *  refetched page to render. An empty value restores the full page. */
+        const searchFor = async (value) => {
+            jest.useFakeTimers();
+            try {
+                fireEvent.change(screen.getByLabelText('Search problems'), { target: { value } });
+                await act(async () => { jest.advanceTimersByTime(300); });
+            } finally {
+                jest.useRealTimers();
+            }
+            await waitFor(() => screen.getByText('Echo 1'));
+        };
+
+        const getRow = (idOrTitle: string) =>
+            screen.getAllByRole('row').find(r => r.textContent.includes(idOrTitle));
+
+        const getRowCheckbox = (idOrTitle: string) =>
+            within(getRow(idOrTitle)).getByRole('checkbox') as HTMLInputElement;
+
+        const headerCheckbox = () =>
+            screen.getByRole('checkbox', { name: /select all currently displayed problems/i }) as HTMLInputElement;
+
+        it('header select-all selects only the DISPLAYED rows when a search filter is active', async () => {
+            await renderWithSearchProblems();
+
+            await searchFor('01_e');
+            expect(screen.getAllByRole('row')).toHaveLength(7); // header + 6 matches
+
+            fireEvent.click(headerCheckbox());
+
+            const checked = screen.getAllByRole('checkbox')
+                .filter(c => (c as HTMLInputElement).checked);
+            expect(checked).toHaveLength(7); // header + exactly the 6 displayed rows
+
+            // Selection bar reports exactly 6 — never the 20 in the system.
+            expect(screen.getByText('6 selected')).toBeInTheDocument();
+        });
+
+        it('clearing the search filter clears the selection (no invisible selected rows)', async () => {
+            await renderWithSearchProblems();
+
+            await searchFor('01_e');
+            fireEvent.click(headerCheckbox());
+            expect(screen.getByText('6 selected')).toBeInTheDocument();
+
+            await searchFor('');
+
+            // All 20 rows are displayed again — none may be selected.
+            expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+            const checked = screen.getAllByRole('checkbox')
+                .filter(c => (c as HTMLInputElement).checked);
+            expect(checked).toHaveLength(0);
+        });
+
+        it('bulk export uses exactly the selected (displayed) ids', async () => {
+            (jest.mocked(adminService.exportProblems) as jest.Mock).mockResolvedValue({
+                data: new Blob(),
+                headers: { 'content-type': 'application/zip' },
+                status: 200,
+                statusText: 'OK',
+                config: { headers: {} },
+            });
+            await renderWithSearchProblems();
+
+            await searchFor('01_e');
+            fireEvent.click(headerCheckbox());
+            fireEvent.click(screen.getByRole('button', { name: /export selected \(6\)/i }));
+
+            await waitFor(() => {
+                expect(adminService.exportProblems).toHaveBeenCalledTimes(1);
+                const exportedIds = (jest.mocked(adminService.exportProblems) as jest.Mock).mock.calls[0][0];
+                expect(exportedIds).toHaveLength(6);
+                expect(exportedIds.every((id: string) => id.startsWith('01_e'))).toBe(true);
+            });
+        });
+
+        it('changing the visibility filter clears the selection', async () => {
+            await renderWithSearchProblems();
+            fireEvent.click(getRowCheckbox('Echo 1'));
+            expect(screen.getByText('1 selected')).toBeInTheDocument();
+
+            fireEvent.change(screen.getByLabelText('Filter problems by visibility'), { target: { value: 'hidden' } });
+            expect(screen.queryByText('1 selected')).not.toBeInTheDocument();
+        });
+
+        it('changing the author filter clears the selection', async () => {
+            await renderWithSearchProblems();
+            fireEvent.click(getRowCheckbox('Echo 1'));
+            expect(screen.getByText('1 selected')).toBeInTheDocument();
+
+            fireEvent.change(screen.getByLabelText('Filter problems by author'), { target: { value: 'admin' } });
+            expect(screen.queryByText('1 selected')).not.toBeInTheDocument();
+        });
+
+        it('header checkbox shows the indeterminate state when some displayed rows are selected', async () => {
+            await renderWithSearchProblems();
+
+            fireEvent.click(getRowCheckbox('Echo 1'));
+            const header = headerCheckbox();
+            expect(header.checked).toBe(false);
+            expect(header.indeterminate).toBe(true);
+
+            // Complete the selection: header becomes fully checked.
+            fireEvent.click(getRowCheckbox('Echo 2'));
+            fireEvent.click(getRowCheckbox('Echo 3'));
+            fireEvent.click(getRowCheckbox('Echo 4'));
+            fireEvent.click(getRowCheckbox('Echo 5'));
+            fireEvent.click(getRowCheckbox('Echo 6'));
+            fireEvent.click(getRowCheckbox('Alpha 1'));
+            // 7 of 20 selected — still indeterminate.
+            expect(headerCheckbox().indeterminate).toBe(true);
+
+            fireEvent.click(headerCheckbox());
+            expect(headerCheckbox().checked).toBe(true);
+            expect(headerCheckbox().indeterminate).toBe(false);
+            expect(screen.getByText('20 selected')).toBeInTheDocument();
+        });
+
+        it('header checkbox is disabled when no rows are displayed', async () => {
+            await renderWithSearchProblems();
+            jest.useFakeTimers();
+            try {
+                // 'zzz-no-match' is a truthy search: the mocked server returns
+                // the empty match page after the debounced re-query.
+                fireEvent.change(screen.getByLabelText('Search problems'), { target: { value: 'zzz-no-match' } });
+                await act(async () => { jest.advanceTimersByTime(300); });
+                await waitFor(
+                    () => expect(jest.mocked(adminService.getProblems)).toHaveBeenLastCalledWith(
+                        expect.objectContaining({ search: 'zzz-no-match' }),
+                    ),
+                    { timeout: 3000 },
+                );
+                await act(async () => { jest.runOnlyPendingTimers(); });
+            } finally {
+                jest.useRealTimers();
+            }
+            await waitFor(
+                () => expect(screen.getAllByRole('row')).toHaveLength(1),
+                { timeout: 3000 },
+            );
+            expect(headerCheckbox()).toBeDisabled();
+        });
+
+        it('clicking the fully-checked header deselects every displayed row', async () => {
+            await renderWithSearchProblems();
+            fireEvent.click(headerCheckbox());
+            expect(screen.getByText('20 selected')).toBeInTheDocument();
+
+            fireEvent.click(headerCheckbox());
+            expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+        });
+
+        it('plain clicks toggle individual rows and the selection bar count follows', async () => {
+            await renderWithSearchProblems();
+
+            fireEvent.click(getRowCheckbox('Alpha 1'));
+            fireEvent.click(getRowCheckbox('Alpha 2'));
+            expect(screen.getByText('2 selected')).toBeInTheDocument();
+
+            fireEvent.click(getRowCheckbox('Alpha 1'));
+            expect(screen.getByText('1 selected')).toBeInTheDocument();
+        });
+
+        it('Clear button empties the selection', async () => {
+            await renderWithSearchProblems();
+            fireEvent.click(getRowCheckbox('Echo 1'));
+            fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+            expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+        });
+
+        it('row click interactions (Edit, row menu) do not start a selection', async () => {
+            await renderWithSearchProblems();
+
+            // Opening the row action menu must not select anything.
+            fireEvent.click(within(getRow('Echo 1')).getByRole('button', { name: /row actions for 01_e1/i }));
+            expect(screen.getByRole('menu')).toBeInTheDocument();
+            fireEvent.keyDown(document, { key: 'Escape' });
+
+            expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+        });
     });
 
     describe('author filter (server-driven options)', () => {

@@ -632,6 +632,31 @@
   gap: 0.5rem;
 }
 
+/* Selected rows: a subtle accent tint (transparent overlay on the accent
+   color) that reads in both light and dark themes — not a bright fill. */
+.row-selected td {
+  background-color: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+.row-selected:hover td {
+  background-color: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+}
+
+/* Rows the pointer has swept through in the current drag gesture get a
+   slightly stronger tint as live feedback while dragging. */
+.row-drag-active td {
+  background-color: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+}
+
+/* While a drag gesture is active, rows are the gesture target — no text
+   cursor weirdness, and the row cells stay non-interactive for selection
+   purposes (buttons inside still work; the gesture only starts from the
+   checkbox cell). */
+.row-drag-active {
+  cursor: default;
+  user-select: none;
+}
+
 /* Selection bar: appears only while problems are selected. */
 .selection-bar {
   display: flex;
