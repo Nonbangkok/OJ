@@ -393,4 +393,50 @@ describe('Problem Authoring draft controller', () => {
     expect(authoringDraftService.getProblemDraft).not.toHaveBeenCalled();
     expect(authoringDraftService.updateProblemDraft).not.toHaveBeenCalled();
   });
+
+  it('deletes a draft and reports whether it had been published', async () => {
+    const draft = draftRow();
+    (authoringDraftService.deleteProblemDraft as jest.Mock).mockResolvedValueOnce({
+      kind: 'deleted',
+      draft,
+      wasPublished: true,
+    });
+
+    const response = await request(createTestApp('staff'))
+      .delete(`/admin/authoring/drafts/${draft.id}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      message: 'Authoring draft deleted',
+      problemId: 'redgate',
+      wasPublished: true,
+    });
+    expect(authoringDraftService.deleteProblemDraft).toHaveBeenCalledWith(draft.id);
+  });
+
+  it('maps missing drafts to 404 on delete and rejects malformed ids', async () => {
+    (authoringDraftService.deleteProblemDraft as jest.Mock).mockResolvedValueOnce({ kind: 'not_found' });
+
+    const missing = await request(createTestApp('admin'))
+      .delete('/admin/authoring/drafts/44444444-4444-4444-8444-444444444444');
+    const malformed = await request(createTestApp('admin'))
+      .delete('/admin/authoring/drafts/not-a-uuid');
+
+    expect(missing.status).toBe(404);
+    expect(missing.body.message).toBe('Problem draft not found');
+    expect(malformed.status).toBe(400);
+    expect(authoringDraftService.deleteProblemDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects anonymous and plain users on delete', async () => {
+    const draft = draftRow();
+    const anonymous = await request(createTestApp())
+      .delete(`/admin/authoring/drafts/${draft.id}`);
+    const user = await request(createTestApp('user'))
+      .delete(`/admin/authoring/drafts/${draft.id}`);
+
+    expect(anonymous.status).toBe(401);
+    expect(user.status).toBe(403);
+    expect(authoringDraftService.deleteProblemDraft).not.toHaveBeenCalled();
+  });
 });

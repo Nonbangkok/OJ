@@ -17,6 +17,7 @@ import {
 import { publishProblemDraft } from '../services/authoringPublishService';
 import {
   createProblemDraft,
+  deleteProblemDraft,
   getProblemDraft,
   listProblemDrafts,
   ProblemDraftListRow,
@@ -257,6 +258,21 @@ router.get('/admin/authoring/drafts/:id',
     // existing testcases disappear from the publish readiness view.
     const testcaseStats = await getDraftTestcaseStats(draft.id);
     res.json({ ...toDraftDetailResponse(draft), testcaseStats });
+  }));
+
+router.delete('/admin/authoring/drafts/:id',
+  validateRequest({ params: problemDraftIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const result = await deleteProblemDraft(String(req.params.id));
+    if (result.kind === 'not_found') {
+      res.status(404).json({ message: 'Problem draft not found' });
+      return;
+    }
+    res.json({
+      message: 'Authoring draft deleted',
+      problemId: result.draft.problem_id,
+      wasPublished: result.wasPublished,
+    });
   }));
 
 router.patch('/admin/authoring/drafts/:id',

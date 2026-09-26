@@ -572,3 +572,61 @@ test('a succeeded verification shows the passing summary', async () => {
   // The success banner carries the green tone.
   expect(screen.getByText(/All checks passed at revision 3/i).closest('div').className).toMatch(/verifyOutcomePassed/);
 });
+
+test('a draft row offers a destructive delete that requires explicit confirmation', async () => {
+  show();
+  fireEvent.click(await screen.findByRole('button', { name: 'Row actions for sum' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+
+  const dialog = await screen.findByRole('dialog', { name: 'Delete draft "sum"?' });
+  expect(dialog).toHaveTextContent(
+    'This permanently deletes this authoring draft and its draft-only artifacts. Published problem data must not be deleted.'
+  );
+  expect(screen.getByRole('button', { name: 'Delete Draft' })).toBeInTheDocument();
+  // Nothing deleted yet.
+  expect(api.delete).not.toHaveBeenCalled();
+
+  // Cancel keeps the draft listed.
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(screen.queryByRole('dialog', { name: 'Delete draft "sum"?' })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'sum' })).toBeInTheDocument();
+  expect(api.delete).not.toHaveBeenCalled();
+
+  // Confirmed delete calls the API and removes the row.
+  fireEvent.click(screen.getByRole('button', { name: 'Row actions for sum' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+  jest
+    .mocked(api.delete)
+    .mockResolvedValue({ data: { message: 'Authoring draft deleted', problemId: 'sum', wasPublished: false } });
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete Draft' }));
+  await waitFor(() => expect(api.delete).toHaveBeenCalledWith('/admin/authoring/drafts/d1'));
+  await waitFor(() => expect(screen.queryByRole('link', { name: 'sum' })).not.toBeInTheDocument());
+});
+
+test('a failed draft delete surfaces the server error and keeps the row', async () => {
+  show();
+  fireEvent.click(await screen.findByRole('button', { name: 'Row actions for sum' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+  jest.mocked(api.delete).mockRejectedValue({
+    response: { status: 409, data: { message: 'The authoring draft is busy' } },
+  });
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete Draft' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('The authoring draft is busy');
+  expect(screen.getByRole('link', { name: 'sum' })).toBeInTheDocument();
+});
+
+test('a published draft row keeps Start new revision and still offers delete', async () => {
+  const published = { ...draft, status: 'published', publishedAt: '2026-09-16T00:00:00.000Z' };
+  jest.mocked(api.get).mockImplementation(async (url) => ({
+    data: url.endsWith('/drafts') ? [published] : url.endsWith('/testcases')
+      ? { revision: published.revision, testcases: [] } : url.endsWith('/d1') ? published : [],
+  }));
+  show();
+
+  expect(await screen.findByRole('button', { name: 'Start new revision' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Row actions for sum' }));
+  // Published drafts do not get the "Open draft" menu item, only Delete.
+  expect(screen.queryByRole('menuitem', { name: 'Open draft' })).not.toBeInTheDocument();
+  expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
+});

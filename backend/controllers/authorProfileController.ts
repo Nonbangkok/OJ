@@ -14,6 +14,7 @@ import {
   AuthorProfileListRow,
   AuthorProfileUpdates,
   createAuthorProfile,
+  deleteAuthorProfile,
   getAuthorProfile,
   listAuthorProfiles,
   readAuthorProfileImage,
@@ -170,6 +171,28 @@ router.patch('/admin/author-profiles/:id',
       await createProfileSync(result.profile.id);
     }
     res.json(toProfileResponse(result.profile));
+  }));
+
+router.delete('/admin/author-profiles/:id',
+  validateRequest({ params: authorProfileIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const result = await deleteAuthorProfile(String(req.params.id));
+    if (result.kind === 'not_found') {
+      res.status(404).json({ message: 'Author profile not found' });
+      return;
+    }
+    if (result.kind === 'active_drafts') {
+      res.status(409).json({
+        message: `This profile is currently referenced by ${result.activeDrafts} draft${result.activeDrafts === 1 ? '' : 's'}. Reassign or delete those drafts first.`,
+        code: 'author_profile_has_active_drafts',
+        activeDrafts: result.activeDrafts,
+      });
+      return;
+    }
+    res.json({
+      message: 'Author profile deleted',
+      detachedDrafts: result.detachedDrafts,
+    });
   }));
 
 export default router;

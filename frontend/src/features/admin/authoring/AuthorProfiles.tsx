@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Dialog } from '../../../components/ui';
+import { ActionMenu, Button, Dialog } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
 import { getErrorMessage } from '../../../utils/error';
 import { Profile, ProfileUpdateConfirmation } from './types';
@@ -7,6 +7,7 @@ import { profileCropToPng } from './profileImage';
 import { useProfileImageCrop } from './useProfileImageCrop';
 import ProfileSyncGateDialog, { PendingSync } from './ProfileSyncGateDialog';
 import ProfileFieldsForm, { Fields } from './ProfileFieldsForm';
+import ConfirmationModal from '../shared/ConfirmationModal';
 import styles from './AuthorProfiles.module.css';
 
 const emptyFields: Fields = {
@@ -34,6 +35,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [pendingSync, setPendingSync] = useState<PendingSync | null>(null);
+  const [deleting, setDeleting] = useState<Profile | null>(null);
   const listRequest = useRef(0);
   const setErrorRef = useRef(setError);
   setErrorRef.current = setError;
@@ -155,6 +157,23 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
   function update(key: keyof Fields, value: string) {
     setFields((current) => ({ ...current, [key]: value }));
   }
+  async function confirmDeleteProfile() {
+    if (!deleting) return;
+    setError('');
+    try {
+      await authoringService.deleteProfile(deleting.id);
+      setProfiles((current) => current.filter((profile) => profile.id !== deleting.id));
+      setNotice('Author profile deleted.');
+      setDeleting(null);
+      onChanged?.();
+    } catch (failure) {
+      // 409 blocked-state: the server message says how many active drafts
+      // still reference the profile and what to do about them.
+      setError(getErrorMessage(failure,
+        'Unable to delete the author profile. Please try again.'));
+      setDeleting(null);
+    }
+  }
   const existingImage = editing && editing !== 'new' && editing.hasProfileImage && !removeImage;
 
   return (
@@ -174,6 +193,9 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
         </div>
       )}
       {notice && <p role="status">{notice}</p>}
+      {/* Delete failures surface outside the edit dialog (the confirmation
+          modal is closed by then), so page-level errors render here. */}
+      {error && !editing && <p role="alert">{error}</p>}
       {!loading && !listError && profiles.length === 0 && (
         <p>No author profiles yet. Create a profile with or without an OJ user account.</p>
       )}
@@ -202,15 +224,24 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
                   {profile.userId === null ? 'No linked user' : `User #${profile.userId}`}
                 </span>
               </div>
-              <Button
-                variant="secondary"
-                size="compact"
-                disabled={saving || imageLoading}
-                aria-label={`Edit ${profile.akaName}`}
-                onClick={() => edit(profile)}
-              >
-                Edit
-              </Button>
+              <ActionMenu
+                label={`Row actions for ${profile.akaName}`}
+                items={[
+                  {
+                    key: 'edit',
+                    label: 'Edit',
+                    disabled: saving || imageLoading,
+                    onClick: () => edit(profile),
+                  },
+                  {
+                    key: 'delete',
+                    label: 'Delete',
+                    variant: 'danger',
+                    disabled: saving || imageLoading,
+                    onClick: () => setDeleting(profile),
+                  },
+                ]}
+              />
             </li>
           ))}
         </ul>
@@ -282,6 +313,19 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
           onKeepEditing={() => setPendingSync(null)}
         />
       )}
+      <ConfirmationModal
+        isOpen={!!deleting}
+        onClose={() => setDeleting(null)}
+        onConfirm={confirmDeleteProfile}
+        title={`Delete author profile "${deleting?.akaName}"?`}
+        message={
+          deleting
+            ? `${deleting.realName}${deleting.userId === null ? '' : ` (AKA user #${deleting.userId})`}. This action cannot be undone.`
+            : ''
+        }
+        confirmText="Delete Author Profile"
+        confirmStyle="danger"
+      />
     </section>
   );
 }
