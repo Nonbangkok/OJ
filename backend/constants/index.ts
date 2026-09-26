@@ -208,7 +208,7 @@ export const JUDGE_CONFIG = {
     // backend's secrets (DATABASE_URL/PGPASSWORD/SECRET_KEY) via getenv().
     SANDBOX_PATH: '/usr/bin:/bin',
     // Maximum number of submissions compiled/run concurrently; excess are queued.
-    MAX_CONCURRENT_JUDGES: 3,
+    MAX_CONCURRENT_JUDGES: 2,
     // Poll interval for the contest-end judge drain (JUDGE-005): how often
     // the migration re-checks the per-contest in-flight judge count.
     DRAIN_POLL_INTERVAL_MS: 100,
