@@ -14,6 +14,7 @@ import { formatTimeAgo } from '../../utils/formatters';
 import { difficultyBand } from '../../utils/constants';
 import type { Contest, ProblemSummary, UserProgression } from '../../types';
 import styles from './Home.module.css';
+import quietActionStyles from '../../components/styles/QuietAction.module.css';
 
 /** Compact summary derived from the profile endpoint. */
 interface HomeProfileSummary {
@@ -257,7 +258,8 @@ const Home = () => {
             className={styles['ghost-action']}
             onClick={handleRandomProblem}
           >
-            Random Problem →
+            Random Problem
+            <span className={quietActionStyles.arrow} aria-hidden="true">→</span>
           </button>
         </div>
       </section>
@@ -350,7 +352,8 @@ const Home = () => {
               className={styles['ghost-action']}
               onClick={() => navigate(`/contests/${contest.id}`)}
             >
-              Open Contest →
+              Open Contest
+              <span className={quietActionStyles.arrow} aria-hidden="true">→</span>
             </button>
           </div>
         </section>

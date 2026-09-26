@@ -61,27 +61,12 @@
 }
 
 /* Ghost action — a low-priority text affordance used next to the one
-   strong primary CTA (hero) and on the contest row. Same treatment as
-   the quote shuffle control. */
+   strong primary CTA (hero) and on the contest row. Composes the shared
+   quiet-action style: neutral at rest, accent tint on hover, never a thin
+   blue hyperlink. */
 .ghost-action {
-  background: none;
-  border: none;
-  padding: 0.25rem 0;
-  font: inherit;
-  font-size: var(--font-size-metadata);
-  color: var(--accent-primary);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.ghost-action:hover {
-  text-decoration: underline;
-}
-
-.ghost-action:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 3px;
-  border-radius: var(--radius-sm);
+  composes: quietAction from '../../components/styles/QuietAction.module.css';
+  /* No rest-state blue next to the primary CTA. */
 }
 
 /* ---------- Progress summary strip ---------- */
@@ -251,28 +236,11 @@
   opacity: 0;
 }
 
+/* Quote shuffle — the quietest action on the page: shared quiet-action
+   base with the muted modifier, so at rest it sits below the contest
+   ghost action while the quote line itself stays dominant. */
 .quote-shuffle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  background: none;
-  border: none;
-  padding: 0.25rem 0;
-  font: inherit;
-  font-size: var(--font-size-metadata);
-  color: var(--accent-primary);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.quote-shuffle:hover {
-  text-decoration: underline;
-}
-
-.quote-shuffle:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 3px;
-  border-radius: var(--radius-sm);
+  composes: quietAction muted from '../../components/styles/QuietAction.module.css';
 }
 
 /* ---------- Logged-out ---------- */

@@ -309,9 +309,17 @@
   background-color: var(--status-success-bg);
 }
 
+/* Green stays green on interaction: the Edit/Continue button is a
+   success-semantic action, so hover/active use the success-green
+   hover/active tokens, never the blue accent. */
 .problem-action-btn.new:hover,
 .problem-action-btn.edit:hover {
-  background-color: var(--accent-primary-hover);
+  background-color: var(--status-success-hover);
+}
+
+.problem-action-btn.new:active,
+.problem-action-btn.edit:active {
+  background-color: var(--status-success-active);
 }
 
 .problem-action-btn:focus-visible {
