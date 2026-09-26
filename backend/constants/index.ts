@@ -509,6 +509,10 @@ export const STRING_LIMITS = {
     PREFIX: 64,
     TITLE: 256,
     AUTHOR: 256,
+    // Must match collections.name VARCHAR(100) (migrations/0014ProblemCollections.ts).
+    COLLECTION_NAME: 100,
+    // Matches collections.description VARCHAR(500) (migration 0021).
+    COLLECTION_DESCRIPTION: 500,
 } as const;
 
 
