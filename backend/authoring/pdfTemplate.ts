@@ -17,6 +17,14 @@ export interface PdfDocument {
   statementHtml: string;
 }
 
+/**
+ * PDF header label for a draft: the problem title with a leading CSP_ series
+ * prefix stripped, so the printed code reads "Two Sum" rather than "CSP_Two Sum".
+ */
+export function taskCodeFromDraft(problemId: string, title: string): string {
+  return title.startsWith('CSP_') ? title.slice('CSP_'.length) : problemId;
+}
+
 export interface PdfRenderOptions {
   templateBaseUrl: string;
   /** Packet assets directory, used for {{ASSET_BASE}}/filename references. */

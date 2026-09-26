@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { runInNewContext } from 'node:vm';
-import { buildPdfHtml, PDF_TEMPLATE_DIRECTORY, PdfDocument } from '../../authoring/pdfTemplate';
+import { buildPdfHtml, PDF_TEMPLATE_DIRECTORY, PdfDocument, taskCodeFromDraft } from '../../authoring/pdfTemplate';
 
 const document: PdfDocument = {
   templateVersion: 'red-gate-v1', title: 'Current <task>', taskCode: 'sum&go',
@@ -29,6 +29,18 @@ function executeReadiness(mathFailure?: Error) {
   timers.forEach(callback => callback());
   return { window, errors, attributes, mathOptions };
 }
+
+describe('taskCodeFromDraft', () => {
+  it('strips a leading CSP_ prefix from the title for the printed header code', () => {
+    expect(taskCodeFromDraft('csp_twosum', 'CSP_Two Sum')).toBe('Two Sum');
+    expect(taskCodeFromDraft('csp_ncr', 'CSP_nCr')).toBe('nCr');
+  });
+
+  it('falls back to the problem id for titles without the prefix', () => {
+    expect(taskCodeFromDraft('aplusb', 'A + B')).toBe('aplusb');
+    expect(taskCodeFromDraft('redgate', 'Red Gate')).toBe('redgate');
+  });
+});
 
 describe('versioned PDF template', () => {
   it('uses current metadata and explicit avatar with escaped text', () => {
