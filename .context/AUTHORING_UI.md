@@ -1,21 +1,29 @@
 # Admin Problem Authoring UI — Slice 10
 
 Slice 10 integrates the complete human-first authoring workflow directly into
-the existing Admin Panel. Only authenticated `admin` users can open
-`/admin/authoring`; staff and ordinary users cannot load authoring APIs from this
-page. AI-assisted authoring remains a future extension.
+the existing Admin Panel. Authenticated `staff` and `admin` users can open
+`/admin/authoring`; ordinary users cannot load authoring APIs from this page.
+AI-assisted authoring remains a future extension.
 
 ## Workspace
 
 The draft list creates drafts, opens saved drafts and manages reusable author
-profiles. A draft has five tabs:
+profiles. A discovery toolbar (search, author filter, status filter, sort)
+filters the single collaborative draft list. A draft has these sections, each a
+real URL under `/admin/authoring/:draftId`:
 
-1. **Metadata** — problem ID, title, author snapshot, language/country and limits.
+1. **Metadata** — problem ID, title, author snapshot, language/country, limits,
+   categories and difficulty.
 2. **Statement** — entry to the full-screen source editor, statement assets,
    fast preview and authoritative PDF.
 3. **Solution** — private C++20 reference solution and explicit compilation.
-4. **Testcases** — optional C++20 generator, seed, manual/ZIP files and outputs.
-5. **Verify & Publish** — readiness, reports, diagnostics, PDF and Publish.
+4. **Generator** — optional C++20 generator with a seeded template.
+5. **Testcases** — manual/ZIP files and generated inputs/outputs.
+6. **Verify & Publish** — readiness, reports, diagnostics, PDF and Publish.
+7. **History & Logs** — the 100-row job history with on-demand inspection.
+8. **AI Docs** — the in-app API reference (derived from the backend Zod
+   schemas) with a "Copy for AI agent" button that puts the full markdown
+   reference on the clipboard.
 
 Editing never autosaves to the server. The toolbar shows saved/dirty/read-only state and Save
 sends only changed fields with `expectedRevision`. Unsaved changes, a revision
@@ -94,8 +102,8 @@ Management.
 - `POST /admin/authoring/drafts/:id/preview` — unsaved sanitized fast preview.
 - `GET /admin/authoring/drafts/:id/assets/:assetId` — private normalized image.
 
-All require admin authentication and use private/no-store responses. Existing
-single-job detail, PDF, mutation and Publish APIs remain authoritative.
+All require staff/admin authentication and use private/no-store responses.
+Existing single-job detail, PDF, mutation and Publish APIs remain authoritative.
 
 ## Verification
 

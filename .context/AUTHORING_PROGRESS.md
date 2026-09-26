@@ -1,6 +1,9 @@
 # Problem Authoring Progress
 
-Updated: 2026-09-16. Branch: `authoring`.
+Updated: 2026-09-26. Status: all slices merged to `master` (the `authoring`
+branch no longer exists). Auth on all authoring routes was later widened from
+admin-only to staff/admin, and drafts gained categories (0012) and difficulty
+(0013) fields — see `DATA_MODEL.md`.
 
 Scope authority: `docs/superpowers/specs/2026-09-12-problem-authoring-workspace-design.md`, section 17.
 
@@ -51,7 +54,7 @@ fixtures for both solution and generator sources. Full protocol details are in
   result import, idempotency, timeout/restart reconciliation, and file cleanup.
 - `backend/migrations/0003AuthoringJobDelivery.ts`: durable source snapshots and
   a unique active-job-per-draft constraint; pre-protocol active jobs fail explicitly.
-- `backend/controllers/authoringJobController.ts`: admin-only enqueue/status APIs;
+- `backend/controllers/authoringJobController.ts`: staff/admin enqueue/status APIs (admin-only when written; since widened);
   authentication, revision conflicts, queue limits, and metadata-only responses.
 - `docker-compose.yml`: network-disabled runner with resource limits and a private
   shared spool. Backend startup enables reconciliation through `AUTHORING_JOBS_DIR`.
@@ -90,7 +93,7 @@ Details and API usage are in `AUTHORING_TESTCASES.md`.
 - Job query/coordinator/router changes: generate endpoint, immutable seed/source,
   transactional whole-set replacement, stale/duplicate rejection, readiness invalidation,
   and durable unverified-reproducibility warnings. No algorithm-correctness claims.
-- `authoringTestcaseController` and upload/query services: admin-only list/detail,
+- `authoringTestcaseController` and upload/query services: staff/admin list/detail (admin-only when written; since widened),
   individual input/output append/update/delete, ZIP whole-set replacement, optimistic
   revisions, generator-less drafts, private streaming uploads and late-failure rollback.
 - ZIP guards: exact EOCD selection, bounded verified central records, safe pairing,
@@ -124,7 +127,7 @@ Details and API usage are in `AUTHORING_TESTCASES.md`.
 Reference-solution execution and atomic output generation are implemented and
 verified. Details, limits and API usage are in `AUTHORING_OUTPUTS.md`.
 
-- Admin-only `POST /admin/authoring/drafts/:id/jobs/outputs`, expected-revision
+- Staff/admin `POST /admin/authoring/drafts/:id/jobs/outputs` (admin-only when written; since widened), expected-revision
   validation, generator-less support and explicit missing-input/source/limit errors.
 - `0004_authoring_job_inputs` migration: durable input bytes separate from bounded
   source/manifest JSON; snapshots survive live testcase edits and backend restart.
@@ -167,7 +170,7 @@ verified. Details, limits and API usage are in `AUTHORING_OUTPUTS.md`.
 Versioned generic PDF generation, statement sanitization and immutable image
 snapshots are implemented. Contract and reproduction details: `AUTHORING_PDF.md`.
 
-- Admin-only PDF enqueue and private inline download APIs. The saved task-pdf-writer
+- Staff/admin PDF enqueue and private inline download APIs (admin-only when written; since widened). The saved task-pdf-writer
   source compiles to HTML while retaining manual sample tables, Thai text,
   inline/display KaTeX and explicit page breaks.
 - Parser-based allowlist rejects executable HTML, arbitrary CSS, external URLs,
@@ -212,7 +215,7 @@ snapshots are implemented. Contract and reproduction details: `AUTHORING_PDF.md`
 Mechanical Verify All and revision-safe readiness are implemented. Contract,
 reports and limits: `AUTHORING_VERIFY.md`. No Publish or Admin UI work is included.
 
-- Admin-only `POST /admin/authoring/drafts/:id/jobs/verify`, metadata/source/pair
+- Staff/admin `POST /admin/authoring/drafts/:id/jobs/verify` (admin-only when written; since widened), metadata/source/pair
   validation, immutable PDF/input/expected-output/source snapshots, optional generator.
 - Existing snapshot tables reused without migration. Expected outputs are private
   binary job files and survive live testcase edits/deletions or backend restart.
@@ -259,7 +262,7 @@ reports and limits: `AUTHORING_VERIFY.md`. No Publish or Admin UI work is includ
 Transactional Publish is implemented. API, transaction boundaries, legacy mapping
 and retry behavior: `AUTHORING_PUBLISH.md`. No Admin UI or deployment is included.
 
-- Admin-only synchronous Publish API with strict expected revision and existing
+- Staff/admin synchronous Publish API (admin-only when written; since widened) with strict expected revision and existing
   authentication/authorization. Requires ready status and successful current
   Verify All provenance, matching PDF hash/template and complete bounded pairs.
 - Locks the draft, inserts a new hidden legacy problem, copies exact testcase
@@ -295,8 +298,10 @@ and retry behavior: `AUTHORING_PUBLISH.md`. No Admin UI or deployment is include
 The complete human-first workflow is integrated into the existing Admin Panel.
 UI behavior and the three workspace APIs are documented in `AUTHORING_UI.md`.
 
-- Admin-only draft list plus five-tab workspace for Metadata, Statement, Solution,
-  Testcases and Verify & Publish. Explicit Save, dirty/conflict/read-only state,
+- Admin-only (now staff/admin) draft list plus the workspace sections for
+  Metadata, Statement, Solution, Generator, Testcases and Verify & Publish
+  (History & Logs and AI Docs sections were added after Slice 10). Explicit
+  Save, dirty/conflict/read-only state,
   navigation warning and active-job locks prevent accidental overwrites.
 - Reusable author profile editor with optional account link, adjustable square
   image crop/removal and snapshot semantics.

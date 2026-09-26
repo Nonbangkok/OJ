@@ -39,14 +39,15 @@ the shell to locate `timeout`).
   - `RLIMIT_NPROC`— blocks fork bombs;
   - `RLIMIT_FSIZE`— caps file write size;
   - `RLIMIT_NOFILE`— caps open file descriptors;
-- if running as root, **drops privileges** to `nobody` (uid/gid `65534`) via
-  `setgid()` → `setgroups(0, NULL)` → `setuid()` (correct order), and verifies
-  the drop is irreversible.
+- if running as root, **drops privileges** to the per-submission sandbox uid
+  (passed as a fourth argv parameter; `nobody`/65534 remains the default when
+  none is supplied) via `setgid()` → `setgroups(0, NULL)` → `setuid()`
+  (correct order), and verifies the drop is irreversible.
 
-The memory limit (MB) and CPU-seconds are passed as **new positional argv
-parameters** by `judgeService.ts`:
-`timeout <s>s ./scripts/time_wrapper <exe> <mem_mb> <cpu_s>`.
-The wrapper strips those two values from the child's argv before `execv`, and
+The memory limit (MB), CPU-seconds and sandbox uid are passed as **positional
+argv parameters** by `judgeService.ts`:
+`timeout -k <grace>s <limit>s ./scripts/time_wrapper <exe> <mem_mb> <cpu_s> <uid>`.
+The wrapper strips those values from the child's argv before `execv`, and
 its `TIME_USED:.../MEM_USED:...` stderr line is unchanged so the judge parser
 still works. The wrapper remains backwards-compatible with the legacy 1-arg
 invocation (no limits applied).
@@ -73,7 +74,7 @@ The audit pass added the following layers on top of the items above.
 g++ no longer runs as root or through a shell. The compile is executed via
 `runBoundedChildProcess` (`backend/utils/sandboxProcess.ts`, mirroring the
 authoring runner's `process.ts`): `spawn()` without a shell, dropped to a
-per-submission sandbox uid (pool `60000..60015`, gid 65534) when the backend
+per-submission sandbox uid (pool `60000..60015`, with a matching gid) when the backend
 runs as root, wrapped in `prlimit --as --cpu --nproc --fsize --core=0`
 (the authoring compiler recipe), env-stripped, with a hard wall-clock timeout
 and output cap that SIGKILL the whole process group. A macro-include of

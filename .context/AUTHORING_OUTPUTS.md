@@ -2,7 +2,7 @@
 
 ## API and semantics
 
-Authenticated admins queue `POST /admin/authoring/drafts/:id/jobs/outputs`:
+Authenticated staff/admins queue `POST /admin/authoring/drafts/:id/jobs/outputs`:
 
 ```json
 { "expectedRevision": 3 }

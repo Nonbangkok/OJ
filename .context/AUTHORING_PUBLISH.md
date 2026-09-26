@@ -2,10 +2,11 @@
 
 ## API
 
-`POST /admin/authoring/drafts/:id/publish` requires an authenticated **admin** and
-a strict JSON body `{ "expectedRevision": 3 }`. No visibility, source or artifact
-overrides are accepted. This is a synchronous database transaction, not a runner
-job; a previously verified draft can be published while the runner is offline.
+`POST /admin/authoring/drafts/:id/publish` requires an authenticated **staff or
+admin** and a strict JSON body `{ "expectedRevision": 3 }`. No visibility, source
+or artifact overrides are accepted. This is a synchronous database transaction,
+not a runner job; a previously verified draft can be published while the runner
+is offline.
 
 First publication returns 201; a verified revision of an already published task
 returns 200. Both return only `draftId`, `problemId`, `revision`, `caseCount`,
@@ -17,7 +18,7 @@ otherwise nothing is overwritten.
 
 Errors:
 
-- 401 unauthenticated; 403 user/staff; 400 invalid UUID/body/revision.
+- 401 unauthenticated; 403 ordinary user; 400 invalid UUID/body/revision.
 - 404 `draft_not_found`.
 - 409 `draft_published`, `revision_conflict`, `job_active`, `draft_not_ready`,
   `pdf_not_verified`, `invalid_testcases`, `problem_id_conflict`, or

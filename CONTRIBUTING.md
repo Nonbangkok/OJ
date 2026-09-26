@@ -41,25 +41,24 @@ script for normal development.
 
 ## Branch model
 
-- **`local`** — the integration branch for development work. Branch from it and
-  open feature pull requests against it.
-- **`master`** — the release branch. Changes flow `local → master` after
-  verification.
+Development happens directly on **`master`** (short-lived feature branches are
+merged into it after verification; there is currently no separate integration
+branch).
 
-Both environments now live in the same codebase. `docker-compose.yml` is the
+Both environments live in the same codebase. `docker-compose.yml` is the
 local-safe base; production adds `docker-compose.production.yml`. Do not encode
-environment behavior by keeping conflicting versions of files on the two branches.
+environment behavior in environment-specific file variants.
 
 Use descriptive branch names, e.g. `feature/contest-export`, `fix/pdf-idor`,
 `security/rate-limiting`.
 
 ## Development workflow
 
-1. Create a branch from `local`.
+1. Create a short-lived branch from `master`.
 2. Make focused changes that stay within one concern.
 3. Add or update tests for the code you touch (see below).
 4. Run the type-checks, linters, and tests locally until they pass.
-5. Open a PR against `local` with a clear description of the what and the why.
+5. Open a PR against `master` with a clear description of the what and the why.
 
 ### Backend (`backend/`)
 
@@ -100,6 +99,14 @@ node --test tests/composeConfig.test.mjs
 BASE_URL=http://127.0.0.1 node --test tests/localSessionSmoke.test.mjs
 ```
 
+Frontend visual regression (admin shell + authoring profiles, Playwright):
+
+```bash
+cd frontend
+npm run test:visual          # run against the current baselines
+npm run test:visual:update   # regenerate baselines after an intentional UI change
+```
+
 Before a production deployment, render and validate the combined configuration:
 
 ```bash
@@ -118,9 +125,18 @@ These mirror the existing codebase — match the surrounding style.
   user-supplied string should have a finite `.max()`.
 - **Layering:** `controllers/ → services/ → db.ts`. Controllers wire routes and
   middleware; services hold business logic and **raw parameterized SQL** (no
-  string interpolation of values — always use `$1, $2, …`).
+  string interpolation of values — always use `$1, $2, …`). Multi-statement
+  writes use `db.withTransaction`; unique-violation errors (Postgres 23505) map
+  to 409 via `utils/dbErrors.ts` (`isUniqueViolation`), not error-string matching.
+- **Identity from `req.user` only** — the request context is revalidated
+  against the `users` table on every request; controllers must not read raw
+  `req.session` fields.
+- **Logging** goes through `backend/utils/logger.ts`, never raw `console.*`.
 - **Centralize magic values** in `backend/constants/index.ts` and
   `frontend/src/config` / `frontend/src/utils/constants.ts` rather than inlining.
+- **Frontend UI primitives** come from `src/components/ui/` (`Dialog`, `Button`,
+  `ActionMenu`, `SegmentedControl`, …) and the CSS token contract in `index.css`;
+  see `STANDARDS.md` for the guard tests that enforce this.
 - **Reproducible installs:** dependencies are pinned via `package-lock.json`
   (committed); the Docker images use `npm ci`. If you add a dependency, commit the
   updated lockfile.

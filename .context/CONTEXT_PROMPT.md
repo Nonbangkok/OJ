@@ -4,32 +4,33 @@
 
 ---
 
-You are an expert software engineer working on **OJ (Grader System)** — an online judge platform for competitive programming built with React 19, Express 5, PostgreSQL 16, and Docker. The admin-only Problem Authoring Workspace is under incremental development on the `authoring` branch.
+You are an expert software engineer working on **OJ (Grader System)** — an online judge platform for competitive programming built with React 19, Express 5, PostgreSQL 16, and Docker. Users submit C++ or Python solutions judged in a per-submission sandbox. The admin/staff Problem Authoring Workspace (drafts, runner jobs, PDF, verify, publish) is complete and documented in the `AUTHORING_*.md` files.
 
 ## Context Awareness
 
 Before generating any code, consult the files in the `.context/` directory:
 
-- **`.context/AUTHORING_PROGRESS.md`** — Current authoring slice status, completion evidence, and the boundary between Slice 3, the runner, PDF rendering, and frontend work.
-- **`.context/ARCHITECTURE.md`** — System hierarchy, directory structure, tech stack, Mermaid diagrams of all major flows (submission judging, contest lifecycle, authentication, request routing, provider tree).
+- **`.context/AUTHORING_PROGRESS.md`** — Authoring slice status and completion evidence (Slices 3–10 complete).
+- **`.context/ARCHITECTURE.md`** — System hierarchy, directory structure, tech stack, Mermaid diagrams of all major flows (submission judging, contest lifecycle, authentication, request routing, provider tree, realtime SSE).
 - **`.context/STANDARDS.md`** — Coding patterns, naming conventions, architecture rules, and testing standards. Your code MUST follow these patterns exactly.
-- **`.context/DATA_MODEL.md`** — Complete database schema (17 tables), entity relationships, JSONB structures, indexes, and non-destructive migration instructions.
-- **`.context/API_SCHEMA.md`** — Canonical API contract reference (61 endpoints across admin/auth/contest/problem/submission/authoring controllers).
+- **`.context/DATA_MODEL.md`** — Complete database schema (24 tables), entity relationships, JSONB structures, indexes, and non-destructive migration instructions.
+- **`.context/API_SCHEMA.md`** — Canonical API contract reference (116 endpoints across admin/analytics/auth/contest/health/problem/realtime/submission/user-profile/authoring controllers).
 
 ## Core Rules
 
 1. **Pattern Compliance:** Follow the Controller → Service → DB pattern (backend) and Page → Hook → Service pattern (frontend) defined in `STANDARDS.md`. Never bypass a layer.
 2. **Data Integrity:** Before generating any code that touches the database, verify the table schema in `DATA_MODEL.md`. Never hallucinate columns or relationships.
-3. **Constants First:** Never hardcode magic numbers, string literals, or configuration values. Use `backend/constants/index.ts` or frontend constants modules.
+3. **Constants First:** Never hardcode magic numbers, string literals, or configuration values. Use `backend/constants/index.ts` (and `constants/progression.ts`) or frontend constants modules.
 4. **Naming Consistency:** PascalCase for components, camelCase for functions/hooks/variables, UPPER_SNAKE_CASE for constants, snake_case for DB columns.
-5. **Module Systems:** Backend and frontend code should use ES `import`/`export` syntax in source files (backend is TypeScript; build target is CommonJS).
-6. **No ORM:** All database access is raw parameterized SQL via `db.query(text, params)`.
-7. **Session Auth:** Authentication is session-based (express-session + connect-pg-simple). No JWT.
-8. **Error Handling:** Use centralized backend error handling (`asyncHandler` + `AppError` + `errorHandler`) and never leave error handling as TODO.
+5. **Module Systems:** Backend and frontend source files use ES `import`/`export` syntax (backend is TypeScript compiled to CommonJS).
+6. **No ORM:** All database access is raw parameterized SQL via `db.query(text, params)`; multi-statement writes use `db.withTransaction`.
+7. **Session Auth:** Authentication is session-based (express-session + connect-pg-simple), revalidated per request. No JWT. Read identity from `req.user` only — never from `req.session` in controllers.
+8. **Error Handling:** Use centralized backend error handling (`asyncHandler` + `AppError` + `errorHandler`) and never leave error handling as TODO. Map Postgres unique violations (23505) to 409 via `utils/dbErrors.ts` (`isUniqueViolation`).
 9. **Testing:** Backend tests use Jest + Supertest. Frontend tests use Jest + React Testing Library. Mock services and context providers.
 10. **Validation Standard:** Backend request validation must use `zod` only, wired through `validateRequest`, and prefer shared schemas from `backend/schemas/requestSchemas.ts` (avoid inline validation duplication in controllers).
 11. **Author Image Standard:** Normalize author JPEG/PNG/WebP uploads through `authorProfileImageService.ts`; database profile and draft snapshot images use canonical 512×512 PNG bytes.
 12. **Statement Asset Standard:** Prepare statement JPEG/PNG/WebP files through `statementAssetService.ts`; reject unsafe filenames and store only validated, metadata-stripped bytes with their SHA-256 checksum.
+13. **Logging Standard:** Use `backend/utils/logger.ts` (structured), never raw `console.*` in backend code.
 
 ## Communication
 
@@ -53,7 +54,8 @@ Before finalizing any implementation:
 
 - Frontend codebase is now TypeScript-first (`.ts/.tsx`) with centralized types under `frontend/src/types/`.
 - Service layer uses explicit typed I/O contracts and admin service domain split (`frontend/src/services/admin/*` with compatibility facade in `adminService.ts`).
-- Context contracts are explicitly typed (`AuthContext`, `ThemeContext`, `SettingsContext`) with safe `useXxx()` guards.
+- Context contracts are explicitly typed (`AuthContext`, `ThemeContext`, `SettingsContext`) with safe `useXxx()` guards. `AuthContext` also exposes `refreshUser()` (refresh tier/level after XP awards); `SettingsContext` reads `/site-config` and refetches on window focus.
+- Shared UI primitives live in `frontend/src/components/ui/` (Dialog, Button, ActionMenu portal dropdown, SegmentedControl, Drawer, StatusBadge, OverflowTable) — use them instead of hand-rolled overlays.
 - Frontend validation gates are stable:
   - `npm run type-check`
   - `npm run lint:check`

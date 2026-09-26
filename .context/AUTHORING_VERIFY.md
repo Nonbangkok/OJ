@@ -2,7 +2,7 @@
 
 ## API and lifecycle
 
-Authenticated admins send `POST /admin/authoring/drafts/:id/jobs/verify` with
+Authenticated staff/admins send `POST /admin/authoring/drafts/:id/jobs/verify` with
 `{ "expectedRevision": 3 }`. Response202 contains job metadata, never private
 source or testcase bytes. Poll `GET /admin/authoring/jobs/:id` until terminal.
 

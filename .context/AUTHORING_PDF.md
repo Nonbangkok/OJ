@@ -7,7 +7,7 @@
 - `GET /admin/authoring/jobs/:id` returns job state, bounded diagnostics and PDF
   manifest (size, SHA-256, template version), never private input/source bytes.
 - `GET /admin/authoring/drafts/:id/pdf` returns the last successful PDF inline for
-  authenticated admins only, with `Cache-Control: private, no-store`, same-origin
+  authenticated staff/admins only, with `Cache-Control: private, no-store`, same-origin
   framing and `X-PDF-Revision` / `X-Draft-Revision`. A newer draft does not erase its
   prior successful PDF; the frontend must label differing revisions as out of date.
 

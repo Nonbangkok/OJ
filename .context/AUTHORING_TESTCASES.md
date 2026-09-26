@@ -57,7 +57,7 @@ is made; a two-run reproducibility check is not implemented in this slice.
 
 ## Manual input/output workflow
 
-All routes below require an authenticated admin, including reads.
+All routes below require an authenticated staff or admin, including reads.
 
 | Method/path relative to `/admin/authoring/drafts/:id` | Behavior |
 | --- | --- |

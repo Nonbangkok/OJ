@@ -13,33 +13,46 @@ The Grader System is a comprehensive online judge platform designed to facilitat
 The Grader System offers a rich set of features for both users and administrators:
 
 *   **User Management:**
-    *   **User Registration and Login:** Secure user authentication with encrypted passwords and session management.
+    *   **User Registration and Login:** Secure user authentication with encrypted passwords and session management (case-insensitive unique usernames, per-account login lockout against brute force).
     *   **User Roles:** Differentiated access for regular users, staffs and administrators.
+    *   **Password Management:** Self-service password change from the navbar user menu (keeps you signed in on this device, signs out all others), plus admin-initiated resets in User Management (signs the target out everywhere). Self-service changes can be disabled per-site by admins.
     *   **Batch User Creation (Admin):** Administrators can generate multiple user accounts with a defined prefix and random passwords.
+    *   **User Profiles:** Public profile pages with submission statistics, verdict breakdowns, daily-activity heatmaps, streaks, achievements, a per-category radar chart, and XP progression.
+    *   **XP / Level / Tier / Global Rank:** Solving problems awards XP based on difficulty; levels and tiers (Novice up to Grandmaster) are derived from the XP history, with a first-solve toast and rank on the global scoreboard.
 *   **Problem Management:**
     *   **Problem Statements (PDF):** Upload and display problem descriptions in PDF format (up to 2GB).
-    *   **Test Case Management:** Store and manage test cases (input/output) for each problem in the database.
+    *   **Test Case Management:** Store and manage test cases (input/output) for each problem in the database, with a per-problem testcase viewer in the admin panel.
     *   **Single Problem Upload (Admin):** Administrators can add new problems or update existing ones individually, including their metadata, PDF, and test cases (via ZIP upload).
     *   **Batch Problem Upload (Admin):** Efficiently upload multiple problems at once using structured ZIP files (up to 2GB).
-    *   **Problem Visibility Control (Admin):** Administrators can toggle the visibility of problems to users.
+    *   **Problem Visibility Control (Admin):** Administrators can toggle the visibility of problems to users, individually or across a whole collection at once.
+    *   **Categories and Difficulty:** Problems carry multiple algorithm categories (from a fixed list) and a Codeforces-like numeric difficulty (800–3500), filterable on the problem list.
+    *   **Collections:** Organizational groups (e.g. teaching chapters) that problems can belong to.
+    *   **Author Filter (Admin):** Problem Management can be filtered by author.
 *   **Code Submission & Judging:**
-    *   **C++ Code Submission:** Users can submit C++ solutions to problems (C++ only currently supported).
-    *   **Isolated Judging Environment:** Code is compiled and executed in an isolated environment to prevent security risks and ensure fair evaluation.
-    *   **Real-time Judging:** Submissions are judged promptly, providing immediate feedback on correctness, execution time, and memory usage.
+    *   **C++ and Python Submission:** Users can submit C++ or Python (standard library only) solutions; Python gets time ×4 / memory ×2 limits to compensate for interpreter overhead.
+    *   **Isolated Judging Environment:** Code is compiled and executed as an unprivileged per-submission sandbox identity (separate uid/gid, resource limits, seccomp network denial) — see [SANDBOX.md](SANDBOX.md).
+    *   **Real-time Judging:** Submissions are judged promptly, with live status updates delivered over Server-Sent Events (polling fallback).
     *   **Detailed Results:** For each submission, users receive detailed results per test case, including status (Accepted, Wrong Answer, Time Limit Exceeded, Memory Limit Exceeded, Runtime Error, Compilation Error).
     *   **Time and Memory Limits:** Configurable time and memory limits for each problem to control resource usage during judging.
 *   **Contest Management:**
-    *   **Contest Creation and Configuration (Admin):** Administrators can create and configure new programming contests with specific problems, start/end times, and visibility settings.
+    *   **Contest Creation and Configuration (Admin):** Administrators can create and configure new programming contests with specific problems, start/end times, and a visibility (hide/show) setting independent of the schedule.
+    *   **Contest Visibility (Admin):** Contests can be hidden from end users without touching their schedule or status — a reversible publishing gate.
     *   **Contest Participation:** Users can view available contests and join those that are currently active or scheduled.
     *   **Contest-Specific Submissions:** Submissions made within a contest are tracked separately from general problem submissions, ensuring contest integrity.
-    *   **Contest Scoreboard:** Real-time scoreboard displaying participants' scores and rankings within a contest.
+    *   **Contest Scoreboard:** Live scoreboard displaying participants' scores and rankings within a contest (updates pushed over SSE), frozen at contest end.
+    *   **Cheat Detection (Admin):** Similarity detection flags pairs of contestants whose submissions for the same problem are near-identical after normalization.
 *   **Scoreboard:**
-    *   **Global Scoreboard:** A public scoreboard displaying user rankings based on their performance across all general problems.
+    *   **Global Scoreboard:** A public scoreboard displaying user rankings based on their performance across all general problems, with tie-aware ranking.
+*   **Authoring Workspace (Admin/Staff):** A full problem-authoring pipeline — drafts with author profiles, a Markdown/LaTeX statement editor with live preview, private reference solutions and generators, sandboxed testcase generation, PDF builds, mechanical verification, and transactional publication into the problem pool. Includes an in-app AI Docs API reference with a copy-for-AI-agent button.
+*   **Site Access Modes (Admin):** PUBLIC mode allows guests to browse problems, submissions, and scoreboards read-only; PRIVATE mode requires login for all content.
+*   **Analytics (Admin/Staff):** Submission analytics with overview KPIs, daily/hourly activity (site timezone), user/problem drill-downs, retention, and CSV export.
 *   **Database Management (Admin Only):**
-    *   **Export Database:** Administrators can export the entire database to a `.sql` dump file for backup purposes.
-    *   **Import Database:** Administrators can restore the database from a `.sql`, `.dump`, or `.tar` file. **WARNING: Importing a database will PERMANENTLY DELETE ALL EXISTING DATA in the database and replace it with the contents of the uploaded file. Proceed with extreme caution and ensure you have a backup of your current database if needed.**
+    *   **Export Database:** Administrators can export the database to a `.sql` dump file for backup purposes (session data is excluded).
+    *   **Import Database:** Administrators can restore the database from a `.sql`, `.dump`, or `.tar` file. The site enters maintenance mode (other requests answer 503) while the import runs. **WARNING: Importing a database will PERMANENTLY DELETE ALL EXISTING DATA in the database and replace it with the contents of the uploaded file. Proceed with extreme caution and ensure you have a backup of your current database if needed.**
 *   **System Settings (Admin Only):**
     *   **Registration Toggle:** Administrators can enable or disable new user registrations.
+    *   **Site Access Mode:** PUBLIC (default, guests can browse read-only) or PRIVATE (login required for content).
+    *   **Password Change Toggle:** Enable or disable self-service password changes for users/staff (admins are exempt).
 
 ## Technology
 
@@ -57,10 +70,11 @@ The Grader System is built with a modern, type-safe tech stack (TypeScript-first
     *   **`bcrypt`:** Secure password hashing.
     *   **`multer` & `unzipper` & `archiver`:** File upload, extraction, and asset management.
     *   **`node-cron`:** For automated contest scheduling and lifecycle management.
-    *   **Session-based Auth:** Secure authentication using `express-session` and `connect-pg-simple`.
+    *   **`express-rate-limit`:** API, auth, and submission rate limiting.
+    *   **Session-based Auth:** Secure authentication using `express-session` and `connect-pg-simple`, revalidated against the database on every request.
 *   **Judging System:**
-    *   **C++:** High-performance execution for user-submitted code.
-    *   **GCC:** Used to compile the judging wrapper and user submissions.
+    *   **C++:** Compiled with GCC and executed in a per-submission sandbox identity.
+    *   **Python:** Standard-library-only interpreter execution with adjusted time/memory limits.
 *   **Containerization & Deployment:**
     *   **Docker & Docker Compose:** Containerized microservices for consistent environments.
     *   **Nginx:** Reverse proxy handling `/api` routing and frontend serving.
@@ -92,6 +106,13 @@ To get the Grader System up and running, you only need to install a few essentia
     ```
     Change `POSTGRES_PASSWORD` and `SECRET_KEY` before sharing the environment
     with anyone. The remaining defaults are suitable for plain HTTP on localhost.
+    Notable variables:
+    - `HTTP_PORT` — host port for the app (default `80`).
+    - `COOKIE_SECURE` — must be `true` in any production deployment over HTTPS;
+      the backend refuses to start in production without it.
+    - `REACT_APP_LARGE_UPLOAD_API_URL` — optional DNS-only origin endpoint for
+      large admin uploads (batch ZIPs, database imports) to bypass proxied
+      upload size limits.
 
 ## Running the Project
 
@@ -102,7 +123,7 @@ Once the installation and setup are complete, you can start the application:
     ```bash
     docker compose up --build -d
     ```
-    *   The first time you run this command, it might take several minutes as Docker downloads the PostgreSQL image and builds the frontend and backend images.
+    *   The first time you run this command, it might take several minutes as Docker downloads the PostgreSQL image and builds the frontend and backend images. The stack runs six services: `database`, a one-shot `migrate` job, `backend`, an isolated `authoring-runner` (no network), `frontend`, and `nginx-proxy`.
 2.  **Access the Application:**
     After the containers have successfully started, open your web browser and navigate to:
     [http://localhost](http://localhost)
@@ -495,15 +516,17 @@ The Grader System includes a dedicated module for managing programming contests,
 
 *   **Contest Creation and Configuration:**
     Administrators can create new contests, defining:
-    *   **Basic Information:** Contest title, description, and visibility.
+    *   **Basic Information:** Contest title and description.
     *   **Schedule:** Start and end times for the contest.
-    *   **Associated Problems:** Select existing problems to be part of the contest. **Important: Problems assigned to an active contest become inaccessible as standalone problems for general submission during the contest period.**
-    *   **Status Management:** Contests progress through various statuses: `scheduled` (waiting to start), `running` (currently active), and `finished` (concluded). These statuses are managed automatically by the system's scheduler.
+    *   **Associated Problems:** Select existing problems to be part of the contest. **Important: Problems assigned to an active contest become inaccessible as standalone problems for general submission during the contest period.** Their pre-contest visibility is restored automatically on every exit path.
+    *   **Status Management:** Contests progress through various statuses: `scheduled` (waiting to start), `running` (currently active), `finishing` (end time reached, final migration running), and `finished` (concluded). These statuses are managed automatically by the system's scheduler.
+*   **Contest Visibility:**
+    Independent from scheduling, administrators can hide or show a contest. Hidden contests are invisible to regular users and guests on every public surface (list, detail, join, scoreboard) while remaining fully manageable by staff and admins.
 *   **Contest Participation:**
-    Users can view available contests and join those that are currently active or scheduled.
+    Users can view available contests and join those that are currently active or scheduled. Submission eligibility is checked against the contest's actual start/end times, not just its scheduler status.
 *   **Contest-Specific Submissions:**
     During a contest, participants submit solutions to problems specifically within the contest environment. These submissions are tracked separately from general problem submissions, ensuring contest integrity.
 *   **Contest Scoreboard:**
-    A real-time scoreboard is available for each contest, displaying the scores and rankings of participants. This scoreboard is dynamically updated as participants submit and their solutions are judged.
+    A real-time scoreboard is available for each contest, displaying the scores and rankings of participants. This scoreboard is dynamically updated as participants submit and their solutions are judged, and freezes (with all participants listed) once the contest finishes.
 *   **Contest Scheduler:**
-    The backend includes a dedicated service (`contestScheduler.js`) that automatically manages the status of contests based on their defined start and end times.
+    The backend includes a dedicated service (`contestScheduler.ts`) that automatically manages the status of contests based on their defined start and end times.
