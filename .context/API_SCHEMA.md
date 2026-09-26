@@ -702,6 +702,7 @@ All endpoints in this section require an authenticated **staff or admin** (`requ
 ### 91. `GET /admin/authoring/drafts`
 
 - Purpose: List draft summaries without private C++ source or binary artifacts.
+- Query: `scope` — `all` (default) or `mine`. `mine` matches the logged-in username against Author Profile AKA names (exact, case-normalized comparison mirroring `users_username_lower_unique`); drafts match via their linked profile or their own AKA snapshot. No matching profile → empty list, never a fallback to all drafts.
 - Response 200: draft summaries ordered by most recently updated.
 
 ### 92. `GET /admin/authoring/drafts/:id`

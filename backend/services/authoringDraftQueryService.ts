@@ -144,16 +144,58 @@ export const createProblemDraft = async (
   return result.rows[0];
 };
 
+/**
+ * "My drafts" scope: match the logged-in username against Author Profile
+ * AKA names (the profile's identity handle), never against display fields.
+ *
+ * Semantics: `users.username` ↔ `author_profiles.aka_name`, compared with the
+ * same normalization the system uses for username uniqueness (a unique index
+ * on LOWER(username), migration 0018) — so `NewAdmin` matches an AKA stored
+ * as `newadmin`. Exact identity match only: no substring, no display/real
+ * name comparison.
+ *
+ * Uniqueness: `author_profiles.aka_name` has no unique constraint, so two
+ * profiles can legitimately share an AKA (e.g. one author with several
+ * profile rows). We never delete or reassign anything — we simply match every
+ * profile whose AKA equals the username, which keeps the behavior
+ * deterministic and additive. The link is via the draft's linked profile
+ * first; a draft whose author profile link was cleared (ON DELETE SET NULL)
+ * can still match its snapshot AKA (`author_aka_name`), which preserves the
+ * author relationship the draft itself recorded.
+ */
 export const listProblemDrafts = async (
+  options: { scope?: 'all' | 'mine'; username?: string } = {},
   database: AuthoringDraftDatabase = db,
 ): Promise<ProblemDraftListRow[]> => {
+  const { scope = 'all', username } = options;
+  const params: unknown[] = [];
+
+  let mineFilter = '';
+  if (scope === 'mine') {
+    if (!username) {
+      // No authenticated username → nothing can match. The controller only
+      // reaches here with a session, but the service stays total.
+      return [];
+    }
+    params.push(username);
+    mineFilter = `
+      WHERE (
+        problem_drafts.author_profile_id IN (
+          SELECT id FROM author_profiles WHERE LOWER(aka_name) = LOWER($1)
+        )
+        OR LOWER(problem_drafts.author_aka_name) = LOWER($1)
+      )
+    `;
+  }
+
   const result = await database.query<ProblemDraftListRow>(`
     SELECT
       id, problem_id, title, author_profile_id, author_aka_name, status, revision,
       verified_revision, created_by, created_at, updated_at
     FROM problem_drafts
+    ${mineFilter}
     ORDER BY updated_at DESC, id ASC
-  `);
+  `, params);
   return result.rows;
 };
 
