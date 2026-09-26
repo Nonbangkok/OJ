@@ -4,20 +4,25 @@ import { getErrorMessage } from '../../utils/error';
 import useBatchUpload from './useBatchUpload';
 import useProblemCrud from './useProblemCrud';
 import { triggerZipDownload } from './useProblemExport';
-import useProblemSelection from './useProblemSelection';
 
-/** Facade over the four problem-management hooks; keeps the public API
- *  (consumed by ProblemManagement.tsx and tests) unchanged. */
+/** Facade over the problem-management hooks; keeps the public API
+ *  (consumed by ProblemManagement.tsx and tests) unchanged.
+ *
+ *  Bulk selection is intentionally NOT part of this facade anymore: its
+ *  source of truth is the DISPLAYED rows (search/filter results), which
+ *  only ProblemManagement.tsx knows. The page builds it directly via
+ *  useProblemSelection({ displayedProblems }) so the semantics stay
+ *  display-scoped under any loading scheme (today: one fetch; tomorrow:
+ *  Show More incremental loading). */
 const useProblemManagement = () => {
   const crud = useProblemCrud();
-  const selection = useProblemSelection({ problems: crud.problems });
   const batchUpload = useBatchUpload({
     onCompleted: crud.fetchProblems,
     setLoading: crud.setLoading,
   });
 
-  const handleExportSelected = async () => {
-    if (selection.selectedProblems.length === 0) {
+  const handleExportSelected = async (problemIds: Array<string | number>) => {
+    if (problemIds.length === 0) {
       batchUpload.setBatchUploadFeedback({
         visible: true,
         message: 'Please select at least one problem to export.',
@@ -29,7 +34,7 @@ const useProblemManagement = () => {
     batchUpload.setBatchUploadFeedback({ visible: true, message: 'Initiating problem export...', type: 'info' });
 
     try {
-      const response = await adminService.exportProblems(selection.selectedProblems);
+      const response = await adminService.exportProblems(problemIds);
       const contentType = response.headers['content-type'];
       triggerZipDownload({
         data: response.data,
@@ -39,10 +44,9 @@ const useProblemManagement = () => {
 
       batchUpload.setBatchUploadFeedback({
         visible: true,
-        message: `${selection.selectedProblems.length} problems exported successfully!`,
+        message: `${problemIds.length} problems exported successfully!`,
         type: 'success',
       });
-      selection.setSelectedProblems([]);
     } catch (errorValue) {
       const errorMsg = getErrorMessage(errorValue, 'Failed to export problems.');
       batchUpload.setBatchUploadFeedback({ visible: true, message: errorMsg, type: 'error' });
@@ -62,8 +66,6 @@ const useProblemManagement = () => {
     setEditingProblem: crud.setEditingProblem,
     uploadProgress: crud.uploadProgress,
     setUploadProgress: crud.setUploadProgress,
-    selectedProblems: selection.selectedProblems,
-    setSelectedProblems: selection.setSelectedProblems,
     batchUploadFeedback: batchUpload.batchUploadFeedback,
     setBatchUploadFeedback: batchUpload.setBatchUploadFeedback,
     batchUploadProgress: batchUpload.batchUploadProgress,
@@ -88,8 +90,6 @@ const useProblemManagement = () => {
     executeShowAll: crud.executeShowAll,
     handleEdit: crud.handleEdit,
     handleCreate: crud.handleCreate,
-    handleToggleSelectProblem: selection.handleToggleSelectProblem,
-    handleSelectAll: selection.handleSelectAll,
     handleExportSelected,
     handleTriggerBatchUpload: batchUpload.handleTriggerBatchUpload,
     handleBatchUploadFileChange: batchUpload.handleBatchUploadFileChange,

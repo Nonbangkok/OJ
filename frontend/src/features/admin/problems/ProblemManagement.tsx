@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import useProblemManagement from '../../../hooks/admin/useProblemManagement';
+import useProblemSelection from '../../../hooks/admin/useProblemSelection';
 import useRejudge from '../../../hooks/admin/useRejudge';
 import ProblemModal from './ProblemModal';
 import CollectionsDialog from './CollectionsDialog';
@@ -32,8 +33,6 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     isModalOpen,
     editingProblem,
     uploadProgress,
-    selectedProblems,
-    setSelectedProblems,
     batchUploadFeedback,
     setBatchUploadFeedback,
     batchUploadProgress,
@@ -55,8 +54,6 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     moveSelectionToCollection,
     handleEdit,
     handleCreate,
-    handleToggleSelectProblem,
-    handleSelectAll,
     handleExportSelected,
     handleTriggerBatchUpload,
     handleBatchUploadFileChange,
@@ -141,6 +138,49 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
 
   const filteredCollection = collections.find(c => c.id === Number(collectionFilter));
 
+  // --- Bulk selection ------------------------------------------------------
+  // `visibleProblems` (rows the table displays, after every filter) is the
+  // single source of truth for selection — not the full fetched list. The
+  // header checkbox, Shift+click ranges, and drag gestures all operate on
+  // it, so this wires into Show More incremental loading unchanged (newly
+  // loaded rows simply start unselected).
+  const {
+    selectedProblemIds,
+    selectedCount,
+    hasSelection,
+    isProblemSelected,
+    headerChecked,
+    headerIndeterminate,
+    bindHeaderCheckboxRef,
+    handleToggleSelectProblem,
+    handleSelectAll,
+    clearSelection,
+    isDragging,
+    isRowVisited,
+    handleDragOverRow,
+    handleSelectionZonePointerDown,
+  } = useProblemSelection({ displayedProblems: visibleProblems });
+
+  // Changing any filter clears the selection: a stale selection of rows the
+  // user can no longer see (e.g. after clearing a search) is more dangerous
+  // than useful. Debounce-free — filters are already user-paced.
+  const changeSearch = (value: string) => {
+    clearSelection();
+    setSearch(value);
+  };
+  const changeCollectionFilter = (value: string) => {
+    clearSelection();
+    setCollectionFilter(value);
+  };
+  const changeVisibilityFilter = (value: 'all' | 'visible' | 'hidden') => {
+    clearSelection();
+    setVisibilityFilter(value);
+  };
+  const changeAuthorFilter = (value: string) => {
+    clearSelection();
+    setAuthorFilter(value);
+  };
+
   const runCollectionVisibility = async () => {
     if (!collectionConfirm) return;
     try {
@@ -155,8 +195,8 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
   const runMoveSelection = async () => {
     if (!moveConfirm) return;
     try {
-      await moveSelectionToCollection(selectedProblems, moveConfirm.collectionId);
-      setSelectedProblems([]);
+      await moveSelectionToCollection(selectedProblemIds, moveConfirm.collectionId);
+      clearSelection();
     } finally {
       setMoveConfirm(null);
     }
@@ -164,8 +204,6 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
 
   if (loading && !batchUploadProgress.visible) return <LoadingPage />;
   if (error) return <div className='error-message'>{error}</div>;
-
-  const hasSelection = selectedProblems.length > 0;
 
   return (
     <div className={styles['management-container']}>
@@ -192,14 +230,14 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
           className={styles['filter-search']}
           placeholder="Search by ID or title…"
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => changeSearch(event.target.value)}
           aria-label="Search problems"
         />
         <label className={styles['filter-control']}>
           <span className={styles['filter-label']}>Collection</span>
           <select
             value={collectionFilter}
-            onChange={(event) => setCollectionFilter(event.target.value)}
+            onChange={(event) => changeCollectionFilter(event.target.value)}
             aria-label="Filter problems by collection"
           >
             <option value="all">All Collections</option>
@@ -213,7 +251,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
           <span className={styles['filter-label']}>Visibility</span>
           <select
             value={visibilityFilter}
-            onChange={(event) => setVisibilityFilter(event.target.value as 'all' | 'visible' | 'hidden')}
+            onChange={(event) => changeVisibilityFilter(event.target.value as 'all' | 'visible' | 'hidden')}
             aria-label="Filter problems by visibility"
           >
             <option value="all">All</option>
@@ -225,7 +263,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
           <span className={styles['filter-label']}>Author</span>
           <select
             value={activeAuthorFilter}
-            onChange={(event) => setAuthorFilter(event.target.value)}
+            onChange={(event) => changeAuthorFilter(event.target.value)}
             aria-label="Filter problems by author"
           >
             <option value="all">All Authors</option>
@@ -278,12 +316,12 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
       {hasSelection && (
         <div className={styles['selection-bar']} role="status">
           <span className={styles['selection-count']}>
-            {selectedProblems.length} selected
+            {selectedCount} selected
           </span>
           <div className={styles['selection-actions']}>
-            <Button size="compact" onClick={handleExportSelected} disabled={loading}>Export</Button>
-            <Button size="compact" onClick={() => setSelectionVisibility(selectedProblems, true)} disabled={loading}>Show</Button>
-            <Button size="compact" variant="secondary" onClick={() => setSelectionVisibility(selectedProblems, false)} disabled={loading}>Hide</Button>
+            <Button size="compact" onClick={() => handleExportSelected(selectedProblemIds)} disabled={loading}>Export Selected ({selectedCount})</Button>
+            <Button size="compact" onClick={() => setSelectionVisibility(selectedProblemIds, true)} disabled={loading}>Show</Button>
+            <Button size="compact" variant="secondary" onClick={() => setSelectionVisibility(selectedProblemIds, false)} disabled={loading}>Hide</Button>
             <label className={styles['selection-move']}>
               <span className={styles['filter-label']}>Move to Collection</span>
               <select
@@ -304,10 +342,10 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
                 ))}
               </select>
             </label>
-            <Button size="compact" variant="secondary" onClick={() => handleRejudgeClick({ kind: 'problem', id: String(selectedProblems[0]), title: `the ${selectedProblems.length} selected problems` })} disabled={loading}>
+            <Button size="compact" variant="secondary" onClick={() => handleRejudgeClick({ kind: 'problem', id: String(selectedProblemIds[0]), title: `the ${selectedCount} selected problems` })} disabled={loading}>
               Rejudge
             </Button>
-            <Button size="compact" variant="neutral" onClick={() => setSelectedProblems([])}>Clear</Button>
+            <Button size="compact" variant="neutral" onClick={clearSelection}>Clear</Button>
           </div>
         </div>
       )}
@@ -356,11 +394,12 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
               <th className={styles['col-checkbox']}>
                 <input
                   type="checkbox"
-                  onChange={handleSelectAll}
-                  checked={selectedProblems.length > 0 && selectedProblems.length === visibleProblems.length}
+                  ref={bindHeaderCheckboxRef}
+                  onChange={(event) => handleSelectAll(event.target.checked)}
+                  checked={headerChecked}
                   disabled={loading || visibleProblems.length === 0}
-                  title="Select all visible problems"
-                  aria-label="Select all visible problems"
+                  title="Select all currently displayed problems"
+                  aria-label="Select all currently displayed problems"
                 />
               </th>
               <th className={styles['col-left']}>ID</th>
@@ -371,13 +410,28 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
             </tr>
           </thead>
           <tbody>
-            {visibleProblems.map(problem => (
-              <tr key={problem.id}>
-                <td className={styles['col-checkbox']}>
+            {visibleProblems.map(problem => {
+              const selected = isProblemSelected(problem.id);
+              const visited = isDragging && isRowVisited(problem.id);
+              const rowClasses = [
+                selected ? styles['row-selected'] : '',
+                visited ? styles['row-drag-active'] : '',
+              ].filter(Boolean).join(' ');
+              return (
+              <tr
+                key={problem.id}
+                className={rowClasses || undefined}
+                onPointerEnter={() => isDragging && handleDragOverRow(problem.id)}
+              >
+                <td
+                  className={styles['col-checkbox']}
+                  onPointerDown={(event) => handleSelectionZonePointerDown(event, problem.id, selected)}
+                >
                   <input
                     type="checkbox"
-                    checked={selectedProblems.includes(problem.id)}
-                    onChange={() => handleToggleSelectProblem(problem.id)}
+                    checked={selected}
+                    onChange={(event) => handleToggleSelectProblem(problem.id, { shiftKey: (event.nativeEvent as KeyboardEvent).shiftKey })}
+                    onClick={(event) => event.stopPropagation()}
                     aria-label={`Select problem ${problem.id}`}
                   />
                 </td>
@@ -438,7 +492,8 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -468,7 +523,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
           onClose={() => setMoveConfirm(null)}
           onConfirm={runMoveSelection}
           title="Confirm Move to Collection"
-          message={`Move ${selectedProblems.length} selected problem${selectedProblems.length === 1 ? '' : 's'} to "${moveConfirm.name}"? Each problem keeps at most one collection.`}
+          message={`Move ${selectedCount} selected problem${selectedCount === 1 ? '' : 's'} to "${moveConfirm.name}"? Each problem keeps at most one collection.`}
         />
       )}
       {isModalOpen && (
