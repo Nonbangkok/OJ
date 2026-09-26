@@ -313,6 +313,15 @@ export const draftAssetParamsSchema = z.object({
   assetId: z.string().uuid(),
 }).strict();
 
+/**
+ * GET /admin/authoring/drafts query. `scope=mine` filters to drafts whose
+ * author identity matches the logged-in username (see
+ * listProblemDrafts in authoringDraftQueryService).
+ */
+export const listProblemDraftsQuerySchema = z.object({
+  scope: z.enum(['all', 'mine']).default('all'),
+}).strict();
+
 const authorProfileFields = {
   userId: z.preprocess(
     parseOptionalInteger,

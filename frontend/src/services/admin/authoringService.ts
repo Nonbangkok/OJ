@@ -37,8 +37,15 @@ export interface TestcaseContents extends TestcaseMetadata {
 
 const authoringService = {
   // Drafts
-  listDrafts: async (): Promise<Draft[]> => {
-    const response = await api.get<Draft[]>(draftsBase);
+  /**
+   * `scope: 'mine'` asks the backend to filter by the logged-in username ↔
+   * Author Profile AKA identity (exact, case-normalized match — never a
+   * display-name or substring comparison). Without it every draft is listed.
+   */
+  listDrafts: async (scope: 'all' | 'mine' = 'all'): Promise<Draft[]> => {
+    const response = await api.get<Draft[]>(draftsBase, {
+      params: scope === 'mine' ? { scope } : {},
+    });
     return response.data;
   },
   createDraft: async (fields: DraftFields): Promise<Draft> => {

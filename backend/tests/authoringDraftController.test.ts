@@ -177,6 +177,33 @@ describe('Problem Authoring draft controller', () => {
       createdBy: 7,
     })]);
     expect(response.body[0].solutionCpp).toBeUndefined();
+    // No scope → the service sees the default (all) view, with no username.
+    expect(authoringDraftService.listProblemDrafts).toHaveBeenCalledWith({
+      scope: 'all',
+      username: undefined,
+    });
+  });
+
+  it('passes scope=mine through with the logged-in username for AKA matching', async () => {
+    (authoringDraftService.listProblemDrafts as jest.Mock).mockResolvedValueOnce([]);
+
+    const response = await request(createTestApp('admin'))
+      .get('/admin/authoring/drafts?scope=mine');
+
+    expect(response.status).toBe(200);
+    expect(authoringDraftService.listProblemDrafts).toHaveBeenCalledWith({
+      scope: 'mine',
+      // The test session's username — this is what AKA names match against.
+      username: 'user7',
+    });
+  });
+
+  it('rejects an unknown scope value', async () => {
+    const response = await request(createTestApp('admin'))
+      .get('/admin/authoring/drafts?scope=everything');
+
+    expect(response.status).toBe(400);
+    expect(authoringDraftService.listProblemDrafts).not.toHaveBeenCalled();
   });
 
   it('returns draft detail and handles a missing id', async () => {

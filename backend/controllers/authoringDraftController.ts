@@ -9,6 +9,7 @@ import {
   createStatementAssetSchema,
   deleteStatementAssetQuerySchema,
   draftAssetParamsSchema,
+  listProblemDraftsQuerySchema,
   problemDraftIdParamSchema,
   refreshProblemDraftAuthorSchema,
   updateProblemDraftSchema,
@@ -239,10 +240,18 @@ router.post('/admin/authoring/drafts',
     res.status(201).json(toDraftDetailResponse(created));
   }));
 
-router.get('/admin/authoring/drafts', asyncHandler(async (_req: Request, res: Response) => {
-  const drafts = await listProblemDrafts();
-  res.json(drafts.map(toDraftSummaryResponse));
-}));
+router.get('/admin/authoring/drafts',
+  validateRequest({ query: listProblemDraftsQuerySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    // `scope=mine` matches the logged-in username against Author Profile AKA
+    // names — see listProblemDrafts for the exact-normalized semantics.
+    const query = req.query as { scope: 'all' | 'mine' };
+    const drafts = await listProblemDrafts({
+      scope: query.scope,
+      username: query.scope === 'mine' ? req.user?.username : undefined,
+    });
+    res.json(drafts.map(toDraftSummaryResponse));
+  }));
 
 router.get('/admin/authoring/drafts/:id',
   validateRequest({ params: problemDraftIdParamSchema }),

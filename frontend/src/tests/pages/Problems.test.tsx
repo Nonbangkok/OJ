@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Problems from '../../pages/problem/Problems';
 import problemService from '../../services/problemService';
@@ -380,6 +380,190 @@ describe('Problems Page', () => {
             await waitFor(() => expect(screen.getByText('Problem not available.')).toBeInTheDocument());
 
             expect(screen.getByText(/check back later or try refreshing the page/i)).toBeInTheDocument();
+        });
+    });
+
+    // ------------------------------------------------------------------
+    // Search focus stability: the controls must never remount while the
+    // user interacts with them — only the result area may change.
+    // ------------------------------------------------------------------
+    describe('search focus stability (no remount during search)', () => {
+        const type = (text: string) =>
+            fireEvent.change(screen.getByLabelText('Search problems'), { target: { value: text } });
+
+        it('keeps focus in the search input through debounce, request, and results update', async () => {
+            jest.useFakeTimers();
+            try {
+                const mock = (jest.mocked(problemService.getProblemsPage) as jest.Mock);
+                mock.mockResolvedValueOnce(firstPage);
+                // A pending promise: the results arrive only when we let them.
+                let resolveSearch: (value: unknown) => void = () => { };
+                mock.mockReturnValueOnce(new Promise(resolve => { resolveSearch = resolve; }));
+                mock.mockResolvedValue({ problems: [], nextCursor: null, hasMore: false });
+
+                renderProblems();
+                await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
+                const input = screen.getByLabelText('Search problems');
+                input.focus();
+                expect(document.activeElement).toBe(input);
+
+                // Type through the debounce window.
+                act(() => {
+                    type('kna');
+                    jest.advanceTimersByTime(300);
+                });
+
+                // The debounced request is in flight. The page has NOT been
+                // replaced by a loading screen — the input is still the same
+                // focused DOM node, and the previous results stay visible.
+                expect(document.activeElement).toBe(input);
+                expect(document.body.contains(input)).toBe(true);
+                expect(screen.getByText('Knapsack')).toBeInTheDocument();
+
+                // The response lands; the results swap in. Focus must survive.
+                await act(async () => {
+                    resolveSearch({ problems: [problem('k1', 'Knapsack Fresh')], nextCursor: null, hasMore: false });
+                });
+                await waitFor(() => expect(screen.getByText('Knapsack Fresh')).toBeInTheDocument());
+                expect(document.activeElement).toBe(input);
+
+                // And the user can keep typing without clicking again.
+                act(() => {
+                    fireEvent.change(input, { target: { value: 'knaps' } });
+                    jest.advanceTimersByTime(300);
+                });
+                // Let the mocked request resolve (already settled promises).
+                await act(async () => { await Promise.resolve(); });
+                expect(document.activeElement).toBe(input);
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it('continues typing mid-flight: a newer keystroke supersedes the pending request', async () => {
+            jest.useFakeTimers();
+            try {
+                const mock = (jest.mocked(problemService.getProblemsPage) as jest.Mock);
+                mock.mockResolvedValueOnce(firstPage);
+                let resolveOld: (value: unknown) => void = () => { };
+                let resolveNew: (value: unknown) => void = () => { };
+                mock.mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve; }));
+                mock.mockReturnValueOnce(new Promise(resolve => { resolveNew = resolve; }));
+
+                renderProblems();
+                await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
+                const input = screen.getByLabelText('Search problems');
+                input.focus();
+
+                // "dp" settles and fires a request…
+                act(() => {
+                    type('dp');
+                    jest.advanceTimersByTime(300);
+                });
+                // …but the user keeps typing before it returns, so a newer
+                // request for "dp t" is now in flight too.
+                act(() => {
+                    fireEvent.change(input, { target: { value: 'dp t' } });
+                    jest.advanceTimersByTime(300);
+                });
+                expect(mock).toHaveBeenCalledTimes(3);
+
+                // The newer response lands first with fresh data.
+                await act(async () => {
+                    resolveNew({ problems: [problem('fresh', 'Fresh Result')], nextCursor: null, hasMore: false });
+                });
+                await waitFor(() => expect(screen.getByText('Fresh Result')).toBeInTheDocument());
+
+                // Now the older "dp" response finally arrives — it must not
+                // overwrite the newer query's results. The hook's monotonic
+                // request id discards it.
+                await act(async () => {
+                    resolveOld({ problems: [problem('stale', 'Stale Result')], nextCursor: null, hasMore: false });
+                    await Promise.resolve();
+                });
+
+                expect(screen.queryByText('Stale Result')).not.toBeInTheDocument();
+                expect(screen.getByText('Fresh Result')).toBeInTheDocument();
+                expect(document.activeElement).toBe(input);
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it('a filter change resets the list (page 1) without remounting the search box', async () => {
+            const mock = (jest.mocked(problemService.getProblemsPage) as jest.Mock);
+            // Call order is deterministic: initial load, search, search+category.
+            mock
+                .mockResolvedValueOnce(firstPage)
+                .mockResolvedValueOnce(firstPage)
+                .mockResolvedValueOnce({ problems: [problem('g1', 'Greedy One')], nextCursor: null, hasMore: false });
+
+            renderProblems();
+            await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
+            const input = screen.getByLabelText('Search problems');
+            input.focus();
+            fireEvent.change(input, { target: { value: 'knapsack' } });
+
+            await waitFor(() => {
+                expect(mock).toHaveBeenLastCalledWith({ search: 'knapsack', limit: 20 });
+            }, { timeout: 2000 });
+
+            // A category change while a search is active: the list resets to
+            // page 1 of the new query. The input node is never recreated.
+            fireEvent.click(screen.getByRole('tab', { name: /^Greedy/ }));
+
+            await waitFor(() => {
+                expect(mock).toHaveBeenLastCalledWith({ search: 'knapsack', category: 'Greedy', limit: 20 });
+            }, { timeout: 2000 });
+            await waitFor(() => expect(screen.getByText('Greedy One')).toBeInTheDocument());
+            expect(screen.queryByText('LIS')).not.toBeInTheDocument();
+            expect(document.activeElement).toBe(input);
+            expect((input as HTMLInputElement).value).toBe('knapsack');
+        });
+
+        it('Show More appends after a search, and the search box stays interactive while loading', async () => {
+            jest.useFakeTimers();
+            try {
+                const mock = (jest.mocked(problemService.getProblemsPage) as jest.Mock);
+                mock.mockResolvedValueOnce(firstPage);
+                // The search query returns a list with more pages.
+                mock.mockResolvedValueOnce({
+                    problems: [problem('s1', 'Searchable One')],
+                    nextCursor: 's-cur',
+                    hasMore: true,
+                });
+                mock.mockResolvedValueOnce({
+                    problems: [problem('s2', 'Searchable Two')],
+                    nextCursor: null,
+                    hasMore: false,
+                });
+
+                renderProblems();
+                await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
+
+                act(() => {
+                    type('searchable');
+                    jest.advanceTimersByTime(300);
+                });
+                await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ search: 'searchable', limit: 20 }));
+                await waitFor(() => expect(screen.getByText('Searchable One')).toBeInTheDocument());
+                expect(screen.queryByText('Knapsack')).not.toBeInTheDocument(); // reset, not appended
+
+                // Show More appends within the same search.
+                fireEvent.click(screen.getByRole('button', { name: 'Show More' }));
+                await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ search: 'searchable', limit: 20, cursor: 's-cur' }));
+                await waitFor(() => expect(screen.getByText('Searchable Two')).toBeInTheDocument());
+                expect(screen.getByText('Searchable One')).toBeInTheDocument();
+
+                // The search box is still editable while a load is in flight.
+                const input = screen.getByLabelText('Search problems');
+                fireEvent.change(input, { target: { value: 'searchable two' } });
+                expect((input as HTMLInputElement).value).toBe('searchable two');
+                input.focus();
+                expect(document.activeElement).toBe(input);
+            } finally {
+                jest.useRealTimers();
+            }
         });
     });
 });
