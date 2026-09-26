@@ -2,9 +2,79 @@ import { judge } from '../../services/judgeService';
 import * as db from '../../db';
 import cp from 'child_process';
 import { SUBMISSION_STATUS, JUDGE_CONFIG, LANGUAGE_LIMITS } from '../../constants';
+import { normalizeOutput, outputsMatch } from '../../utils/outputComparison';
 
 jest.mock('../../db');
 jest.mock('child_process');
+
+describe('output comparison normalization (trailing whitespace per line)', () => {
+    describe('normalizeOutput', () => {
+        it('strips trailing spaces/tabs per line', () => {
+            expect(normalizeOutput('2 3 4 \n1 5 6 \n')).toBe('2 3 4\n1 5 6');
+            expect(normalizeOutput('a\t\nb   \n')).toBe('a\nb');
+        });
+
+        it('preserves leading whitespace per line', () => {
+            expect(normalizeOutput('a\n b')).toBe('a\n b');
+            expect(normalizeOutput('  abc')).toBe('abc'); // outer-leading still trimmed (existing semantics)
+        });
+
+        it('preserves internal whitespace', () => {
+            expect(normalizeOutput('1  2')).toBe('1  2');
+        });
+
+        it('normalizes CRLF line endings (lone CR is not a line separator, matching the original comparator)', () => {
+            expect(normalizeOutput('a\r\nb\r\n')).toBe('a\nb');
+            expect(normalizeOutput('a \r\nb')).toBe('a\nb');
+            // Lone CR was never a line break in the original comparator; keep it.
+            expect(normalizeOutput('a\rb')).toBe('a\rb');
+        });
+
+        it('handles empty and whitespace-only output', () => {
+            expect(normalizeOutput('')).toBe('');
+            expect(normalizeOutput('   \n\t\n')).toBe('');
+            expect(normalizeOutput('  ')).toBe('');
+        });
+
+        it('keeps whitespace-only lines in the middle (structural blank lines)', () => {
+            // A blank line between content survives normalization as a line
+            // (the whitespace itself is dropped, but the line break stays).
+            expect(normalizeOutput('a\n \nb')).toBe('a\n\nb');
+        });
+    });
+
+    describe('outputsMatch — MUST ACCEPT', () => {
+        it.each([
+            ['trailing space before newline (the TUSCO SetOperator bug)', '2 3 4 \n1 5 6 \n', '2 3 4\n1 5 6\n'],
+            ['trailing tab and trailing spaces on separate lines', 'a\t\nb   \n', 'a\nb\n'],
+            ['outer trailing newline (existing outer semantics)', 'hello\n', 'hello'],
+            ['both sides have trailing whitespace', '2 3 4 \n1 5 6 ', '2 3 4\n1 5 6\n'],
+            ['CRLF actual vs LF expected', 'a\r\nb\r\n', 'a\nb\n'],
+            ['empty vs empty', '', ''],
+            ['empty vs whitespace-only', ' \n\t\n', ''],
+            ['multiple lines, no trailing whitespace anywhere', '1 2 3\n4 5 6\n7 8 9\n', '1 2 3\n4 5 6\n7 8 9\n'],
+        ])('%s', (_label, actual, expected) => {
+            expect(outputsMatch(actual, expected)).toBe(true);
+            expect(outputsMatch(expected, actual)).toBe(true); // symmetric
+        });
+    });
+
+    describe('outputsMatch — MUST REJECT', () => {
+        it.each([
+            ['internal double space', '1  2', '1 2'],
+            ['leading space on a middle line', 'a\n b', 'a\nb'],
+            ['different numbers', '123', '124'],
+            ['missing line', 'a\nb', 'a'],
+            ['extra line', 'a', 'a\nb'],
+            ['token order', '1 2', '2 1'],
+            ['structural blank line difference', 'a\n\nb', 'a\nb'],
+            ['tab inside a line vs space', '1\t2', '1 2'],
+        ])('%s', (_label, actual, expected) => {
+            expect(outputsMatch(actual, expected)).toBe(false);
+        });
+    });
+});
+
 
 describe('Judge Service', () => {
     beforeEach(() => {
@@ -436,6 +506,76 @@ describe('Judge Service', () => {
 
             expect(result.overallStatus).toBe(SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED);
         });
+    });
+
+    it('accepts a solution whose output has trailing spaces before newlines (the SetOperator WA)', async () => {
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ time_limit_ms: 1000, memory_limit_mb: 256 }] });
+        (db.query as jest.Mock).mockResolvedValueOnce({
+            rows: [{ case_number: 1, input_data: 'x', output_data: '2 3 4\n1 5 6\n' }]
+        });
+
+        const mockChild = { stdin: { write: jest.fn(), end: jest.fn(), on: jest.fn() }, on: jest.fn() };
+        (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, opts, cb) => {
+            // Logically identical output, but each line carries a trailing space.
+            cb(null, '2 3 4 \n1 5 6 \n', '');
+            return mockChild;
+        });
+
+        const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
+
+        expect(result.overallStatus).toBe(SUBMISSION_STATUS.ACCEPTED);
+        expect(result.score).toBe(100);
+    });
+
+    it('accepts trailing tabs and CRLF actual output vs LF expected', async () => {
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ time_limit_ms: 1000, memory_limit_mb: 256 }] });
+        (db.query as jest.Mock).mockResolvedValueOnce({
+            rows: [{ case_number: 1, input_data: 'x', output_data: 'a\nb\n' }]
+        });
+
+        const mockChild = { stdin: { write: jest.fn(), end: jest.fn(), on: jest.fn() }, on: jest.fn() };
+        (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, opts, cb) => {
+            cb(null, 'a\t\r\nb   \r\n', '');
+            return mockChild;
+        });
+
+        const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
+
+        expect(result.overallStatus).toBe(SUBMISSION_STATUS.ACCEPTED);
+    });
+
+    it('still rejects leading whitespace on a middle line', async () => {
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ time_limit_ms: 1000, memory_limit_mb: 256 }] });
+        (db.query as jest.Mock).mockResolvedValueOnce({
+            rows: [{ case_number: 1, input_data: 'x', output_data: 'a\nb\n' }]
+        });
+
+        const mockChild = { stdin: { write: jest.fn(), end: jest.fn(), on: jest.fn() }, on: jest.fn() };
+        (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, opts, cb) => {
+            cb(null, 'a\n b\n', '');
+            return mockChild;
+        });
+
+        const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
+
+        expect(result.overallStatus).toBe(SUBMISSION_STATUS.WRONG_ANSWER);
+    });
+
+    it('still rejects internal double spaces', async () => {
+        (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ time_limit_ms: 1000, memory_limit_mb: 256 }] });
+        (db.query as jest.Mock).mockResolvedValueOnce({
+            rows: [{ case_number: 1, input_data: 'x', output_data: '1 2' }]
+        });
+
+        const mockChild = { stdin: { write: jest.fn(), end: jest.fn(), on: jest.fn() }, on: jest.fn() };
+        (cp.exec as unknown as jest.Mock).mockImplementationOnce((cmd, opts, cb) => {
+            cb(null, '1  2\n', '');
+            return mockChild;
+        });
+
+        const result = await judge('P1', { command: '/tmp/a.out', args: [] }, 'cpp');
+
+        expect(result.overallStatus).toBe(SUBMISSION_STATUS.WRONG_ANSWER);
     });
 
     it('strips secrets from the executed program environment (sandbox env-strip)', async () => {
