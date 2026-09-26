@@ -42,6 +42,13 @@ const ProblemCard = ({ problem, contestId = null, highlightCategory = null }: Pr
     const hasHiddenCategories = hasCategories
         && (filteredCategory ? categories.length > 1 : true);
 
+    // Computed once: the legacy [PPPP...] pattern string, rendered as the
+    // score column's second row and exposed as a native title tooltip so a
+    // long truncated pattern stays inspectable.
+    const resultString = hasSubmitted
+        ? generateResultString(problem.best_submission_status, problem.best_submission_results)
+        : '';
+
     return (
         <div className={styles['problem-list-item']}>
             <div className={styles['problem-info']}>
@@ -98,8 +105,8 @@ const ProblemCard = ({ problem, contestId = null, highlightCategory = null }: Pr
                                 <span>{problem.best_score || 0}</span>
                             </div>
                         </div>
-                        <span className={styles['score-text']}>
-                            {generateResultString(problem.best_submission_status, problem.best_submission_results)}
+                        <span className={styles['score-text']} title={resultString}>
+                            {resultString}
                         </span>
                     </div>
                 )}

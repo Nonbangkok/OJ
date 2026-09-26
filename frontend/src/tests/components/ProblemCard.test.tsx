@@ -14,6 +14,8 @@ jest.mock('../../utils/formatters', () => ({
     generateResultString: jest.fn(() => 'PPPP')
 }));
 
+import { generateResultString } from '../../utils/formatters';
+
 const mockProblem: ProblemSummary = {
     id: 'prob-1',
     title: 'Two Sum',
@@ -113,5 +115,28 @@ describe('ProblemCard', () => {
         );
 
         expect(screen.queryByTestId('problem-difficulty')).not.toBeInTheDocument();
+    });
+
+    it('renders the result string with a title tooltip carrying the full string', () => {
+        (generateResultString as jest.Mock).mockReturnValueOnce('[PPPP--T]');
+
+        render(
+            <BrowserRouter>
+                <ProblemCard problem={mockProblem} />
+            </BrowserRouter>
+        );
+
+        const scoreText = screen.getByTitle('[PPPP--T]');
+        expect(scoreText).toHaveTextContent('[PPPP--T]');
+    });
+
+    it('renders no result string when the problem was never attempted', () => {
+        render(
+            <BrowserRouter>
+                <ProblemCard problem={mockProblemNoSubmission} />
+            </BrowserRouter>
+        );
+
+        expect(screen.queryByText(/^\[?P/)).not.toBeInTheDocument();
     });
 });

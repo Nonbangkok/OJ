@@ -192,26 +192,29 @@
   min-width: 0;
 }
 
-/* The details row spans the zone's full width so the bar can flex into
-   all of it (a plain flex child would shrink-wrap to its content). */
+/* The details group spans the zone's full width so both rows — the bar
+   track and the result string — measure against the whole score column. */
 .problem-score-placeholder .problem-score-details {
   width: 100%;
 }
 
-/* Score bar + result text read as ONE group: tight gap, single baseline.
-   The bar and the [PP] text are aligned on their text midlines so the
-   numbers in the bar sit level with the result text. */
+/* Score bar + result text read as ONE group, stacked in two rows: the
+   progress track spans the full score column on top, the legacy [PPPP...]
+   pattern string sits centered underneath it. The two rows share the
+   group's full width, so the bar always measures the whole column and the
+   text row never squeezes it. */
 .problem-score-details {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
+  display: grid;
+  grid-template-rows: 20px minmax(1.2rem, auto);
+  row-gap: 0.3rem;
+  align-content: center;
   min-width: 0;
 }
 
 .score-bar-container {
-  /* The bar fills the score zone's remaining width so the score reads as a
-     proportion of the full track. */
-  flex: 1 1 auto;
+  /* Full column width: the score reads as a proportion of the complete
+     track. Height matches the first grid row. */
+  width: 100%;
   height: 20px;
   background-color: var(--background-tertiary);
   border-radius: 6px;
@@ -257,18 +260,22 @@
 }
 
 .score-text {
+  /* Second row, centered under the bar. Same tone as the bar's number so
+     the pair reads as one unit. Long patterns clamp with an ellipsis — the
+     full string stays available via the native title tooltip — and never
+     change the card's geometry. */
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   font-family: 'Inconsolata';
   font-size: 1rem;
-  /* Same tone as the bar's number so the pair reads as one unit rather
-     than two siblings from different families. Fixed-size so the bar
-     always gets the zone's remaining width. */
+  font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
-  font-weight: 600;
+  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 0 0 auto;
-  max-width: 40%;
 }
 
 /* ------------------------------------------------------------------ *
@@ -329,10 +336,10 @@
     row-gap: 0.6rem;
   }
 
+  /* The score spans the full card here, so the two-row group gets extra
+     breathing room between bar and text. */
   .problem-score-details {
-    flex-wrap: wrap;
-    /* Same tight group spacing as the desktop row. */
-    gap: 0.375rem;
+    row-gap: 0.375rem;
   }
 }
 
