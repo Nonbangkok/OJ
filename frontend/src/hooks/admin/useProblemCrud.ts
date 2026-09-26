@@ -4,6 +4,7 @@ import adminService from '../../services/adminService';
 import { POLLING_INTERVALS } from '../../config/constants';
 import type {
   AdminProblem,
+  AdminProblemsQuery,
   ProblemDetail,
   ProblemSelectionBulkConfirm,
   UploadProgressState,
@@ -11,6 +12,7 @@ import type {
 import { getErrorMessage, toApiLikeError } from '../../utils/error';
 import type { ProblemCategory } from '../../utils/constants';
 
+import { useAdminProblemsPage } from './useAdminProblemsPage';
 import { getBulkVisibilityTargets, normalizeUploadProgress } from './problemManagement.helpers';
 
 export interface ProblemSaveData {
@@ -34,9 +36,28 @@ export interface ProblemSavePayload {
  *  still running, but the UI no longer waits on it indefinitely. */
 const UPLOAD_POLL_MAX_ATTEMPTS = 300;
 
-const useProblemCrud = () => {
-  const [problems, setProblems] = useState<AdminProblem[]>([]);
-  const [loading, setLoading] = useState(true);
+interface UseProblemCrudArgs {
+  /** Server-side filter query for the paged admin problem list. */
+  query: AdminProblemsQuery;
+}
+
+const useProblemCrud = ({ query }: UseProblemCrudArgs) => {
+  const {
+    problems,
+    loading: pageLoading,
+    error: pageError,
+    loadingMore,
+    loadMoreError,
+    hasMore,
+    authors,
+    hasUnauthoredProblems,
+    loadMore,
+    refresh,
+  } = useAdminProblemsPage(query);
+
+  // Mutation-busy flag (bulk ops, edit modal); the paged hook owns the
+  // initial list load, so this starts false and only flips during mutations.
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProblem, setEditingProblem] = useState<ProblemDetail | null>(null);
@@ -47,21 +68,17 @@ const useProblemCrud = () => {
 
   const [bulkConfirm, setBulkConfirm] = useState<ProblemSelectionBulkConfirm>({ isOpen: false, type: null });
 
-  const fetchProblems = useCallback(async () => {
-    try {
-      const data = await adminService.getProblems();
-      setProblems(data);
-    } catch (errorValue) {
-      setError('Failed to fetch problems.');
-      console.error(errorValue);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // The paged hook owns list loading state; a busy overlay is shown while
+  // ANY of the two is true (page fetch, or a mutation-driven loading flag).
+  const listBusy = pageLoading || loading;
+  const listError = error || pageError;
 
-  useEffect(() => {
-    void fetchProblems();
-  }, [fetchProblems]);
+  /** Re-fetch the loaded page span (first batch through the current
+   *  cursor) under the current filters — keeps the table position after
+   *  mutations instead of collapsing back to the first batch. */
+  const fetchProblems = useCallback(async () => {
+    await refresh();
+  }, [refresh]);
 
   const handleDeleteClick = (problemId: string) => {
     setProblemToDelete(problemId);
@@ -311,10 +328,16 @@ const useProblemCrud = () => {
 
   return {
     problems,
-    loading,
+    loading: listBusy,
     setLoading,
-    error,
+    error: listError,
     setError,
+    loadingMore,
+    loadMoreError,
+    hasMore,
+    authors,
+    hasUnauthoredProblems,
+    loadMore,
     isModalOpen,
     setIsModalOpen,
     editingProblem,

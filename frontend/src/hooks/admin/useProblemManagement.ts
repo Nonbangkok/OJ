@@ -1,5 +1,6 @@
 import adminService from '../../services/adminService';
 import { getErrorMessage } from '../../utils/error';
+import type { AdminProblemsQuery } from '../../types';
 
 import useBatchUpload from './useBatchUpload';
 import useProblemCrud from './useProblemCrud';
@@ -7,9 +8,11 @@ import { triggerZipDownload } from './useProblemExport';
 import useProblemSelection from './useProblemSelection';
 
 /** Facade over the four problem-management hooks; keeps the public API
- *  (consumed by ProblemManagement.tsx and tests) unchanged. */
-const useProblemManagement = () => {
-  const crud = useProblemCrud();
+ *  (consumed by ProblemManagement.tsx and tests) unchanged. The `query`
+ *  is the server-side filter surface — filter changes reset the paged
+ *  list to the first batch of the new query. */
+const useProblemManagement = (query: AdminProblemsQuery) => {
+  const crud = useProblemCrud({ query });
   const selection = useProblemSelection({ problems: crud.problems });
   const batchUpload = useBatchUpload({
     onCompleted: crud.fetchProblems,
@@ -56,6 +59,12 @@ const useProblemManagement = () => {
     problems: crud.problems,
     loading: crud.loading,
     error: crud.error,
+    loadingMore: crud.loadingMore,
+    loadMoreError: crud.loadMoreError,
+    hasMore: crud.hasMore,
+    authors: crud.authors,
+    hasUnauthoredProblems: crud.hasUnauthoredProblems,
+    loadMore: crud.loadMore,
     isModalOpen: crud.isModalOpen,
     setIsModalOpen: crud.setIsModalOpen,
     editingProblem: crud.editingProblem,

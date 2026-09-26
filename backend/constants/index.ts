@@ -131,6 +131,17 @@ export const PROBLEM_LIST_CONFIG = {
 } as const;
 
 /**
+ * Admin problem management list (GET /admin/problems). Same keyset
+ * pagination contract as the public list, but over the full pool
+ * (visible + hidden, contest-attached included). The default is one
+ * screenful of table rows per "Show More" round trip.
+ */
+export const ADMIN_PROBLEM_LIST_CONFIG = {
+    DEFAULT_LIMIT: 25,
+    MAX_LIMIT: 100,
+} as const;
+
+/**
  * Admin testcase viewer (GET /admin/problems/:id/testcases). The metadata
  * list stays cheap for any problem size (sizes computed in SQL, content
  * never fetched); a single case fetched with ?caseNumber= is truncated in

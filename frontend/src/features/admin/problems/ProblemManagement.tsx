@@ -8,6 +8,8 @@ import ConfirmationModal from '../shared/ConfirmationModal';
 import RejudgeFeedbackBox from '../shared/RejudgeFeedbackBox';
 import adminService from '../../../services/adminService';
 import type { CollectionWithStats } from '../../../services/admin/problemsAdminService';
+import type { AdminProblemsQuery } from '../../../types';
+import { ADMIN_PROBLEMS_PAGE } from '../../../config/constants';
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 import LoadingPage from '../../../components/shared/LoadingPage';
@@ -25,10 +27,43 @@ const COLLECTION_STATUS_LABEL: Record<CollectionWithStats['status'], string> = {
 };
 
 const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
+  // --- Filters ------------------------------------------------------------
+  // All filters run server-side (SQL BEFORE pagination); changing any of
+  // them resets the paged list to the first batch of the new query. The
+  // search box is debounced so typing does not fire a request per key.
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [collectionFilter, setCollectionFilter] = useState<string>('all');
+  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'visible' | 'hidden'>('all');
+  const [authorFilter, setAuthorFilter] = useState<string>('all');
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), ADMIN_PROBLEMS_PAGE.SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  // Server-side query. Sentinels 'all' are omitted so the default query is
+  // the clean unfiltered first page.
+  const query = useMemo<AdminProblemsQuery>(() => {
+    const trimmed = debouncedSearch.trim();
+    return {
+      ...(trimmed ? { search: trimmed } : {}),
+      ...(collectionFilter !== 'all' ? { collection: collectionFilter === 'none' ? 'none' as const : Number(collectionFilter) } : {}),
+      ...(visibilityFilter !== 'all' ? { visibility: visibilityFilter } : {}),
+      ...(authorFilter !== 'all' ? { author: authorFilter } : {}),
+    };
+  }, [debouncedSearch, collectionFilter, visibilityFilter, authorFilter]);
+
   const {
     problems,
     loading,
     error,
+    loadingMore,
+    loadMoreError,
+    hasMore,
+    authors,
+    hasUnauthoredProblems,
+    loadMore,
     isModalOpen,
     editingProblem,
     uploadProgress,
@@ -62,7 +97,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     handleBatchUploadFileChange,
     handleSave,
     handleCloseModal
-  } = useProblemManagement();
+  } = useProblemManagement(query);
 
   const {
     isRejudgeConfirmOpen,
@@ -74,37 +109,32 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     dismissRejudgeFeedback,
   } = useRejudge();
 
-  // --- Filters ------------------------------------------------------------
-  const [search, setSearch] = useState('');
-  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'visible' | 'hidden'>('all');
-
-  // Author options derive from the loaded problems (same pattern as
-  // collections): distinct non-empty authors, sorted alphabetically. Rows
+  // Author options come from the server with every page (a distinct-names
+  // aggregate over the WHOLE pool, independent of the loaded batch). Rows
   // with a NULL/empty author group under a "No author" option when present.
-  const NO_AUTHOR = '__none__';
-  const [authorFilter, setAuthorFilter] = useState<string>('all');
-  const authorOptions = useMemo(() => {
-    const names = new Set<string>();
-    let hasUnauthored = false;
-    for (const problem of problems) {
-      const author = problem.author?.trim();
-      if (author) names.add(author);
-      else hasUnauthored = true;
-    }
-    const sorted = [...names].sort((a, b) => a.localeCompare(b));
-    return hasUnauthored ? [...sorted, NO_AUTHOR] : sorted;
-  }, [problems]);
+  const NO_AUTHOR = 'none';
+  const authorOptions = useMemo(
+    () => (hasUnauthoredProblems ? [...authors.map(a => a.name), NO_AUTHOR] : authors.map(a => a.name)),
+    [authors, hasUnauthoredProblems],
+  );
   const authorLabel = (value: string) => (value === NO_AUTHOR ? 'No author' : value);
-  // If the selected author disappears from the data (e.g. its only problem
-  // was deleted), fall back to 'all' so the control never shows a phantom
-  // selection.
-  const activeAuthorFilter = authorFilter !== 'all' && authorOptions.includes(authorFilter)
+  // If the selected author disappears from the pool (e.g. its only problem
+  // was deleted), reset to 'all' — the query recomputes and refetches, so
+  // the control never shows (or queries by) a phantom selection. Skipped
+  // while the options list is still empty (first page in flight).
+  useEffect(() => {
+    if (authorFilter !== 'all' && authorOptions.length > 0 && !authorOptions.includes(authorFilter)) {
+      setAuthorFilter('all');
+    }
+  }, [authorFilter, authorOptions]);
+  // Display uses the sanitized value so the select never shows a phantom
+  // selection even for the one render before the reset effect lands.
+  const displayAuthorFilter = authorFilter !== 'all' && authorOptions.includes(authorFilter)
     ? authorFilter
     : 'all';
 
   // --- Collections --------------------------------------------------------
   const [collections, setCollections] = useState<CollectionWithStats[]>([]);
-  const [collectionFilter, setCollectionFilter] = useState<string>('all');
   const [collectionsOpen, setCollectionsOpen] = useState(false);
   const [testcasesProblem, setTestcasesProblem] = useState<{ id: string } | null>(null);
   const [collectionConfirm, setCollectionConfirm] = useState<{ id: number; name: string; count: number; isVisible: boolean } | null>(null);
@@ -122,22 +152,9 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     return fetchProblems();
   };
 
-  // Filters compose: search (ID/title) x collection x visibility x author.
-  const visibleProblems = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return problems.filter(problem => {
-      if (collectionFilter === 'none' && problem.collection_id !== null) return false;
-      if (collectionFilter !== 'all' && collectionFilter !== 'none' && problem.collection_id !== Number(collectionFilter)) return false;
-      if (visibilityFilter === 'visible' && !problem.is_visible) return false;
-      if (visibilityFilter === 'hidden' && problem.is_visible) return false;
-      if (activeAuthorFilter !== 'all') {
-        const author = problem.author?.trim();
-        if (activeAuthorFilter === NO_AUTHOR ? Boolean(author) : author !== activeAuthorFilter) return false;
-      }
-      if (!query) return true;
-      return problem.id.toLowerCase().includes(query) || problem.title.toLowerCase().includes(query);
-    });
-  }, [problems, collectionFilter, visibilityFilter, activeAuthorFilter, search]);
+  // The table renders exactly the server-paged rows (filters already ran
+  // in SQL, before pagination).
+  const visibleProblems = problems;
 
   const filteredCollection = collections.find(c => c.id === Number(collectionFilter));
 
@@ -224,7 +241,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
         <label className={styles['filter-control']}>
           <span className={styles['filter-label']}>Author</span>
           <select
-            value={activeAuthorFilter}
+            value={displayAuthorFilter}
             onChange={(event) => setAuthorFilter(event.target.value)}
             aria-label="Filter problems by author"
           >
@@ -234,14 +251,16 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
             ))}
           </select>
         </label>
-        {/* Global, low-frequency actions live behind one quiet menu. */}
+        {/* Global, low-frequency actions live behind one quiet menu. The
+            Show/Hide-all toggles act on the LOADED rows (the list is
+            server-paginated); the confirm dialogs say so explicitly. */}
         <ActionMenu
           label="More global actions"
           trigger="text"
           items={[
             { key: 'manage-collections', label: 'Manage Collections', onClick: () => setCollectionsOpen(true) },
-            { key: 'show-all', label: 'Show all problems', onClick: handleShowAll, disabled: loading || problems.every(p => p.is_visible), title: 'Set every problem in the system to visible' },
-            { key: 'hide-all', label: 'Hide all problems', onClick: handleHideAll, disabled: loading || problems.every(p => !p.is_visible), title: 'Set every problem in the system to hidden' },
+            { key: 'show-all', label: 'Show all problems', onClick: handleShowAll, disabled: loading || problems.every(p => p.is_visible), title: `Set every LOADED problem (${problems.length}) to visible` },
+            { key: 'hide-all', label: 'Hide all problems', onClick: handleHideAll, disabled: loading || problems.every(p => !p.is_visible), title: `Set every LOADED problem (${problems.length}) to hidden` },
           ]}
         />
       </div>
@@ -443,6 +462,25 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
         </table>
       </div>
 
+      {/* --- 5. Show More: server-side next batch -------------------------- */}
+      {(hasMore || loadMoreError) && !loading && (
+        <div className={styles['load-more-container']}>
+          {loadMoreError && (
+            <p className={styles['load-more-error']} role="alert">
+              Failed to load more problems.
+            </p>
+          )}
+          <Button
+            variant="secondary"
+            onClick={loadMore}
+            loading={loadingMore}
+            loadingLabel="Loading…"
+          >
+            {loadMoreError ? 'Retry' : 'Show More'}
+          </Button>
+        </div>
+      )}
+
       <CollectionsDialog
         open={collectionsOpen}
         onClose={() => setCollectionsOpen(false)}
@@ -494,8 +532,8 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
         onConfirm={bulkConfirm.type === 'show' ? executeShowAll : executeHideAll}
         title={bulkConfirm.type === 'show' ? "Confirm Show All" : "Confirm Hide All"}
         message={bulkConfirm.type === 'show'
-          ? "Are you sure you want to make all problems in the system visible? (Excluding those in contests)"
-          : "Are you sure you want to hide all problems in the system? (Excluding those in contests)"}
+          ? `Are you sure you want to make all ${problems.length} loaded problems visible? (Excluding those in contests)`
+          : `Are you sure you want to hide all ${problems.length} loaded problems? (Excluding those in contests)`}
       />
       <ConfirmationModal
         isOpen={isRejudgeConfirmOpen}

@@ -9,7 +9,7 @@ import {
   updateCollection,
 } from '../../services/collectionQueryService';
 import { runMigrationsFromPool } from '../../scripts/migrate';
-import { createProblem, getAdminProblems, updateProblem } from '../../services/problemQueryService';
+import { createProblem, getAdminProblemsPage, updateProblem } from '../../services/problemQueryService';
 
 jest.unmock('pg');
 jest.mock('../../db', () => ({ query: jest.fn(), pool: { connect: jest.fn() } }));
@@ -116,18 +116,18 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     const idB = (b as { collection: { id: number } }).collection.id;
 
     await createProblem({ id: 'f1', title: 'F One', author: 'x', categories: [], collection_id: idA, time_limit_ms: 1000, memory_limit_mb: 256 } as never);
-    let rows = (await getAdminProblems()).find((p) => p.id === 'f1');
+    let rows = (await getAdminProblemsPage()).problems.find((p: { id: string }) => p.id === 'f1');
     expect(rows?.collection_id).toBe(idA);
     expect(rows?.collection_name).toBe('F');
 
     // Reassign to another collection.
     await updateProblem('f1', { id: 'f1', collection_id: idB } as never);
-    rows = (await getAdminProblems()).find((p) => p.id === 'f1');
+    rows = (await getAdminProblemsPage()).problems.find((p: { id: string }) => p.id === 'f1');
     expect(rows?.collection_id).toBe(idB);
 
     // Clear back to no collection.
     await updateProblem('f1', { id: 'f1', collection_id: null } as never);
-    rows = (await getAdminProblems()).find((p) => p.id === 'f1');
+    rows = (await getAdminProblemsPage()).problems.find((p: { id: string }) => p.id === 'f1');
     expect(rows?.collection_id).toBeNull();
     expect(rows?.collection_name).toBeNull();
   });
@@ -137,7 +137,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     const id = (created as { collection: { id: number } }).collection.id;
     await createProblem({ id: 'h1', title: 'H One', author: 'x', categories: ['Math', 'Graph'], collection_id: id, time_limit_ms: 1000, memory_limit_mb: 256 } as never);
 
-    const row = (await getAdminProblems()).find((p) => p.id === 'h1');
+    const row = (await getAdminProblemsPage()).problems.find((p: { id: string }) => p.id === 'h1');
     expect([...(row?.categories ?? [])].sort()).toEqual(['Graph', 'Math']);
     expect(row?.collection_id).toBe(id);
   });

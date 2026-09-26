@@ -96,7 +96,26 @@ export interface BatchCreateUsersResponse extends ApiMessageResponse {
   users: BatchCreatedUser[];
 }
 
-export type AdminProblemsResponse = AdminProblem[];
+/** One page of the admin problem list (GET /admin/problems). */
+export interface AdminProblemsPageResponse {
+  problems: AdminProblem[];
+  /** Opaque token for the next page; null when this is the last page. */
+  nextCursor: string | null;
+  hasMore: boolean;
+  /** Distinct author filter options over the whole pool. */
+  authors: Array<{ name: string }>;
+  /** True when at least one problem has an empty/NULL author. */
+  hasUnauthoredProblems: boolean;
+}
+/** Filter surface for the admin problem list (server-side pagination). */
+export interface AdminProblemsQuery {
+  search?: string;
+  collection?: 'none' | 'all' | number;
+  visibility?: 'all' | 'visible' | 'hidden';
+  author?: 'none' | 'all' | string;
+  limit?: number;
+  cursor?: string | null;
+}
 export type AdminProblemDetailResponse = ProblemDetail;
 
 // --- Admin testcase viewer (GET /admin/problems/:id/testcases) -----------

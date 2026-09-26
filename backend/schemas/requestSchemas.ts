@@ -138,6 +138,22 @@ export const adminUsersQuerySchema = z.object({
     .default(ADMIN_USER_LIST_CONFIG.DEFAULT_LIMIT),
 }).strict();
 
+/**
+ * Admin problem list (GET /admin/problems): keyset pagination plus the
+ * filter-bar surface. `collection` accepts 'all' | 'none' | a numeric id;
+ * `visibility` accepts 'all' | 'visible' | 'hidden'; `author` accepts
+ * 'all' | 'none' | an exact author name. Everything is optional and
+ * defaults to the unfiltered first page.
+ */
+export const adminProblemsQuerySchema = z.object({
+  search: z.string().trim().max(STRING_LIMITS.TITLE).optional(),
+  collection: z.union([z.literal('all'), z.literal('none'), z.coerce.number().int().positive()]).optional(),
+  visibility: z.enum(['all', 'visible', 'hidden']).optional(),
+  author: z.string().trim().max(STRING_LIMITS.AUTHOR).optional(),
+  limit: z.coerce.number().int().min(1).max(PROBLEM_LIST_CONFIG.MAX_LIMIT).optional(),
+  cursor: z.string().min(1).max(2048).optional(),
+}).strict();
+
 export const batchCreateUsersSchema = z.object({
   prefix: nonEmptyString.max(STRING_LIMITS.PREFIX),
   count: z.number().int().min(1).max(USER_VALIDATION.BATCH_MAX_COUNT),

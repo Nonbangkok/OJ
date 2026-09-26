@@ -17,28 +17,33 @@ describe('useProblemCrud', () => {
         });
     });
 
-    const mockProblems = [
-        { id: 'PROB1', title: 'Problem 1', author: 'admin', is_visible: true },
-    ];
+    const mockPage = {
+        problems: [{ id: 'PROB1', title: 'Problem 1', author: 'admin', is_visible: true }],
+        nextCursor: null,
+        hasMore: false,
+        authors: [{ name: 'admin' }],
+        hasUnauthoredProblems: false,
+    };
+    const mockProblems = mockPage.problems;
 
     it('fetches problems on mount', async () => {
-        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(mockProblems);
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(mockPage);
 
-        const { result } = renderHook(() => useProblemCrud());
+        const { result } = renderHook(() => useProblemCrud({ query: {} }));
 
         await waitFor(() => expect(result.current.loading).toBe(false));
         expect(result.current.problems).toEqual(mockProblems);
     });
 
     it('stops upload-progress polling when the job completes', async () => {
-        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(mockProblems);
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(mockPage);
         (jest.mocked(adminService.createProblem) as jest.Mock).mockResolvedValueOnce({ id: 'NEW1' });
         (jest.mocked(adminService.uploadFiles) as jest.Mock).mockResolvedValueOnce({ jobId: 'job-1' });
         (jest.mocked(adminService.getUploadProgress) as jest.Mock)
             .mockResolvedValueOnce({ status: 'uploading', message: 'Working...' })
             .mockResolvedValueOnce({ status: 'completed', message: 'Done' });
 
-        const { result } = renderHook(() => useProblemCrud());
+        const { result } = renderHook(() => useProblemCrud({ query: {} }));
 
         await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -71,12 +76,12 @@ describe('useProblemCrud', () => {
     });
 
     it('stops polling after the max-duration ceiling even if the job never finishes', async () => {
-        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(mockProblems);
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(mockPage);
         (jest.mocked(adminService.createProblem) as jest.Mock).mockResolvedValueOnce({ id: 'NEW1' });
         (jest.mocked(adminService.uploadFiles) as jest.Mock).mockResolvedValueOnce({ jobId: 'job-2' });
         (jest.mocked(adminService.getUploadProgress) as jest.Mock).mockResolvedValue({ status: 'uploading', message: 'Stuck...' });
 
-        const { result } = renderHook(() => useProblemCrud());
+        const { result } = renderHook(() => useProblemCrud({ query: {} }));
 
         await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -110,12 +115,12 @@ describe('useProblemCrud', () => {
     });
 
     it('stops polling and never setStates after unmount', async () => {
-        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(mockProblems);
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(mockPage);
         (jest.mocked(adminService.createProblem) as jest.Mock).mockResolvedValueOnce({ id: 'NEW1' });
         (jest.mocked(adminService.uploadFiles) as jest.Mock).mockResolvedValueOnce({ jobId: 'job-3' });
         (jest.mocked(adminService.getUploadProgress) as jest.Mock).mockResolvedValue({ status: 'uploading', message: 'Working...' });
 
-        const { result, unmount } = renderHook(() => useProblemCrud());
+        const { result, unmount } = renderHook(() => useProblemCrud({ query: {} }));
 
         await waitFor(() => expect(result.current.loading).toBe(false));
 

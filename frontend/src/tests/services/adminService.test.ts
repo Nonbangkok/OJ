@@ -69,10 +69,40 @@ describe('adminService', () => {
     });
 
     describe('Problem Management', () => {
-        it('getProblems calls api.get with correct path', async () => {
+        it('getProblems calls api.get with the paged admin problems path', async () => {
             jest.mocked(api.get).mockResolvedValueOnce({ data: [] });
             await adminService.getProblems();
-            expect(api.get).toHaveBeenCalledWith('/admin/problems');
+            expect(api.get).toHaveBeenCalledWith('/admin/problems', { params: {} });
+        });
+
+        it('getProblems forwards filter, cursor and limit as query params', async () => {
+            const mockData = {
+                problems: [],
+                nextCursor: 'cursor-2',
+                hasMore: true,
+                authors: [],
+                hasUnauthoredProblems: false,
+            };
+            jest.mocked(api.get).mockResolvedValueOnce({ data: mockData });
+            const result = await adminService.getProblems({
+                search: 'dp',
+                visibility: 'hidden',
+                author: 'Alice',
+                collection: 3,
+                limit: 25,
+                cursor: 'cursor-1',
+            });
+            expect(api.get).toHaveBeenCalledWith('/admin/problems', {
+                params: {
+                    search: 'dp',
+                    visibility: 'hidden',
+                    author: 'Alice',
+                    collection: 3,
+                    limit: 25,
+                    cursor: 'cursor-1',
+                },
+            });
+            expect(result).toEqual(mockData);
         });
 
         it('updateProblemVisibility calls api.put with correct body', async () => {

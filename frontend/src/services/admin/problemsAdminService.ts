@@ -3,7 +3,8 @@ import api, { getLargeUploadBaseUrl, largeUploadApi } from '../api';
 
 import type {
   AdminProblemDetailResponse,
-  AdminProblemsResponse,
+  AdminProblemsPageResponse,
+  AdminProblemsQuery,
   ApiMessageResponse,
   BatchUploadStartResponse,
   ProblemMutationResponse,
@@ -29,8 +30,15 @@ export interface CollectionWithStats {
 }
 
 const problemsAdminService = {
-  getProblems: async (): Promise<AdminProblemsResponse> => {
-    const response = await api.get<AdminProblemsResponse>('/admin/problems');
+  /**
+   * One page of the admin problem list. Filters, ordering and keyset
+   * pagination all run server-side; the returned cursor feeds the next
+   * call ("Show More").
+   */
+  getProblems: async (query: AdminProblemsQuery = {}): Promise<AdminProblemsPageResponse> => {
+    const response = await api.get<AdminProblemsPageResponse>('/admin/problems', {
+      params: query,
+    });
     return response.data;
   },
 
