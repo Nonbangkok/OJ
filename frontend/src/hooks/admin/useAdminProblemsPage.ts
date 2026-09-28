@@ -33,6 +33,11 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
   /** Distinct author filter options over the whole pool (server-provided). */
   const [authors, setAuthors] = useState<Array<{ name: string }>>([]);
   const [hasUnauthoredProblems, setHasUnauthoredProblems] = useState(false);
+  const [bulkEligibleCount, setBulkEligibleCount] = useState(0);
+  // Identifies the filter scope for which the count/page response is current.
+  // Consumers with scope-wide actions must not use a stale count while a new
+  // query is waiting to fetch (or has failed).
+  const [loadedQueryKey, setLoadedQueryKey] = useState<string | null>(null);
   // Monotonic request id: two fetches started in the same millisecond must
   // not collide the way Date.now() did, or a stale response could win.
   const lastRequestIdRef = useRef(0);
@@ -63,6 +68,8 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
         setHasMore(page.hasMore);
         setAuthors(page.authors);
         setHasUnauthoredProblems(page.hasUnauthoredProblems);
+        setBulkEligibleCount(page.bulkEligibleCount);
+        setLoadedQueryKey(JSON.stringify(requestQuery));
         nextCursorRef.current = page.nextCursor;
         loadedCountRef.current = page.problems.length;
       })
@@ -73,6 +80,8 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
         setHasMore(false);
         setAuthors([]);
         setHasUnauthoredProblems(false);
+        setBulkEligibleCount(0);
+        setLoadedQueryKey(null);
         nextCursorRef.current = null;
         loadedCountRef.current = 0;
       })
@@ -119,6 +128,8 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
         setHasMore(page.hasMore);
         setAuthors(page.authors);
         setHasUnauthoredProblems(page.hasUnauthoredProblems);
+        setBulkEligibleCount(page.bulkEligibleCount);
+        setLoadedQueryKey(JSON.stringify(requestQuery));
         nextCursorRef.current = page.nextCursor;
       })
       .catch(() => {
@@ -179,6 +190,7 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
         setHasMore(page.hasMore);
         setAuthors(page.authors);
         setHasUnauthoredProblems(page.hasUnauthoredProblems);
+        setBulkEligibleCount(page.bulkEligibleCount);
         nextCursorRef.current = page.nextCursor;
         loadedCountRef.current = page.problems.length;
       })
@@ -191,6 +203,12 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
       });
   }, []);
 
+  /** Reset cursor and loaded span after a filter-wide mutation. */
+  const refreshFirstPage = useCallback(() => {
+    loadedCountRef.current = 0;
+    fetchFirstPage(loadedQueryRef.current);
+  }, [fetchFirstPage]);
+
   return {
     problems,
     loading,
@@ -200,8 +218,11 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
     hasMore,
     authors,
     hasUnauthoredProblems,
+    bulkEligibleCount,
+    loadedQueryKey,
     loadMore,
     refresh,
+    refreshFirstPage,
   };
 };
 

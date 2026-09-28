@@ -417,8 +417,8 @@ export const deleteProblem = async (problemId: string): Promise<boolean> => {
   });
 };
 
-/** Full query surface of the paginated admin problem list. */
-export interface AdminProblemListOptions {
+/** Filters shared by the paginated admin list, eligible count, and bulk actions. */
+export interface AdminProblemFilters {
   /** Substring match on problem id or title (ILIKE, server-side). */
   search?: string;
   /** Numeric collection id, the literal 'none' (no collection), or 'all'. */
@@ -427,6 +427,10 @@ export interface AdminProblemListOptions {
   visibility?: 'all' | 'visible' | 'hidden';
   /** Exact author match after trim, or 'none' (empty/NULL author), or 'all'. */
   author?: 'none' | 'all' | string;
+}
+
+/** Full query surface of the paginated admin problem list. */
+export interface AdminProblemListOptions extends AdminProblemFilters {
   /** Page size (1..MAX_LIMIT); defaults to ADMIN_PROBLEM_LIST_CONFIG.DEFAULT_LIMIT. */
   limit?: number;
   /** Opaque next-page token from a previous response. */
@@ -448,6 +452,8 @@ export interface AdminProblemsPage {
   authors: AdminProblemListAuthor[];
   /** True when at least one problem has an empty/NULL author. */
   hasUnauthoredProblems: boolean;
+  /** All matching standalone problems, independent of cursor/page size. */
+  bulkEligibleCount: number;
 }
 
 /** Author filter option: the trimmed author name ('' = "No author"). */
@@ -474,24 +480,12 @@ const decodeAdminCursor = (raw: string): string => {
 };
 
 /**
- * One keyset-paginated page of the admin problem list. Rows are ordered by
- * id ASC (unique, so the order is total and pages can never overlap or
- * skip); filters all run in SQL BEFORE the LIMIT, so pagination composes
- * with the filter bar. `limit + 1` rows are fetched so hasMore/nextCursor
- * come from the presence of an extra row — the same contract as the public
- * list.
+ * Canonical filter predicates for the admin table and filter-wide actions.
+ * Keep pagination cursor and limit out of this builder so all-matching
+ * operations always use the entire matching set.
  */
-export const getAdminProblemsPage = async (
-  options: AdminProblemListOptions = {},
-): Promise<AdminProblemsPage> => {
-  const limit = options.limit ?? ADMIN_PROBLEM_LIST_CONFIG.DEFAULT_LIMIT;
-  if (!Number.isInteger(limit) || limit < 1 || limit > ADMIN_PROBLEM_LIST_CONFIG.MAX_LIMIT) {
-    throw new AppError(`limit must be an integer between 1 and ${ADMIN_PROBLEM_LIST_CONFIG.MAX_LIMIT}`, 400);
-  }
-  const afterId = options.cursor !== undefined ? decodeAdminCursor(options.cursor) : null;
-
+const buildAdminProblemFilter = (options: AdminProblemFilters, params: unknown[]): string[] => {
   const filters: string[] = [];
-  const params: unknown[] = [];
   if (options.search !== undefined && options.search !== '') {
     params.push(`%${escapeLikePattern(options.search)}%`);
     filters.push(`(p.id ILIKE $${params.length} OR p.title ILIKE $${params.length})`);
@@ -508,11 +502,33 @@ export const getAdminProblemsPage = async (
     filters.push('p.is_visible = false');
   }
   if (options.author === 'none') {
-    filters.push(`(p.author IS NULL OR btrim(p.author) = '')`);
+    filters.push('(p.author IS NULL OR btrim(p.author) = \'\')');
   } else if (typeof options.author === 'string' && options.author !== 'all') {
     params.push(options.author);
     filters.push(`btrim(p.author) = $${params.length}`);
   }
+  return filters;
+};
+
+/**
+ * One keyset-paginated page of the admin problem list. Rows are ordered by
+ * id ASC (unique, so the order is total and pages can never overlap or
+ * skip); filters all run in SQL BEFORE the LIMIT, so pagination composes
+ * with the filter bar. `limit + 1` rows are fetched so hasMore/nextCursor
+ * come from the presence of an extra row — the same contract as the public
+ * list.
+ */
+export const getAdminProblemsPage = async (
+  options: AdminProblemListOptions = {},
+): Promise<AdminProblemsPage> => {
+  const limit = options.limit ?? ADMIN_PROBLEM_LIST_CONFIG.DEFAULT_LIMIT;
+  if (!Number.isInteger(limit) || limit < 1 || limit > ADMIN_PROBLEM_LIST_CONFIG.MAX_LIMIT) {
+    throw new AppError(`limit must be an integer between 1 and ${ADMIN_PROBLEM_LIST_CONFIG.MAX_LIMIT}`, 400);
+  }
+  const afterId = options.cursor !== undefined ? decodeAdminCursor(options.cursor) : null;
+
+  const params: unknown[] = [];
+  const filters = buildAdminProblemFilter(options, params);
   if (afterId !== null) {
     params.push(afterId);
     filters.push(`p.id > $${params.length}`);
@@ -548,6 +564,15 @@ export const getAdminProblemsPage = async (
   const unauthoredResult = await db.query<{ exists: boolean }>(
     `SELECT EXISTS (SELECT 1 FROM problems p WHERE p.author IS NULL OR btrim(p.author) = '') AS exists`
   );
+  // Confirmation count matches the exact all-matching bulk eligibility rule.
+  // Contest-attached problems remain visible in the table but are excluded
+  // from bulk visibility operations by product policy.
+  const countParams: unknown[] = [];
+  const countFilters = [...buildAdminProblemFilter(options, countParams), 'p.contest_id IS NULL'];
+  const countResult = await db.query<{ count: string | number }>(
+    `SELECT COUNT(*) AS count FROM problems p WHERE ${countFilters.join(' AND ')}`,
+    countParams,
+  );
 
   return {
     problems,
@@ -557,7 +582,22 @@ export const getAdminProblemsPage = async (
       : null,
     authors: authorAggregate.rows.map(row => ({ name: row.name })),
     hasUnauthoredProblems: unauthoredResult.rows[0]?.exists === true,
+    bulkEligibleCount: Number(countResult.rows[0]?.count ?? 0),
   };
+};
+
+/** One server-side UPDATE for every standalone problem matching the admin filters. */
+export const updateAdminProblemsVisibility = async (
+  filters: AdminProblemFilters,
+  isVisible: boolean,
+): Promise<{ updatedCount: number }> => {
+  const params: unknown[] = [isVisible];
+  const predicates = [...buildAdminProblemFilter(filters, params), 'p.contest_id IS NULL'];
+  const result = await db.query(
+    `UPDATE problems AS p SET is_visible = $1 WHERE ${predicates.join(' AND ')}`,
+    params,
+  );
+  return { updatedCount: result.rowCount ?? 0 };
 };
 
 export const updateProblemVisibility = async (
@@ -639,7 +679,11 @@ export const replaceProblemTestcasesFromZip = async (
 
 export const getProblemExportBundle = async (problemId: string): Promise<ProblemExportBundle | null> => {
   const problemResult = await db.query<ProblemExportBundle['problem']>(
-    'SELECT id, title, author, time_limit_ms, memory_limit_mb, problem_pdf FROM problems WHERE id = $1',
+    `SELECT p.id, p.title, p.author, p.time_limit_ms, p.memory_limit_mb, p.problem_pdf,
+            p.categories, p.difficulty, col.name AS collection_name
+     FROM problems p
+     LEFT JOIN collections col ON col.id = p.collection_id
+     WHERE p.id = $1`,
     [problemId]
   );
 

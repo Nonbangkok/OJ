@@ -14,6 +14,7 @@ const firstPage = {
   hasMore: true,
   authors: [{ name: 'admin' }],
   hasUnauthoredProblems: false,
+  bulkEligibleCount: 100,
 };
 
 describe('useAdminProblemsPage', () => {
@@ -44,6 +45,7 @@ describe('useAdminProblemsPage', () => {
             hasMore: false,
             authors: [{ name: 'admin' }],
             hasUnauthoredProblems: false,
+            bulkEligibleCount: 100,
         };
         (jest.mocked(adminService.getProblems) as jest.Mock)
             .mockResolvedValueOnce(firstPage)
@@ -81,7 +83,7 @@ describe('useAdminProblemsPage', () => {
         expect(adminService.getProblems).toHaveBeenCalledTimes(2);
 
         await act(async () => {
-            resolveSecond({ problems: [makeRow('p25')], nextCursor: null, hasMore: false, authors: [], hasUnauthoredProblems: false });
+            resolveSecond({ problems: [makeRow('p25')], nextCursor: null, hasMore: false, authors: [], hasUnauthoredProblems: false, bulkEligibleCount: 100 });
             await pendingSecond;
         });
         await waitFor(() => expect(result.current.problems).toHaveLength(26));
@@ -94,6 +96,7 @@ describe('useAdminProblemsPage', () => {
             hasMore: false,
             authors: [{ name: 'admin' }],
             hasUnauthoredProblems: false,
+            bulkEligibleCount: 5,
         };
         (jest.mocked(adminService.getProblems) as jest.Mock)
             .mockResolvedValueOnce(firstPage)
@@ -118,7 +121,7 @@ describe('useAdminProblemsPage', () => {
         const oldQuery = new Promise(resolve => { resolveOld = resolve; });
         (jest.mocked(adminService.getProblems) as jest.Mock)
             .mockReturnValueOnce(oldQuery) // slow first query
-            .mockResolvedValueOnce({ problems: [makeRow('new-1')], nextCursor: null, hasMore: false, authors: [], hasUnauthoredProblems: false });
+            .mockResolvedValueOnce({ problems: [makeRow('new-1')], nextCursor: null, hasMore: false, authors: [], hasUnauthoredProblems: false, bulkEligibleCount: 1 });
 
         const { result, rerender } = renderHook(
             ({ query }: { query: { search?: string } }) => useAdminProblemsPage(query),
@@ -130,7 +133,7 @@ describe('useAdminProblemsPage', () => {
 
         // The slow earlier response arrives late — it must be discarded.
         await act(async () => {
-            resolveOld({ problems: [makeRow('stale-1')], nextCursor: null, hasMore: false, authors: [], hasUnauthoredProblems: false });
+            resolveOld({ problems: [makeRow('stale-1')], nextCursor: null, hasMore: false, authors: [], hasUnauthoredProblems: false, bulkEligibleCount: 1 });
             await oldQuery;
         });
         expect(result.current.problems.map(p => p.id)).toEqual(['new-1']);
@@ -140,7 +143,7 @@ describe('useAdminProblemsPage', () => {
         (jest.mocked(adminService.getProblems) as jest.Mock)
             .mockResolvedValueOnce(firstPage)
             .mockRejectedValueOnce(new Error('network down'))
-            .mockResolvedValueOnce({ problems: [makeRow('p25')], nextCursor: null, hasMore: false, authors: [], hasUnauthoredProblems: false });
+            .mockResolvedValueOnce({ problems: [makeRow('p25')], nextCursor: null, hasMore: false, authors: [], hasUnauthoredProblems: false, bulkEligibleCount: 100 });
 
         const { result } = renderHook(() => useAdminProblemsPage({}));
         await waitFor(() => expect(result.current.loading).toBe(false));

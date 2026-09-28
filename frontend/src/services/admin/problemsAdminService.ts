@@ -90,6 +90,14 @@ const problemsAdminService = {
     return response.data;
   },
 
+  setProblemsVisibility: async (
+    filters: Omit<AdminProblemsQuery, 'limit' | 'cursor'>,
+    isVisible: boolean,
+  ): Promise<{ updatedCount: number }> => {
+    const response = await api.patch<{ updatedCount: number }>('/admin/problems/visibility', { isVisible, filters });
+    return response.data;
+  },
+
   exportProblems: async (problemIds: Array<string | number>): Promise<AxiosResponse<Blob>> => {
     return api.post<Blob>('/admin/problems/export', { problemIds }, { responseType: 'blob' });
   },
@@ -147,4 +155,3 @@ const problemsAdminService = {
 };
 
 export default problemsAdminService;
-

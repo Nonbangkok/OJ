@@ -67,6 +67,8 @@ const useProblemManagement = (query: AdminProblemsQuery) => {
     hasMore: crud.hasMore,
     authors: crud.authors,
     hasUnauthoredProblems: crud.hasUnauthoredProblems,
+    bulkEligibleCount: crud.bulkEligibleCount,
+    loadedQueryKey: crud.loadedQueryKey,
     loadMore: crud.loadMore,
     isModalOpen: crud.isModalOpen,
     setIsModalOpen: crud.setIsModalOpen,

@@ -5,10 +5,19 @@ import path from 'path';
 import archiver from 'archiver';
 import pg, { PoolClient } from 'pg';
 import * as db from '../../db';
+import express from 'express';
+import request from 'supertest';
+import unzipper from 'unzipper';
+import problemRoutes from '../../controllers/problemController';
+import { errorHandler } from '../../middleware/errorHandler';
 import { runMigrationsFromPool } from '../../scripts/migrate';
 import { processBatchUpload } from '../../services/batchUploadService';
 
 jest.unmock('pg');
+jest.mock('../../middleware/auth', () => ({
+  requireAuth: (_req: unknown, _res: unknown, next: () => void) => next(),
+  requireStaffOrAdmin: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
 
 // The service's transaction path must land on the integration pool, not on
 // db.ts's real pool (which has no DATABASE_URL in tests). The pool reference
@@ -63,6 +72,10 @@ type CollectionRow = { id: number; name: string };
     options: `-c search_path=${schema}`,
     application_name: schema,
   });
+  const exportApp = express();
+  exportApp.use(express.json());
+  exportApp.use(problemRoutes);
+  exportApp.use(errorHandler);
 
   beforeAll(async () => {
     poolRef.current = pool;
@@ -121,6 +134,33 @@ type CollectionRow = { id: number; name: string };
     author: 'Nonbangkok',
     time_limit_ms: 1000,
     memory_limit_mb: 256,
+  };
+
+  const exportZip = async (problemIds: string[]): Promise<Buffer> => {
+    const response = await request(exportApp)
+      .post('/admin/problems/export')
+      .send({ problemIds })
+      .buffer(true)
+      .parse((incoming, callback) => {
+        const chunks: Buffer[] = [];
+        incoming.on('data', chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+        incoming.on('end', () => callback(null, Buffer.concat(chunks)));
+      });
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('application/zip');
+    return response.body as Buffer;
+  };
+
+  const readExportedConfigs = async (zip: Buffer): Promise<Record<string, Record<string, unknown>>> => {
+    const directory = await unzipper.Open.buffer(zip);
+    const configs: Record<string, Record<string, unknown>> = {};
+    for (const entry of directory.files) {
+      if (entry.path.endsWith('/config.json')) {
+        const config = JSON.parse((await entry.buffer()).toString('utf8')) as Record<string, unknown>;
+        configs[String(config.id)] = config;
+      }
+    }
+    return configs;
   };
 
   beforeEach(async () => {
@@ -188,6 +228,62 @@ type CollectionRow = { id: number; name: string };
     expect(collections[0].name).toBe('Chapter 1');
     expect(treeDp?.collection_id).toBe(collections[0].id);
     expect(bs?.collection_id).toBe(collections[0].id);
+  });
+
+  it('exports selected problems with portable metadata and round-trips the exported ZIP through import', async () => {
+    const sourceZip = await makeZip({
+      'SourceA/config.json': configJson({
+        ...baseConfig, id: 'roundtrip-a', title: 'Round Trip A',
+        categories: ['Graph', 'Tree'], difficulty: 1800, collection: 'Classical Problems',
+      }),
+      'SourceB/config.json': configJson({
+        ...baseConfig, id: 'roundtrip-b', title: 'Round Trip B',
+        categories: [], difficulty: null, collection: null,
+      }),
+    });
+    expect((await processBatchUpload(sourceZip)).errors).toEqual([]);
+
+    const multiExport = await exportZip(['roundtrip-a', 'roundtrip-b']);
+    const configs = await readExportedConfigs(multiExport);
+    expect(Object.keys(configs).sort()).toEqual(['roundtrip-a', 'roundtrip-b']);
+    expect(configs['roundtrip-a']).toEqual({
+      id: 'roundtrip-a', title: 'Round Trip A', author: 'Nonbangkok',
+      time_limit_ms: 1000, memory_limit_mb: 256,
+      categories: ['Graph', 'Tree'], difficulty: 1800, collection: 'Classical Problems',
+    });
+    expect(configs['roundtrip-b']).toEqual({
+      id: 'roundtrip-b', title: 'Round Trip B', author: 'Nonbangkok',
+      time_limit_ms: 1000, memory_limit_mb: 256,
+      categories: [], difficulty: null, collection: null,
+    });
+    for (const config of Object.values(configs)) {
+      expect(Array.isArray(config.categories)).toBe(true);
+      expect(config.difficulty === null || typeof config.difficulty === 'number').toBe(true);
+      expect(config.collection === null || typeof config.collection === 'string').toBe(true);
+      expect(config).not.toHaveProperty('collection_id');
+      expect(config).not.toHaveProperty('problem_pdf');
+    }
+
+    const singleExport = await exportZip(['roundtrip-a']);
+    expect(await readExportedConfigs(singleExport)).toMatchObject({
+      'roundtrip-a': { categories: ['Graph', 'Tree'], difficulty: 1800, collection: 'Classical Problems' },
+    });
+
+    await pool.query('TRUNCATE problems, collections CASCADE');
+    const exportPath = path.join(workDir, 'export-roundtrip.zip');
+    await realFs.writeFile(exportPath, multiExport);
+    const results = await processBatchUpload(exportPath);
+    expect(results.added).toEqual(['roundtrip-a', 'roundtrip-b']);
+    expect(results.errors).toEqual([]);
+    expect(await fetchProblem('roundtrip-a')).toMatchObject({
+      categories: ['Graph', 'Tree'], difficulty: 1800,
+    });
+    expect(await fetchProblem('roundtrip-b')).toMatchObject({
+      categories: [], difficulty: null, collection_id: null,
+    });
+    const collections = await fetchCollections();
+    expect(collections.map(collection => collection.name)).toEqual(['Classical Problems']);
+    expect((await fetchProblem('roundtrip-a'))?.collection_id).toBe(collections[0].id);
   });
 
   it('reuses an existing collection instead of duplicating it', async () => {

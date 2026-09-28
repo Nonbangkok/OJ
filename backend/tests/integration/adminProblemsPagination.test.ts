@@ -8,7 +8,7 @@ import problemRoutes from '../../controllers/problemController';
 import { errorHandler } from '../../middleware/errorHandler';
 import { attachRequestUser } from '../../middleware/requestContext';
 import { runMigrationsFromPool } from '../../scripts/migrate';
-import { getAdminProblemsPage } from '../../services/problemQueryService';
+import { getAdminProblemsPage, updateAdminProblemsVisibility } from '../../services/problemQueryService';
 import type { AdminProblemsPage } from '../../services/problemQueryService';
 
 jest.unmock('pg');
@@ -116,6 +116,91 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     });
   });
 
+  describe('filter-wide visibility scope', () => {
+    it('updates all eligible matches independently of loaded pages and excludes contest-attached problems', async () => {
+      await insertContest();
+      for (let i = 0; i < 100; i++) await insertProblem(`p${String(i).padStart(3, '0')}`);
+      await insertProblem('contest-p', { contest: true });
+
+      const first = await getAdminProblemsPage({ limit: 20 });
+      expect(first.problems).toHaveLength(20);
+      expect(first.hasMore).toBe(true);
+      expect(first.bulkEligibleCount).toBe(100);
+      // Loading another page must not affect the server-side action scope.
+      await getAdminProblemsPage({ limit: 20, cursor: first.nextCursor! });
+
+      expect(await updateAdminProblemsVisibility({}, false)).toEqual({ updatedCount: 100 });
+      const state = await pool.query<{ is_visible: boolean; contest_id: number | null }>(
+        'SELECT is_visible, contest_id FROM problems',
+      );
+      expect(state.rows.filter(row => row.contest_id === null && !row.is_visible)).toHaveLength(100);
+      expect(state.rows.find(row => row.contest_id !== null)?.is_visible).toBe(true);
+    });
+
+    it('search scope changes exactly matching rows across pages', async () => {
+      for (let i = 0; i < 100; i++) await insertProblem(`all-${String(i).padStart(3, '0')}`, {
+        title: i < 30 ? `01_Expr ${i}` : `Other ${i}`,
+      });
+      const first = await getAdminProblemsPage({ limit: 20, search: '01_Expr' });
+      expect(first.problems).toHaveLength(20);
+      expect(first.bulkEligibleCount).toBe(30);
+      expect(await updateAdminProblemsVisibility({ search: '01_Expr' }, false)).toEqual({ updatedCount: 30 });
+      const hidden = await pool.query<{ id: string }>('SELECT id FROM problems WHERE is_visible = false');
+      expect(hidden.rows).toHaveLength(30);
+      expect(hidden.rows.every(row => row.id.startsWith('all-'))).toBe(true);
+    });
+
+    it('collection-only and author-only scopes leave other groups unchanged', async () => {
+      const cedt = await insertCollection('CEDT');
+      const other = await insertCollection('Other');
+      const cedtId = (cedt.rows[0] as { id: number }).id;
+      const otherId = (other.rows[0] as { id: number }).id;
+      for (const [id, collection, author] of [
+        ['cedt-a', cedtId, 'Alice'], ['cedt-b', cedtId, 'Bob'],
+        ['other-a', otherId, 'Alice'], ['other-b', otherId, 'Carol'],
+      ] as const) await insertProblem(id, { collection, author, visible: false });
+
+      expect((await getAdminProblemsPage({ collection: cedtId, limit: 1 })).bulkEligibleCount).toBe(2);
+      expect(await updateAdminProblemsVisibility({ collection: cedtId }, true)).toEqual({ updatedCount: 2 });
+      let states = await pool.query<{ id: string; is_visible: boolean }>('SELECT id, is_visible FROM problems ORDER BY id');
+      expect(states.rows.map(row => row.is_visible)).toEqual([true, true, false, false]);
+      expect(await updateAdminProblemsVisibility({ author: 'Alice' }, false)).toEqual({ updatedCount: 2 });
+      states = await pool.query<{ id: string; is_visible: boolean }>('SELECT id, is_visible FROM problems ORDER BY id');
+      expect(states.rows).toEqual([
+        { id: 'cedt-a', is_visible: false },
+        { id: 'cedt-b', is_visible: true },
+        { id: 'other-a', is_visible: false },
+        { id: 'other-b', is_visible: false },
+      ]);
+    });
+
+    it('composes collection, author, and other filters and preserves the pre-update visibility scope', async () => {
+      const cedt = await insertCollection('CEDT');
+      const other = await insertCollection('Other');
+      const cedtId = (cedt.rows[0] as { id: number }).id;
+      const otherId = (other.rows[0] as { id: number }).id;
+      await insertProblem('cedt-alice-hidden', { collection: cedtId, author: 'Alice', visible: false, title: 'Graph match' });
+      await insertProblem('cedt-alice-visible', { collection: cedtId, author: 'Alice', visible: true, title: 'Graph match' });
+      await insertProblem('cedt-bob-hidden', { collection: cedtId, author: 'Bob', visible: false, title: 'Graph match' });
+      await insertProblem('other-alice-hidden', { collection: otherId, author: 'Alice', visible: false, title: 'Graph match' });
+
+      const filters = { search: 'Graph', collection: cedtId, author: 'Alice', visibility: 'hidden' as const };
+      const page = await getAdminProblemsPage({ ...filters, limit: 1 });
+      expect(page.bulkEligibleCount).toBe(1);
+      expect(await updateAdminProblemsVisibility(filters, true)).toEqual({ updatedCount: 1 });
+      const refreshedHidden = await getAdminProblemsPage({ ...filters, limit: 10 });
+      expect(refreshedHidden.problems).toEqual([]);
+
+      const states = await pool.query<{ id: string; is_visible: boolean }>('SELECT id, is_visible FROM problems ORDER BY id');
+      expect(states.rows).toEqual([
+        { id: 'cedt-alice-hidden', is_visible: true },
+        { id: 'cedt-alice-visible', is_visible: true },
+        { id: 'cedt-bob-hidden', is_visible: false },
+        { id: 'other-alice-hidden', is_visible: false },
+      ]);
+    });
+  });
+
   describe('filters compose before pagination', () => {
     beforeEach(async () => {
       const collection = await insertCollection('Chapter 1');
@@ -189,10 +274,10 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
       for (let i = 0; i < 25; i++) await insertProblem(`h${String(i).padStart(2, '0')}`);
     });
 
-    it('returns the { problems, nextCursor, hasMore, authors, hasUnauthoredProblems } envelope', async () => {
+    it('returns the paginated results plus the eligible filtered count', async () => {
       const res = await request(app).get('/admin/problems?limit=10').set('x-test-role', 'admin');
       expect(res.status).toBe(200);
-      expect(res.body).toMatchObject({ hasMore: true, nextCursor: expect.any(String), hasUnauthoredProblems: false });
+      expect(res.body).toMatchObject({ hasMore: true, nextCursor: expect.any(String), hasUnauthoredProblems: false, bulkEligibleCount: 25 });
       expect(res.body.problems).toHaveLength(10);
       expect(res.body.problems[0]).toMatchObject({ id: 'h00', title: 'h00', author: 'A' });
       expect(res.body.authors).toEqual([{ name: 'A' }]);

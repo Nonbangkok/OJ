@@ -128,9 +128,6 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
     setSelectedSubmission(null);
   };
 
-  if (error) return <p className={styles.error}>{error}</p>;
-  if (loading && submissions.length === 0) return <p className={styles.loading}>Loading submissions…</p>;
-
   return (
     <div className={styles.container}>
       <div className={styles.filters} role="group" aria-label="Submission filters">
@@ -210,6 +207,9 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
         </button>
       </div>
 
+      {error && <p className={styles.error} role="alert">{error}</p>}
+      {loading && <p className={styles.loading} role="status">Loading submissions…</p>}
+
       <div className={styles['table-card']}>
         <div className={styles['table-scroll']}>
           <table>
@@ -264,7 +264,7 @@ const SubmissionsTab = ({ onSelectUser, onSelectProblem }: SubmissionsTabProps) 
                   </td>
                 </tr>
               ))}
-              {submissions.length === 0 && (
+            {submissions.length === 0 && !loading && !error && (
                 <tr><td colSpan={8} className={styles.empty}>No submissions match these filters.</td></tr>
               )}
             </tbody>

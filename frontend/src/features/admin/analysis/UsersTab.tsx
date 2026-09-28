@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AnalyticsUserRow,
   exportAnalyticsCsv,
@@ -10,6 +10,7 @@ import {
 } from '../../../services/analyticsService';
 import SortableHeader from './components/SortableHeader';
 import styles from './UsersTab.module.css';
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 
 const PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -31,12 +32,12 @@ const UsersTab = ({ onSelectUser, onCompareUsers }: UsersTabProps) => {
   const [compareSelection, setCompareSelection] = useState<number[]>([]);
   const [users, setUsers] = useState<AnalyticsUserRow[]>([]);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
   const [offset, setOffset] = useState(0);
   const [sortBy, setSortBy] = useState<UserSortKey>('submissions');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,7 +56,7 @@ const UsersTab = ({ onSelectUser, onCompareUsers }: UsersTabProps) => {
       setError(null);
       try {
         const result = await fetchAnalyticsUsers({
-          search: search || undefined,
+          search: debouncedSearch || undefined,
           limit: PAGE_SIZE,
           offset,
           sortBy,
@@ -71,7 +72,7 @@ const UsersTab = ({ onSelectUser, onCompareUsers }: UsersTabProps) => {
 
     void load();
     return () => { cancelled = true; };
-  }, [search, offset, sortBy, sortDir]);
+  }, [debouncedSearch, offset, sortBy, sortDir]);
 
   const toggleCompare = (userId: number): void => {
     setCompareSelection((current) => {
@@ -85,11 +86,8 @@ const UsersTab = ({ onSelectUser, onCompareUsers }: UsersTabProps) => {
 
   // Debounce typing so we do not fire a request per keystroke.
   const handleSearchChange = (value: string) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setOffset(0);
-      setSearch(value);
-    }, SEARCH_DEBOUNCE_MS);
+    setOffset(0);
+    setSearch(value);
   };
 
   const handleSort = (column: string) => {
@@ -103,9 +101,6 @@ const UsersTab = ({ onSelectUser, onCompareUsers }: UsersTabProps) => {
     }
   };
 
-  if (error) return <p className={styles.error}>{error}</p>;
-  if (loading && users.length === 0) return <p className={styles.loading}>Loading users…</p>;
-
   return (
     <div className={styles.container}>
       <div className={styles['toolbar-row']}>
@@ -114,6 +109,7 @@ const UsersTab = ({ onSelectUser, onCompareUsers }: UsersTabProps) => {
           className={styles.search}
           placeholder="Search users…"
           aria-label="Search users"
+          value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
         />
         <button
@@ -133,6 +129,9 @@ const UsersTab = ({ onSelectUser, onCompareUsers }: UsersTabProps) => {
           </button>
         )}
       </div>
+
+      {error && <p className={styles.error} role="alert">{error}</p>}
+      {loading && <p className={styles.loading} role="status">Loading users…</p>}
 
       {retention && (
         <div className={styles['retention-card']} aria-label="Retention summary">
@@ -184,7 +183,7 @@ const UsersTab = ({ onSelectUser, onCompareUsers }: UsersTabProps) => {
                 </td>
               </tr>
             ))}
-            {users.length === 0 && (
+            {users.length === 0 && !loading && !error && (
               <tr><td colSpan={7} className={styles.empty}>No users found.</td></tr>
             )}
           </tbody>
@@ -194,7 +193,7 @@ const UsersTab = ({ onSelectUser, onCompareUsers }: UsersTabProps) => {
       <div className={styles.pagination}>
         <button
           type="button"
-          disabled={offset === 0}
+          disabled={offset === 0 || loading}
           onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
         >
           Prev
@@ -202,7 +201,7 @@ const UsersTab = ({ onSelectUser, onCompareUsers }: UsersTabProps) => {
         <span>{offset + 1}–{offset + users.length}</span>
         <button
           type="button"
-          disabled={users.length < PAGE_SIZE}
+          disabled={loading || users.length < PAGE_SIZE}
           onClick={() => setOffset(offset + PAGE_SIZE)}
         >
           Next

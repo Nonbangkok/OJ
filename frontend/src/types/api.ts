@@ -106,6 +106,8 @@ export interface AdminProblemsPageResponse {
   authors: Array<{ name: string }>;
   /** True when at least one problem has an empty/NULL author. */
   hasUnauthoredProblems: boolean;
+  /** All matching standalone problems, independent of cursor/page size. */
+  bulkEligibleCount: number;
 }
 /** Filter surface for the admin problem list (server-side pagination). */
 export interface AdminProblemsQuery {

@@ -18,6 +18,8 @@ interface ConfirmationModalProps {
    *  exact phrase into the confirmation input (type-to-confirm guard for
    *  highly destructive actions). */
   confirmationPhrase?: string;
+  /** Disables confirmation while the scope/data being confirmed is stale. */
+  confirmDisabled?: boolean;
 }
 
 const ConfirmationModal = ({
@@ -30,6 +32,7 @@ const ConfirmationModal = ({
   confirmStyle = 'danger',
   children,
   confirmationPhrase,
+  confirmDisabled = false,
 }: ConfirmationModalProps) => {
   const cancelRef = useRef<HTMLElement | null>(null);
   const pendingRef = useRef(false);
@@ -58,7 +61,7 @@ const ConfirmationModal = ({
   if (!isOpen) return null;
 
   const handleConfirm = async () => {
-    if (pendingRef.current || !phraseMatches) {
+    if (pendingRef.current || !phraseMatches || confirmDisabled) {
       return;
     }
 
@@ -102,7 +105,7 @@ const ConfirmationModal = ({
           <Button
             variant={confirmStyle === 'danger' ? 'destructive' : 'primary'}
             onClick={handleConfirm}
-            disabled={isPending || !phraseMatches}
+            disabled={isPending || !phraseMatches || confirmDisabled}
             loading={isPending}
             loadingLabel="Working…"
           >

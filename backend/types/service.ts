@@ -209,7 +209,9 @@ export interface ProblemCategoryCounts {
 export interface ProblemExportTestcaseRow extends Pick<TestcaseRow, 'case_number' | 'input_data' | 'output_data'> {}
 
 export interface ProblemExportBundle {
-  problem: Pick<ProblemRow, 'id' | 'title' | 'author' | 'time_limit_ms' | 'memory_limit_mb' | 'problem_pdf'>;
+  problem: Pick<ProblemRow, 'id' | 'title' | 'author' | 'time_limit_ms' | 'memory_limit_mb' | 'problem_pdf' | 'categories' | 'difficulty'> & {
+    collection_name: string | null;
+  };
   testcases: ProblemExportTestcaseRow[];
 }
 

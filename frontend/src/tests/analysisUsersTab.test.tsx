@@ -86,6 +86,24 @@ describe('UsersTab', () => {
         await waitFor(() => expect(mockFetchUsers).toHaveBeenCalledWith(expect.objectContaining({ search: 'bo' })));
     });
 
+    it('keeps the focused search input mounted during loading and error states', async () => {
+        mockFetchUsers.mockResolvedValue({ users: mockUsers });
+        render(
+            <BrowserRouter>
+                <UsersTab onSelectUser={jest.fn()} onCompareUsers={jest.fn()} />
+            </BrowserRouter>
+        );
+        await waitFor(() => expect(screen.getByText('bob')).toBeInTheDocument());
+        mockFetchUsers.mockRejectedValueOnce(new Error('offline'));
+        const input = screen.getByRole('textbox', { name: /search users/i });
+        input.focus();
+        fireEvent.change(input, { target: { value: 'missing' } });
+
+        await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Failed to load users'));
+        expect(screen.getByRole('textbox', { name: /search users/i })).toBe(input);
+        expect(input).toHaveValue('missing');
+    });
+
     it('sorts by username when the header is clicked', async () => {
         mockFetchUsers.mockResolvedValue({ users: mockUsers });
 

@@ -54,11 +54,9 @@ describe('SubmissionsTab', () => {
             </BrowserRouter>
         );
 
-        const table = await waitFor(() => {
-            const el = document.querySelector('table');
-            if (!el) throw new Error('table not rendered');
-            return el;
-        });
+        await waitFor(() => expect(screen.getByText('A Plus B')).toBeInTheDocument());
+        const table = document.querySelector('table');
+        expect(table).not.toBeNull();
         expect(within(table).getByRole('button', { name: 'bob' })).toBeInTheDocument();
         expect(within(table).getByRole('button', { name: 'A Plus B' })).toBeInTheDocument();
         expect(mockFetchSubmissions).toHaveBeenCalledWith(expect.objectContaining({ limit: 50, offset: 0 }));
@@ -133,6 +131,26 @@ describe('SubmissionsTab', () => {
         await waitFor(() => expect(mockFetchSubmissions).toHaveBeenCalledWith(
             expect.objectContaining({ userId: 2 }),
         ));
+    });
+
+    it('keeps the same search input mounted while a selected-filter request fails', async () => {
+        mockFetchSubmissions.mockResolvedValueOnce({ submissions: [mockSubmission] });
+        mockFetchSubmissions.mockRejectedValueOnce(new Error('offline'));
+        render(
+            <BrowserRouter>
+                <SubmissionsTab onSelectUser={jest.fn()} onSelectProblem={jest.fn()} />
+            </BrowserRouter>
+        );
+        await waitFor(() => expect(screen.getByText('A Plus B')).toBeInTheDocument());
+        const input = screen.getByLabelText('Filter by problem');
+        input.focus();
+        fireEvent.change(input, { target: { value: 'plus' } });
+        const suggestion = await screen.findByText('aplusb — A Plus B');
+        expect(screen.getByLabelText('Filter by problem')).toBe(input);
+        fireEvent.click(suggestion);
+
+        await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Failed to load submissions'));
+        expect(screen.getByLabelText('Filter by problem')).toBe(input);
     });
 
     it('clears the user filter when the clear button is clicked', async () => {

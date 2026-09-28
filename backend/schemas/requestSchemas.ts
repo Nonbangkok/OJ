@@ -145,13 +145,21 @@ export const adminUsersQuerySchema = z.object({
  * 'all' | 'none' | an exact author name. Everything is optional and
  * defaults to the unfiltered first page.
  */
-export const adminProblemsQuerySchema = z.object({
+export const adminProblemFiltersSchema = z.object({
   search: z.string().trim().max(STRING_LIMITS.TITLE).optional(),
   collection: z.union([z.literal('all'), z.literal('none'), z.coerce.number().int().positive()]).optional(),
   visibility: z.enum(['all', 'visible', 'hidden']).optional(),
   author: z.string().trim().max(STRING_LIMITS.AUTHOR).optional(),
+}).strict();
+
+export const adminProblemsQuerySchema = adminProblemFiltersSchema.extend({
   limit: z.coerce.number().int().min(1).max(PROBLEM_LIST_CONFIG.MAX_LIMIT).optional(),
   cursor: z.string().min(1).max(2048).optional(),
+}).strict();
+
+export const adminProblemsVisibilitySchema = z.object({
+  isVisible: z.boolean(),
+  filters: adminProblemFiltersSchema.default({}),
 }).strict();
 
 export const batchCreateUsersSchema = z.object({

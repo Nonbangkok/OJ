@@ -31,6 +31,7 @@ const makePage = (problems, extra = {}) => ({
     hasMore: false,
     authors: [],
     hasUnauthoredProblems: false,
+    bulkEligibleCount: problems.filter(problem => !problem.contest_id).length,
     ...extra,
 });
 
@@ -58,6 +59,7 @@ describe('ProblemManagement Component', () => {
         (jest.mocked(adminService.getProblems) as jest.Mock).mockReturnValue(new Promise(() => { }));
         renderProblemManagement();
         expect(screen.getByText(/loading problems\.\.\.$/i)).toBeInTheDocument();
+        expect(screen.getByLabelText('Search problems')).toBeInTheDocument();
     });
 
     it('renders problem list correctly', async () => {
@@ -94,8 +96,11 @@ describe('ProblemManagement Component', () => {
     });
 
     it('handles bulk actions (Hide All)', async () => {
-        (jest.mocked(adminService.updateProblemVisibility) as jest.Mock).mockResolvedValue({ message: 'Updated' });
+        (jest.mocked(adminService.setProblemsVisibility) as jest.Mock).mockResolvedValue({ updatedCount: 2 });
         renderProblemManagement();
+        await waitFor(() => screen.getByText('Problem 1'));
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Select problem P1' }));
+        expect(screen.getByText('1 selected')).toBeInTheDocument();
 
         // Global visibility actions live behind the More menu now.
         await waitFor(() => screen.getByRole('button', { name: /more global actions/i }));
@@ -103,14 +108,56 @@ describe('ProblemManagement Component', () => {
         fireEvent.click(screen.getByRole('menuitem', { name: /hide all problems/i }));
 
         // Check confirmation modal
-        expect(screen.getByText(/are you sure you want to hide all 3 loaded problems/i)).toBeInTheDocument();
+        expect(screen.getByText(/hide all 2 matching eligible problems/i)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
 
         await waitFor(() => {
-            // Should be called for P1 (P3 is in contest, P2 is already hidden)
-            expect(adminService.updateProblemVisibility).toHaveBeenCalledWith('P1', false);
-            expect(adminService.updateProblemVisibility).not.toHaveBeenCalledWith('P3', false);
+            expect(adminService.setProblemsVisibility).toHaveBeenCalledWith({}, false);
+            expect(adminService.updateProblemVisibility).not.toHaveBeenCalled();
+            expect(screen.queryByText('1 selected')).not.toBeInTheDocument();
         });
+        expect(screen.getByText('Problem 1')).toBeInTheDocument();
+    });
+
+    it('retains the loaded rows and reports a bulk failure for retry', async () => {
+        (jest.mocked(adminService.setProblemsVisibility) as jest.Mock).mockRejectedValueOnce(new Error('offline'));
+        renderProblemManagement();
+        await waitFor(() => screen.getByText('Problem 1'));
+        fireEvent.click(screen.getByRole('button', { name: /more global actions/i }));
+        fireEvent.click(screen.getByRole('menuitem', { name: /hide all problems/i }));
+        fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
+
+        expect(await screen.findByRole('alert')).toHaveTextContent('Failed to hide all problems.');
+        expect(screen.getByText('Problem 1')).toBeInTheDocument();
+        expect(screen.getByText('Problem 2')).toBeInTheDocument();
+    });
+
+    it('keeps Show/Hide All disabled until the visible search and server count agree', async () => {
+        let resolveSearch: (value: ReturnType<typeof makePage>) => void = () => undefined;
+        (jest.mocked(adminService.getProblems) as jest.Mock)
+            .mockResolvedValueOnce(makePage(mockProblems))
+            .mockReturnValueOnce(new Promise(resolve => { resolveSearch = resolve; }));
+        (jest.mocked(adminService.setProblemsVisibility) as jest.Mock).mockResolvedValue({ updatedCount: 1 });
+        renderProblemManagement();
+        await waitFor(() => screen.getByText('Problem 1'));
+
+        const search = screen.getByLabelText('Search problems');
+        fireEvent.change(search, { target: { value: 'P1' } });
+        fireEvent.click(screen.getByRole('button', { name: /more global actions/i }));
+        expect(screen.getByRole('menuitem', { name: /hide all problems/i })).toBeDisabled();
+
+        await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(
+            expect.objectContaining({ search: 'P1', limit: 25 }),
+        ), { timeout: 1500 });
+        expect(screen.getByLabelText('Search problems')).toBe(search);
+        expect(screen.getByRole('menuitem', { name: /hide all problems/i })).toBeDisabled();
+
+        await act(async () => { resolveSearch(makePage([mockProblems[0]], { bulkEligibleCount: 1 })); });
+        await waitFor(() => expect(screen.getByRole('menuitem', { name: /hide all problems/i })).toBeEnabled());
+        fireEvent.click(screen.getByRole('menuitem', { name: /hide all problems/i }));
+        expect(screen.getByText(/hide all 1 matching eligible problem/i)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
+        await waitFor(() => expect(adminService.setProblemsVisibility).toHaveBeenCalledWith({ search: 'P1' }, false));
     });
 
     it('handles individual problem deletion', async () => {
@@ -210,7 +257,7 @@ describe('ProblemManagement Component', () => {
         fireEvent.click(screen.getByRole('menuitem', { name: 'View Testcases' }));
 
         expect(await screen.findByText('Testcases: P1')).toBeInTheDocument();
-        expect(screen.getByText('1 testcase')).toBeInTheDocument();
+        expect(await screen.findByText('1 testcase')).toBeInTheDocument();
 
         fireEvent.click(await screen.findByRole('button', { name: /#1/i }));
         expect(await screen.findByText('1 2')).toBeInTheDocument();
@@ -237,6 +284,7 @@ describe('ProblemManagement Component', () => {
             hasMore: false,
             authors: [],
             hasUnauthoredProblems: false,
+            bulkEligibleCount: problems.length,
         });
         const matching = searchMockProblems.filter(p => p.id.startsWith('01_e'));
 
@@ -268,7 +316,11 @@ describe('ProblemManagement Component', () => {
             } finally {
                 jest.useRealTimers();
             }
-            await waitFor(() => screen.getByText('Echo 1'));
+            await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(
+                expect.objectContaining(value ? { search: value } : { limit: 25 }),
+            ));
+            const expectedRows = value === 'zzz-no-match' ? 2 : value ? matching.length + 1 : searchMockProblems.length + 1;
+            await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(expectedRows));
         };
 
         const getRow = (idOrTitle: string) =>
@@ -395,7 +447,7 @@ describe('ProblemManagement Component', () => {
                 jest.useRealTimers();
             }
             await waitFor(
-                () => expect(screen.getAllByRole('row')).toHaveLength(1),
+                () => expect(screen.getAllByRole('row')).toHaveLength(2),
                 { timeout: 3000 },
             );
             expect(headerCheckbox()).toBeDisabled();
@@ -628,6 +680,28 @@ describe('ProblemManagement Component', () => {
             } finally {
                 jest.useRealTimers();
             }
+        });
+
+        it('keeps the same focused search element while a filtered request is pending', async () => {
+            let resolveSearch: (value: ReturnType<typeof makePage>) => void = () => undefined;
+            (jest.mocked(adminService.getProblems) as jest.Mock)
+                .mockResolvedValueOnce(makePage(mockProblems))
+                .mockReturnValueOnce(new Promise(resolve => { resolveSearch = resolve; }));
+            renderProblemManagement();
+            await waitFor(() => screen.getByText('Problem 1'));
+            const input = screen.getByLabelText('Search problems');
+            input.focus();
+            fireEvent.change(input, { target: { value: 'slow' } });
+
+            await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(
+                expect.objectContaining({ search: 'slow', limit: 25 }),
+            ), { timeout: 1500 });
+            expect(screen.getByLabelText('Search problems')).toBe(input);
+            expect(document.activeElement).toBe(input);
+            await act(async () => { resolveSearch(makePage([])); });
+            await waitFor(() => expect(screen.getByText(/no problems match/i)).toBeInTheDocument());
+            expect(screen.getByLabelText('Search problems')).toBe(input);
+            expect(document.activeElement).toBe(input);
         });
     });
 });

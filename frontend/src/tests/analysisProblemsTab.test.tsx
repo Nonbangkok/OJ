@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import ProblemsTab from '../features/admin/analysis/ProblemsTab';
 import ProblemDetail from '../features/admin/analysis/ProblemDetail';
@@ -110,6 +110,32 @@ describe('ProblemsTab', () => {
         await waitFor(() => expect(mockFetchAnalyticsProblems).toHaveBeenCalledWith(
             expect.objectContaining({ search: 'plus' }),
         ));
+    });
+
+    it('keeps the focused search input mounted through loading, empty results, and errors', async () => {
+        let resolveSearch: (value: { problems: typeof mockProblems }) => void = () => undefined;
+        render(
+            <BrowserRouter>
+                <ProblemsTab onSelectProblem={jest.fn()} />
+            </BrowserRouter>
+        );
+        await waitFor(() => expect(screen.getByText('A Plus B')).toBeInTheDocument());
+        mockFetchAnalyticsProblems.mockReturnValueOnce(new Promise(resolve => { resolveSearch = resolve; }));
+        const input = screen.getByRole('textbox', { name: /search problems/i });
+        input.focus();
+        fireEvent.change(input, { target: { value: 'none' } });
+        await waitFor(() => expect(mockFetchAnalyticsProblems).toHaveBeenCalledWith(expect.objectContaining({ search: 'none' })));
+        expect(screen.getByRole('textbox', { name: /search problems/i })).toBe(input);
+        expect(document.activeElement).toBe(input);
+
+        await act(async () => { resolveSearch({ problems: [] }); });
+        await waitFor(() => expect(screen.getByText('No problems found.')).toBeInTheDocument());
+        expect(screen.getByRole('textbox', { name: /search problems/i })).toBe(input);
+
+        mockFetchAnalyticsProblems.mockRejectedValueOnce(new Error('offline'));
+        fireEvent.change(input, { target: { value: 'failed' } });
+        await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Failed to load problems'));
+        expect(screen.getByRole('textbox', { name: /search problems/i })).toBe(input);
     });
 });
 

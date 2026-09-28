@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import useProblemMigrationModal from '../../../hooks/admin/useProblemMigrationModal';
 import modalStyles from '../shared/ModalLayout.module.css';
-import LoadingPage from '../../../components/shared/LoadingPage';
 import { Button, Dialog } from '../../../components/ui';
 
 /** One compact problem row: title + muted ID with a real checkbox. */
@@ -161,8 +160,6 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
   const [availableSearch, setAvailableSearch] = useState('');
   const [contestSearch, setContestSearch] = useState('');
 
-  if (loading) return <LoadingPage />;
-
   return (
     <Dialog
       open
@@ -176,6 +173,7 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
           {error}
         </div>
       )}
+      {loading && <p role="status">Loading problems…</p>}
 
       {contest.status !== 'scheduled' && contest.status !== 'running' && (
         <div className={modalStyles.migrationModalWarning}>
@@ -191,7 +189,7 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
           selected={selectedAvailable}
           onToggle={handleSelectAvailable}
           onSetSelected={setSelectedAvailable}
-          disabled={!canMoveProblems}
+          disabled={!canMoveProblems || loading}
           searchPlaceholder="Search by ID or title…"
           search={availableSearch}
           onSearch={setAvailableSearch}
@@ -224,7 +222,7 @@ const ProblemMigrationModal = ({ contest, onClose, onSuccess }) => {
           selected={selectedContest}
           onToggle={handleSelectContest}
           onSetSelected={setSelectedContest}
-          disabled={!canMoveProblems}
+          disabled={!canMoveProblems || loading}
           searchPlaceholder="Search contest problems…"
           search={contestSearch}
           onSearch={setContestSearch}
