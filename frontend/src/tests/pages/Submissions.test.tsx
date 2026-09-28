@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Submissions from '../../pages/submission/Submissions';
 import submissionService from '../../services/submissionService';
@@ -29,10 +29,10 @@ describe('Submissions Page', () => {
         jest.mocked(submissionService.searchUsers).mockResolvedValue([]);
     });
 
-    it('renders loading state initially', () => {
+    it('keeps the page render stable and reports initial loading inline', () => {
         jest.mocked(submissionService.getAll).mockReturnValue(new Promise(() => { }));
         render(<BrowserRouter><Submissions /></BrowserRouter>);
-        expect(screen.getByText(/loading submissions\.\.\.$/i)).toBeInTheDocument();
+        expect(screen.getByRole('status')).toHaveTextContent('Loading submissions');
     });
 
     it('displays submissions on success', async () => {
@@ -57,5 +57,29 @@ describe('Submissions Page', () => {
         await waitFor(() => {
             expect(screen.getByText(/failed to fetch submissions/i)).toBeInTheDocument();
         });
+    });
+
+    it('keeps the admin problem filter focused while suggestions load', async () => {
+        jest.mocked(useAuth).mockReturnValue({
+            user: { id: 1, username: 'admin', role: 'admin', hasAvatar: false },
+            isLoading: false,
+        } as ReturnType<typeof useAuth>);
+        jest.mocked(submissionService.getAll).mockResolvedValue([]);
+        let resolveSuggestions: (value: Array<{ id: string; title: string }>) => void = () => undefined;
+        jest.mocked(submissionService.searchProblems).mockReturnValueOnce(
+            new Promise(resolve => { resolveSuggestions = resolve; }),
+        );
+        render(<BrowserRouter><Submissions /></BrowserRouter>);
+        await waitFor(() => expect(jest.mocked(submissionService.getAll)).toHaveBeenCalled());
+        const input = screen.getByPlaceholderText('Filter by Problem ID');
+        input.focus();
+        fireEvent.change(input, { target: { value: 'graph' } });
+
+        await waitFor(() => expect(submissionService.searchProblems).toHaveBeenCalledWith('graph'), { timeout: 1500 });
+        expect(screen.getByPlaceholderText('Filter by Problem ID')).toBe(input);
+        expect(document.activeElement).toBe(input);
+        await act(async () => { resolveSuggestions([{ id: 'graph', title: 'Graph' }]); });
+        expect(screen.getByPlaceholderText('Filter by Problem ID')).toBe(input);
+        expect(document.activeElement).toBe(input);
     });
 });

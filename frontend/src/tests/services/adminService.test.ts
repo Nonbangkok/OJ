@@ -112,6 +112,13 @@ describe('adminService', () => {
             expect(api.put).toHaveBeenCalledWith('/admin/problems/10/visibility', { isVisible: true });
         });
 
+        it('setProblemsVisibility sends filters to the server-side bulk endpoint', async () => {
+            jest.mocked(api.patch).mockResolvedValueOnce({ data: { updatedCount: 42 } });
+            const filters = { search: '01_Expr', visibility: 'hidden' as const, author: 'Alice' };
+            await expect(adminService.setProblemsVisibility(filters, true)).resolves.toEqual({ updatedCount: 42 });
+            expect(api.patch).toHaveBeenCalledWith('/admin/problems/visibility', { isVisible: true, filters });
+        });
+
         it('getProblemDetail calls api.get with correct path', async () => {
             const detail: AdminProblemDetailResponse = {
                 id: 'P1',

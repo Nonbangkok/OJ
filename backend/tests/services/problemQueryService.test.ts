@@ -3,6 +3,9 @@ import {
   createProblem,
   getProblemsWithStatsForUser,
   getPublicProblemCategoryCounts,
+  getAdminProblemsPage,
+  updateAdminProblemsVisibility,
+  getProblemExportBundle,
   updateProblem,
   updateProblemPdf,
 } from '../../services/problemQueryService';
@@ -18,6 +21,63 @@ describe('problemQueryService difficulty handling', () => {
   beforeEach(() => {
     query.mockReset();
     query.mockResolvedValue({ rows: [] });
+  });
+
+  describe('admin filter-wide visibility', () => {
+    it('counts eligible filter matches separately from the current page', async () => {
+      query
+        .mockResolvedValueOnce({ rows: [{ id: 'p1', title: 'p1', author: 'A', categories: [], difficulty: null, collection_id: null, collection_name: null, is_visible: false, contest_id: null, contest_status: null }] })
+        .mockResolvedValueOnce({ rows: [{ name: 'A' }] })
+        .mockResolvedValueOnce({ rows: [{ exists: false }] })
+        .mockResolvedValueOnce({ rows: [{ count: '30' }] });
+
+      const page = await getAdminProblemsPage({ search: '01_Expr', limit: 20 });
+
+      expect(page.problems).toHaveLength(1);
+      expect(page.bulkEligibleCount).toBe(30);
+      expect(query).toHaveBeenCalledTimes(4);
+      expect(query.mock.calls[3][0]).toContain('p.contest_id IS NULL');
+      expect(query.mock.calls[3][0]).toContain('p.id ILIKE');
+      expect(query.mock.calls[3][1]).toEqual(['%01\\_Expr%']);
+    });
+
+    it('performs one parameterized UPDATE using the visibility-filtered scope and excludes contest problems', async () => {
+      query.mockResolvedValueOnce({ rowCount: 7, rows: [] });
+
+      const result = await updateAdminProblemsVisibility({
+        search: '01_Expr', collection: 12, visibility: 'hidden', author: 'Alice',
+      }, true);
+
+      expect(result).toEqual({ updatedCount: 7 });
+      expect(query).toHaveBeenCalledTimes(1);
+      const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+      expect(sql).toMatch(/^UPDATE problems AS p\s+SET is_visible = \$1/m);
+      expect(sql).toContain('p.id ILIKE');
+      expect(sql).toContain('p.collection_id =');
+      expect(sql).toContain('p.is_visible = false');
+      expect(sql).toContain('btrim(p.author) =');
+      expect(sql).toContain('p.contest_id IS NULL');
+      expect(sql).not.toContain('LIMIT');
+      expect(params).toEqual([true, '%01\\_Expr%', 12, 'Alice']);
+    });
+  });
+
+  describe('portable problem export bundle', () => {
+    it('loads the canonical categories, rating, and collection name for config serialization', async () => {
+      const problem = {
+        id: 'amgis', title: 'AMGIS', author: 'Nonbangkok', time_limit_ms: 1000,
+        memory_limit_mb: 256, problem_pdf: null, categories: ['Graph', 'Tree'],
+        difficulty: 1800, collection_name: 'Classical Problems',
+      };
+      query.mockResolvedValueOnce({ rows: [problem] }).mockResolvedValueOnce({ rows: [] });
+
+      const bundle = await getProblemExportBundle('amgis');
+
+      expect(bundle?.problem).toEqual(problem);
+      expect(query.mock.calls[0][0]).toContain('LEFT JOIN collections');
+      expect(query.mock.calls[0][0]).toContain('col.name AS collection_name');
+      expect(query).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('selects difficulty in the user-facing problem list', async () => {

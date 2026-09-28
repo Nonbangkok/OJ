@@ -20,6 +20,7 @@ import {
   updateProblem,
   updateProblemPdf,
   updateProblemVisibility,
+  updateAdminProblemsVisibility,
 } from '../services/problemQueryService';
 import { USER_ROLES } from '../constants';
 import {
@@ -37,11 +38,14 @@ import {
   ProblemExportRequestBody,
   UpdateProblemRequestBody,
   UpdateProblemVisibilityRequestBody,
+  UpdateAdminProblemsVisibilityRequestBody,
 } from '../types/api';
 import { getErrorMessage } from '../utils/errorMessage';
+import { serializeProblemConfig } from '../services/problemConfigSerializer';
 import { validateRequest } from '../middleware/validation';
 import {
   adminProblemsQuerySchema,
+  adminProblemsVisibilitySchema,
   createProblemSchema,
   problemIdParamSchema,
   problemExportSchema,
@@ -265,6 +269,14 @@ router.put('/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin,
   });
 }));
 
+router.patch('/admin/problems/visibility', requireAuth, requireStaffOrAdmin,
+  validateRequest({ body: adminProblemsVisibilitySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { isVisible, filters } = req.body as UpdateAdminProblemsVisibilityRequestBody;
+    const result = await updateAdminProblemsVisibility(filters, isVisible);
+    res.json(result);
+  }));
+
 // Admin testcase viewer (JUDGE-011: testcase content is staff-only — never
 // exposed on any user-facing route). Default response is metadata only
 // (case numbers + sizes); ?caseNumber=N fetches one full case, truncated
@@ -445,13 +457,7 @@ router.post('/admin/problems/export', requireAuth, requireStaffOrAdmin,
       const problemFolderName = `${problem.id}`; // Use problem ID as folder name
 
       // 1. Add config.json
-      const config: ProblemExportConfig = {
-        id: problem.id,
-        title: problem.title,
-        author: problem.author,
-        time_limit_ms: problem.time_limit_ms,
-        memory_limit_mb: problem.memory_limit_mb,
-      };
+      const config: ProblemExportConfig = serializeProblemConfig(problem);
       archive.append(JSON.stringify(config, null, 2), { name: `${problemFolderName}/config.json` });
 
       // 2. Add problem PDF (if exists)

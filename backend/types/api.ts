@@ -162,6 +162,9 @@ export interface ProblemExportConfig {
     author: string | null;
     time_limit_ms: number;
     memory_limit_mb: number;
+    categories: ProblemCategory[];
+    difficulty: number | null;
+    collection: string | null;
 }
 
 export interface CreateProblemRequestBody {
@@ -190,6 +193,18 @@ export interface UpdateProblemRequestBody {
 
 export interface UpdateProblemVisibilityRequestBody {
     isVisible: boolean;
+}
+
+export interface AdminProblemFiltersRequest {
+    search?: string;
+    collection?: 'none' | 'all' | number;
+    visibility?: 'all' | 'visible' | 'hidden';
+    author?: 'none' | 'all' | string;
+}
+
+export interface UpdateAdminProblemsVisibilityRequestBody {
+    isVisible: boolean;
+    filters: AdminProblemFiltersRequest;
 }
 
 export interface UpdateContestVisibilityRequestBody {

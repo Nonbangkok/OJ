@@ -6,7 +6,6 @@ import XpToast from '../../components/user/XpToast';
 import { useSubmissions } from '../../hooks/useSubmissions';
 import { getStatusClass, canViewCode, formatDateTime } from '../../utils/formatters';
 import tableStyles from '../../components/styles/Table.module.css';
-import LoadingPage from '../../components/shared/LoadingPage';
 import { Button, SegmentedControl } from '../../components/ui';
 import { USER_ROLES, getLanguageDisplayName } from '../../utils/constants';
 import type { AuthUser } from '../../types';
@@ -84,13 +83,6 @@ const SubmissionsView = ({
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [setShowProblemSuggestions, setShowUserSuggestions]);
-
-    if (variant === 'page') {
-        if (loading) return <LoadingPage />;
-        if (error) return <div className="error-message">{error}</div>;
-    } else if (loading) {
-        return <LoadingPage />;
-    }
 
     const displayError = variant === 'contest' ? guardError || error : error;
 
@@ -183,10 +175,12 @@ const SubmissionsView = ({
                 </div>
             )}
 
-            {displayError && <div className="error-message">{displayError}</div>}
+            {displayError && <div className="error-message" role="alert">{displayError}</div>}
 
             <div className={tableStyles['table-container']}>
-                {submissions.length === 0 ? (
+                {loading && submissions.length === 0 ? (
+                    <p role="status" className={styles['no-submissions']}>Loading submissions…</p>
+                ) : submissions.length === 0 ? (
                     <div className={styles['no-submissions']}>
                         {variant === 'contest' ? (
                             <>

@@ -13,7 +13,7 @@ import { getErrorMessage, toApiLikeError } from '../../utils/error';
 import type { ProblemCategory } from '../../utils/constants';
 
 import { useAdminProblemsPage } from './useAdminProblemsPage';
-import { getBulkVisibilityTargets, normalizeUploadProgress } from './problemManagement.helpers';
+import { normalizeUploadProgress } from './problemManagement.helpers';
 
 export interface ProblemSaveData {
   id: string;
@@ -51,8 +51,11 @@ const useProblemCrud = ({ query }: UseProblemCrudArgs) => {
     hasMore,
     authors,
     hasUnauthoredProblems,
+    bulkEligibleCount,
+    loadedQueryKey,
     loadMore,
     refresh,
+    refreshFirstPage,
   } = useAdminProblemsPage(query);
 
   // Mutation-busy flag (bulk ops, edit modal); the paged hook owns the
@@ -115,14 +118,14 @@ const useProblemCrud = ({ query }: UseProblemCrudArgs) => {
   const executeBulkVisibility = async (nextVisible: boolean) => {
     try {
       setLoading(true);
-      const targets = getBulkVisibilityTargets(problems, nextVisible);
-      await Promise.all(
-        targets.map((problem) => adminService.updateProblemVisibility(problem.id, nextVisible)),
-      );
-      await fetchProblems();
+      setError('');
+      await adminService.setProblemsVisibility(query, nextVisible);
+      refreshFirstPage();
+      return true;
     } catch (errorValue) {
       setError(nextVisible ? 'Failed to show all problems.' : 'Failed to hide all problems.');
       console.error(errorValue);
+      return false;
     } finally {
       setLoading(false);
       setBulkConfirm({ isOpen: false, type: null });
@@ -180,7 +183,7 @@ const useProblemCrud = ({ query }: UseProblemCrudArgs) => {
   };
 
   const executeHideAll = async () => {
-    await executeBulkVisibility(false);
+    return executeBulkVisibility(false);
   };
 
   const handleShowAll = () => {
@@ -188,7 +191,7 @@ const useProblemCrud = ({ query }: UseProblemCrudArgs) => {
   };
 
   const executeShowAll = async () => {
-    await executeBulkVisibility(true);
+    return executeBulkVisibility(true);
   };
 
   const handleEdit = async (problem: AdminProblem) => {
@@ -337,6 +340,8 @@ const useProblemCrud = ({ query }: UseProblemCrudArgs) => {
     hasMore,
     authors,
     hasUnauthoredProblems,
+    bulkEligibleCount,
+    loadedQueryKey,
     loadMore,
     isModalOpen,
     setIsModalOpen,

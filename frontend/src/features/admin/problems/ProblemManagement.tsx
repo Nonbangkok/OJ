@@ -13,8 +13,8 @@ import type { AdminProblemsQuery } from '../../../types';
 import { ADMIN_PROBLEMS_PAGE } from '../../../config/constants';
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
-import LoadingPage from '../../../components/shared/LoadingPage';
 import { ActionMenu, Button, StatusBadge } from '../../../components/ui';
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 
 interface ProblemManagementProps {
   currentUser?: { username?: string } | null;
@@ -33,15 +33,10 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
   // them resets the paged list to the first batch of the new query. The
   // search box is debounced so typing does not fire a request per key.
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, ADMIN_PROBLEMS_PAGE.SEARCH_DEBOUNCE_MS);
   const [collectionFilter, setCollectionFilter] = useState<string>('all');
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'visible' | 'hidden'>('all');
   const [authorFilter, setAuthorFilter] = useState<string>('all');
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearch(search), ADMIN_PROBLEMS_PAGE.SEARCH_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [search]);
 
   // Server-side query. Sentinels 'all' are omitted so the default query is
   // the clean unfiltered first page.
@@ -64,6 +59,8 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     hasMore,
     authors,
     hasUnauthoredProblems,
+    bulkEligibleCount,
+    loadedQueryKey,
     loadMore,
     isModalOpen,
     editingProblem,
@@ -95,6 +92,14 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     handleSave,
     handleCloseModal
   } = useProblemManagement(query);
+  const currentQueryKey = JSON.stringify(query);
+  // The visible input updates immediately, but the server query is debounced.
+  // Keep scope-wide actions unavailable until the result/count are for exactly
+  // the query represented by the current controls.
+  const bulkScopeReady = !loading
+    && !error
+    && search.trim() === debouncedSearch.trim()
+    && loadedQueryKey === currentQueryKey;
 
   const {
     isRejudgeConfirmOpen,
@@ -219,8 +224,13 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     }
   };
 
-  if (loading && !batchUploadProgress.visible) return <LoadingPage />;
-  if (error) return <div className='error-message'>{error}</div>;
+  const confirmBulkVisibility = async () => {
+    if (!bulkScopeReady || !bulkConfirm.type) return;
+    const succeeded = bulkConfirm.type === 'show'
+      ? await executeShowAll()
+      : await executeHideAll();
+    if (succeeded) clearSelection();
+  };
 
   return (
     <div className={styles['management-container']}>
@@ -289,16 +299,15 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
             ))}
           </select>
         </label>
-        {/* Global, low-frequency actions live behind one quiet menu. The
-            Show/Hide-all toggles act on the LOADED rows (the list is
-            server-paginated); the confirm dialogs say so explicitly. */}
+        {/* Show/Hide All are server-side actions over every eligible problem
+            matching the current filters; the header checkbox stays page-scoped. */}
         <ActionMenu
           label="More global actions"
           trigger="text"
           items={[
             { key: 'manage-collections', label: 'Manage Collections', onClick: () => setCollectionsOpen(true) },
-            { key: 'show-all', label: 'Show all problems', onClick: handleShowAll, disabled: loading || problems.every(p => p.is_visible), title: `Set every LOADED problem (${problems.length}) to visible` },
-            { key: 'hide-all', label: 'Hide all problems', onClick: handleHideAll, disabled: loading || problems.every(p => !p.is_visible), title: `Set every LOADED problem (${problems.length}) to hidden` },
+            { key: 'show-all', label: 'Show all problems', onClick: handleShowAll, disabled: !bulkScopeReady || bulkEligibleCount === 0, title: `Set all ${bulkEligibleCount} matching eligible problems to visible` },
+            { key: 'hide-all', label: 'Hide all problems', onClick: handleHideAll, disabled: !bulkScopeReady || bulkEligibleCount === 0, title: `Set all ${bulkEligibleCount} matching eligible problems to hidden` },
           ]}
         />
       </div>
@@ -405,6 +414,13 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
         </div>
       )}
 
+      {(loading || error) && !batchUploadProgress.visible && (
+        <div className={styles['scope-bar']}>
+          {loading && <span role="status">Loading Problems...</span>}
+          {error && <span className="error-message" role="alert">{error}</span>}
+        </div>
+      )}
+
       {/* --- 4. Table: minimal row actions -------------------------------- */}
       <div className={`${tableStyles['table-container']} ${styles.tableWrap}`}>
         <table className={tableStyles.table}>
@@ -429,6 +445,9 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
             </tr>
           </thead>
           <tbody>
+            {visibleProblems.length === 0 && !loading && !error && (
+              <tr><td colSpan={6}>No problems match the current filters.</td></tr>
+            )}
             {visibleProblems.map(problem => {
               const selected = isProblemSelected(problem.id);
               const visited = isDragging && isRowVisited(problem.id);
@@ -584,11 +603,12 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
       <ConfirmationModal
         isOpen={bulkConfirm.isOpen}
         onClose={() => setBulkConfirm({ isOpen: false, type: null })}
-        onConfirm={bulkConfirm.type === 'show' ? executeShowAll : executeHideAll}
+        onConfirm={confirmBulkVisibility}
         title={bulkConfirm.type === 'show' ? "Confirm Show All" : "Confirm Hide All"}
         message={bulkConfirm.type === 'show'
-          ? `Are you sure you want to make all ${problems.length} loaded problems visible? (Excluding those in contests)`
-          : `Are you sure you want to hide all ${problems.length} loaded problems? (Excluding those in contests)`}
+          ? `Are you sure you want to make all ${bulkEligibleCount} matching eligible problem${bulkEligibleCount === 1 ? '' : 's'} visible? (Excluding those in contests)`
+          : `Are you sure you want to hide all ${bulkEligibleCount} matching eligible problem${bulkEligibleCount === 1 ? '' : 's'}? (Excluding those in contests)`}
+        confirmDisabled={!bulkScopeReady || bulkEligibleCount === 0}
       />
       <ConfirmationModal
         isOpen={isRejudgeConfirmOpen}

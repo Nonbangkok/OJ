@@ -473,6 +473,31 @@ describe('Problem Controller', () => {
         });
     });
 
+    describe('PATCH /admin/problems/visibility', () => {
+        it('updates the server-side filter scope in one query', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rowCount: 4, rows: [] });
+
+            const res = await request(app)
+                .patch('/admin/problems/visibility')
+                .send({ isVisible: false, filters: { search: 'graph', collection: 9, author: 'Alice' } });
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual({ updatedCount: 4 });
+            expect(db.query).toHaveBeenCalledTimes(1);
+            expect(db.query).toHaveBeenCalledWith(
+                expect.stringContaining('p.contest_id IS NULL'),
+                [false, '%graph%', 9, 'Alice'],
+            );
+        });
+
+        it('validates the visibility flag and filter shape', async () => {
+            expect((await request(app).patch('/admin/problems/visibility')
+                .send({ isVisible: 'false', filters: {} })).status).toBe(400);
+            expect((await request(app).patch('/admin/problems/visibility')
+                .send({ isVisible: false, filters: { cursor: 'x' } })).status).toBe(400);
+        });
+    });
+
     describe('POST /admin/problems/batch-upload', () => {
         it('should return 400 if zip file is not uploaded', async () => {
             const res = await request(app).post('/admin/problems/batch-upload');
