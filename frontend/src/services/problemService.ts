@@ -3,6 +3,7 @@ import api from './api';
 import type {
   ContestProblemDetailResponse,
   ProblemCategoryCountsResponse,
+  ProblemFilterOptionsResponse,
   ProblemDetailResponse,
   ProblemsWithStatsPageResponse,
   ProblemsWithStatsResponse,
@@ -26,6 +27,8 @@ export interface ProblemListDifficultyQuery {
 export interface ProblemListQuery extends ProblemListDifficultyQuery {
   search?: string;
   category?: string;
+  author?: string;
+  collection?: number | 'none';
   limit?: number;
   cursor?: string | null;
 }
@@ -73,6 +76,11 @@ const problemService = {
   /** Global category tab counts (visible standalone problems only). */
   getCategoryCounts: async (): Promise<ProblemCategoryCountsResponse> => {
     const response = await api.get<ProblemCategoryCountsResponse>('/problems/categories');
+    return response.data;
+  },
+
+  getFilterOptions: async (): Promise<ProblemFilterOptionsResponse> => {
+    const response = await api.get<ProblemFilterOptionsResponse>('/problems/filter-options');
     return response.data;
   },
 

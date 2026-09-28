@@ -285,6 +285,8 @@ export const problemsWithStatsQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).optional(),
   search: z.string().trim().max(STRING_LIMITS.TITLE).optional(),
   category: z.enum(['Uncategorized', ...PROBLEM_CATEGORIES] as [string, ...string[]]).optional(),
+  author: z.string().trim().min(1).max(STRING_LIMITS.AUTHOR).optional(),
+  collection: z.union([z.literal('none'), z.coerce.number().int().positive()]).optional(),
   limit: z.coerce.number().int().min(1).max(PROBLEM_LIST_CONFIG.MAX_LIMIT).optional(),
   cursor: z.string().min(1).max(2048).optional(),
 }).refine(

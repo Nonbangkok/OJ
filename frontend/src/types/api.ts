@@ -61,6 +61,10 @@ export interface ProblemCategoryCountsResponse {
   uncategorized: number;
   total: number;
 }
+export interface ProblemFilterOptionsResponse {
+  collections: Array<{ id: number; name: string }>;
+  hasUncollected: boolean;
+}
 export type ProblemDetailResponse = ProblemDetail;
 export type ContestProblemDetailResponse = ProblemDetail;
 

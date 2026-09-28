@@ -3,6 +3,7 @@ import {
   createProblem,
   getProblemsWithStatsForUser,
   getPublicProblemCategoryCounts,
+  getPublicProblemFilterOptions,
   getAdminProblemsPage,
   updateAdminProblemsVisibility,
   getProblemExportBundle,
@@ -189,6 +190,34 @@ describe('problemQueryService difficulty handling', () => {
       expect(query.mock.calls[0][1]).toContain('%100\\% \\_x%');
     });
 
+    it('composes author and collection filters with existing filters inside the paged batch', async () => {
+      await getProblemsWithStatsForUser(1, {
+        search: 'dp', category: 'Graph', difficultyMin: 1000,
+        author: 'Alice', collection: 7, limit: 2,
+        sort: 'difficulty', order: 'desc',
+      });
+      const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+      expect(sql).toMatch(/WITH batch AS \([\s\S]*p\.author ILIKE \$\d+[\s\S]*p\.collection_id = \$\d+[\s\S]*LIMIT \$\d+/);
+      expect(sql).toContain('p.is_visible = true AND p.contest_id IS NULL');
+      expect(sql).toContain('p.difficulty DESC NULLS LAST');
+      expect(params).toEqual([1, 1000, '%dp%', 'Graph', '%Alice%', 7, 3]);
+    });
+
+    it('filters unassigned collection values before pagination', async () => {
+      await getProblemsWithStatsForUser(null, { collection: 'none', limit: 2 });
+      const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('p.collection_id IS NULL');
+      expect(params).toEqual([null, 3]);
+    });
+
+    it('searches arbitrary author text case-insensitively and literally', async () => {
+      await getProblemsWithStatsForUser(null, { author: '  nOnE%_  ', limit: 2 });
+      const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('p.author ILIKE $2');
+      expect(sql).not.toContain('JOIN users');
+      expect(params).toEqual([null, '%nOnE\\%\\_%', 3]);
+    });
+
     it('treats the Uncategorized category filter as cardinality = 0', async () => {
       await getProblemsWithStatsForUser(1, { limit: 20, category: 'Uncategorized' });
       expect(query.mock.calls[0][0]).toContain('cardinality(p.categories) = 0');
@@ -219,6 +248,21 @@ describe('problemQueryService difficulty handling', () => {
       const categorySql = query.mock.calls.find(([sql]) => String(sql).includes('unnest'))![0] as string;
       expect(categorySql).toContain('p.is_visible = true AND p.contest_id IS NULL');
     });
+  });
+
+  it('loads canonical public collection options beyond the current page', async () => {
+    query
+      .mockResolvedValueOnce({ rows: [{ id: 7, name: 'Practice' }] })
+      .mockResolvedValueOnce({ rows: [{ exists: true }] });
+
+    await expect(getPublicProblemFilterOptions()).resolves.toEqual({
+      collections: [{ id: 7, name: 'Practice' }], hasUncollected: true,
+    });
+    expect(query).toHaveBeenCalledTimes(2);
+    for (const [sql] of query.mock.calls) {
+      expect(sql).toContain('p.is_visible = true AND p.contest_id IS NULL');
+    }
+    expect(query.mock.calls[0][0]).toContain('JOIN collections');
   });
 
   it('inserts difficulty on problem create', async () => {

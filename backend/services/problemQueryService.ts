@@ -63,6 +63,10 @@ export interface ProblemListOptions extends ProblemListDifficultyOptions {
   search?: string;
   /** One category from the closed list, or 'Uncategorized' (empty array). */
   category?: string;
+  /** Case-insensitive substring of the problem's free-text author field. */
+  author?: string;
+  /** Collection id, or 'none' for problems outside a collection. */
+  collection?: number | 'none';
   /** Page size (1..MAX_LIMIT); defaults to PROBLEM_LIST_CONFIG.DEFAULT_LIMIT. */
   limit?: number;
   /** Opaque next-page token from a previous response. */
@@ -203,6 +207,16 @@ export const getProblemsWithStatsForUser = async (
     params.push(options.category);
     filters.push(`p.categories @> ARRAY[$${params.length}]::text[]`);
   }
+  if (options.author?.trim()) {
+    params.push(`%${escapeLikePattern(options.author.trim())}%`);
+    filters.push(`p.author ILIKE $${params.length}`);
+  }
+  if (options.collection === 'none') {
+    filters.push('p.collection_id IS NULL');
+  } else if (options.collection !== undefined) {
+    params.push(options.collection);
+    filters.push(`p.collection_id = $${params.length}`);
+  }
   const afterCursor = cursorCondition(cursor, params);
   if (afterCursor) {
     filters.push(afterCursor);
@@ -313,6 +327,32 @@ export const getPublicProblemCategoryCounts = async (): Promise<ProblemCategoryC
     categories: categoryResult.rows,
     uncategorized: totalsResult.rows[0]?.uncategorized ?? 0,
     total: totalsResult.rows[0]?.total ?? 0,
+  };
+};
+
+export interface PublicProblemFilterOptions {
+  collections: Array<{ id: number; name: string }>;
+  hasUncollected: boolean;
+}
+
+/** Canonical collection options from the entire visible standalone pool, independent of pages and active filters. */
+export const getPublicProblemFilterOptions = async (): Promise<PublicProblemFilterOptions> => {
+  const [collections, uncollected] = await Promise.all([
+    db.query<{ id: number; name: string }>(`
+      SELECT DISTINCT c.id, c.name FROM problems p
+      JOIN collections c ON c.id = p.collection_id
+      WHERE p.is_visible = true AND p.contest_id IS NULL
+      ORDER BY c.name ASC, c.id ASC
+    `),
+    db.query<{ exists: boolean }>(`
+      SELECT EXISTS (SELECT 1 FROM problems p
+        WHERE p.is_visible = true AND p.contest_id IS NULL
+          AND p.collection_id IS NULL) AS exists
+    `),
+  ]);
+  return {
+    collections: collections.rows,
+    hasUncollected: uncollected.rows[0]?.exists ?? false,
   };
 };
 
