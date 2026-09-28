@@ -84,6 +84,44 @@ describe('ProblemManagement Component', () => {
         expect(adminService.updateProblemVisibility).toHaveBeenCalledWith('P2', true);
     });
 
+    it('preselects the existing collection when editing a collected problem', async () => {
+        const collectionId = 17;
+        const collectedProblem = {
+            ...mockProblems[0],
+            collection_id: collectionId,
+            collection_name: 'Chapter 1',
+        };
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(makePage([collectedProblem]));
+        (jest.mocked(adminService.getCollections) as jest.Mock).mockResolvedValue([
+            { id: collectionId, name: 'Chapter 1', problem_count: 1, status: 'all_visible', created_at: '', updated_at: '' },
+        ]);
+        (jest.mocked(adminService.getAuthors) as jest.Mock).mockResolvedValue([]);
+        // GET /admin/problems/:id currently returns problem detail without
+        // collection_id, while the paged admin row already carries that ID.
+        (jest.mocked(adminService.getProblemDetail) as jest.Mock).mockResolvedValue({
+            id: collectedProblem.id,
+            title: collectedProblem.title,
+            author: collectedProblem.author,
+            categories: [],
+            difficulty: null,
+            time_limit_ms: 1000,
+            memory_limit_mb: 256,
+            has_pdf: false,
+            is_visible: true,
+            contest_id: null,
+        });
+
+        renderProblemManagement();
+        const row = await screen.findByText('Problem 1').then(element => element.closest('tr'));
+        fireEvent.click(within(row).getByRole('button', { name: 'Edit' }));
+
+        const collectionSelect = () => screen.getAllByLabelText('Collection').at(-1);
+        await waitFor(() => {
+            expect(collectionSelect()).toHaveValue(String(collectionId));
+        });
+        expect(collectionSelect()).toHaveDisplayValue('Chapter 1');
+    });
+
     it('disables visibility toggle for problems in active contests', async () => {
         renderProblemManagement();
 
