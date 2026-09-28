@@ -118,6 +118,28 @@ describe('Admin Controller', () => {
         });
     });
 
+    describe('PUT /admin/users/submission-lock', () => {
+        it('updates selected users once and reports ineligible or missing IDs', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ id: 8 }] });
+            const res = await request(app).put('/admin/users/submission-lock').send({ ids: [8, 9], locked: true });
+            expect({ status: res.status, body: res.body }).toEqual({
+                status: 200, body: { updatedIds: [8], skippedIds: [9] },
+            });
+            expect(db.query).toHaveBeenCalledTimes(1);
+        });
+
+        it.each([
+            { ids: [], locked: true },
+            { ids: [8, 8], locked: true },
+            { ids: [8, '9'], locked: false },
+            { ids: [8], locked: 'true' },
+        ])('rejects invalid bulk lock payload %j', async (payload) => {
+            const res = await request(app).put('/admin/users/submission-lock').send(payload);
+            expect(res.status).toBe(400);
+            expect(db.query).not.toHaveBeenCalled();
+        });
+    });
+
     describe('GET /admin/settings/registration', () => {
         it('should return site settings', async () => {
             (db.query as jest.Mock).mockResolvedValueOnce({

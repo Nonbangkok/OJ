@@ -12,6 +12,7 @@ import {
   updateRegistrationEnabled,
   updateAdminUser,
   setAdminUserSubmissionLock,
+  setAdminUsersSubmissionLock,
 } from '../../services/adminQueryService';
 
 jest.mock('../../db', () => {
@@ -69,6 +70,19 @@ describe('adminQueryService', () => {
   it('refuses to lock staff/admin accounts', async () => {
     (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
     await expect(setAdminUserSubmissionLock('9', true)).resolves.toEqual({ kind: 'not_lockable' });
+  });
+
+  it('bulk locks eligible users in one parameterized update and reports skipped IDs', async () => {
+    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ id: 8 }, { id: 11 }] });
+    await expect(setAdminUsersSubmissionLock([8, 9, 11, 404], true)).resolves.toEqual({
+      updatedIds: [8, 11],
+      skippedIds: [9, 404],
+    });
+    expect(db.query).toHaveBeenCalledTimes(1);
+    expect(db.query).toHaveBeenCalledWith(
+      "UPDATE users SET submissions_locked = $1 WHERE id = ANY($2::int[]) AND role = 'user' RETURNING id",
+      [true, [8, 9, 11, 404]],
+    );
   });
 
   it('createAdminUser should return duplicate when username already exists', async () => {

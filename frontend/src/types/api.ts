@@ -91,6 +91,10 @@ export interface AdminUsersPageResponse {
 export type AdminAuthorsResponse = Array<Pick<AdminUser, 'id' | 'username'>>;
 export type AdminCreateUserResponse = AdminUser;
 export type AdminUpdateUserResponse = AdminUser;
+export interface AdminBulkSubmissionLockResponse {
+  updatedIds: number[];
+  skippedIds: number[];
+}
 
 export interface BatchCreateUsersResponse extends ApiMessageResponse {
   users: BatchCreatedUser[];

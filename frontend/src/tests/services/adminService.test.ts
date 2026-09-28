@@ -25,6 +25,15 @@ describe('adminService', () => {
             await expect(adminService.setUserSubmissionLock(2, true)).resolves.toEqual(response);
             expect(api.put).toHaveBeenCalledWith('/admin/users/2/submission-lock', { locked: true });
         });
+        it('sends a bulk submission lock in one request', async () => {
+            const response = { updatedIds: [2], skippedIds: [3] };
+            jest.mocked(api.put).mockResolvedValueOnce({ data: response } as never);
+            await expect(adminService.setUsersSubmissionLock([2, 3], false)).resolves.toEqual(response);
+            expect(api.put).toHaveBeenCalledWith('/admin/users/submission-lock', {
+                ids: [2, 3], locked: false,
+            });
+            expect(api.put).toHaveBeenCalledTimes(1);
+        });
         it('getUsers calls api.get with the paged user-list path (ADMIN-008)', async () => {
             const mockData: AdminUsersPageResponse = {
                 users: [{ id: 1, username: 'admin', role: 'admin' }],

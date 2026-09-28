@@ -133,6 +133,49 @@ describe('UserManagement Component', () => {
         expect(await screen.findByText(/submissions locked/i)).toBeInTheDocument();
     });
 
+    it('selects displayed rows, confirms one bulk request, and reports skipped accounts', async () => {
+        (jest.mocked(adminService.setUsersSubmissionLock) as jest.Mock).mockResolvedValue({
+            updatedIds: [2], skippedIds: [1, 3],
+        });
+        renderUserManagement();
+        await screen.findByText('user1');
+        fireEvent.click(screen.getByRole('checkbox', { name: /select displayed users/i }));
+        expect(screen.getByRole('checkbox', { name: /select user1/i })).toBeChecked();
+        expect(screen.getByRole('checkbox', { name: /select staff1/i })).toBeChecked();
+        fireEvent.click(screen.getByRole('button', { name: /^lock selected$/i }));
+        expect(screen.getByText(/lock 3 selected users/i)).toBeInTheDocument();
+        expect(adminService.setUsersSubmissionLock).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: /^lock$/i }));
+        await waitFor(() => expect(adminService.setUsersSubmissionLock).toHaveBeenCalledWith([1, 2, 3], true));
+        expect(adminService.setUsersSubmissionLock).toHaveBeenCalledTimes(1);
+        expect(await screen.findByRole('status')).toHaveTextContent(/updated 1 user.*skipped 2.*1, 3/i);
+        expect(screen.getByRole('checkbox', { name: /select user1/i })).not.toBeChecked();
+    });
+
+    it('keeps bulk selection on the displayed page and clears it when the page changes', async () => {
+        (jest.mocked(adminService.getUsers) as jest.Mock)
+            .mockResolvedValueOnce({ users: mockUsers, total: 101, page: 1, limit: 100 })
+            .mockResolvedValueOnce({ users: [{ id: 101, username: 'page2', role: 'user' }], total: 101, page: 2, limit: 100 });
+        renderUserManagement();
+        await screen.findByText('user1');
+        fireEvent.click(screen.getByRole('checkbox', { name: /select user1/i }));
+        fireEvent.click(screen.getByRole('button', { name: /^next$/i }));
+        await screen.findByText('page2');
+        expect(screen.getByRole('checkbox', { name: /select page2/i })).not.toBeChecked();
+        expect(screen.getByRole('button', { name: /^lock selected$/i })).toBeDisabled();
+    });
+
+    it('reports a failed bulk request and retains selection for retry', async () => {
+        (jest.mocked(adminService.setUsersSubmissionLock) as jest.Mock).mockRejectedValue(new Error('Network error'));
+        renderUserManagement();
+        await screen.findByText('user1');
+        fireEvent.click(screen.getByRole('checkbox', { name: /select user1/i }));
+        fireEvent.click(screen.getByRole('button', { name: /unlock selected/i }));
+        fireEvent.click(screen.getByRole('button', { name: /^unlock$/i }));
+        expect(await screen.findByRole('alert')).toHaveTextContent(/failed to update selected users/i);
+        expect(screen.getByRole('checkbox', { name: /select user1/i })).toBeChecked();
+    });
+
     it('opens and closes AddUserModal', async () => {
         renderUserManagement();
 

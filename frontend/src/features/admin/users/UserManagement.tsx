@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import useUserManagement from '../../../hooks/admin/useUserManagement';
 import { useAuth } from '../../../context/AuthContext';
 import EditUserModal from './EditUserModal';
@@ -47,6 +47,42 @@ const UserManagement = () => {
   // AUTH-004: target of the pending admin password reset.
   const [resettingPasswordUser, setResettingPasswordUser] = useState<AdminUser | null>(null);
   const [submissionLockTarget, setSubmissionLockTarget] = useState<AdminUser | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
+  const [bulkLockAction, setBulkLockAction] = useState<boolean | null>(null);
+  const [bulkMessage, setBulkMessage] = useState('');
+  const [bulkError, setBulkError] = useState('');
+
+  // A selection belongs to the visible query and page, never to another page.
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setBulkLockAction(null);
+    setBulkMessage('');
+    setBulkError('');
+  }, [page, search, roleFilter]);
+
+  const displayedIds = users.map((user) => user.id);
+  const selectedDisplayedIds = displayedIds.filter((id) => selectedIds.has(id));
+  const allDisplayedSelected = displayedIds.length > 0 && selectedDisplayedIds.length === displayedIds.length;
+
+  const confirmBulkLock = async () => {
+    if (bulkLockAction === null || selectedDisplayedIds.length === 0) return;
+    try {
+      setBulkError('');
+      const { updatedIds, skippedIds } = await adminService.setUsersSubmissionLock(
+        selectedDisplayedIds, bulkLockAction,
+      );
+      setBulkLockAction(null);
+      setSelectedIds(new Set());
+      setBulkMessage(`Updated ${updatedIds.length} user${updatedIds.length === 1 ? '' : 's'}; `
+        + `skipped ${skippedIds.length}${skippedIds.length ? ` (IDs: ${skippedIds.join(', ')})` : ''}.`
+        + (skippedIds.length ? ' Skipped accounts are ineligible or no longer exist.' : ''));
+      await fetchUsers(page);
+    } catch (err) {
+      setBulkLockAction(null);
+      setBulkError('Failed to update selected users. Selection was kept; please retry.');
+      console.error(err);
+    }
+  };
 
   // ADMIN-008: filtered totals and rows are both server-paged.
   const pageCount = Math.max(1, Math.ceil(total / USER_PAGE_SIZE));
@@ -98,12 +134,32 @@ const UserManagement = () => {
             </Button>
           </div>
         )}
+        {bulkError && <div className="error-message" role="alert">{bulkError}</div>}
+        {bulkMessage && <p role="status">{bulkMessage}</p>}
+
+        <div className={styles['bulk-actions']}>
+          <span>{selectedDisplayedIds.length} selected on this page</span>
+          <Button size="compact" variant="secondary" disabled={!selectedDisplayedIds.length || loading}
+            onClick={() => setBulkLockAction(true)}>Lock selected</Button>
+          <Button size="compact" variant="secondary" disabled={!selectedDisplayedIds.length || loading}
+            onClick={() => setBulkLockAction(false)}>Unlock selected</Button>
+        </div>
 
         {/* --- Table: Edit + overflow ------------------------------------ */}
         <div className={`${tableStyles['table-container']} ${styles.tableWrap}`}>
           <table className={tableStyles.table}>
             <thead>
               <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    aria-label="Select displayed users"
+                    checked={allDisplayedSelected}
+                    disabled={!displayedIds.length || loading}
+                    onChange={(event) => setSelectedIds(event.target.checked
+                      ? new Set(displayedIds) : new Set())}
+                  />
+                </th>
                 <th className={styles['col-left']}>Username</th>
                 <th className={styles['col-center']}>Role</th>
                 <th className={styles['col-center']}>Actions</th>
@@ -115,6 +171,20 @@ const UserManagement = () => {
                   && user.username !== APP_CONSTANTS.SYSTEM_ADMIN_USERNAME;
                 return (
                   <tr key={user.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${user.username}`}
+                        checked={selectedIds.has(user.id)}
+                        disabled={loading}
+                        onChange={(event) => setSelectedIds((current) => {
+                          const next = new Set(current);
+                          if (event.target.checked) next.add(user.id);
+                          else next.delete(user.id);
+                          return next;
+                        })}
+                      />
+                    </td>
                     <td className={styles['col-left']}>{user.username}</td>
                     <td className={styles['col-center']}>
                       <StatusBadge tone={user.role === 'admin' ? 'info' : 'neutral'} soft>
@@ -232,6 +302,16 @@ const UserManagement = () => {
             : `Lock ${submissionLockTarget?.username}? This will prevent this user from submitting and joining contests until unlocked.`}
           confirmText={submissionLockTarget?.submissions_locked ? 'Unlock' : 'Lock'}
           confirmStyle={submissionLockTarget?.submissions_locked ? 'default' : 'danger'}
+        />
+        <ConfirmationModal
+          isOpen={bulkLockAction !== null}
+          onClose={() => setBulkLockAction(null)}
+          onConfirm={confirmBulkLock}
+          title={bulkLockAction ? 'Lock selected users' : 'Unlock selected users'}
+          message={`${bulkLockAction ? 'Lock' : 'Unlock'} ${selectedDisplayedIds.length} selected users? `
+            + 'Only regular user accounts can be changed. The result will report skipped accounts.'}
+          confirmText={bulkLockAction ? 'Lock' : 'Unlock'}
+          confirmStyle={bulkLockAction ? 'danger' : 'default'}
         />
         <AddUserModal
           isOpen={isAddModalOpen}

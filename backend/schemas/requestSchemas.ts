@@ -120,6 +120,13 @@ export const updateAdminUserSubmissionLockSchema = z.object({
   locked: z.boolean(),
 });
 
+export const updateAdminUsersSubmissionLockSchema = z.object({
+  ids: z.array(z.number().int().positive().max(2147483647))
+    .min(1).max(ADMIN_USER_LIST_CONFIG.MAX_LIMIT)
+    .refine((ids) => new Set(ids).size === ids.length, 'User IDs must be unique'),
+  locked: z.boolean(),
+}).strict();
+
 // Admin schemas
 // The create endpoint sits behind requireAdmin, so allowing role 'admin'
 // here (mirroring updateAdminUserSchema) does not widen the authorization

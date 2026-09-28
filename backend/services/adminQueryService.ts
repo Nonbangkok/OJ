@@ -98,6 +98,22 @@ export const setAdminUserSubmissionLock = async (
   return { kind: 'ok', data: result.rows[0] };
 };
 
+/** Update selected regular users together; missing and non-user IDs are skipped. */
+export const setAdminUsersSubmissionLock = async (
+  ids: number[],
+  locked: boolean,
+): Promise<{ updatedIds: number[]; skippedIds: number[] }> => {
+  const result = await db.query<{ id: number }>(
+    "UPDATE users SET submissions_locked = $1 WHERE id = ANY($2::int[]) AND role = 'user' RETURNING id",
+    [locked, ids],
+  );
+  const updated = new Set(result.rows.map((row) => row.id));
+  return {
+    updatedIds: ids.filter((id) => updated.has(id)),
+    skippedIds: ids.filter((id) => !updated.has(id)),
+  };
+};
+
 export const createAdminUser = async (
   username: string,
   password: string,

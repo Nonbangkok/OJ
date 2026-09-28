@@ -26,6 +26,7 @@ import {
   idParamSchema,
   updateAdminUserSchema,
   updateAdminUserSubmissionLockSchema,
+  updateAdminUsersSubmissionLockSchema,
   updateRegistrationSettingSchema,
   updateSiteAccessModeSchema,
   updatePasswordChangeSettingSchema,
@@ -49,6 +50,7 @@ import {
   resetAdminUserPassword,
   updateAdminUser,
   setAdminUserSubmissionLock,
+  setAdminUsersSubmissionLock,
   updateRegistrationEnabled,
 } from '../services/adminQueryService';
 import {
@@ -84,6 +86,13 @@ router.post('/admin/users', requireAuth, requireAdmin,
     throw new AppError('Username already exists.', 409);
   }
   res.status(201).json(createResult.data);
+}));
+
+router.put('/admin/users/submission-lock', requireAuth, requireAdmin,
+  validateRequest({ body: updateAdminUsersSubmissionLockSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const { ids, locked } = req.body as { ids: number[]; locked: boolean };
+  res.json(await setAdminUsersSubmissionLock(ids, locked));
 }));
 
 router.put('/admin/users/:id', requireAuth, requireAdmin,

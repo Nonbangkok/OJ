@@ -4,6 +4,7 @@ import type {
   AdminAuthorsResponse,
   AdminCreateUserResponse,
   AdminUpdateUserResponse,
+  AdminBulkSubmissionLockResponse,
   AdminUsersPageResponse,
   ApiMessageResponse,
   BatchCreateUsersResponse,
@@ -49,6 +50,17 @@ const usersAdminService = {
     const response = await api.put<AdminUpdateUserResponse>(
       `/admin/users/${userId}/submission-lock`,
       { locked },
+    );
+    return response.data;
+  },
+
+  setUsersSubmissionLock: async (
+    ids: number[],
+    locked: boolean,
+  ): Promise<AdminBulkSubmissionLockResponse> => {
+    const response = await api.put<AdminBulkSubmissionLockResponse>(
+      '/admin/users/submission-lock',
+      { ids, locked },
     );
     return response.data;
   },
