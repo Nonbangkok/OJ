@@ -112,6 +112,27 @@ describe('UserManagement Component', () => {
         });
     });
 
+    it('allows admins to lock a regular user and refreshes the row after confirmation', async () => {
+        (jest.mocked(adminService.setUserSubmissionLock) as jest.Mock).mockResolvedValue({
+            id: 2, username: 'user1', role: 'user', submissions_locked: true,
+        });
+        (jest.mocked(adminService.getUsers) as jest.Mock)
+            .mockResolvedValueOnce({ users: mockUsers, total: mockUsers.length, page: 1, limit: 100 })
+            .mockResolvedValueOnce({
+                users: [mockUsers[0], { ...mockUsers[1], submissions_locked: true }, mockUsers[2]],
+                total: mockUsers.length, page: 1, limit: 100,
+            });
+        renderUserManagement();
+        await screen.findByText('user1');
+        const userRow = screen.getAllByRole('row').find(r => r.textContent.includes('user1'));
+        fireEvent.click(within(userRow).getByRole('button', { name: /row actions for user1/i }));
+        fireEvent.click(screen.getByRole('menuitem', { name: /lock submissions/i }));
+        expect(screen.getByText(/prevent this user from submitting and joining contests/i)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /^lock$/i }));
+        await waitFor(() => expect(adminService.setUserSubmissionLock).toHaveBeenCalledWith(2, true));
+        expect(await screen.findByText(/submissions locked/i)).toBeInTheDocument();
+    });
+
     it('opens and closes AddUserModal', async () => {
         renderUserManagement();
 

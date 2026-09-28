@@ -1,6 +1,7 @@
 import express, { Request, Response, Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import { requirePublicAccess } from '../middleware/siteAccess';
+import { requireSubmissionsUnlocked } from '../middleware/submissionLock';
 import { memoryUpload } from '../middleware/upload';
 import { processContestSubmission, processSubmission } from '../services/submissionService';
 import { USER_ROLES } from '../constants';
@@ -38,6 +39,7 @@ router.post(
   '/submit',
   submitLimiter,
   requireAuth,
+  requireSubmissionsUnlocked,
   memoryUpload.none(),
   validateRequest({ body: submitSchema }),
   asyncHandler(async (req: Request, res: Response<SubmitSuccessResponse | MessageResponse>) => {

@@ -2,6 +2,7 @@ import express, { Request, Response, Router } from 'express';
 import * as problemMigration from '../services/problemMigration';
 import { requireAuth, requireStaffOrAdmin } from '../middleware/auth';
 import { requirePublicAccess } from '../middleware/siteAccess';
+import { requireSubmissionsUnlocked } from '../middleware/submissionLock';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import {
   ContestCreateRequestBody,
@@ -73,7 +74,7 @@ router.get('/contests/:id',
 }));
 
 // Join a contest
-router.post('/contests/:id/join', requireAuth,
+router.post('/contests/:id/join', requireAuth, requireSubmissionsUnlocked,
   validateRequest({ params: contestIdParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);

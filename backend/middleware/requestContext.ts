@@ -9,6 +9,7 @@ interface SessionUserRow {
     username: string;
     role: UserRole;
     has_avatar: boolean;
+    submissions_locked: boolean;
 }
 
 /**
@@ -46,7 +47,7 @@ export const revalidateSessionUser = async (
         }
 
         const result = await db.query<SessionUserRow>(
-            'SELECT id, username, role, (avatar_png IS NOT NULL) AS has_avatar FROM users WHERE id = $1',
+            'SELECT id, username, role, (avatar_png IS NOT NULL) AS has_avatar, submissions_locked FROM users WHERE id = $1',
             [session.userId],
         );
 
@@ -61,6 +62,7 @@ export const revalidateSessionUser = async (
             delete session.username;
             delete session.role;
             delete session.hasAvatar;
+            delete session.submissionsLocked;
             next();
             return;
         }
@@ -72,6 +74,7 @@ export const revalidateSessionUser = async (
         session.username = user.username;
         session.role = user.role;
         session.hasAvatar = user.has_avatar;
+        session.submissionsLocked = user.submissions_locked;
 
         next();
     } catch (error) {
@@ -97,6 +100,7 @@ export const attachRequestUser = (req: Request, _res: Response, next: NextFuncti
             username: session.username ?? '',
             role: (session.role ?? 'user') as 'user' | 'staff' | 'admin',
             hasAvatar: session.hasAvatar === true,
+            submissionsLocked: session.submissionsLocked === true,
         };
     } else {
         req.user = undefined;

@@ -105,6 +105,7 @@ const useUserManagement = (search = '', roleFilter = 'all') => {
         total,
         loading,
         error,
+        setError,
         editingUser,
         setEditingUser,
         deletingUser,

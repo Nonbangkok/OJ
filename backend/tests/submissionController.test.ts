@@ -26,6 +26,7 @@ jest.mock('../middleware/auth', () => ({
 
 describe('Submission Controller', () => {
     let app: Express;
+    let requestUser: NonNullable<Request['user']>;
 
     beforeEach(() => {
         app = express();
@@ -37,15 +38,40 @@ describe('Submission Controller', () => {
         }));
         // Handlers read the user context (req.user), not raw session fields.
         app.use((req: Request, _res: Response, next: NextFunction) => {
-            req.user = { id: 1, username: 'user1', role: 'user', hasAvatar: false };
+            req.user = requestUser;
             next();
         });
         app.use('/', submissionRouter);
         app.use(errorHandler);
         jest.clearAllMocks();
+        requestUser = { id: 1, username: 'user1', role: 'user', hasAvatar: false };
     });
 
     describe('POST /submit', () => {
+        it('rejects new submissions from a locked regular user before touching submission data', async () => {
+            requestUser = { ...requestUser, submissionsLocked: true };
+            const res = await request(app)
+                .post('/submit')
+                .send({ problemId: 'P1', language: 'cpp', code: 'int main(){}' });
+
+            expect(res.status).toBe(403);
+            expect(res.body.message).toMatch(/locked/i);
+            expect(db.query).not.toHaveBeenCalled();
+            expect(processSubmission).not.toHaveBeenCalled();
+        });
+
+        it('does not apply the submission lock to staff', async () => {
+            requestUser = { ...requestUser, role: 'staff', submissionsLocked: true };
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ 1: 1 }] })
+                .mockResolvedValueOnce({ rows: [{ 1: 1 }] })
+                .mockResolvedValueOnce({ rows: [{ id: 404 }] });
+
+            const res = await request(app)
+                .post('/submit')
+                .send({ problemId: 'P1', language: 'cpp', code: 'int main(){}' });
+            expect(res.status).toBe(202);
+        });
         it('should return 400 for invalid payload (zod validation)', async () => {
             const res = await request(app)
                 .post('/submit')

@@ -68,6 +68,7 @@ export interface UserRow {
     username: string;
     password_hash: string;
     role: UserRole;
+    submissions_locked: boolean;
     created_at: Date;
 }
 
@@ -77,6 +78,8 @@ export interface UserPublicProfileDTO {
     username: string;
     role: UserRole;
     hasAvatar: boolean;
+    /** Refreshed from the live users row on each authenticated request. */
+    submissionsLocked?: boolean;
     /**
      * XP-derived tier label (e.g. "Novice", "Specialist"). Present only on
      * auth-bootstrap responses (login, /me) where the backend computes it —

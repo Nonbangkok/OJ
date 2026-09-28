@@ -7,6 +7,7 @@ import AddUserModal from './AddUserModal';
 import ResetPasswordModal from './ResetPasswordModal';
 import BatchUserCreation from './BatchUserCreation';
 import styles from '../shared/Management.module.css';
+import adminService from '../../../services/adminService';
 import tableStyles from '../../../components/styles/Table.module.css';
 import { ActionMenu, Button, StatusBadge } from '../../../components/ui';
 import type { AdminUser } from '../../../types';
@@ -25,6 +26,7 @@ const UserManagement = () => {
     total,
     loading,
     error,
+    setError,
     editingUser,
     setEditingUser,
     deletingUser,
@@ -44,6 +46,7 @@ const UserManagement = () => {
 
   // AUTH-004: target of the pending admin password reset.
   const [resettingPasswordUser, setResettingPasswordUser] = useState<AdminUser | null>(null);
+  const [submissionLockTarget, setSubmissionLockTarget] = useState<AdminUser | null>(null);
 
   // ADMIN-008: filtered totals and rows are both server-paged.
   const pageCount = Math.max(1, Math.ceil(total / USER_PAGE_SIZE));
@@ -117,6 +120,9 @@ const UserManagement = () => {
                       <StatusBadge tone={user.role === 'admin' ? 'info' : 'neutral'} soft>
                         {user.role}
                       </StatusBadge>
+                      {user.role === 'user' && user.submissions_locked && (
+                        <StatusBadge tone="danger" soft>Submissions locked</StatusBadge>
+                      )}
                     </td>
                     <td className={styles['col-center']}>
                       <div className={styles['row-actions']}>
@@ -131,6 +137,12 @@ const UserManagement = () => {
                         <ActionMenu
                           label={`Row actions for ${user.username}`}
                           items={[
+                            ...(user.role === 'user' ? [{
+                              key: 'submission-lock',
+                              label: user.submissions_locked ? 'Unlock submissions' : 'Lock submissions',
+                              disabled: !canManage,
+                              onClick: () => setSubmissionLockTarget(user),
+                            }] : []),
                             {
                               key: 'reset-password',
                               label: 'Reset password',
@@ -196,6 +208,30 @@ const UserManagement = () => {
           onConfirm={handleConfirmDelete}
           title="Confirm Deletion"
           message={`Are you sure you want to delete user "${deletingUser?.username}"? All related submissions will also be deleted.`}
+        />
+        <ConfirmationModal
+          isOpen={!!submissionLockTarget}
+          onClose={() => setSubmissionLockTarget(null)}
+          onConfirm={async () => {
+            if (!submissionLockTarget) return;
+            try {
+              await adminService.setUserSubmissionLock(
+                submissionLockTarget.id,
+                !submissionLockTarget.submissions_locked,
+              );
+              setSubmissionLockTarget(null);
+              await fetchUsers(page);
+            } catch (err) {
+              setError('Failed to update submission lock. Please retry.');
+              console.error(err);
+            }
+          }}
+          title={submissionLockTarget?.submissions_locked ? 'Unlock user submissions' : 'Lock user submissions'}
+          message={submissionLockTarget?.submissions_locked
+            ? `Allow ${submissionLockTarget?.username} to submit solutions and join contests again?`
+            : `Lock ${submissionLockTarget?.username}? This will prevent this user from submitting and joining contests until unlocked.`}
+          confirmText={submissionLockTarget?.submissions_locked ? 'Unlock' : 'Lock'}
+          confirmStyle={submissionLockTarget?.submissions_locked ? 'default' : 'danger'}
         />
         <AddUserModal
           isOpen={isAddModalOpen}

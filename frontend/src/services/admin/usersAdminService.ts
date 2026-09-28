@@ -42,6 +42,17 @@ const usersAdminService = {
     return response.data;
   },
 
+  setUserSubmissionLock: async (
+    userId: string | number,
+    locked: boolean,
+  ): Promise<AdminUpdateUserResponse> => {
+    const response = await api.put<AdminUpdateUserResponse>(
+      `/admin/users/${userId}/submission-lock`,
+      { locked },
+    );
+    return response.data;
+  },
+
   /**
    * AUTH-004: admin-set password reset. Sets the new password directly and
    * signs the target out of every device (all their sessions are deleted
