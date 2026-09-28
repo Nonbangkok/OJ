@@ -64,6 +64,12 @@ const UserManagement = () => {
   const selectedDisplayedIds = displayedIds.filter((id) => selectedIds.has(id));
   const allDisplayedSelected = displayedIds.length > 0 && selectedDisplayedIds.length === displayedIds.length;
 
+  const startBulkLock = (locked: boolean) => {
+    setBulkMessage('');
+    setBulkError('');
+    setBulkLockAction(locked);
+  };
+
   const confirmBulkLock = async () => {
     if (bulkLockAction === null || selectedDisplayedIds.length === 0) return;
     try {
@@ -140,9 +146,9 @@ const UserManagement = () => {
         <div className={styles['bulk-actions']}>
           <span>{selectedDisplayedIds.length} selected on this page</span>
           <Button size="compact" variant="secondary" disabled={!selectedDisplayedIds.length || loading}
-            onClick={() => setBulkLockAction(true)}>Lock selected</Button>
+            onClick={() => startBulkLock(true)}>Lock selected</Button>
           <Button size="compact" variant="secondary" disabled={!selectedDisplayedIds.length || loading}
-            onClick={() => setBulkLockAction(false)}>Unlock selected</Button>
+            onClick={() => startBulkLock(false)}>Unlock selected</Button>
         </div>
 
         {/* --- Table: Edit + overflow ------------------------------------ */}

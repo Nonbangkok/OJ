@@ -176,6 +176,26 @@ describe('UserManagement Component', () => {
         expect(screen.getByRole('checkbox', { name: /select user1/i })).toBeChecked();
     });
 
+    it('clears a prior bulk success before another action that fails', async () => {
+        (jest.mocked(adminService.setUsersSubmissionLock) as jest.Mock)
+            .mockResolvedValueOnce({ updatedIds: [2], skippedIds: [] })
+            .mockRejectedValueOnce(new Error('Network error'));
+        renderUserManagement();
+        await screen.findByText('user1');
+
+        fireEvent.click(screen.getByRole('checkbox', { name: /select user1/i }));
+        fireEvent.click(screen.getByRole('button', { name: /^lock selected$/i }));
+        fireEvent.click(screen.getByRole('button', { name: /^lock$/i }));
+        expect(await screen.findByRole('status')).toHaveTextContent(/updated 1 user/i);
+
+        fireEvent.click(screen.getByRole('checkbox', { name: /select user1/i }));
+        fireEvent.click(screen.getByRole('button', { name: /^unlock selected$/i }));
+        expect(screen.queryByText(/updated 1 user/i)).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /^unlock$/i }));
+        expect(await screen.findByRole('alert')).toHaveTextContent(/failed to update selected users/i);
+        expect(screen.queryByText(/updated 1 user/i)).not.toBeInTheDocument();
+    });
+
     it('opens and closes AddUserModal', async () => {
         renderUserManagement();
 
