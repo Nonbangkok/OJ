@@ -52,6 +52,29 @@ describe('UserManagement Component', () => {
         expect(screen.getByRole('status')).toHaveTextContent(/loading users/i);
     });
 
+    it('groups filters and bulk actions into separate toolbar rows above the table', async () => {
+        renderUserManagement();
+        await screen.findByText('user1');
+
+        const search = screen.getByRole('searchbox', { name: /search users/i });
+        const role = screen.getByRole('combobox', { name: /filter users by role/i });
+        const selectionCount = screen.getByText(/selected on this page/i);
+        const lock = screen.getByRole('button', { name: /^lock selected$/i });
+        const unlock = screen.getByRole('button', { name: /^unlock selected$/i });
+        const table = screen.getByRole('table');
+        const toolbar = screen.getByTestId('users-toolbar');
+        const filterRow = search.parentElement;
+        const actionRow = selectionCount.parentElement;
+
+        expect(filterRow).toContainElement(role);
+        expect(actionRow).toContainElement(lock);
+        expect(actionRow).toContainElement(unlock);
+        expect(filterRow).not.toBe(actionRow);
+        expect(filterRow?.parentElement).toBe(toolbar);
+        expect(actionRow?.parentElement).toBe(toolbar);
+        expect(toolbar.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
     it('renders user list and headers correctly', async () => {
         renderUserManagement();
 

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import ProblemManagement from '../../../features/admin/problems/ProblemManagement';
 import adminService from '../../../services/adminService';
 import { BrowserRouter } from 'react-router-dom';
+import { installMockIntersectionObserver, restoreMockIntersectionObserver, triggerIntersectionObservers } from '../../utils/mockIntersectionObserver';
 
 // Mock services
 jest.mock('../../../services/adminService');
@@ -47,6 +48,8 @@ const renderProblemManagement = () => {
 };
 
 describe('ProblemManagement Component', () => {
+    afterEach(() => restoreMockIntersectionObserver());
+
     beforeEach(() => {
         jest.clearAllMocks();
         (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(makePage(mockProblems));
@@ -653,6 +656,24 @@ describe('ProblemManagement Component', () => {
     });
 
     describe('Show More pagination (server-side)', () => {
+        it('automatically loads the next server page near the Show More control', async () => {
+            const restoreObserver = installMockIntersectionObserver();
+            (jest.mocked(adminService.getProblems) as jest.Mock)
+                .mockResolvedValueOnce(makePage(mockProblems.slice(0, 2), { hasMore: true, nextCursor: 'cursor-1' }))
+                .mockResolvedValueOnce(makePage([mockProblems[2]], { hasMore: false, nextCursor: null }));
+            renderProblemManagement();
+
+            await screen.findByText('Problem 2');
+            await waitFor(() => expect(adminService.getProblems).toHaveBeenCalledTimes(1));
+            act(() => triggerIntersectionObservers());
+
+            expect(await screen.findByText('Problem 3')).toBeInTheDocument();
+            expect(adminService.getProblems).toHaveBeenLastCalledWith(expect.objectContaining({
+                cursor: 'cursor-1', limit: 25,
+            }));
+            restoreObserver();
+        });
+
         it('Load All keeps filters mounted and lets the header select exactly the loaded rows', async () => {
             (jest.mocked(adminService.getProblems) as jest.Mock)
                 .mockResolvedValueOnce(makePage(mockProblems.slice(0, 2), { hasMore: true, nextCursor: 'cursor-1' }))

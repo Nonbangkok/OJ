@@ -107,52 +107,58 @@ const UserManagement = () => {
         </div>
 
         {/* --- Filter / scope bar ----------------------------------------- */}
-        <div className={styles['filter-bar']}>
-          <input
-            type="search"
-            className={styles['filter-search']}
-            placeholder="Search users…"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            aria-label="Search users"
-          />
-          <label className={styles['filter-control']}>
-            <span className={styles['filter-label']}>Role</span>
-            <select
-              value={roleFilter}
-              onChange={(event) => setRoleFilter(event.target.value)}
-              aria-label="Filter users by role"
-            >
-              <option value="all">All</option>
-              {['admin', 'staff', 'user'].map(role => (
-                <option key={role} value={role}>{role}</option>
-              ))}
-            </select>
-          </label>
+        <div className={styles['users-toolbar']} data-testid="users-toolbar">
+          <div className={`${styles['filter-bar']} ${styles['users-filter-row']}`}>
+            <input
+              type="search"
+              className={styles['filter-search']}
+              placeholder="Search users…"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              aria-label="Search users"
+            />
+            <label className={styles['filter-control']}>
+              <span className={styles['filter-label']}>Role</span>
+              <select
+                value={roleFilter}
+                onChange={(event) => setRoleFilter(event.target.value)}
+                aria-label="Filter users by role"
+              >
+                <option value="all">All</option>
+                {['admin', 'staff', 'user'].map(role => (
+                  <option key={role} value={role}>{role}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className={`${styles['bulk-actions']} ${styles['users-bulk-row']}`}>
+            <span>{selectedDisplayedIds.length} selected on this page</span>
+            <Button size="compact" variant="secondary" disabled={!selectedDisplayedIds.length || loading}
+              onClick={() => startBulkLock(true)}>Lock selected</Button>
+            <Button size="compact" variant="secondary" disabled={!selectedDisplayedIds.length || loading}
+              onClick={() => startBulkLock(false)}>Unlock selected</Button>
+          </div>
         </div>
 
-        {loading && <p role="status">Loading users…</p>}
-        {error && (
-          <div className="error-message" role="alert">
-            {error}{' '}
-            <Button variant="secondary" size="compact" onClick={() => fetchUsers(page)}>
-              Retry
-            </Button>
+        {(loading || error || bulkError || bulkMessage) && (
+          <div className={styles['users-feedback']}>
+            {loading && <p role="status">Loading users…</p>}
+            {error && (
+              <div className="error-message" role="alert">
+                {error}{' '}
+                <Button variant="secondary" size="compact" onClick={() => fetchUsers(page)}>
+                  Retry
+                </Button>
+              </div>
+            )}
+            {bulkError && <div className="error-message" role="alert">{bulkError}</div>}
+            {bulkMessage && <p role="status">{bulkMessage}</p>}
           </div>
         )}
-        {bulkError && <div className="error-message" role="alert">{bulkError}</div>}
-        {bulkMessage && <p role="status">{bulkMessage}</p>}
-
-        <div className={styles['bulk-actions']}>
-          <span>{selectedDisplayedIds.length} selected on this page</span>
-          <Button size="compact" variant="secondary" disabled={!selectedDisplayedIds.length || loading}
-            onClick={() => startBulkLock(true)}>Lock selected</Button>
-          <Button size="compact" variant="secondary" disabled={!selectedDisplayedIds.length || loading}
-            onClick={() => startBulkLock(false)}>Unlock selected</Button>
-        </div>
 
         {/* --- Table: Edit + overflow ------------------------------------ */}
-        <div className={`${tableStyles['table-container']} ${styles.tableWrap}`}>
+        <div className={`${tableStyles['table-container']} ${styles['users-table-wrap']}`}>
           <table className={tableStyles.table}>
             <thead>
               <tr>

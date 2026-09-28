@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { BrowserRouter, MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Problems from '../../pages/problem/Problems';
 import problemService from '../../services/problemService';
+import { installMockIntersectionObserver, restoreMockIntersectionObserver, triggerIntersectionObservers } from '../utils/mockIntersectionObserver';
 
 jest.mock('../../services/problemService');
 
@@ -54,6 +55,8 @@ const SameRouteNavigation = () => {
 };
 
 describe('Problems Page', () => {
+    afterEach(() => restoreMockIntersectionObserver());
+
     beforeEach(() => {
         jest.clearAllMocks();
         window.history.replaceState({}, '', '/problems');
@@ -107,6 +110,25 @@ describe('Problems Page', () => {
     });
 
     describe('Show More (incremental loading)', () => {
+        it('automatically loads the next batch when the Show More control enters the near-viewport', async () => {
+            const restoreObserver = installMockIntersectionObserver();
+            (jest.mocked(problemService.getProblemsPage) as jest.Mock)
+                .mockResolvedValueOnce({ problems: [problem('a')], nextCursor: 'cur-1', hasMore: true })
+                .mockResolvedValueOnce({ problems: [problem('b')], nextCursor: null, hasMore: false });
+
+            renderProblems();
+            await screen.findByText('Title a');
+            await waitFor(() => expect(problemService.getProblemsPage).toHaveBeenCalledTimes(1));
+
+            act(() => triggerIntersectionObservers());
+
+            expect(await screen.findByText('Title b')).toBeInTheDocument();
+            expect(problemService.getProblemsPage).toHaveBeenLastCalledWith({
+                sort: 'difficulty', order: 'asc', limit: 20, cursor: 'cur-1',
+            });
+            restoreObserver();
+        });
+
         it('appends the next batch when Show More is clicked', async () => {
             (jest.mocked(problemService.getProblemsPage) as jest.Mock)
                 .mockResolvedValueOnce({ problems: [problem('a'), problem('b')], nextCursor: 'cur-1', hasMore: true })

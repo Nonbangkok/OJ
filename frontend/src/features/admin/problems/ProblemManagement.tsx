@@ -15,6 +15,7 @@ import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 import { ActionMenu, Button, StatusBadge } from '../../../components/ui';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
+import { useInfiniteScroll } from '../../../hooks/useInfiniteScroll';
 
 interface ProblemManagementProps {
   currentUser?: { username?: string } | null;
@@ -160,6 +161,12 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
   // The table renders exactly the server-paged rows (filters already ran
   // in SQL, before pagination).
   const visibleProblems = problems;
+  const showMoreRef = useInfiniteScroll({
+    enabled: hasMore && !loading && !loadingMore && !loadMoreError && !loadingAll
+      && !loadAllError && bulkScopeReady,
+    observationKey: visibleProblems.length,
+    onLoadMore: loadMore,
+  });
 
   const filteredCollection = collections.find(c => c.id === Number(collectionFilter));
 
@@ -548,7 +555,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
 
       {/* --- 5. Show More: server-side next batch -------------------------- */}
       {(hasMore || loadMoreError || loadAllError) && !loading && (
-        <div className={styles['load-more-container']}>
+        <div className={styles['load-more-container']} ref={showMoreRef}>
           {loadMoreError && (
             <p className={styles['load-more-error']} role="alert">
               Failed to load more problems.

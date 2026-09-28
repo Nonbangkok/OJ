@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom';
 import Submissions from '../../pages/submission/Submissions';
 import submissionService from '../../services/submissionService';
 import { useAuth } from '../../context/AuthContext';
+import { installMockIntersectionObserver, restoreMockIntersectionObserver, triggerIntersectionObservers } from '../utils/mockIntersectionObserver';
 
 jest.mock('../../services/submissionService');
 jest.mock('../../context/AuthContext', () => ({
@@ -22,6 +23,8 @@ jest.mock('react-router-dom', () => ({
 }));
 
 describe('Submissions Page', () => {
+    afterEach(() => restoreMockIntersectionObserver());
+
     beforeEach(() => {
         jest.clearAllMocks();
         jest.mocked(useAuth).mockReturnValue({ user: null, isLoading: false } as ReturnType<typeof useAuth>);
@@ -47,6 +50,31 @@ describe('Submissions Page', () => {
             expect(screen.getByText('Test Problem')).toBeInTheDocument();
             expect(screen.getByText('Accepted')).toBeInTheDocument();
         });
+    });
+
+    it('automatically reveals the next submissions batch near the Show More control', async () => {
+        const restoreObserver = installMockIntersectionObserver();
+        const submissions = Array.from({ length: 12 }, (_, index) => ({
+            id: index + 1,
+            problem_id: `P${index + 1}`,
+            problem_title: `Test Problem ${index + 1}`,
+            username: `user${index + 1}`,
+            overall_status: 'Accepted',
+            score: 100,
+            language: 'python',
+            submitted_at: '2025-01-01T00:00:00Z',
+        }));
+        jest.mocked(submissionService.getAll).mockResolvedValueOnce(submissions);
+
+        render(<BrowserRouter><Submissions /></BrowserRouter>);
+
+        expect(await screen.findByText('Test Problem 10')).toBeInTheDocument();
+        expect(screen.queryByText('Test Problem 11')).not.toBeInTheDocument();
+        act(() => triggerIntersectionObservers());
+
+        expect(await screen.findByText('Test Problem 11')).toBeInTheDocument();
+        expect(screen.getByText('Test Problem 12')).toBeInTheDocument();
+        restoreObserver();
     });
 
     it('handles fetch error gracefully', async () => {

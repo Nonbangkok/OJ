@@ -27,6 +27,59 @@
   margin-bottom: 0.75rem;
 }
 
+/* User Management keeps its filters and page-scoped actions in distinct rows. */
+.users-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin: 0.75rem 0 1.125rem;
+}
+
+.filter-bar.users-filter-row {
+  margin-top: 0;
+  gap: 0.875rem;
+}
+
+.users-filter-row .filter-search {
+  flex: 1 1 22rem;
+  max-width: none;
+}
+
+.users-filter-row .filter-control {
+  flex: 0 0 auto;
+}
+
+.users-filter-row .filter-control select {
+  min-width: 5rem;
+}
+
+.users-bulk-row {
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  margin: 0;
+}
+
+.users-bulk-row > span {
+  margin-right: 0.25rem;
+  color: var(--text-muted);
+  font-size: var(--font-size-metadata);
+}
+
+.users-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.users-feedback p {
+  margin: 0;
+}
+
+.users-table-wrap {
+  margin-top: 0;
+}
+
 .management-header h2 {
   margin: 0;
 }
@@ -768,6 +821,10 @@
     gap: 0.5rem;
   }
 
+  .filter-bar.users-filter-row {
+    gap: 0.875rem;
+  }
+
   .filter-search {
     flex-basis: 100%;
     max-width: none;
@@ -788,6 +845,14 @@
   .selection-bar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .users-filter-row {
+    align-items: stretch;
+  }
+
+  .users-filter-row .filter-control {
+    align-self: flex-start;
   }
 }
 

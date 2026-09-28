@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import styles from './Problems.module.css';
 import { useIncrementalProblems } from '../../hooks/useIncrementalProblems';
+import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
 import { useScrollRestore } from '../../hooks/useScrollRestore';
 import ProblemCard from '../../features/problem/ProblemCard';
 import { Button } from '../../components/ui';
@@ -86,6 +87,11 @@ const Problems = () => {
     hasMore,
     loadMore,
   } = useIncrementalProblems(query);
+  const showMoreRef = useInfiniteScroll({
+    enabled: hasMore && !loading && !loadingMore && !loadMoreError,
+    observationKey: problems.length,
+    onLoadMore: loadMore,
+  });
 
   // True once any first page has finished loading. After that the controls
   // stay mounted forever — a later query change refreshes only the result
@@ -277,7 +283,7 @@ const Problems = () => {
       )}
 
       {(hasMore || loadMoreError) && (
-        <div className={styles['show-more-container']}>
+        <div className={styles['show-more-container']} ref={showMoreRef}>
           {loadMoreError && (
             <p className={styles['show-more-error']} role="alert">
               Failed to load more problems.

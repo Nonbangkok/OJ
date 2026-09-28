@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import styles from '../../components/styles/Submissions.module.css';
 import SubmissionModal from '../problem/submission/SubmissionModal';
@@ -8,6 +8,7 @@ import { getStatusClass, canViewCode, formatDateTime } from '../../utils/formatt
 import tableStyles from '../../components/styles/Table.module.css';
 import { Button, SegmentedControl } from '../../components/ui';
 import { USER_ROLES, getLanguageDisplayName } from '../../utils/constants';
+import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
 import type { AuthUser } from '../../types';
 
 type SubmissionsViewProps = {
@@ -64,9 +65,16 @@ const SubmissionsView = ({
         selectProblem,
         selectUser
     } = useSubmissions(problemId, contestId);
+    const displayError = variant === 'contest' ? guardError || error : error;
 
     // UI Only state
     const [visibleCount, setVisibleCount] = useState(10);
+    const loadMoreVisible = useCallback(() => setVisibleCount(prev => prev + 10), []);
+    const showMoreRef = useInfiniteScroll({
+        enabled: visibleCount < submissions.length && !loading && !displayError,
+        observationKey: visibleCount,
+        onLoadMore: loadMoreVisible,
+    });
     const problemInputRef = useRef<HTMLDivElement | null>(null);
     const userInputRef = useRef<HTMLDivElement | null>(null);
 
@@ -83,8 +91,6 @@ const SubmissionsView = ({
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [setShowProblemSuggestions, setShowUserSuggestions]);
-
-    const displayError = variant === 'contest' ? guardError || error : error;
 
     return (
         <div className={styles['submissions-container']}>
@@ -261,10 +267,10 @@ const SubmissionsView = ({
             </div>
 
             {visibleCount < submissions.length && (
-                <div className={styles['show-more-container']}>
+                <div className={styles['show-more-container']} ref={showMoreRef}>
                     <button
                         className={styles['show-more-btn']}
-                        onClick={() => setVisibleCount(prev => prev + 10)}
+                        onClick={loadMoreVisible}
                     >
                         Show More
                     </button>
