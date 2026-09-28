@@ -15,6 +15,8 @@ import type { ProblemCategory } from '../../utils/constants';
 import { useAdminProblemsPage } from './useAdminProblemsPage';
 import { normalizeUploadProgress } from './problemManagement.helpers';
 
+type EditableProblem = ProblemDetail & Pick<AdminProblem, 'collection_id'>;
+
 export interface ProblemSaveData {
   id: string;
   title: string;
@@ -63,7 +65,7 @@ const useProblemCrud = ({ query }: UseProblemCrudArgs) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProblem, setEditingProblem] = useState<ProblemDetail | null>(null);
+  const [editingProblem, setEditingProblem] = useState<EditableProblem | null>(null);
   const [uploadProgress, setUploadProgress] = useState<UploadProgressState | null>(null);
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -198,7 +200,10 @@ const useProblemCrud = ({ query }: UseProblemCrudArgs) => {
     try {
       setLoading(true);
       const data = await adminService.getProblemDetail(problem.id);
-      setEditingProblem(data);
+      // The detail endpoint intentionally omits collection metadata. Keep the
+      // collection id from the admin list row so Edit opens with its current
+      // collection selected instead of falling back to "No Collection".
+      setEditingProblem({ ...data, collection_id: problem.collection_id });
       setIsModalOpen(true);
     } catch (errorValue) {
       setError('Failed to fetch problem details.');
