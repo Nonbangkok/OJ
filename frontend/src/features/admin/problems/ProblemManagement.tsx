@@ -340,8 +340,8 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
         </div>
       )}
 
-      {/* --- 3b. Selection bar (only with a selection) -------------------- */}
-      {hasSelection && (
+      {/* --- 3b. Selection bar (after the pointer gesture ends) ----------- */}
+      {hasSelection && !isDragging && (
         <div className={styles['selection-bar']} role="status">
           <span className={styles['selection-count']}>
             {selectedCount} selected
@@ -463,7 +463,14 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
               >
                 <td
                   className={styles['col-checkbox']}
-                  onPointerDown={(event) => handleSelectionZonePointerDown(event, problem.id, selected)}
+                  onPointerDown={(event) => {
+                    // The checkbox handles its own click on release. Starting
+                    // drag-selection from pointerdown on the input changes the
+                    // selection bar while the pointer is still down, shifting
+                    // the table under the user's cursor.
+                    if (event.target === event.currentTarget.querySelector('input[type="checkbox"]')) return;
+                    handleSelectionZonePointerDown(event, problem.id, selected);
+                  }}
                 >
                   <input
                     type="checkbox"

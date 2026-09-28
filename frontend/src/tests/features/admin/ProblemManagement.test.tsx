@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import ProblemManagement from '../../../features/admin/problems/ProblemManagement';
 import adminService from '../../../services/adminService';
 import { BrowserRouter } from 'react-router-dom';
@@ -509,6 +510,38 @@ describe('ProblemManagement Component', () => {
 
             fireEvent.click(getRowCheckbox('Alpha 1'));
             expect(screen.getByText('1 selected')).toBeInTheDocument();
+        });
+
+        it('a pointer click on a row checkbox selects exactly once when the selection bar appears', async () => {
+            await renderWithSearchProblems();
+
+            const checkbox = getRowCheckbox('Echo 1');
+            const user = userEvent.setup();
+            await user.pointer([{ keys: '[MouseLeft>]', target: checkbox }]);
+            expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+            await user.pointer([{ keys: '[/MouseLeft]', target: checkbox }]);
+
+            expect(checkbox).toBeChecked();
+            expect(screen.getByText('1 selected')).toBeInTheDocument();
+        });
+
+        it('keeps the selection bar hidden until a drag gesture ends', async () => {
+            await renderWithSearchProblems();
+
+            const firstRow = getRow('Echo 1');
+            const secondRow = getRow('Echo 2');
+            const user = userEvent.setup();
+            await user.pointer([
+                { keys: '[MouseLeft>]', target: firstRow.querySelector('td') },
+                { target: secondRow },
+            ]);
+
+            expect(getRowCheckbox('Echo 1')).toBeChecked();
+            expect(getRowCheckbox('Echo 2')).toBeChecked();
+            expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+            await user.pointer([{ keys: '[/MouseLeft]', target: secondRow }]);
+            expect(screen.getByRole('status')).toHaveTextContent('2 selected');
         });
 
         it('Clear button empties the selection', async () => {
