@@ -45,6 +45,13 @@ const DetailWithBack = () => {
     const navigate = useNavigate();
     return <button onClick={() => navigate(-1)}>Back to problems</button>;
 };
+const SameRouteNavigation = () => {
+    const navigate = useNavigate();
+    return <>
+        <button onClick={() => navigate('/problems?keep=yes&search=updated&category=Greedy&difficultyMin=1200&difficultyMax=2200&sort=difficulty-desc&author=Alice&collection=7')}>Open filtered URL</button>
+        <button onClick={() => navigate(-1)}>Back to prior URL</button>
+    </>;
+};
 
 describe('Problems Page', () => {
     beforeEach(() => {
@@ -52,8 +59,7 @@ describe('Problems Page', () => {
         window.history.replaceState({}, '', '/problems');
         (jest.mocked(problemService.getCategoryCounts) as jest.Mock).mockResolvedValue(categoryCounts);
         (jest.mocked(problemService.getFilterOptions) as jest.Mock).mockResolvedValue({
-            authors: ['Alice', 'Bob'], collections: [{ id: 7, name: 'Practice' }],
-            hasUnauthored: true, hasUncollected: true,
+            collections: [{ id: 7, name: 'Practice' }], hasUncollected: true,
         });
     });
 
@@ -351,23 +357,71 @@ describe('Problems Page', () => {
     });
 
     describe('public author and collection filters', () => {
-        it('offers canonical values and refetches the first page immediately with both filters', async () => {
+        it('accepts arbitrary author text, saves it immediately, and debounces the request', async () => {
+            const mock = jest.mocked(problemService.getProblemsPage) as jest.Mock;
+            mock.mockResolvedValue(firstPage);
+            render(
+                <MemoryRouter initialEntries={['/problems?keep=yes']}>
+                    <LocationProbe /><Problems />
+                </MemoryRouter>,
+            );
+            await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
+            mock.mockClear();
+            fireEvent.change(screen.getByLabelText('Author'), { target: { value: '  nOnE  ' } });
+            expect(screen.getByLabelText('Author')).toHaveValue('  nOnE  ');
+            expect(mock).not.toHaveBeenCalled();
+            const params = new URLSearchParams(screen.getByTestId('location').textContent || '');
+            expect(params.get('author')).toBe('  nOnE  ');
+            expect(params.get('keep')).toBe('yes');
+            await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ author: 'nOnE', sort: 'difficulty', order: 'asc', limit: 20 }));
+        });
+
+        it('syncs controls and results after same-route URL navigation and Back', async () => {
+            const mock = jest.mocked(problemService.getProblemsPage) as jest.Mock;
+            mock.mockImplementation(async (query) => query.search === 'updated'
+                ? { problems: [problem('new', 'Updated Result')], nextCursor: null, hasMore: false }
+                : firstPage);
+            render(
+                <MemoryRouter initialEntries={['/problems?keep=yes']}>
+                    <LocationProbe /><SameRouteNavigation /><Problems />
+                </MemoryRouter>,
+            );
+            await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
+            fireEvent.click(screen.getByRole('button', { name: 'Open filtered URL' }));
+            await waitFor(() => expect(screen.getByText('Updated Result')).toBeInTheDocument());
+            expect(screen.getByLabelText('Search problems')).toHaveValue('updated');
+            expect(screen.getByRole('tab', { name: /^Greedy/ })).toHaveAttribute('aria-selected', 'true');
+            expect(screen.getByLabelText('Difficulty minimum')).toHaveValue('1200');
+            expect(screen.getByLabelText('Difficulty maximum')).toHaveValue('2200');
+            expect(screen.getByLabelText('Sort problems')).toHaveValue('difficulty-desc');
+            expect(screen.getByLabelText('Author')).toHaveValue('Alice');
+            expect(screen.getByLabelText('Collection')).toHaveValue('7');
+            expect(mock).toHaveBeenLastCalledWith({
+                search: 'updated', category: 'Greedy', difficultyMin: 1200, difficultyMax: 2200,
+                sort: 'difficulty', order: 'desc', author: 'Alice', collection: 7, limit: 20,
+            });
+            fireEvent.click(screen.getByRole('button', { name: 'Back to prior URL' }));
+            await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
+            expect(screen.getByLabelText('Search problems')).toHaveValue('');
+            expect(screen.getByLabelText('Author')).toHaveValue('');
+            expect(screen.getByTestId('location').textContent).toBe('?keep=yes');
+        });
+        it('offers canonical collection choices and composes them with free-text author search', async () => {
             const mock = jest.mocked(problemService.getProblemsPage) as jest.Mock;
             mock.mockResolvedValue({ ...firstPage, nextCursor: 'next', hasMore: true });
             renderProblems();
             await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-            expect(screen.getByRole('option', { name: 'Bob' })).toBeInTheDocument();
             expect(screen.getByRole('option', { name: 'Practice' })).toBeInTheDocument();
 
-            fireEvent.change(screen.getByLabelText('Author'), { target: { value: 'Bob' } });
-            await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ author: 'Bob', sort: 'difficulty', order: 'asc', limit: 20 }));
             fireEvent.change(screen.getByLabelText('Collection'), { target: { value: '7' } });
-            await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ author: 'Bob', collection: 7, sort: 'difficulty', order: 'asc', limit: 20 }));
+            await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ collection: 7, sort: 'difficulty', order: 'asc', limit: 20 }));
+            fireEvent.change(screen.getByLabelText('Author'), { target: { value: 'Accountless Author' } });
+            await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ author: 'Accountless Author', collection: 7, sort: 'difficulty', order: 'asc', limit: 20 }));
             expect(mock.mock.calls.at(-1)?.[0].cursor).toBeUndefined();
 
-            fireEvent.change(screen.getByLabelText('Author'), { target: { value: 'none' } });
+            fireEvent.change(screen.getByLabelText('Author'), { target: { value: '' } });
             fireEvent.change(screen.getByLabelText('Collection'), { target: { value: 'none' } });
-            await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ author: 'none', collection: 'none', sort: 'difficulty', order: 'asc', limit: 20 }));
+            await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ collection: 'none', sort: 'difficulty', order: 'asc', limit: 20 }));
         });
 
         it('restores every filter from the URL after navigating to a detail and back', async () => {
@@ -459,11 +513,14 @@ describe('Problems Page', () => {
             await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
             mock.mockClear();
             fireEvent.change(screen.getByLabelText('Search problems'), { target: { value: 'very quick' } });
+            fireEvent.change(screen.getByLabelText('Author'), { target: { value: 'Writer Without Account' } });
             expect(mock).not.toHaveBeenCalled();
             fireEvent.click(screen.getAllByRole('link', { name: 'New' })[0]);
             fireEvent.click(screen.getByRole('button', { name: 'Back to problems' }));
             await waitFor(() => expect(screen.getByLabelText('Search problems')).toHaveValue('very quick'));
+            expect(screen.getByLabelText('Author')).toHaveValue('Writer Without Account');
             expect(screen.getByTestId('location').textContent).toContain('search=very+quick');
+            expect(screen.getByTestId('location').textContent).toContain('author=Writer+Without+Account');
             expect(screen.getByTestId('location').textContent).toContain('keep=yes');
         });
     });

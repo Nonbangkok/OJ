@@ -63,7 +63,7 @@ export interface ProblemListOptions extends ProblemListDifficultyOptions {
   search?: string;
   /** One category from the closed list, or 'Uncategorized' (empty array). */
   category?: string;
-  /** Exact trimmed author name, or 'none' for an unassigned author. */
+  /** Case-insensitive substring of the problem's free-text author field. */
   author?: string;
   /** Collection id, or 'none' for problems outside a collection. */
   collection?: number | 'none';
@@ -207,11 +207,9 @@ export const getProblemsWithStatsForUser = async (
     params.push(options.category);
     filters.push(`p.categories @> ARRAY[$${params.length}]::text[]`);
   }
-  if (options.author === 'none') {
-    filters.push("(p.author IS NULL OR btrim(p.author) = '')");
-  } else if (options.author !== undefined) {
-    params.push(options.author);
-    filters.push(`btrim(p.author) = $${params.length}`);
+  if (options.author?.trim()) {
+    params.push(`%${escapeLikePattern(options.author.trim())}%`);
+    filters.push(`p.author ILIKE $${params.length}`);
   }
   if (options.collection === 'none') {
     filters.push('p.collection_id IS NULL');
@@ -333,21 +331,13 @@ export const getPublicProblemCategoryCounts = async (): Promise<ProblemCategoryC
 };
 
 export interface PublicProblemFilterOptions {
-  authors: string[];
   collections: Array<{ id: number; name: string }>;
-  hasUnauthored: boolean;
   hasUncollected: boolean;
 }
 
-/** Canonical options from the entire visible standalone pool, independent of pages and active filters. */
+/** Canonical collection options from the entire visible standalone pool, independent of pages and active filters. */
 export const getPublicProblemFilterOptions = async (): Promise<PublicProblemFilterOptions> => {
-  const [authors, collections, unauthored, uncollected] = await Promise.all([
-    db.query<{ name: string }>(`
-      SELECT DISTINCT btrim(p.author) AS name FROM problems p
-      WHERE p.is_visible = true AND p.contest_id IS NULL
-        AND p.author IS NOT NULL AND btrim(p.author) <> ''
-      ORDER BY name ASC
-    `),
+  const [collections, uncollected] = await Promise.all([
     db.query<{ id: number; name: string }>(`
       SELECT DISTINCT c.id, c.name FROM problems p
       JOIN collections c ON c.id = p.collection_id
@@ -357,18 +347,11 @@ export const getPublicProblemFilterOptions = async (): Promise<PublicProblemFilt
     db.query<{ exists: boolean }>(`
       SELECT EXISTS (SELECT 1 FROM problems p
         WHERE p.is_visible = true AND p.contest_id IS NULL
-          AND (p.author IS NULL OR btrim(p.author) = '')) AS exists
-    `),
-    db.query<{ exists: boolean }>(`
-      SELECT EXISTS (SELECT 1 FROM problems p
-        WHERE p.is_visible = true AND p.contest_id IS NULL
           AND p.collection_id IS NULL) AS exists
     `),
   ]);
   return {
-    authors: authors.rows.map(row => row.name),
     collections: collections.rows,
-    hasUnauthored: unauthored.rows[0]?.exists ?? false,
     hasUncollected: uncollected.rows[0]?.exists ?? false,
   };
 };

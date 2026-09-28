@@ -20,21 +20,29 @@ const DIFFICULTY_SORT_DESC = 'difficulty-desc';
 
 const Problems = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeCategory, setActiveCategory] = useState(() => searchParams.get('category') || ALL_CATEGORIES);
+  const activeCategory = searchParams.get('category') || ALL_CATEGORIES;
   const [search, setSearch] = useState(() => searchParams.get('search') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('search') || '');
-  const [difficultyMin, setDifficultyMin] = useState(() => searchParams.get('difficultyMin') || '');
-  const [difficultyMax, setDifficultyMax] = useState(() => searchParams.get('difficultyMax') || '');
-  const [difficultySort, setDifficultySort] = useState(() => searchParams.get('sort') ?? DIFFICULTY_SORT_ASC);
+  const difficultyMin = searchParams.get('difficultyMin') || '';
+  const difficultyMax = searchParams.get('difficultyMax') || '';
+  const difficultySort = searchParams.get('sort') ?? DIFFICULTY_SORT_ASC;
   const [author, setAuthor] = useState(() => searchParams.get('author') || '');
-  const [collection, setCollection] = useState(() => searchParams.get('collection') || '');
+  const [debouncedAuthor, setDebouncedAuthor] = useState(() => searchParams.get('author') || '');
+  const collection = searchParams.get('collection') || '';
   const [categoryCounts, setCategoryCounts] = useState<ProblemCategoryCountsResponse | null>(null);
   const [filterOptions, setFilterOptions] = useState<ProblemFilterOptionsResponse | null>(null);
 
-  const updateUrlFilter = (key: string, value: string) => {
+  const urlSearch = searchParams.get('search') || '';
+  const urlAuthor = searchParams.get('author') || '';
+  // Same-route navigation keeps this component mounted. Mirror an externally
+  // changed URL into the text boxes; the existing debounce governs queries.
+  useEffect(() => { setSearch(urlSearch); }, [urlSearch]);
+  useEffect(() => { setAuthor(urlAuthor); }, [urlAuthor]);
+
+  const updateUrlFilter = (key: string, value: string, preserveEmpty = false) => {
     setSearchParams(previous => {
       const next = new URLSearchParams(previous);
-      if (value) next.set(key, value);
+      if (value || preserveEmpty) next.set(key, value);
       else next.delete(key);
       return next;
     }, { replace: true });
@@ -46,6 +54,10 @@ const Problems = () => {
     const timer = window.setTimeout(() => setDebouncedSearch(search), PROBLEMS_PAGE.SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [search]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedAuthor(author), PROBLEMS_PAGE.SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [author]);
 
   // Server-side query. The public list defaults to difficulty ascending;
   // unrated problems remain included after rated problems. Search, category,
@@ -55,7 +67,7 @@ const Problems = () => {
     return {
       ...(trimmed ? { search: trimmed } : {}),
       ...(activeCategory !== ALL_CATEGORIES ? { category: activeCategory } : {}),
-      ...(author !== '' ? { author } : {}),
+      ...(debouncedAuthor.trim() ? { author: debouncedAuthor.trim() } : {}),
       ...(collection !== '' ? { collection: collection === 'none' ? 'none' as const : Number(collection) } : {}),
       ...(difficultyMin !== '' ? { difficultyMin: Number(difficultyMin) } : {}),
       ...(difficultyMax !== '' ? { difficultyMax: Number(difficultyMax) } : {}),
@@ -63,7 +75,7 @@ const Problems = () => {
         ? { sort: 'difficulty' as const, order: difficultySort === DIFFICULTY_SORT_ASC ? 'asc' as const : 'desc' as const }
         : {}),
     };
-  }, [debouncedSearch, activeCategory, author, collection, difficultyMin, difficultyMax, difficultySort]);
+  }, [debouncedSearch, activeCategory, debouncedAuthor, collection, difficultyMin, difficultyMax, difficultySort]);
 
   const {
     problems,
@@ -118,7 +130,7 @@ const Problems = () => {
     || activeCategory !== ALL_CATEGORIES
     || difficultyMin !== ''
     || difficultyMax !== ''
-    || author !== ''
+    || debouncedAuthor.trim() !== ''
     || collection !== '';
 
   // The full-page loader is only for the very first load. Every later
@@ -149,7 +161,7 @@ const Problems = () => {
               aria-label="Difficulty minimum"
               className={styles['difficulty-select']}
               value={difficultyMin}
-              onChange={event => { setDifficultyMin(event.target.value); updateUrlFilter('difficultyMin', event.target.value); }}
+              onChange={event => updateUrlFilter('difficultyMin', event.target.value)}
             >
               <option value="">Min</option>
               {PROBLEM_DIFFICULTY_OPTIONS.map(option => (
@@ -162,7 +174,7 @@ const Problems = () => {
             aria-label="Difficulty maximum"
             className={styles['difficulty-select']}
             value={difficultyMax}
-            onChange={event => { setDifficultyMax(event.target.value); updateUrlFilter('difficultyMax', event.target.value); }}
+            onChange={event => updateUrlFilter('difficultyMax', event.target.value)}
           >
             <option value="">Max</option>
             {PROBLEM_DIFFICULTY_OPTIONS.map(option => (
@@ -173,7 +185,7 @@ const Problems = () => {
             aria-label="Sort problems"
             className={styles['difficulty-select']}
             value={difficultySort}
-            onChange={event => { setDifficultySort(event.target.value); updateUrlFilter('sort', event.target.value); }}
+            onChange={event => updateUrlFilter('sort', event.target.value, true)}
           >
             <option value="">Sort: Default</option>
             <option value={DIFFICULTY_SORT_ASC}>Difficulty ↑</option>
@@ -182,17 +194,14 @@ const Problems = () => {
         </div>
         <label className={styles['difficulty-control']}>
           <span className={styles['difficulty-control-label']}>Author</span>
-          <select aria-label="Author" className={styles['difficulty-select']} value={author}
-            onChange={event => { setAuthor(event.target.value); updateUrlFilter('author', event.target.value); }}>
-            <option value="">All authors</option>
-            {filterOptions?.hasUnauthored && <option value="none">No author</option>}
-            {filterOptions?.authors.map(name => <option key={name} value={name}>{name}</option>)}
-          </select>
+          <input type="search" aria-label="Author" className={styles['difficulty-select']}
+            placeholder="Filter by author…" value={author}
+            onChange={event => { setAuthor(event.target.value); updateUrlFilter('author', event.target.value); }} />
         </label>
         <label className={styles['difficulty-control']}>
           <span className={styles['difficulty-control-label']}>Collection</span>
           <select aria-label="Collection" className={styles['difficulty-select']} value={collection}
-            onChange={event => { setCollection(event.target.value); updateUrlFilter('collection', event.target.value); }}>
+            onChange={event => updateUrlFilter('collection', event.target.value)}>
             <option value="">All collections</option>
             {filterOptions?.hasUncollected && <option value="none">No collection</option>}
             {filterOptions?.collections.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
@@ -206,7 +215,7 @@ const Problems = () => {
             role="tab"
             aria-selected={activeCategory === ALL_CATEGORIES}
             className={`${styles['category-tab']} ${activeCategory === ALL_CATEGORIES ? styles.active : ''}`}
-            onClick={() => { setActiveCategory(ALL_CATEGORIES); updateUrlFilter('category', ''); }}
+            onClick={() => updateUrlFilter('category', '')}
           >
             {ALL_CATEGORIES} <span className={styles['category-count']}>{categoryCounts.total}</span>
           </button>
@@ -216,7 +225,7 @@ const Problems = () => {
               role="tab"
               aria-selected={activeCategory === name}
               className={`${styles['category-tab']} ${activeCategory === name ? styles.active : ''}`}
-              onClick={() => { setActiveCategory(name); updateUrlFilter('category', name); }}
+              onClick={() => updateUrlFilter('category', name)}
             >
               {name} <span className={styles['category-count']}>{count}</span>
             </button>
@@ -226,7 +235,7 @@ const Problems = () => {
               role="tab"
               aria-selected={activeCategory === UNCATEGORIZED}
               className={`${styles['category-tab']} ${activeCategory === UNCATEGORIZED ? styles.active : ''}`}
-              onClick={() => { setActiveCategory(UNCATEGORIZED); updateUrlFilter('category', UNCATEGORIZED); }}
+              onClick={() => updateUrlFilter('category', UNCATEGORIZED)}
             >
               {UNCATEGORIZED} <span className={styles['category-count']}>{categoryCounts.uncategorized}</span>
             </button>

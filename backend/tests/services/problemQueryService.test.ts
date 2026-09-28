@@ -197,18 +197,25 @@ describe('problemQueryService difficulty handling', () => {
         sort: 'difficulty', order: 'desc',
       });
       const [sql, params] = query.mock.calls[0] as [string, unknown[]];
-      expect(sql).toMatch(/WITH batch AS \([\s\S]*btrim\(p\.author\) = \$\d+[\s\S]*p\.collection_id = \$\d+[\s\S]*LIMIT \$\d+/);
+      expect(sql).toMatch(/WITH batch AS \([\s\S]*p\.author ILIKE \$\d+[\s\S]*p\.collection_id = \$\d+[\s\S]*LIMIT \$\d+/);
       expect(sql).toContain('p.is_visible = true AND p.contest_id IS NULL');
       expect(sql).toContain('p.difficulty DESC NULLS LAST');
-      expect(params).toEqual([1, 1000, '%dp%', 'Graph', 'Alice', 7, 3]);
+      expect(params).toEqual([1, 1000, '%dp%', 'Graph', '%Alice%', 7, 3]);
     });
 
-    it('filters unassigned author and collection values before pagination', async () => {
-      await getProblemsWithStatsForUser(null, { author: 'none', collection: 'none', limit: 2 });
+    it('filters unassigned collection values before pagination', async () => {
+      await getProblemsWithStatsForUser(null, { collection: 'none', limit: 2 });
       const [sql, params] = query.mock.calls[0] as [string, unknown[]];
-      expect(sql).toContain("(p.author IS NULL OR btrim(p.author) = '')");
       expect(sql).toContain('p.collection_id IS NULL');
       expect(params).toEqual([null, 3]);
+    });
+
+    it('searches arbitrary author text case-insensitively and literally', async () => {
+      await getProblemsWithStatsForUser(null, { author: '  nOnE%_  ', limit: 2 });
+      const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('p.author ILIKE $2');
+      expect(sql).not.toContain('JOIN users');
+      expect(params).toEqual([null, '%nOnE\\%\\_%', 3]);
     });
 
     it('treats the Uncategorized category filter as cardinality = 0', async () => {
@@ -243,22 +250,19 @@ describe('problemQueryService difficulty handling', () => {
     });
   });
 
-  it('loads canonical public author and collection options beyond the current page', async () => {
+  it('loads canonical public collection options beyond the current page', async () => {
     query
-      .mockResolvedValueOnce({ rows: [{ name: 'Alice' }, { name: 'Bob' }] })
       .mockResolvedValueOnce({ rows: [{ id: 7, name: 'Practice' }] })
-      .mockResolvedValueOnce({ rows: [{ exists: true }] })
       .mockResolvedValueOnce({ rows: [{ exists: true }] });
 
     await expect(getPublicProblemFilterOptions()).resolves.toEqual({
-      authors: ['Alice', 'Bob'], collections: [{ id: 7, name: 'Practice' }],
-      hasUnauthored: true, hasUncollected: true,
+      collections: [{ id: 7, name: 'Practice' }], hasUncollected: true,
     });
-    expect(query).toHaveBeenCalledTimes(4);
+    expect(query).toHaveBeenCalledTimes(2);
     for (const [sql] of query.mock.calls) {
       expect(sql).toContain('p.is_visible = true AND p.contest_id IS NULL');
     }
-    expect(query.mock.calls[1][0]).toContain('JOIN collections');
+    expect(query.mock.calls[0][0]).toContain('JOIN collections');
   });
 
   it('inserts difficulty on problem create', async () => {

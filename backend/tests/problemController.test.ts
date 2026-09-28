@@ -125,7 +125,7 @@ describe('Problem Controller', () => {
                 .query({ search: 'dp', category: 'Graph', difficultyMin: 1000, author: 'Alice', collection: '7', sort: 'difficulty', order: 'desc' });
             expect(res.status).toBe(200);
             expect(res.body).toEqual({ problems: [], hasMore: false, nextCursor: null });
-            expect((db.query as jest.Mock).mock.calls[0][1]).toEqual([1, 1000, '%dp%', 'Graph', 'Alice', 7, 21]);
+            expect((db.query as jest.Mock).mock.calls[0][1]).toEqual([1, 1000, '%dp%', 'Graph', '%Alice%', 7, 21]);
         });
 
         it('rejects invalid collection values', async () => {
@@ -134,17 +134,23 @@ describe('Problem Controller', () => {
             expect(db.query).not.toHaveBeenCalled();
         });
 
+        it('treats any trimmed author text as a substring without an account lookup', async () => {
+            (db.query as jest.Mock).mockResolvedValue({ rows: [] });
+            const named = await request(app).get('/problems-with-stats?author=%20nOnE%20');
+            expect(named.status).toBe(200);
+            expect((db.query as jest.Mock).mock.calls[0][0]).toContain('p.author ILIKE $2');
+            expect((db.query as jest.Mock).mock.calls[0][0]).not.toContain('JOIN users');
+            expect((db.query as jest.Mock).mock.calls[0][1]).toEqual([1, '%nOnE%', 21]);
+        });
+
         it('serves canonical public filter choices before the problem detail route', async () => {
             (db.query as jest.Mock)
-                .mockResolvedValueOnce({ rows: [{ name: 'Alice' }] })
                 .mockResolvedValueOnce({ rows: [{ id: 7, name: 'Practice' }] })
-                .mockResolvedValueOnce({ rows: [{ exists: false }] })
                 .mockResolvedValueOnce({ rows: [{ exists: true }] });
             const res = await request(app).get('/problems/filter-options');
             expect(res.status).toBe(200);
             expect(res.body).toEqual({
-                authors: ['Alice'], collections: [{ id: 7, name: 'Practice' }],
-                hasUnauthored: false, hasUncollected: true,
+                collections: [{ id: 7, name: 'Practice' }], hasUncollected: true,
             });
         });
     });

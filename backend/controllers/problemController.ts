@@ -82,7 +82,8 @@ router.get('/problems-with-stats', requirePublicAccess,
   // validateRequest writes Zod defaults/coercions back into req.query.
   const { difficultyMin, difficultyMax, sort, order, search, category, author, collection, limit, cursor } = req.query as unknown as {
     difficultyMin?: number; difficultyMax?: number; sort?: 'difficulty'; order?: 'asc' | 'desc';
-    search?: string; category?: string; author?: string; collection?: number | 'none'; limit?: number; cursor?: string;
+    search?: string; category?: string; author?: string; collection?: number | 'none';
+    limit?: number; cursor?: string;
   };
   const page = await getProblemsWithStatsForUser(userId, {
     ...(difficultyMin !== undefined ? { difficultyMin } : {}),

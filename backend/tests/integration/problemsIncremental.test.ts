@@ -160,7 +160,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
       await insertProblem('delta-none', { difficulty: 2400, categories: [], title: 'No Category' });
     });
 
-    it('filters author and collection before the page boundary and exposes only public options', async () => {
+    it('searches arbitrary author text with collection before pagination and exposes only public collections', async () => {
       const first = await pool.query("INSERT INTO collections (name) VALUES ('Practice') RETURNING id");
       const second = await pool.query("INSERT INTO collections (name) VALUES ('Hidden Set') RETURNING id");
       const practiceId = first.rows[0].id as number;
@@ -168,23 +168,26 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
       await pool.query("UPDATE problems SET author='Alice', collection_id=$1 WHERE id IN ('alpha-dp', 'beta-dp')", [practiceId]);
       await pool.query("UPDATE problems SET author='Bob' WHERE id='gamma-graph'");
       await pool.query("UPDATE problems SET author=NULL WHERE id='delta-none'");
+      await insertProblem('literal-none');
+      await pool.query("UPDATE problems SET author='none' WHERE id='literal-none'");
       await insertProblem('hidden', { visible: false });
       await pool.query("UPDATE problems SET author='Secret', collection_id=$1 WHERE id='hidden'", [hiddenId]);
 
       const options = await getPublicProblemFilterOptions();
       expect(options).toEqual({
-        authors: ['Alice', 'Bob'], collections: [{ id: practiceId, name: 'Practice' }],
-        hasUnauthored: true, hasUncollected: true,
+        collections: [{ id: practiceId, name: 'Practice' }], hasUncollected: true,
       });
-      expect((await walkAll(null, { author: 'Alice', collection: practiceId, limit: 1 })).ids)
+      expect((await walkAll(null, { author: 'aLi', collection: practiceId, limit: 1 })).ids)
         .toEqual(['alpha-dp', 'beta-dp']);
       const narrowed = await getProblemsWithStatsForUser(null, {
         search: 'dp', category: 'Graph', difficultyMin: 1500,
-        author: 'Alice', collection: practiceId, sort: 'difficulty', order: 'desc', limit: 1,
+        author: 'LiC', collection: practiceId, sort: 'difficulty', order: 'desc', limit: 1,
       });
       expect(narrowed.problems.map(p => p.id)).toEqual(['beta-dp']);
-      expect((await walkAll(null, { author: 'none', collection: 'none', limit: 1 })).ids)
-        .toEqual(['delta-none']);
+      expect((await walkAll(null, { author: 'NONE', limit: 1 })).ids)
+        .toEqual(['literal-none']);
+      expect((await walkAll(null, { author: 'Secret', limit: 1 })).ids).toEqual([]);
+      expect((await walkAll(null, { author: 'NoMatchingAccountNeeded', limit: 1 })).ids).toEqual([]);
     });
 
     it('search + category + difficulty all apply before the LIMIT', async () => {
