@@ -96,6 +96,7 @@
 .left-nav {
   width: 280px;
   flex-shrink: 0;
+  min-width: 0;
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
@@ -134,9 +135,16 @@
   color: var(--text-secondary);
 }
 
+.problem-info .metadata-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  margin-bottom: 1rem;
+}
+
 .problem-info .problem-id {
   font-family: 'Inconsolata';
-  margin-bottom: 1rem;
 }
 
 .problem-info .problem-author {

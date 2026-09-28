@@ -1,8 +1,7 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatTimeAgo, formatDateAbsolute, generateResultString } from '../../utils/formatters';
-import { difficultyBand } from '../../utils/constants';
 import type { ProblemSummary } from '../../types';
+import { DifficultyChip, ProblemCategoryReveal } from './ProblemMetadata';
 import styles from './ProblemCard.module.css';
 
 interface ProblemCardProps {
@@ -15,33 +14,11 @@ interface ProblemCardProps {
 }
 
 const ProblemCard = ({ problem, contestId = null, highlightCategory = null }: ProblemCardProps) => {
-    const [revealed, setRevealed] = useState(false);
     const submissionCount = Number(problem.submission_count ?? 0);
     const hasSubmitted = submissionCount > 0;
     const linkPath = contestId
         ? `/contests/${contestId}/problems/${problem.id}`
         : `/problems/${problem.id}`;
-    const difficulty = problem.difficulty ?? null;
-    const band = difficultyBand(difficulty);
-
-    const categories = problem.categories ?? [];
-    const hasCategories = categories.length > 0;
-    // With a filter active the selected category leads; once revealed, every
-    // remaining category joins it (selected first, then the rest).
-    const filteredCategory = highlightCategory && categories.includes(highlightCategory)
-        ? highlightCategory
-        : null;
-    const revealedCategories = revealed
-        ? (filteredCategory
-            ? [filteredCategory, ...categories.filter(c => c !== filteredCategory)]
-            : categories)
-        : [];
-
-    // The toggle exists whenever categories could stay hidden: by default all
-    // are hidden, and under a filter the non-selected ones are.
-    const hasHiddenCategories = hasCategories
-        && (filteredCategory ? categories.length > 1 : true);
-
     // Computed once: the legacy [PPPP...] pattern string, rendered as the
     // score column's second row and exposed as a native title tooltip so a
     // long truncated pattern stays inspectable.
@@ -55,32 +32,8 @@ const ProblemCard = ({ problem, contestId = null, highlightCategory = null }: Pr
                 <h3 className={styles['problem-title']}>{problem.title}</h3>
                 <p className={styles['problem-author']}>
                     <span className={styles['problem-id']}>{problem.id}</span>
-                    {difficulty !== null && band !== null && (
-                        <span
-                            data-testid="problem-difficulty"
-                            data-band={band}
-                            className={styles[`difficulty-chip-${band}`]}
-                            title={`Difficulty ${difficulty}`}
-                        >
-                            {difficulty}
-                        </span>
-                    )}
-                    {!revealed && filteredCategory && (
-                        <span className={styles['problem-category']}>{filteredCategory}</span>
-                    )}
-                    {revealedCategories.map(category => (
-                        <span key={category} className={styles['problem-category']}>{category}</span>
-                    ))}
-                    {hasHiddenCategories && (
-                        <button
-                            type="button"
-                            className={styles['category-toggle']}
-                            aria-expanded={revealed}
-                            onClick={() => setRevealed(previous => !previous)}
-                        >
-                            {revealed ? 'Hide categories' : (filteredCategory ? 'Show all categories' : 'Show categories')}
-                        </button>
-                    )}
+                    <DifficultyChip difficulty={problem.difficulty} />
+                    <ProblemCategoryReveal categories={problem.categories} highlightCategory={highlightCategory} />
                 </p>
                 {hasSubmitted && (
                     <div className={styles['submission-status']}>

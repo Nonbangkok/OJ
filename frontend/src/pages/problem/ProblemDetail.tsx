@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './ProblemDetail.module.css';
 import CodeSubmissionForm from '../../features/problem/submission/CodeSubmissionForm';
+import { DifficultyChip, ProblemCategoryReveal } from '../../features/problem/ProblemMetadata';
+import cardStyles from '../../features/problem/ProblemCard.module.css';
 import Submissions from '../submission/Submissions';
 import problemService from '../../services/problemService';
 import { useProblemDetail } from '../../hooks/useProblemDetail';
@@ -91,7 +93,17 @@ const ProblemDetail = () => {
               ← Back
             </button>
             <h2>{problem.title}</h2>
-            <p className={styles['problem-id']}>{problem.id}</p>
+            <div className={styles['metadata-group']}>
+              <div className={cardStyles['problem-author']}>
+                <span className={`${cardStyles['problem-id']} ${styles['problem-id']}`}>{problem.id}</span>
+                <DifficultyChip difficulty={problem.difficulty} />
+              </div>
+              {(problem.categories?.length ?? 0) > 0 && (
+                <div data-testid="problem-categories" className={cardStyles['problem-author']}>
+                  <ProblemCategoryReveal key={problem.id} categories={problem.categories} />
+                </div>
+              )}
+            </div>
             {problem.author && <p className={styles['problem-author']}>Author: {problem.author}</p>}
             {/* Staff context: hidden problems now return 404 for everyone
                 else, so only staff can reach this page with is_visible=false
