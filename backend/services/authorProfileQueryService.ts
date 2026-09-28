@@ -1,10 +1,11 @@
 import { randomUUID } from 'crypto';
-import type { QueryResultRow } from 'pg';
+import type { Pool, QueryResultRow } from 'pg';
 import * as db from '../db';
 import { AuthorProfileRow } from '../types/authoring';
 import { isUniqueViolation } from '../utils/dbErrors';
 
 export type AuthorProfileDatabase = {
+  pool?: Pick<Pool, 'connect'>;
   query<T extends QueryResultRow = QueryResultRow>(
     text: string,
     params?: unknown[],
@@ -54,6 +55,11 @@ export type UpdateAuthorProfileResult =
   | { kind: 'updated'; profile: AuthorProfileRow }
   | { kind: 'not_found' }
   | { kind: 'duplicate_user_link' };
+
+export type DeleteAuthorProfileResult =
+  | { kind: 'deleted'; profile: AuthorProfileRow; detachedDrafts: number }
+  | { kind: 'not_found' }
+  | { kind: 'active_drafts'; activeDrafts: number };
 
 const isDuplicateUserLink = (error: unknown): boolean =>
   isUniqueViolation(error, 'author_profiles_user_id_key');
@@ -186,4 +192,84 @@ export const readAuthorProfileImage = async (
     [id],
   );
   return result.rows[0]?.profile_image_png ?? null;
+};
+
+/**
+ * Permanently deletes an author profile and its profile-owned sync history.
+ *
+ * Dependency policy (per the FK model, chosen to never destroy data):
+ * - Active dependent drafts (any status other than `published` whose
+ *   `author_profile_id` points at this profile) block deletion: those drafts
+ *   still need the profile link for refresh/sync cascades. Reassign or delete
+ *   those drafts first.
+ * - Published drafts remain and are detached: the FK is
+ *   `ON DELETE SET NULL`, and the draft row carries a full frozen author
+ *   snapshot (aka name, real name, language, country, image) plus the
+ *   published problem already carries `problems.author` — so historical
+ *   attribution survives deletion intact.
+ * - `authoring_profile_syncs` (+ its items via cascade) are profile-owned
+ *   run history and are deleted with the profile, per the model.
+ */
+export const deleteAuthorProfile = async (
+  profileId: string,
+  database: AuthorProfileDatabase = db,
+): Promise<DeleteAuthorProfileResult> => {
+  const runDelete = async (client: {
+    query: AuthorProfileDatabase['query'];
+  }): Promise<DeleteAuthorProfileResult> => {
+    const profileResult = await client.query<AuthorProfileRow>(
+      'SELECT * FROM author_profiles WHERE id = $1 FOR UPDATE',
+      [profileId],
+    );
+    const profile = profileResult.rows[0];
+    if (!profile) {
+      return { kind: 'not_found' };
+    }
+    const active = await client.query<{ count: number }>(
+      "SELECT COUNT(*)::int AS count FROM problem_drafts WHERE author_profile_id = $1 AND status <> 'published'",
+      [profileId],
+    );
+    const activeDrafts = active.rows[0]?.count ?? 0;
+    if (activeDrafts > 0) {
+      return { kind: 'active_drafts', activeDrafts };
+    }
+    const detached = await client.query<{ count: number }>(
+      'SELECT COUNT(*)::int AS count FROM problem_drafts WHERE author_profile_id = $1',
+      [profileId],
+    );
+    const detachedDrafts = detached.rows[0]?.count ?? 0;
+    // Sync history is profile-owned (FK ON DELETE CASCADE from the profile).
+    await client.query('DELETE FROM authoring_profile_sync_items WHERE sync_id IN (SELECT id FROM authoring_profile_syncs WHERE profile_id = $1)', [profileId]);
+    await client.query('DELETE FROM authoring_profile_syncs WHERE profile_id = $1', [profileId]);
+    // Published drafts detach via the FK's ON DELETE SET NULL.
+    await client.query('UPDATE problem_drafts SET author_profile_id = NULL WHERE author_profile_id = $1', [profileId]);
+    const deleted = await client.query<{ id: string }>(
+      'DELETE FROM author_profiles WHERE id = $1 RETURNING id', [profileId]);
+    if (!deleted.rows.length) {
+      return { kind: 'not_found' };
+    }
+    return { kind: 'deleted', profile, detachedDrafts };
+  };
+
+  if (database.pool) {
+    const client = await database.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await runDelete(client);
+      if (result.kind !== 'deleted') {
+        await client.query('ROLLBACK');
+        return result;
+      }
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      try { await client.query('ROLLBACK'); } catch { /* connection already broken */ }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Fallback for plain-query databases (unit tests).
+  return runDelete(database);
 };

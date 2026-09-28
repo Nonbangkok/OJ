@@ -1,23 +1,30 @@
 import adminService from '../../services/adminService';
 import { getErrorMessage } from '../../utils/error';
+import type { AdminProblemsQuery } from '../../types';
 
 import useBatchUpload from './useBatchUpload';
 import useProblemCrud from './useProblemCrud';
 import { triggerZipDownload } from './useProblemExport';
-import useProblemSelection from './useProblemSelection';
 
-/** Facade over the four problem-management hooks; keeps the public API
- *  (consumed by ProblemManagement.tsx and tests) unchanged. */
-const useProblemManagement = () => {
-  const crud = useProblemCrud();
-  const selection = useProblemSelection({ problems: crud.problems });
+/** Facade over the problem-management hooks; keeps the public API
+ *  (consumed by ProblemManagement.tsx and tests) unchanged. The `query`
+ *  is the server-side filter surface — filter changes reset the paged
+ *  list to the first batch of the new query.
+ *
+ *  Bulk selection is intentionally NOT part of this facade: its
+ *  source of truth is the DISPLAYED rows (the loaded page of the current
+ *  server query), which only ProblemManagement.tsx knows. The page builds
+ *  it directly via useProblemSelection({ displayedProblems }) so the
+ *  semantics stay display-scoped under any loading scheme. */
+const useProblemManagement = (query: AdminProblemsQuery) => {
+  const crud = useProblemCrud({ query });
   const batchUpload = useBatchUpload({
     onCompleted: crud.fetchProblems,
     setLoading: crud.setLoading,
   });
 
-  const handleExportSelected = async () => {
-    if (selection.selectedProblems.length === 0) {
+  const handleExportSelected = async (problemIds: Array<string | number>) => {
+    if (problemIds.length === 0) {
       batchUpload.setBatchUploadFeedback({
         visible: true,
         message: 'Please select at least one problem to export.',
@@ -29,7 +36,7 @@ const useProblemManagement = () => {
     batchUpload.setBatchUploadFeedback({ visible: true, message: 'Initiating problem export...', type: 'info' });
 
     try {
-      const response = await adminService.exportProblems(selection.selectedProblems);
+      const response = await adminService.exportProblems(problemIds);
       const contentType = response.headers['content-type'];
       triggerZipDownload({
         data: response.data,
@@ -39,10 +46,9 @@ const useProblemManagement = () => {
 
       batchUpload.setBatchUploadFeedback({
         visible: true,
-        message: `${selection.selectedProblems.length} problems exported successfully!`,
+        message: `${problemIds.length} problems exported successfully!`,
         type: 'success',
       });
-      selection.setSelectedProblems([]);
     } catch (errorValue) {
       const errorMsg = getErrorMessage(errorValue, 'Failed to export problems.');
       batchUpload.setBatchUploadFeedback({ visible: true, message: errorMsg, type: 'error' });
@@ -56,14 +62,18 @@ const useProblemManagement = () => {
     problems: crud.problems,
     loading: crud.loading,
     error: crud.error,
+    loadingMore: crud.loadingMore,
+    loadMoreError: crud.loadMoreError,
+    hasMore: crud.hasMore,
+    authors: crud.authors,
+    hasUnauthoredProblems: crud.hasUnauthoredProblems,
+    loadMore: crud.loadMore,
     isModalOpen: crud.isModalOpen,
     setIsModalOpen: crud.setIsModalOpen,
     editingProblem: crud.editingProblem,
     setEditingProblem: crud.setEditingProblem,
     uploadProgress: crud.uploadProgress,
     setUploadProgress: crud.setUploadProgress,
-    selectedProblems: selection.selectedProblems,
-    setSelectedProblems: selection.setSelectedProblems,
     batchUploadFeedback: batchUpload.batchUploadFeedback,
     setBatchUploadFeedback: batchUpload.setBatchUploadFeedback,
     batchUploadProgress: batchUpload.batchUploadProgress,
@@ -88,8 +98,6 @@ const useProblemManagement = () => {
     executeShowAll: crud.executeShowAll,
     handleEdit: crud.handleEdit,
     handleCreate: crud.handleCreate,
-    handleToggleSelectProblem: selection.handleToggleSelectProblem,
-    handleSelectAll: selection.handleSelectAll,
     handleExportSelected,
     handleTriggerBatchUpload: batchUpload.handleTriggerBatchUpload,
     handleBatchUploadFileChange: batchUpload.handleBatchUploadFileChange,

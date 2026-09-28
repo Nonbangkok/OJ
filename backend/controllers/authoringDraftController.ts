@@ -9,6 +9,7 @@ import {
   createStatementAssetSchema,
   deleteStatementAssetQuerySchema,
   draftAssetParamsSchema,
+  listProblemDraftsQuerySchema,
   problemDraftIdParamSchema,
   refreshProblemDraftAuthorSchema,
   updateProblemDraftSchema,
@@ -17,6 +18,7 @@ import {
 import { publishProblemDraft } from '../services/authoringPublishService';
 import {
   createProblemDraft,
+  deleteProblemDraft,
   getProblemDraft,
   listProblemDrafts,
   ProblemDraftListRow,
@@ -239,10 +241,18 @@ router.post('/admin/authoring/drafts',
     res.status(201).json(toDraftDetailResponse(created));
   }));
 
-router.get('/admin/authoring/drafts', asyncHandler(async (_req: Request, res: Response) => {
-  const drafts = await listProblemDrafts();
-  res.json(drafts.map(toDraftSummaryResponse));
-}));
+router.get('/admin/authoring/drafts',
+  validateRequest({ query: listProblemDraftsQuerySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    // `scope=mine` matches the logged-in username against Author Profile AKA
+    // names — see listProblemDrafts for the exact-normalized semantics.
+    const query = req.query as { scope: 'all' | 'mine' };
+    const drafts = await listProblemDrafts({
+      scope: query.scope,
+      username: query.scope === 'mine' ? req.user?.username : undefined,
+    });
+    res.json(drafts.map(toDraftSummaryResponse));
+  }));
 
 router.get('/admin/authoring/drafts/:id',
   validateRequest({ params: problemDraftIdParamSchema }),
@@ -257,6 +267,21 @@ router.get('/admin/authoring/drafts/:id',
     // existing testcases disappear from the publish readiness view.
     const testcaseStats = await getDraftTestcaseStats(draft.id);
     res.json({ ...toDraftDetailResponse(draft), testcaseStats });
+  }));
+
+router.delete('/admin/authoring/drafts/:id',
+  validateRequest({ params: problemDraftIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const result = await deleteProblemDraft(String(req.params.id));
+    if (result.kind === 'not_found') {
+      res.status(404).json({ message: 'Problem draft not found' });
+      return;
+    }
+    res.json({
+      message: 'Authoring draft deleted',
+      problemId: result.draft.problem_id,
+      wasPublished: result.wasPublished,
+    });
   }));
 
 router.patch('/admin/authoring/drafts/:id',

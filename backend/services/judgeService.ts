@@ -4,6 +4,7 @@ import { SUBMISSION_STATUS, JUDGE_CONFIG, LANGUAGE_LIMITS, SubmissionLanguage } 
 import { RunnableCommand } from '../constants';
 import { logger } from '../utils/logger';
 import { nextSandboxIdentity, SandboxIdentity } from '../utils/sandboxProcess';
+import { outputsMatch } from '../utils/outputComparison';
 import {
   ExecutionError,
   JudgeProblemLimitsRow,
@@ -282,9 +283,12 @@ export async function judge(
 
       // Now, compare output
       if (runResult.status === SUBMISSION_STATUS.PENDING) {
-        const formattedStdout = (runResult.output || '').trim().replace(/\r\n/g, '\n');
-        const formattedExpectedOutput = output_data.trim().replace(/\r\n/g, '\n');
-        if (formattedStdout === formattedExpectedOutput) {
+        // Shared exact-output comparator (see utils/outputComparison.ts):
+        // outer trim + CRLF normalization (as before), plus per-line
+        // trimEnd() so trailing spaces/tabs before a newline no longer WA
+        // a logically correct solution. Leading and internal whitespace
+        // remain significant.
+        if (outputsMatch(runResult.output || '', output_data)) {
           runResult.status = SUBMISSION_STATUS.ACCEPTED;
         } else {
           runResult.status = SUBMISSION_STATUS.WRONG_ANSWER;

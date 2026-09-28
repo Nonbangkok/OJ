@@ -44,3 +44,14 @@ export const PROBLEMS_PAGE = {
   PAGE_SIZE: 20,
   SEARCH_DEBOUNCE_MS: 300,
 } as const;
+
+/**
+ * Admin problem management incremental loading. PAGE_SIZE is the
+ * server-side batch ("Show More" fetches exactly this many problems) and
+ * matches ADMIN_PROBLEM_LIST_CONFIG.DEFAULT_LIMIT on the backend;
+ * SEARCH_DEBOUNCE_MS throttles the server-side search.
+ */
+export const ADMIN_PROBLEMS_PAGE = {
+  PAGE_SIZE: 25,
+  SEARCH_DEBOUNCE_MS: 300,
+} as const;

@@ -19,17 +19,20 @@ beforeEach(() => {
   jest.mocked(api.get).mockResolvedValue({ data: [profile] });
 });
 
+/** Opens the row's action menu and clicks one item (Edit / Delete). */
+const chooseRowAction = async (label: string, akaName = 'Writer') => {
+  fireEvent.click(await screen.findByRole('button', { name: `Row actions for ${akaName}` }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: label }));
+};
+
 test('uses bounded profile identity and shared action hierarchy', async () => {
   render(<AuthorProfiles />);
-  const edit = await screen.findByRole('button', { name: 'Edit Writer' });
-  const row = edit.closest('li');
+  await chooseRowAction('Edit');
+  const row = screen.getByText('Writer').closest('li');
 
   expect(row).not.toBeNull();
   expect(row?.querySelector('[data-profile-identity]')).toHaveTextContent('Writer');
-  expect(edit).toHaveAttribute('type', 'button');
   expect(screen.getByRole('button', { name: 'New author profile' })).toBeEnabled();
-
-  fireEvent.click(edit);
 
   expect(screen.getByRole('button', { name: 'Remove image' })).toBeEnabled();
   expect(screen.getByRole('button', { name: 'Save profile' })).toHaveAttribute('type', 'submit');
@@ -40,7 +43,7 @@ test('uses bounded profile identity and shared action hierarchy', async () => {
 
 test('creates an unlinked profile and shows it in the list after saving', async () => {
   render(<AuthorProfiles />);
-  await screen.findByRole('button', { name: 'Edit Writer' });
+  await screen.findByRole('button', { name: 'Row actions for Writer' });
   fireEvent.click(screen.getByRole('button', { name: 'New author profile' }));
   fireEvent.change(screen.getByLabelText('AKA name'), { target: { value: 'New writer' } });
   fireEvent.change(screen.getByLabelText('Real name'), { target: { value: 'New Name' } });
@@ -59,7 +62,9 @@ test('creates an unlinked profile and shows it in the list after saving', async 
     },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Create profile' }));
-  expect(await screen.findByRole('button', { name: 'Edit New writer' })).toBeInTheDocument();
+  expect(
+    await screen.findByRole('button', { name: 'Row actions for New writer' })
+  ).toBeInTheDocument();
   const [url, body] = jest.mocked(api.post).mock.calls[0];
   expect(url).toBe('/admin/author-profiles');
   expect(Object.fromEntries((body as FormData).entries())).toEqual({
@@ -74,7 +79,7 @@ test('creates an unlinked profile and shows it in the list after saving', async 
 test('edits metadata, unlinks user and removes image through the profile API', async () => {
   const onChanged = jest.fn();
   render(<AuthorProfiles onChanged={onChanged} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit Writer' }));
+  await chooseRowAction('Edit');
   fireEvent.change(screen.getByLabelText('AKA name'), { target: { value: 'Updated writer' } });
   fireEvent.change(screen.getByLabelText('User account ID (optional)'), { target: { value: '' } });
   fireEvent.click(screen.getByRole('button', { name: 'Remove image' }));
@@ -82,7 +87,9 @@ test('edits metadata, unlinks user and removes image through the profile API', a
     data: { ...profile, akaName: 'Updated writer', userId: null, hasProfileImage: false },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
-  expect(await screen.findByRole('button', { name: 'Edit Updated writer' })).toBeInTheDocument();
+  expect(
+    await screen.findByRole('button', { name: 'Row actions for Updated writer' })
+  ).toBeInTheDocument();
   const [url, body] = jest.mocked(api.patch).mock.calls[0];
   expect(url).toBe('/admin/author-profiles/p1');
   expect((body as FormData).get('removeProfileImage')).toBe('true');
@@ -95,7 +102,7 @@ test('edits metadata, unlinks user and removes image through the profile API', a
 
 test('retains edits and presents server error on conflicting user link', async () => {
   render(<AuthorProfiles />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit Writer' }));
+  await chooseRowAction('Edit');
   fireEvent.change(screen.getByLabelText('Real name'), { target: { value: 'Keep this name' } });
   jest.mocked(api.patch).mockRejectedValue({
     response: { data: { message: 'This user account is already linked to an author profile' } },
@@ -113,12 +120,14 @@ test('retries a failed profile list request', async () => {
   const retry = screen.getByRole('button', { name: 'Retry profiles' });
   expect(retry).toHaveAttribute('type', 'button');
   fireEvent.click(retry);
-  expect(await screen.findByRole('button', { name: 'Edit Writer' })).toBeInTheDocument();
+  expect(
+    await screen.findByRole('button', { name: 'Row actions for Writer' })
+  ).toBeInTheDocument();
 });
 
 test('rejects unsupported images and prevents saving while a request is pending', async () => {
   render(<AuthorProfiles />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit Writer' }));
+  await chooseRowAction('Edit');
   fireEvent.change(screen.getByLabelText('Profile image'), {
     target: { files: [new File(['svg'], 'test.svg', { type: 'image/svg+xml' })] },
   });
@@ -156,7 +165,7 @@ test('uploads the adjusted square crop as PNG using a CSP-compatible source imag
     );
   try {
     render(<AuthorProfiles />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Writer' }));
+    await chooseRowAction('Edit');
     fireEvent.change(screen.getByLabelText('Profile image'), {
       target: { files: [new File(['jpeg pixels'], 'photo.jpg', { type: 'image/jpeg' })] },
     });
@@ -184,7 +193,7 @@ test('uploads the adjusted square crop as PNG using a CSP-compatible source imag
 
 test('author-relevant edit shows the cascade confirm step, then saves with confirmed', async () => {
   render(<AuthorProfiles />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit Writer' }));
+  await chooseRowAction('Edit');
   fireEvent.change(screen.getByLabelText('AKA name'), { target: { value: 'Renamed writer' } });
 
   // First submit: the server reports cascade impact instead of saving.
@@ -211,7 +220,9 @@ test('author-relevant edit shows the cascade confirm step, then saves with confi
   });
   fireEvent.click(screen.getByRole('button', { name: 'Save and sync linked problems' }));
 
-  expect(await screen.findByRole('button', { name: 'Edit Renamed writer' })).toBeInTheDocument();
+  expect(
+    await screen.findByRole('button', { name: 'Row actions for Renamed writer' })
+  ).toBeInTheDocument();
   expect(screen.getByRole('status')).toHaveTextContent(/Linked drafts are syncing/i);
   const confirmedBody = jest.mocked(api.patch).mock.calls[1][1] as FormData;
   expect(confirmedBody.get('confirmed')).toBe('true');
@@ -221,7 +232,7 @@ test('author-relevant edit shows the cascade confirm step, then saves with confi
 
 test('cancel from the confirm step discards the pending cascade without a confirmed request', async () => {
   render(<AuthorProfiles />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit Writer' }));
+  await chooseRowAction('Edit');
   fireEvent.change(screen.getByLabelText('Real name'), { target: { value: 'Gate me' } });
   jest.mocked(api.patch).mockResolvedValueOnce({
     data: {
@@ -245,16 +256,72 @@ test('cancel from the confirm step discards the pending cascade without a confir
 
 test('no-impact edit (no linked drafts) saves directly with no confirm step', async () => {
   render(<AuthorProfiles />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit Writer' }));
+  await chooseRowAction('Edit');
   fireEvent.change(screen.getByLabelText('AKA name'), { target: { value: 'Direct save' } });
   jest.mocked(api.patch).mockResolvedValueOnce({
     data: { ...profile, akaName: 'Direct save' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
 
-  expect(await screen.findByRole('button', { name: 'Edit Direct save' })).toBeInTheDocument();
+  expect(
+    await screen.findByRole('button', { name: 'Row actions for Direct save' })
+  ).toBeInTheDocument();
   // A single save request that carried no confirmation flag (server decided no cascade).
   expect(api.patch).toHaveBeenCalledTimes(1);
   expect((jest.mocked(api.patch).mock.calls[0][1] as FormData).get('confirmed')).toBeNull();
   expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+});
+
+test('delete asks for confirmation with the profile identity, then deletes via the API', async () => {
+  const onChanged = jest.fn();
+  render(<AuthorProfiles onChanged={onChanged} />);
+  await chooseRowAction('Delete');
+
+  const dialog = await screen.findByRole('dialog', { name: 'Delete author profile "Writer"?' });
+  expect(dialog).toHaveTextContent('A Writer');
+  expect(dialog).toHaveTextContent('AKA user #7');
+  expect(dialog).toHaveTextContent('This action cannot be undone.');
+  // Nothing deleted yet.
+  expect(api.delete).not.toHaveBeenCalled();
+
+  jest.mocked(api.delete).mockResolvedValue({ data: { message: 'Author profile deleted', detachedDrafts: 0 } });
+  fireEvent.click(screen.getByRole('button', { name: 'Delete Author Profile' }));
+
+  expect(await screen.findByRole('status')).toHaveTextContent('Author profile deleted.');
+  expect(api.delete).toHaveBeenCalledWith('/admin/author-profiles/p1');
+  expect(screen.queryByText('Writer')).not.toBeInTheDocument();
+  expect(onChanged).toHaveBeenCalledTimes(1);
+});
+
+test('delete confirmation can be cancelled without a request', async () => {
+  render(<AuthorProfiles />);
+  await chooseRowAction('Delete');
+  fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+  expect(screen.queryByRole('dialog', { name: 'Delete author profile "Writer"?' })).not.toBeInTheDocument();
+  expect(api.delete).not.toHaveBeenCalled();
+  expect(screen.getByText('Writer')).toBeInTheDocument();
+});
+
+test('blocked delete (active drafts) renders the server message and keeps the list', async () => {
+  render(<AuthorProfiles />);
+  await chooseRowAction('Delete');
+  jest.mocked(api.delete).mockRejectedValue({
+    response: {
+      status: 409,
+      data: {
+        message: 'This profile is currently referenced by 2 drafts. Reassign or delete those drafts first.',
+        code: 'author_profile_has_active_drafts',
+        activeDrafts: 2,
+      },
+    },
+  });
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete Author Profile' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'This profile is currently referenced by 2 drafts. Reassign or delete those drafts first.'
+  );
+  // The confirmation closes and the profile stays in the list.
+  expect(screen.queryByRole('dialog', { name: 'Delete author profile "Writer"?' })).not.toBeInTheDocument();
+  expect(screen.getByText('Writer')).toBeInTheDocument();
 });

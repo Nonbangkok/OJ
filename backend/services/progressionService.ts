@@ -217,6 +217,17 @@ export const getUserProgression = async (userId: number): Promise<UserProgressio
 /**
  * The user's most recent rewards, newest first, with the problem title at
  * award time (kept via LEFT JOIN so deleted problems don't hide history).
+ *
+ * PROFILE-PROBLEM-SCOPE: this listing shows only rewards for CURRENTLY
+ * VISIBLE problems (`p.is_visible = true`), for EVERY viewer — admin
+ * included. Profile semantics must be stable and never depend on who is
+ * looking, so unlike the submission feed there is no staff bypass. Deleted
+ * problems (no `problems` row) keep their slot with a null title: the reward
+ * itself is still earned history, there is no problem metadata left to leak,
+ * and the long-standing "deleted problems don't hide history" policy holds.
+ * Note the XP numbers themselves (getUserProgression) are a historical
+ * reward ledger and deliberately never filtered by visibility — a hidden
+ * solve disappears from this list while its XP stays in the total.
  */
 export const getRecentRewards = async (
     userId: number,
@@ -234,6 +245,7 @@ export const getRecentRewards = async (
       FROM user_problem_rewards r
       LEFT JOIN problems p ON p.id = r.problem_id
       WHERE r.user_id = $1
+        AND (p.id IS NULL OR p.is_visible = true)
       ORDER BY r.awarded_at DESC
       LIMIT $2
     `, [userId, limit]);

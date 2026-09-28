@@ -13,11 +13,18 @@ describe('useProblemManagement', () => {
         { id: 'PROB1', title: 'Problem 1', author: 'admin', is_visible: true },
         { id: 'PROB2', title: 'Problem 2', author: 'user1', is_visible: false }
     ];
+    const mockPage = {
+        problems: mockProblems,
+        nextCursor: null,
+        hasMore: false,
+        authors: [{ name: 'admin' }, { name: 'user1' }],
+        hasUnauthoredProblems: false,
+    };
 
     it('fetches problems correctly', async () => {
-        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(mockProblems);
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(mockPage);
 
-        const { result } = renderHook(() => useProblemManagement());
+        const { result } = renderHook(() => useProblemManagement({}));
 
         expect(result.current.loading).toBe(true);
 
@@ -30,10 +37,10 @@ describe('useProblemManagement', () => {
     });
 
     it('handles problem deletion', async () => {
-        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(mockProblems);
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(mockPage);
         (jest.mocked(adminService.deleteProblem) as jest.Mock).mockResolvedValueOnce({});
 
-        const { result } = renderHook(() => useProblemManagement());
+        const { result } = renderHook(() => useProblemManagement({}));
 
         await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -51,10 +58,10 @@ describe('useProblemManagement', () => {
     });
 
     it('handles visibility toggle', async () => {
-        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(mockProblems);
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(mockPage);
         (jest.mocked(adminService.updateProblemVisibility) as jest.Mock).mockResolvedValueOnce({});
 
-        const { result } = renderHook(() => useProblemManagement());
+        const { result } = renderHook(() => useProblemManagement({}));
 
         await waitFor(() => expect(result.current.loading).toBe(false));
 

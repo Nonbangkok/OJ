@@ -115,6 +115,15 @@
   gap: 1rem;
 }
 
+/* Refresh indicator for the result area only — the search and filter
+   controls above it stay mounted and interactive while it shows. */
+.results-loading {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  padding: 3rem 0;
+  text-align: center;
+}
+
 .no-problems-container {
   display: flex;
   flex-direction: column;

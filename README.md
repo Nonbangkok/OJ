@@ -443,7 +443,10 @@ Each problem directory (either at the root of a multi-problem ZIP or the content
       "title": "Plus",
       "author": "Nonbangkok",
       "time_limit_ms": 1000,
-      "memory_limit_mb": 32
+      "memory_limit_mb": 32,
+      "categories": ["Math", "Implementation"],
+      "difficulty": 800,
+      "collection": "Chapter 1"
     }
     ```
     *   `id`: A unique string identifier for the problem (e.g., "plus").
@@ -451,6 +454,19 @@ Each problem directory (either at the root of a multi-problem ZIP or the content
     *   `author`: The author of the problem.
     *   `time_limit_ms`: The maximum allowed execution time for a solution, in milliseconds.
     *   `memory_limit_mb`: The maximum allowed memory usage for a solution, in megabytes.
+    *   `categories` *(optional)*: An array of category names from the fixed list below. Whitespace is trimmed and duplicates are removed. An empty array (or `null`) means uncategorized. Unknown names are rejected with an error that names the offending value and the allowed list — the importer never creates arbitrary categories.
+        *   Allowed: `Dynamic Programming`, `Greedy`, `Graph`, `Tree`, `Data Structures`, `String`, `Math`, `Geometry`, `Divide and Conquer`, `Binary Search`, `Constructive`, `Bitmasks`, `Sorting`, `2D-Grid`, `Implementation`, `Other`
+    *   `difficulty` *(optional)*: A rating on the same 800–3500 scale (in steps of 100) used by normal problem editing. `null` (or omitting the field on a **new** problem) means Unrated. Values outside the scale, non-integers, or strings are rejected.
+    *   `collection` *(optional)*: The **name** of a collection (e.g., `"Chapter 1"`) — a name, not a numeric id, so archives stay portable across databases. If a collection with that name exists it is reused; otherwise it is created once (multiple problems in one batch referencing the same new name all land in the same collection). An empty/whitespace-only string is treated the same as `null`: no collection.
+
+    **Updating an existing problem** (a ZIP whose `config.json` `id` matches an existing problem — the problem is reported as *skipped*, not re-created, but its metadata fields below are applied). For the three optional fields, omitted vs. explicit matters:
+    *   **Field omitted** → the stored value is **preserved**.
+    *   **Field set to `null`** (or `[]` for categories, or `""` for collection) → the stored value is **cleared**.
+    *   **Field set to a value** → the stored value is **replaced**.
+
+    Example: importing an existing problem with `{"id": "plus", "title": "Plus", "author": "Nonbangkok", "time_limit_ms": 1000, "memory_limit_mb": 32, "difficulty": null}` keeps its current categories and collection but clears its rating. (PDF and test cases for existing problems are managed from the individual problem's upload form, not the ZIP import.)
+
+    A problem that fails validation is reported per-problem with a specific message (e.g., `Problem "tree-dp": config.json "categories.0" is invalid: Unknown category "Graphs". Allowed: ...`); the rest of the batch continues, and any collection the failed problem would have created is rolled back.
 
 2.  **Problem Statement PDF:**
     A single `.pdf` file (up to 2GB) containing the problem description. The system will automatically detect and use the first PDF file found within the problem's directory.

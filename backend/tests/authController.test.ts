@@ -321,6 +321,26 @@ describe('Auth Controller', () => {
             // Locked before any DB lookup.
             expect(db.query).not.toHaveBeenCalled();
         });
+
+        it('still locks out an admin-named account after repeated failures (no privileged exemption)', async () => {
+            // The per-account lockout must never be weakened by the
+            // staff/admin rate-limit exemptions: admin accounts are the most
+            // attractive brute-force targets.
+            const adminName = 'SiteAdmin';
+            for (let i = 0; i < RATE_LIMIT_CONFIG.LOGIN_FAILURE_MAX; i++) {
+                recordLoginFailure(adminName);
+            }
+            expect(require('../middleware/rateLimit').isLoginLocked(adminName)).toBe(true);
+
+            const res = await request(app)
+                .post('/login')
+                .set('X-Forwarded-For', '10.8.8.8')
+                .send({ username: adminName, password: 'password123' });
+
+            expect(res.status).toBe(429);
+            expect(res.body.message).toBe('Too many failed login attempts. Please try again later.');
+            expect(db.query).not.toHaveBeenCalled();
+        });
     });
 
     describe('POST /logout', () => {

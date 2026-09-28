@@ -572,3 +572,156 @@ test('a succeeded verification shows the passing summary', async () => {
   // The success banner carries the green tone.
   expect(screen.getByText(/All checks passed at revision 3/i).closest('div').className).toMatch(/verifyOutcomePassed/);
 });
+
+// ---------------------------------------------------------------------------
+// "My drafts" scope — Author Profile AKA ↔ username identity matching.
+// ---------------------------------------------------------------------------
+/** List-page api.get mock that answers the three list endpoints separately:
+ *  all drafts, my drafts (scope=mine), and author profiles. */
+const listPageMock = (mine: DraftSummary[], profiles: ProfileSummary[]) => {
+  jest.mocked(api.get).mockImplementation(async (url, config) => {
+    const scope = (config as { params?: { scope?: string } } | undefined)?.params?.scope;
+    if (String(url).endsWith('/drafts') && scope === 'mine') return { data: mine };
+    if (String(url).endsWith('/drafts')) return { data: [draft, someoneElsesDraft] };
+    if (String(url).endsWith('/author-profiles')) return { data: profiles };
+    return { data: [] };
+  });
+};
+
+type DraftSummary = typeof draft;
+type ProfileSummary = { id: string; userId: number | null; akaName: string; realName: string };
+const someoneElsesDraft = { ...draft, id: 'd2', problemId: 'other', title: 'Other Problem', authorProfileId: 'p2' };
+
+describe('My drafts scope (AKA ↔ username identity)', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+    (useAuth as jest.Mock).mockReturnValue({
+      user: { id: 7, username: 'newadmin', role: 'admin' },
+      isLoading: false,
+    });
+  });
+
+  test('My drafts lists the drafts of the profile whose AKA matches the username', async () => {
+    // Profile "Nonbangkok" carries AKA "newadmin" — the logged-in username.
+    // Its drafts must appear under My drafts even though the displayed
+    // profile name is unrelated to the username.
+    listPageMock(
+      [{ ...draft, authorProfileId: 'p1' }, { ...draft, id: 'd3', problemId: 'third' }],
+      [{ id: 'p1', userId: null, akaName: 'newadmin', realName: 'Nonbangkok' }],
+    );
+    show();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'My drafts' }));
+    // The scoped request went out with the scope param.
+    await waitFor(() =>
+      expect(api.get).toHaveBeenCalledWith('/admin/authoring/drafts', { params: { scope: 'mine' } })
+    );
+    // Both mine-scoped drafts render; the other author's draft does not.
+    expect(await screen.findByRole('link', { name: 'third' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'other' })).not.toBeInTheDocument();
+
+    // All drafts still shows everything.
+    fireEvent.click(screen.getByRole('button', { name: 'All drafts' }));
+    await waitFor(() => expect(screen.getByRole('link', { name: 'other' })).toBeInTheDocument());
+  });
+
+  test('My drafts with no matching profile shows the linked-profile empty state, not all drafts', async () => {
+    // No profile carries AKA "newadmin": My drafts must be empty with the
+    // explanatory message — never a silent fallback to every draft.
+    listPageMock([], [{ id: 'p2', userId: null, akaName: 'someoneelse', realName: 'Other Author' }]);
+    show();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'My drafts' }));
+
+    expect(await screen.findByText('No author profile is linked to your username.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'sum' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'other' })).not.toBeInTheDocument();
+  });
+
+  test('a profile whose display name matches but AKA does not must not count as mine', async () => {
+    // The profile's real name is "newadmin"-like but its AKA differs — only
+    // the AKA is the identity handle.
+    listPageMock([], [{ id: 'p3', userId: null, akaName: 'Someone Else', realName: 'New Admin' }]);
+    show();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'My drafts' }));
+
+    expect(await screen.findByText('No author profile is linked to your username.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'sum' })).not.toBeInTheDocument();
+  });
+
+  test('AKA matching is case-insensitive like usernames', async () => {
+    // usernames are unique on LOWER(username); the AKA match follows the same
+    // normalization, so "NewAdmin" == "newadmin".
+    listPageMock(
+      [{ ...draft, authorProfileId: 'p1' }],
+      [{ id: 'p1', userId: null, akaName: 'NewAdmin', realName: 'Nonbangkok' }],
+    );
+    show();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'My drafts' }));
+    // The mine-scoped list (which the backend computed) renders the draft.
+    expect(await screen.findByRole('link', { name: 'sum' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'other' })).not.toBeInTheDocument();
+  });
+});
+
+test('a draft row offers a destructive delete that requires explicit confirmation', async () => {
+  show();
+  fireEvent.click(await screen.findByRole('button', { name: 'Row actions for sum' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+
+  const dialog = await screen.findByRole('dialog', { name: 'Delete draft "sum"?' });
+  expect(dialog).toHaveTextContent(
+    'This permanently deletes this authoring draft and its draft-only artifacts. Published problem data must not be deleted.'
+  );
+  expect(screen.getByRole('button', { name: 'Delete Draft' })).toBeInTheDocument();
+  // Nothing deleted yet.
+  expect(api.delete).not.toHaveBeenCalled();
+
+  // Cancel keeps the draft listed.
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(screen.queryByRole('dialog', { name: 'Delete draft "sum"?' })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'sum' })).toBeInTheDocument();
+  expect(api.delete).not.toHaveBeenCalled();
+
+  // Confirmed delete calls the API and removes the row.
+  fireEvent.click(screen.getByRole('button', { name: 'Row actions for sum' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+  jest
+    .mocked(api.delete)
+    .mockResolvedValue({ data: { message: 'Authoring draft deleted', problemId: 'sum', wasPublished: false } });
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete Draft' }));
+  await waitFor(() => expect(api.delete).toHaveBeenCalledWith('/admin/authoring/drafts/d1'));
+  await waitFor(() => expect(screen.queryByRole('link', { name: 'sum' })).not.toBeInTheDocument());
+});
+
+test('a failed draft delete surfaces the server error and keeps the row', async () => {
+  show();
+  fireEvent.click(await screen.findByRole('button', { name: 'Row actions for sum' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+  jest.mocked(api.delete).mockRejectedValue({
+    response: { status: 409, data: { message: 'The authoring draft is busy' } },
+  });
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete Draft' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('The authoring draft is busy');
+  expect(screen.getByRole('link', { name: 'sum' })).toBeInTheDocument();
+});
+
+test('a published draft row keeps Start new revision and still offers delete', async () => {
+  const published = { ...draft, status: 'published', publishedAt: '2026-09-16T00:00:00.000Z' };
+  jest.mocked(api.get).mockImplementation(async (url) => ({
+    data: url.endsWith('/drafts') ? [published] : url.endsWith('/testcases')
+      ? { revision: published.revision, testcases: [] } : url.endsWith('/d1') ? published : [],
+  }));
+  show();
+
+  expect(await screen.findByRole('button', { name: 'Start new revision' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Row actions for sum' }));
+  // Published drafts do not get the "Open draft" menu item, only Delete.
+  expect(screen.queryByRole('menuitem', { name: 'Open draft' })).not.toBeInTheDocument();
+  expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
+});

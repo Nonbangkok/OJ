@@ -23,14 +23,6 @@ export interface IdTitlePair {
 // batchUploadService
 // ---------------------------------------------------------------------------
 
-export interface ProblemConfig {
-  id: string;
-  title: string;
-  author: string;
-  time_limit_ms: number;
-  memory_limit_mb: number;
-}
-
 export interface BatchUploadResult {
   added: string[];
   skipped: string[];

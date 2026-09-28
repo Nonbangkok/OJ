@@ -8,7 +8,7 @@ import { registerProgressClient, streamBatchUpload } from '../services/batchUplo
 import {
   createProblem,
   deleteProblem,
-  getAdminProblems,
+  getAdminProblemsPage,
   getProblemDetail,
   getProblemExportBundle,
   getProblemPdfWithAccess,
@@ -41,6 +41,7 @@ import {
 import { getErrorMessage } from '../utils/errorMessage';
 import { validateRequest } from '../middleware/validation';
 import {
+  adminProblemsQuerySchema,
   createProblemSchema,
   problemIdParamSchema,
   problemExportSchema,
@@ -218,9 +219,34 @@ router.delete('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
   res.status(200).json({ message: `Problem ${id} deleted successfully` });
 }));
 
-router.get('/admin/problems', requireAuth, requireStaffOrAdmin, asyncHandler(async (_req: Request, res: Response) => {
-  const problems = await getAdminProblems();
-  res.json(problems);
+// Keyset-paginated admin problem list. All filters run server-side BEFORE
+// the LIMIT; hidden and contest-attached problems are deliberately included
+// (the whole point of the management view). The response envelope is
+// { problems, nextCursor, hasMore, authors, hasUnauthoredProblems }.
+router.get('/admin/problems', requireAuth, requireStaffOrAdmin,
+  validateRequest({ query: adminProblemsQuerySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  // validateRequest writes Zod defaults/coercions back into req.query.
+  const { search, collection, visibility, author, limit, cursor } = req.query as unknown as {
+    search?: string;
+    collection?: 'none' | 'all' | number;
+    visibility?: 'all' | 'visible' | 'hidden';
+    author?: string;
+    limit?: number;
+    cursor?: string;
+  };
+  // Map the sentinel strings the frontend sends for "all" onto undefined so
+  // the service sees a clean unfiltered query (its own 'all' handling is
+  // for internal callers passing the raw enum).
+  const page = await getAdminProblemsPage({
+    ...(search !== undefined && search !== '' ? { search } : {}),
+    ...(collection !== undefined && collection !== 'all' ? { collection } : {}),
+    ...(visibility !== undefined && visibility !== 'all' ? { visibility } : {}),
+    ...(author !== undefined && author !== 'all' ? { author } : {}),
+    ...(limit !== undefined ? { limit } : {}),
+    ...(cursor !== undefined ? { cursor } : {}),
+  });
+  res.json(page);
 }));
 
 router.put('/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin,

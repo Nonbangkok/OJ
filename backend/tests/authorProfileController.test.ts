@@ -262,4 +262,54 @@ describe('Author Profile controller', () => {
     expect(imageService.normalizeAuthorProfileImage).not.toHaveBeenCalled();
     expect(profileService.createAuthorProfile).not.toHaveBeenCalled();
   });
+
+  it('deletes a profile and reports the number of detached published drafts', async () => {
+    (profileService.deleteAuthorProfile as jest.Mock).mockResolvedValueOnce({
+      kind: 'deleted',
+      profile: profileRow(),
+      detachedDrafts: 2,
+    });
+
+    const response = await request(createTestApp('staff'))
+      .delete(`/admin/author-profiles/${profileRow().id}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ message: 'Author profile deleted', detachedDrafts: 2 });
+    expect(profileService.deleteAuthorProfile).toHaveBeenCalledWith(profileRow().id);
+  });
+
+  it('blocks deletion while active drafts reference the profile', async () => {
+    (profileService.deleteAuthorProfile as jest.Mock).mockResolvedValueOnce({
+      kind: 'active_drafts',
+      activeDrafts: 3,
+    });
+
+    const response = await request(createTestApp('admin'))
+      .delete(`/admin/author-profiles/${profileRow().id}`);
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      message: 'This profile is currently referenced by 3 drafts. Reassign or delete those drafts first.',
+      code: 'author_profile_has_active_drafts',
+      activeDrafts: 3,
+    });
+  });
+
+  it('maps missing profiles to 404 on delete', async () => {
+    (profileService.deleteAuthorProfile as jest.Mock).mockResolvedValueOnce({ kind: 'not_found' });
+
+    const response = await request(createTestApp('admin'))
+      .delete('/admin/author-profiles/33333333-3333-4333-8333-333333333333');
+
+    expect(response.status).toBe(404);
+    expect(response.body.message).toBe('Author profile not found');
+  });
+
+  it('rejects malformed profile ids on delete', async () => {
+    const response = await request(createTestApp('admin'))
+      .delete('/admin/author-profiles/not-a-uuid');
+
+    expect(response.status).toBe(400);
+    expect(profileService.deleteAuthorProfile).not.toHaveBeenCalled();
+  });
 });

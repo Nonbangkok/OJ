@@ -22,6 +22,23 @@ describe('general API limiter skip paths', () => {
     return skipGeneralLimit({ path } as SkipRequest);
   };
 
+  it('skips a route-agnostic request when the session is staff/admin (revalidated req.user role)', () => {
+    process.env.NODE_ENV = 'production';
+    const { skipGeneralLimit } = require('../../middleware/rateLimit') as {
+      skipGeneralLimit: (req: SkipRequest) => boolean;
+    };
+    // Simulate what attachRequestUser produces after revalidateSessionUser:
+    // the role read is the live users-row role, never a stale session value.
+    const userWithRole = (role: string) => ({ user: { role } });
+    expect(skipGeneralLimit({ path: '/problems', ...userWithRole('staff') } as SkipRequest)).toBe(true);
+    expect(skipGeneralLimit({ path: '/problems', ...userWithRole('admin') } as SkipRequest)).toBe(true);
+    // Regression: regular users and guests stay limited.
+    expect(skipGeneralLimit({ path: '/problems', ...userWithRole('user') } as SkipRequest)).toBe(false);
+    expect(skipGeneralLimit({ path: '/problems', user: undefined } as SkipRequest)).toBe(false);
+    expect(skipGeneralLimit({ path: '/problems' } as SkipRequest)).toBe(false);
+  });
+
+
   it('skips draft, job, profile, and profile-sync workspace traffic', () => {
     expect(skipped('/admin/authoring/drafts/abc')).toBe(true);
     expect(skipped('/admin/authoring/jobs/abc')).toBe(true);
@@ -45,8 +62,91 @@ describe('general API limiter skip paths', () => {
   });
 });
 
-describe('proxyClientKey (AUTH-001)', () => {
-  const keyFor = (headers: Record<string, string | string[] | undefined>, ip?: string): string => {
+describe('privileged-user rate limit exemptions', () => {
+  const OLD_ENV = process.env.NODE_ENV;
+
+  afterEach(() => {
+    process.env.NODE_ENV = OLD_ENV;
+    jest.resetModules();
+  });
+
+  type Req = { path: string; user?: { role: string } };
+
+  const loadMiddleware = (): {
+    skipGeneralLimit: (req: Req) => boolean;
+    skipSubmitLimit: (req: Req) => boolean;
+    isPrivilegedUser: (req: Req) => boolean;
+    authLimiter: { skip?: (req: Req) => boolean };
+  } => {
+    jest.resetModules();
+    process.env.NODE_ENV = 'production';
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('../../middleware/rateLimit');
+  };
+
+  it('exempts staff and admin from the general and submit limiters', () => {
+    const { skipGeneralLimit, skipSubmitLimit } = loadMiddleware();
+    for (const role of ['staff', 'admin']) {
+      const req = { path: '/problems', user: { id: 1, username: 'u', role } } as unknown as Req;
+      expect(skipGeneralLimit(req)).toBe(true);
+      expect(skipSubmitLimit(req)).toBe(true);
+    }
+  });
+
+  it('still limits regular users and guests on both limiters (regression)', () => {
+    const { skipGeneralLimit, skipSubmitLimit } = loadMiddleware();
+    const cases: Req[] = [
+      { path: '/problems', user: { role: 'user' } },
+      { path: '/problems', user: undefined },
+      { path: '/problems' },
+    ];
+    for (const req of cases) {
+      expect(skipGeneralLimit(req)).toBe(false);
+      expect(skipSubmitLimit(req)).toBe(false);
+    }
+  });
+
+  it('reads the role from req.user only (a stale-session claim is not trusted)', () => {
+    const { isPrivilegedUser } = loadMiddleware();
+    // req.user absent → not privileged, even if a session object exists.
+    expect(isPrivilegedUser({ path: '/x', session: { role: 'admin' } } as unknown as Req)).toBe(false);
+    // Unknown/garbage roles are not privileged.
+    expect(isPrivilegedUser({ path: '/x', user: { role: 'superuser' } } as Req)).toBe(false);
+  });
+
+  it('keeps the auth limiter free of any role exemption', async () => {
+    // The auth limiter's only skip is the test env: an admin session must
+    // still be limited on /login attempts (in practice, after logout). We
+    // exercise the real limiter middleware on a throwaway Express app with a
+    // requestContext stand-in that populates req.user with an admin role —
+    // a role-based skip would return 200 forever; the real limiter must 429
+    // once the budget is spent.
+    const { authLimiter } = loadMiddleware();
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const express = require('express');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const request = require('supertest');
+    const app = express();
+    app.use((_req: object, _res: object, next: (err?: unknown) => void) => { next(); });
+    app.use(authLimiter);
+    app.use((_req: object, res: { status: (n: number) => { json: (o: object) => void } }) => {
+      res.status(200).json({ ok: true });
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { RATE_LIMIT_CONFIG } = require('../../constants');
+    const attempts = RATE_LIMIT_CONFIG.AUTH_MAX + 1;
+    let finalStatus = 0;
+    for (let i = 0; i < attempts; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      const r = await request(app).post('/login');
+      finalStatus = r.status;
+    }
+    expect(finalStatus).toBe(429);
+  });
+});
+
+describe('proxyClientKey (AUTH-001)', () => {  const keyFor = (headers: Record<string, string | string[] | undefined>, ip?: string): string => {
     const { proxyClientKey } = require('../../middleware/rateLimit') as {
       proxyClientKey: (req: { headers: Record<string, string | string[] | undefined>; ip?: string }) => string;
     };

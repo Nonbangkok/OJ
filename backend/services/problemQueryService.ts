@@ -14,7 +14,7 @@ import {
   TestcaseView,
   TestcaseViewPart,
 } from '../types/service';
-import { PROBLEM_LIST_CONFIG, TESTCASE_VIEWER_CONFIG } from '../constants';
+import { ADMIN_PROBLEM_LIST_CONFIG, PROBLEM_LIST_CONFIG, TESTCASE_VIEWER_CONFIG } from '../constants';
 import { fullyPairedCaseNumbers, pairZippedTestcaseFiles } from './testcaseZipPairing';
 import { isUniqueViolation } from '../utils/dbErrors';
 import { AppError } from '../middleware/errorHandler';
@@ -417,11 +417,147 @@ export const deleteProblem = async (problemId: string): Promise<boolean> => {
   });
 };
 
-export const getAdminProblems = async (): Promise<AdminProblemRow[]> => {
-  const result = await db.query<AdminProblemRow>(
-    'SELECT p.id, p.title, p.author, p.categories, p.difficulty, p.collection_id, col.name AS collection_name, p.is_visible, p.contest_id, c.status AS contest_status FROM problems p LEFT JOIN contests c ON p.contest_id = c.id LEFT JOIN collections col ON p.collection_id = col.id ORDER BY p.id'
+/** Full query surface of the paginated admin problem list. */
+export interface AdminProblemListOptions {
+  /** Substring match on problem id or title (ILIKE, server-side). */
+  search?: string;
+  /** Numeric collection id, the literal 'none' (no collection), or 'all'. */
+  collection?: 'none' | 'all' | number;
+  /** 'visible' / 'hidden' keep only that slice; 'all' keeps everything. */
+  visibility?: 'all' | 'visible' | 'hidden';
+  /** Exact author match after trim, or 'none' (empty/NULL author), or 'all'. */
+  author?: 'none' | 'all' | string;
+  /** Page size (1..MAX_LIMIT); defaults to ADMIN_PROBLEM_LIST_CONFIG.DEFAULT_LIMIT. */
+  limit?: number;
+  /** Opaque next-page token from a previous response. */
+  cursor?: string;
+}
+
+/**
+ * One page of the admin problem list plus the distinct author filter
+ * options (so the Author dropdown does not depend on which rows are
+ * currently loaded). The admin endpoint deliberately applies NO public
+ * visibility filter: hidden and contest-attached problems are the point
+ * of the management view.
+ */
+export interface AdminProblemsPage {
+  problems: AdminProblemRow[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  /** Distinct trimmed authors over the WHOLE (unfiltered) problem set. */
+  authors: AdminProblemListAuthor[];
+  /** True when at least one problem has an empty/NULL author. */
+  hasUnauthoredProblems: boolean;
+}
+
+/** Author filter option: the trimmed author name ('' = "No author"). */
+export interface AdminProblemListAuthor {
+  name: string;
+}
+
+/**
+ * Admin list cursor: the last emitted row's problem id. The list has a
+ * single sort mode (id ASC — a total order, since ids are unique), so the
+ * payload is just the id, base64url-encoded and treated as a black box by
+ * clients.
+ */
+const decodeAdminCursor = (raw: string): string => {
+  try {
+    const cursor = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as { id?: unknown };
+    if (typeof cursor === 'object' && cursor !== null && typeof cursor.id === 'string' && cursor.id !== '') {
+      return cursor.id;
+    }
+  } catch {
+    // fall through to the 400 below
+  }
+  throw new AppError('Invalid cursor', 400);
+};
+
+/**
+ * One keyset-paginated page of the admin problem list. Rows are ordered by
+ * id ASC (unique, so the order is total and pages can never overlap or
+ * skip); filters all run in SQL BEFORE the LIMIT, so pagination composes
+ * with the filter bar. `limit + 1` rows are fetched so hasMore/nextCursor
+ * come from the presence of an extra row — the same contract as the public
+ * list.
+ */
+export const getAdminProblemsPage = async (
+  options: AdminProblemListOptions = {},
+): Promise<AdminProblemsPage> => {
+  const limit = options.limit ?? ADMIN_PROBLEM_LIST_CONFIG.DEFAULT_LIMIT;
+  if (!Number.isInteger(limit) || limit < 1 || limit > ADMIN_PROBLEM_LIST_CONFIG.MAX_LIMIT) {
+    throw new AppError(`limit must be an integer between 1 and ${ADMIN_PROBLEM_LIST_CONFIG.MAX_LIMIT}`, 400);
+  }
+  const afterId = options.cursor !== undefined ? decodeAdminCursor(options.cursor) : null;
+
+  const filters: string[] = [];
+  const params: unknown[] = [];
+  if (options.search !== undefined && options.search !== '') {
+    params.push(`%${escapeLikePattern(options.search)}%`);
+    filters.push(`(p.id ILIKE $${params.length} OR p.title ILIKE $${params.length})`);
+  }
+  if (options.collection === 'none') {
+    filters.push('p.collection_id IS NULL');
+  } else if (typeof options.collection === 'number') {
+    params.push(options.collection);
+    filters.push(`p.collection_id = $${params.length}`);
+  }
+  if (options.visibility === 'visible') {
+    filters.push('p.is_visible = true');
+  } else if (options.visibility === 'hidden') {
+    filters.push('p.is_visible = false');
+  }
+  if (options.author === 'none') {
+    filters.push(`(p.author IS NULL OR btrim(p.author) = '')`);
+  } else if (typeof options.author === 'string' && options.author !== 'all') {
+    params.push(options.author);
+    filters.push(`btrim(p.author) = $${params.length}`);
+  }
+  if (afterId !== null) {
+    params.push(afterId);
+    filters.push(`p.id > $${params.length}`);
+  }
+
+  params.push(limit + 1);
+  const fetchLimitParam = params.length;
+
+  const query = `
+    SELECT p.id, p.title, p.author, p.categories, p.difficulty, p.collection_id,
+           col.name AS collection_name, p.is_visible, p.contest_id, c.status AS contest_status
+    FROM problems p
+    LEFT JOIN contests c ON p.contest_id = c.id
+    LEFT JOIN collections col ON p.collection_id = col.id
+    ${filters.length ? `WHERE ${filters.join(' AND ')}` : ''}
+    ORDER BY p.id ASC
+    LIMIT $${fetchLimitParam}
+  `;
+  const result = await db.query<AdminProblemRow>(query, params);
+  const hasMore = result.rows.length > limit;
+  const problems = hasMore ? result.rows.slice(0, limit) : result.rows;
+  const last = problems[problems.length - 1];
+
+  // Author filter options come from the whole pool, not the current page —
+  // one cheap aggregate per request (the admin list is orders of magnitude
+  // smaller than the row payload it replaces).
+  const authorAggregate = await db.query<{ name: string }>(
+    `SELECT DISTINCT btrim(p.author) AS name
+     FROM problems p
+     WHERE p.author IS NOT NULL AND btrim(p.author) <> ''
+     ORDER BY name ASC`
   );
-  return result.rows;
+  const unauthoredResult = await db.query<{ exists: boolean }>(
+    `SELECT EXISTS (SELECT 1 FROM problems p WHERE p.author IS NULL OR btrim(p.author) = '') AS exists`
+  );
+
+  return {
+    problems,
+    hasMore,
+    nextCursor: hasMore && last
+      ? Buffer.from(JSON.stringify({ id: last.id }), 'utf8').toString('base64url')
+      : null,
+    authors: authorAggregate.rows.map(row => ({ name: row.name })),
+    hasUnauthoredProblems: unauthoredResult.rows[0]?.exists === true,
+  };
 };
 
 export const updateProblemVisibility = async (

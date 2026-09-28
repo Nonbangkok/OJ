@@ -31,8 +31,9 @@ describeWithDatabase('author profiles and statement assets through HTTP and Post
   app.use(express.json());
   app.use(session({ secret: 'slice3-test', resave: false, saveUninitialized: false }));
   app.use((req, _res, next) => {
-    req.session.userId = 1;
-    req.session.role = 'admin';
+    // Auth guards read only `req.user` (populated by attachRequestUser in
+    // the real app), so the test harness sets it directly.
+    req.user = { id: 1, username: 'slice3-admin', role: 'admin', hasAvatar: false };
     next();
   });
   app.use(authorProfiles);

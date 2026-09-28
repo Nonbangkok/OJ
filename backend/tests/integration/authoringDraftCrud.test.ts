@@ -58,7 +58,7 @@ describeWithDatabase('problem authoring draft persistence', () => {
       verified_revision: null,
     }));
     await expect(getProblemDraft(created.id, database)).resolves.toEqual(created);
-    await expect(listProblemDrafts(database)).resolves.toEqual([
+    await expect(listProblemDrafts({}, database)).resolves.toEqual([
       expect.objectContaining({ id: created.id, problem_id: 'redgate', revision: 1 }),
     ]);
   });

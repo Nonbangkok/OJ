@@ -4,16 +4,22 @@ import path from 'path';
 import * as unzipper from 'unzipper';
 import os from 'os';
 import { Readable } from 'stream';
+import type { PoolClient } from 'pg';
 import * as db from '../db';
 import { UPLOAD_STATUS, FILE_CONFIG, ARCHIVE_LIMITS } from '../constants';
 import { BatchUploadProgressData } from '../types/api';
 import {
   BatchUploadResult,
   BufferedContent,
-  ProblemConfig,
   ProblemProcessResult,
   TestcasePairMap,
 } from '../types/service';
+import {
+  formatProblemZipConfigError,
+  problemZipConfigSchema,
+  type ProblemZipConfig,
+} from '../schemas/problemZipConfig';
+import { resolveCollectionIdByName } from './collectionQueryService';
 import { pairFlatDirTestcaseFiles, pairZippedTestcaseFiles } from './testcaseZipPairing';
 
 const MAX_ARCHIVE_UNCOMPRESSED_BYTES = ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES;
@@ -78,7 +84,7 @@ async function removeDir(dir: string): Promise<void> {
   await fsPromises.rm(dir, { recursive: true, force: true });
 }
 
-async function processTestcasesFromZip(problemId: string, zipPath: string, log: string[]): Promise<number> {
+async function processTestcasesFromZip(client: PoolClient, problemId: string, zipPath: string, log: string[]): Promise<number> {
   const zip = await unzipper.Open.file(zipPath);
 
   // Check for input/output directory structure within the zip
@@ -109,7 +115,7 @@ async function processTestcasesFromZip(problemId: string, zipPath: string, log: 
       const inputDir = path.join(tempExtractDir, basePathInZip, 'input');
       const outputDir = path.join(tempExtractDir, basePathInZip, 'output');
 
-      return await processTestcasesFromInputOutputDirs(problemId, inputDir, outputDir, log);
+      return await processTestcasesFromInputOutputDirs(client, problemId, inputDir, outputDir, log);
 
     } finally {
       // Clean up the temporary extraction directory (no shell — avoids injection).
@@ -120,11 +126,11 @@ async function processTestcasesFromZip(problemId: string, zipPath: string, log: 
     // --- Fallback to original logic for flat zip files ---
     log.push('Detected flat file structure inside zip.');
     const testcaseFiles = pairZippedTestcaseFiles(zip.files);
-    return processPairedFiles(problemId, testcaseFiles, (file) => Promise.resolve(file.stream()), log);
+    return processPairedFiles(client, problemId, testcaseFiles, (file) => Promise.resolve(file.stream()), log);
   }
 }
 
-async function processTestcasesFromInputOutputDirs(problemId: string, inputDir: string, outputDir: string, log: string[]): Promise<number> {
+async function processTestcasesFromInputOutputDirs(client: PoolClient, problemId: string, inputDir: string, outputDir: string, log: string[]): Promise<number> {
   const inputFilenames = (await fsPromises.readdir(inputDir)).filter(f => f !== '.DS_Store');
   const outputFilenames = (await fsPromises.readdir(outputDir)).filter(f => f !== '.DS_Store');
 
@@ -151,13 +157,13 @@ async function processTestcasesFromInputOutputDirs(problemId: string, inputDir: 
     };
   }
 
-  return processPairedFiles(problemId, testcaseFiles, (filePath: string) => fsPromises.readFile(filePath), log);
+  return processPairedFiles(client, problemId, testcaseFiles, (filePath: string) => fsPromises.readFile(filePath), log);
 }
 
-async function processTestcasesFromFlatDir(problemId: string, dirPath: string, log: string[]): Promise<number> {
+async function processTestcasesFromFlatDir(client: PoolClient, problemId: string, dirPath: string, log: string[]): Promise<number> {
   const allFiles = await fsPromises.readdir(dirPath);
   const testcaseFiles = pairFlatDirTestcaseFiles(allFiles, dirPath);
-  return processPairedFiles(problemId, testcaseFiles, (filePath: string) => fsPromises.readFile(filePath), log);
+  return processPairedFiles(client, problemId, testcaseFiles, (filePath: string) => fsPromises.readFile(filePath), log);
 }
 
 async function streamToBuffer(stream: Readable): Promise<Buffer> {
@@ -170,6 +176,7 @@ async function streamToBuffer(stream: Readable): Promise<Buffer> {
 }
 
 async function processPairedFiles<TSource>(
+  client: PoolClient,
   problemId: string,
   pairedFiles: TestcasePairMap<TSource>,
   readFileFunc: (source: TSource) => Promise<BufferedContent>,
@@ -193,7 +200,7 @@ async function processPairedFiles<TSource>(
       const inputData = inputContent instanceof Readable ? await streamToBuffer(inputContent) : inputContent;
       const outputData = outputContent instanceof Readable ? await streamToBuffer(outputContent) : outputContent;
 
-      await db.query(
+      await client.query(
         'INSERT INTO testcases (problem_id, case_number, input_data, output_data) VALUES ($1, $2, $3, $4)',
         [problemId, caseCounter, inputData.toString('utf-8'), outputData.toString('utf-8')]
       );
@@ -203,109 +210,177 @@ async function processPairedFiles<TSource>(
   return caseCounter - 1;
 }
 
-async function processProblemDirectory(problemPath: string): Promise<ProblemProcessResult> {
-  const log: string[] = [];
-
+/**
+ * Read and validate config.json for one problem directory. Single- and
+ * batch-problem ZIPs share this parser: both reach here via
+ * processProblemDirectory.
+ *
+ * Per-problem error messages name the offending problem and field, e.g.
+ * `Problem "tree-dp": Unknown category "Graphs". Allowed: ...` — never a
+ * generic "invalid config.json".
+ */
+async function readProblemConfig(problemPath: string): Promise<ProblemZipConfig> {
   const configPath = path.join(problemPath, 'config.json');
-  let config: ProblemConfig;
+  let raw: unknown;
   try {
     const configFile = await fsPromises.readFile(configPath, 'utf-8');
-    config = JSON.parse(configFile);
+    raw = JSON.parse(configFile);
   } catch (e) {
     throw new Error(`Cannot read or parse config.json.`);
   }
 
+  // Best-effort problem id for the error message: fall back to the directory
+  // name when the id is missing or not a usable string.
+  let problemIdForError = path.basename(problemPath);
+  if (raw !== null && typeof raw === 'object' && 'id' in raw) {
+    const id = (raw as { id?: unknown }).id;
+    if (typeof id === 'string' && id.trim() !== '') {
+      problemIdForError = id.trim();
+    }
+  }
+
+  const parsed = problemZipConfigSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(`Problem "${problemIdForError}": ${formatProblemZipConfigError(parsed.error)}`);
+  }
+  return parsed.data;
+}
+
+/**
+ * Persist one problem directory inside a single transaction (per-problem
+ * boundary: one problem failing rolls back only itself — a batch continues
+ * with the other directories and reports this one as an error).
+ *
+ * Metadata semantics (categories / difficulty / collection):
+ *  - New problem: an omitted field applies the same defaults as the admin
+ *    create form (no categories, Unrated, no collection).
+ *  - Existing problem: an omitted field preserves the stored value; an
+ *    explicit null / [] clears it. The schema layer preserves field
+ *    presence, so this distinction is decided here, not lost to parsing.
+ *
+ * The collection is resolved by name (reuse-or-create, race-free upsert) on
+ * the same client, so a failing problem insert rolls the collection back too
+ * — an import can never leave an orphaned collection behind.
+ */
+async function processProblemDirectory(problemPath: string): Promise<ProblemProcessResult> {
+  const log: string[] = [];
+
+  const config = await readProblemConfig(problemPath);
+
   const { id: problemId, title, author, time_limit_ms, memory_limit_mb } = config;
-  if (!problemId || !title || !author || !time_limit_ms || !memory_limit_mb) {
-    throw new Error(`config.json is missing required fields (id, title, etc.).`);
-  }
-
-  const insertResult = await db.query(`
-        INSERT INTO problems (id, title, author, time_limit_ms, memory_limit_mb, is_visible)
-        VALUES ($1, $2, $3, $4, $5, false)
-        ON CONFLICT (id) DO NOTHING;
-    `, [problemId, title, author, time_limit_ms, memory_limit_mb]);
-
-  if (insertResult.rowCount === 0) {
-    return { status: UPLOAD_STATUS.SKIPPED, problemId };
-  }
 
   const filesInProblemDir = await fsPromises.readdir(problemPath);
 
-  const pdfFileName = filesInProblemDir.find(f => f.toLowerCase().endsWith('.pdf'));
-  if (pdfFileName) {
-    try {
-      const pdfPath = path.join(problemPath, pdfFileName);
-      const pdfBuffer = await fsPromises.readFile(pdfPath);
-      // Validate the PDF magic bytes before persisting / later serving it.
-      if (pdfBuffer.length < PDF_MAGIC.length || !pdfBuffer.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC)) {
-        log.push(`Skipped ${pdfFileName}: not a valid PDF (missing %PDF header).`);
-      } else {
-        await db.query('UPDATE problems SET problem_pdf = $1 WHERE id = $2', [pdfBuffer, problemId]);
-        log.push(`Uploaded ${pdfFileName}.`);
-      }
-    } catch (e) {
-      log.push(`ERROR: Could not read PDF file ${pdfFileName}.`);
+  return db.withTransaction(async (client) => {
+    // Resolve the collection (if any) inside the same transaction as the
+    // problem persist, so a later failure rolls back an auto-created
+    // collection. A null/absent collection simply means no collection.
+    let collectionId: number | null = null;
+    if (config.collection !== undefined && config.collection !== null) {
+      collectionId = await resolveCollectionIdByName(client, config.collection);
     }
-  } else {
-    log.push('No .pdf file found, skipping PDF upload.');
-  }
 
-  await db.query('DELETE FROM testcases WHERE problem_id = $1', [problemId]);
+    const insertResult = await client.query(`
+          INSERT INTO problems (id, title, author, time_limit_ms, memory_limit_mb, is_visible,
+            categories, difficulty, collection_id)
+          VALUES ($1, $2, $3, $4, $5, false, $6::text[], $7, $8)
+          ON CONFLICT (id) DO NOTHING;
+      `, [problemId, title, author, time_limit_ms, memory_limit_mb,
+        [...config.categories ?? []], config.difficulty ?? null, collectionId]);
 
-  const zipFileName = filesInProblemDir.find(f => f.toLowerCase().endsWith('.zip'));
-  let testcasesFound = false;
-
-  if (zipFileName) {
-    const zipPath = path.join(problemPath, zipFileName);
-    try {
-      const processedCount = await processTestcasesFromZip(problemId, zipPath, log);
-      log.push(`Processed ${processedCount} test cases from ${zipFileName}.`);
-      testcasesFound = true;
-    } catch (e) {
-      log.push(`ERROR: Failed to process zip file ${zipFileName}.`);
+    if (insertResult.rowCount === 0) {
+      // Existing problem: omitted metadata fields preserve the stored
+      // values; explicit values (including null / []) replace them.
+      const categoriesProvided = config.categories !== undefined;
+      const difficultyProvided = config.difficulty !== undefined;
+      const collectionProvided = config.collection !== undefined;
+      await client.query(`
+          UPDATE problems SET
+            categories = CASE WHEN $2::boolean THEN $3::text[] ELSE categories END,
+            difficulty = CASE WHEN $4::boolean THEN $5 ELSE difficulty END,
+            collection_id = CASE WHEN $6::boolean THEN $7 ELSE collection_id END
+          WHERE id = $1;
+        `, [problemId, categoriesProvided, [...config.categories ?? []],
+          difficultyProvided, config.difficulty ?? null,
+          collectionProvided, collectionId]);
+      return { status: UPLOAD_STATUS.SKIPPED, problemId };
     }
-  } else {
-    const items = await fsPromises.readdir(problemPath, { withFileTypes: true });
-    const subdirectories = items.filter(d => d.isDirectory()).map(d => d.name);
 
-    for (const dirName of subdirectories) {
-      const testcaseRootPath = path.join(problemPath, dirName);
-      const inputPath = path.join(testcaseRootPath, 'input');
-      const outputPath = path.join(testcaseRootPath, 'output');
-
+    const pdfFileName = filesInProblemDir.find(f => f.toLowerCase().endsWith('.pdf'));
+    if (pdfFileName) {
       try {
-        const inputStats = await fsPromises.stat(inputPath);
-        const outputStats = await fsPromises.stat(outputPath);
-
-        if (inputStats.isDirectory() && outputStats.isDirectory()) {
-          const processedCount = await processTestcasesFromInputOutputDirs(problemId, inputPath, outputPath, log);
-          if (processedCount > 0) {
-            log.push(`Processed ${processedCount} test cases from '${dirName}/input-output' subdirectories.`);
-            testcasesFound = true;
-          }
+        const pdfPath = path.join(problemPath, pdfFileName);
+        const pdfBuffer = await fsPromises.readFile(pdfPath);
+        // Validate the PDF magic bytes before persisting / later serving it.
+        if (pdfBuffer.length < PDF_MAGIC.length || !pdfBuffer.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC)) {
+          log.push(`Skipped ${pdfFileName}: not a valid PDF (missing %PDF header).`);
+        } else {
+          await client.query('UPDATE problems SET problem_pdf = $1 WHERE id = $2', [pdfBuffer, problemId]);
+          log.push(`Uploaded ${pdfFileName}.`);
         }
-      } catch (e) { }
-
-      if (!testcasesFound) {
-        try {
-          const processedCount = await processTestcasesFromFlatDir(problemId, testcaseRootPath, log);
-          if (processedCount > 0) {
-            log.push(`Processed ${processedCount} flat test cases from '${dirName}/' directory.`);
-            testcasesFound = true;
-          }
-        } catch (flatDirError) { }
+      } catch (e) {
+        log.push(`ERROR: Could not read PDF file ${pdfFileName}.`);
       }
-
-      if (testcasesFound) break;
+    } else {
+      log.push('No .pdf file found, skipping PDF upload.');
     }
-  }
 
-  if (!testcasesFound) {
-    log.push('No .zip file or valid testcase directory found.');
-  }
+    await client.query('DELETE FROM testcases WHERE problem_id = $1', [problemId]);
 
-  return { status: UPLOAD_STATUS.ADDED, problemId, log };
+    const zipFileName = filesInProblemDir.find(f => f.toLowerCase().endsWith('.zip'));
+    let testcasesFound = false;
+
+    if (zipFileName) {
+      const zipPath = path.join(problemPath, zipFileName);
+      try {
+        const processedCount = await processTestcasesFromZip(client, problemId, zipPath, log);
+        log.push(`Processed ${processedCount} test cases from ${zipFileName}.`);
+        testcasesFound = true;
+      } catch (e) {
+        log.push(`ERROR: Failed to process zip file ${zipFileName}.`);
+      }
+    } else {
+      const items = await fsPromises.readdir(problemPath, { withFileTypes: true });
+      const subdirectories = items.filter(d => d.isDirectory()).map(d => d.name);
+
+      for (const dirName of subdirectories) {
+        const testcaseRootPath = path.join(problemPath, dirName);
+        const inputPath = path.join(testcaseRootPath, 'input');
+        const outputPath = path.join(testcaseRootPath, 'output');
+
+        try {
+          const inputStats = await fsPromises.stat(inputPath);
+          const outputStats = await fsPromises.stat(outputPath);
+
+          if (inputStats.isDirectory() && outputStats.isDirectory()) {
+            const processedCount = await processTestcasesFromInputOutputDirs(client, problemId, inputPath, outputPath, log);
+            if (processedCount > 0) {
+              log.push(`Processed ${processedCount} test cases from '${dirName}/input-output' subdirectories.`);
+              testcasesFound = true;
+            }
+          }
+        } catch (e) { }
+
+        if (!testcasesFound) {
+          try {
+            const processedCount = await processTestcasesFromFlatDir(client, problemId, testcaseRootPath, log);
+            if (processedCount > 0) {
+              log.push(`Processed ${processedCount} flat test cases from '${dirName}/' directory.`);
+              testcasesFound = true;
+            }
+          } catch (flatDirError) { }
+        }
+
+        if (testcasesFound) break;
+      }
+    }
+
+    if (!testcasesFound) {
+      log.push('No .zip file or valid testcase directory found.');
+    }
+
+    return { status: UPLOAD_STATUS.ADDED, problemId, log };
+  });
 }
 
 export async function processBatchUpload(

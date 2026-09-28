@@ -303,6 +303,46 @@ describe('problem draft reads and creation', () => {
     expect(sql).not.toContain('latest_pdf');
     expect(sql).not.toContain('profile_image_png');
     expect(sql).toContain('ORDER BY updated_at DESC, id ASC');
+    // No scope → no filter parameters.
+    expect(db.query).toHaveBeenCalledWith(expect.any(String), []);
+  });
+
+  describe('scope=mine (username ↔ Author Profile AKA matching)', () => {
+    it('filters by the AKA join when scope is mine', async () => {
+      (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+
+      await listProblemDrafts({ scope: 'mine', username: 'newadmin' });
+
+      const [sql, params] = (db.query as jest.Mock).mock.calls[0] as [string, unknown[]];
+      expect(params).toEqual(['newadmin']);
+      expect(sql).toContain('LOWER(aka_name) = LOWER($1)');
+      // Both identity carriers participate: the linked profile AND the
+      // draft's own AKA snapshot (a profile link cleared by ON DELETE SET
+      // NULL must not orphan the author's drafts).
+      expect(sql).toContain('LOWER(problem_drafts.author_aka_name) = LOWER($1)');
+    });
+
+    it('normalizes case like the username uniqueness rule does', async () => {
+      (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+
+      await listProblemDrafts({ scope: 'mine', username: 'NewAdmin' });
+
+      const [sql, params] = (db.query as jest.Mock).mock.calls[0] as [string, unknown[]];
+      // The raw username is passed once; the SQL compares on LOWER() for
+      // both sides, mirroring users_username_lower_unique.
+      expect(params).toEqual(['NewAdmin']);
+      expect(sql).toContain('LOWER(aka_name) = LOWER($1)');
+      expect(sql).toContain('LOWER(problem_drafts.author_aka_name) = LOWER($1)');
+    });
+
+    it('returns no drafts without a username (no fallback to all drafts)', async () => {
+      const result = await listProblemDrafts({ scope: 'mine' });
+
+      expect(result).toEqual([]);
+      // Crucially, no query runs — there is nothing to match, and the
+      // unfiltered list must never leak through the "mine" scope.
+      expect(db.query).not.toHaveBeenCalled();
+    });
   });
 
   it('returns a complete draft by id', async () => {

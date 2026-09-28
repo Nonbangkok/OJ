@@ -24,6 +24,10 @@ const normalizeUpload = async (file: Express.Multer.File): Promise<Buffer> => {
 router.get('/users/:username/profile',
   validateRequest({ params: usernameParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
+    // PROFILE-PROBLEM-SCOPE: every stat (aggregates AND the Recently Solved
+    // listing) is computed from currently visible problems only, for every
+    // viewer — admin included. Profile semantics are stable and never
+    // depend on who is looking, so no viewer role is forwarded.
     const stats = await getUserProfileStats(String(req.params.username));
     if (!stats) {
       throw new AppError('User not found', 404);

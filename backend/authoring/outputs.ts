@@ -6,6 +6,7 @@ import { AUTHORING_RUNNER, failedResult, JobResult, JobSnapshot, jobSnapshotSche
 import { runOutputProcess } from './outputProcess';
 import { AuthoringSpool } from './spool';
 import { TESTCASE_LIMITS, TestcaseError, decodeTestcaseText, readTestcaseFile } from './testcases';
+import { outputsMatch } from '../utils/outputComparison';
 
 /** Compile once; run each immutable input in a read-only jail and publish only a complete set. */
 export async function generateOutputs(jobInput: JobSnapshot, workRoot: string, spool: AuthoringSpool,
@@ -79,8 +80,10 @@ export async function generateOutputs(jobInput: JobSnapshot, workRoot: string, s
                 const actual = decodeTestcaseText(content, input.filename);
                 total += content.length;
                 await rm(rawOutput);
-                // Keep the current judge's trim + CRLF normalization and exact internal whitespace.
-                if (actual.trim().replace(/\r\n/g, '\n') !== expected!.trim().replace(/\r\n/g, '\n')) {
+                // Same comparator as the judge (utils/outputComparison.ts):
+                // outer trim + CRLF normalization, exact internal whitespace,
+                // per-line trailing whitespace ignored.
+                if (!outputsMatch(actual, expected!)) {
                   failure.errorCode = 'wrong_answer'; return failure;
                 }
                 continue;

@@ -37,8 +37,15 @@ export interface TestcaseContents extends TestcaseMetadata {
 
 const authoringService = {
   // Drafts
-  listDrafts: async (): Promise<Draft[]> => {
-    const response = await api.get<Draft[]>(draftsBase);
+  /**
+   * `scope: 'mine'` asks the backend to filter by the logged-in username ↔
+   * Author Profile AKA identity (exact, case-normalized match — never a
+   * display-name or substring comparison). Without it every draft is listed.
+   */
+  listDrafts: async (scope: 'all' | 'mine' = 'all'): Promise<Draft[]> => {
+    const response = await api.get<Draft[]>(draftsBase, {
+      params: scope === 'mine' ? { scope } : {},
+    });
     return response.data;
   },
   createDraft: async (fields: DraftFields): Promise<Draft> => {
@@ -55,6 +62,12 @@ const authoringService = {
   },
   startNewRevision: async (id: string): Promise<Draft> => {
     const response = await api.post<Draft>(`${draftBase(id)}/new-revision`, {});
+    return response.data;
+  },
+  /** Permanently deletes a draft and its draft-only artifacts. The published
+   *  problem (if any) is never deleted by the backend. */
+  deleteDraft: async (id: string): Promise<{ message: string; problemId: string; wasPublished: boolean }> => {
+    const response = await api.delete<{ message: string; problemId: string; wasPublished: boolean }>(draftBase(id));
     return response.data;
   },
   refreshAuthorProfile: async (id: string, expectedRevision: number): Promise<Draft> => {
@@ -168,6 +181,14 @@ const authoringService = {
     const response = await api.patch<Profile>(
       `${profilesBase}/${encodeURIComponent(id)}`,
       data
+    );
+    return response.data;
+  },
+  /** Deletes an author profile. The backend blocks with 409 while active
+   *  (unpublished) drafts still reference the profile. */
+  deleteProfile: async (id: string): Promise<{ message: string; detachedDrafts: number }> => {
+    const response = await api.delete<{ message: string; detachedDrafts: number }>(
+      `${profilesBase}/${encodeURIComponent(id)}`
     );
     return response.data;
   },
