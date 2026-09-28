@@ -61,8 +61,23 @@ describe('Problems Page', () => {
         await waitFor(() => {
             expect(screen.getByText('Knapsack')).toBeInTheDocument();
         });
-        // The initial request asks for exactly one batch.
-        expect(problemService.getProblemsPage).toHaveBeenLastCalledWith({ limit: 20 });
+        // The initial request asks for one batch in the default difficulty order.
+        expect(problemService.getProblemsPage).toHaveBeenLastCalledWith({ sort: 'difficulty', order: 'asc', limit: 20 });
+    });
+
+    it('requests the initial public list ordered by difficulty ascending', async () => {
+        (jest.mocked(problemService.getProblemsPage) as jest.Mock).mockResolvedValueOnce(firstPage);
+
+        renderProblems();
+
+        await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
+
+        expect(problemService.getProblemsPage).toHaveBeenLastCalledWith({
+            sort: 'difficulty',
+            order: 'asc',
+            limit: 20,
+        });
+        expect(screen.getByLabelText('Sort problems')).toHaveValue('difficulty-asc');
     });
 
     it('displays error if the first fetch fails', async () => {
@@ -88,7 +103,7 @@ describe('Problems Page', () => {
             fireEvent.click(screen.getByRole('button', { name: 'Show More' }));
 
             await waitFor(() => expect(screen.getByText('Title c')).toBeInTheDocument());
-            expect(problemService.getProblemsPage).toHaveBeenLastCalledWith({ limit: 20, cursor: 'cur-1' });
+            expect(problemService.getProblemsPage).toHaveBeenLastCalledWith({ sort: 'difficulty', order: 'asc', limit: 20, cursor: 'cur-1' });
             // Appended, never replaced.
             expect(screen.getByText('Title a')).toBeInTheDocument();
             expect(screen.getByText('Title b')).toBeInTheDocument();
@@ -175,7 +190,7 @@ describe('Problems Page', () => {
             fireEvent.click(screen.getByRole('tab', { name: /Greedy/ }));
 
             await waitFor(() => {
-                expect(problemService.getProblemsPage).toHaveBeenLastCalledWith({ category: 'Greedy', limit: 20 });
+                expect(problemService.getProblemsPage).toHaveBeenLastCalledWith({ category: 'Greedy', sort: 'difficulty', order: 'asc', limit: 20 });
             });
         });
 
@@ -188,7 +203,7 @@ describe('Problems Page', () => {
             fireEvent.click(screen.getByRole('tab', { name: /^Uncategorized/ }));
 
             await waitFor(() => {
-                expect(problemService.getProblemsPage).toHaveBeenLastCalledWith({ category: 'Uncategorized', limit: 20 });
+                expect(problemService.getProblemsPage).toHaveBeenLastCalledWith({ category: 'Uncategorized', sort: 'difficulty', order: 'asc', limit: 20 });
             });
         });
 
@@ -279,8 +294,8 @@ describe('Problems Page', () => {
             renderProblems();
 
             await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-            // The default request carries only the batch size.
-            expect(mock).toHaveBeenLastCalledWith({ limit: 20 });
+            // The default request carries the difficulty ordering and batch size.
+            expect(mock).toHaveBeenLastCalledWith({ sort: 'difficulty', order: 'asc', limit: 20 });
         });
 
         it('sends difficulty min and max as server-side params', async () => {
@@ -292,13 +307,13 @@ describe('Problems Page', () => {
             fireEvent.change(screen.getByLabelText('Difficulty minimum'), { target: { value: '1000' } });
 
             await waitFor(() => {
-                expect(mock).toHaveBeenLastCalledWith({ difficultyMin: 1000, limit: 20 });
+                expect(mock).toHaveBeenLastCalledWith({ difficultyMin: 1000, sort: 'difficulty', order: 'asc', limit: 20 });
             });
 
             fireEvent.change(screen.getByLabelText('Difficulty maximum'), { target: { value: '2000' } });
 
             await waitFor(() => {
-                expect(mock).toHaveBeenLastCalledWith({ difficultyMin: 1000, difficultyMax: 2000, limit: 20 });
+                expect(mock).toHaveBeenLastCalledWith({ difficultyMin: 1000, difficultyMax: 2000, sort: 'difficulty', order: 'asc', limit: 20 });
             });
         });
 
@@ -352,7 +367,7 @@ describe('Problems Page', () => {
             // …only after the debounce window settles.
             jest.advanceTimersByTime(300);
             await waitFor(() => {
-                expect(mock).toHaveBeenLastCalledWith({ search: 'kna', limit: 20 });
+                expect(mock).toHaveBeenLastCalledWith({ search: 'kna', sort: 'difficulty', order: 'asc', limit: 20 });
             });
         });
     });
@@ -505,7 +520,7 @@ describe('Problems Page', () => {
             fireEvent.change(input, { target: { value: 'knapsack' } });
 
             await waitFor(() => {
-                expect(mock).toHaveBeenLastCalledWith({ search: 'knapsack', limit: 20 });
+                expect(mock).toHaveBeenLastCalledWith({ search: 'knapsack', sort: 'difficulty', order: 'asc', limit: 20 });
             }, { timeout: 2000 });
 
             // A category change while a search is active: the list resets to
@@ -513,7 +528,7 @@ describe('Problems Page', () => {
             fireEvent.click(screen.getByRole('tab', { name: /^Greedy/ }));
 
             await waitFor(() => {
-                expect(mock).toHaveBeenLastCalledWith({ search: 'knapsack', category: 'Greedy', limit: 20 });
+                expect(mock).toHaveBeenLastCalledWith({ search: 'knapsack', category: 'Greedy', sort: 'difficulty', order: 'asc', limit: 20 });
             }, { timeout: 2000 });
             await waitFor(() => expect(screen.getByText('Greedy One')).toBeInTheDocument());
             expect(screen.queryByText('LIS')).not.toBeInTheDocument();
@@ -545,13 +560,13 @@ describe('Problems Page', () => {
                     type('searchable');
                     jest.advanceTimersByTime(300);
                 });
-                await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ search: 'searchable', limit: 20 }));
+                await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ search: 'searchable', sort: 'difficulty', order: 'asc', limit: 20 }));
                 await waitFor(() => expect(screen.getByText('Searchable One')).toBeInTheDocument());
                 expect(screen.queryByText('Knapsack')).not.toBeInTheDocument(); // reset, not appended
 
                 // Show More appends within the same search.
                 fireEvent.click(screen.getByRole('button', { name: 'Show More' }));
-                await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ search: 'searchable', limit: 20, cursor: 's-cur' }));
+                await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ search: 'searchable', sort: 'difficulty', order: 'asc', limit: 20, cursor: 's-cur' }));
                 await waitFor(() => expect(screen.getByText('Searchable Two')).toBeInTheDocument());
                 expect(screen.getByText('Searchable One')).toBeInTheDocument();
 

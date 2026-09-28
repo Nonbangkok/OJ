@@ -23,7 +23,7 @@ const Problems = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [difficultyMin, setDifficultyMin] = useState('');
   const [difficultyMax, setDifficultyMax] = useState('');
-  const [difficultySort, setDifficultySort] = useState(DIFFICULTY_SORT_NONE);
+  const [difficultySort, setDifficultySort] = useState(DIFFICULTY_SORT_ASC);
   const [categoryCounts, setCategoryCounts] = useState<ProblemCategoryCountsResponse | null>(null);
 
   // Debounce the search box: keystrokes settle before the server-side query
@@ -33,10 +33,9 @@ const Problems = () => {
     return () => window.clearTimeout(timer);
   }, [search]);
 
-  // Server-side query. With nothing selected it is empty and the backend
-  // returns exactly the pre-feature default view (Unrated problems included,
-  // ordered by id). Search, category, difficulty filters and sorting all run
-  // in SQL before pagination.
+  // Server-side query. The public list defaults to difficulty ascending;
+  // unrated problems remain included after rated problems. Search, category,
+  // difficulty filters and sorting all run in SQL before pagination.
   const query = useMemo(() => {
     const trimmed = debouncedSearch.trim();
     return {
@@ -85,12 +84,12 @@ const Problems = () => {
   // Coming back from a problem detail page restores the previous scroll spot.
   useScrollRestore(!loading && !error);
 
-  // Any filter/search/sort selection active (drives the empty-state copy).
+  // Only narrowing controls affect the empty-state copy; the default sort
+  // does not turn an otherwise unfiltered empty list into a filtered state.
   const hasActiveFilters = debouncedSearch.trim() !== ''
     || activeCategory !== ALL_CATEGORIES
     || difficultyMin !== ''
-    || difficultyMax !== ''
-    || difficultySort !== DIFFICULTY_SORT_NONE;
+    || difficultyMax !== '';
 
   // The full-page loader is only for the very first load. Every later
   // refresh (typing in search, changing a filter) keeps the controls
