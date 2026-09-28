@@ -101,6 +101,23 @@ describe('Admin Controller', () => {
         jest.restoreAllMocks();
     });
 
+    describe('PUT /admin/users/:id/submission-lock', () => {
+        it('returns the updated lock state for a regular user', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [
+                { id: 8, username: 'alice', role: 'user', submissions_locked: true },
+            ] });
+            const res = await request(app).put('/admin/users/8/submission-lock').send({ locked: true });
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual({ id: 8, username: 'alice', role: 'user', submissions_locked: true });
+        });
+
+        it('validates the lock state as a boolean', async () => {
+            const res = await request(app).put('/admin/users/8/submission-lock').send({ locked: 'true' });
+            expect(res.status).toBe(400);
+            expect(db.query).not.toHaveBeenCalled();
+        });
+    });
+
     describe('GET /admin/settings/registration', () => {
         it('should return site settings', async () => {
             (db.query as jest.Mock).mockResolvedValueOnce({

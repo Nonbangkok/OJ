@@ -11,6 +11,7 @@ import {
   getRegistrationEnabled,
   updateRegistrationEnabled,
   updateAdminUser,
+  setAdminUserSubmissionLock,
 } from '../../services/adminQueryService';
 
 jest.mock('../../db', () => {
@@ -49,6 +50,25 @@ describe('adminQueryService', () => {
     jest.clearAllMocks();
     (randomInt as jest.Mock).mockReturnValue(0);
     (bcrypt.hash as jest.Mock).mockImplementation(async (value: string) => `hash-${value}`);
+  });
+
+  it('only locks accounts whose role is exactly user and returns the updated lock state', async () => {
+    (db.query as jest.Mock).mockResolvedValueOnce({
+      rows: [{ id: 8, username: 'alice', role: 'user', submissions_locked: true }],
+    });
+    await expect(setAdminUserSubmissionLock('8', true)).resolves.toEqual({
+      kind: 'ok',
+      data: { id: 8, username: 'alice', role: 'user', submissions_locked: true },
+    });
+    expect(db.query).toHaveBeenCalledWith(
+      "UPDATE users SET submissions_locked = $1 WHERE id = $2 AND role = 'user' RETURNING id, username, role, submissions_locked",
+      [true, '8'],
+    );
+  });
+
+  it('refuses to lock staff/admin accounts', async () => {
+    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+    await expect(setAdminUserSubmissionLock('9', true)).resolves.toEqual({ kind: 'not_lockable' });
   });
 
   it('createAdminUser should return duplicate when username already exists', async () => {

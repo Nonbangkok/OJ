@@ -19,6 +19,12 @@ describe('adminService', () => {
     });
 
     describe('User Management', () => {
+        it('sets a regular user submission lock through the admin endpoint', async () => {
+            const response = { id: 2, username: 'student', role: 'user' as const, submissions_locked: true };
+            jest.mocked(api.put).mockResolvedValueOnce({ data: response } as never);
+            await expect(adminService.setUserSubmissionLock(2, true)).resolves.toEqual(response);
+            expect(api.put).toHaveBeenCalledWith('/admin/users/2/submission-lock', { locked: true });
+        });
         it('getUsers calls api.get with the paged user-list path (ADMIN-008)', async () => {
             const mockData: AdminUsersPageResponse = {
                 users: [{ id: 1, username: 'admin', role: 'admin' }],

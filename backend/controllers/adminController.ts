@@ -25,6 +25,7 @@ import {
   createAdminUserSchema,
   idParamSchema,
   updateAdminUserSchema,
+  updateAdminUserSubmissionLockSchema,
   updateRegistrationSettingSchema,
   updateSiteAccessModeSchema,
   updatePasswordChangeSettingSchema,
@@ -47,6 +48,7 @@ import {
   getRegistrationEnabled,
   resetAdminUserPassword,
   updateAdminUser,
+  setAdminUserSubmissionLock,
   updateRegistrationEnabled,
 } from '../services/adminQueryService';
 import {
@@ -105,6 +107,16 @@ router.put('/admin/users/:id', requireAuth, requireAdmin,
     throw new AppError('Username is already taken.', 409);
   }
   res.json(updateResult.data);
+}));
+
+router.put('/admin/users/:id/submission-lock', requireAuth, requireAdmin,
+  validateRequest({ params: idParamSchema, body: updateAdminUserSubmissionLockSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const result = await setAdminUserSubmissionLock(String(req.params.id), req.body.locked);
+  if (result.kind === 'not_lockable') {
+    throw new AppError('Only accounts with the user role can be locked.', 400);
+  }
+  res.json(result.data);
 }));
 
 // AUTH-004: admin-set password reset. The admin supplies the new password

@@ -7,6 +7,7 @@ import {
 } from '../middleware/requestContext';
 import { requireAuth, requireStaffOrAdmin } from '../middleware/auth';
 import { errorHandler } from '../middleware/errorHandler';
+import { requireSubmissionsUnlocked } from '../middleware/submissionLock';
 import * as db from '../db';
 
 jest.mock('../db');
@@ -23,10 +24,13 @@ const buildApp = (): Express => {
   app.use(revalidateSessionUser);
   app.use(attachRequestUser);
   app.get('/whoami', requireAuth, (req: Request, res: Response) => {
-    res.json({ id: req.user!.id, username: req.user!.username, role: req.user!.role });
+    res.json({ id: req.user!.id, username: req.user!.username, role: req.user!.role, submissionsLocked: req.user!.submissionsLocked });
   });
   app.get('/staff-only', requireAuth, requireStaffOrAdmin, (_req: Request, res: Response) => {
     res.json({ ok: true });
+  });
+  app.post('/mutation', requireAuth, requireSubmissionsUnlocked, (_req: Request, res: Response) => {
+    res.json({ accepted: true });
   });
   app.get('/public', (req: Request, res: Response) => {
     res.json({ authenticated: !!req.user, id: req.user?.id ?? null });
@@ -35,11 +39,12 @@ const buildApp = (): Express => {
   return app;
 };
 
-const userRow = (overrides: Partial<{ id: number; username: string; role: string; has_avatar: boolean }> = {}) => ({
+const userRow = (overrides: Partial<{ id: number; username: string; role: string; has_avatar: boolean; submissions_locked: boolean }> = {}) => ({
   id: 5,
   username: 'alice',
   role: 'user',
   has_avatar: false,
+  submissions_locked: false,
   ...overrides,
 });
 
@@ -77,10 +82,13 @@ describe('revalidateSessionUser + attachRequestUser', () => {
     server.use(revalidateSessionUser);
     server.use(attachRequestUser);
     server.get('/whoami', requireAuth, (req: Request, res: Response) => {
-      res.json({ id: req.user!.id, username: req.user!.username, role: req.user!.role });
+      res.json({ id: req.user!.id, username: req.user!.username, role: req.user!.role, submissionsLocked: req.user!.submissionsLocked });
     });
     server.get('/staff-only', requireAuth, requireStaffOrAdmin, (_req: Request, res: Response) => {
       res.json({ ok: true });
+    });
+    server.post('/mutation', requireAuth, requireSubmissionsUnlocked, (_req: Request, res: Response) => {
+      res.json({ accepted: true });
     });
     server.get('/public', (req: Request, res: Response) => {
       res.json({ authenticated: !!req.user, id: req.user?.id ?? null });
@@ -99,7 +107,7 @@ describe('revalidateSessionUser + attachRequestUser', () => {
     const res = await agent.get('/whoami');
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ id: 5, username: 'alice-renamed', role: 'staff' });
+    expect(res.body).toEqual({ id: 5, username: 'alice-renamed', role: 'staff', submissionsLocked: false });
   });
 
   it('grants staff access after a promotion is revalidated', async () => {
@@ -167,6 +175,29 @@ describe('revalidateSessionUser + attachRequestUser', () => {
     // hasAvatar rides on req.user even if /whoami does not return it.
     expect(res.body.username).toBe('alice');
   });
+
+  it('refreshes the submission lock from the live user row on each request', async () => {
+    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [userRow({ submissions_locked: true })] });
+    const res = await agent.get('/whoami');
+    expect(res.status).toBe(200);
+    expect(res.body.submissionsLocked).toBe(true);
+  });
+
+  it('enforces a newly applied lock on the next mutation request and exempts staff/admin', async () => {
+    (db.query as jest.Mock)
+      .mockResolvedValueOnce({ rows: [userRow()] })
+      .mockResolvedValueOnce({ rows: [userRow({ submissions_locked: true })] });
+    expect((await agent.post('/mutation')).status).toBe(200);
+    const locked = await agent.post('/mutation');
+    expect(locked.status).toBe(403);
+
+    for (const role of ['staff', 'admin'] as const) {
+      (db.query as jest.Mock).mockResolvedValueOnce({
+        rows: [userRow({ role, submissions_locked: true })],
+      });
+      expect((await agent.post('/mutation')).status).toBe(200);
+    }
+  });
 });
 
 describe('attachRequestUser standalone mapping', () => {
@@ -182,6 +213,7 @@ describe('attachRequestUser standalone mapping', () => {
       username: 'bob',
       role: 'staff',
       hasAvatar: true,
+      submissionsLocked: false,
     });
   });
 
@@ -190,6 +222,6 @@ describe('attachRequestUser standalone mapping', () => {
   });
 
   it('defaults to least privilege for partial legacy sessions', () => {
-    expect(map({ userId: 3 })).toEqual({ id: 3, username: '', role: 'user', hasAvatar: false });
+    expect(map({ userId: 3 })).toEqual({ id: 3, username: '', role: 'user', hasAvatar: false, submissionsLocked: false });
   });
 });

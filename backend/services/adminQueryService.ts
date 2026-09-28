@@ -11,6 +11,7 @@ import {
   AdminResetPasswordResult,
   AdminUpdateUserResult,
   AdminUserListRow,
+  AdminSubmissionLockResult,
   BatchUserBuildInput,
   ChangePasswordResult,
   CreateBatchUsersResult,
@@ -70,7 +71,7 @@ export const getAdminUsers = async (
 
   const [rowsResult, countResult] = await Promise.all([
     db.query<AdminUserListRow>(
-      `SELECT id, username, role, created_at FROM users${whereClause} ORDER BY id LIMIT $${filterValues.length + 1} OFFSET $${filterValues.length + 2}`,
+      `SELECT id, username, role, created_at, submissions_locked FROM users${whereClause} ORDER BY id LIMIT $${filterValues.length + 1} OFFSET $${filterValues.length + 2}`,
       [...filterValues, safeLimit, offset],
     ),
     db.query<{ total: string }>(`SELECT COUNT(*) AS total FROM users${whereClause}`, filterValues),
@@ -82,6 +83,19 @@ export const getAdminUsers = async (
     page: safePage,
     limit: safeLimit,
   };
+};
+
+/** Set the submission/join lock only for accounts whose current role is user. */
+export const setAdminUserSubmissionLock = async (
+  userId: string,
+  locked: boolean,
+): Promise<AdminSubmissionLockResult> => {
+  const result = await db.query<Extract<AdminSubmissionLockResult, { kind: 'ok' }>['data']>(
+    "UPDATE users SET submissions_locked = $1 WHERE id = $2 AND role = 'user' RETURNING id, username, role, submissions_locked",
+    [locked, userId],
+  );
+  if (!result.rows[0]) return { kind: 'not_lockable' };
+  return { kind: 'ok', data: result.rows[0] };
 };
 
 export const createAdminUser = async (

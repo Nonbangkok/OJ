@@ -21,13 +21,14 @@ jest.mock('../middleware/auth', () => ({
         next();
     },
     requireAuth: (req: Request, _res: Response, next: NextFunction) => {
-        req.user = { id: 1, username: 'user1', role: 'user', hasAvatar: false };
+        req.user = req.user ?? { id: 1, username: 'user1', role: 'user', hasAvatar: false };
         next();
     }
 }));
 
 describe('Contest Controller', () => {
     let app: Express;
+    let requestUser: NonNullable<Request['user']>;
 
     beforeEach(() => {
         app = express();
@@ -39,12 +40,13 @@ describe('Contest Controller', () => {
         }));
         app.use((req: Request, _res: Response, next: NextFunction) => {
             // Handlers read the user context (req.user), not raw session fields.
-            req.user = { id: 1, username: 'user1', role: 'admin', hasAvatar: false };
+            req.user = requestUser;
             next();
         });
         app.use('/', contestRouter);
         app.use(errorHandler);
         jest.resetAllMocks();
+        requestUser = { id: 1, username: 'user1', role: 'admin', hasAvatar: false };
     });
 
     afterAll(() => {
@@ -103,6 +105,22 @@ describe('Contest Controller', () => {
     });
 
     describe('POST /contests/:id/join', () => {
+        it('rejects a locked user from joining before reading or creating contest participation', async () => {
+            requestUser = { ...requestUser, role: 'user', submissionsLocked: true };
+            const res = await request(app).post('/contests/1/join');
+            expect(res.status).toBe(403);
+            expect(res.body.message).toMatch(/locked/i);
+            expect(db.query).not.toHaveBeenCalled();
+        });
+
+        it('does not apply the lock to staff joining contests', async () => {
+            requestUser = { ...requestUser, role: 'staff', submissionsLocked: true };
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ id: 1, end_time: new Date(Date.now() + 60_000), is_visible: true }] })
+                .mockResolvedValueOnce({ rowCount: 1 });
+            const res = await request(app).post('/contests/1/join');
+            expect(res.status).toBe(200);
+        });
         it('should return 404 when contest does not exist', async () => {
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 

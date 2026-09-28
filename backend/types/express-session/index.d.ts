@@ -10,5 +10,6 @@ declare module 'express-session' {
         username?: string;
         role?: UserRole;
         hasAvatar?: boolean;
+        submissionsLocked?: boolean;
     }
 }

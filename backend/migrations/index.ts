@@ -20,6 +20,7 @@ import { passwordChangeEnabledSql } from './0019PasswordChangeEnabled';
 import { contestVisibilitySql } from './0020ContestVisibility';
 import { collectionDescriptionSql } from './0021CollectionDescription';
 import { dropCollectionDescriptionAgainSql } from './0022DropCollectionDescriptionAgain';
+import { userSubmissionLockSql } from './0023UserSubmissionLock';
 import { problemDifficultySql } from './0013ProblemDifficulty';
 
 export const coreMigrations: readonly Migration[] = Object.freeze([
@@ -55,4 +56,5 @@ export const migrations: readonly Migration[] = Object.freeze([
   { version: '0020_contest_visibility', sql: contestVisibilitySql },
   { version: '0021_collection_description', sql: collectionDescriptionSql },
   { version: '0022_drop_collection_description_again', sql: dropCollectionDescriptionAgainSql },
+  { version: '0023_user_submission_lock', sql: userSubmissionLockSql },
 ]);

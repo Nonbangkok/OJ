@@ -253,7 +253,13 @@ export type GetProblemTestcasesResult =
 // adminQueryService
 // ---------------------------------------------------------------------------
 
-export interface AdminUserListRow extends Pick<UserRow, 'id' | 'username' | 'role' | 'created_at'> {}
+export interface AdminUserListRow extends Pick<UserRow, 'id' | 'username' | 'role' | 'created_at' | 'submissions_locked'> {}
+
+export interface AdminSubmissionLockRow extends Pick<UserRow, 'id' | 'username' | 'role' | 'submissions_locked'> {}
+
+export type AdminSubmissionLockResult =
+  | { kind: 'not_lockable' }
+  | { kind: 'ok'; data: AdminSubmissionLockRow };
 
 export interface AdminAuthorListRow extends Pick<UserRow, 'id' | 'username'> {}
 

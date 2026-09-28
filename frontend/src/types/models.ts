@@ -163,6 +163,7 @@ export interface AdminUser {
   username: string;
   role: UserRole;
   created_at?: string;
+  submissions_locked?: boolean;
 }
 
 export interface BatchCreatedUser {

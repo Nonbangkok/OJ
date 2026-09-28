@@ -116,6 +116,10 @@ export const adminResetUserPasswordSchema = z.object({
   newPassword: z.string().min(USER_VALIDATION.MIN_PASSWORD_LENGTH).max(STRING_LIMITS.PASSWORD),
 });
 
+export const updateAdminUserSubmissionLockSchema = z.object({
+  locked: z.boolean(),
+});
+
 // Admin schemas
 // The create endpoint sits behind requireAdmin, so allowing role 'admin'
 // here (mirroring updateAdminUserSchema) does not widen the authorization
