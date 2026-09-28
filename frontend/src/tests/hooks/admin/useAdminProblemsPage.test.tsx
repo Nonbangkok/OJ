@@ -64,6 +64,106 @@ describe('useAdminProblemsPage', () => {
         expect(result.current.hasMore).toBe(false);
     });
 
+    it('Load All follows every remaining cursor and dedupes overlapping rows', async () => {
+        (jest.mocked(adminService.getProblems) as jest.Mock)
+            .mockResolvedValueOnce(firstPage)
+            .mockResolvedValueOnce({ ...firstPage, problems: [makeRow('p25'), makeRow('p05')], nextCursor: 'cursor-2' })
+            .mockResolvedValueOnce({ ...firstPage, problems: [makeRow('p26')], nextCursor: null, hasMore: false });
+
+        const { result } = renderHook(() => useAdminProblemsPage({}));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        await act(async () => { await result.current.loadAll(); });
+
+        expect((adminService.getProblems as jest.Mock).mock.calls).toEqual([
+            [{ limit: 25 }],
+            [{ limit: 100, cursor: 'cursor-1' }],
+            [{ limit: 100, cursor: 'cursor-2' }],
+        ]);
+        expect(result.current.problems.map(problem => problem.id)).toEqual([
+            ...firstPage.problems.map(problem => problem.id), 'p25', 'p26',
+        ]);
+        expect(result.current.hasMore).toBe(false);
+        expect(result.current.loadingAll).toBe(false);
+    });
+
+    it('Load All resumes after Show More from the current cursor', async () => {
+        (jest.mocked(adminService.getProblems) as jest.Mock)
+            .mockResolvedValueOnce(firstPage)
+            .mockResolvedValueOnce({ ...firstPage, problems: [makeRow('p25')], nextCursor: 'cursor-2' })
+            .mockResolvedValueOnce({ ...firstPage, problems: [makeRow('p26')], nextCursor: null, hasMore: false });
+
+        const { result } = renderHook(() => useAdminProblemsPage({}));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        await act(async () => { result.current.loadMore(); });
+        await act(async () => { await result.current.loadAll(); });
+
+        expect((adminService.getProblems as jest.Mock).mock.calls[2][0]).toEqual({ limit: 100, cursor: 'cursor-2' });
+        expect(result.current.problems).toHaveLength(27);
+    });
+
+    it('Load All uses the new filtered query after filters change', async () => {
+        (jest.mocked(adminService.getProblems) as jest.Mock)
+            .mockResolvedValueOnce(firstPage)
+            .mockResolvedValueOnce({ ...firstPage, problems: [makeRow('hidden-1')], nextCursor: 'hidden-cursor' })
+            .mockResolvedValueOnce({ ...firstPage, problems: [makeRow('hidden-2')], nextCursor: null, hasMore: false });
+
+        const { result, rerender } = renderHook(
+            ({ query }: { query: { visibility?: 'hidden' } }) => useAdminProblemsPage(query),
+            { initialProps: { query: {} as { visibility?: 'hidden' } } },
+        );
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        rerender({ query: { visibility: 'hidden' } });
+        await waitFor(() => expect(result.current.problems.map(problem => problem.id)).toEqual(['hidden-1']));
+        await act(async () => { await result.current.loadAll(); });
+
+        expect((adminService.getProblems as jest.Mock).mock.calls[2][0]).toEqual({ visibility: 'hidden', limit: 100, cursor: 'hidden-cursor' });
+        expect(result.current.problems.map(problem => problem.id)).toEqual(['hidden-1', 'hidden-2']);
+    });
+
+    it('Load All retains completed pages and retries from the failed cursor', async () => {
+        (jest.mocked(adminService.getProblems) as jest.Mock)
+            .mockResolvedValueOnce(firstPage)
+            .mockResolvedValueOnce({ ...firstPage, problems: [makeRow('p25')], nextCursor: 'cursor-2' })
+            .mockRejectedValueOnce(new Error('network down'))
+            .mockResolvedValueOnce({ ...firstPage, problems: [makeRow('p26')], nextCursor: null, hasMore: false });
+
+        const { result } = renderHook(() => useAdminProblemsPage({}));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        await act(async () => { await result.current.loadAll(); });
+
+        expect(result.current.problems).toHaveLength(26);
+        expect(result.current.loadAllError).toBe(true);
+        expect(result.current.hasMore).toBe(true);
+        await act(async () => { await result.current.loadAll(); });
+
+        expect((adminService.getProblems as jest.Mock).mock.calls[3][0]).toEqual({ limit: 100, cursor: 'cursor-2' });
+        expect(result.current.problems).toHaveLength(27);
+        expect(result.current.loadAllError).toBe(false);
+    });
+
+    it('ignores a Load All response after a filter change', async () => {
+        let resolveOld: (value: unknown) => void = () => undefined;
+        const oldPage = new Promise(resolve => { resolveOld = resolve; });
+        (jest.mocked(adminService.getProblems) as jest.Mock)
+            .mockResolvedValueOnce(firstPage)
+            .mockReturnValueOnce(oldPage)
+            .mockResolvedValueOnce({ ...firstPage, problems: [makeRow('hidden-1')], nextCursor: null, hasMore: false });
+
+        const { result, rerender } = renderHook(
+            ({ query }: { query: { visibility?: 'hidden' } }) => useAdminProblemsPage(query),
+            { initialProps: { query: {} as { visibility?: 'hidden' } } },
+        );
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        act(() => { void result.current.loadAll(); });
+        rerender({ query: { visibility: 'hidden' } });
+        await waitFor(() => expect(result.current.problems.map(problem => problem.id)).toEqual(['hidden-1']));
+        await act(async () => {
+            resolveOld({ ...firstPage, problems: [makeRow('stale')], nextCursor: null, hasMore: false });
+            await oldPage;
+        });
+        expect(result.current.problems.map(problem => problem.id)).toEqual(['hidden-1']);
+    });
+
     it('a double-click spam fires a single request for the next batch', async () => {
         let resolveSecond: (value: unknown) => void = () => { };
         const pendingSecond = new Promise(resolve => { resolveSecond = resolve; });
@@ -267,5 +367,37 @@ describe('useAdminProblemsPage', () => {
         expect(calls[3]).toEqual([{ limit: 100 }]);                     // span start
         expect(calls[4]).toEqual([{ limit: 100, cursor: 'rc1' }]);      // span remainder
         expect(result.current.problems).toHaveLength(75);
+    });
+
+    it('refresh() preserves a Load All span longer than ten server pages', async () => {
+        const rows = Array.from({ length: 1025 }, (_, i) => makeRow(`long-${i}`));
+        const getProblems = jest.mocked(adminService.getProblems) as jest.Mock;
+        getProblems.mockResolvedValueOnce({ ...firstPage, problems: rows.slice(0, 25), nextCursor: 'load-0' });
+        for (let page = 0; page < 10; page += 1) {
+            getProblems.mockResolvedValueOnce({
+                ...firstPage,
+                problems: rows.slice(25 + page * 100, 125 + page * 100),
+                nextCursor: page === 9 ? null : `load-${page + 1}`,
+                hasMore: page !== 9,
+            });
+        }
+        for (let page = 0; page < 11; page += 1) {
+            getProblems.mockResolvedValueOnce({
+                ...firstPage,
+                problems: rows.slice(page * 100, (page + 1) * 100),
+                nextCursor: page === 10 ? null : `refresh-${page + 1}`,
+                hasMore: page !== 10,
+            });
+        }
+
+        const { result } = renderHook(() => useAdminProblemsPage({}));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        await act(async () => { await result.current.loadAll(); });
+        expect(result.current.problems).toHaveLength(1025);
+        await act(async () => { await result.current.refresh(); });
+
+        expect(result.current.problems).toHaveLength(1025);
+        expect(getProblems).toHaveBeenCalledTimes(22);
+        expect(getProblems.mock.calls[21][0]).toEqual({ limit: 100, cursor: 'refresh-10' });
     });
 });
