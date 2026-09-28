@@ -342,7 +342,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
 
       {/* --- 3b. Selection bar (after the pointer gesture ends) ----------- */}
       {hasSelection && !isDragging && (
-        <div className={styles['selection-bar']} role="status">
+        <div className={styles['selection-bar']} role="status" style={{ position: 'fixed' }}>
           <span className={styles['selection-count']}>
             {selectedCount} selected
           </span>

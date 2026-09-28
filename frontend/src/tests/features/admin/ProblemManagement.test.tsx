@@ -512,6 +512,14 @@ describe('ProblemManagement Component', () => {
             expect(screen.getByText('1 selected')).toBeInTheDocument();
         });
 
+        it('keeps the selection bar out of the table layout flow', async () => {
+            await renderWithSearchProblems();
+
+            fireEvent.click(getRowCheckbox('Echo 1'));
+
+            expect(screen.getByRole('status')).toHaveStyle({ position: 'fixed' });
+        });
+
         it('a pointer click on a row checkbox selects exactly once when the selection bar appears', async () => {
             await renderWithSearchProblems();
 
