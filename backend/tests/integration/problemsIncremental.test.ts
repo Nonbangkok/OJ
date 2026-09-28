@@ -10,6 +10,7 @@ import { runMigrationsFromPool } from '../../scripts/migrate';
 import {
   getProblemsWithStatsForUser,
   getPublicProblemCategoryCounts,
+  getPublicProblemFilterOptions,
 } from '../../services/problemQueryService';
 import type { ProblemsPage } from '../../types/service';
 
@@ -157,6 +158,33 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
       await insertProblem('beta-dp', { difficulty: 2000, categories: ['Dynamic Programming', 'Graph'], title: 'Dp Beta' });
       await insertProblem('gamma-graph', { difficulty: 1200, categories: ['Graph'], title: 'Graph Gamma' });
       await insertProblem('delta-none', { difficulty: 2400, categories: [], title: 'No Category' });
+    });
+
+    it('filters author and collection before the page boundary and exposes only public options', async () => {
+      const first = await pool.query("INSERT INTO collections (name) VALUES ('Practice') RETURNING id");
+      const second = await pool.query("INSERT INTO collections (name) VALUES ('Hidden Set') RETURNING id");
+      const practiceId = first.rows[0].id as number;
+      const hiddenId = second.rows[0].id as number;
+      await pool.query("UPDATE problems SET author='Alice', collection_id=$1 WHERE id IN ('alpha-dp', 'beta-dp')", [practiceId]);
+      await pool.query("UPDATE problems SET author='Bob' WHERE id='gamma-graph'");
+      await pool.query("UPDATE problems SET author=NULL WHERE id='delta-none'");
+      await insertProblem('hidden', { visible: false });
+      await pool.query("UPDATE problems SET author='Secret', collection_id=$1 WHERE id='hidden'", [hiddenId]);
+
+      const options = await getPublicProblemFilterOptions();
+      expect(options).toEqual({
+        authors: ['Alice', 'Bob'], collections: [{ id: practiceId, name: 'Practice' }],
+        hasUnauthored: true, hasUncollected: true,
+      });
+      expect((await walkAll(null, { author: 'Alice', collection: practiceId, limit: 1 })).ids)
+        .toEqual(['alpha-dp', 'beta-dp']);
+      const narrowed = await getProblemsWithStatsForUser(null, {
+        search: 'dp', category: 'Graph', difficultyMin: 1500,
+        author: 'Alice', collection: practiceId, sort: 'difficulty', order: 'desc', limit: 1,
+      });
+      expect(narrowed.problems.map(p => p.id)).toEqual(['beta-dp']);
+      expect((await walkAll(null, { author: 'none', collection: 'none', limit: 1 })).ids)
+        .toEqual(['delta-none']);
     });
 
     it('search + category + difficulty all apply before the LIMIT', async () => {

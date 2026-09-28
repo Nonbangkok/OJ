@@ -118,6 +118,37 @@ describe('Problem Controller', () => {
         });
     });
 
+    describe('public problem filters', () => {
+        it('accepts author and numeric collection alongside existing filters', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+            const res = await request(app).get('/problems-with-stats')
+                .query({ search: 'dp', category: 'Graph', difficultyMin: 1000, author: 'Alice', collection: '7', sort: 'difficulty', order: 'desc' });
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual({ problems: [], hasMore: false, nextCursor: null });
+            expect((db.query as jest.Mock).mock.calls[0][1]).toEqual([1, 1000, '%dp%', 'Graph', 'Alice', 7, 21]);
+        });
+
+        it('rejects invalid collection values', async () => {
+            expect((await request(app).get('/problems-with-stats?collection=0')).status).toBe(400);
+            expect((await request(app).get('/problems-with-stats?collection=abc')).status).toBe(400);
+            expect(db.query).not.toHaveBeenCalled();
+        });
+
+        it('serves canonical public filter choices before the problem detail route', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ name: 'Alice' }] })
+                .mockResolvedValueOnce({ rows: [{ id: 7, name: 'Practice' }] })
+                .mockResolvedValueOnce({ rows: [{ exists: false }] })
+                .mockResolvedValueOnce({ rows: [{ exists: true }] });
+            const res = await request(app).get('/problems/filter-options');
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual({
+                authors: ['Alice'], collections: [{ id: 7, name: 'Practice' }],
+                hasUnauthored: false, hasUncollected: true,
+            });
+        });
+    });
+
     describe('GET /problems/:id', () => {
         it('should return problem details if visible', async () => {
             const mockProblem = {

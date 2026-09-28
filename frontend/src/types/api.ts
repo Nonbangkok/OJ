@@ -61,6 +61,12 @@ export interface ProblemCategoryCountsResponse {
   uncategorized: number;
   total: number;
 }
+export interface ProblemFilterOptionsResponse {
+  authors: string[];
+  collections: Array<{ id: number; name: string }>;
+  hasUnauthored: boolean;
+  hasUncollected: boolean;
+}
 export type ProblemDetailResponse = ProblemDetail;
 export type ContestProblemDetailResponse = ProblemDetail;
 

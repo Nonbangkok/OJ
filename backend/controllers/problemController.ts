@@ -15,6 +15,7 @@ import {
   getProblemTestcases,
   getProblemsWithStatsForUser,
   getPublicProblemCategoryCounts,
+  getPublicProblemFilterOptions,
   getVisibleProblems,
   replaceProblemTestcasesFromZip,
   updateProblem,
@@ -79,9 +80,9 @@ router.get('/problems-with-stats', requirePublicAccess,
   // PRIVATE mode is still enforced by requirePublicAccess above.
   const userId = req.user?.id ?? null;
   // validateRequest writes Zod defaults/coercions back into req.query.
-  const { difficultyMin, difficultyMax, sort, order, search, category, limit, cursor } = req.query as unknown as {
+  const { difficultyMin, difficultyMax, sort, order, search, category, author, collection, limit, cursor } = req.query as unknown as {
     difficultyMin?: number; difficultyMax?: number; sort?: 'difficulty'; order?: 'asc' | 'desc';
-    search?: string; category?: string; limit?: number; cursor?: string;
+    search?: string; category?: string; author?: string; collection?: number | 'none'; limit?: number; cursor?: string;
   };
   const page = await getProblemsWithStatsForUser(userId, {
     ...(difficultyMin !== undefined ? { difficultyMin } : {}),
@@ -90,6 +91,8 @@ router.get('/problems-with-stats', requirePublicAccess,
     ...(order !== undefined ? { order } : {}),
     ...(search !== undefined && search !== '' ? { search } : {}),
     ...(category !== undefined ? { category } : {}),
+    ...(author !== undefined ? { author } : {}),
+    ...(collection !== undefined ? { collection } : {}),
     ...(limit !== undefined ? { limit } : {}),
     ...(cursor !== undefined ? { cursor } : {}),
   });
@@ -102,6 +105,10 @@ router.get('/problems-with-stats', requirePublicAccess,
 // the parameterised /problems/:id route.
 router.get('/problems/categories', requirePublicAccess, asyncHandler(async (_req: Request, res: Response) => {
   res.json(await getPublicProblemCategoryCounts());
+}));
+
+router.get('/problems/filter-options', requirePublicAccess, asyncHandler(async (_req: Request, res: Response) => {
+  res.json(await getPublicProblemFilterOptions());
 }));
 
 // Problem API Endpoints
