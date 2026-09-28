@@ -56,12 +56,15 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     error,
     loadingMore,
     loadMoreError,
+    loadingAll,
+    loadAllError,
     hasMore,
     authors,
     hasUnauthoredProblems,
     bulkEligibleCount,
     loadedQueryKey,
     loadMore,
+    loadAll,
     isModalOpen,
     editingProblem,
     uploadProgress,
@@ -544,20 +547,38 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
       </div>
 
       {/* --- 5. Show More: server-side next batch -------------------------- */}
-      {(hasMore || loadMoreError) && !loading && (
+      {(hasMore || loadMoreError || loadAllError) && !loading && (
         <div className={styles['load-more-container']}>
           {loadMoreError && (
             <p className={styles['load-more-error']} role="alert">
               Failed to load more problems.
             </p>
           )}
+          {loadAllError && (
+            <p className={styles['load-more-error']} role="alert">
+              Failed to load all problems. Loaded rows remain available.
+            </p>
+          )}
+          {loadingAll && (
+            <span role="status" aria-label="Loading all problems">
+              Loading all problems… {visibleProblems.length} loaded
+            </span>
+          )}
           <Button
             variant="secondary"
             onClick={loadMore}
             loading={loadingMore}
             loadingLabel="Loading…"
+            disabled={loadingAll || !bulkScopeReady}
           >
             {loadMoreError ? 'Retry' : 'Show More'}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={loadAll}
+            disabled={loadingAll || loadingMore || !bulkScopeReady}
+          >
+            {loadAllError ? 'Retry Load All' : 'Load All'}
           </Button>
         </div>
       )}

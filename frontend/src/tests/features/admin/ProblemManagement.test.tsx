@@ -653,6 +653,84 @@ describe('ProblemManagement Component', () => {
     });
 
     describe('Show More pagination (server-side)', () => {
+        it('Load All keeps filters mounted and lets the header select exactly the loaded rows', async () => {
+            (jest.mocked(adminService.getProblems) as jest.Mock)
+                .mockResolvedValueOnce(makePage(mockProblems.slice(0, 2), { hasMore: true, nextCursor: 'cursor-1' }))
+                .mockResolvedValueOnce(makePage([mockProblems[2]], { hasMore: false, nextCursor: null }));
+            renderProblemManagement();
+
+            await waitFor(() => screen.getByText('Problem 2'));
+            fireEvent.click(screen.getByRole('checkbox', { name: 'Select all currently displayed problems' }));
+            expect(screen.getByText('2 selected')).toBeInTheDocument();
+            expect(screen.queryByRole('checkbox', { name: 'Select problem P3' })).not.toBeInTheDocument();
+
+            fireEvent.click(screen.getByRole('button', { name: 'Load All' }));
+            expect(await screen.findByText('Problem 3')).toBeInTheDocument();
+            expect(screen.getByLabelText('Search problems')).toBeInTheDocument();
+            expect(screen.getByText('2 selected')).toBeInTheDocument();
+            expect(screen.getByRole('checkbox', { name: 'Select problem P3' })).not.toBeChecked();
+            fireEvent.click(screen.getByRole('checkbox', { name: 'Select all currently displayed problems' }));
+            expect(screen.getByText('3 selected')).toBeInTheDocument();
+            expect(screen.getByRole('checkbox', { name: 'Select problem P3' })).toBeChecked();
+        });
+
+        it('Load All shows progress and disables Show More while its page is pending', async () => {
+            let resolveRemaining: (value: ReturnType<typeof makePage>) => void = () => undefined;
+            (jest.mocked(adminService.getProblems) as jest.Mock)
+                .mockResolvedValueOnce(makePage(mockProblems.slice(0, 2), { hasMore: true, nextCursor: 'cursor-1' }))
+                .mockReturnValueOnce(new Promise(resolve => { resolveRemaining = resolve; }));
+            renderProblemManagement();
+            await waitFor(() => screen.getByText('Problem 2'));
+
+            fireEvent.click(screen.getByRole('button', { name: 'Load All' }));
+            expect(screen.getByRole('status', { name: /loading all problems/i })).toHaveTextContent('2 loaded');
+            expect(screen.getByRole('button', { name: /show more/i })).toBeDisabled();
+            expect(screen.getByLabelText('Search problems')).toBeInTheDocument();
+
+            await act(async () => { resolveRemaining(makePage([mockProblems[2]])); });
+            expect(await screen.findByText('Problem 3')).toBeInTheDocument();
+        });
+
+        it('Load All uses the current visibility filter for remaining pages', async () => {
+            const otherHidden = { ...mockProblems[1], id: 'P4', title: 'Problem 4' };
+            (jest.mocked(adminService.getProblems) as jest.Mock)
+                .mockResolvedValueOnce(makePage(mockProblems, { hasMore: true, nextCursor: 'old-cursor' }))
+                .mockResolvedValueOnce(makePage([mockProblems[1]], { hasMore: true, nextCursor: 'hidden-cursor' }))
+                .mockResolvedValueOnce(makePage([otherHidden]));
+            renderProblemManagement();
+            await waitFor(() => screen.getByText('Problem 1'));
+
+            fireEvent.change(screen.getByLabelText('Filter problems by visibility'), { target: { value: 'hidden' } });
+            await waitFor(() => expect(screen.queryByText('Problem 1')).not.toBeInTheDocument());
+            fireEvent.click(screen.getByRole('button', { name: 'Load All' }));
+
+            expect(await screen.findByText('Problem 4')).toBeInTheDocument();
+            expect((adminService.getProblems as jest.Mock).mock.calls[2][0]).toEqual({
+                visibility: 'hidden', limit: 100, cursor: 'hidden-cursor',
+            });
+            expect(screen.queryByText('Problem 1')).not.toBeInTheDocument();
+        });
+
+        it('Load All keeps completed rows and offers a retry after a later page fails', async () => {
+            const lastProblem = { ...mockProblems[2], id: 'P4', title: 'Problem 4' };
+            (jest.mocked(adminService.getProblems) as jest.Mock)
+                .mockResolvedValueOnce(makePage(mockProblems.slice(0, 2), { hasMore: true, nextCursor: 'cursor-1' }))
+                .mockResolvedValueOnce(makePage([mockProblems[2]], { hasMore: true, nextCursor: 'cursor-2' }))
+                .mockRejectedValueOnce(new Error('offline'))
+                .mockResolvedValueOnce(makePage([lastProblem]));
+            renderProblemManagement();
+            await waitFor(() => screen.getByText('Problem 2'));
+
+            fireEvent.click(screen.getByRole('button', { name: 'Load All' }));
+            expect(await screen.findByRole('button', { name: 'Retry Load All' })).toBeInTheDocument();
+            expect(screen.getByText('Problem 3')).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('button', { name: 'Retry Load All' }));
+
+            expect(await screen.findByText('Problem 4')).toBeInTheDocument();
+            expect((adminService.getProblems as jest.Mock).mock.calls[3][0]).toEqual({ limit: 100, cursor: 'cursor-2' });
+            expect(screen.queryByRole('button', { name: 'Retry Load All' })).not.toBeInTheDocument();
+        });
+
         it('renders only the first batch and a Show More button when more pages exist', async () => {
             (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(
                 makePage(mockProblems, { hasMore: true, nextCursor: 'cursor-1' }),

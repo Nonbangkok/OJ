@@ -8,9 +8,9 @@ import type { AdminProblem, AdminProblemsPageResponse, AdminProblemsQuery } from
  * management list.
  *
  * The first page is fetched whenever `query` changes (search, collection,
- * visibility, author); "Show More" appends subsequent pages by following
- * the server's opaque cursor. The DB always returns just one batch — the
- * full list is never fetched and sliced client-side. Filters run in SQL
+ * visibility, author); "Show More" appends one page, while "Load All" walks
+ * the remaining pages by following the server's opaque cursor. The DB
+ * returns one batch per request. Filters run in SQL
  * BEFORE pagination, so a filter change resets rows + cursor and loads the
  * first batch of the new query (never appends across filter states).
  *
@@ -20,7 +20,7 @@ import type { AdminProblem, AdminProblemsPageResponse, AdminProblemsQuery } from
  * keeps its position instead of collapsing back to 25 rows.
  *
  * Stale-response protection uses a monotonic request id: any new fetch
- * (page 1, Show More, or refresh) invalidates every in-flight response
+ * (page 1, Show More, Load All, or refresh) invalidates every in-flight response
  * with a lower id, so a slow earlier query can never overwrite a newer one.
  */
 export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
@@ -29,6 +29,8 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
   const [error, setError] = useState('');
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState(false);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const [loadAllError, setLoadAllError] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   /** Distinct author filter options over the whole pool (server-provided). */
   const [authors, setAuthors] = useState<Array<{ name: string }>>([]);
@@ -45,6 +47,9 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
   // fire two Show More requests against the same cursor.
   const nextCursorRef = useRef<string | null>(null);
   const loadingMoreRef = useRef(false);
+  const loadingAllRef = useRef(false);
+  const pageLoadingRef = useRef(true);
+  const problemsRef = useRef<AdminProblem[]>([]);
   // Filter state the loaded rows belong to. A refresh must re-run the SAME
   // query (not whatever `query` is at call time) to avoid mixing batches.
   const loadedQueryRef = useRef<AdminProblemsQuery>(query);
@@ -56,15 +61,21 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
   const fetchFirstPage = useCallback((requestQuery: AdminProblemsQuery) => {
     const requestId = ++lastRequestIdRef.current;
     setLoading(true);
+    pageLoadingRef.current = true;
     setError('');
     setLoadMoreError(false);
+    setLoadAllError(false);
     loadingMoreRef.current = false;
+    loadingAllRef.current = false;
+    setLoadingMore(false);
+    setLoadingAll(false);
     nextCursorRef.current = null;
 
     adminService.getProblems({ ...requestQuery, limit: ADMIN_PROBLEMS_PAGE.PAGE_SIZE })
       .then(page => {
         if (requestId !== lastRequestIdRef.current) return;
         setProblems(page.problems);
+        problemsRef.current = page.problems;
         setHasMore(page.hasMore);
         setAuthors(page.authors);
         setHasUnauthoredProblems(page.hasUnauthoredProblems);
@@ -77,6 +88,7 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
         if (requestId !== lastRequestIdRef.current) return;
         setError('Failed to fetch problems.');
         setProblems([]);
+        problemsRef.current = [];
         setHasMore(false);
         setAuthors([]);
         setHasUnauthoredProblems(false);
@@ -86,7 +98,10 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
         loadedCountRef.current = 0;
       })
       .finally(() => {
-        if (requestId === lastRequestIdRef.current) setLoading(false);
+        if (requestId === lastRequestIdRef.current) {
+          pageLoadingRef.current = false;
+          setLoading(false);
+        }
       });
   }, []);
 
@@ -104,12 +119,14 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
     const cursor = nextCursorRef.current;
     // Guard against double-clicks and re-entrancy: a batch already in
     // flight, or no next page, is a no-op.
-    if (loadingMoreRef.current || cursor === null) return;
+    if (pageLoadingRef.current || loadingMoreRef.current || loadingAllRef.current || cursor === null
+      || JSON.stringify(loadedQueryRef.current) !== queryKey) return;
     const requestId = ++lastRequestIdRef.current;
     const requestQuery = loadedQueryRef.current;
     loadingMoreRef.current = true;
     setLoadingMore(true);
     setLoadMoreError(false);
+    setLoadAllError(false);
 
     adminService.getProblems({
       ...requestQuery,
@@ -119,12 +136,16 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
       .then(page => {
         if (requestId !== lastRequestIdRef.current) return;
         // Append, deduping by id (defensive against cursor drift).
-        setProblems(previous => {
-          const seen = new Set(previous.map(problem => problem.id));
-          const fresh = page.problems.filter(problem => !seen.has(problem.id));
-          loadedCountRef.current = previous.length + fresh.length;
-          return [...previous, ...fresh];
+        const seen = new Set(problemsRef.current.map(problem => problem.id));
+        const fresh = page.problems.filter(problem => {
+          if (seen.has(problem.id)) return false;
+          seen.add(problem.id);
+          return true;
         });
+        const merged = [...problemsRef.current, ...fresh];
+        problemsRef.current = merged;
+        loadedCountRef.current = merged.length;
+        setProblems(merged);
         setHasMore(page.hasMore);
         setAuthors(page.authors);
         setHasUnauthoredProblems(page.hasUnauthoredProblems);
@@ -148,6 +169,61 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryKey]);
 
+  /** Walk the remaining pages for the current filter and loaded cursor. */
+  const loadAll = useCallback(async () => {
+    let cursor = nextCursorRef.current;
+    if (pageLoadingRef.current || loadingMoreRef.current || loadingAllRef.current || cursor === null
+      || JSON.stringify(loadedQueryRef.current) !== queryKey) return;
+
+    const requestId = ++lastRequestIdRef.current;
+    const requestQuery = loadedQueryRef.current;
+    const visitedCursors = new Set<string>();
+    loadingAllRef.current = true;
+    setLoadingAll(true);
+    setLoadAllError(false);
+    setLoadMoreError(false);
+
+    try {
+      while (cursor && requestId === lastRequestIdRef.current) {
+        if (visitedCursors.has(cursor)) throw new Error('Repeated problem cursor');
+        visitedCursors.add(cursor);
+        const page = await adminService.getProblems({ ...requestQuery, limit: 100, cursor });
+        if (requestId !== lastRequestIdRef.current) return;
+
+        const seen = new Set(problemsRef.current.map(problem => problem.id));
+        const fresh = page.problems.filter(problem => {
+          if (seen.has(problem.id)) return false;
+          seen.add(problem.id);
+          return true;
+        });
+        const merged = [...problemsRef.current, ...fresh];
+        problemsRef.current = merged;
+        loadedCountRef.current = merged.length;
+        setProblems(merged);
+        setHasMore(page.hasMore);
+        setAuthors(page.authors);
+        setHasUnauthoredProblems(page.hasUnauthoredProblems);
+        setBulkEligibleCount(page.bulkEligibleCount);
+        setLoadedQueryKey(JSON.stringify(requestQuery));
+
+        if (!page.hasMore) {
+          nextCursorRef.current = null;
+          return;
+        }
+        if (!page.nextCursor || page.nextCursor === cursor) throw new Error('Invalid problem cursor');
+        nextCursorRef.current = page.nextCursor;
+        cursor = page.nextCursor;
+      }
+    } catch {
+      if (requestId === lastRequestIdRef.current) setLoadAllError(true);
+    } finally {
+      if (requestId === lastRequestIdRef.current) {
+        loadingAllRef.current = false;
+        setLoadingAll(false);
+      }
+    }
+  }, [queryKey]);
+
   /**
    * Re-fetch the CURRENT page span (every batch loaded so far, in one
    * request) under the same filters. Used after admin mutations so the
@@ -159,34 +235,53 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
   const refresh = useCallback(() => {
     const requestQuery = loadedQueryRef.current;
     const requestId = ++lastRequestIdRef.current;
+    pageLoadingRef.current = true;
     loadingMoreRef.current = false;
+    loadingAllRef.current = false;
     setLoadingMore(false);
+    setLoadingAll(false);
     setLoadMoreError(false);
+    setLoadAllError(false);
     setLoading(true);
 
-    // The server page is bounded by MAX_LIMIT (100); page through with full
-    // pages until the loaded span is covered or the list ends. Bounded hard
-    // (a server that never stops paging cannot loop forever).
-    const walk = async (cursor: string | null, collected: AdminProblem[], pagesLeft: number): Promise<AdminProblemsPageResponse> => {
-      const page = await adminService.getProblems({
-        ...requestQuery,
-        ...(cursor ? { cursor } : {}),
-        limit: 100,
-      });
-      // Dedupe by id defensively (keyset on a unique key cannot repeat,
-      // but a concurrent rename could in principle re-order rows).
-      const seen = new Set(collected.map(problem => problem.id));
-      const merged = [...collected, ...page.problems.filter(problem => !seen.has(problem.id))];
-      if (!page.hasMore || merged.length >= loadedCountRef.current || pagesLeft <= 1) {
-        return { ...page, problems: merged };
+    // The server caps each page at 100. Continue until the previous loaded
+    // span is covered, so editing after Load All does not collapse a long list.
+    const walk = async (): Promise<AdminProblemsPageResponse> => {
+      let cursor: string | null = null;
+      let collected: AdminProblem[] = [];
+      const visitedCursors = new Set<string>();
+      while (requestId === lastRequestIdRef.current) {
+        if (cursor !== null) {
+          if (visitedCursors.has(cursor)) throw new Error('Repeated problem cursor');
+          visitedCursors.add(cursor);
+        }
+        const page = await adminService.getProblems({
+          ...requestQuery,
+          ...(cursor ? { cursor } : {}),
+          limit: 100,
+        });
+        if (requestId !== lastRequestIdRef.current) return { ...page, problems: collected };
+        const seen = new Set(collected.map(problem => problem.id));
+        const fresh = page.problems.filter(problem => {
+          if (seen.has(problem.id)) return false;
+          seen.add(problem.id);
+          return true;
+        });
+        collected = [...collected, ...fresh];
+        if (!page.hasMore || collected.length >= loadedCountRef.current) {
+          return { ...page, problems: collected };
+        }
+        if (!page.nextCursor || page.nextCursor === cursor) throw new Error('Invalid problem cursor');
+        cursor = page.nextCursor;
       }
-      return walk(page.nextCursor, merged, pagesLeft - 1);
+      throw new Error('Problem refresh superseded');
     };
 
-    walk(null, [], 10)
+    walk()
       .then(page => {
         if (requestId !== lastRequestIdRef.current) return;
         setProblems(page.problems);
+        problemsRef.current = page.problems;
         setHasMore(page.hasMore);
         setAuthors(page.authors);
         setHasUnauthoredProblems(page.hasUnauthoredProblems);
@@ -199,7 +294,10 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
         setError('Failed to fetch problems.');
       })
       .finally(() => {
-        if (requestId === lastRequestIdRef.current) setLoading(false);
+        if (requestId === lastRequestIdRef.current) {
+          pageLoadingRef.current = false;
+          setLoading(false);
+        }
       });
   }, []);
 
@@ -215,12 +313,15 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
     error,
     loadingMore,
     loadMoreError,
+    loadingAll,
+    loadAllError,
     hasMore,
     authors,
     hasUnauthoredProblems,
     bulkEligibleCount,
     loadedQueryKey,
     loadMore,
+    loadAll,
     refresh,
     refreshFirstPage,
   };
