@@ -13,6 +13,7 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
         memory_limit_mb: 512,
     });
     const [authors, setAuthors] = useState([]);
+    const [validationError, setValidationError] = useState('');
     const [pdfFile, setPdfFile] = useState<File | null>(null);
     const [zipFile, setZipFile] = useState<File | null>(null);
     const pdfRef = useRef<HTMLInputElement | null>(null);
@@ -67,9 +68,11 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        setValidationError('');
         setFormData(prev => ({
             ...prev,
-            // Treat all form values as strings. The backend will handle parsing.
+            // Keep the input value editable while typing; numeric limits are
+            // parsed and validated before they cross the API boundary.
             [name]: value,
             // Difficulty is tri-state: '' = Unrated (null), otherwise the
             // numeric rating from the dropdown.
@@ -89,9 +92,24 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
     };
 
     const handleSave = () => {
-        // Pass the collected data back to the parent component.
+        const timeLimit = Number(formData.time_limit_ms);
+        const memoryLimit = Number(formData.memory_limit_mb);
+        if (!Number.isInteger(timeLimit) || timeLimit < 100) {
+            setValidationError('Time Limit must be a whole number of at least 100 ms.');
+            return;
+        }
+        if (!Number.isInteger(memoryLimit) || memoryLimit < 1) {
+            setValidationError('Memory Limit must be a whole number of at least 1 MB.');
+            return;
+        }
+
+        // Send numeric values matching the backend schema, not DOM strings.
         onSave({
-            problemData: formData,
+            problemData: {
+                ...formData,
+                time_limit_ms: timeLimit,
+                memory_limit_mb: memoryLimit,
+            },
             pdfFile,
             zipFile,
         }, isEditing);
@@ -100,6 +118,7 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
     return {
         formData,
         authors,
+        validationError,
         pdfFile,
         setPdfFile,
         zipFile,

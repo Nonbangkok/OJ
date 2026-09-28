@@ -35,6 +35,53 @@ describe('useProblemCrud', () => {
         expect(result.current.problems).toEqual(mockProblems);
     });
 
+    it('uses the update endpoint for an Edit Problem modal save', async () => {
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(mockPage);
+        (jest.mocked(adminService.getProblemDetail) as jest.Mock).mockResolvedValue({
+            id: 'PROB1', title: 'Problem 1', author: 'admin', time_limit_ms: 1000, memory_limit_mb: 256,
+        });
+        (jest.mocked(adminService.updateProblem) as jest.Mock).mockResolvedValue({});
+
+        const { result } = renderHook(() => useProblemCrud({ query: {} }));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        await act(async () => {
+            await result.current.handleEdit(mockProblems[0] as never);
+        });
+        await act(async () => {
+            await result.current.handleSave({
+                problemData: { id: 'PROB1', title: 'Changed', author: 'admin', time_limit_ms: 2500, memory_limit_mb: 768 },
+                pdfFile: null,
+                zipFile: null,
+            }, true);
+        });
+
+        expect(adminService.updateProblem).toHaveBeenCalledWith('PROB1', expect.objectContaining({
+            time_limit_ms: 2500,
+            memory_limit_mb: 768,
+        }));
+        expect(adminService.createProblem).not.toHaveBeenCalled();
+    });
+
+    it('refuses to create a problem when the modal says edit but no target is available', async () => {
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(mockPage);
+
+        const { result } = renderHook(() => useProblemCrud({ query: {} }));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        await act(async () => {
+            await result.current.handleSave({
+                problemData: { id: 'PROB1', title: 'Changed', author: 'admin', time_limit_ms: 2500, memory_limit_mb: 768 },
+                pdfFile: null,
+                zipFile: null,
+            }, true);
+        });
+
+        expect(adminService.createProblem).not.toHaveBeenCalled();
+        expect(adminService.updateProblem).not.toHaveBeenCalled();
+        expect(result.current.error).toMatch(/identify the problem to update/i);
+    });
+
     it('stops upload-progress polling when the job completes', async () => {
         (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(mockPage);
         (jest.mocked(adminService.createProblem) as jest.Mock).mockResolvedValueOnce({ id: 'NEW1' });

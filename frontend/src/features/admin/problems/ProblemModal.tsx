@@ -8,6 +8,7 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser, c
   const {
     formData,
     authors,
+    validationError,
     pdfFile,
     setPdfFile,
     zipFile,
@@ -32,6 +33,12 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser, c
       <div className={`${formStyles['form-container']} ${formStyles['problem-form']}`}>
         <header className={formStyles['problem-form-header']}>
           <h2>{isEditing ? 'Edit Problem' : 'Create New Problem'}</h2>
+
+          {validationError && (
+            <div className={formStyles['error-message']} role="alert">
+              ⚠️ {validationError}
+            </div>
+          )}
 
           {/* Progress Bar Area */}
           {uploadProgress && (
