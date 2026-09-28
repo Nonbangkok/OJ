@@ -75,6 +75,35 @@ describe('useProblemModal', () => {
         }, false); // false for isEditing
     });
 
+    it('keeps edited time and memory limits as numbers in the save payload', async () => {
+        const mockSave = jest.fn();
+        const { result } = renderHook(() => useProblemModal(null, mockSave, null, { username: 'admin' }));
+
+        act(() => {
+            result.current.handleChange({ target: { name: 'time_limit_ms', value: '2500' } });
+            result.current.handleChange({ target: { name: 'memory_limit_mb', value: '768' } });
+        });
+
+        act(() => result.current.handleSave());
+
+        expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({
+            problemData: expect.objectContaining({ time_limit_ms: 2500, memory_limit_mb: 768 }),
+        }), false);
+    });
+
+    it('does not save invalid numeric limits', () => {
+        const mockSave = jest.fn();
+        const { result } = renderHook(() => useProblemModal(null, mockSave, null, { username: 'admin' }));
+
+        act(() => {
+            result.current.handleChange({ target: { name: 'time_limit_ms', value: '99' } });
+        });
+        act(() => result.current.handleSave());
+
+        expect(mockSave).not.toHaveBeenCalled();
+        expect(result.current.validationError).toMatch(/at least 100 ms/i);
+    });
+
     it('round-trips difficulty: prefills, edits, and clears to null', async () => {
         const mockProblem = {
             id: 'p-difficulty',

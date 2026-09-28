@@ -218,14 +218,26 @@ const useProblemCrud = ({ query }: UseProblemCrudArgs) => {
     setIsModalOpen(true);
   };
 
-  const handleSave = async ({ problemData, pdfFile, zipFile }: ProblemSavePayload) => {
-    const isEditing = Boolean(editingProblem);
+  const handleSave = async (
+    { problemData, pdfFile, zipFile }: ProblemSavePayload,
+    modalSaysEditing = Boolean(editingProblem),
+  ) => {
+    // Prefer the modal's explicit mode, but never let an edit modal fall
+    // through to POST/create if its target disappeared from parent state.
+    const isEditing = modalSaysEditing || Boolean(editingProblem);
+    if (isEditing && !editingProblem) {
+      const errorMessage = 'Unable to identify the problem to update. Close and reopen the editor.';
+      setError(errorMessage);
+      setUploadProgress({ status: 'failed', message: errorMessage });
+      return;
+    }
+
     setUploadProgress({ status: 'pending', message: 'Initiating save...' });
 
     try {
       let problemIdForUpload = problemData.id;
 
-      if (isEditing && editingProblem) {
+      if (isEditing) {
         await adminService.updateProblem(editingProblem.id, problemData);
       } else {
         const data = await adminService.createProblem(problemData);
