@@ -45,10 +45,11 @@ describe('UserManagement Component', () => {
         });
     });
 
-    it('renders loading state initially', () => {
+    it('keeps the search toolbar mounted while the initial users request loads', () => {
         (jest.mocked(adminService.getUsers) as jest.Mock).mockReturnValue(new Promise(() => { }));
         renderUserManagement();
-        expect(screen.getByText(/loading users\.\.\.$/i)).toBeInTheDocument();
+        expect(screen.getByRole('searchbox', { name: /search users/i })).toBeInTheDocument();
+        expect(screen.getByRole('status')).toHaveTextContent(/loading users/i);
     });
 
     it('renders user list and headers correctly', async () => {
@@ -58,6 +59,37 @@ describe('UserManagement Component', () => {
             expect(screen.getByText('User Management')).toBeInTheDocument();
             expect(screen.getByText('user1')).toBeInTheDocument();
             expect(screen.getByText('staff1')).toBeInTheDocument();
+        });
+    });
+
+    it('searches users across the database instead of only the currently loaded page', async () => {
+        const remoteMatch = { id: 119, username: 'user-1-19', role: 'user' as const };
+        (jest.mocked(adminService.getUsers) as jest.Mock)
+            .mockResolvedValueOnce({ users: mockUsers, total: 123, page: 1, limit: 100 })
+            .mockResolvedValueOnce({
+                users: [{ id: 120, username: 'last-page-user', role: 'user' as const }],
+                total: 123,
+                page: 2,
+                limit: 100,
+            })
+            .mockResolvedValueOnce({ users: [remoteMatch], total: 1, page: 1, limit: 100 });
+
+        renderUserManagement();
+        await screen.findByText('user1');
+        fireEvent.click(screen.getByRole('button', { name: /next/i }));
+        expect(await screen.findByText('last-page-user')).toBeInTheDocument();
+
+        const search = await screen.findByRole('searchbox', { name: /search users/i });
+        search.focus();
+        fireEvent.change(search, { target: { value: '1-19' } });
+
+        expect(await screen.findByText('user-1-19')).toBeInTheDocument();
+        expect(search).toHaveFocus();
+        expect(adminService.getUsers).toHaveBeenLastCalledWith({
+            page: 1,
+            limit: 100,
+            search: '1-19',
+            role: 'all',
         });
     });
 

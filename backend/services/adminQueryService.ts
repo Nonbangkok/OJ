@@ -30,30 +30,50 @@ const buildRandomPassword = (passwordLength: number): string => {
 
 export interface AdminUsersPage {
   users: AdminUserListRow[];
-  /** Total user count, so the UI can page without over-fetching. */
+  /** Total count matching the supplied filters, so the UI can page accurately. */
   total: number;
   page: number;
   limit: number;
 }
 
+export interface AdminUsersFilters {
+  search?: string;
+  role?: string;
+}
+
 /**
- * Admin user list (ADMIN-008). Previously returned the entire table in one
- * response; now paginated. `limit` is capped at ADMIN_USER_LIST_MAX_LIMIT.
+ * Admin user list (ADMIN-008). Filters are applied to both rows and count
+ * before pagination. `limit` is capped at ADMIN_USER_LIST_MAX_LIMIT.
  */
 export const getAdminUsers = async (
   page: number = 1,
   limit: number = ADMIN_USER_LIST_CONFIG.DEFAULT_LIMIT,
+  filters: AdminUsersFilters = {},
 ): Promise<AdminUsersPage> => {
   const safePage = Math.max(1, Math.floor(page));
   const safeLimit = Math.min(Math.max(1, Math.floor(limit)), ADMIN_USER_LIST_CONFIG.MAX_LIMIT);
   const offset = (safePage - 1) * safeLimit;
 
+  const normalizedSearch = filters.search?.trim();
+  const selectedRole = filters.role && filters.role !== 'all' ? filters.role : undefined;
+  const conditions: string[] = [];
+  const filterValues: string[] = [];
+  if (normalizedSearch) {
+    filterValues.push(normalizedSearch);
+    conditions.push(`STRPOS(LOWER(username), LOWER($${filterValues.length})) > 0`);
+  }
+  if (selectedRole) {
+    filterValues.push(selectedRole);
+    conditions.push(`role = $${filterValues.length}`);
+  }
+  const whereClause = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : '';
+
   const [rowsResult, countResult] = await Promise.all([
     db.query<AdminUserListRow>(
-      'SELECT id, username, role, created_at FROM users ORDER BY id LIMIT $1 OFFSET $2',
-      [safeLimit, offset],
+      `SELECT id, username, role, created_at FROM users${whereClause} ORDER BY id LIMIT $${filterValues.length + 1} OFFSET $${filterValues.length + 2}`,
+      [...filterValues, safeLimit, offset],
     ),
-    db.query<{ total: string }>('SELECT COUNT(*) AS total FROM users'),
+    db.query<{ total: string }>(`SELECT COUNT(*) AS total FROM users${whereClause}`, filterValues),
   ]);
 
   return {

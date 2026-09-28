@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import adminService from '../../services/adminService';
 import type { AdminUser } from '../../types';
 
 /** Rows per page on the admin user list (ADMIN-008). */
 export const USER_PAGE_SIZE = 100;
 
-const useUserManagement = () => {
+const useUserManagement = (search = '', roleFilter = 'all') => {
     const [users, setUsers] = useState<AdminUser[]>([]);
     // ADMIN-008: server-side paging state. Page 1 + total from the response.
     const [page, setPage] = useState(1);
@@ -15,25 +15,45 @@ const useUserManagement = () => {
     const [editingUser, setEditingUser] = useState(null);
     const [deletingUser, setDeletingUser] = useState(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const latestRequestId = useRef(0);
 
     const fetchUsers = useCallback(async (pageToLoad = 1) => {
+        const requestId = ++latestRequestId.current;
         try {
             setLoading(true);
-            const data = await adminService.getUsers({ page: pageToLoad, limit: USER_PAGE_SIZE });
+            setError('');
+            const data = await adminService.getUsers({
+                page: pageToLoad,
+                limit: USER_PAGE_SIZE,
+                search: search.trim() || undefined,
+                role: roleFilter as 'all' | 'user' | 'staff' | 'admin',
+            });
+            if (requestId !== latestRequestId.current) return;
             setUsers(data.users);
             setTotal(data.total);
             setPage(data.page);
         } catch (err) {
-            setError('Failed to fetch users.');
-            console.error(err);
+            if (requestId === latestRequestId.current) {
+                setError('Failed to fetch users.');
+                console.error(err);
+            }
         } finally {
-            setLoading(false);
+            if (requestId === latestRequestId.current) setLoading(false);
         }
-    }, []);
+    }, [search, roleFilter]);
 
     useEffect(() => {
-        fetchUsers();
-    }, [fetchUsers]);
+        // Invalidate an in-flight request as soon as the query changes. The
+        // toolbar stays mounted while the first page for the new query loads.
+        latestRequestId.current += 1;
+        setLoading(true);
+        setError('');
+        const timeout = window.setTimeout(() => fetchUsers(1), search.trim() ? 300 : 0);
+        return () => {
+            window.clearTimeout(timeout);
+            latestRequestId.current += 1;
+        };
+    }, [fetchUsers, search]);
 
     const handleEdit = (user) => {
         setEditingUser(user);
@@ -47,7 +67,8 @@ const useUserManagement = () => {
         if (deletingUser) {
             try {
                 await adminService.deleteUser(deletingUser.id);
-                setUsers(users.filter(user => user.id !== deletingUser.id));
+                setUsers((current) => current.filter(user => user.id !== deletingUser.id));
+                setTotal((current) => Math.max(0, current - 1));
             } catch (err) {
                 setError('Failed to delete user.');
                 console.error(err);

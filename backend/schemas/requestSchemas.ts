@@ -136,6 +136,8 @@ export const adminUsersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(ADMIN_USER_LIST_CONFIG.MAX_LIMIT)
     .default(ADMIN_USER_LIST_CONFIG.DEFAULT_LIMIT),
+  search: z.string().trim().max(STRING_LIMITS.USERNAME).optional(),
+  role: z.enum(['all', USER_ROLES.USER, USER_ROLES.STAFF, USER_ROLES.ADMIN]).default('all'),
 }).strict();
 
 /**

@@ -32,7 +32,12 @@ describe('useUserManagement', () => {
         expect(result.current.users).toEqual(mockUsers);
         expect(result.current.total).toBe(mockUsers.length);
         expect(result.current.page).toBe(1);
-        expect(adminService.getUsers).toHaveBeenCalledWith({ page: 1, limit: 100 });
+        expect(adminService.getUsers).toHaveBeenCalledWith({
+            page: 1,
+            limit: 100,
+            search: undefined,
+            role: 'all',
+        });
     });
 
     it('handles user deletion correctly', async () => {

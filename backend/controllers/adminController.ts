@@ -62,9 +62,14 @@ const router: Router = express.Router();
 router.get('/admin/users', requireAuth, requireAdmin,
   validateRequest({ query: adminUsersQuerySchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  // ADMIN-008: paged list (defaults: page 1, 100 rows) + total count.
-  const { page, limit } = req.query as unknown as { page: number; limit: number };
-  const result = await getAdminUsers(page, limit);
+  // ADMIN-008: search/role scope is applied before paging and to the matching total.
+  const { page, limit, search, role } = req.query as unknown as {
+    page: number;
+    limit: number;
+    search?: string;
+    role: string;
+  };
+  const result = await getAdminUsers(page, limit, { search, role });
   res.json(result);
 }));
 

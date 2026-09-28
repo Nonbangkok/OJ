@@ -219,6 +219,28 @@ describe('Admin Controller', () => {
             expect(zero.status).toBe(400);
         });
 
+        it('filters all users by username and role before applying pagination', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ id: 119, username: 'user-1-19', role: 'user' }] })
+                .mockResolvedValueOnce({ rows: [{ total: '1' }] });
+
+            const res = await request(app).get('/admin/users?page=1&limit=100&search=1-19&role=user');
+
+            expect(res.status).toBe(200);
+            expect(res.body.users).toEqual([{ id: 119, username: 'user-1-19', role: 'user' }]);
+            expect(res.body.total).toBe(1);
+            expect(db.query).toHaveBeenNthCalledWith(
+                1,
+                expect.stringContaining('STRPOS(LOWER(username), LOWER($1)) > 0'),
+                ['1-19', 'user', 100, 0],
+            );
+            expect(db.query).toHaveBeenNthCalledWith(
+                2,
+                expect.stringContaining('STRPOS(LOWER(username), LOWER($1)) > 0'),
+                ['1-19', 'user'],
+            );
+        });
+
         it('should return 404 when deleting a nonexistent user (ADMIN-007)', async () => {
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 

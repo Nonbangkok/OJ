@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import useUserManagement from '../../../hooks/admin/useUserManagement';
 import { useAuth } from '../../../context/AuthContext';
 import EditUserModal from './EditUserModal';
@@ -12,9 +12,13 @@ import { ActionMenu, Button, StatusBadge } from '../../../components/ui';
 import type { AdminUser } from '../../../types';
 import { USER_PAGE_SIZE } from '../../../hooks/admin/useUserManagement';
 import { APP_CONSTANTS } from '../../../utils/constants';
-import LoadingPage from '../../../components/shared/LoadingPage';
 
 const UserManagement = () => {
+  // Keep the controlled search/filter state above the data hook so result
+  // updates never replace the filter toolbar or its input element.
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+
   const {
     users,
     page,
@@ -34,39 +38,17 @@ const UserManagement = () => {
     handleConfirmDelete,
     handleSave,
     handleAddNewUser
-  } = useUserManagement();
+  } = useUserManagement(search, roleFilter);
 
   const { user: currentUser } = useAuth();
 
   // AUTH-004: target of the pending admin password reset.
   const [resettingPasswordUser, setResettingPasswordUser] = useState<AdminUser | null>(null);
 
-  // --- Filters: username search x role -----------------------------------
-  const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('all');
-
-  const roles = useMemo(
-    () => [...new Set(users.map(user => user.role))].sort(),
-    [users],
-  );
-
-  const visibleUsers = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return users.filter(user => {
-      if (roleFilter !== 'all' && user.role !== roleFilter) return false;
-      if (!query) return true;
-      return user.username.toLowerCase().includes(query);
-    });
-  }, [users, roleFilter, search]);
-
-  // ADMIN-008: server-side paging. The search/role filters above apply
-  // within the fetched page; the pager walks the full user table.
+  // ADMIN-008: filtered totals and rows are both server-paged.
   const pageCount = Math.max(1, Math.ceil(total / USER_PAGE_SIZE));
   const rangeStart = total === 0 ? 0 : (page - 1) * USER_PAGE_SIZE + 1;
   const rangeEnd = Math.min(page * USER_PAGE_SIZE, total);
-
-  if (loading) return <LoadingPage />;
-  if (error) return <div className="error-message">{error}</div>;
 
   return (
     <>
@@ -97,12 +79,22 @@ const UserManagement = () => {
               aria-label="Filter users by role"
             >
               <option value="all">All</option>
-              {roles.map(role => (
+              {['admin', 'staff', 'user'].map(role => (
                 <option key={role} value={role}>{role}</option>
               ))}
             </select>
           </label>
         </div>
+
+        {loading && <p role="status">Loading users…</p>}
+        {error && (
+          <div className="error-message" role="alert">
+            {error}{' '}
+            <Button variant="secondary" size="compact" onClick={() => fetchUsers(page)}>
+              Retry
+            </Button>
+          </div>
+        )}
 
         {/* --- Table: Edit + overflow ------------------------------------ */}
         <div className={`${tableStyles['table-container']} ${styles.tableWrap}`}>
@@ -115,7 +107,7 @@ const UserManagement = () => {
               </tr>
             </thead>
             <tbody>
-              {visibleUsers.map(user => {
+              {users.map(user => {
                 const canManage = currentUser && user.id !== currentUser.id
                   && user.username !== APP_CONSTANTS.SYSTEM_ADMIN_USERNAME;
                 return (
@@ -161,7 +153,7 @@ const UserManagement = () => {
               })}
             </tbody>
           </table>
-          {!visibleUsers.length && (
+          {!users.length && !loading && !error && (
             <p className={styles['empty-state']}>No users found.</p>
           )}
         </div>

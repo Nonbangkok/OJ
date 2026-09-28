@@ -19,6 +19,8 @@ import type {
 export interface AdminUsersQuery {
   page?: number;
   limit?: number;
+  search?: string;
+  role?: 'all' | 'user' | 'staff' | 'admin';
 }
 
 const usersAdminService = {
