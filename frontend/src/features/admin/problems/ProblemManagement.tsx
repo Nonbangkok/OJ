@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import useProblemManagement from '../../../hooks/admin/useProblemManagement';
 import useProblemSelection from '../../../hooks/admin/useProblemSelection';
 import useRejudge from '../../../hooks/admin/useRejudge';
@@ -17,9 +17,11 @@ import tableStyles from '../../../components/styles/Table.module.css';
 import { ActionMenu, Button, StatusBadge } from '../../../components/ui';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useInfiniteScroll } from '../../../hooks/useInfiniteScroll';
+import { buildAdminProblemListQuery, type AdminProblemListLoaderData } from '../../../routing/problemListLoaders';
 
 interface ProblemManagementProps {
   currentUser?: { username?: string } | null;
+  initialPageSpan?: AdminProblemListLoaderData;
 }
 
 const COLLECTION_STATUS_LABEL: Record<CollectionWithStats['status'], string> = {
@@ -29,27 +31,50 @@ const COLLECTION_STATUS_LABEL: Record<CollectionWithStats['status'], string> = {
   mixed: 'Mixed',
 };
 
-const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
+const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: ProblemManagementProps) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlSearch = searchParams.get('search') || '';
+  const urlCollection = searchParams.get('collection') || 'all';
+  const urlVisibility = searchParams.get('visibility');
+  const urlAuthor = searchParams.get('author') || 'all';
+  const validVisibility = urlVisibility === 'visible' || urlVisibility === 'hidden' ? urlVisibility : 'all';
+
   // --- Filters ------------------------------------------------------------
   // All filters run server-side (SQL BEFORE pagination); changing any of
   // them resets the paged list to the first batch of the new query. The
   // search box is debounced so typing does not fire a request per key.
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(urlSearch);
   const debouncedSearch = useDebouncedValue(search, ADMIN_PROBLEMS_PAGE.SEARCH_DEBOUNCE_MS);
-  const [collectionFilter, setCollectionFilter] = useState<string>('all');
-  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'visible' | 'hidden'>('all');
-  const [authorFilter, setAuthorFilter] = useState<string>('all');
+  const [collectionFilter, setCollectionFilter] = useState<string>(urlCollection);
+  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'visible' | 'hidden'>(validVisibility);
+  const [authorFilter, setAuthorFilter] = useState<string>(urlAuthor);
+
+  // Keep admin list filters shareable and tied to this history entry. This
+  // also lets browser Back restore the same controls without a separate cache.
+  useEffect(() => { setSearch(urlSearch); }, [urlSearch]);
+  useEffect(() => { setCollectionFilter(urlCollection); }, [urlCollection]);
+  useEffect(() => { setVisibilityFilter(validVisibility); }, [validVisibility]);
+  useEffect(() => { setAuthorFilter(urlAuthor); }, [urlAuthor]);
+
+  const updateUrlFilter = (key: string, value: string) => {
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous);
+      if (value && value !== 'all') next.set(key, value);
+      else next.delete(key);
+      next.delete('pages');
+      return next;
+    }, { replace: true, preventScrollReset: true });
+  };
 
   // Server-side query. Sentinels 'all' are omitted so the default query is
   // the clean unfiltered first page.
   const query = useMemo<AdminProblemsQuery>(() => {
-    const trimmed = debouncedSearch.trim();
-    return {
-      ...(trimmed ? { search: trimmed } : {}),
-      ...(collectionFilter !== 'all' ? { collection: collectionFilter === 'none' ? 'none' as const : Number(collectionFilter) } : {}),
-      ...(visibilityFilter !== 'all' ? { visibility: visibilityFilter } : {}),
-      ...(authorFilter !== 'all' ? { author: authorFilter } : {}),
-    };
+    return buildAdminProblemListQuery({
+      search: debouncedSearch,
+      collection: collectionFilter,
+      visibility: visibilityFilter,
+      author: authorFilter,
+    });
   }, [debouncedSearch, collectionFilter, visibilityFilter, authorFilter]);
 
   const {
@@ -97,7 +122,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     handleBatchUploadFileChange,
     handleSave,
     handleCloseModal
-  } = useProblemManagement(query);
+  } = useProblemManagement(query, initialPageSpan);
   const currentQueryKey = JSON.stringify(query);
   // The visible input updates immediately, but the server query is debounced.
   // Keep scope-wide actions unavailable until the result/count are for exactly
@@ -106,6 +131,21 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     && !error
     && search.trim() === debouncedSearch.trim()
     && loadedQueryKey === currentQueryKey;
+
+  useEffect(() => {
+    if (!bulkScopeReady) return;
+    const loadedPages = Math.max(1, Math.ceil(problems.length / ADMIN_PROBLEMS_PAGE.PAGE_SIZE));
+    const desiredPageParam = loadedPages > 1 ? String(loadedPages) : null;
+    if (desiredPageParam === searchParams.get('pages') || (desiredPageParam === null && !searchParams.has('pages'))) return;
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous);
+      const nextValue = loadedPages > 1 ? String(loadedPages) : null;
+      if (nextValue === next.get('pages') || (nextValue === null && !next.has('pages'))) return previous;
+      if (nextValue) next.set('pages', nextValue);
+      else next.delete('pages');
+      return next;
+    }, { replace: true, preventScrollReset: true });
+  }, [bulkScopeReady, problems.length, searchParams, setSearchParams]);
 
   const {
     isRejudgeConfirmOpen,
@@ -202,18 +242,22 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
   const changeSearch = (value: string) => {
     clearSelection();
     setSearch(value);
+    updateUrlFilter('search', value);
   };
   const changeCollectionFilter = (value: string) => {
     clearSelection();
     setCollectionFilter(value);
+    updateUrlFilter('collection', value);
   };
   const changeVisibilityFilter = (value: 'all' | 'visible' | 'hidden') => {
     clearSelection();
     setVisibilityFilter(value);
+    updateUrlFilter('visibility', value);
   };
   const changeAuthorFilter = (value: string) => {
     clearSelection();
     setAuthorFilter(value);
+    updateUrlFilter('author', value);
   };
 
   const runCollectionVisibility = async () => {

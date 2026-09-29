@@ -3,13 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 import styles from './Problems.module.css';
 import { useIncrementalProblems } from '../../hooks/useIncrementalProblems';
 import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
-import { useScrollRestore } from '../../hooks/useScrollRestore';
 import ProblemCard from '../../features/problem/ProblemCard';
 import { Button } from '../../components/ui';
 import { PROBLEMS_PAGE } from '../../config/constants';
 import { PROBLEM_DIFFICULTY_OPTIONS } from '../../utils/constants';
 import problemService from '../../services/problemService';
 import type { ProblemCategoryCountsResponse, ProblemFilterOptionsResponse } from '../../types';
+import type { PublicProblemListLoaderData } from '../../routing/problemListLoaders';
+import { buildPublicProblemListQuery } from '../../routing/problemListLoaders';
 
 import LoadingPage from '../../components/shared/LoadingPage';
 
@@ -19,7 +20,7 @@ const DIFFICULTY_SORT_NONE = '';
 const DIFFICULTY_SORT_ASC = 'difficulty-asc';
 const DIFFICULTY_SORT_DESC = 'difficulty-desc';
 
-const Problems = () => {
+const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemListLoaderData }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedCategories = (searchParams.get('category') || '').split(',').filter(Boolean);
   const hasCategoryFilter = selectedCategories.length > 0;
@@ -47,8 +48,9 @@ const Problems = () => {
       const next = new URLSearchParams(previous);
       if (value || preserveEmpty) next.set(key, value);
       else next.delete(key);
+      next.delete('pages');
       return next;
-    }, { replace: true });
+    }, { replace: true, preventScrollReset: true });
   };
 
   // Debounce the search box: keystrokes settle before the server-side query
@@ -66,18 +68,15 @@ const Problems = () => {
   // unrated problems remain included after rated problems. Search, category,
   // difficulty filters and sorting all run in SQL before pagination.
   const query = useMemo(() => {
-    const trimmed = debouncedSearch.trim();
-    return {
-      ...(trimmed ? { search: trimmed } : {}),
-      ...(categoryQueryValue ? { category: categoryQueryValue } : {}),
-      ...(debouncedAuthor.trim() ? { author: debouncedAuthor.trim() } : {}),
-      ...(collection !== '' ? { collection: collection === 'none' ? 'none' as const : Number(collection) } : {}),
-      ...(difficultyMin !== '' ? { difficultyMin: Number(difficultyMin) } : {}),
-      ...(difficultyMax !== '' ? { difficultyMax: Number(difficultyMax) } : {}),
-      ...(difficultySort === DIFFICULTY_SORT_ASC || difficultySort === DIFFICULTY_SORT_DESC
-        ? { sort: 'difficulty' as const, order: difficultySort === DIFFICULTY_SORT_ASC ? 'asc' as const : 'desc' as const }
-        : {}),
-    };
+    return buildPublicProblemListQuery({
+      search: debouncedSearch,
+      category: categoryQueryValue,
+      author: debouncedAuthor,
+      collection,
+      difficultyMin,
+      difficultyMax,
+      sort: difficultySort,
+    });
   }, [debouncedSearch, categoryQueryValue, debouncedAuthor, collection, difficultyMin, difficultyMax, difficultySort]);
 
   const {
@@ -88,7 +87,8 @@ const Problems = () => {
     loadMoreError,
     hasMore,
     loadMore,
-  } = useIncrementalProblems(query);
+    loadedQueryKey,
+  } = useIncrementalProblems(query, initialPageSpan);
   const showMoreRef = useInfiniteScroll({
     enabled: hasMore && !loading && !loadingMore && !loadMoreError,
     observationKey: problems.length,
@@ -117,6 +117,26 @@ const Problems = () => {
     };
   }, []);
 
+  // Record the loaded span only after it belongs to the committed URL filters.
+  // This avoids reviving an old page count in the debounce window after a
+  // search/author input changes.
+  useEffect(() => {
+    if (loadedQueryKey !== JSON.stringify(query)
+      || search.trim() !== debouncedSearch.trim()
+      || author.trim() !== debouncedAuthor.trim()) return;
+    const loadedPages = Math.max(1, Math.ceil(problems.length / PROBLEMS_PAGE.PAGE_SIZE));
+    const desiredPageParam = loadedPages > 1 ? String(loadedPages) : null;
+    if (desiredPageParam === searchParams.get('pages') || (desiredPageParam === null && !searchParams.has('pages'))) return;
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous);
+      const nextValue = loadedPages > 1 ? String(loadedPages) : null;
+      if (nextValue === next.get('pages') || (nextValue === null && !next.has('pages'))) return previous;
+      if (nextValue) next.set('pages', nextValue);
+      else next.delete('pages');
+      return next;
+    }, { replace: true, preventScrollReset: true });
+  }, [loadedQueryKey, query, problems.length, search, debouncedSearch, author, debouncedAuthor, searchParams, setSearchParams]);
+
   useEffect(() => {
     let cancelled = false;
     problemService.getFilterOptions()
@@ -129,9 +149,6 @@ const Problems = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // Coming back from a problem detail page restores the previous scroll spot.
-  useScrollRestore(!loading && !error);
-
   // Only narrowing controls affect the empty-state copy; the default sort
   // does not turn an otherwise unfiltered empty list into a filtered state.
   const hasActiveFilters = debouncedSearch.trim() !== ''
@@ -143,12 +160,12 @@ const Problems = () => {
 
   // Keep search and ordering visible; narrowing controls and categories are
   // grouped in one disclosure, with only selected filters summarized inline.
-  const activeFilterCount = [
-    hasCategoryFilter,
-    difficultyMin !== '' || difficultyMax !== '',
-    author.trim() !== '',
-    collection !== '',
-  ].filter(Boolean).length;
+  // Count each selected category separately so the badge reflects a
+  // multi-category filter, while range/author/collection remain one each.
+  const activeFilterCount = selectedCategories.length
+    + Number(difficultyMin !== '' || difficultyMax !== '')
+    + Number(author.trim() !== '')
+    + Number(collection !== '');
   const difficultyFilterLabel = difficultyMin && difficultyMax
     ? `Difficulty: ${difficultyMin}–${difficultyMax}`
     : difficultyMin
@@ -162,8 +179,9 @@ const Problems = () => {
     setSearchParams(previous => {
       const next = new URLSearchParams(previous);
       ['category', 'difficultyMin', 'difficultyMax', 'author', 'collection'].forEach(key => next.delete(key));
+      next.delete('pages');
       return next;
-    }, { replace: true });
+    }, { replace: true, preventScrollReset: true });
   };
   const setCategorySelection = (category: string, checked: boolean) => {
     setSearchParams(previous => {
@@ -178,8 +196,9 @@ const Problems = () => {
       }
       if (selected.size > 0) next.set('category', [...selected].join(','));
       else next.delete('category');
+      next.delete('pages');
       return next;
-    }, { replace: true });
+    }, { replace: true, preventScrollReset: true });
   };
 
   // The full-page loader is only for the very first load. Every later
@@ -314,8 +333,9 @@ const Problems = () => {
                   const next = new URLSearchParams(previous);
                   next.delete('difficultyMin');
                   next.delete('difficultyMax');
+                  next.delete('pages');
                   return next;
-                }, { replace: true });
+                }, { replace: true, preventScrollReset: true });
               }}>
               {difficultyFilterLabel}<span aria-hidden="true">×</span>
             </button>

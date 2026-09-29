@@ -11,6 +11,7 @@ import type {
 } from '../../types';
 import { getErrorMessage, toApiLikeError } from '../../utils/error';
 import type { ProblemCategory } from '../../utils/constants';
+import type { ProblemListSpan } from '../../routing/problemListLoaders';
 
 import { useAdminProblemsPage } from './useAdminProblemsPage';
 import { normalizeUploadProgress } from './problemManagement.helpers';
@@ -41,9 +42,10 @@ const UPLOAD_POLL_MAX_ATTEMPTS = 300;
 interface UseProblemCrudArgs {
   /** Server-side filter query for the paged admin problem list. */
   query: AdminProblemsQuery;
+  initialPageSpan?: ProblemListSpan<AdminProblem> | null;
 }
 
-const useProblemCrud = ({ query }: UseProblemCrudArgs) => {
+const useProblemCrud = ({ query, initialPageSpan }: UseProblemCrudArgs) => {
   const {
     problems,
     loading: pageLoading,
@@ -61,7 +63,7 @@ const useProblemCrud = ({ query }: UseProblemCrudArgs) => {
     loadAll,
     refresh,
     refreshFirstPage,
-  } = useAdminProblemsPage(query);
+  } = useAdminProblemsPage(query, initialPageSpan);
 
   // Mutation-busy flag (bulk ops, edit modal); the paged hook owns the
   // initial list load, so this starts false and only flips during mutations.

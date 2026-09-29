@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import problemService, { type ProblemListQuery } from '../services/problemService';
 import { PROBLEMS_PAGE } from '../config/constants';
 import type { ProblemSummary } from '../types';
+import type { ProblemListSpan } from '../routing/problemListLoaders';
 
 /**
  * Incremental ("Show More") loading for the standalone problems list.
@@ -16,32 +17,40 @@ import type { ProblemSummary } from '../types';
  * in-flight response with a lower id, so a slow earlier query can never
  * overwrite a newer one.
  */
-export const useIncrementalProblems = (query: ProblemListQuery) => {
-  const [problems, setProblems] = useState<ProblemSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+export const useIncrementalProblems = (
+  query: ProblemListQuery,
+  initialPageSpan?: ProblemListSpan<ProblemSummary> | null,
+) => {
+  const queryKey = JSON.stringify(query);
+  const initialData = initialPageSpan?.queryKey === queryKey ? initialPageSpan : null;
+  const [problems, setProblems] = useState<ProblemSummary[]>(() => initialData?.problems ?? []);
+  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState('');
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(() => initialData?.hasMore ?? false);
+  const [nextCursor, setNextCursor] = useState<string | null>(() => initialData?.nextCursor ?? null);
+  const [loadedQueryKey, setLoadedQueryKey] = useState<string | null>(() => initialData ? queryKey : null);
   // Monotonic request id: two fetches started in the same millisecond must
   // not collide the way Date.now() did, or a stale response could win.
   const lastRequestIdRef = useRef(0);
   // Cursor for the NEXT page, kept in a ref so a rapid double-click cannot
   // fire two Show More requests against the same cursor.
-  const nextCursorRef = useRef<string | null>(null);
+  const nextCursorRef = useRef<string | null>(initialData?.nextCursor ?? null);
   const loadingMoreRef = useRef(false);
-
-  const queryKey = JSON.stringify(query);
+  const changedQueryRef = useRef(false);
 
   // First page: resets the list whenever the query changes. Never appends
   // across different queries.
   useEffect(() => {
+    if (!changedQueryRef.current && initialPageSpan?.queryKey === queryKey) return;
+    changedQueryRef.current = true;
     const requestId = ++lastRequestIdRef.current;
     let cancelled = false;
     const isCurrent = () => !cancelled && requestId === lastRequestIdRef.current;
 
     setLoading(true);
+    setLoadedQueryKey(null);
     setError('');
     setLoadMoreError(false);
     loadingMoreRef.current = false;
@@ -51,6 +60,7 @@ export const useIncrementalProblems = (query: ProblemListQuery) => {
       .then(page => {
         if (!isCurrent()) return;
         setProblems(page.problems);
+        setLoadedQueryKey(queryKey);
         setHasMore(page.hasMore);
         nextCursorRef.current = page.nextCursor;
         setNextCursor(page.nextCursor);
@@ -59,6 +69,7 @@ export const useIncrementalProblems = (query: ProblemListQuery) => {
         if (!isCurrent()) return;
         setError('Failed to fetch problems.');
         setProblems([]);
+        setLoadedQueryKey(null);
         setHasMore(false);
         nextCursorRef.current = null;
       })
@@ -97,6 +108,7 @@ export const useIncrementalProblems = (query: ProblemListQuery) => {
           return [...previous, ...page.problems.filter(problem => !seen.has(problem.id))];
         });
         setHasMore(page.hasMore);
+        setLoadedQueryKey(queryKey);
         nextCursorRef.current = page.nextCursor;
         setNextCursor(page.nextCursor);
       })
@@ -124,6 +136,7 @@ export const useIncrementalProblems = (query: ProblemListQuery) => {
     loadMoreError,
     hasMore,
     nextCursor,
+    loadedQueryKey,
     loadMore,
   };
 };

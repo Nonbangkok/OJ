@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import adminService from '../../services/adminService';
 import { ADMIN_PROBLEMS_PAGE } from '../../config/constants';
 import type { AdminProblem, AdminProblemsPageResponse, AdminProblemsQuery } from '../../types';
+import type { ProblemListSpan } from '../../routing/problemListLoaders';
 
 /**
  * Server-side incremental ("Show More") loading for the admin problem
@@ -23,40 +24,44 @@ import type { AdminProblem, AdminProblemsPageResponse, AdminProblemsQuery } from
  * (page 1, Show More, Load All, or refresh) invalidates every in-flight response
  * with a lower id, so a slow earlier query can never overwrite a newer one.
  */
-export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
-  const [problems, setProblems] = useState<AdminProblem[]>([]);
-  const [loading, setLoading] = useState(true);
+export const useAdminProblemsPage = (
+  query: AdminProblemsQuery,
+  initialPageSpan?: ProblemListSpan<AdminProblem> | null,
+) => {
+  const queryKey = JSON.stringify(query);
+  const initialData = initialPageSpan?.queryKey === queryKey ? initialPageSpan : null;
+  const [problems, setProblems] = useState<AdminProblem[]>(() => initialData?.problems ?? []);
+  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState('');
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState(false);
   const [loadingAll, setLoadingAll] = useState(false);
   const [loadAllError, setLoadAllError] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
+  const [hasMore, setHasMore] = useState(() => initialData?.hasMore ?? false);
   /** Distinct author filter options over the whole pool (server-provided). */
-  const [authors, setAuthors] = useState<Array<{ name: string }>>([]);
-  const [hasUnauthoredProblems, setHasUnauthoredProblems] = useState(false);
-  const [bulkEligibleCount, setBulkEligibleCount] = useState(0);
+  const [authors, setAuthors] = useState<Array<{ name: string }>>(() => initialData?.pageMetadata?.authors ?? []);
+  const [hasUnauthoredProblems, setHasUnauthoredProblems] = useState(() => initialData?.pageMetadata?.hasUnauthoredProblems ?? false);
+  const [bulkEligibleCount, setBulkEligibleCount] = useState(() => initialData?.pageMetadata?.bulkEligibleCount ?? 0);
   // Identifies the filter scope for which the count/page response is current.
   // Consumers with scope-wide actions must not use a stale count while a new
   // query is waiting to fetch (or has failed).
-  const [loadedQueryKey, setLoadedQueryKey] = useState<string | null>(null);
+  const [loadedQueryKey, setLoadedQueryKey] = useState<string | null>(() => initialData ? queryKey : null);
   // Monotonic request id: two fetches started in the same millisecond must
   // not collide the way Date.now() did, or a stale response could win.
   const lastRequestIdRef = useRef(0);
   // Cursor for the NEXT page, kept in a ref so a rapid double-click cannot
   // fire two Show More requests against the same cursor.
-  const nextCursorRef = useRef<string | null>(null);
+  const nextCursorRef = useRef<string | null>(initialData?.nextCursor ?? null);
   const loadingMoreRef = useRef(false);
   const loadingAllRef = useRef(false);
-  const pageLoadingRef = useRef(true);
-  const problemsRef = useRef<AdminProblem[]>([]);
+  const pageLoadingRef = useRef(!initialData);
+  const problemsRef = useRef<AdminProblem[]>(initialData?.problems ?? []);
   // Filter state the loaded rows belong to. A refresh must re-run the SAME
   // query (not whatever `query` is at call time) to avoid mixing batches.
   const loadedQueryRef = useRef<AdminProblemsQuery>(query);
   // How many rows are loaded under the current query — the refresh span.
-  const loadedCountRef = useRef(0);
-
-  const queryKey = JSON.stringify(query);
+  const loadedCountRef = useRef(initialData?.problems.length ?? 0);
+  const changedQueryRef = useRef(false);
 
   const fetchFirstPage = useCallback((requestQuery: AdminProblemsQuery) => {
     const requestId = ++lastRequestIdRef.current;
@@ -108,6 +113,8 @@ export const useAdminProblemsPage = (query: AdminProblemsQuery) => {
   // First page: resets the list whenever the query changes. Never appends
   // across different queries.
   useEffect(() => {
+    if (!changedQueryRef.current && initialPageSpan?.queryKey === queryKey) return;
+    changedQueryRef.current = true;
     loadedQueryRef.current = query;
     fetchFirstPage(query);
     // The serialized query is the dependency — a new object identity with

@@ -1,4 +1,13 @@
-import { BrowserRouter as Router, Routes, Route, useLocation, Outlet } from 'react-router-dom';
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  Outlet,
+  Route,
+  RouterProvider,
+  ScrollRestoration,
+  useLoaderData,
+  useLocation,
+} from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -25,6 +34,13 @@ import ContestSubmissions from './pages/contest/ContestSubmissions';
 import ContestScoreboard from './pages/contest/ContestScoreboard';
 import { SettingsProvider } from './context/SettingsContext';
 import PrivateRoute from './components/shared/PrivateRoute';
+import {
+  adminProblemsLoader,
+  publicProblemsLoader,
+  revalidateProblemListOnPathChange,
+  type AdminProblemListLoaderData,
+  type PublicProblemListLoaderData,
+} from './routing/problemListLoaders';
 
 // Admin Pages
 import UserManagement from './features/admin/users/UserManagement';
@@ -51,8 +67,20 @@ const MainLayout = () => (
   </main>
 );
 
-// This component will contain the logic for switching navbars
-const Layout = () => {
+const PublicProblemsRoute = () => {
+  const initialPageSpan = useLoaderData() as PublicProblemListLoaderData;
+  return <PrivateRoute><Problems initialPageSpan={initialPageSpan} /></PrivateRoute>;
+};
+
+const AdminProblemsRoute = () => {
+  const initialPageSpan = useLoaderData() as AdminProblemListLoaderData;
+  return <ProblemManagement initialPageSpan={initialPageSpan} />;
+};
+
+// The root route owns React Router's native, history-entry-keyed restoration.
+// Data loaders below ensure list rows are present before the saved scroll is
+// applied when returning from a problem detail page.
+const RootLayout = () => {
   const location = useLocation();
 
   // Use a regular expression for a more robust check.
@@ -65,61 +93,59 @@ const Layout = () => {
   return (
     <div className="App">
       {isContestPage || isAdminPage ? null : <Navbar />}
-      {/* Remove the main container from here */}
-      <Routes>
-        {/* Standard routes wrapped in MainLayout */}
-        <Route element={<MainLayout />}>
-          <Route path="/" element={<Home />} />
-          {/* Site-private mode: guests get the shared auth-required screen
-              (with post-login returnTo) instead of these content pages. */}
-          <Route path="/problems" element={<PrivateRoute><Problems /></PrivateRoute>} />
-          {/* Note: ProblemDetail is used by both layouts, so we keep it duplicated for now */}
-          <Route path="/problems/:problemId" element={<PrivateRoute><ProblemDetail /></PrivateRoute>} />
-          <Route path="/scoreboard" element={<PrivateRoute><Scoreboard /></PrivateRoute>} />
-          <Route path="/submissions" element={<PrivateRoute><Submissions /></PrivateRoute>} />
-          <Route path="/profile/:username" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/contests" element={<PrivateRoute><Contests /></PrivateRoute>} />
-        </Route>
-
-        {/* Admin routes with their own layout */}
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Admin />} />
-          <Route path="users" element={<UserManagement />} />
-          <Route path="problems" element={<ProblemManagement />} />
-          <Route path="authoring" element={<ProblemAuthoring />} />
-          <Route path="authoring/profiles" element={<ProblemAuthoring />} />
-          <Route path="authoring/ai-docs" element={<ProblemAuthoring />} />
-          <Route path="authoring/:draftId" element={<ProblemAuthoring />}>
-            <Route index element={<DraftMetadata />} />
-            <Route path="metadata" element={<DraftMetadata />} />
-            <Route path="statement" element={<DraftStatement />} />
-            <Route path="solution" element={<DraftSolution />} />
-            <Route path="testcases" element={<DraftTestcases />} />
-            <Route path="generator" element={<DraftGenerator />} />
-            <Route path="verify" element={<DraftVerify />} />
-            <Route path="jobs" element={<DraftJobs />} />
-            <Route path="ai-docs" element={<DraftAiDocs />} />
-          </Route>
-          <Route path="authoring/:draftId/editor" element={<ProblemAuthoring editorMode />} />
-          <Route path="contests" element={<ContestManagement />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="analysis" element={<AnalysisPage />} />
-        </Route>
-
-        {/* Contest routes with their own self-contained layout */}
-        <Route path="/contests/:contestId" element={<PrivateRoute><ContestLayout /></PrivateRoute>}>
-          <Route index element={<ContestDetail />} />
-          <Route path="problems" element={<ContestProblems />} />
-          <Route path="problems/:problemId" element={<ProblemDetail />} />
-          <Route path="submissions" element={<ContestSubmissions />} />
-          <Route path="scoreboard" element={<ContestScoreboard />} />
-        </Route>
-      </Routes>
+      <Outlet />
+      <ScrollRestoration />
     </div>
   );
 };
+
+const router = createBrowserRouter(createRoutesFromElements(
+  <Route element={<RootLayout />} hydrateFallbackElement={<main className="container">Loading…</main>}>
+    <Route element={<MainLayout />}>
+      <Route path="/" element={<Home />} />
+      <Route path="/problems" loader={publicProblemsLoader} shouldRevalidate={revalidateProblemListOnPathChange} element={<PublicProblemsRoute />} />
+      <Route path="/problems/:problemId" element={<PrivateRoute><ProblemDetail /></PrivateRoute>} />
+      <Route path="/scoreboard" element={<PrivateRoute><Scoreboard /></PrivateRoute>} />
+      <Route path="/submissions" element={<PrivateRoute><Submissions /></PrivateRoute>} />
+      <Route path="/profile/:username" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/contests" element={<PrivateRoute><Contests /></PrivateRoute>} />
+    </Route>
+
+    <Route path="/admin" element={<AdminLayout />}>
+      <Route index element={<Admin />} />
+      <Route path="users" element={<UserManagement />} />
+      <Route path="problems" loader={adminProblemsLoader} shouldRevalidate={revalidateProblemListOnPathChange} element={<AdminProblemsRoute />} />
+      <Route path="authoring" element={<ProblemAuthoring />} />
+      <Route path="authoring/profiles" element={<ProblemAuthoring />} />
+      <Route path="authoring/ai-docs" element={<ProblemAuthoring />} />
+      <Route path="authoring/:draftId" element={<ProblemAuthoring />}>
+        <Route index element={<DraftMetadata />} />
+        <Route path="metadata" element={<DraftMetadata />} />
+        <Route path="statement" element={<DraftStatement />} />
+        <Route path="solution" element={<DraftSolution />} />
+        <Route path="testcases" element={<DraftTestcases />} />
+        <Route path="generator" element={<DraftGenerator />} />
+        <Route path="verify" element={<DraftVerify />} />
+        <Route path="jobs" element={<DraftJobs />} />
+        <Route path="ai-docs" element={<DraftAiDocs />} />
+      </Route>
+      <Route path="authoring/:draftId/editor" element={<ProblemAuthoring editorMode />} />
+      <Route path="contests" element={<ContestManagement />} />
+      <Route path="settings" element={<Settings />} />
+      <Route path="analysis" element={<AnalysisPage />} />
+    </Route>
+
+    <Route path="/contests/:contestId" element={<PrivateRoute><ContestLayout /></PrivateRoute>}>
+      <Route index element={<ContestDetail />} />
+      <Route path="problems" element={<ContestProblems />} />
+      <Route path="problems/:problemId" element={<ProblemDetail />} />
+      <Route path="submissions" element={<ContestSubmissions />} />
+      <Route path="scoreboard" element={<ContestScoreboard />} />
+    </Route>
+  </Route>,
+));
 
 const App = () => {
   return (
@@ -127,9 +153,7 @@ const App = () => {
       <ThemeProvider>
         <AuthProvider>
           <SettingsProvider>
-            <Router>
-              <Layout />
-            </Router>
+            <RouterProvider router={router} fallbackElement={<main className="container">Loading…</main>} />
           </SettingsProvider>
         </AuthProvider>
       </ThemeProvider>

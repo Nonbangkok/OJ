@@ -1,6 +1,8 @@
 import adminService from '../../services/adminService';
 import { getErrorMessage } from '../../utils/error';
 import type { AdminProblemsQuery } from '../../types';
+import type { ProblemListSpan } from '../../routing/problemListLoaders';
+import type { AdminProblem } from '../../types';
 
 import useBatchUpload from './useBatchUpload';
 import useProblemCrud from './useProblemCrud';
@@ -16,8 +18,8 @@ import { triggerZipDownload } from './useProblemExport';
  *  server query), which only ProblemManagement.tsx knows. The page builds
  *  it directly via useProblemSelection({ displayedProblems }) so the
  *  semantics stay display-scoped under any loading scheme. */
-const useProblemManagement = (query: AdminProblemsQuery) => {
-  const crud = useProblemCrud({ query });
+const useProblemManagement = (query: AdminProblemsQuery, initialPageSpan?: ProblemListSpan<AdminProblem> | null) => {
+  const crud = useProblemCrud({ query, initialPageSpan });
   const batchUpload = useBatchUpload({
     onCompleted: crud.fetchProblems,
     setLoading: crud.setLoading,

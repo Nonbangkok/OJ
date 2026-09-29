@@ -1,4 +1,5 @@
 import Editor from 'react-simple-code-editor';
+import { ClipboardText } from '@phosphor-icons/react';
 import useSubmissionModal from '../../../hooks/useSubmissionModal';
 import { Dialog } from '../../../components/ui/Dialog';
 import 'highlight.js/styles/atom-one-dark.css';
@@ -112,9 +113,10 @@ const SubmissionModal = ({ submission, onClose }) => {
                 className={styles['copy-button']}
                 onClick={handleCopyCode}
                 title={copySuccess ? 'Copied!' : 'Copy code'}
+                aria-label={copySuccess ? 'Copied!' : 'Copy code'}
                 style={{ right: hasScrollbar ? '1.5rem' : '0.5rem' }}
               >
-                {copySuccess ? '✓' : '📋'}
+                {copySuccess ? '✓' : <ClipboardText size={18} aria-hidden="true" />}
               </button>
               <div className={editorStyles['lineNumbersGutter']} ref={lineNumbersRef}>
                 {Array.from({ length: lineCount }).map((_, i) => (

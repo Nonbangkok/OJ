@@ -58,6 +58,14 @@ describe('SubmissionModal', () => {
     expect(screen.getByText('12')).toBeInTheDocument();
   });
 
+  it('uses the Phosphor clipboard icon for the copy-code action', () => {
+    render(<SubmissionModal submission={sampleSubmission} onClose={jest.fn()} />);
+
+    const copyButton = screen.getByRole('button', { name: 'Copy code' });
+    expect(copyButton.querySelector('svg')).toBeInTheDocument();
+    expect(copyButton).not.toHaveTextContent('📋');
+  });
+
   it('shows a friendly message when there are no results', () => {
     render(
       <SubmissionModal

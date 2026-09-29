@@ -52,6 +52,8 @@ describe('ProblemManagement Component', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        window.history.replaceState({}, '', '/admin/problems');
+        window.sessionStorage.clear();
         (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(makePage(mockProblems));
         // Auto-mocks reset between tests (react-scripts sets resetMocks), so
         // the collections fetch the page performs on mount must be re-stubbed
@@ -83,6 +85,40 @@ describe('ProblemManagement Component', () => {
 
         expect(screen.getByRole('link', { name: 'P1' })).toHaveAttribute('href', '/problems/P1');
         expect(screen.getByRole('link', { name: 'P2' })).toHaveAttribute('href', '/problems/P2');
+    });
+
+    it('hydrates the admin list span and filters from route loader data without restarting at page one', async () => {
+        const restoredProblems = Array.from({ length: 50 }, (_, index) => ({
+            id: `admin-restore-${index}`, title: `Admin Restore ${index}`, author: 'Alice',
+            is_visible: false, contest_id: null, contest_status: null,
+            collection_id: null, collection_name: null, categories: [], difficulty: null,
+        }));
+        const query = { search: 'needle', collection: 'none' as const, visibility: 'hidden' as const, author: 'Alice' };
+        window.history.replaceState({}, '', '/admin/problems?search=needle&collection=none&visibility=hidden&author=Alice&pages=2');
+
+        render(<BrowserRouter><ProblemManagement currentUser={mockCurrentUser} initialPageSpan={{
+            queryKey: JSON.stringify(query),
+            problems: restoredProblems,
+            nextCursor: 'admin-cursor-3',
+            hasMore: true,
+            pageMetadata: { authors: [{ name: 'Alice' }], hasUnauthoredProblems: false, bulkEligibleCount: 50 },
+        }} /></BrowserRouter>);
+
+        expect(screen.getByText('Admin Restore 49')).toBeInTheDocument();
+        expect(screen.getByLabelText('Search problems')).toHaveValue('needle');
+        expect(screen.getByLabelText('Filter problems by collection')).toHaveValue('none');
+        expect(screen.getByLabelText('Filter problems by visibility')).toHaveValue('hidden');
+        expect(screen.getByLabelText('Filter problems by author')).toHaveValue('Alice');
+        expect(adminService.getProblems).not.toHaveBeenCalled();
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(makePage([{
+            id: 'admin-restore-50', title: 'Admin Restore 50', author: 'Alice', is_visible: false,
+            contest_id: null, contest_status: null, collection_id: null, collection_name: null,
+        }], { hasMore: false, nextCursor: null, authors: [{ name: 'Alice' }], bulkEligibleCount: 51 }));
+        fireEvent.click(screen.getByRole('button', { name: 'Show More' }));
+        expect(adminService.getProblems).toHaveBeenCalledWith({
+            ...query, limit: 25, cursor: 'admin-cursor-3',
+        });
+        await waitFor(() => expect(new URLSearchParams(window.location.search).get('pages')).toBe('3'));
     });
 
     it('shows chunk upload progress before SSE processing without replacing upload controls', async () => {

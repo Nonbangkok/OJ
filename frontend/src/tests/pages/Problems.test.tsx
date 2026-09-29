@@ -67,6 +67,7 @@ describe('Problems Page', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         window.history.replaceState({}, '', '/problems');
+        window.sessionStorage.clear();
         (jest.mocked(problemService.getCategoryCounts) as jest.Mock).mockResolvedValue(categoryCounts);
         (jest.mocked(problemService.getFilterOptions) as jest.Mock).mockResolvedValue({
             collections: [{ id: 7, name: 'Practice' }], hasUncollected: true,
@@ -261,6 +262,8 @@ describe('Problems Page', () => {
 
             expect(dynamicProgramming).toBeChecked();
             expect(greedy).toBeChecked();
+            expect(document.querySelector('summary')?.getAttribute('aria-label')).toBe('Filters, 2 active');
+            expect(within(document.querySelector('summary') as HTMLElement).getByText('2')).toBeInTheDocument();
             expect(new URLSearchParams(screen.getByTestId('location').textContent || '').get('category'))
                 .toBe('Dynamic Programming,Greedy');
             await waitFor(() => expect(mock).toHaveBeenLastCalledWith({
@@ -270,6 +273,7 @@ describe('Problems Page', () => {
             fireEvent.click(dynamicProgramming);
             expect(dynamicProgramming).not.toBeChecked();
             expect(greedy).toBeChecked();
+            expect(document.querySelector('summary')?.getAttribute('aria-label')).toBe('Filters, 1 active');
             await waitFor(() => expect(mock).toHaveBeenLastCalledWith({
                 category: 'Greedy', sort: 'difficulty', order: 'asc', limit: 20,
             }));
@@ -534,7 +538,7 @@ describe('Problems Page', () => {
             expect(params.has('collection')).toBe(false);
         });
 
-        it('restores every filter from the URL after navigating to a detail and back', async () => {
+    it('restores every filter from the URL after navigating to a detail and back', async () => {
             (jest.mocked(problemService.getProblemsPage) as jest.Mock).mockResolvedValue(firstPage);
             render(
                 <MemoryRouter initialEntries={['/problems?keep=yes&search=knapsack&category=Graph&difficultyMin=1000&difficultyMax=2000&sort=difficulty-desc&author=Alice&collection=7']}>
@@ -562,6 +566,32 @@ describe('Problems Page', () => {
             openFilters();
             await waitFor(() => expect(screen.getByLabelText('Author')).toHaveValue('Alice'));
             expect(screen.getByTestId('location').textContent).toContain('keep=yes');
+        });
+
+        it('hydrates all rows already loaded for the current list history entry before scroll restoration', async () => {
+            const restoredProblems = Array.from({ length: 40 }, (_, index) =>
+                problem(`restore-${index}`, `Restore ${index}`));
+            const query = { search: 'restore', sort: 'difficulty' as const, order: 'desc' as const };
+            window.history.replaceState({}, '', '/problems?search=restore&sort=difficulty-desc&pages=2');
+
+            render(<BrowserRouter><Problems initialPageSpan={{
+                queryKey: JSON.stringify(query),
+                problems: restoredProblems,
+                nextCursor: 'cursor-3',
+                hasMore: true,
+            }} /></BrowserRouter>);
+
+            expect(screen.getByText('Restore 39')).toBeInTheDocument();
+            expect(screen.getByLabelText('Search problems')).toHaveValue('restore');
+            expect(problemService.getProblemsPage).not.toHaveBeenCalled();
+            (jest.mocked(problemService.getProblemsPage) as jest.Mock).mockResolvedValueOnce({
+                problems: [problem('restore-40', 'Restore 40')], nextCursor: null, hasMore: false,
+            });
+            fireEvent.click(screen.getByRole('button', { name: 'Show More' }));
+            await waitFor(() => expect(problemService.getProblemsPage).toHaveBeenCalledWith({
+                search: 'restore', sort: 'difficulty', order: 'desc', limit: 20, cursor: 'cursor-3',
+            }));
+            await waitFor(() => expect(new URLSearchParams(window.location.search).get('pages')).toBe('3'));
         });
 
         it('replaces the current URL on filter edits while retaining unrelated params', async () => {
