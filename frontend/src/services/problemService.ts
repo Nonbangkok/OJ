@@ -21,8 +21,9 @@ export interface ProblemListDifficultyQuery {
 
 /**
  * Full query surface of the paginated problems list. `search` matches
- * id/title server-side; `category` is one of the fixed categories or
- * 'Uncategorized'; `cursor` is the opaque next-page token.
+ * id/title server-side; `category` is one or more comma-separated fixed
+ * categories (matched as any selected tag) or 'Uncategorized'; `cursor` is the
+ * opaque next-page token.
  */
 export interface ProblemListQuery extends ProblemListDifficultyQuery {
   search?: string;

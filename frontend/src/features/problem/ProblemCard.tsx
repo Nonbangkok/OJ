@@ -7,13 +7,12 @@ import styles from './ProblemCard.module.css';
 interface ProblemCardProps {
     problem: ProblemSummary;
     contestId?: string | null;
-    /** When a specific category filter is active, that category's badge
-     *  shows by default; with no filter badges stay hidden — categories can
-     *  reveal problem content, so they are opt-in per card. */
-    highlightCategory?: string | null;
+    /** When category filters are active, matching badges show by default;
+     *  other categories stay opt-in because they can reveal problem content. */
+    highlightCategories?: readonly string[];
 }
 
-const ProblemCard = ({ problem, contestId = null, highlightCategory = null }: ProblemCardProps) => {
+const ProblemCard = ({ problem, contestId = null, highlightCategories = [] }: ProblemCardProps) => {
     const submissionCount = Number(problem.submission_count ?? 0);
     const hasSubmitted = submissionCount > 0;
     const linkPath = contestId
@@ -33,7 +32,7 @@ const ProblemCard = ({ problem, contestId = null, highlightCategory = null }: Pr
                 <p className={styles['problem-author']}>
                     <span className={styles['problem-id']}>{problem.id}</span>
                     <DifficultyChip difficulty={problem.difficulty} />
-                    <ProblemCategoryReveal categories={problem.categories} highlightCategory={highlightCategory} />
+                    <ProblemCategoryReveal categories={problem.categories} highlightCategories={highlightCategories} />
                 </p>
                 {hasSubmitted && (
                     <div className={styles['submission-status']}>

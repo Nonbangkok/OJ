@@ -21,7 +21,9 @@ const DIFFICULTY_SORT_DESC = 'difficulty-desc';
 
 const Problems = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeCategory = searchParams.get('category') || ALL_CATEGORIES;
+  const selectedCategories = (searchParams.get('category') || '').split(',').filter(Boolean);
+  const hasCategoryFilter = selectedCategories.length > 0;
+  const categoryQueryValue = selectedCategories.join(',');
   const [search, setSearch] = useState(() => searchParams.get('search') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('search') || '');
   const difficultyMin = searchParams.get('difficultyMin') || '';
@@ -67,7 +69,7 @@ const Problems = () => {
     const trimmed = debouncedSearch.trim();
     return {
       ...(trimmed ? { search: trimmed } : {}),
-      ...(activeCategory !== ALL_CATEGORIES ? { category: activeCategory } : {}),
+      ...(categoryQueryValue ? { category: categoryQueryValue } : {}),
       ...(debouncedAuthor.trim() ? { author: debouncedAuthor.trim() } : {}),
       ...(collection !== '' ? { collection: collection === 'none' ? 'none' as const : Number(collection) } : {}),
       ...(difficultyMin !== '' ? { difficultyMin: Number(difficultyMin) } : {}),
@@ -76,7 +78,7 @@ const Problems = () => {
         ? { sort: 'difficulty' as const, order: difficultySort === DIFFICULTY_SORT_ASC ? 'asc' as const : 'desc' as const }
         : {}),
     };
-  }, [debouncedSearch, activeCategory, debouncedAuthor, collection, difficultyMin, difficultyMax, difficultySort]);
+  }, [debouncedSearch, categoryQueryValue, debouncedAuthor, collection, difficultyMin, difficultyMax, difficultySort]);
 
   const {
     problems,
@@ -99,8 +101,8 @@ const Problems = () => {
   const hasLoadedRef = useRef(false);
   if (!loading && !error) hasLoadedRef.current = true;
 
-  // Global category tab counts — one cheap aggregate, independent of the
-  // loaded batch, so tabs stay correct while pages stream in.
+  // Global category counts — one cheap aggregate, independent of the loaded
+  // batch, so category choices stay correct while pages stream in.
   useEffect(() => {
     let cancelled = false;
     problemService.getCategoryCounts()
@@ -133,11 +135,52 @@ const Problems = () => {
   // Only narrowing controls affect the empty-state copy; the default sort
   // does not turn an otherwise unfiltered empty list into a filtered state.
   const hasActiveFilters = debouncedSearch.trim() !== ''
-    || activeCategory !== ALL_CATEGORIES
+    || hasCategoryFilter
     || difficultyMin !== ''
     || difficultyMax !== ''
     || debouncedAuthor.trim() !== ''
     || collection !== '';
+
+  // Keep search and ordering visible; narrowing controls and categories are
+  // grouped in one disclosure, with only selected filters summarized inline.
+  const activeFilterCount = [
+    hasCategoryFilter,
+    difficultyMin !== '' || difficultyMax !== '',
+    author.trim() !== '',
+    collection !== '',
+  ].filter(Boolean).length;
+  const difficultyFilterLabel = difficultyMin && difficultyMax
+    ? `Difficulty: ${difficultyMin}–${difficultyMax}`
+    : difficultyMin
+      ? `Difficulty: ≥ ${difficultyMin}`
+      : `Difficulty: ≤ ${difficultyMax}`;
+  const collectionFilterLabel = collection === 'none'
+    ? 'No collection'
+    : filterOptions?.collections.find(option => String(option.id) === collection)?.name ?? `Collection ${collection}`;
+  const clearFilterControls = () => {
+    setAuthor('');
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous);
+      ['category', 'difficultyMin', 'difficultyMax', 'author', 'collection'].forEach(key => next.delete(key));
+      return next;
+    }, { replace: true });
+  };
+  const setCategorySelection = (category: string, checked: boolean) => {
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous);
+      const selected = new Set((next.get('category') || '').split(',').filter(Boolean));
+      if (category === ALL_CATEGORIES) {
+        selected.clear();
+      } else if (checked) {
+        selected.add(category);
+      } else {
+        selected.delete(category);
+      }
+      if (selected.size > 0) next.set('category', [...selected].join(','));
+      else next.delete('category');
+      return next;
+    }, { replace: true });
+  };
 
   // The full-page loader is only for the very first load. Every later
   // refresh (typing in search, changing a filter) keeps the controls
@@ -152,44 +195,20 @@ const Problems = () => {
       <h1>All Problems</h1>
 
       <div className={styles['problems-controls']}>
-        <input
-          type="search"
-          className={styles['problems-search']}
-          placeholder="Search by name or ID…"
-          value={search}
-          onChange={event => { setSearch(event.target.value); updateUrlFilter('search', event.target.value); }}
-          aria-label="Search problems"
-        />
-        <div className={styles['difficulty-controls']}>
-          <label className={styles['difficulty-control']}>
-            <span className={styles['difficulty-control-label']}>Difficulty</span>
-            <select
-              aria-label="Difficulty minimum"
-              className={styles['difficulty-select']}
-              value={difficultyMin}
-              onChange={event => updateUrlFilter('difficultyMin', event.target.value)}
-            >
-              <option value="">Min</option>
-              {PROBLEM_DIFFICULTY_OPTIONS.map(option => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </label>
-          <span className={styles['difficulty-separator']} aria-hidden="true">–</span>
-          <select
-            aria-label="Difficulty maximum"
-            className={styles['difficulty-select']}
-            value={difficultyMax}
-            onChange={event => updateUrlFilter('difficultyMax', event.target.value)}
-          >
-            <option value="">Max</option>
-            {PROBLEM_DIFFICULTY_OPTIONS.map(option => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
+        <div className={styles['search-wrap']}>
+          <input
+            type="search"
+            className={styles['problems-search']}
+            placeholder="Search by name or ID…"
+            value={search}
+            onChange={event => { setSearch(event.target.value); updateUrlFilter('search', event.target.value); }}
+            aria-label="Search problems"
+          />
+        </div>
+        <div className={styles['primary-filter-actions']}>
           <select
             aria-label="Sort problems"
-            className={styles['difficulty-select']}
+            className={`${styles['difficulty-select']} ${styles['sort-select']}`}
             value={difficultySort}
             onChange={event => updateUrlFilter('sort', event.target.value, true)}
           >
@@ -197,53 +216,120 @@ const Problems = () => {
             <option value={DIFFICULTY_SORT_ASC}>Difficulty ↑</option>
             <option value={DIFFICULTY_SORT_DESC}>Difficulty ↓</option>
           </select>
+          <details className={styles['filter-popover']}>
+            <summary aria-label={`Filters${activeFilterCount ? `, ${activeFilterCount} active` : ''}`}>
+              <span>Filters</span>
+              {activeFilterCount > 0 && <span className={styles['filter-count']}>{activeFilterCount}</span>}
+              <span className={styles['filter-chevron']} aria-hidden="true">⌄</span>
+            </summary>
+            <div className={styles['filter-panel']}>
+              <div className={styles['filter-panel-header']}>
+                <strong>Filters</strong>
+                {activeFilterCount > 0 && (
+                  <button type="button" className={styles['clear-filters']} onClick={clearFilterControls}>
+                    Clear all
+                  </button>
+                )}
+              </div>
+              <div className={styles['filter-fields']}>
+                <div className={`${styles['filter-control']} ${styles['difficulty-control-group']}`}>
+                  <span>Difficulty</span>
+                  <div className={styles['difficulty-controls']}>
+                    <label className={styles['sr-only']} htmlFor="problem-difficulty-min">Difficulty minimum</label>
+                    <select id="problem-difficulty-min" aria-label="Difficulty minimum"
+                      className={styles['difficulty-select']} value={difficultyMin}
+                      onChange={event => updateUrlFilter('difficultyMin', event.target.value)}>
+                      <option value="">Min</option>
+                      {PROBLEM_DIFFICULTY_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                    <span className={styles['difficulty-separator']} aria-hidden="true">–</span>
+                    <label className={styles['sr-only']} htmlFor="problem-difficulty-max">Difficulty maximum</label>
+                    <select id="problem-difficulty-max" aria-label="Difficulty maximum"
+                      className={styles['difficulty-select']} value={difficultyMax}
+                      onChange={event => updateUrlFilter('difficultyMax', event.target.value)}>
+                      <option value="">Max</option>
+                      {PROBLEM_DIFFICULTY_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <label className={styles['filter-control']}>
+                  <span>Collection</span>
+                  <select aria-label="Collection" className={styles['difficulty-select']} value={collection}
+                    onChange={event => updateUrlFilter('collection', event.target.value)}>
+                    <option value="">All collections</option>
+                    {filterOptions?.hasUncollected && <option value="none">No collection</option>}
+                    {filterOptions?.collections.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
+                  </select>
+                </label>
+                <label className={styles['filter-control']}>
+                  <span>Author</span>
+                  <input type="search" aria-label="Author" className={styles['difficulty-select']}
+                    placeholder="Filter by author…" value={author}
+                    onChange={event => { setAuthor(event.target.value); updateUrlFilter('author', event.target.value); }} />
+                </label>
+              </div>
+              <fieldset className={`${styles['filter-fieldset']} ${styles['category-fieldset']}`}>
+                <legend>Category</legend>
+                <div className={styles['category-options']} role="group" aria-label="Problem categories">
+                  <label className={styles['category-option']}>
+                    <input type="checkbox" checked={!hasCategoryFilter}
+                      onChange={() => setCategorySelection(ALL_CATEGORIES, true)} />
+                    <span>All</span>
+                    {categoryCounts && <small>{categoryCounts.total}</small>}
+                  </label>
+                  {categoryCounts?.categories.map(({ name, count }) => (
+                    <label key={name} className={styles['category-option']}>
+                      <input type="checkbox" value={name} checked={selectedCategories.includes(name)}
+                        onChange={event => setCategorySelection(name, event.target.checked)} />
+                      <span>{name}</span><small>{count}</small>
+                    </label>
+                  ))}
+                  {Boolean(categoryCounts?.uncategorized) && (
+                    <label className={styles['category-option']}>
+                      <input type="checkbox" value={UNCATEGORIZED} checked={selectedCategories.includes(UNCATEGORIZED)}
+                        onChange={event => setCategorySelection(UNCATEGORIZED, event.target.checked)} />
+                      <span>{UNCATEGORIZED}</span><small>{categoryCounts?.uncategorized}</small>
+                    </label>
+                  )}
+                </div>
+              </fieldset>
+            </div>
+          </details>
         </div>
-        <label className={styles['difficulty-control']}>
-          <span className={styles['difficulty-control-label']}>Author</span>
-          <input type="search" aria-label="Author" className={styles['difficulty-select']}
-            placeholder="Filter by author…" value={author}
-            onChange={event => { setAuthor(event.target.value); updateUrlFilter('author', event.target.value); }} />
-        </label>
-        <label className={styles['difficulty-control']}>
-          <span className={styles['difficulty-control-label']}>Collection</span>
-          <select aria-label="Collection" className={styles['difficulty-select']} value={collection}
-            onChange={event => updateUrlFilter('collection', event.target.value)}>
-            <option value="">All collections</option>
-            {filterOptions?.hasUncollected && <option value="none">No collection</option>}
-            {filterOptions?.collections.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
-          </select>
-        </label>
       </div>
 
-      {categoryCounts && categoryCounts.total > 0 && (
-        <div className={styles['category-tabs']} role="tablist" aria-label="Problem categories">
-          <button
-            role="tab"
-            aria-selected={activeCategory === ALL_CATEGORIES}
-            className={`${styles['category-tab']} ${activeCategory === ALL_CATEGORIES ? styles.active : ''}`}
-            onClick={() => updateUrlFilter('category', '')}
-          >
-            {ALL_CATEGORIES} <span className={styles['category-count']}>{categoryCounts.total}</span>
-          </button>
-          {categoryCounts.categories.map(({ name, count }) => (
-            <button
-              key={name}
-              role="tab"
-              aria-selected={activeCategory === name}
-              className={`${styles['category-tab']} ${activeCategory === name ? styles.active : ''}`}
-              onClick={() => updateUrlFilter('category', name)}
-            >
-              {name} <span className={styles['category-count']}>{count}</span>
+      {activeFilterCount > 0 && (
+        <div className={styles['active-filters']} aria-label="Active filters">
+          <span className={styles['active-filters-label']}>Active filters</span>
+          {hasCategoryFilter && (
+            <button type="button" className={styles['active-filter-chip']} aria-label={`Remove category filter: ${selectedCategories.join(', ')}`}
+              onClick={() => updateUrlFilter('category', '')}>
+              Category: {selectedCategories.join(', ')}<span aria-hidden="true">×</span>
             </button>
-          ))}
-          {categoryCounts.uncategorized > 0 && (
-            <button
-              role="tab"
-              aria-selected={activeCategory === UNCATEGORIZED}
-              className={`${styles['category-tab']} ${activeCategory === UNCATEGORIZED ? styles.active : ''}`}
-              onClick={() => updateUrlFilter('category', UNCATEGORIZED)}
-            >
-              {UNCATEGORIZED} <span className={styles['category-count']}>{categoryCounts.uncategorized}</span>
+          )}
+          {(difficultyMin !== '' || difficultyMax !== '') && (
+            <button type="button" className={styles['active-filter-chip']} aria-label="Remove difficulty filter"
+              onClick={() => {
+                setSearchParams(previous => {
+                  const next = new URLSearchParams(previous);
+                  next.delete('difficultyMin');
+                  next.delete('difficultyMax');
+                  return next;
+                }, { replace: true });
+              }}>
+              {difficultyFilterLabel}<span aria-hidden="true">×</span>
+            </button>
+          )}
+          {author.trim() !== '' && (
+            <button type="button" className={styles['active-filter-chip']} aria-label="Remove author filter"
+              onClick={() => { setAuthor(''); updateUrlFilter('author', ''); }}>
+              Author: {author.trim()}<span aria-hidden="true">×</span>
+            </button>
+          )}
+          {collection !== '' && (
+            <button type="button" className={styles['active-filter-chip']} aria-label="Remove collection filter"
+              onClick={() => updateUrlFilter('collection', '')}>
+              {collectionFilterLabel}<span aria-hidden="true">×</span>
             </button>
           )}
         </div>
@@ -264,7 +350,7 @@ const Problems = () => {
             <ProblemCard
               key={problem.id}
               problem={problem}
-              highlightCategory={activeCategory === ALL_CATEGORIES ? null : activeCategory}
+              highlightCategories={selectedCategories}
             />
           ))}
         </div>

@@ -293,8 +293,9 @@ export const collectionVisibilityBodySchema = z.object({
  * problem list (/problems-with-stats). difficultyMin/Max are inclusive and
  * exclude Unrated (NULL) problems; sort=difficulty puts NULLs last in both
  * directions. `search` matches id/title (ILIKE, server-side); `category`
- * filters by one category from the closed list, or the literal
- * 'Uncategorized' for problems with no categories. `cursor` is the opaque
+ * filters by one or more comma-separated categories from the closed list; any
+ * selected category may match, and 'Uncategorized' includes empty category
+ * arrays. `cursor` is the opaque
  * next-page token returned by the previous response — it encodes the last
  * row's sort key and is only valid for the same sort/order.
  */
@@ -304,13 +305,20 @@ const difficultyBound = z.coerce.number().int()
   .refine((value) => value % PROBLEM_DIFFICULTY_STEP === 0, {
     message: `difficulty bound must be a multiple of ${PROBLEM_DIFFICULTY_STEP}`,
   });
+const problemCategoryFilter = z.string()
+  .transform(value => value.split(','))
+  .pipe(z.array(z.enum(['Uncategorized', ...PROBLEM_CATEGORIES] as [string, ...string[]]))
+    .min(1)
+    .max(PROBLEM_CATEGORIES.length + 1)
+    .refine(categories => new Set(categories).size === categories.length, 'categories must be unique'))
+  .transform(categories => categories.join(','));
 export const problemsWithStatsQuerySchema = z.object({
   difficultyMin: difficultyBound.optional(),
   difficultyMax: difficultyBound.optional(),
   sort: z.enum(['difficulty']).optional(),
   order: z.enum(['asc', 'desc']).optional(),
   search: z.string().trim().max(STRING_LIMITS.TITLE).optional(),
-  category: z.enum(['Uncategorized', ...PROBLEM_CATEGORIES] as [string, ...string[]]).optional(),
+  category: problemCategoryFilter.optional(),
   author: z.string().trim().min(1).max(STRING_LIMITS.AUTHOR).optional(),
   collection: z.union([z.literal('none'), z.coerce.number().int().positive()]).optional(),
   limit: z.coerce.number().int().min(1).max(PROBLEM_LIST_CONFIG.MAX_LIMIT).optional(),

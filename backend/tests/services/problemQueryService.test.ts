@@ -223,6 +223,13 @@ describe('problemQueryService difficulty handling', () => {
       expect(query.mock.calls[0][0]).toContain('cardinality(p.categories) = 0');
     });
 
+    it('matches any selected category and can include uncategorized problems in the same filter', async () => {
+      await getProblemsWithStatsForUser(1, { limit: 20, category: 'Graph,Math,Uncategorized' });
+      const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('(p.categories && $2::text[] OR cardinality(p.categories) = 0)');
+      expect(params).toEqual([1, ['Graph', 'Math'], 21]);
+    });
+
     it('rejects an out-of-range limit', async () => {
       await expect(getProblemsWithStatsForUser(1, { limit: 0 })).rejects.toMatchObject({ statusCode: 400 });
       await expect(getProblemsWithStatsForUser(1, { limit: 101 })).rejects.toMatchObject({ statusCode: 400 });

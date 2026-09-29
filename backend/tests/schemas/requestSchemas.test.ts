@@ -10,6 +10,7 @@ import {
   // their boundaries here makes the API contract independent of its routes.
   chunkedBatchUploadCompleteSchema,
   chunkedBatchUploadInitSchema,
+  problemsWithStatsQuerySchema,
 } from '../../schemas/requestSchemas';
 import { SUBMISSION_VALIDATION, STRING_LIMITS, SUPPORTED_LANGUAGES, USER_VALIDATION } from '../../constants';
 
@@ -19,6 +20,20 @@ import { SUBMISSION_VALIDATION, STRING_LIMITS, SUPPORTED_LANGUAGES, USER_VALIDAT
  * push megabytes of data into the DB / compiler.
  */
 describe('requestSchemas size & validation caps', () => {
+  describe('problemsWithStatsQuerySchema categories', () => {
+    it('accepts one or multiple canonical categories and preserves the portable query value', () => {
+      expect(problemsWithStatsQuerySchema.parse({ category: 'Math' }).category).toBe('Math');
+      expect(problemsWithStatsQuerySchema.parse({ category: 'Math,Graph,Uncategorized' }).category)
+        .toBe('Math,Graph,Uncategorized');
+    });
+
+    it('rejects unknown, empty, or duplicate categories', () => {
+      expect(problemsWithStatsQuerySchema.safeParse({ category: 'Math,Not a category' }).success).toBe(false);
+      expect(problemsWithStatsQuerySchema.safeParse({ category: 'Math,,Graph' }).success).toBe(false);
+      expect(problemsWithStatsQuerySchema.safeParse({ category: 'Math,Math' }).success).toBe(false);
+    });
+  });
+
   describe('chunked batch upload schemas', () => {
     const MIB = 1024 * 1024;
     const CHUNK_BYTES = 25 * MIB;

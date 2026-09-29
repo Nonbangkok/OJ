@@ -61,7 +61,7 @@ export interface ProblemListDifficultyOptions {
 export interface ProblemListOptions extends ProblemListDifficultyOptions {
   /** Substring match on problem id or title (ILIKE, server-side). */
   search?: string;
-  /** One category from the closed list, or 'Uncategorized' (empty array). */
+  /** Comma-separated category names; any selected tag matches ('Uncategorized' matches empty arrays). */
   category?: string;
   /** Case-insensitive substring of the problem's free-text author field. */
   author?: string;
@@ -201,11 +201,24 @@ export const getProblemsWithStatsForUser = async (
     params.push(`%${escapeLikePattern(options.search)}%`);
     filters.push(`(p.id ILIKE $${params.length} OR p.title ILIKE $${params.length})`);
   }
-  if (options.category === 'Uncategorized') {
-    filters.push('cardinality(p.categories) = 0');
-  } else if (options.category !== undefined) {
-    params.push(options.category);
-    filters.push(`p.categories @> ARRAY[$${params.length}]::text[]`);
+  if (options.category !== undefined) {
+    const categories = options.category.split(',');
+    const includeUncategorized = categories.includes('Uncategorized');
+    const namedCategories = categories.filter(category => category !== 'Uncategorized');
+    if (namedCategories.length === 0) {
+      filters.push('cardinality(p.categories) = 0');
+    } else if (namedCategories.length === 1 && !includeUncategorized) {
+      // Preserve the single-category predicate while allowing multiple
+      // selected tags to use array overlap below.
+      params.push(namedCategories[0]);
+      filters.push(`p.categories @> ARRAY[$${params.length}]::text[]`);
+    } else {
+      params.push(namedCategories);
+      const hasNamedCategory = `p.categories && $${params.length}::text[]`;
+      filters.push(includeUncategorized
+        ? `(${hasNamedCategory} OR cardinality(p.categories) = 0)`
+        : hasNamedCategory);
+    }
   }
   if (options.author?.trim()) {
     params.push(`%${escapeLikePattern(options.author.trim())}%`);

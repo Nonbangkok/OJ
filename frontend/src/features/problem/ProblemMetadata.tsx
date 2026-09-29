@@ -21,26 +21,26 @@ export const DifficultyChip = ({ difficulty }: { difficulty?: number | null }) =
 interface ProblemCategoryRevealProps {
     categories?: readonly string[];
     highlightCategory?: string | null;
+    highlightCategories?: readonly string[];
 }
 
-export const ProblemCategoryReveal = ({ categories = [], highlightCategory = null }: ProblemCategoryRevealProps) => {
+export const ProblemCategoryReveal = ({
+    categories = [],
+    highlightCategory = null,
+    highlightCategories,
+}: ProblemCategoryRevealProps) => {
     const [revealed, setRevealed] = useState(false);
-    const filteredCategory = highlightCategory && categories.includes(highlightCategory)
-        ? highlightCategory
-        : null;
-    const revealedCategories = revealed
-        ? (filteredCategory
-            ? [filteredCategory, ...categories.filter(category => category !== filteredCategory)]
-            : categories)
-        : [];
-    const hasHiddenCategories = categories.length > 0
-        && (filteredCategory ? categories.length > 1 : true);
+    const selectedCategoryNames = highlightCategories ?? (highlightCategory ? [highlightCategory] : []);
+    const filteredCategories = selectedCategoryNames.filter(category => categories.includes(category));
+    const orderedCategories = [...filteredCategories, ...categories.filter(category => !filteredCategories.includes(category))];
+    const revealedCategories = revealed ? orderedCategories : [];
+    const hasHiddenCategories = categories.length > filteredCategories.length;
 
     return (
         <>
-            {!revealed && filteredCategory && (
-                <span className={styles['problem-category']}>{filteredCategory}</span>
-            )}
+            {!revealed && filteredCategories.map(category => (
+                <span key={category} className={styles['problem-category']}>{category}</span>
+            ))}
             {revealedCategories.map(category => (
                 <span key={category} className={styles['problem-category']}>{category}</span>
             ))}
@@ -51,7 +51,7 @@ export const ProblemCategoryReveal = ({ categories = [], highlightCategory = nul
                     aria-expanded={revealed}
                     onClick={() => setRevealed(previous => !previous)}
                 >
-                    {revealed ? 'Hide categories' : (filteredCategory ? 'Show all categories' : 'Show categories')}
+                    {revealed ? 'Hide categories' : (filteredCategories.length > 0 ? 'Show all categories' : 'Show categories')}
                 </button>
             )}
         </>
