@@ -94,6 +94,7 @@ const useProblemManagement = (query: AdminProblemsQuery) => {
     fetchProblems: crud.fetchProblems,
     handleDeleteClick: crud.handleDeleteClick,
     handleConfirmDelete: crud.handleConfirmDelete,
+    deleteSelectedProblems: crud.deleteSelectedProblems,
     handleToggleVisibility: crud.handleToggleVisibility,
     handleHideAll: crud.handleHideAll,
     executeHideAll: crud.executeHideAll,

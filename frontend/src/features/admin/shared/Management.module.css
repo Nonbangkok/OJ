@@ -379,6 +379,11 @@
   justify-content: space-between;
 }
 
+/* Keep batch-upload progress visually separated from the problem filters. */
+.batchUploadFeedback {
+  margin-top: 1rem;
+}
+
 .feedbackContent {
   flex-grow: 1;
   padding-right: 30px; /* Space for close button */

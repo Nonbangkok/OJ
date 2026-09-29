@@ -81,6 +81,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     fetchProblems,
     handleDeleteClick,
     handleConfirmDelete,
+    deleteSelectedProblems,
     handleToggleVisibility,
     handleHideAll,
     executeHideAll,
@@ -145,6 +146,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
   const [testcasesProblem, setTestcasesProblem] = useState<{ id: string } | null>(null);
   const [collectionConfirm, setCollectionConfirm] = useState<{ id: number; name: string; count: number; isVisible: boolean } | null>(null);
   const [moveConfirm, setMoveConfirm] = useState<{ collectionId: number | null; name: string } | null>(null);
+  const [deleteSelectionConfirm, setDeleteSelectionConfirm] = useState(false);
 
   const refreshCollections = () => {
     adminService.getCollections()
@@ -232,6 +234,12 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
     } finally {
       setMoveConfirm(null);
     }
+  };
+
+  const runDeleteSelection = async () => {
+    const succeeded = await deleteSelectedProblems(selectedProblemIds);
+    if (succeeded) clearSelection();
+    setDeleteSelectionConfirm(false);
   };
 
   const confirmBulkVisibility = async () => {
@@ -383,6 +391,9 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
             <Button size="compact" variant="secondary" onClick={() => handleRejudgeClick({ kind: 'problem', id: String(selectedProblemIds[0]), title: `the ${selectedCount} selected problems` })} disabled={loading}>
               Rejudge
             </Button>
+            <Button size="compact" variant="destructive" onClick={() => setDeleteSelectionConfirm(true)} disabled={loading}>
+              Delete ({selectedCount})
+            </Button>
             <Button size="compact" variant="neutral" onClick={clearSelection}>Clear</Button>
           </div>
         </div>
@@ -390,7 +401,7 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
 
       <RejudgeFeedbackBox feedback={rejudgeFeedback} onDismiss={dismissRejudgeFeedback} />
       {batchUploadFeedback.visible && (
-        <div className={`${styles.feedbackBox} ${styles[batchUploadFeedback.type]}`}>
+        <div className={`${styles.feedbackBox} ${styles.batchUploadFeedback} ${styles[batchUploadFeedback.type]}`}>
           <div className={styles.feedbackContent}>
             <p>{batchUploadFeedback.message}</p>
             {batchUploadProgress.visible && batchUploadProgress.total > 0
@@ -621,6 +632,14 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
           message={`Move ${selectedCount} selected problem${selectedCount === 1 ? '' : 's'} to "${moveConfirm.name}"? Each problem keeps at most one collection.`}
         />
       )}
+      <ConfirmationModal
+        isOpen={deleteSelectionConfirm}
+        onClose={() => setDeleteSelectionConfirm(false)}
+        onConfirm={runDeleteSelection}
+        title={`Delete ${selectedCount} selected problem${selectedCount === 1 ? '' : 's'}?`}
+        message="This permanently deletes the selected problems and their test cases and submissions. This action cannot be undone."
+        confirmText={`Delete ${selectedCount}`}
+      />
       {isModalOpen && (
         <ProblemModal
           collections={collections}

@@ -63,6 +63,13 @@ const problemsAdminService = {
     return response.data;
   },
 
+  deleteProblems: async (problemIds: Array<string | number>): Promise<{ message: string; deletedCount: number }> => {
+    const response = await api.delete<{ message: string; deletedCount: number }>('/admin/problems/bulk-delete', {
+      data: { problemIds: problemIds.map(String) },
+    });
+    return response.data;
+  },
+
   rejudgeProblem: async (problemId: string | number): Promise<RejudgeResponse> => {
     const response = await api.post<RejudgeResponse>(`/admin/rejudge/problem/${problemId}`);
     return response.data;

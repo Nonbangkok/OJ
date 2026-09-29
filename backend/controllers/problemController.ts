@@ -10,6 +10,7 @@ import { registerProgressClient, streamBatchUpload } from '../services/batchUplo
 import {
   createProblem,
   deleteProblem,
+  deleteProblems,
   getAdminProblemsPage,
   getProblemDetail,
   getProblemExportBundle,
@@ -50,6 +51,7 @@ import { validateRequest } from '../middleware/validation';
 import {
   adminProblemsQuerySchema,
   adminProblemsVisibilitySchema,
+  adminProblemsBulkDeleteSchema,
   createProblemSchema,
   problemIdParamSchema,
   problemExportSchema,
@@ -234,6 +236,14 @@ router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
     throw new AppError('Problem not found', 404);
   }
   res.json(updateResult);
+}));
+
+router.delete('/admin/problems/bulk-delete', requireAuth, requireStaffOrAdmin,
+  validateRequest({ body: adminProblemsBulkDeleteSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const { problemIds } = req.body as { problemIds: string[] };
+  const deletedCount = await deleteProblems(problemIds);
+  res.status(200).json({ message: `${deletedCount} problem${deletedCount === 1 ? '' : 's'} deleted successfully`, deletedCount });
 }));
 
 router.delete('/admin/problems/:id', requireAuth, requireStaffOrAdmin,

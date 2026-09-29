@@ -110,6 +110,23 @@ const useProblemCrud = ({ query }: UseProblemCrudArgs) => {
     }
   };
 
+  const deleteSelectedProblems = async (problemIds: Array<string | number>): Promise<boolean> => {
+    if (problemIds.length === 0) return false;
+    try {
+      setLoading(true);
+      setError('');
+      await adminService.deleteProblems(problemIds);
+      refreshFirstPage();
+      return true;
+    } catch (errorValue) {
+      setError('Failed to delete the selected problems.');
+      console.error(errorValue);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleToggleVisibility = async (problemId: string, currentVisibility: boolean) => {
     try {
       await adminService.updateProblemVisibility(problemId, !currentVisibility);
@@ -381,6 +398,7 @@ const useProblemCrud = ({ query }: UseProblemCrudArgs) => {
     fetchProblems,
     handleDeleteClick,
     handleConfirmDelete,
+    deleteSelectedProblems,
     handleToggleVisibility,
     handleHideAll,
     executeHideAll,

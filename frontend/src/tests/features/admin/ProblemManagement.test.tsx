@@ -274,6 +274,27 @@ describe('ProblemManagement Component', () => {
         });
     });
 
+    it('deletes selected problems together after confirmation and refreshes the first page', async () => {
+        (jest.mocked(adminService.deleteProblems) as jest.Mock).mockResolvedValue({
+            message: '2 problems deleted successfully',
+            deletedCount: 2,
+        });
+        renderProblemManagement();
+
+        await waitFor(() => screen.getByText('Problem 2'));
+        const checkboxes = screen.getAllByRole('checkbox');
+        fireEvent.click(checkboxes[1]);
+        fireEvent.click(checkboxes[2]);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delete (2)' }));
+        expect(screen.getByText(/permanently deletes the selected problems/i)).toBeInTheDocument();
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete 2' }));
+
+        await waitFor(() => expect(adminService.deleteProblems).toHaveBeenCalledWith(['P1', 'P2']));
+        await waitFor(() => expect(adminService.getProblems).toHaveBeenCalledTimes(2));
+        expect(screen.queryByText('2 selected')).not.toBeInTheDocument();
+    });
+
     it('handles problem export', async () => {
         (jest.mocked(adminService.exportProblems) as jest.Mock).mockResolvedValue({
             data: new Blob(),

@@ -457,6 +457,24 @@ export const deleteProblem = async (problemId: string): Promise<boolean> => {
   });
 };
 
+/** Delete the selected problems and their dependent rows in one transaction. */
+export const deleteProblems = async (problemIds: string[]): Promise<number> => {
+  if (problemIds.length === 0) return 0;
+
+  return withTransaction(async (client) => {
+    const ids = [...new Set(problemIds)];
+    await client.query('DELETE FROM submissions WHERE problem_id = ANY($1::text[])', [ids]);
+    await client.query('DELETE FROM testcases WHERE problem_id = ANY($1::text[])', [ids]);
+    await client.query('DELETE FROM contest_problems WHERE problem_id = ANY($1::text[])', [ids]);
+    await client.query('DELETE FROM contest_submissions WHERE problem_id = ANY($1::text[])', [ids]);
+    const result = await client.query<Pick<ProblemRow, 'id'>>(
+      'DELETE FROM problems WHERE id = ANY($1::text[]) RETURNING id',
+      [ids],
+    );
+    return result.rowCount ?? result.rows.length;
+  });
+};
+
 /** Filters shared by the paginated admin list, eligible count, and bulk actions. */
 export interface AdminProblemFilters {
   /** Substring match on problem id or title (ILIKE, server-side). */

@@ -490,6 +490,41 @@ describe('Problem Controller', () => {
         });
     });
 
+    describe('DELETE /admin/problems/bulk-delete', () => {
+        it('deletes all selected problems and their related data in one transaction', async () => {
+            (db.query as jest.Mock).mockImplementation(async (text: string) => {
+                if (text.includes('DELETE FROM problems')) {
+                    return { rowCount: 2, rows: [{ id: 'P1' }, { id: 'P2' }] };
+                }
+                return { rowCount: 2, rows: [] };
+            });
+
+            const res = await request(app)
+                .delete('/admin/problems/bulk-delete')
+                .send({ problemIds: ['P1', 'P2'] });
+
+            expect(res.status).toBe(200);
+            expect(res.body.deletedCount).toBe(2);
+            expect(db.query).toHaveBeenCalledWith(
+                'DELETE FROM submissions WHERE problem_id = ANY($1::text[])',
+                [['P1', 'P2']],
+            );
+            expect(db.query).toHaveBeenCalledWith(
+                'DELETE FROM problems WHERE id = ANY($1::text[]) RETURNING id',
+                [['P1', 'P2']],
+            );
+            expect(db.query).toHaveBeenCalledWith('COMMIT');
+        });
+
+        it('rejects an empty or malformed selection', async () => {
+            const empty = await request(app).delete('/admin/problems/bulk-delete').send({ problemIds: [] });
+            const malformed = await request(app).delete('/admin/problems/bulk-delete').send({ problemIds: [''] });
+
+            expect(empty.status).toBe(400);
+            expect(malformed.status).toBe(400);
+        });
+    });
+
     describe('PUT /admin/problems/:id/visibility', () => {
         it('should update visibility successfully', async () => {
             (db.query as jest.Mock).mockResolvedValueOnce({

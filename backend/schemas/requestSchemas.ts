@@ -193,6 +193,14 @@ export const adminProblemsVisibilitySchema = z.object({
   filters: adminProblemFiltersSchema.default({}),
 }).strict();
 
+/** IDs selected from the currently loaded admin problem rows for bulk deletion. */
+export const adminProblemsBulkDeleteSchema = z.object({
+  problemIds: z.array(nonEmptyString.max(50)).min(1).max(5000),
+}).strict().refine(({ problemIds }) => new Set(problemIds).size === problemIds.length, {
+  message: 'problemIds must not contain duplicates',
+  path: ['problemIds'],
+});
+
 export const batchCreateUsersSchema = z.object({
   prefix: nonEmptyString.max(STRING_LIMITS.PREFIX),
   count: z.number().int().min(1).max(USER_VALIDATION.BATCH_MAX_COUNT),
