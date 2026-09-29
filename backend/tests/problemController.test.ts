@@ -1,6 +1,9 @@
 import request from 'supertest';
 import express, { Express, Request, Response, NextFunction } from 'express';
 import session from 'express-session';
+import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
 import problemRouter from '../controllers/problemController';
 import { errorHandler } from '../middleware/errorHandler';
 import { selectProgressResponseOrigin } from '../services/batchUploadProgress';
@@ -15,22 +18,26 @@ jest.mock('../services/siteSettingsService', () => ({
     resetSiteAccessModeCache: jest.fn(),
 }));
 jest.mock('../middleware/auth', () => ({
-    requireAuth: (req: Request, _res: Response, next: NextFunction) => {
-        req.user = { id: 1, username: 'user1', role: 'user', hasAvatar: false };
+    requireAuth: (req: Request, res: Response, next: NextFunction) => {
+        if (req.headers['x-test-auth'] === 'none') return res.status(401).json({ message: 'Unauthorized' });
+        const requestedRole = req.headers['x-test-role'];
+        const role = requestedRole === 'staff' ? 'staff' : requestedRole === 'user' ? 'user' : 'admin';
+        req.user = { id: req.headers['x-test-user'] === '2' ? 2 : 1, username: 'user1', role, hasAvatar: false };
         next();
     },
     requireAdmin: (req: Request, _res: Response, next: NextFunction) => {
         req.user = { id: 1, username: 'user1', role: 'admin', hasAvatar: false };
         next();
     },
-    requireStaffOrAdmin: (req: Request, _res: Response, next: NextFunction) => {
-        req.user = { id: 1, username: 'user1', role: 'admin', hasAvatar: false };
+    requireStaffOrAdmin: (req: Request, res: Response, next: NextFunction) => {
+        if (req.user?.role !== 'admin' && req.user?.role !== 'staff') return res.status(403).json({ message: 'Forbidden' });
         next();
     }
 }));
 jest.mock('unzipper', () => ({}));
 jest.mock('archiver', () => ({}));
 jest.mock('../middleware/upload', () => ({
+    ...jest.requireActual('../middleware/upload'),
     diskUpload: {
         single: () => (req: Request, _res: Response, next: NextFunction) => {
             if (req.headers['x-test-has-file'] === '1') {
@@ -552,6 +559,97 @@ describe('Problem Controller', () => {
             expect(res.status).toBe(202);
             expect(res.body.progressId).toBeDefined();
             expect(res.body.message).toContain('Batch upload initiated');
+        });
+
+        it('keeps the existing single-upload 202 response contract', async () => {
+            (processBatchUpload as jest.Mock).mockResolvedValueOnce({ added: [], skipped: [], errors: [] });
+            const res = await request(app).post('/admin/problems/batch-upload').set('x-test-has-file', '1');
+            expect(res.status).toBe(202);
+            expect(res.body.message).toBe('Batch upload initiated. Connect to progress endpoint to monitor.');
+            expect(res.body.progressId).toEqual(expect.any(String));
+        });
+    });
+
+    describe('chunked batch upload routes', () => {
+        let createdUploadIds: string[];
+        beforeEach(() => { createdUploadIds = []; });
+        afterEach(async () => {
+            await Promise.all(createdUploadIds.map((uploadId) =>
+                fs.rm(path.join(os.tmpdir(), 'oj-chunk-uploads', uploadId), { recursive: true, force: true })));
+        });
+
+        const init = async (userId = '1') => {
+            const response = await request(app).post('/admin/problems/batch-upload/init')
+                .set('x-test-user', userId).send({ fileName: 'problems.zip', fileSize: 3, totalChunks: 1 });
+            if (response.body.uploadId) createdUploadIds.push(response.body.uploadId as string);
+            return response;
+        };
+
+        it.each([
+            ['init', () => request(app).post('/admin/problems/batch-upload/init').send({ fileName: 'a.zip', fileSize: 3, totalChunks: 1 })],
+            ['chunk', () => request(app).post('/admin/problems/batch-upload/chunk').field('uploadId', '00000000-0000-4000-8000-000000000000').field('chunkIndex', '0').attach('chunk', Buffer.from('abc'), '0.part')],
+            ['complete', () => request(app).post('/admin/problems/batch-upload/complete').send({ uploadId: '00000000-0000-4000-8000-000000000000' })],
+        ])('requires authentication for %s', async (_route, call) => {
+            const res = await call().set('x-test-auth', 'none');
+            expect(res.status).toBe(401);
+        });
+
+        it.each([
+            ['init', () => request(app).post('/admin/problems/batch-upload/init').send({ fileName: 'a.zip', fileSize: 3, totalChunks: 1 })],
+            ['chunk', () => request(app).post('/admin/problems/batch-upload/chunk').field('uploadId', '00000000-0000-4000-8000-000000000000').field('chunkIndex', '0').attach('chunk', Buffer.from('abc'), '0.part')],
+            ['complete', () => request(app).post('/admin/problems/batch-upload/complete').send({ uploadId: '00000000-0000-4000-8000-000000000000' })],
+        ])('requires staff or admin for %s', async (_route, call) => {
+            const res = await call().set('x-test-role', 'user');
+            expect(res.status).toBe(403);
+        });
+
+        it('rejects malformed init and complete schemas', async () => {
+            expect((await request(app).post('/admin/problems/batch-upload/init').send({ fileName: '', fileSize: 3, totalChunks: 2 })).status).toBe(400);
+            expect((await request(app).post('/admin/problems/batch-upload/complete').send({ uploadId: '../bad' })).status).toBe(400);
+        });
+
+        it('rejects a chunk request without a multipart file', async () => {
+            const { body: { uploadId } } = await init();
+            const response = await request(app).post('/admin/problems/batch-upload/chunk')
+                .field('uploadId', uploadId).field('chunkIndex', '0');
+            expect(response.status).toBe(400);
+        });
+
+        it('binds init, chunk writes, and completion to the initiating user', async () => {
+            const started = await init();
+            expect(started.status).toBe(201);
+            const uploadId = started.body.uploadId as string;
+            const otherUserChunk = await request(app).post('/admin/problems/batch-upload/chunk').set('x-test-user', '2')
+                .field('uploadId', uploadId).field('chunkIndex', '0').attach('chunk', Buffer.from('abc'), '0.part');
+            expect(otherUserChunk.status).toBe(403);
+            const otherUserComplete = await request(app).post('/admin/problems/batch-upload/complete').set('x-test-user', '2').send({ uploadId });
+            expect(otherUserComplete.status).toBe(403);
+        });
+
+        it('rejects missing and invalid chunks and completes a valid session with HTTP 202', async () => {
+            const missingSession = await request(app).post('/admin/problems/batch-upload/complete').send({ uploadId: '00000000-0000-4000-8000-000000000000' });
+            expect(missingSession.status).toBe(404);
+
+            const { body: { uploadId } } = await init();
+            const missingChunk = await request(app).post('/admin/problems/batch-upload/complete').send({ uploadId });
+            expect(missingChunk.status).toBe(400);
+            const invalidChunk = await request(app).post('/admin/problems/batch-upload/chunk')
+                .field('uploadId', uploadId).field('chunkIndex', '1').attach('chunk', Buffer.from('abc'), '1.part');
+            expect(invalidChunk.status).toBe(400);
+
+            const chunk = await request(app).post('/admin/problems/batch-upload/chunk')
+                .field('uploadId', uploadId).field('chunkIndex', '0').attach('chunk', Buffer.from('abc'), '0.part');
+            expect(chunk.status).toBe(200);
+            expect(chunk.body).toEqual({ success: true, chunkIndex: 0 });
+            (processBatchUpload as jest.Mock).mockResolvedValueOnce({ added: [], skipped: [], errors: [] });
+            const completed = await request(app).post('/admin/problems/batch-upload/complete').send({ uploadId });
+            expect(completed.status).toBe(202);
+            expect(completed.body).toEqual({ message: 'Batch upload initiated.', progressId: expect.any(String) });
+            const [zipPath] = (processBatchUpload as jest.Mock).mock.calls[0] as [string, unknown];
+            expect(zipPath).toMatch(/\/oj-batch-.+\.zip$/);
+            expect(processBatchUpload).toHaveBeenCalledWith(zipPath, expect.any(Function));
+            await new Promise<void>((resolve) => setTimeout(resolve, 25));
+            await expect(fs.access(zipPath)).rejects.toThrow();
         });
     });
 

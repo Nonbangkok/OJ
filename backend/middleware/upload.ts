@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { AUTHOR_PROFILE_IMAGE, FILE_CONFIG, STATEMENT_ASSET, USER_AVATAR } from '../constants';
 import { AppError } from './errorHandler';
+import { CHUNKED_BATCH_UPLOAD_MULTER_FILE_SIZE_BYTES } from '../services/chunkedBatchUploadService';
 
 // Multer configuration for single file uploads (in memory)
 export const memoryUpload = multer({
@@ -69,4 +70,10 @@ const diskStorage = multer.diskStorage({
 export const diskUpload = multer({
     storage: diskStorage,
     limits: { fileSize: FILE_CONFIG.MAX_UPLOAD_SIZE_BYTES },
+});
+
+/** Chunk parts are disk-backed and capped below Cloudflare's request limit. */
+export const chunkDiskUpload = multer({
+    storage: diskStorage,
+    limits: { fileSize: CHUNKED_BATCH_UPLOAD_MULTER_FILE_SIZE_BYTES },
 });

@@ -8,13 +8,40 @@ import { getErrorMessage } from '../utils/errorMessage';
 
 const progressMap = new Map<string, Response>();
 const progressHeartbeatMap = new Map<string, NodeJS.Timeout>();
+const PROGRESS_RETENTION_MS = 10 * 60 * 1000;
+type RetainedEvent = { payload: unknown; updatedAt: number };
+type RetainedProgress = { progress?: RetainedEvent; terminal?: RetainedEvent & { event: 'complete' | 'error' } };
+const retainedProgressMap = new Map<string, RetainedProgress>();
+
+const pruneExpiredProgress = (now = Date.now()): void => {
+  for (const [progressId, retained] of retainedProgressMap) {
+    if (retained.progress && now - retained.progress.updatedAt >= PROGRESS_RETENTION_MS) {
+      delete retained.progress;
+    }
+    if (retained.terminal && now - retained.terminal.updatedAt >= PROGRESS_RETENTION_MS) {
+      delete retained.terminal;
+    }
+    if (!retained.progress && !retained.terminal) retainedProgressMap.delete(progressId);
+  }
+};
+
+const writeSseEvent = (res: Response, event: string, payload: unknown): void => {
+  if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+};
 
 const writeProgressEvent = (progressId: string, event: string, payload: unknown): void => {
+  const now = Date.now();
+  pruneExpiredProgress(now);
+  const retained = retainedProgressMap.get(progressId) ?? {};
+  if (event === 'progress') retained.progress = { payload, updatedAt: now };
+  if (event === 'complete' || event === 'error') retained.terminal = { payload, updatedAt: now, event };
+  retainedProgressMap.set(progressId, retained);
+
   const clientResponse = progressMap.get(progressId);
   if (!clientResponse || clientResponse.writableEnded) {
     return;
   }
-  clientResponse.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+  writeSseEvent(clientResponse, event, payload);
 };
 
 const endProgressStream = (progressId: string): void => {
@@ -40,6 +67,7 @@ export const selectProgressResponseOrigin = (
 
 /** Register an SSE client for a progressId and start its keepalive heartbeat. */
 export const registerProgressClient = (progressId: string, req: Request, res: Response): void => {
+  pruneExpiredProgress();
   const responseOrigin = selectProgressResponseOrigin(req.headers.origin);
 
   res.writeHead(200, {
@@ -59,7 +87,13 @@ export const registerProgressClient = (progressId: string, req: Request, res: Re
   }, 15000);
   progressHeartbeatMap.set(progressId, heartbeat);
 
-  res.write(`event: initial\ndata: ${JSON.stringify({ message: 'Connected to batch upload progress stream.', progressId })}\n\n`);
+  writeSseEvent(res, 'initial', { message: 'Connected to batch upload progress stream.', progressId });
+  const retained = retainedProgressMap.get(progressId);
+  if (retained?.progress) writeSseEvent(res, 'progress', retained.progress.payload);
+  if (retained?.terminal) {
+    writeSseEvent(res, retained.terminal.event, retained.terminal.payload);
+    endProgressStream(progressId);
+  }
 
   req.on('close', () => {
     if (progressMap.get(progressId) === res) {

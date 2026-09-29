@@ -1,7 +1,9 @@
-import express, { Request, Response, Router } from 'express';
+import express, { NextFunction, Request, Response, Router } from 'express';
+import fs from 'fs/promises';
+import multer from 'multer';
 import { requireAuth, requireStaffOrAdmin } from '../middleware/auth';
 import { requirePublicAccess } from '../middleware/siteAccess';
-import { diskUpload, memoryUpload } from '../middleware/upload';
+import { chunkDiskUpload, diskUpload, memoryUpload } from '../middleware/upload';
 import archiver from 'archiver';
 import { processBatchUpload } from '../services/batchUploadService';
 import { registerProgressClient, streamBatchUpload } from '../services/batchUploadProgress';
@@ -42,6 +44,7 @@ import {
   UpdateAdminProblemsVisibilityRequestBody,
 } from '../types/api';
 import { getErrorMessage } from '../utils/errorMessage';
+import { ChunkedBatchUploadService } from '../services/chunkedBatchUploadService';
 import { serializeProblemConfig } from '../services/problemConfigSerializer';
 import { validateRequest } from '../middleware/validation';
 import {
@@ -57,11 +60,24 @@ import {
   updateProblemVisibilitySchema,
   collectionIdParamSchema,
   collectionVisibilityBodySchema,
+  chunkedBatchUploadInitSchema,
+  chunkedBatchUploadCompleteSchema,
   createCollectionSchema,
   updateCollectionSchema,
 } from '../schemas/requestSchemas';
 
 const router: Router = express.Router();
+const chunkedBatchUploadService = new ChunkedBatchUploadService();
+const multipartChunkUpload = chunkDiskUpload.single('chunk');
+const parseChunkMultipart = (req: Request, res: Response, next: NextFunction): void => {
+  multipartChunkUpload(req, res, (error?: unknown) => {
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+      next(new AppError('Chunk exceeds the 35 MiB upload limit.', 413));
+      return;
+    }
+    next(error);
+  });
+};
 
 // A valid PDF file always begins with the magic bytes "%PDF". Reject anything
 // that does not, so a renamed HTML/script payload cannot be stored and later
@@ -378,6 +394,57 @@ router.post('/admin/problems/batch-upload', requireAuth, requireStaffOrAdmin, di
   void streamBatchUpload(progressId, (onProgress) =>
     processBatchUpload(uploadPath, (progressData: BatchUploadProgressData) => onProgress(progressData)));
 });
+
+router.post('/admin/problems/batch-upload/init', requireAuth, requireStaffOrAdmin,
+  validateRequest({ body: chunkedBatchUploadInitSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { fileName, fileSize, totalChunks } = req.body as { fileName: string; fileSize: number; totalChunks: number };
+    const session = await chunkedBatchUploadService.createSession({
+      userId: req.user!.id,
+      fileName,
+      fileSize,
+      totalChunks,
+    });
+    res.status(201).json(session);
+  }));
+
+router.post('/admin/problems/batch-upload/chunk', requireAuth, requireStaffOrAdmin,
+  parseChunkMultipart,
+  asyncHandler(async (req: Request, res: Response) => {
+    const uploadId = typeof req.body?.uploadId === 'string' ? req.body.uploadId : '';
+    const rawChunkIndex = req.body?.chunkIndex;
+    const chunkIndex = typeof rawChunkIndex === 'string' && /^\d+$/.test(rawChunkIndex)
+      ? Number(rawChunkIndex)
+      : Number.NaN;
+    if (!uploadId || !Number.isSafeInteger(chunkIndex) || chunkIndex < 0) {
+      if (req.file?.path) await fs.rm(req.file.path, { force: true });
+      throw new AppError('Invalid chunk upload fields.', 400);
+    }
+    if (!req.file) throw new AppError('No chunk file uploaded.', 400);
+
+    try {
+      const data = await fs.readFile(req.file.path);
+      await chunkedBatchUploadService.writeChunk({ uploadId, userId: req.user!.id, chunkIndex, data });
+      res.json({ success: true, chunkIndex });
+    } finally {
+      await fs.rm(req.file.path, { force: true });
+    }
+  }));
+
+router.post('/admin/problems/batch-upload/complete', requireAuth, requireStaffOrAdmin,
+  validateRequest({ body: chunkedBatchUploadCompleteSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { uploadId } = req.body as { uploadId: string };
+    const { zipPath } = await chunkedBatchUploadService.assemble({ uploadId, userId: req.user!.id });
+    const progressId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+
+    res.status(202).json({ message: 'Batch upload initiated.', progressId });
+    void streamBatchUpload(progressId, (onProgress) =>
+      processBatchUpload(zipPath, (progressData: BatchUploadProgressData) => onProgress(progressData)))
+      .finally(() => fs.rm(zipPath, { force: true }).catch((error: unknown) => {
+        console.error('Failed to remove assembled batch upload archive:', error);
+      }));
+  }));
 
 router.get('/admin/problems/batch-upload-progress/:progressId', requireAuth, requireStaffOrAdmin,
   validateRequest({ params: progressIdParamSchema }),
