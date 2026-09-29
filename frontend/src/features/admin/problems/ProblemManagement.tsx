@@ -393,11 +393,14 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
         <div className={`${styles.feedbackBox} ${styles[batchUploadFeedback.type]}`}>
           <div className={styles.feedbackContent}>
             <p>{batchUploadFeedback.message}</p>
-            {batchUploadProgress.visible && batchUploadProgress.total > 0 && batchUploadProgress.status === 'in_progress' && (
+            {batchUploadProgress.visible && batchUploadProgress.total > 0
+              && (batchUploadProgress.status === 'pending' || batchUploadProgress.status === 'in_progress') && (
               <div className={styles.progressWrapper}>
                 <div className={styles.progressInfo}>
                   <span className={styles.progressFile}>
-                    Processing: {batchUploadProgress.currentProblem || '...'}
+                    {batchUploadProgress.status === 'pending'
+                      ? 'Uploading parts'
+                      : `Processing: ${batchUploadProgress.currentProblem || '...'}`}
                   </span>
                   <span className={styles.progressCounters}>
                     {batchUploadProgress.processed}/{batchUploadProgress.total}

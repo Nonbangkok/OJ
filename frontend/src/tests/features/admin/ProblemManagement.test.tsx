@@ -76,6 +76,60 @@ describe('ProblemManagement Component', () => {
         });
     });
 
+    it('shows chunk upload progress before SSE processing without replacing upload controls', async () => {
+        let finishSecondChunk: (value: { success: true; chunkIndex: number }) => void = () => undefined;
+        (jest.mocked(adminService.initBatchUpload) as jest.Mock).mockResolvedValueOnce({ uploadId: 'upload-1' });
+        (jest.mocked(adminService.uploadBatchUploadChunk) as jest.Mock)
+            .mockResolvedValueOnce({ success: true, chunkIndex: 0 })
+            .mockReturnValueOnce(new Promise(resolve => { finishSecondChunk = resolve; }));
+        (jest.mocked(adminService.completeBatchUpload) as jest.Mock).mockResolvedValueOnce({ progressId: 'job-1' });
+
+        const listeners = new Map<string, (event: MessageEvent<string>) => void>();
+        (jest.mocked(adminService.getBatchUploadProgressEventSource) as jest.Mock).mockReturnValueOnce({
+            addEventListener: jest.fn((name: string, listener: (event: MessageEvent<string>) => void) => listeners.set(name, listener)),
+            close: jest.fn(),
+        } as unknown as EventSource);
+
+        const { container } = renderProblemManagement();
+        const fileInput = container.querySelector('input[type="file"][accept=".zip"]') as HTMLInputElement;
+        const file = new File([], 'large-problems.zip', { type: 'application/zip' });
+        Object.defineProperties(file, {
+            size: { value: 50 * 1024 * 1024 + 1 },
+            slice: { value: jest.fn(() => new Blob(['part'])) },
+        });
+
+        fireEvent.change(fileInput, { target: { files: [file] } });
+
+        await waitFor(() => {
+            expect(screen.getByText('Uploading parts')).toBeInTheDocument();
+            expect(screen.getByText('1/3')).toBeInTheDocument();
+            expect(screen.getByText('33%')).toBeInTheDocument();
+        });
+        expect(screen.getByRole('button', { name: 'Batch Upload' })).toBeInTheDocument();
+        expect(container.querySelector('input[type="file"][accept=".zip"]')).toBe(fileInput);
+
+        await act(async () => {
+            finishSecondChunk({ success: true, chunkIndex: 1 });
+        });
+        await waitFor(() => expect(adminService.getBatchUploadProgressEventSource).toHaveBeenCalledWith('job-1'));
+        act(() => {
+            listeners.get('progress')?.({ data: JSON.stringify({
+                visible: true,
+                processed: 1,
+                total: 3,
+                message: 'Processing problems...',
+                status: 'in_progress',
+                currentProblem: 'P-002',
+            }) } as MessageEvent<string>);
+        });
+
+        expect(screen.getByText('Processing: P-002')).toBeInTheDocument();
+        expect(screen.getByText('1/3')).toBeInTheDocument();
+        expect(screen.getByText('33%')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Batch Upload' })).toBeInTheDocument();
+        expect(container.querySelector('input[type="file"][accept=".zip"]')).toBe(fileInput);
+    });
+
     it('handles visibility toggle', async () => {
         (jest.mocked(adminService.updateProblemVisibility) as jest.Mock).mockResolvedValue({ message: 'Updated' });
         renderProblemManagement();
