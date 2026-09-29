@@ -124,10 +124,9 @@ describe('ChunkedBatchUploadService', () => {
     await service.writeChunk({ uploadId, userId: 17, chunkIndex: 1, data: Buffer.from('end') });
     let wrotePartialArchive = false;
     const failing = createService({
-      createOutputStream: () => new Writable({
+      createOutputStream: (outputPath) => new Writable({
         write(chunk, _encoding, callback) {
-          const partialPath = path.join(assembledRoot, `oj-batch-${uploadId}.zip`);
-          fs.promises.writeFile(partialPath, chunk, { flag: wrotePartialArchive ? 'a' : 'w' })
+          fs.promises.writeFile(outputPath, chunk, { flag: wrotePartialArchive ? 'a' : 'w' })
             .then(() => {
               wrotePartialArchive = true;
               callback(new Error('disk write failed'));
@@ -139,7 +138,76 @@ describe('ChunkedBatchUploadService', () => {
     await expect(failing.assemble({ uploadId, userId: 17 })).rejects.toThrow('disk write failed');
     expect(wrotePartialArchive).toBe(true);
     await expect(fs.promises.access(path.join(assembledRoot, `oj-batch-${uploadId}.zip`))).rejects.toThrow();
+    expect(await fs.promises.readdir(assembledRoot)).toEqual([]);
     await expect(fs.promises.access(path.join(sessionRoot, uploadId))).resolves.toBeUndefined();
+  });
+
+  it('removes its temporary archive when output stream setup fails synchronously', async () => {
+    const { uploadId } = await createUpload();
+    await service.writeChunk({ uploadId, userId: 17, chunkIndex: 0, data: Buffer.alloc(CHUNK_BYTES, 1) });
+    await service.writeChunk({ uploadId, userId: 17, chunkIndex: 1, data: Buffer.from('end') });
+    const failing = createService({
+      createOutputStream: (outputPath) => {
+        fs.writeFileSync(outputPath, 'partial');
+        throw new Error('stream setup failed');
+      },
+    });
+
+    await expect(failing.assemble({ uploadId, userId: 17 })).rejects.toThrow('stream setup failed');
+    expect(await fs.promises.readdir(assembledRoot)).toEqual([]);
+    await expect(fs.promises.access(path.join(sessionRoot, uploadId))).resolves.toBeUndefined();
+  });
+
+  it('publishes one concurrent assembly without deleting another attempt output', async () => {
+    const { uploadId } = await createUpload();
+    await service.writeChunk({ uploadId, userId: 17, chunkIndex: 0, data: Buffer.alloc(CHUNK_BYTES, 1) });
+    await service.writeChunk({ uploadId, userId: 17, chunkIndex: 1, data: Buffer.from('end') });
+
+    let releaseFirstWrite: (() => void) | undefined;
+    let notifyFirstWrite: (() => void) | undefined;
+    const firstWriteStarted = new Promise<void>((resolve) => { notifyFirstWrite = resolve; });
+    let firstOutputPath: string | undefined;
+    let secondOutputPath: string | undefined;
+    let writes = 0;
+    const firstService = createService({
+      createOutputStream: (outputPath) => new Writable({
+        construct(callback) {
+          firstOutputPath = outputPath;
+          callback();
+        },
+        write(chunk, _encoding, callback) {
+          fs.promises.writeFile(outputPath, chunk, { flag: writes++ === 0 ? 'w' : 'a' })
+            .then(() => {
+              if (writes === 1) {
+                notifyFirstWrite?.();
+                releaseFirstWrite = () => callback();
+                return;
+              }
+              callback();
+            }, callback);
+        },
+      }),
+    });
+    const firstAssembly = firstService.assemble({ uploadId, userId: 17 });
+
+    await firstWriteStarted;
+    const first = createService({
+      createOutputStream: (outputPath) => {
+        secondOutputPath = outputPath;
+        const error = Object.assign(new Error('exclusive output already exists'), { code: 'EEXIST' });
+        return new Writable({ write(_chunk, _encoding, callback) { callback(error); } });
+      },
+    });
+    const secondAssembly = first.assemble({ uploadId, userId: 17 });
+
+    await expect(secondAssembly).rejects.toMatchObject({ code: 'EEXIST' });
+    expect(secondOutputPath).not.toBe(firstOutputPath);
+    expect(releaseFirstWrite).toBeDefined();
+    releaseFirstWrite?.();
+    await expect(firstAssembly).resolves.toMatchObject({ zipPath: expect.any(String) });
+
+    const zipPath = path.join(assembledRoot, `oj-batch-${uploadId}.zip`);
+    await expect(fs.promises.access(zipPath)).resolves.toBeUndefined();
   });
 
   it('removes stale chunk sessions and assembled archives after two hours', async () => {

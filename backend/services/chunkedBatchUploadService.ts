@@ -184,9 +184,14 @@ export class ChunkedBatchUploadService {
 
     await fs.mkdir(this.assembledRoot, { recursive: true, mode: SESSION_DIRECTORY_MODE });
     const zipPath = path.join(this.assembledRoot, `oj-batch-${input.uploadId}.zip`);
-    const output = this.outputStreamFactory(zipPath);
+    // Assemble to an attempt-local file. A concurrent request must never be
+    // able to remove or replace another request's in-progress/final archive.
+    // Keeping the .zip suffix also lets the existing two-hour cleanup collect
+    // a temporary file left behind by an interrupted process.
+    const temporaryZipPath = path.join(this.assembledRoot, `oj-batch-${input.uploadId}.${randomUUID()}.zip`);
 
     try {
+      const output = this.outputStreamFactory(temporaryZipPath);
       for (const partPath of partPaths) {
         await pipeline(createReadStream(partPath), output, { end: false });
       }
@@ -196,12 +201,16 @@ export class ChunkedBatchUploadService {
         output.end();
       });
 
-      const assembled = await fs.stat(zipPath);
+      const assembled = await fs.stat(temporaryZipPath);
       if (assembled.size !== metadata.fileSize) {
         throw new AppError('Assembled ZIP byte count does not match the upload session.', 500);
       }
+      // link creates the final name atomically without replacing an archive
+      // published by another concurrent completion attempt.
+      await fs.link(temporaryZipPath, zipPath);
+      await fs.rm(temporaryZipPath, { force: true });
     } catch (error) {
-      await fs.rm(zipPath, { force: true });
+      await fs.rm(temporaryZipPath, { force: true });
       throw error;
     }
 
