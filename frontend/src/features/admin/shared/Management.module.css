@@ -382,10 +382,13 @@
 .feedbackContent {
   flex-grow: 1;
   padding-right: 30px; /* Space for close button */
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 
 .feedbackBox p {
-  margin: 0 0 12px 0;
+  margin: 0;
 }
 
 .feedbackBox p:last-child {
@@ -436,18 +439,21 @@
 
 .progressWrapper {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 
 .progressInfo {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 8px;
+  margin-bottom: 0;
   font-size: 0.85rem;
 }
 
 .progressFile {
-  color: var(--text-primary);
+  color: var(--feedback-info-fg);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -456,7 +462,7 @@
 
 .progressCounters {
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--feedback-info-fg);
 }
 
 /* Progress Bar for Batch Upload */

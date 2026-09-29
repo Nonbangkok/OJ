@@ -106,6 +106,13 @@ describe('action theme contrast', () => {
     expect(contrastRatio('#ffffff', resolveToken(dark, 'status-danger'))).toBeGreaterThanOrEqual(4.5);
   });
 
+  it('keeps informational feedback text readable on its feedback surface', () => {
+    expect(contrastRatio(
+      resolveToken(light, 'feedback-info-fg'),
+      resolveToken(light, 'feedback-info-bg'),
+    )).toBeGreaterThanOrEqual(4.5);
+  });
+
   it.each([
     ['text-muted', 'background-primary'],
     ['text-muted', 'surface-elevated'],
