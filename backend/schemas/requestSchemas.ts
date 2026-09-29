@@ -19,6 +19,24 @@ import {
 } from '../constants';
 
 const nonEmptyString = z.string().trim().min(1);
+
+export const CHUNKED_BATCH_UPLOAD_CHUNK_BYTES = 25 * 1024 * 1024;
+export const CHUNKED_BATCH_UPLOAD_MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024;
+
+/** Body accepted when a client begins a chunked batch ZIP upload. */
+export const chunkedBatchUploadInitSchema = z.object({
+  fileName: nonEmptyString.max(255),
+  fileSize: z.number().int().positive().max(CHUNKED_BATCH_UPLOAD_MAX_FILE_BYTES),
+  totalChunks: z.number().int().positive(),
+}).refine(
+  ({ fileSize, totalChunks }) => totalChunks === Math.ceil(fileSize / CHUNKED_BATCH_UPLOAD_CHUNK_BYTES),
+  { message: 'totalChunks must match the file size and chunk size', path: ['totalChunks'] },
+);
+
+/** Body accepted when a client asks to assemble a completed chunked upload. */
+export const chunkedBatchUploadCompleteSchema = z.object({
+  uploadId: z.string().uuid(),
+});
 // Categories must come from the fixed list. An empty array means
 // uncategorized. Deduplicated and sorted on the way in so equal sets always
 // compare equal (the publish provenance guard relies on that).

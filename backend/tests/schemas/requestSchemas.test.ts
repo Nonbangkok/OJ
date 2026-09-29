@@ -6,6 +6,10 @@ import {
   createProblemSchema,
   batchCreateUsersSchema,
   updateAdminUserSchema,
+  // These schemas are introduced by the chunked batch upload flow. Keeping
+  // their boundaries here makes the API contract independent of its routes.
+  chunkedBatchUploadCompleteSchema,
+  chunkedBatchUploadInitSchema,
 } from '../../schemas/requestSchemas';
 import { SUBMISSION_VALIDATION, STRING_LIMITS, SUPPORTED_LANGUAGES, USER_VALIDATION } from '../../constants';
 
@@ -15,6 +19,39 @@ import { SUBMISSION_VALIDATION, STRING_LIMITS, SUPPORTED_LANGUAGES, USER_VALIDAT
  * push megabytes of data into the DB / compiler.
  */
 describe('requestSchemas size & validation caps', () => {
+  describe('chunked batch upload schemas', () => {
+    const MIB = 1024 * 1024;
+    const CHUNK_BYTES = 25 * MIB;
+    const MAX_BYTES = 2 * 1024 * 1024 * 1024;
+
+    it('accepts only a positive file size up to 2 GiB with its exact chunk count', () => {
+      expect(chunkedBatchUploadInitSchema.safeParse({
+        fileName: 'batch.zip', fileSize: 1, totalChunks: 1,
+      }).success).toBe(true);
+      expect(chunkedBatchUploadInitSchema.safeParse({
+        fileName: 'batch.zip', fileSize: MAX_BYTES, totalChunks: 82,
+      }).success).toBe(true);
+      expect(chunkedBatchUploadInitSchema.safeParse({
+        fileName: 'batch.zip', fileSize: 0, totalChunks: 0,
+      }).success).toBe(false);
+      expect(chunkedBatchUploadInitSchema.safeParse({
+        fileName: 'batch.zip', fileSize: MAX_BYTES + 1, totalChunks: 82,
+      }).success).toBe(false);
+      expect(chunkedBatchUploadInitSchema.safeParse({
+        fileName: 'batch.zip', fileSize: CHUNK_BYTES + 1, totalChunks: 1,
+      }).success).toBe(false);
+      expect(chunkedBatchUploadInitSchema.safeParse({
+        fileName: 'batch.zip', fileSize: CHUNK_BYTES + 1, totalChunks: 2,
+      }).success).toBe(true);
+    });
+
+    it('requires a non-empty upload id when completing an upload', () => {
+      expect(chunkedBatchUploadCompleteSchema.safeParse({ uploadId: '2f793c3f-a1a0-4b12-8f25-a2bd84c56dbd' }).success).toBe(true);
+      expect(chunkedBatchUploadCompleteSchema.safeParse({ uploadId: '' }).success).toBe(false);
+      expect(chunkedBatchUploadCompleteSchema.safeParse({}).success).toBe(false);
+    });
+  });
+
   describe('submitSchema.code', () => {
     const base = { problemId: 'p1', language: 'cpp' };
 
