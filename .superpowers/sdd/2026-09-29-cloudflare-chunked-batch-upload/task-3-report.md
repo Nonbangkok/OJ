@@ -148,3 +148,51 @@ Exit 0.
 
 - Verification ran successfully on Node 25.9.0 despite the package's declared Node 20.x engine; npm reported the engine mismatch.
 - The hook-test TypeScript command remains red because of the five unrelated `toHaveStyle` matcher typing errors described above. Production type-check, service-test type-check, focused tests, full tests, lint, and build pass.
+
+## Fix round: make file-input reset coverage meaningful
+
+Review found that the three reset assertions previously inspected inputs whose values started empty, so removing the reset side effect would not fail those tests. The hook tests now use a selected file-input fixture initialized to `C:\\fakepath\\problems.zip`; the failure, over-2-GiB rejection, and successful-upload cases assert that the value is empty afterward.
+
+No production files were changed in this fix round.
+
+### Mutation check
+
+Created temporary detached worktree `/private/tmp/OJ-worktrees/chunked-reset-mutation-5ba2c40` at pre-fix HEAD `5ba2c403c711c4e45098b0903486df427d7173a1`. Applied the strengthened test, then removed both input-clearing statements only in that temporary worktree. The mutation test command exited 1 as intended:
+
+```text
+CI=true npm test -- --watchAll=false --runInBand src/tests/hooks/admin/useBatchUpload.test.tsx
+
+FAIL does not complete or subscribe when a chunk fails, and leaves a retryable error
+  Expected: ""
+  Received: "C:\\fakepath\\problems.zip"
+FAIL rejects files above 2 GiB before making a request and resets the file input
+  Expected: ""
+  Received: "C:\\fakepath\\problems.zip"
+FAIL resets the file input after a successful upload begins processing
+  Expected: ""
+  Received: "C:\\fakepath\\problems.zip"
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 4 passed, 7 total
+```
+
+The temporary worktree was removed after the mutation run. The main worktree's hook implementation was unchanged.
+
+### Actual implementation verification
+
+Against the actual implementation, the same command exited 0:
+
+```text
+CI=true npm test -- --watchAll=false --runInBand src/tests/hooks/admin/useBatchUpload.test.tsx
+
+PASS src/tests/hooks/admin/useBatchUpload.test.tsx
+  ✓ does not complete or subscribe when a chunk fails, and leaves a retryable error
+  ✓ rejects files above 2 GiB before making a request and resets the file input
+  ✓ resets the file input after a successful upload begins processing
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+```
+
+`git diff --check` exited 0. Test-only fix commit: `b37e904f1da7b07d056fb849187159ad3e577761` (`test: assert batch upload resets selected input`).
