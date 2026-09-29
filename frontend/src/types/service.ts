@@ -53,6 +53,21 @@ export interface BatchCreateUsersRequest {
   count: number;
 }
 
+export interface BatchUploadInitRequest {
+  fileName: string;
+  fileSize: number;
+  totalChunks: number;
+}
+
+export interface BatchUploadInitResponse {
+  uploadId: string;
+}
+
+export interface BatchUploadChunkResponse {
+  success: boolean;
+  chunkIndex: number;
+}
+
 export interface CreateProblemRequest {
   id: string;
   title: string;

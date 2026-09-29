@@ -6,6 +6,9 @@ import type {
   AdminProblemsPageResponse,
   AdminProblemsQuery,
   ApiMessageResponse,
+  BatchUploadChunkResponse,
+  BatchUploadInitRequest,
+  BatchUploadInitResponse,
   BatchUploadStartResponse,
   ProblemMutationResponse,
   RejudgeResponse,
@@ -106,6 +109,31 @@ const problemsAdminService = {
     const response = await largeUploadApi.post<BatchUploadStartResponse>('/admin/problems/batch-upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+    return response.data;
+  },
+
+  initBatchUpload: async (request: BatchUploadInitRequest): Promise<BatchUploadInitResponse> => {
+    const response = await largeUploadApi.post<BatchUploadInitResponse>('/admin/problems/batch-upload/init', request);
+    return response.data;
+  },
+
+  uploadBatchUploadChunk: async (
+    uploadId: string,
+    chunkIndex: number,
+    chunk: Blob,
+  ): Promise<BatchUploadChunkResponse> => {
+    const formData = new FormData();
+    formData.append('uploadId', uploadId);
+    formData.append('chunkIndex', String(chunkIndex));
+    formData.append('chunk', chunk, `chunk-${chunkIndex}`);
+    const response = await largeUploadApi.post<BatchUploadChunkResponse>('/admin/problems/batch-upload/chunk', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  completeBatchUpload: async (uploadId: string): Promise<BatchUploadStartResponse> => {
+    const response = await largeUploadApi.post<BatchUploadStartResponse>('/admin/problems/batch-upload/complete', { uploadId });
     return response.data;
   },
 

@@ -1,4 +1,4 @@
-import api, { getLargeUploadBaseUrl } from '../../services/api';
+import api, { getLargeUploadBaseUrl, largeUploadApi } from '../../services/api';
 import adminService from '../../services/adminService';
 import type { AxiosResponse } from 'axios';
 import type {
@@ -271,6 +271,39 @@ describe('adminService', () => {
             );
 
             globalThis.EventSource = originalEventSource;
+        });
+
+        it('initializes a chunked batch upload through the configured large-upload API', async () => {
+            jest.mocked(largeUploadApi.post).mockResolvedValueOnce({ data: { uploadId: 'upload-1' } } as never);
+            const request = { fileName: 'problems.zip', fileSize: 52_428_800, totalChunks: 2 };
+
+            await expect(adminService.initBatchUpload(request)).resolves.toEqual({ uploadId: 'upload-1' });
+
+            expect(largeUploadApi.post).toHaveBeenCalledWith('/admin/problems/batch-upload/init', request);
+        });
+
+        it('posts chunk bytes and their index as multipart data through the large-upload API', async () => {
+            jest.mocked(largeUploadApi.post).mockResolvedValueOnce({ data: { success: true, chunkIndex: 1 } } as never);
+            const chunk = new Blob(['chunk data'], { type: 'application/octet-stream' });
+
+            await expect(adminService.uploadBatchUploadChunk('upload-1', 1, chunk)).resolves.toEqual({ success: true, chunkIndex: 1 });
+
+            const [path, formData] = jest.mocked(largeUploadApi.post).mock.calls[0];
+            expect(path).toBe('/admin/problems/batch-upload/chunk');
+            expect((formData as FormData).get('uploadId')).toBe('upload-1');
+            expect((formData as FormData).get('chunkIndex')).toBe('1');
+            const appendedChunk = (formData as FormData).get('chunk') as File;
+            expect(appendedChunk.name).toBe('chunk-1');
+            expect(appendedChunk.size).toBe(chunk.size);
+            expect(appendedChunk.type).toBe(chunk.type);
+        });
+
+        it('completes a chunked batch upload through the configured large-upload API', async () => {
+            jest.mocked(largeUploadApi.post).mockResolvedValueOnce({ data: { message: 'Batch upload initiated.', progressId: 'job-1' } } as never);
+
+            await expect(adminService.completeBatchUpload('upload-1')).resolves.toEqual({ message: 'Batch upload initiated.', progressId: 'job-1' });
+
+            expect(largeUploadApi.post).toHaveBeenCalledWith('/admin/problems/batch-upload/complete', { uploadId: 'upload-1' });
         });
     });
 });

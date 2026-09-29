@@ -7,7 +7,6 @@ import type {
   BatchUploadProgressState,
 } from '../../types';
 import { getErrorMessage } from '../../utils/error';
-import { APP_CONSTANTS } from '../../utils/constants';
 
 import {
   buildBatchUploadSuccessMessage,
@@ -16,6 +15,9 @@ import {
 } from './problemManagement.helpers';
 
 const DEFAULT_BATCH_FEEDBACK: BatchUploadFeedback = { visible: false, message: '', type: 'info' };
+const SINGLE_REQUEST_LIMIT_BYTES = 50 * 1024 * 1024;
+const CHUNK_SIZE_BYTES = 25 * 1024 * 1024;
+const MAX_BATCH_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 
 interface UseBatchUploadArgs {
   onCompleted: () => Promise<void> | void;
@@ -40,11 +42,11 @@ const useBatchUpload = ({ onCompleted, setLoading }: UseBatchUploadArgs) => {
       return;
     }
 
-    if (file.size > APP_CONSTANTS.LARGE_UPLOAD_WARNING_BYTES && !process.env.REACT_APP_LARGE_UPLOAD_API_URL) {
+    if (file.size > MAX_BATCH_UPLOAD_BYTES) {
       setBatchUploadFeedback({
         visible: true,
-        message: 'This ZIP is over 100MB. Through proxied Cloudflare it will usually fail before reaching the server. Set REACT_APP_LARGE_UPLOAD_API_URL to a DNS-only/origin upload endpoint first.',
-        type: 'warning',
+        message: 'ZIP files must be 2 GiB or smaller.',
+        type: 'error',
       });
       if (batchUploadInputRef.current) {
         batchUploadInputRef.current.value = '';
@@ -63,23 +65,59 @@ const useBatchUpload = ({ onCompleted, setLoading }: UseBatchUploadArgs) => {
       currentProblem: '',
     });
 
-    const formData = new FormData();
-    formData.append('problemsZip', file);
-
+    let chunkProgressMessage = '';
     try {
-      const response = await adminService.batchUploadProblems(formData);
+      let response;
+      if (file.size <= SINGLE_REQUEST_LIMIT_BYTES) {
+        const formData = new FormData();
+        formData.append('problemsZip', file);
+        response = await adminService.batchUploadProblems(formData);
+      } else {
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE_BYTES);
+        const { uploadId } = await adminService.initBatchUpload({
+          fileName: file.name,
+          fileSize: file.size,
+          totalChunks,
+        });
+
+        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+          const start = chunkIndex * CHUNK_SIZE_BYTES;
+          const end = Math.min(start + CHUNK_SIZE_BYTES, file.size);
+          await adminService.uploadBatchUploadChunk(uploadId, chunkIndex, file.slice(start, end));
+
+          const uploadedChunks = chunkIndex + 1;
+          const percent = Math.round((uploadedChunks / totalChunks) * 100);
+          const progressMessage = `Uploaded part ${uploadedChunks}/${totalChunks} (${percent}%).`;
+          chunkProgressMessage = progressMessage;
+          setBatchUploadFeedback({ visible: true, message: progressMessage, type: 'info' });
+          setBatchUploadProgress({
+            visible: true,
+            processed: uploadedChunks,
+            total: totalChunks,
+            message: progressMessage,
+            status: 'pending',
+            currentProblem: '',
+          });
+        }
+
+        response = await adminService.completeBatchUpload(uploadId);
+      }
       const { progressId } = response;
 
       if (progressId) {
         setBatchUploadFeedback({
           visible: true,
-          message: 'File uploaded. Waiting for processing to start...',
+          message: chunkProgressMessage
+            ? `${chunkProgressMessage} File uploaded. Waiting for processing to start...`
+            : 'File uploaded. Waiting for processing to start...',
           type: 'info',
         });
 
         const eventSource = adminService.getBatchUploadProgressEventSource(progressId);
+        let terminalEventReceived = false;
 
         eventSource.addEventListener('progress', (progressEvent: MessageEvent<string>) => {
+          if (terminalEventReceived) return;
           const progressState = parseProgressEventData(progressEvent.data);
           if (!progressState) {
             console.warn('Received malformed progress data (progress event):', progressEvent.data);
@@ -92,6 +130,8 @@ const useBatchUpload = ({ onCompleted, setLoading }: UseBatchUploadArgs) => {
         });
 
         eventSource.addEventListener('complete', (completeEvent: MessageEvent<string>) => {
+          if (terminalEventReceived) return;
+          terminalEventReceived = true;
           const data = JSON.parse(completeEvent.data) as Partial<BatchUploadProgressState>;
           setBatchUploadProgress({
             ...EMPTY_BATCH_PROGRESS,
@@ -113,6 +153,8 @@ const useBatchUpload = ({ onCompleted, setLoading }: UseBatchUploadArgs) => {
         });
 
         eventSource.addEventListener('error', (errorEvent: MessageEvent<string>) => {
+          if (terminalEventReceived) return;
+          terminalEventReceived = true;
           let errorMsg = 'An unknown error occurred during processing.';
           if (errorEvent.data) {
             try {
