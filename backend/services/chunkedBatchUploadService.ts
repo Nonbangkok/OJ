@@ -241,7 +241,13 @@ export class ChunkedBatchUploadService {
     await Promise.all(entries.map(async (entry) => {
       if (!shouldRemove(entry)) return;
       const entryPath = path.join(root, entry.name);
-      const stats = await fs.stat(entryPath);
+      let stats;
+      try {
+        stats = await fs.stat(entryPath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+        throw error;
+      }
       if (stats.mtimeMs < expiredBefore) {
         await fs.rm(entryPath, { recursive: entry.isDirectory(), force: true });
       }

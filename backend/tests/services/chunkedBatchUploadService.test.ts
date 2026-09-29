@@ -227,4 +227,29 @@ describe('ChunkedBatchUploadService', () => {
     await expect(fs.promises.access(staleSession)).rejects.toThrow();
     await expect(fs.promises.access(staleArchive)).rejects.toThrow();
   });
+
+  it('continues creating a session when a listed stale session disappears before stat', async () => {
+    const fixedNow = new Date('2026-09-29T12:00:00.000Z').getTime();
+    service = createService({ now: () => fixedNow });
+    const staleSession = path.join(sessionRoot, 'a0f53660-04ea-4ae9-9b78-80646a9bf115');
+    await fs.promises.mkdir(staleSession, { recursive: true });
+    const old = new Date(fixedNow - TWO_HOURS_MS - 1);
+    await fs.promises.utimes(staleSession, old, old);
+
+    const originalReaddir = fs.promises.readdir.bind(fs.promises);
+    const readdirSpy = jest.spyOn(fs.promises, 'readdir').mockImplementation(async (directory, options) => {
+      const entries = await originalReaddir(directory, options as any);
+      if (directory === sessionRoot) {
+        await fs.promises.rm(staleSession, { recursive: true, force: true });
+      }
+      return entries as any;
+    });
+
+    try {
+      const { uploadId } = await createUpload(3);
+      await expect(fs.promises.access(path.join(sessionRoot, uploadId))).resolves.toBeUndefined();
+    } finally {
+      readdirSpy.mockRestore();
+    }
+  });
 });
