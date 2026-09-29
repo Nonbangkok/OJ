@@ -615,6 +615,16 @@ describe('Problem Controller', () => {
             expect(response.status).toBe(400);
         });
 
+        it('rejects multipart chunk files larger than 35 MiB with 413', async () => {
+            const response = await request(app).post('/admin/problems/batch-upload/chunk')
+                .field('uploadId', '00000000-0000-4000-8000-000000000000')
+                .field('chunkIndex', '0')
+                .attach('chunk', Buffer.alloc(35 * 1024 * 1024 + 1), 'oversized.part');
+
+            expect(response.status).toBe(413);
+            expect(response.body.message).toMatch(/35 MiB/);
+        });
+
         it('binds init, chunk writes, and completion to the initiating user', async () => {
             const started = await init();
             expect(started.status).toBe(201);
