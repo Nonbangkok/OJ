@@ -43,8 +43,19 @@ const makeFile = (size: number, name = 'problems.zip'): File => {
   return file;
 };
 
+const makeSelectedFileInput = (): HTMLInputElement => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  Object.defineProperty(input, 'value', {
+    configurable: true,
+    writable: true,
+    value: 'C:\\fakepath\\problems.zip',
+  });
+  return input;
+};
+
 const chooseFile = async (result: { current: ReturnType<typeof useBatchUpload> }, file: File) => {
-  const input = result.current.batchUploadInputRef.current ?? document.createElement('input');
+  const input = result.current.batchUploadInputRef.current ?? makeSelectedFileInput();
   result.current.batchUploadInputRef.current = input;
   await act(async () => {
     await result.current.handleBatchUploadFileChange({ target: { files: [file] } } as unknown as ChangeEvent<HTMLInputElement>);
@@ -141,8 +152,9 @@ describe('useBatchUpload', () => {
       .mockResolvedValueOnce({ success: true, chunkIndex: 0 })
       .mockRejectedValueOnce(new Error('chunk rejected'));
     const { result } = renderHook(() => useBatchUpload({ onCompleted, setLoading }));
-    const input = document.createElement('input');
+    const input = makeSelectedFileInput();
     result.current.batchUploadInputRef.current = input;
+    expect(input.value).toBe('C:\\fakepath\\problems.zip');
 
     await chooseFile(result, makeFile(50 * 1024 * 1024 + 1));
 
@@ -174,9 +186,10 @@ describe('useBatchUpload', () => {
 
   it('rejects files above 2 GiB before making a request and resets the file input', async () => {
     const { result } = renderHook(() => useBatchUpload({ onCompleted, setLoading }));
-    const input = document.createElement('input');
+    const input = makeSelectedFileInput();
     result.current.batchUploadInputRef.current = input;
     const file = makeFile(2 * 1024 * 1024 * 1024 + 1);
+    expect(input.value).toBe('C:\\fakepath\\problems.zip');
 
     await chooseFile(result, file);
 
@@ -191,8 +204,9 @@ describe('useBatchUpload', () => {
     (jest.mocked(adminService.batchUploadProblems) as jest.Mock).mockResolvedValueOnce({ progressId: 'reset-job' });
     (jest.mocked(adminService.getBatchUploadProgressEventSource) as jest.Mock).mockReturnValueOnce(source);
     const { result } = renderHook(() => useBatchUpload({ onCompleted, setLoading }));
-    const input = document.createElement('input');
+    const input = makeSelectedFileInput();
     result.current.batchUploadInputRef.current = input;
+    expect(input.value).toBe('C:\\fakepath\\problems.zip');
 
     await chooseFile(result, makeFile(1));
 
