@@ -93,15 +93,6 @@ const ProblemDetail = () => {
             <h2>{problem.title}</h2>
             <p className={styles['problem-id']}>{problem.id}</p>
             {problem.author && <p className={styles['problem-author']}>Author: {problem.author}</p>}
-            {/* Staff context: hidden problems now return 404 for everyone
-                else, so only staff can reach this page with is_visible=false
-                and they get an inline indicator instead of the old 403 body. */}
-            {problem.is_visible === false && (
-              <p className={styles['hidden-problem-indicator']}>
-                This problem is currently hidden — it is only visible to staff.
-              </p>
-            )}
-
             <div className={styles['problem-meta']}>
               <span>Time Limit: {problem.time_limit_ms} ms</span>
               <span>Memory Limit: {problem.memory_limit_mb} MB</span>
@@ -140,6 +131,13 @@ const ProblemDetail = () => {
               My Submissions
             </button>
           </nav>
+          {/* Staff context: hidden problems now return 404 for everyone
+              else, so only staff can reach this page with is_visible=false. */}
+          {problem.is_visible === false && (
+            <p className={styles['hidden-problem-indicator']}>
+              This problem is currently hidden — it is only visible to staff.
+            </p>
+          )}
           {problem && typeof problem.best_score !== 'undefined' && (
             <div className={styles['score-container']}>
               <div className={styles['score-bar-container']}>

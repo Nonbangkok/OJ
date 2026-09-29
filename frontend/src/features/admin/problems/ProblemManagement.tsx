@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import useProblemManagement from '../../../hooks/admin/useProblemManagement';
 import useProblemSelection from '../../../hooks/admin/useProblemSelection';
 import useRejudge from '../../../hooks/admin/useRejudge';
@@ -504,7 +505,9 @@ const ProblemManagement = ({ currentUser = null }: ProblemManagementProps) => {
                     aria-label={`Select problem ${problem.id}`}
                   />
                 </td>
-                <td className={styles['col-left']}>{problem.id}</td>
+                <td className={styles['col-left']}>
+                  <Link to={`/problems/${encodeURIComponent(problem.id)}`}>{problem.id}</Link>
+                </td>
                 <td className={styles['col-left']}>{problem.title}</td>
                 <td className={styles['col-left']}>
                   {problem.collection_id !== null

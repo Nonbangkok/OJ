@@ -76,6 +76,15 @@ describe('ProblemManagement Component', () => {
         });
     });
 
+    it('links visible and hidden problem IDs to their detail pages', async () => {
+        renderProblemManagement();
+
+        await waitFor(() => expect(screen.getByText('Problem 2')).toBeInTheDocument());
+
+        expect(screen.getByRole('link', { name: 'P1' })).toHaveAttribute('href', '/problems/P1');
+        expect(screen.getByRole('link', { name: 'P2' })).toHaveAttribute('href', '/problems/P2');
+    });
+
     it('shows chunk upload progress before SSE processing without replacing upload controls', async () => {
         let finishSecondChunk: (value: { success: true; chunkIndex: number }) => void = () => undefined;
         (jest.mocked(adminService.initBatchUpload) as jest.Mock).mockResolvedValueOnce({ uploadId: 'upload-1' });

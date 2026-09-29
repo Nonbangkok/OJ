@@ -74,6 +74,21 @@ describe('ProblemDetail Page', () => {
         expect(screen.getByText('Time Limit: 1000 ms')).toBeInTheDocument();
     });
 
+    it('shows the hidden-problem notice below My Submissions with clear spacing', async () => {
+        jest.mocked(problemService.getDetails).mockResolvedValueOnce({
+            id: '1', title: 'Hidden Problem', author: 'Ada', is_visible: false,
+            time_limit_ms: 1000, memory_limit_mb: 256,
+        });
+        jest.mocked(problemService.getAllWithStats).mockResolvedValueOnce([]);
+
+        render(<BrowserRouter><ProblemDetail /></BrowserRouter>);
+
+        const submissionsTab = await screen.findByRole('button', { name: 'My Submissions' });
+        const hiddenNotice = screen.getByText('This problem is currently hidden — it is only visible to staff.');
+        expect(submissionsTab.compareDocumentPosition(hiddenNotice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(hiddenNotice).toHaveClass('hidden-problem-indicator');
+    });
+
     it('shows a back control that navigates back to the list', async () => {
         const mockProblem = {
             id: '1', title: 'Test Problem', author: null,

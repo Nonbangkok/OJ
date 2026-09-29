@@ -452,7 +452,7 @@
 /* Hidden Problem Styles — staff-only inline indicator (the old full-page
    hidden state rode a 403 body that no longer exists for non-staff). */
 .hidden-problem-indicator {
-  margin: 0.5rem 0 0;
+  margin: 1rem 0 0;
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
   border: 1px solid var(--border-color);
