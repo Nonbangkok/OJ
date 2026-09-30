@@ -21,6 +21,7 @@ import {
   getPublicProblemFilterOptions,
   getVisibleProblems,
   replaceProblemTestcasesFromZip,
+  replaceProblemTestcasesFromZipFile,
   updateProblem,
   updateProblemPdf,
   updateProblemVisibility,
@@ -454,6 +455,71 @@ router.post('/admin/problems/batch-upload/complete', requireAuth, requireStaffOr
       .finally(() => fs.rm(zipPath, { force: true }).catch((error: unknown) => {
         console.error('Failed to remove assembled batch upload archive:', error);
       }));
+  }));
+
+router.post('/admin/problems/:id/testcases-upload/init', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: problemIdParamSchema, body: chunkedBatchUploadInitSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const problemId = String(req.params.id);
+    if (!await getProblemDetail(problemId)) throw new AppError('Problem not found', 404);
+    const { fileName, fileSize, totalChunks } = req.body as { fileName: string; fileSize: number; totalChunks: number };
+    const session = await chunkedBatchUploadService.createSession({
+      userId: req.user!.id,
+      fileName,
+      fileSize,
+      totalChunks,
+      purpose: 'problem-testcases',
+      problemId,
+    });
+    res.status(201).json(session);
+  }));
+
+router.post('/admin/problems/:id/testcases-upload/chunk', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: problemIdParamSchema }),
+  parseChunkMultipart,
+  asyncHandler(async (req: Request, res: Response) => {
+    const uploadId = typeof req.body?.uploadId === 'string' ? req.body.uploadId : '';
+    const rawChunkIndex = req.body?.chunkIndex;
+    const chunkIndex = typeof rawChunkIndex === 'string' && /^\d+$/.test(rawChunkIndex)
+      ? Number(rawChunkIndex)
+      : Number.NaN;
+    if (!uploadId || !Number.isSafeInteger(chunkIndex) || chunkIndex < 0) {
+      if (req.file?.path) await fs.rm(req.file.path, { force: true });
+      throw new AppError('Invalid chunk upload fields.', 400);
+    }
+    if (!req.file) throw new AppError('No chunk file uploaded.', 400);
+
+    try {
+      const data = await fs.readFile(req.file.path);
+      await chunkedBatchUploadService.writeChunk({ uploadId, userId: req.user!.id, chunkIndex, data });
+      res.json({ success: true, chunkIndex });
+    } finally {
+      await fs.rm(req.file.path, { force: true });
+    }
+  }));
+
+router.post('/admin/problems/:id/testcases-upload/complete', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: problemIdParamSchema, body: chunkedBatchUploadCompleteSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const problemId = String(req.params.id);
+    const { uploadId } = req.body as { uploadId: string };
+    const { zipPath } = await chunkedBatchUploadService.assembleProblemTestcases({
+      uploadId,
+      userId: req.user!.id,
+      problemId,
+    });
+
+    let result: Awaited<ReturnType<typeof replaceProblemTestcasesFromZipFile>>;
+    try {
+      result = await replaceProblemTestcasesFromZipFile(problemId, zipPath);
+    } finally {
+      await fs.rm(zipPath, { force: true });
+    }
+    if (result.kind === 'no_valid_pairs') {
+      throw new AppError('No valid testcase pairs (.in/.out or input/output) found in the ZIP file.', 400);
+    }
+    if (result.kind === 'not_found') throw new AppError('Problem not found', 404);
+    res.status(200).json({ message: 'Test Cases ZIP processed successfully.', insertedCount: result.insertedCount });
   }));
 
 router.get('/admin/problems/batch-upload-progress/:progressId', requireAuth, requireStaffOrAdmin,

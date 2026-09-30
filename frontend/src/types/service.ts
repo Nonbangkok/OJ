@@ -127,8 +127,10 @@ export interface ProblemSelectionBulkConfirm {
 }
 
 export interface UploadProgressState {
-  status: 'pending' | 'uploading' | 'completed' | 'failed';
+  status: 'pending' | 'uploading' | 'processing' | 'completed' | 'failed';
   message: string;
+  progress?: number;
+  total?: number;
 }
 
 export type ContestStatusStyleMap = Record<ContestStatus, string>;

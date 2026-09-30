@@ -52,6 +52,28 @@ describe('ChunkedBatchUploadService', () => {
     expect((await fs.promises.stat(sessionPath)).mode & 0o077).toBe(0);
   });
 
+  it('binds testcase upload sessions to one problem and assembles them separately from batch sessions', async () => {
+    const file = Buffer.from('zip');
+    const { uploadId } = await service.createSession({
+      userId: 17,
+      fileName: 'testcases.zip',
+      fileSize: file.length,
+      totalChunks: 1,
+      purpose: 'problem-testcases',
+      problemId: 'P1',
+    });
+    await service.writeChunk({ uploadId, userId: 17, chunkIndex: 0, data: file });
+
+    await expect(service.assemble({ uploadId, userId: 17 })).rejects.toMatchObject({ statusCode: 400 });
+    await expect(service.assembleProblemTestcases({ uploadId, userId: 17, problemId: 'P2' }))
+      .rejects.toMatchObject({ statusCode: 403 });
+
+    const { zipPath } = await service.assembleProblemTestcases({ uploadId, userId: 17, problemId: 'P1' });
+    expect(zipPath).toMatch(/\/oj-testcases-.+\.zip$/);
+    await expect(fs.promises.readFile(zipPath)).resolves.toEqual(file);
+    await expect(fs.promises.access(path.join(sessionRoot, uploadId))).rejects.toThrow();
+  });
+
   it('tightens an existing session root to private permissions when supported', async () => {
     await fs.promises.mkdir(sessionRoot, { recursive: true, mode: 0o755 });
     await fs.promises.chmod(sessionRoot, 0o755);
@@ -219,13 +241,17 @@ describe('ChunkedBatchUploadService', () => {
     await fs.promises.mkdir(assembledRoot, { recursive: true });
     const staleArchive = path.join(assembledRoot, 'oj-batch-deadbeef.zip');
     await fs.promises.writeFile(staleArchive, 'old');
+    const staleTestcaseArchive = path.join(assembledRoot, 'oj-testcases-deadbeef.zip');
+    await fs.promises.writeFile(staleTestcaseArchive, 'old');
     const old = new Date(fixedNow - TWO_HOURS_MS - 1);
     await fs.promises.utimes(staleSession, old, old);
     await fs.promises.utimes(staleArchive, old, old);
+    await fs.promises.utimes(staleTestcaseArchive, old, old);
 
     await service.cleanupExpired();
     await expect(fs.promises.access(staleSession)).rejects.toThrow();
     await expect(fs.promises.access(staleArchive)).rejects.toThrow();
+    await expect(fs.promises.access(staleTestcaseArchive)).rejects.toThrow();
   });
 
   it('continues creating a session when a listed stale session disappears before stat', async () => {

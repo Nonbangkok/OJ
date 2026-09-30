@@ -698,11 +698,12 @@ export const updateProblemPdf = async (
   return 'ok';
 };
 
-export const replaceProblemTestcasesFromZip = async (
+type OpenedTestcaseZip = Awaited<ReturnType<typeof unzipper.Open.buffer>>;
+
+const replaceProblemTestcasesFromOpenedZip = async (
   problemId: string,
-  zipBuffer: Buffer,
+  zip: OpenedTestcaseZip,
 ): Promise<ReplaceProblemTestcasesFromZipResult> => {
-  const zip = await unzipper.Open.buffer(zipBuffer);
   const testcaseFiles = pairZippedTestcaseFiles(zip.files);
   const pairedCases = fullyPairedCaseNumbers(testcaseFiles);
 
@@ -747,6 +748,19 @@ export const replaceProblemTestcasesFromZip = async (
     return { kind: 'ok', insertedCount: pairedCases.length };
   });
 };
+
+export const replaceProblemTestcasesFromZip = async (
+  problemId: string,
+  zipBuffer: Buffer,
+): Promise<ReplaceProblemTestcasesFromZipResult> =>
+  replaceProblemTestcasesFromOpenedZip(problemId, await unzipper.Open.buffer(zipBuffer));
+
+/** Open an assembled, disk-backed upload without buffering the full ZIP in memory. */
+export const replaceProblemTestcasesFromZipFile = async (
+  problemId: string,
+  zipPath: string,
+): Promise<ReplaceProblemTestcasesFromZipResult> =>
+  replaceProblemTestcasesFromOpenedZip(problemId, await unzipper.Open.file(zipPath));
 
 export const getProblemExportBundle = async (problemId: string): Promise<ProblemExportBundle | null> => {
   const problemResult = await db.query<ProblemExportBundle['problem']>(

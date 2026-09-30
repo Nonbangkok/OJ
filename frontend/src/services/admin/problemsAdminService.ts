@@ -22,6 +22,10 @@ interface UploadFilesResponse extends ApiMessageResponse {
   jobId?: string;
 }
 
+interface TestcaseChunkUploadCompleteResponse extends ApiMessageResponse {
+  insertedCount: number;
+}
+
 
 export interface CollectionWithStats {
   id: number;
@@ -141,6 +145,37 @@ const problemsAdminService = {
 
   completeBatchUpload: async (uploadId: string): Promise<BatchUploadStartResponse> => {
     const response = await largeUploadApi.post<BatchUploadStartResponse>('/admin/problems/batch-upload/complete', { uploadId });
+    return response.data;
+  },
+
+  initProblemTestcaseUpload: async (problemId: string, request: BatchUploadInitRequest): Promise<BatchUploadInitResponse> => {
+    const response = await largeUploadApi.post<BatchUploadInitResponse>(`/admin/problems/${encodeURIComponent(problemId)}/testcases-upload/init`, request);
+    return response.data;
+  },
+
+  uploadProblemTestcaseChunk: async (
+    problemId: string,
+    uploadId: string,
+    chunkIndex: number,
+    chunk: Blob,
+  ): Promise<BatchUploadChunkResponse> => {
+    const formData = new FormData();
+    formData.append('uploadId', uploadId);
+    formData.append('chunkIndex', String(chunkIndex));
+    formData.append('chunk', chunk, `chunk-${chunkIndex}`);
+    const response = await largeUploadApi.post<BatchUploadChunkResponse>(
+      `/admin/problems/${encodeURIComponent(problemId)}/testcases-upload/chunk`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  },
+
+  completeProblemTestcaseUpload: async (problemId: string, uploadId: string): Promise<TestcaseChunkUploadCompleteResponse> => {
+    const response = await largeUploadApi.post<TestcaseChunkUploadCompleteResponse>(
+      `/admin/problems/${encodeURIComponent(problemId)}/testcases-upload/complete`,
+      { uploadId },
+    );
     return response.data;
   },
 

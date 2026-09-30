@@ -9,6 +9,7 @@ import { errorHandler } from '../middleware/errorHandler';
 import { selectProgressResponseOrigin } from '../services/batchUploadProgress';
 import * as db from '../db';
 import { processBatchUpload } from '../services/batchUploadService';
+import * as problemQueryService from '../services/problemQueryService';
 
 // Mock dependencies
 jest.mock('../db');
@@ -695,6 +696,48 @@ describe('Problem Controller', () => {
             expect(processBatchUpload).toHaveBeenCalledWith(zipPath, expect.any(Function));
             await new Promise<void>((resolve) => setTimeout(resolve, 25));
             await expect(fs.access(zipPath)).rejects.toThrow();
+        });
+    });
+
+    describe('chunked problem testcase upload routes', () => {
+        let createdUploadIds: string[];
+        beforeEach(() => { createdUploadIds = []; });
+        afterEach(async () => {
+            await Promise.all(createdUploadIds.map(async (uploadId) => {
+                await fs.rm(path.join(os.tmpdir(), 'oj-chunk-uploads', uploadId), { recursive: true, force: true });
+                await fs.rm(path.join(os.tmpdir(), `oj-testcases-${uploadId}.zip`), { force: true });
+            }));
+        });
+
+        it('uploads testcase ZIP chunks and completes against the problem bound at init', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ id: 'P1' }] });
+            const initialized = await request(app).post('/admin/problems/P1/testcases-upload/init')
+                .send({ fileName: 'testcases.zip', fileSize: 3, totalChunks: 1 });
+            expect(initialized.status).toBe(201);
+            const { uploadId } = initialized.body as { uploadId: string };
+            createdUploadIds.push(uploadId);
+
+            const chunk = await request(app).post('/admin/problems/P1/testcases-upload/chunk')
+                .field('uploadId', uploadId).field('chunkIndex', '0')
+                .attach('chunk', Buffer.from('zip'), 'chunk-0');
+            expect(chunk.status).toBe(200);
+            expect(chunk.body).toEqual({ success: true, chunkIndex: 0 });
+
+            const parser = jest.spyOn(problemQueryService, 'replaceProblemTestcasesFromZipFile')
+                .mockResolvedValueOnce({ kind: 'ok', insertedCount: 2 });
+            const completed = await request(app).post('/admin/problems/P1/testcases-upload/complete').send({ uploadId });
+
+            expect(completed.status).toBe(200);
+            expect(completed.body).toEqual({ message: 'Test Cases ZIP processed successfully.', insertedCount: 2 });
+            expect(parser).toHaveBeenCalledWith('P1', expect.stringMatching(/\/oj-testcases-.+\.zip$/));
+            await expect(fs.access(path.join(os.tmpdir(), `oj-testcases-${uploadId}.zip`))).rejects.toThrow();
+        });
+
+        it('rejects testcase upload initialization for a missing problem', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+            const response = await request(app).post('/admin/problems/NOPE/testcases-upload/init')
+                .send({ fileName: 'testcases.zip', fileSize: 3, totalChunks: 1 });
+            expect(response.status).toBe(404);
         });
     });
 

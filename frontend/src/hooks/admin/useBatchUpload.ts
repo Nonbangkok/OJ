@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 
 import adminService from '../../services/adminService';
+import { CHUNKED_UPLOAD_CONFIG } from '../../config/upload';
 import type {
   BatchUploadFeedback,
   BatchUploadProgressState,
@@ -15,10 +16,6 @@ import {
 } from './problemManagement.helpers';
 
 const DEFAULT_BATCH_FEEDBACK: BatchUploadFeedback = { visible: false, message: '', type: 'info' };
-const SINGLE_REQUEST_LIMIT_BYTES = 50 * 1024 * 1024;
-const CHUNK_SIZE_BYTES = 25 * 1024 * 1024;
-const MAX_BATCH_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
-
 interface UseBatchUploadArgs {
   onCompleted: () => Promise<void> | void;
   setLoading: (loading: boolean) => void;
@@ -42,7 +39,7 @@ const useBatchUpload = ({ onCompleted, setLoading }: UseBatchUploadArgs) => {
       return;
     }
 
-    if (file.size > MAX_BATCH_UPLOAD_BYTES) {
+    if (file.size > CHUNKED_UPLOAD_CONFIG.maxFileBytes) {
       setBatchUploadFeedback({
         visible: true,
         message: 'ZIP files must be 2 GiB or smaller.',
@@ -68,12 +65,12 @@ const useBatchUpload = ({ onCompleted, setLoading }: UseBatchUploadArgs) => {
     let chunkProgressMessage = '';
     try {
       let response;
-      if (file.size <= SINGLE_REQUEST_LIMIT_BYTES) {
+      if (file.size <= CHUNKED_UPLOAD_CONFIG.singleRequestLimitBytes) {
         const formData = new FormData();
         formData.append('problemsZip', file);
         response = await adminService.batchUploadProblems(formData);
       } else {
-        const totalChunks = Math.ceil(file.size / CHUNK_SIZE_BYTES);
+        const totalChunks = Math.ceil(file.size / CHUNKED_UPLOAD_CONFIG.chunkSizeBytes);
         const { uploadId } = await adminService.initBatchUpload({
           fileName: file.name,
           fileSize: file.size,
@@ -81,8 +78,8 @@ const useBatchUpload = ({ onCompleted, setLoading }: UseBatchUploadArgs) => {
         });
 
         for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
-          const start = chunkIndex * CHUNK_SIZE_BYTES;
-          const end = Math.min(start + CHUNK_SIZE_BYTES, file.size);
+          const start = chunkIndex * CHUNKED_UPLOAD_CONFIG.chunkSizeBytes;
+          const end = Math.min(start + CHUNKED_UPLOAD_CONFIG.chunkSizeBytes, file.size);
           await adminService.uploadBatchUploadChunk(uploadId, chunkIndex, file.slice(start, end));
 
           const uploadedChunks = chunkIndex + 1;

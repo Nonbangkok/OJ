@@ -27,6 +27,8 @@ interface ChunkedBatchUploadMetadata {
   fileSize: number;
   totalChunks: number;
   createdAt: number;
+  purpose?: 'batch' | 'problem-testcases';
+  problemId?: string;
 }
 
 export interface CreateChunkedBatchUploadSessionInput {
@@ -34,6 +36,8 @@ export interface CreateChunkedBatchUploadSessionInput {
   fileName: string;
   fileSize: number;
   totalChunks: number;
+  purpose?: 'batch' | 'problem-testcases';
+  problemId?: string;
 }
 
 export interface WriteChunkInput {
@@ -89,6 +93,11 @@ export class ChunkedBatchUploadService {
     if (!parsed.success) {
       throw new AppError('Invalid chunked batch upload session.', 400, parsed.error.issues);
     }
+    const purpose = input.purpose ?? 'batch';
+    if ((purpose === 'problem-testcases' && !input.problemId)
+      || (purpose === 'batch' && input.problemId !== undefined)) {
+      throw new AppError('Invalid chunked upload target.', 400);
+    }
 
     await this.cleanupExpired();
     await fs.mkdir(this.sessionRoot, { recursive: true, mode: SESSION_DIRECTORY_MODE });
@@ -100,6 +109,8 @@ export class ChunkedBatchUploadService {
       ownerId: input.userId,
       ...parsed.data,
       createdAt: this.now(),
+      purpose,
+      ...(purpose === 'problem-testcases' ? { problemId: input.problemId } : {}),
     };
 
     try {
@@ -163,6 +174,26 @@ export class ChunkedBatchUploadService {
 
   async assemble(input: AssembleChunkedBatchUploadInput): Promise<{ zipPath: string }> {
     const { sessionPath, metadata } = await this.loadOwnedSession(input.uploadId, input.userId);
+    if ((metadata.purpose ?? 'batch') !== 'batch') {
+      throw new AppError('Upload session is not a batch upload.', 400);
+    }
+    return this.assembleSession(sessionPath, metadata, input.uploadId, 'oj-batch');
+  }
+
+  async assembleProblemTestcases(input: AssembleChunkedBatchUploadInput & { problemId: string }): Promise<{ zipPath: string }> {
+    const { sessionPath, metadata } = await this.loadOwnedSession(input.uploadId, input.userId);
+    if (metadata.purpose !== 'problem-testcases' || metadata.problemId !== input.problemId) {
+      throw new AppError('Upload session does not belong to this problem.', 403);
+    }
+    return this.assembleSession(sessionPath, metadata, input.uploadId, 'oj-testcases');
+  }
+
+  private async assembleSession(
+    sessionPath: string,
+    metadata: ChunkedBatchUploadMetadata,
+    uploadId: string,
+    archivePrefix: 'oj-batch' | 'oj-testcases',
+  ): Promise<{ zipPath: string }> {
     const partPaths: string[] = [];
 
     for (let chunkIndex = 0; chunkIndex < metadata.totalChunks; chunkIndex += 1) {
@@ -183,12 +214,12 @@ export class ChunkedBatchUploadService {
     }
 
     await fs.mkdir(this.assembledRoot, { recursive: true, mode: SESSION_DIRECTORY_MODE });
-    const zipPath = path.join(this.assembledRoot, `oj-batch-${input.uploadId}.zip`);
+    const zipPath = path.join(this.assembledRoot, `${archivePrefix}-${uploadId}.zip`);
     // Assemble to an attempt-local file. A concurrent request must never be
     // able to remove or replace another request's in-progress/final archive.
     // Keeping the .zip suffix also lets the existing two-hour cleanup collect
     // a temporary file left behind by an interrupted process.
-    const temporaryZipPath = path.join(this.assembledRoot, `oj-batch-${input.uploadId}.${randomUUID()}.zip`);
+    const temporaryZipPath = path.join(this.assembledRoot, `${archivePrefix}-${uploadId}.${randomUUID()}.zip`);
 
     try {
       const output = this.outputStreamFactory(temporaryZipPath);
@@ -222,7 +253,7 @@ export class ChunkedBatchUploadService {
     const expiredBefore = this.now() - CHUNKED_BATCH_UPLOAD_TTL_MS;
     await this.removeOldEntries(this.sessionRoot, expiredBefore, (entry) => entry.isDirectory());
     await this.removeOldEntries(this.assembledRoot, expiredBefore,
-      (entry) => entry.isFile() && /^oj-batch-.+\.zip$/.test(entry.name));
+      (entry) => entry.isFile() && /^oj-(?:batch|testcases)-.+\.zip$/.test(entry.name));
   }
 
   private async removeOldEntries(
@@ -330,6 +361,8 @@ export class ChunkedBatchUploadService {
         fileSize: metadata.fileSize,
         totalChunks: metadata.totalChunks,
       }).success
+      && (metadata.purpose === undefined || metadata.purpose === 'batch' || metadata.purpose === 'problem-testcases')
+      && (metadata.purpose !== 'problem-testcases' || (typeof metadata.problemId === 'string' && metadata.problemId.length > 0))
       && Number.isFinite(metadata.createdAt);
   }
 }

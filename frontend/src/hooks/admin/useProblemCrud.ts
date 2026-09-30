@@ -15,6 +15,7 @@ import type { ProblemListSpan } from '../../routing/problemListLoaders';
 
 import { useAdminProblemsPage } from './useAdminProblemsPage';
 import { normalizeUploadProgress } from './problemManagement.helpers';
+import { CHUNKED_UPLOAD_CONFIG } from '../../config/upload';
 
 type EditableProblem = ProblemDetail & Pick<AdminProblem, 'collection_id'>;
 
@@ -254,6 +255,13 @@ const useProblemCrud = ({ query, initialPageSpan }: UseProblemCrudArgs) => {
       return;
     }
 
+    if (zipFile && zipFile.size > CHUNKED_UPLOAD_CONFIG.maxFileBytes) {
+      const errorMessage = 'Test Cases ZIP files must be 2 GiB or smaller.';
+      setError(errorMessage);
+      setUploadProgress({ status: 'failed', message: errorMessage });
+      return;
+    }
+
     setUploadProgress({ status: 'pending', message: 'Initiating save...' });
 
     try {
@@ -266,27 +274,63 @@ const useProblemCrud = ({ query, initialPageSpan }: UseProblemCrudArgs) => {
         problemIdForUpload = data.id || problemData.id;
       }
 
-      if (pdfFile || zipFile) {
-        const fileData = new FormData();
-        if (pdfFile) {
-          fileData.append('problemPdf', pdfFile);
+      let jobId: string | undefined;
+      if (zipFile && zipFile.size > CHUNKED_UPLOAD_CONFIG.singleRequestLimitBytes) {
+        const totalChunks = Math.ceil(zipFile.size / CHUNKED_UPLOAD_CONFIG.chunkSizeBytes);
+        setUploadProgress({
+          status: 'uploading',
+          message: `Preparing Test Cases ZIP upload (0/${totalChunks} parts)...`,
+          progress: 0,
+          total: totalChunks,
+        });
+        const { uploadId } = await adminService.initProblemTestcaseUpload(problemIdForUpload, {
+          fileName: zipFile.name,
+          fileSize: zipFile.size,
+          totalChunks,
+        });
+
+        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+          const start = chunkIndex * CHUNKED_UPLOAD_CONFIG.chunkSizeBytes;
+          const end = Math.min(start + CHUNKED_UPLOAD_CONFIG.chunkSizeBytes, zipFile.size);
+          await adminService.uploadProblemTestcaseChunk(
+            problemIdForUpload,
+            uploadId,
+            chunkIndex,
+            zipFile.slice(start, end),
+          );
+          const uploadedChunks = chunkIndex + 1;
+          const percent = Math.round((uploadedChunks / totalChunks) * 100);
+          setUploadProgress({
+            status: 'uploading',
+            message: `Uploading Test Cases ZIP: ${percent}% (part ${uploadedChunks}/${totalChunks})...`,
+            progress: uploadedChunks,
+            total: totalChunks,
+          });
         }
-        if (zipFile) {
+
+        setUploadProgress({
+          status: 'processing',
+          message: 'Processing Test Cases ZIP...',
+          progress: totalChunks,
+          total: totalChunks,
+        });
+        await adminService.completeProblemTestcaseUpload(problemIdForUpload, uploadId);
+      }
+
+      if (pdfFile || (zipFile && zipFile.size <= CHUNKED_UPLOAD_CONFIG.singleRequestLimitBytes)) {
+        const fileData = new FormData();
+        if (pdfFile) fileData.append('problemPdf', pdfFile);
+        if (zipFile && zipFile.size <= CHUNKED_UPLOAD_CONFIG.singleRequestLimitBytes) {
           fileData.append('testcasesZip', zipFile);
         }
 
         setUploadProgress({ status: 'uploading', message: 'Uploading files to server...' });
-
         const data = await adminService.uploadFiles(problemIdForUpload, fileData);
-        const { jobId } = data;
+        jobId = data.jobId;
+      }
 
-        if (jobId) {
-          startUploadProgressPolling(jobId);
-        } else {
-          setIsModalOpen(false);
-          await fetchProblems();
-          setUploadProgress(null);
-        }
+      if (jobId) {
+        startUploadProgressPolling(jobId);
       } else {
         setIsModalOpen(false);
         await fetchProblems();

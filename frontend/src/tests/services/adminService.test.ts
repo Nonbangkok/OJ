@@ -305,5 +305,29 @@ describe('adminService', () => {
 
             expect(largeUploadApi.post).toHaveBeenCalledWith('/admin/problems/batch-upload/complete', { uploadId: 'upload-1' });
         });
+
+        it('routes testcase chunk uploads through the configured large-upload API and problem-bound endpoints', async () => {
+            jest.mocked(largeUploadApi.post).mockResolvedValueOnce({ data: { uploadId: 'testcase-upload' } } as never);
+            await expect(adminService.initProblemTestcaseUpload('P/1', {
+                fileName: 'testcases.zip', fileSize: 52_428_801, totalChunks: 3,
+            })).resolves.toEqual({ uploadId: 'testcase-upload' });
+            expect(largeUploadApi.post).toHaveBeenCalledWith('/admin/problems/P%2F1/testcases-upload/init', {
+                fileName: 'testcases.zip', fileSize: 52_428_801, totalChunks: 3,
+            });
+
+            jest.mocked(largeUploadApi.post).mockResolvedValueOnce({ data: { success: true, chunkIndex: 0 } } as never);
+            await adminService.uploadProblemTestcaseChunk('P/1', 'testcase-upload', 0, new Blob(['chunk']));
+            const [chunkPath, formData] = jest.mocked(largeUploadApi.post).mock.calls[1];
+            expect(chunkPath).toBe('/admin/problems/P%2F1/testcases-upload/chunk');
+            expect((formData as FormData).get('uploadId')).toBe('testcase-upload');
+            expect((formData as FormData).get('chunkIndex')).toBe('0');
+
+            jest.mocked(largeUploadApi.post).mockResolvedValueOnce({ data: { message: 'done', insertedCount: 2 } } as never);
+            await expect(adminService.completeProblemTestcaseUpload('P/1', 'testcase-upload'))
+                .resolves.toEqual({ message: 'done', insertedCount: 2 });
+            expect(largeUploadApi.post).toHaveBeenCalledWith(
+                '/admin/problems/P%2F1/testcases-upload/complete', { uploadId: 'testcase-upload' },
+            );
+        });
     });
 });
