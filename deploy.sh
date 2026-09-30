@@ -18,7 +18,16 @@ bad = [row["Name"] for row in rows if row.get("State") != "running" or row.get("
 print(" ".join(bad))
 ')
     if [[ -z "$unhealthy" ]]; then
-        curl -fsS -H 'Host: nonbangkokgrader.com' http://127.0.0.1/ >/dev/null
+        http_port="${HTTP_PORT:-80}"
+        https_port="${HTTPS_PORT:-443}"
+        http_status=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H 'Host: nonbangkokgrader.com' "http://127.0.0.1:${http_port}/")
+        if [[ "$http_status" != "301" ]]; then
+            echo "Expected HTTP to redirect to HTTPS, got $http_status" >&2
+            exit 1
+        fi
+        curl -fsS --resolve "nonbangkokgrader.com:${https_port}:127.0.0.1" \
+            "https://nonbangkokgrader.com:${https_port}/" >/dev/null
         echo "OJ deployment healthy"
         exit 0
     fi

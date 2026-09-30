@@ -12,7 +12,7 @@ interface ErrorBoundaryState {
 
 /**
  * Global render-crash guard. Without it, a throwing component white-screens
- * the whole CRA app with no recovery. Shows a retry (remount) and a link
+ * the whole application with no recovery. Shows a retry (remount) and a link
  * back home instead.
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {

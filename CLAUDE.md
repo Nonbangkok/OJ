@@ -30,12 +30,12 @@ npm test -- -t "test name substring"      # single test by name
 
 ### Frontend (`frontend/`)
 
-Create React App (react-scripts). `npm test` runs in **watch mode** by default — use `CI=true` for one-shot.
+Vite serves the frontend and Jest runs its tests.
 
 ```bash
-npm start                                  # dev server
+npm start                                  # Vite dev server
 npm run build
-CI=true npm test                           # run once
+npm run test:ci                            # one-shot Jest run with coverage
 npm test -- src/tests/foo.test.tsx         # single test file
 npm run validate                           # type-check + lint:check + test:ci (run before pushing)
 npm run lint                               # eslint --fix
@@ -66,7 +66,7 @@ Nginx (`nginx-proxy/*.conf`) serves the frontend at `/` and proxies `/api/*` to 
 
 Cross-cutting concerns:
 - **Auth** is session-based (`express-session` + `connect-pg-simple`, stored in the `user_sessions` table). `middleware/requestContext.ts` runs two middlewares on every request: `revalidateSessionUser` re-syncs the session's username/role/existence from the live `users` row (deleted user → request proceeds unauthenticated; role changes apply immediately), then `attachRequestUser` maps it to typed `req.user`. **Controllers read `req.user` only, never `req.session` directly.** `middleware/auth.ts` exposes `requireAuth`, `requireStaffOrAdmin`, `requireAdmin`. Roles: `admin`, `staff`, `user` (see `constants/index.ts`). The authoring family of routes is `staff|admin`, not admin-only.
-- **Site access mode** — `system_settings.site_access_mode` (`public`/`private`, set from Admin Settings). `middleware/siteAccess.ts` (`requirePublicAccess`) guards public-browsing routes: in PUBLIC mode guests get read-only access to problem lists/statements, submissions feed, and scoreboards; in PRIVATE mode unauthenticated requests 401.
+- **Site access mode** — `system_settings.site_access_mode` (`public`/`private`, set from Admin Settings). `middleware/siteAccess.ts` (`requirePublicAccess`) guards public-browsing routes, including user profiles and avatars: in PUBLIC mode guests get read-only access; in PRIVATE mode unauthenticated requests 401.
 - **Rate limiting** — `middleware/rateLimit.ts`: general API limiter (1000/15min), auth limiter (10/15min on login/register), submit limiter (30/min), all keyed on the proxy-vouched IP; plus an in-memory per-account login lockout (10 failures/15min → 15min lockout). SSE and authoring-workspace polling paths are excluded from the general limiter.
 - **Validation** — Zod schemas in `schemas/requestSchemas.ts`, applied via `middleware/validation.ts` (`validateRequest({ body, query, params })`).
 - **Errors** — `middleware/errorHandler.ts` provides `asyncHandler`, `AppError`, plus `notFoundHandler`/`errorHandler` mounted last in `app.ts`. Use `utils/dbErrors.ts` (`isUniqueViolation`, Postgres 23505) to map duplicate-key errors to 409s instead of string-matching.

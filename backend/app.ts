@@ -8,6 +8,7 @@ import { AUTHORING_VALIDATION, SECURITY_CONFIG } from './constants';
 import { attachRequestUser, revalidateSessionUser } from './middleware/requestContext';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { generalApiLimiter } from './middleware/rateLimit';
+import { requirePublicAccess } from './middleware/siteAccess';
 import { maintenanceGate } from './services/maintenanceMode';
 import adminRoutes from './controllers/adminController';
 import authRoutes from './controllers/authController';
@@ -117,6 +118,11 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
   app.use('/', realtimeRoutes);
   app.use('/', authoringDraftRoutes);
   app.use('/', authorProfileRoutes);
+  // In private mode, profile stats and avatars follow the same site gate as
+  // problem, contest, and scoreboard browsing. Keep the gate here so it runs
+  // after the request user has been attached and before the profile handlers.
+  app.use('/users/:username/profile', requirePublicAccess);
+  app.use('/users/:username/avatar', requirePublicAccess);
   app.use('/', userProfileRoutes);
   app.use('/', analyticsRoutes);
 

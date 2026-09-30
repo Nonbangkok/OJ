@@ -89,7 +89,7 @@ To get the Grader System up and running, you only need to install a few essentia
 
 *   **[Docker](https://www.docker.com/):** Essential for containerizing, building, running, and managing the application's services.
 *   **[Git](https://git-scm.com/downloads):** Required to clone the project repository for local development and version control.
-*   **Node.js 20 (optional):** Required only for running npm and root-level smoke
+*   **Node.js 24 (optional):** Required only for running npm and root-level smoke
     tests directly on the host. Docker remains the primary runtime.
 
 ## Installation & Setup
@@ -280,7 +280,7 @@ docker run --rm -d --name oj-authoring-test-db \
 docker exec oj-authoring-test-db pg_isready -U oj_test -d oj_test
 ```
 
-Once `pg_isready` reports accepting connections, run the suite in Node 20 with the
+Once `pg_isready` reports accepting connections, run the suite in Node 24 with the
 same native dependencies and fonts as the deployed backend:
 
 ```bash

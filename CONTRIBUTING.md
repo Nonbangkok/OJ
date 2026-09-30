@@ -19,7 +19,7 @@ You only need these on your host machine — everything else runs in containers:
 
 - [Docker](https://www.docker.com/) (with Docker Compose v2, i.e. `docker compose`)
 - [Git](https://git-scm.com/)
-- Node.js 20 when running npm or root-level smoke tests on the host (optional
+- Node.js 24 when running npm or root-level smoke tests on the host (optional
   when using only the container workflow; see `.nvmrc`)
 
 ## Getting started (local development)
@@ -73,13 +73,12 @@ npm test -- -t "test name substring"       # a single test by name
 
 ### Frontend (`frontend/`)
 
-Create React App. `npm test` runs in **watch mode** by default — use `CI=true`
-for a one-shot run.
+Vite serves the application, and Jest runs the component and service tests.
 
 ```bash
-npm start                                  # dev server
+npm start                                  # Vite dev server
 npm run build
-CI=true npm test                           # run once
+npm run test:ci                            # run once with coverage
 npm test -- src/tests/foo.test.tsx         # a single test file
 npm run type-check                         # tsc --noEmit
 npm run lint                               # eslint --fix

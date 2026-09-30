@@ -1,5 +1,5 @@
 # Use an official Node.js runtime as a parent image. We'll use a recent Long-Term Support (LTS) version.
-FROM node:20-slim
+FROM node:24-slim
 
 # Install g++, build tools, the 'time' utility, and Python 3 (stdlib only —
 # `python` submissions run via `python3`, resolved from /usr/bin inside

@@ -1,11 +1,11 @@
-FROM node:20-slim AS build
+FROM node:24-slim AS build
 WORKDIR /build
 COPY package*.json ./
 RUN npm ci --no-audit
 COPY . .
 RUN npm run build
 
-# Match the approved PDF demo's Qt/FreeType environment, while retaining Node 20.
+# Match the approved PDF demo's Qt/FreeType environment, while retaining Node 24.
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends g++ util-linux \

@@ -1,5 +1,5 @@
 # Stage 1: Build the React application
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 
 # Set the working directory
 WORKDIR /app
@@ -8,26 +8,17 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-# CRA 5 + modern lint/tooling can emit peer-dependency conflicts in npm v10+.
-# Use legacy peer resolution in container build to avoid ERESOLVE hard-fail.
 # Use `npm ci` for reproducible, lockfile-exact installs (requires package-lock.json).
-RUN npm ci --legacy-peer-deps --no-audit
+RUN npm ci --no-audit
 
 # Copy the rest of the application source code
 COPY . .
 
 # Build the application for production
-ARG REACT_APP_API_URL
-ARG REACT_APP_LARGE_UPLOAD_API_URL
-ENV REACT_APP_API_URL=$REACT_APP_API_URL
-ENV REACT_APP_LARGE_UPLOAD_API_URL=$REACT_APP_LARGE_UPLOAD_API_URL
-# CRA's production build runs ESLint in this container, but the repo's strict
-# type-aware ESLint config is not compatible with the pinned plugin version.
-ENV DISABLE_ESLINT_PLUGIN=true
-# Emit the webpack runtime as a separate self-hosted file instead of an inline
-# <script>. The reverse-proxy CSP uses `script-src 'self'` (no 'unsafe-inline'),
-# which would otherwise block CRA's inlined runtime chunk and break the app.
-ENV INLINE_RUNTIME_CHUNK=false
+ARG REACT_APP_API_URL=/api
+ARG REACT_APP_LARGE_UPLOAD_API_URL=
+ENV VITE_API_URL=$REACT_APP_API_URL
+ENV VITE_LARGE_UPLOAD_API_URL=$REACT_APP_LARGE_UPLOAD_API_URL
 RUN npm run build
 
 # Stage 2: Serve the application with Nginx
