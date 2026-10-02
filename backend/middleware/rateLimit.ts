@@ -6,6 +6,14 @@ import { RATE_LIMIT_CONFIG, USER_ROLES } from '../constants';
 const isTestEnv = (_req: Request): boolean => process.env.NODE_ENV === 'test';
 
 /**
+ * Local/admin-stack escape hatch for login throttling. The secure default is
+ * enabled protection; set OJ_DISABLE_LOGIN_LIMIT=true only on a deliberately
+ * trusted deployment where unlimited login retries are required.
+ */
+export const isLoginRateLimitDisabled = (): boolean =>
+  process.env.OJ_DISABLE_LOGIN_LIMIT?.toLowerCase() === 'true';
+
+/**
  * Staff/admin sessions are exempt from the operational rate limiters (general
  * API + submit). Limiter middleware runs AFTER revalidateSessionUser +
  * attachRequestUser in app.ts, so req.user.role here is re-synced from the
@@ -96,7 +104,8 @@ export const authLimiter: RateLimitRequestHandler = rateLimit({
   max: RATE_LIMIT_CONFIG.AUTH_MAX,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: isTestEnv,
+  skip: (req: Request): boolean =>
+    isTestEnv(req) || (req.path === '/login' && isLoginRateLimitDisabled()),
   keyGenerator: proxyClientKey,
   message: tooManyRequests('Too many authentication attempts, please try again later.'),
 });
@@ -168,11 +177,13 @@ const evictStaleEntries = (now: number): void => {
 const accountKey = (username: string): string => username.trim().toLowerCase();
 
 export const isLoginLocked = (username: string, now: number = Date.now()): boolean => {
+  if (isLoginRateLimitDisabled()) return false;
   const entry = loginFailures.get(accountKey(username));
   return entry !== undefined && entry.lockedUntil > now;
 };
 
 export const recordLoginFailure = (username: string, now: number = Date.now()): void => {
+  if (isLoginRateLimitDisabled()) return;
   const key = accountKey(username);
   evictStaleEntries(now);
 

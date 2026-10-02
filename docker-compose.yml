@@ -16,6 +16,7 @@ x-backend-environment: &backend-environment
   COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
   CORS_ORIGINS: ${CORS_ORIGINS:-}
   TRUST_PROXY: ${TRUST_PROXY:-1}
+  OJ_DISABLE_LOGIN_LIMIT: ${OJ_DISABLE_LOGIN_LIMIT:-false}
   AUTHORING_JOBS_DIR: /jobs
 
 services:

@@ -66,67 +66,67 @@ const router: Router = express.Router();
 router.get('/admin/users', requireAuth, requireAdmin,
   validateRequest({ query: adminUsersQuerySchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  // ADMIN-008: search/role scope is applied before paging and to the matching total.
-  const { page, limit, search, role } = req.query as unknown as {
-    page: number;
-    limit: number;
-    search?: string;
-    role: string;
-  };
-  const result = await getAdminUsers(page, limit, { search, role });
-  res.json(result);
-}));
+    // ADMIN-008: search/role scope is applied before paging and to the matching total.
+    const { page, limit, search, role } = req.query as unknown as {
+      page: number;
+      limit: number;
+      search?: string;
+      role: string;
+    };
+    const result = await getAdminUsers(page, limit, { search, role });
+    res.json(result);
+  }));
 
 router.post('/admin/users', requireAuth, requireAdmin,
   validateRequest({ body: createAdminUserSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const { username, password, role } = req.body as CreateAdminUserRequestBody;
-  const createResult = await createAdminUser(username, password, role, SECURITY_CONFIG.SALT_ROUNDS);
-  if (createResult.kind === 'duplicate_username') {
-    throw new AppError('Username already exists.', 409);
-  }
-  res.status(201).json(createResult.data);
-}));
+    const { username, password, role } = req.body as CreateAdminUserRequestBody;
+    const createResult = await createAdminUser(username, password, role, SECURITY_CONFIG.SALT_ROUNDS);
+    if (createResult.kind === 'duplicate_username') {
+      throw new AppError('Username already exists.', 409);
+    }
+    res.status(201).json(createResult.data);
+  }));
 
 router.put('/admin/users/submission-lock', requireAuth, requireAdmin,
   validateRequest({ body: updateAdminUsersSubmissionLockSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const { ids, locked } = req.body as { ids: number[]; locked: boolean };
-  res.json(await setAdminUsersSubmissionLock(ids, locked));
-}));
+    const { ids, locked } = req.body as { ids: number[]; locked: boolean };
+    res.json(await setAdminUsersSubmissionLock(ids, locked));
+  }));
 
 router.put('/admin/users/:id', requireAuth, requireAdmin,
   validateRequest({ params: idParamSchema, body: updateAdminUserSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const id = String(req.params.id);
-  const { username, role } = req.body as UpdateAdminUserRequestBody;
+    const id = String(req.params.id);
+    const { username, role } = req.body as UpdateAdminUserRequestBody;
 
-  if (req.user?.id === Number(id)) {
-    throw new AppError('Admins cannot edit their own account.', 403);
-  }
+    if (req.user?.id === Number(id)) {
+      throw new AppError('Admins cannot edit their own account.', 403);
+    }
 
-  const updateResult = await updateAdminUser(id, username, role);
-  if (updateResult.kind === 'not_found') {
-    throw new AppError('User not found.', 404);
-  }
-  if (updateResult.kind === 'protected_user') {
-    throw new AppError('The "Nonbangkok" account cannot be edited.', 403);
-  }
-  if (updateResult.kind === 'duplicate_username') {
-    throw new AppError('Username is already taken.', 409);
-  }
-  res.json(updateResult.data);
-}));
+    const updateResult = await updateAdminUser(id, username, role);
+    if (updateResult.kind === 'not_found') {
+      throw new AppError('User not found.', 404);
+    }
+    if (updateResult.kind === 'protected_user') {
+      throw new AppError('The "Nonbangkok" account cannot be edited.', 403);
+    }
+    if (updateResult.kind === 'duplicate_username') {
+      throw new AppError('Username is already taken.', 409);
+    }
+    res.json(updateResult.data);
+  }));
 
 router.put('/admin/users/:id/submission-lock', requireAuth, requireAdmin,
   validateRequest({ params: idParamSchema, body: updateAdminUserSubmissionLockSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const result = await setAdminUserSubmissionLock(String(req.params.id), req.body.locked);
-  if (result.kind === 'not_lockable') {
-    throw new AppError('Only accounts with the user role can be locked.', 400);
-  }
-  res.json(result.data);
-}));
+    const result = await setAdminUserSubmissionLock(String(req.params.id), req.body.locked);
+    if (result.kind === 'not_lockable') {
+      throw new AppError('Only accounts with the user role can be locked.', 400);
+    }
+    res.json(result.data);
+  }));
 
 // AUTH-004: admin-set password reset. The admin supplies the new password
 // directly (no email infrastructure for a temp-password flow). ALL of the
@@ -137,57 +137,57 @@ router.put('/admin/users/:id/submission-lock', requireAuth, requireAdmin,
 router.put('/admin/users/:id/password', requireAuth, requireAdmin,
   validateRequest({ params: idParamSchema, body: adminResetUserPasswordSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const id = String(req.params.id);
-  const { newPassword } = req.body as AdminResetUserPasswordRequestBody;
+    const id = String(req.params.id);
+    const { newPassword } = req.body as AdminResetUserPasswordRequestBody;
 
-  const resetResult = await resetAdminUserPassword(id, newPassword);
-  if (resetResult.kind === 'not_found') {
-    throw new AppError('User not found.', 404);
-  }
-  if (resetResult.kind === 'protected_user') {
-    throw new AppError('The "Nonbangkok" account password can only be changed by its owner.', 403);
-  }
-  res.json({ message: `Password reset for user ${id}. They will need to sign in again.` });
-}));
+    const resetResult = await resetAdminUserPassword(id, newPassword);
+    if (resetResult.kind === 'not_found') {
+      throw new AppError('User not found.', 404);
+    }
+    if (resetResult.kind === 'protected_user') {
+      throw new AppError('The "Nonbangkok" account password can only be changed by its owner.', 403);
+    }
+    res.json({ message: `Password reset for user ${id}. They will need to sign in again.` });
+  }));
 
 router.delete('/admin/users/:id', requireAuth, requireAdmin,
   validateRequest({ params: idParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const id = String(req.params.id);
+    const id = String(req.params.id);
 
-  if (req.user?.id === Number(id)) {
-    throw new AppError('Admins cannot delete their own account.', 403);
-  }
+    if (req.user?.id === Number(id)) {
+      throw new AppError('Admins cannot delete their own account.', 403);
+    }
 
-  const deleteResult = await deleteAdminUser(id);
-  if (deleteResult.kind === 'not_found') {
-    throw new AppError('User not found.', 404);
-  }
-  if (deleteResult.kind === 'protected_user') {
-    throw new AppError('The "Nonbangkok" account cannot be deleted.', 403);
-  }
-  res.status(200).json({ message: `User ${id} deleted successfully` });
-}));
+    const deleteResult = await deleteAdminUser(id);
+    if (deleteResult.kind === 'not_found') {
+      throw new AppError('User not found.', 404);
+    }
+    if (deleteResult.kind === 'protected_user') {
+      throw new AppError('The "Nonbangkok" account cannot be deleted.', 403);
+    }
+    res.status(200).json({ message: `User ${id} deleted successfully` });
+  }));
 
 router.post('/admin/users/batch', requireAuth, requireAdmin,
   validateRequest({ body: batchCreateUsersSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const { prefix, count } = req.body as BatchCreateUsersRequestBody;
-  const batchResult = await createBatchUsers({
-    prefix,
-    count,
-    saltRounds: SECURITY_CONFIG.SALT_ROUNDS,
-    passwordLength: USER_VALIDATION.RANDOM_PASSWORD_LENGTH,
-  });
-  if (batchResult.kind === 'duplicate_username') {
-    throw new AppError(`Username '${batchResult.username}' already exists. Aborting operation.`, 409);
-  }
-  const responseBody: BatchCreateUsersSuccessResponse = {
-    message: `${count} users created successfully.`,
-    users: batchResult.users,
-  };
-  res.status(201).json(responseBody);
-}));
+    const { prefix, count } = req.body as BatchCreateUsersRequestBody;
+    const batchResult = await createBatchUsers({
+      prefix,
+      count,
+      saltRounds: SECURITY_CONFIG.SALT_ROUNDS,
+      passwordLength: USER_VALIDATION.RANDOM_PASSWORD_LENGTH,
+    });
+    if (batchResult.kind === 'duplicate_username') {
+      throw new AppError(`Username '${batchResult.username}' already exists. Aborting operation.`, 409);
+    }
+    const responseBody: BatchCreateUsersSuccessResponse = {
+      message: `${count} users created successfully.`,
+      users: batchResult.users,
+    };
+    res.status(201).json(responseBody);
+  }));
 
 router.get('/admin/authors', requireAuth, requireStaffOrAdmin, asyncHandler(async (_req: Request, res: Response) => {
   const authors = await getAuthors();
@@ -264,35 +264,35 @@ router.get('/admin/settings/registration', requireAuth, requireAdmin, asyncHandl
 router.post('/admin/rejudge/problem/:problemId', requireAuth, requireAdmin,
   validateRequest({ params: analyticsProblemIdParamSchema }),
   asyncHandler(async (req: Request, res: Response<RejudgeResponse>) => {
-  const { problemId } = req.params as unknown as RejudgeProblemParams;
-  const result = await rejudgeProblem(problemId);
-  res.json(result);
-}));
+    const { problemId } = req.params as unknown as RejudgeProblemParams;
+    const result = await rejudgeProblem(problemId);
+    res.json(result);
+  }));
 
 router.post('/admin/rejudge/contest/:contestId', requireAuth, requireAdmin,
   validateRequest({ params: analyticsContestIdParamSchema }),
   asyncHandler(async (req: Request, res: Response<RejudgeResponse>) => {
-  const { contestId } = req.params as unknown as RejudgeContestParams;
-  const contestStatus = await getContestStatusById(String(contestId));
-  if (contestStatus === null) {
-    throw new AppError('Contest not found.', 404);
-  }
-  // Finished contests keep a frozen scoreboard snapshot; rejudge is refused
-  // so the historical record stays intact (per-problem rejudge remains open).
-  if (contestStatus === CONTEST_STATUS.FINISHED) {
-    throw new AppError('This contest is finished and its scoreboard is frozen. Rejudge its problems individually instead.', 409);
-  }
-  const result = await rejudgeContest(Number(contestId));
-  res.json(result);
-}));
+    const { contestId } = req.params as unknown as RejudgeContestParams;
+    const contestStatus = await getContestStatusById(String(contestId));
+    if (contestStatus === null) {
+      throw new AppError('Contest not found.', 404);
+    }
+    // Finished contests keep a frozen scoreboard snapshot; rejudge is refused
+    // so the historical record stays intact (per-problem rejudge remains open).
+    if (contestStatus === CONTEST_STATUS.FINISHED) {
+      throw new AppError('This contest is finished and its scoreboard is frozen. Rejudge its problems individually instead.', 409);
+    }
+    const result = await rejudgeContest(Number(contestId));
+    res.json(result);
+  }));
 
 router.put('/admin/settings/registration', requireAuth, requireAdmin,
   validateRequest({ body: updateRegistrationSettingSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const { enabled } = req.body as UpdateRegistrationSettingRequestBody;
-  await updateRegistrationEnabled(enabled);
-  res.status(200).json({ message: 'Registration setting updated successfully.' });
-}));
+    const { enabled } = req.body as UpdateRegistrationSettingRequestBody;
+    await updateRegistrationEnabled(enabled);
+    res.status(200).json({ message: 'Registration setting updated successfully.' });
+  }));
 
 router.get('/admin/settings/site-access', requireAuth, requireAdmin, asyncHandler(async (_req: Request, res: Response) => {
   const accessMode = await getSiteAccessMode();
@@ -302,10 +302,10 @@ router.get('/admin/settings/site-access', requireAuth, requireAdmin, asyncHandle
 router.put('/admin/settings/site-access', requireAuth, requireAdmin,
   validateRequest({ body: updateSiteAccessModeSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const { accessMode } = req.body as { accessMode: 'public' | 'private' };
-  await updateSiteAccessMode(accessMode);
-  res.status(200).json({ message: 'Site access mode updated successfully.' });
-}));
+    const { accessMode } = req.body as { accessMode: 'public' | 'private' };
+    await updateSiteAccessMode(accessMode);
+    res.status(200).json({ message: 'Site access mode updated successfully.' });
+  }));
 
 router.get('/admin/settings/password-change', requireAuth, requireAdmin, asyncHandler(async (_req: Request, res: Response) => {
   const enabled = await getPasswordChangeEnabled();
@@ -315,9 +315,9 @@ router.get('/admin/settings/password-change', requireAuth, requireAdmin, asyncHa
 router.put('/admin/settings/password-change', requireAuth, requireAdmin,
   validateRequest({ body: updatePasswordChangeSettingSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const { enabled } = req.body as UpdatePasswordChangeSettingRequestBody;
-  await updatePasswordChangeEnabled(enabled);
-  res.status(200).json({ message: 'Password change setting updated successfully.' });
-}));
+    const { enabled } = req.body as UpdatePasswordChangeSettingRequestBody;
+    await updatePasswordChangeEnabled(enabled);
+    res.status(200).json({ message: 'Password change setting updated successfully.' });
+  }));
 
 export default router;
