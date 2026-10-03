@@ -28,6 +28,38 @@ test('dirty edits disable actions, explicit Save sends only changed fields and t
   expect(result.current.draft?.revision).toBe(4);
 });
 
+test('keeps typing during a save and serializes the newer value at the returned revision', async () => {
+  const { result } = renderHook(() => useAuthoringDraft('d1'));
+  await waitFor(() => expect(result.current.draft?.revision).toBe(3));
+
+  act(() => result.current.edit('title', 'First edit'));
+  let resolveFirst!: (response: { data: typeof draft }) => void;
+  jest.mocked(api.patch).mockImplementationOnce(() => new Promise(resolve => { resolveFirst = resolve; }))
+    .mockResolvedValueOnce({ data: { ...draft, title: 'Latest edit', revision: 5, status: 'draft' } });
+
+  let firstSave!: Promise<void>;
+  act(() => { firstSave = result.current.save(); });
+  await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(1));
+
+  act(() => result.current.edit('title', 'Latest edit'));
+  expect(result.current.form?.title).toBe('Latest edit');
+  expect(result.current.dirty).toBe(true);
+  act(() => { void result.current.save(); });
+
+  await act(async () => {
+    resolveFirst({ data: { ...draft, title: 'First edit', revision: 4, status: 'draft' } });
+    await firstSave;
+  });
+
+  await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(2));
+  expect(api.patch).toHaveBeenNthCalledWith(2, '/admin/authoring/drafts/d1', {
+    expectedRevision: 4, title: 'Latest edit',
+  });
+  await waitFor(() => expect(result.current.draft?.revision).toBe(5));
+  expect(result.current.form?.title).toBe('Latest edit');
+  expect(result.current.dirty).toBe(false);
+});
+
 test('a revision conflict keeps unsaved source and requires explicit discard-and-sync, never auto retries', async () => {
   const { result } = renderHook(() => useAuthoringDraft('d1'));
   await waitFor(() => expect(result.current.draft).not.toBeNull());

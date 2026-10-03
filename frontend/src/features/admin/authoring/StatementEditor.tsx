@@ -244,7 +244,7 @@ export default function StatementEditor({ id }: { id: string }) {
     {model.error ? <p role="alert">{model.error}</p> : <p role="status">Loading editor…</p>}
   </main>;
 
-  const editorDisabled = model.busy || !!model.activeJob;
+  const editorDisabled = (model.busy && model.saveState !== 'saving') || !!model.activeJob;
   const zoomScale = previewZoom / 100;
   const editorState = draft.status === 'published' ? 'Published — editing available'
     : draft.publishedAt ? 'Editing — live problem unchanged'

@@ -43,8 +43,12 @@ export default function useAuthoringDraft(id: string, options: AuthoringDraftOpt
   const [loaded, setLoaded] = useState(false);
   const [saveState, setSaveState] = useState<'saved' | 'dirty' | 'saving' | 'error'>('saved');
   const [recovered, setRecovered] = useState(false);
+  const draftRef = useRef(draft); draftRef.current = draft;
+  const formRef = useRef(form); formRef.current = form;
   const recoveryHandled = useRef(false);
   const busyRef = useRef(false);
+  const saveInFlightRef = useRef(false);
+  const saveQueuedRef = useRef(false);
   const epoch = useRef(0);
   const setOperationBusy = useCallback((value: boolean) => {
     epoch.current++; busyRef.current = value; setBusy(value);
@@ -164,34 +168,54 @@ export default function useAuthoringDraft(id: string, options: AuthoringDraftOpt
 
   function edit<K extends keyof DraftFields>(key: K, value: DraftFields[K]) {
     const canEditPublishedStatement = options.allowPublishedStatementEdit && key === 'statementHtml';
-    if (busyRef.current || activeJob || (draft?.status === 'published' && !canEditPublishedStatement)) return;
+    if ((busyRef.current && !saveInFlightRef.current) || activeJob
+      || (draft?.status === 'published' && !canEditPublishedStatement)) return;
     dirtyRef.current = true;
-    setForm(previous => {
-      if (!previous) return previous;
-      const next = { ...previous, [key]: value };
-      // Keep the recovery snapshot in sync with unsaved edits.
-      const changes = Object.fromEntries(editableFields.filter(k => draft?.[k] !== next[k]).map(k => [k, next[k]]));
-      writeRecovery(id, Object.keys(changes).length ? { baseRevision: draft?.revision ?? 0, fields: changes } : null);
-      return next;
-    });
+    const previous = formRef.current;
+    if (!previous) return;
+    const next = { ...previous, [key]: value };
+    formRef.current = next;
+    // Keep the recovery snapshot in sync with unsaved edits.
+    const changes = Object.fromEntries(editableFields.filter(k => draft?.[k] !== next[k]).map(k => [k, next[k]]));
+    writeRecovery(id, Object.keys(changes).length ? { baseRevision: draft?.revision ?? 0, fields: changes } : null);
+    setForm(next);
   }
   function restoreStatement(statementHtml: string, baseRevision: number) {
     if (!draft || !form || statementHtml === form.statementHtml) return;
     dirtyRef.current = true;
-    setForm(previous => previous ? { ...previous, statementHtml } : previous);
+    const next = { ...form, statementHtml };
+    formRef.current = next;
+    setForm(next);
     if (baseRevision !== draft.revision) setConflict(true);
   }
   async function save() {
-    if (!draft || !form || !dirty || busyRef.current || activeJob || conflict || !loaded) return;
-    const changes = Object.fromEntries(editableFields.filter(key => draft[key] !== form[key]).map(key => [key, form[key]]));
-    const canSavePublishedStatement = options.allowPublishedStatementEdit && draft.status === 'published'
+    if (saveInFlightRef.current) { saveQueuedRef.current = true; return; }
+    const currentDraft = draftRef.current;
+    const currentForm = formRef.current;
+    if (!currentDraft || !currentForm || !dirty || busyRef.current || activeJob || conflict || !loaded) return;
+    const submittedForm = currentForm;
+    const changes = Object.fromEntries(editableFields.filter(key => currentDraft[key] !== submittedForm[key]).map(key => [key, submittedForm[key]]));
+    const canSavePublishedStatement = options.allowPublishedStatementEdit && currentDraft.status === 'published'
       && Object.keys(changes).length === 1 && changes.statementHtml !== undefined;
-    if (draft.status === 'published' && !canSavePublishedStatement) return;
+    if (currentDraft.status === 'published' && !canSavePublishedStatement) return;
+    saveInFlightRef.current = true;
     setOperationBusy(true); setError(''); setSaveState('saving');
     try {
-      const result = await authoringService.saveDraft(id, { expectedRevision: draft.revision, ...changes });
-      setDraft(result); setForm(result); dirtyRef.current = false; setSaveState('saved');
-      writeRecovery(id, null);
+      const result = await authoringService.saveDraft(id, { expectedRevision: currentDraft.revision, ...changes });
+      const latestForm = formRef.current ?? submittedForm;
+      const mergedForm = { ...result };
+      for (const key of editableFields) {
+        if (latestForm[key] !== submittedForm[key]) mergedForm[key] = latestForm[key] as never;
+      }
+      draftRef.current = result; formRef.current = mergedForm;
+      setDraft(result); setForm(mergedForm);
+      const hasNewerChanges = editableFields.some(key => result[key] !== mergedForm[key]);
+      dirtyRef.current = hasNewerChanges;
+      setSaveState(hasNewerChanges ? 'dirty' : 'saved');
+      const remaining = Object.fromEntries(editableFields
+        .filter(key => result[key] !== mergedForm[key]).map(key => [key, mergedForm[key]]));
+      writeRecovery(id, Object.keys(remaining).length
+        ? { baseRevision: result.revision, fields: remaining } : null);
     } catch (err) {
       onError(err); setSaveState('error');
       const code = toApiLikeError(err).response?.data?.code;
@@ -199,7 +223,14 @@ export default function useAuthoringDraft(id: string, options: AuthoringDraftOpt
         try { await refresh(); } catch (refreshError) { onError(refreshError); }
       }
     }
-    finally { setOperationBusy(false); }
+    finally {
+      saveInFlightRef.current = false;
+      setOperationBusy(false);
+      if (saveQueuedRef.current) {
+        saveQueuedRef.current = false;
+        window.setTimeout(() => { if (dirtyRef.current) void autosaveRef.current(); }, 0);
+      }
+    }
   }
   async function mutate(action: () => Promise<unknown>) {
     if (actionsDisabled || busyRef.current) return;
