@@ -94,6 +94,12 @@ const authoringService = {
     const response = await api.get<StatementPreviewContext>(`${draftBase(id)}/preview-context`);
     return response.data;
   },
+  draftAssetUrl: (id: string, assetId: string): string => {
+    const base = api.defaults?.baseURL || '';
+    const url = new URL(`${base.replace(/\/$/, '')}${draftBase(id)}/assets/${encodeURIComponent(assetId)}`, window.location.origin);
+    if (url.origin !== window.location.origin) throw new Error('Statement assets must be served from this site');
+    return `${url.pathname}${url.search}`;
+  },
   draftPdfUrl: (id: string, revision: number | null): string =>
     `${(api.defaults?.baseURL || '').replace(/\/$/, '')}${draftBase(id)}/pdf?revision=${revision}`,
 

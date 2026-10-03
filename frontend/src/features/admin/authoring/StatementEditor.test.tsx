@@ -1,9 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import useAuthoringDraft from './useAuthoringDraft';
+import useStatementPreview from './useStatementPreview';
 import StatementEditor from './StatementEditor';
 
 jest.mock('./useAuthoringDraft');
+jest.mock('./useStatementPreview', () => ({ __esModule: true, default: jest.fn() }));
 
 const draft = {
   id: 'd1', problemId: 'sum', title: 'Sum', authorProfileId: null, authorAkaName: 'AKA',
@@ -22,11 +24,13 @@ const model = (activeJob?: { id: string; jobType: string; status: string }) => (
 });
 
 const mockedUseAuthoringDraft = jest.mocked(useAuthoringDraft);
+const mockedUseStatementPreview = jest.mocked(useStatementPreview);
 
 afterEach(() => jest.clearAllMocks());
 
 test('source remains editable while autosave is pending', () => {
-  mockedUseAuthoringDraft.mockReturnValue(model() as ReturnType<typeof useAuthoringDraft>);
+  mockedUseAuthoringDraft.mockReturnValue(model() as unknown as ReturnType<typeof useAuthoringDraft>);
+  mockedUseStatementPreview.mockReturnValue({ html: '', state: 'waiting', error: '' });
 
   render(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
 
@@ -34,9 +38,21 @@ test('source remains editable while autosave is pending', () => {
 });
 
 test('source locks while an authoring job is active', () => {
-  mockedUseAuthoringDraft.mockReturnValue(model({ id: 'j1', jobType: 'pdf', status: 'running' }) as ReturnType<typeof useAuthoringDraft>);
+  mockedUseAuthoringDraft.mockReturnValue(model({ id: 'j1', jobType: 'pdf', status: 'running' }) as unknown as ReturnType<typeof useAuthoringDraft>);
+  mockedUseStatementPreview.mockReturnValue({ html: '', state: 'waiting', error: '' });
 
   render(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
 
   expect(screen.getByRole('textbox', { name: 'Statement source' })).toHaveAttribute('readonly');
+});
+
+test('keeps source writable and visible when local preview reports an error', () => {
+  mockedUseAuthoringDraft.mockReturnValue(model() as unknown as ReturnType<typeof useAuthoringDraft>);
+  mockedUseStatementPreview.mockReturnValue({ html: '', state: 'error', error: 'Invalid statement markup' });
+
+  render(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
+
+  expect(screen.getByRole('textbox', { name: 'Statement source' })).toHaveValue('# Sum');
+  expect(screen.getByRole('textbox', { name: 'Statement source' })).not.toHaveAttribute('readonly');
+  expect(screen.getByText('Invalid statement markup')).toBeInTheDocument();
 });

@@ -5,11 +5,11 @@ import { ImperativePanelGroupHandle, Panel, PanelGroup, PanelResizeHandle } from
 import { Button, Dialog } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
 import useAuthoringDraft from './useAuthoringDraft';
+import useStatementPreview from './useStatementPreview';
 import { jobLabel } from './status';
 import { StatementAssets } from './StatementTab';
 import styles from './Authoring.module.css';
 
-const PREVIEW_DELAY_MS = 400;
 const recoveryKey = (id: string) => `oj-authoring-statement:${id}`;
 const previewZoomKey = (id: string) => `oj-authoring-statement-preview-zoom:${id}`;
 const MIN_PREVIEW_ZOOM = 50;
@@ -134,9 +134,6 @@ function PdfEmbed({ draftId, revision, buildRunning }: { draftId: string; revisi
 export default function StatementEditor({ id }: { id: string }) {
   const model = useAuthoringDraft(id, { allowPublishedStatementEdit: true });
   const { draft, form, dirty } = model;
-  const [preview, setPreview] = useState('');
-  const [previewState, setPreviewState] = useState<'waiting' | 'loading' | 'ready' | 'error'>('waiting');
-  const [previewError, setPreviewError] = useState('');
   const [recovered, setRecovered] = useState(false);
   const [showAssets, setShowAssets] = useState(false);
   // Live HTML shows unsaved edits instantly; the Actual PDF tab shows the
@@ -158,7 +155,6 @@ export default function StatementEditor({ id }: { id: string }) {
     void buildPdf();
   }, [pdfMode, pdfStale, model.activeJob, model.actionsDisabled, draft?.revision, draft?.latestPdfRevision, buildPdf]);
   useEffect(() => { if (!pdfStale) autoBuiltRef.current = ''; }, [pdfStale]);
-  const request = useRef(0);
   const recoveryHandled = useRef(false);
   const recoveryBaseRevision = useRef<number | null>(null);
   const wasDirty = useRef(false);
@@ -168,6 +164,7 @@ export default function StatementEditor({ id }: { id: string }) {
   const draftId = draft?.id;
   const draftRevision = draft?.revision;
   const statementSource = form?.statementHtml;
+  const preview = useStatementPreview(draftId, statementSource, draftRevision);
 
   useEffect(() => {
     if (recoveryHandled.current || !draft || !form) return;
@@ -196,24 +193,6 @@ export default function StatementEditor({ id }: { id: string }) {
       wasDirty.current = false; setRecovered(false);
     }
   }, [dirty, draftRevision, id]);
-
-  useEffect(() => {
-    if (!draftId || statementSource === undefined) return;
-    const current = ++request.current;
-    setPreviewState('waiting'); setPreviewError('');
-    const timer = window.setTimeout(async () => {
-      setPreviewState('loading');
-      try {
-        const response = await authoringService.previewStatement(draftId, statementSource);
-        if (current === request.current) { setPreview(response.html); setPreviewState('ready'); }
-      } catch {
-        if (current === request.current) {
-          setPreviewState('error'); setPreviewError('Preview could not be updated. Your source is unchanged.');
-        }
-      }
-    }, PREVIEW_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [draftId, draftRevision, statementSource]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -250,8 +229,8 @@ export default function StatementEditor({ id }: { id: string }) {
     : draft.publishedAt ? 'Editing — live problem unchanged'
       : model.conflict ? 'Server conflict'
         : dirty ? (model.saveState === 'saving' ? 'Saving…' : 'Unsaved changes') : 'Saved';
-  const previewStatusText = previewState === 'waiting' ? 'Waiting for typing to pause…' : previewState === 'loading' ? 'Updating preview…'
-    : previewState === 'error' ? previewError : 'Preview is up to date';
+  const previewStatusText = preview.state === 'waiting' ? 'Preparing live preview…' : preview.state === 'loading' ? 'Rendering live preview…'
+    : preview.state === 'error' ? preview.error : 'Live preview is up to date';
   return <main className={styles.editorShell}>
     <header className={styles.editorHeader}>
       <div className={styles.editorHeaderLeft}>
@@ -312,7 +291,7 @@ export default function StatementEditor({ id }: { id: string }) {
               ? <PdfEmbed draftId={draft.id} revision={draft.latestPdfRevision}
                 buildRunning={!!model.activeJob} />
               : <div className={styles.previewEmpty}>No PDF built yet.</div>)
-            : (preview ? <LivePreview preview={preview} zoomScale={zoomScale} />
+            : (preview.html ? <LivePreview preview={preview.html} zoomScale={zoomScale} />
               : <div className={styles.previewEmpty}>Preview will appear here.</div>)}
         </div>
         {pdfMode && pdfStale && !model.activeJob && (
