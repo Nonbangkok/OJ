@@ -1,0 +1,17 @@
+.git
+.codex
+.superpowers
+**/node_modules
+**/dist
+**/build
+**/coverage
+**/test-results
+**/playwright-report
+**/.env
+**/.env.*
+**/*.log
+**/*.pem
+**/*.key
+**/*.crt
+backend/uploads
+certbot-www

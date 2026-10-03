@@ -55,6 +55,8 @@
 - Create: `shared/statement-renderer/statementCompiler.js`
 - Modify: `backend/package.json` and `backend/package-lock.json`
 - Modify: `frontend/package.json` and `frontend/package-lock.json`
+- Modify: `backend/Dockerfile`, `frontend/Dockerfile`, and `docker-compose.yml`
+- Create: `.dockerignore`, `backend/.npmrc`, and `frontend/.npmrc`
 - Modify: `backend/authoring/statementCompiler.ts`
 - Modify: `backend/authoring/statementSanitizer.ts`
 - Modify: `backend/services/authoringWorkspaceService.ts`
@@ -63,13 +65,14 @@
 
 **Interfaces:**
 - Consumes: existing compiler semantics in `backend/authoring/statementCompiler.ts` and sanitizer semantics in `backend/authoring/statementSanitizer.ts`.
-- Produces: CommonJS package `@oj/statement-renderer` with declarations for `compileStatementSource(source: string, assetNames: readonly string[]): string` and `renderStatementMath(html: string): string`; backend modules preserve their existing import paths by re-exporting compiler/sanitizer functions and the workspace service imports the shared math renderer.
+- Produces: CommonJS package `@oj/statement-renderer` with `compileStatementSource(source: string, assetNames: readonly string[]): string` and `renderStatementMath(html: string, renderMath?: (tex: string, display: boolean, timeoutMs: number) => string): string`; backend modules preserve their existing import paths by re-exporting compiler/sanitizer functions and the workspace service imports the shared math renderer while injecting its VM-bounded KaTeX callback.
 
 - [ ] **Step 1: Add shared renderer tests** for current GFM/raw-HTML behavior, math delimiters and limits, the supported tag/attribute/style allowlists, safe links, image allowlisting, and rejection of scripts and malformed input.
 - [ ] **Step 2: Run backend and shared renderer tests** and confirm new package imports fail before implementation.
 - [ ] **Step 3: Implement the CommonJS package** with pinned Marked 4.0.8, KaTeX 0.15.1, and htmlparser2 10.0.0, using browser-safe APIs (no `node:vm`, `node:crypto`, or `Buffer`). Adapt backend compiler/sanitizer modules to re-export the shared canonical implementations without changing their callers; update `authoringWorkspaceService.ts` to use the shared math renderer.
-- [ ] **Step 4: Run the backend compiler and sanitizer tests** and confirm the existing backend behavior and new shared tests pass.
-- [ ] **Step 5: Commit** as `refactor: share canonical statement rendering rules`.
+- [ ] **Step 4: Update image build contexts** to the repository root, copy the shared package into each app build, enable npm `install-links` so local file dependencies are copied with their dependencies, and exclude secrets, generated output, and `node_modules` from the root Docker context.
+- [ ] **Step 5: Run the backend compiler and sanitizer tests plus the frontend shared renderer tests** and confirm existing backend behavior and new shared tests pass.
+- [ ] **Step 6: Commit** as `refactor: share canonical statement rendering rules`.
 
 ### Task 3: Provide a safe preview context without per-edit server rendering
 
@@ -121,6 +124,6 @@
 - Produces: validated frontend and backend builds with the existing PDF job path untouched.
 
 - [ ] **Step 1: Run the complete focused test sets** for authoring draft hooks/editor, statement compiler/sanitizer, and preview context endpoint.
-- [ ] **Step 2: Run frontend and backend type/build checks** and confirm the shared package is included in both runtime bundles.
+- [ ] **Step 2: Run frontend and backend type/build checks and build both images from the repository-root context**; confirm the shared package is included in both runtime bundles.
 - [ ] **Step 3: Review security parity cases** from Review Focus and verify the worker/frame never execute source scripts or load undeclared assets.
 - [ ] **Step 4: Commit any verification-only test corrections** as `test: cover live authoring preview boundaries`.

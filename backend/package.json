@@ -20,6 +20,8 @@
   },
   "dependencies": {
     "archiver": "^7.0.1",
+    "@oj/statement-renderer": "file:../shared/statement-renderer",
+    "@oj/statement-renderer": "file:../shared/statement-renderer",
     "bcrypt": "^6.0.0",
     "connect-pg-simple": "^9.0.1",
     "cors": "^2.8.5",
