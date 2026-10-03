@@ -13,6 +13,7 @@ type Database = Pick<typeof db, 'query'>;
 type PreviewDraft = Pick<ProblemDraftRow, 'id' | 'problem_id' | 'title' | 'author_aka_name'
   | 'author_real_name' | 'language' | 'country_code' | 'author_profile_image_png' | 'template_version'>;
 type RasterAsset = Pick<ProblemDraftAssetRow, 'filename' | 'mime_type' | 'content'>;
+type PreviewAssetMetadata = Pick<ProblemDraftAssetRow, 'id' | 'filename'>;
 type JobListRow = Pick<AuthoringJobRow, 'id' | 'draft_id' | 'draft_revision' | 'job_type' | 'status'
   | 'error_code' | 'error_message' | 'created_at' | 'started_at' | 'finished_at'>;
 const MAX_EMBEDDED_IMAGE_BYTES = 16 * 1024 * 1024;
@@ -64,6 +65,40 @@ function resources() {
   bundledResources = { css, script, fonts }; return bundledResources;
 }
 
+function buildPreviewShell(draft: PreviewDraft, avatar: Buffer, allowSameOriginImages: boolean): string {
+  const bundle = resources();
+  let shell = buildPdfHtml({ templateVersion: draft.template_version, title: draft.title,
+    taskCode: draft.problem_id, akaName: draft.author_aka_name, realName: draft.author_real_name,
+    language: draft.language, countryCode: draft.country_code, statementHtml: '' },
+  { templateBaseUrl: templateUrl, assetBaseUrl: 'file:///preview-assets', avatarUrl });
+  shell = shell.replace(`<link rel="stylesheet" href="${templateUrl}/vendor/katex.css">`, () => `<style>${bundle.css}</style>`)
+    .replace(/url\('file:\/\/\/preview-bundle\/([^']+)'\)/g, (_match, relative: string) => {
+      const font = bundle.fonts.get(relative); if (!font) throw new Error('Unbundled preview font'); return `url('${font}')`;
+    })
+    .replace(`src="${avatarUrl}"`, () => `src="data:image/png;base64,${avatar.toString('base64')}"`)
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '');
+  const imageSources = allowSameOriginImages ? "'self' data:" : 'data:';
+  const csp = `default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src ${imageSources}; font-src data:; base-uri 'none'; form-action 'none'`;
+  return shell.replace('<meta charset="utf-8">', () => `<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}">`);
+}
+
+/** Static preview chrome and declared asset names; no unsaved source or image bytes are included. */
+export async function getWorkspacePreviewContext(id: string, database: Database = db): Promise<{
+  html: string; assets: PreviewAssetMetadata[];
+} | null> {
+  const draft = (await database.query<PreviewDraft>(`SELECT id,problem_id,title,author_aka_name,
+    author_real_name,language,country_code,author_profile_image_png,template_version
+    FROM problem_drafts WHERE id=$1`, [id])).rows[0];
+  if (!draft) return null;
+  if (draft.template_version !== PDF_TEMPLATE_VERSION) {
+    throw new StatementError('unsupported_template', 'This template version is not supported');
+  }
+  const assets = (await database.query<PreviewAssetMetadata>(`SELECT id,filename FROM problem_draft_assets
+    WHERE draft_id=$1 ORDER BY filename`, [id])).rows.map(({ id: assetId, filename }) => ({ id: assetId, filename }));
+  const avatar = draft.author_profile_image_png ?? await createFallbackAuthorAvatar(draft.author_aka_name);
+  return { html: buildPreviewShell(draft, avatar, true), assets };
+}
+
 let mathContext: Context | undefined;
 const renderMath = new Script(`require('katex').renderToString(tex, {displayMode: display, strict: 'error',
   throwOnError: true, trust: function(){throw new Error('Untrusted math command');}, maxExpand: 1000, maxSize: 100})`);
@@ -107,19 +142,7 @@ export async function previewWorkspaceStatement(id: string, statementHtml: strin
     return ` src="data:${asset.mime_type};base64,${asset.content.toString('base64')}"`;
   });
   const avatar = draft.author_profile_image_png ?? await createFallbackAuthorAvatar(draft.author_aka_name);
-  const bundle = resources();
-  // Transform only the trusted shell. Preview has no JavaScript, even when embedded under the app CSP.
-  let shell = buildPdfHtml({ templateVersion: draft.template_version, title: draft.title,
-    taskCode: draft.problem_id, akaName: draft.author_aka_name, realName: draft.author_real_name,
-    language: draft.language, countryCode: draft.country_code, statementHtml: '' },
-  { templateBaseUrl: templateUrl, assetBaseUrl: 'file:///preview-assets', avatarUrl });
-  shell = shell.replace(`<link rel="stylesheet" href="${templateUrl}/vendor/katex.css">`, () => `<style>${bundle.css}</style>`)
-    .replace(/url\('file:\/\/\/preview-bundle\/(fonts\/[^']+)'\)/g, (_match, relative: string) => {
-      const font = bundle.fonts.get(relative); if (!font) throw new Error('Unbundled preview font'); return `url('${font}')`;
-    })
-    .replace(`src="${avatarUrl}"`, () => `src="data:image/png;base64,${avatar.toString('base64')}"`)
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '');
-  const csp = "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'";
-  return shell.replace('<meta charset="utf-8">', () => `<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}">`)
+  const shell = buildPreviewShell(draft, avatar, false);
+  return shell
     .replace('<article id="statement" class="statement"></article>', () => `<article id="statement" class="statement">${statement}</article>`);
 }

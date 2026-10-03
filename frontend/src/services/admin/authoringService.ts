@@ -35,6 +35,11 @@ export interface TestcaseContents extends TestcaseMetadata {
   output: string | null;
 }
 
+export interface StatementPreviewContext {
+  html: string;
+  assets: Array<{ id: string; filename: string }>;
+}
+
 const authoringService = {
   // Drafts
   /**
@@ -83,6 +88,10 @@ const authoringService = {
     const response = await api.post<{ html: string }>(`${draftBase(id)}/preview`, {
       statementHtml,
     });
+    return response.data;
+  },
+  getPreviewContext: async (id: string): Promise<StatementPreviewContext> => {
+    const response = await api.get<StatementPreviewContext>(`${draftBase(id)}/preview-context`);
     return response.data;
   },
   draftPdfUrl: (id: string, revision: number | null): string =>
