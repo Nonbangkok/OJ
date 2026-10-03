@@ -22,14 +22,16 @@ RUN apt-get update \
 WORKDIR /usr/src/app
 
 # Copy package.json and package-lock.json first to leverage Docker's layer caching
-COPY package*.json ./
+COPY backend/package*.json ./
+COPY backend/.npmrc ./
+COPY shared/statement-renderer /usr/src/shared/statement-renderer
 
 # Install app dependencies
 # Use `npm ci` for reproducible, lockfile-exact installs (requires package-lock.json).
-RUN npm ci --no-audit
+RUN npm ci --no-audit --install-links
 
 # Copy the rest of your app's source code from the 'backend' directory
-COPY . .
+COPY backend/. .
 
 # Compile the high-precision time wrapper
 RUN gcc scripts/time_wrapper.c -o scripts/time_wrapper

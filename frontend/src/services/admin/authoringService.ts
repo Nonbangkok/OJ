@@ -35,6 +35,11 @@ export interface TestcaseContents extends TestcaseMetadata {
   output: string | null;
 }
 
+export interface StatementPreviewContext {
+  html: string;
+  assets: Array<{ id: string; filename: string }>;
+}
+
 const authoringService = {
   // Drafts
   /**
@@ -84,6 +89,16 @@ const authoringService = {
       statementHtml,
     });
     return response.data;
+  },
+  getPreviewContext: async (id: string): Promise<StatementPreviewContext> => {
+    const response = await api.get<StatementPreviewContext>(`${draftBase(id)}/preview-context`);
+    return response.data;
+  },
+  draftAssetUrl: (id: string, assetId: string): string => {
+    const base = api.defaults?.baseURL || '';
+    const url = new URL(`${base.replace(/\/$/, '')}${draftBase(id)}/assets/${encodeURIComponent(assetId)}`, window.location.origin);
+    if (url.origin !== window.location.origin) throw new Error('Statement assets must be served from this site');
+    return `${url.pathname}${url.search}`;
   },
   draftPdfUrl: (id: string, revision: number | null): string =>
     `${(api.defaults?.baseURL || '').replace(/\/$/, '')}${draftBase(id)}/pdf?revision=${revision}`,

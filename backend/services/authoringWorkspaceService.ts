@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { createContext, Script, Context } from 'node:vm';
-import { Parser } from 'htmlparser2';
 import path from 'node:path';
 import * as db from '../db';
 import { buildPdfHtml, PDF_TEMPLATE_DIRECTORY, PDF_TEMPLATE_VERSION } from '../authoring/pdfTemplate';
 import { compileStatementSource } from '../authoring/statementCompiler';
 import { StatementError } from '../authoring/statementSanitizer';
+import { renderStatementMath as renderSharedStatementMath } from '@oj/statement-renderer';
 import { AuthoringJobRow, ProblemDraftAssetRow, ProblemDraftRow } from '../types/authoring';
 import { createFallbackAuthorAvatar } from './authorProfileImageService';
 
@@ -13,6 +13,7 @@ type Database = Pick<typeof db, 'query'>;
 type PreviewDraft = Pick<ProblemDraftRow, 'id' | 'problem_id' | 'title' | 'author_aka_name'
   | 'author_real_name' | 'language' | 'country_code' | 'author_profile_image_png' | 'template_version'>;
 type RasterAsset = Pick<ProblemDraftAssetRow, 'filename' | 'mime_type' | 'content'>;
+type PreviewAssetMetadata = Pick<ProblemDraftAssetRow, 'id' | 'filename'>;
 type JobListRow = Pick<AuthoringJobRow, 'id' | 'draft_id' | 'draft_revision' | 'job_type' | 'status'
   | 'error_code' | 'error_message' | 'created_at' | 'started_at' | 'finished_at'>;
 const MAX_EMBEDDED_IMAGE_BYTES = 16 * 1024 * 1024;
@@ -64,7 +65,40 @@ function resources() {
   bundledResources = { css, script, fonts }; return bundledResources;
 }
 
-const escapeHtml = (text: string) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+function buildPreviewShell(draft: PreviewDraft, avatar: Buffer, allowSameOriginImages: boolean): string {
+  const bundle = resources();
+  let shell = buildPdfHtml({ templateVersion: draft.template_version, title: draft.title,
+    taskCode: draft.problem_id, akaName: draft.author_aka_name, realName: draft.author_real_name,
+    language: draft.language, countryCode: draft.country_code, statementHtml: '' },
+  { templateBaseUrl: templateUrl, assetBaseUrl: 'file:///preview-assets', avatarUrl });
+  shell = shell.replace(`<link rel="stylesheet" href="${templateUrl}/vendor/katex.css">`, () => `<style>${bundle.css}</style>`)
+    .replace(/url\('file:\/\/\/preview-bundle\/([^']+)'\)/g, (_match, relative: string) => {
+      const font = bundle.fonts.get(relative); if (!font) throw new Error('Unbundled preview font'); return `url('${font}')`;
+    })
+    .replace(`src="${avatarUrl}"`, () => `src="data:image/png;base64,${avatar.toString('base64')}"`)
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '');
+  const imageSources = allowSameOriginImages ? "'self' data:" : 'data:';
+  const csp = `default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src ${imageSources}; font-src data:; base-uri 'none'; form-action 'none'`;
+  return shell.replace('<meta charset="utf-8">', () => `<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}">`);
+}
+
+/** Static preview chrome and declared asset names; no unsaved source or image bytes are included. */
+export async function getWorkspacePreviewContext(id: string, database: Database = db): Promise<{
+  html: string; assets: PreviewAssetMetadata[];
+} | null> {
+  const draft = (await database.query<PreviewDraft>(`SELECT id,problem_id,title,author_aka_name,
+    author_real_name,language,country_code,author_profile_image_png,template_version
+    FROM problem_drafts WHERE id=$1`, [id])).rows[0];
+  if (!draft) return null;
+  if (draft.template_version !== PDF_TEMPLATE_VERSION) {
+    throw new StatementError('unsupported_template', 'This template version is not supported');
+  }
+  const assets = (await database.query<PreviewAssetMetadata>(`SELECT id,filename FROM problem_draft_assets
+    WHERE draft_id=$1 ORDER BY filename`, [id])).rows.map(({ id: assetId, filename }) => ({ id: assetId, filename }));
+  const avatar = draft.author_profile_image_png ?? await createFallbackAuthorAvatar(draft.author_aka_name);
+  return { html: buildPreviewShell(draft, avatar, true), assets };
+}
+
 let mathContext: Context | undefined;
 const renderMath = new Script(`require('katex').renderToString(tex, {displayMode: display, strict: 'error',
   throwOnError: true, trust: function(){throw new Error('Untrusted math command');}, maxExpand: 1000, maxSize: 100})`);
@@ -74,49 +108,10 @@ function renderStatementMath(html: string): string {
     mathContext = createContext({});
     new Script(resources().script).runInContext(mathContext, { timeout: 1000 });
   }
-  const deadline = Date.now() + 1000;
-  let count = 0; let bytes = 0; let pending = ''; let skipped = 0;
-  const result: string[] = [];
-  const append = (part: string) => {
-    bytes += Buffer.byteLength(part);
-    if (bytes > 16 * 1024 * 1024) throw new StatementError('preview_too_large', 'Rendered preview exceeds 16 MiB');
-    result.push(part);
-  };
-  const text = (value: string) => {
-    if (skipped) { append(escapeHtml(value)); return; }
-    let offset = 0;
-    const opening = /\$\$|\\\[|\\\(|\$/g;
-    for (let match; (match = opening.exec(value));) {
-      const left = match[0]; const right = left === '\\[' ? '\\]' : left === '\\(' ? '\\)' : left;
-      const start = match.index + left.length;
-      let end = start; let braces = 0;
-      for (; end < value.length; end++) {
-        if (braces <= 0 && value.startsWith(right, end)) break;
-        if (value[end] === '\\') { end++; continue; }
-        if (value[end] === '{') braces++;
-        if (value[end] === '}') braces--;
-      }
-      if (end >= value.length) break;
-      append(escapeHtml(value.slice(offset, match.index)));
-      if (++count > 1000 || Date.now() >= deadline) throw new StatementError('preview_too_large', 'Math preview exceeds its rendering budget');
-      mathContext!.tex = value.slice(start, end); mathContext!.display = left === '$$' || left === '\\[';
-      try { append(renderMath.runInContext(mathContext!, { timeout: Math.max(1, deadline - Date.now()) })); }
-      catch { throw new StatementError('invalid_math', 'Invalid, unsafe or overly complex LaTeX in statement'); }
-      offset = end + right.length; opening.lastIndex = offset;
-    }
-    append(escapeHtml(value.slice(offset)));
-  };
-  const flush = () => { if (pending) { text(pending); pending = ''; } };
-  const parser = new Parser({
-    onopentag(tag, attributes) {
-      flush(); append(`<${tag}${Object.entries(attributes).map(([key, value]) => ` ${key}="${escapeHtml(value)}"`).join('')}>`);
-      if (tag === 'pre' || tag === 'code') skipped++;
-    },
-    ontext(value) { pending += value; },
-    onclosetag(tag) { flush(); if (!['br', 'hr', 'img'].includes(tag)) append(`</${tag}>`);
-      if (tag === 'pre' || tag === 'code') skipped--; },
-  }, { decodeEntities: true });
-  parser.end(html); flush(); return result.join('');
+  return renderSharedStatementMath(html, (tex, display, timeoutMs) => {
+    mathContext!.tex = tex; mathContext!.display = display;
+    return renderMath.runInContext(mathContext!, { timeout: Math.max(1, timeoutMs) }) as string;
+  });
 }
 
 /** Read-only browser preview: only the statement is unsaved; header and images use stored draft data. */
@@ -147,19 +142,7 @@ export async function previewWorkspaceStatement(id: string, statementHtml: strin
     return ` src="data:${asset.mime_type};base64,${asset.content.toString('base64')}"`;
   });
   const avatar = draft.author_profile_image_png ?? await createFallbackAuthorAvatar(draft.author_aka_name);
-  const bundle = resources();
-  // Transform only the trusted shell. Preview has no JavaScript, even when embedded under the app CSP.
-  let shell = buildPdfHtml({ templateVersion: draft.template_version, title: draft.title,
-    taskCode: draft.problem_id, akaName: draft.author_aka_name, realName: draft.author_real_name,
-    language: draft.language, countryCode: draft.country_code, statementHtml: '' },
-  { templateBaseUrl: templateUrl, assetBaseUrl: 'file:///preview-assets', avatarUrl });
-  shell = shell.replace(`<link rel="stylesheet" href="${templateUrl}/vendor/katex.css">`, () => `<style>${bundle.css}</style>`)
-    .replace(/url\('file:\/\/\/preview-bundle\/(fonts\/[^']+)'\)/g, (_match, relative: string) => {
-      const font = bundle.fonts.get(relative); if (!font) throw new Error('Unbundled preview font'); return `url('${font}')`;
-    })
-    .replace(`src="${avatarUrl}"`, () => `src="data:image/png;base64,${avatar.toString('base64')}"`)
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '');
-  const csp = "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'";
-  return shell.replace('<meta charset="utf-8">', () => `<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}">`)
+  const shell = buildPreviewShell(draft, avatar, false);
+  return shell
     .replace('<article id="statement" class="statement"></article>', () => `<article id="statement" class="statement">${statement}</article>`);
 }

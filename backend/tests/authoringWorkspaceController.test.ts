@@ -36,6 +36,7 @@ beforeEach(() => {
 it('requires admin-or-staff access for previews, private images and job history', async () => {
   for (const [role, status] of [[undefined, 401], ['user', 403]] as const) {
     expect((await request(app(role)).post(`/admin/authoring/drafts/${id}/preview`).send({ statementHtml: '' })).status).toBe(status);
+    expect((await request(app(role)).get(`/admin/authoring/drafts/${id}/preview-context`)).status).toBe(status);
     expect((await request(app(role)).get(`/admin/authoring/drafts/${id}/jobs`)).status).toBe(status);
     expect((await request(app(role)).get(`/admin/authoring/drafts/${id}/assets/${assetId}`)).status).toBe(status);
   }
@@ -65,6 +66,22 @@ it('renders unsaved sanitized content with escaped metadata and embedded assets 
     expect(html).not.toContain(privateText);
   }
   expect(response.headers['cache-control']).toBe('private, no-store');
+  expect(databaseQuery.mock.calls.every(([sql]) => /^\s*SELECT\b/i.test(sql))).toBe(true);
+});
+
+it('returns a private script-free template context with only declared asset metadata', async () => {
+  const response = await request(app('admin')).get(`/admin/authoring/drafts/${id}/preview-context`);
+
+  expect(response.status).toBe(200);
+  expect(response.headers['cache-control']).toBe('private, no-store');
+  expect(response.body.assets).toEqual([{ id: assetId, filename: 'diagram.png' }]);
+  expect(response.body.html).toContain('<article id="statement" class="statement"></article>');
+  expect(response.body.html).toContain(`src="data:image/png;base64,${png.toString('base64')}"`);
+  expect(response.body.html).toContain("img-src 'self' data:");
+  expect(response.body.html).toContain("script-src 'none'");
+  expect(response.body.html).not.toContain('<script');
+  expect(response.body.html).not.toContain('diagram.png');
+  expect(response.body).not.toHaveProperty('content');
   expect(databaseQuery.mock.calls.every(([sql]) => /^\s*SELECT\b/i.test(sql))).toBe(true);
 });
 

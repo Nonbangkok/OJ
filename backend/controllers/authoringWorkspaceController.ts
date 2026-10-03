@@ -6,7 +6,7 @@ import { asyncHandler } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
 import { draftAssetParamsSchema, problemDraftIdParamSchema } from '../schemas/requestSchemas';
 import { StatementError } from '../authoring/statementSanitizer';
-import { getWorkspaceAsset, listWorkspaceJobs, previewWorkspaceStatement } from '../services/authoringWorkspaceService';
+import { getWorkspaceAsset, getWorkspacePreviewContext, listWorkspaceJobs, previewWorkspaceStatement } from '../services/authoringWorkspaceService';
 
 const router = Router();
 const previewSchema = z.object({ statementHtml: z.string().refine(
@@ -20,6 +20,18 @@ router.get('/admin/authoring/drafts/:id/jobs', requireAuth, requireStaffOrAdmin,
     const jobs = await listWorkspaceJobs(String(req.params.id));
     if (!jobs) { res.status(404).json({ code: 'draft_not_found', message: 'Problem draft not found' }); return; }
     res.set(privateHeaders).json(jobs);
+  }));
+
+router.get('/admin/authoring/drafts/:id/preview-context', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: problemDraftIdParamSchema }), asyncHandler(async (req, res) => {
+    try {
+      const context = await getWorkspacePreviewContext(String(req.params.id));
+      if (context === null) { res.status(404).json({ code: 'draft_not_found', message: 'Problem draft not found' }); return; }
+      res.set(privateHeaders).json(context);
+    } catch (error) {
+      if (!(error instanceof StatementError)) throw error;
+      res.status(400).json({ code: error.code, message: error.message });
+    }
   }));
 
 router.post('/admin/authoring/drafts/:id/preview', requireAuth, requireStaffOrAdmin,

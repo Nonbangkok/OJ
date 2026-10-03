@@ -1,6 +1,6 @@
 x-backend-build: &backend-build
-  context: ./backend
-  dockerfile: Dockerfile
+  context: .
+  dockerfile: backend/Dockerfile
 
 x-backend-environment: &backend-environment
   DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
@@ -112,8 +112,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
       args:
         REACT_APP_API_URL: ${REACT_APP_API_URL:-/api}
         REACT_APP_LARGE_UPLOAD_API_URL: ${REACT_APP_LARGE_UPLOAD_API_URL:-}

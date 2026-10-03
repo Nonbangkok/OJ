@@ -2,19 +2,21 @@
 FROM node:20-alpine AS build
 
 # Set the working directory
-WORKDIR /app
+WORKDIR /app/frontend
 
 # Copy package.json and package-lock.json
-COPY package*.json ./
+COPY frontend/package*.json ./
+COPY frontend/.npmrc ./
+COPY shared/statement-renderer /app/shared/statement-renderer
 
 # Install dependencies
 # CRA 5 + modern lint/tooling can emit peer-dependency conflicts in npm v10+.
 # Use legacy peer resolution in container build to avoid ERESOLVE hard-fail.
 # Use `npm ci` for reproducible, lockfile-exact installs (requires package-lock.json).
-RUN npm ci --legacy-peer-deps --no-audit
+RUN npm ci --legacy-peer-deps --no-audit --install-links
 
 # Copy the rest of the application source code
-COPY . .
+COPY frontend/. ./
 
 # Build the application for production
 ARG REACT_APP_API_URL
@@ -34,10 +36,10 @@ RUN npm run build
 FROM nginx:1.25-alpine
 
 # Copy the build output from the build stage
-COPY --from=build /app/build /usr/share/nginx/html
+COPY --from=build /app/frontend/build /usr/share/nginx/html
 
 # Copy the custom Nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port 80
 EXPOSE 80

@@ -12,6 +12,7 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.7.0",
     "@testing-library/react": "^16.3.0",
+    "@oj/statement-renderer": "file:../shared/statement-renderer",
     "@types/node": "^18.0.0",
     "ajv": "^8.12.0",
     "ajv-formats": "^2.1.1",

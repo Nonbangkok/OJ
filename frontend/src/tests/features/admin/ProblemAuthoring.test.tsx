@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import api from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
+import useStatementPreview from '../../../features/admin/authoring/useStatementPreview';
 import ProblemAuthoring from '../../../features/admin/authoring/ProblemAuthoring';
 import {
   DraftMetadata,
@@ -13,6 +14,7 @@ import {
 } from '../../../features/admin/authoring/DraftWorkspace';
 jest.mock('../../../services/api');
 jest.mock('../../../context/AuthContext', () => ({ useAuth: jest.fn() }));
+jest.mock('../../../features/admin/authoring/useStatementPreview', () => ({ __esModule: true, default: jest.fn() }));
 const draft = {
   id: 'd1',
   problemId: 'sum',
@@ -59,6 +61,7 @@ function show(path = '/admin/authoring') {
 }
 beforeEach(() => {
   jest.resetAllMocks();
+  jest.mocked(useStatementPreview).mockReturnValue({ html: '', state: 'waiting', error: '' });
   window.sessionStorage.clear();
   window.localStorage.clear();
   (useAuth as jest.Mock).mockReturnValue({ user: { role: 'admin' }, isLoading: false });
@@ -296,7 +299,9 @@ test('a new edit after clean auto-sync uses the refreshed server revision as its
   expect(screen.queryByText(/server state changed/i)).not.toBeInTheDocument();
 });
 test('full-screen editor previews the current unsaved source automatically in a sandbox', async () => {
-  jest.mocked(api.post).mockResolvedValue({ data: { html: '<p>Sanitized preview</p>' } });
+  jest.mocked(useStatementPreview).mockReturnValue({
+    html: '<p>Sanitized preview</p>', state: 'ready', error: '',
+  });
   show('/admin/authoring/d1/editor');
   const source = await screen.findByLabelText('Statement source');
   expect(screen.queryByRole('button', { name: 'Preview statement' })).not.toBeInTheDocument();
@@ -304,16 +309,7 @@ test('full-screen editor previews the current unsaved source automatically in a 
   expect(frame).toHaveAttribute('sandbox', 'allow-same-origin');
   expect(frame).toHaveAttribute('srcdoc', '<p>Sanitized preview</p>');
   fireEvent.change(source, { target: { value: '# Live edit' } });
-  expect(api.post).not.toHaveBeenCalledWith('/admin/authoring/drafts/d1/preview', {
-    statementHtml: '# Live edit',
-  });
-  await waitFor(
-    () =>
-      expect(api.post).toHaveBeenCalledWith('/admin/authoring/drafts/d1/preview', {
-        statementHtml: '# Live edit',
-      }),
-    { timeout: 1500 }
-  );
+  expect(source).toHaveValue('# Live edit');
 });
 test('full-screen editor keeps a stable notices row so the workspace fills the remaining viewport', async () => {
   jest.mocked(api.post).mockResolvedValue({ data: { html: '<p>Preview</p>' } });
@@ -360,36 +356,6 @@ test('full-screen editor exposes a draggable pane divider and persistent preview
   expect(screen.getByRole('button', { name: 'Zoom out' })).toBeEnabled();
   fireEvent.click(screen.getByRole('button', { name: 'Reset preview zoom' }));
   expect(screen.getByText('100%')).toBeInTheDocument();
-});
-test('a slower realtime preview response cannot replace the newest preview', async () => {
-  let resolveFirst!: (value: any) => void;
-  let resolveSecond!: (value: any) => void;
-  jest.mocked(api.post).mockResolvedValueOnce({ data: { html: '<p>Initial</p>' } });
-  show('/admin/authoring/d1/editor');
-  const source = await screen.findByLabelText('Statement source');
-  const frame = await screen.findByTitle('Live statement preview');
-  jest
-    .mocked(api.post)
-    .mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveFirst = resolve;
-        })
-    )
-    .mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveSecond = resolve;
-        })
-    );
-  fireEvent.change(source, { target: { value: '# First' } });
-  await waitFor(() => expect(resolveFirst).toBeDefined(), { timeout: 1500 });
-  fireEvent.change(source, { target: { value: '# Second' } });
-  await waitFor(() => expect(resolveSecond).toBeDefined(), { timeout: 1500 });
-  resolveSecond({ data: { html: '<p>Second</p>' } });
-  await waitFor(() => expect(frame).toHaveAttribute('srcdoc', '<p>Second</p>'));
-  resolveFirst({ data: { html: '<p>First</p>' } });
-  await waitFor(() => expect(frame).toHaveAttribute('srcdoc', '<p>Second</p>'));
 });
 test('Publish requires explicit confirmation and explains hidden visibility', async () => {
   jest.mocked(api.get).mockImplementation(async (url) => ({

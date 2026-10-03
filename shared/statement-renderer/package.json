@@ -1,0 +1,12 @@
+{
+  "name": "@oj/statement-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "types": "index.d.ts",
+  "dependencies": {
+    "htmlparser2": "10.0.0",
+    "katex": "0.15.1",
+    "marked": "4.0.8"
+  }
+}

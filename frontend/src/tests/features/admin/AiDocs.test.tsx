@@ -11,6 +11,9 @@ import { buildAiDocsMarkdown } from '../../../features/admin/authoring/aiDocsCon
 
 jest.mock('../../../services/api');
 jest.mock('../../../context/AuthContext', () => ({ useAuth: jest.fn() }));
+jest.mock('../../../features/admin/authoring/useStatementPreview', () => ({
+  __esModule: true, default: jest.fn(() => ({ html: '', state: 'waiting', error: '' })),
+}));
 
 const draft = {
   id: 'd1',
