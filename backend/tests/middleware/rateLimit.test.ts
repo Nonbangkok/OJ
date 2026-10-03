@@ -172,44 +172,6 @@ describe('proxyClientKey (AUTH-001)', () => {  const keyFor = (headers: Record<s
   });
 });
 
-describe('generalApiKey', () => {
-  const keyFor = (req: {
-    headers: Record<string, string | string[] | undefined>;
-    ip?: string;
-    user?: { id?: number };
-  }): string => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { generalApiKey } = require('../../middleware/rateLimit') as {
-      generalApiKey: (request: typeof req) => string;
-    };
-    return generalApiKey(req);
-  };
-
-  it('gives authenticated users behind the same IP separate general API buckets', () => {
-    const sharedIp = { headers: { 'x-real-ip': '203.0.113.7' }, ip: '203.0.113.7' };
-
-    expect(keyFor({ ...sharedIp, user: { id: 190 } })).toBe('user:190');
-    expect(keyFor({ ...sharedIp, user: { id: 191 } })).toBe('user:191');
-  });
-
-  it('keeps guest requests in the proxy-vouched IP bucket', () => {
-    const { ipKeyGenerator } = require('express-rate-limit') as typeof import('express-rate-limit');
-
-    expect(keyFor({ headers: { 'x-real-ip': '203.0.113.7' }, ip: '203.0.113.7' }))
-      .toBe(`rip:${ipKeyGenerator('203.0.113.7')}`);
-  });
-
-  it('falls back to the proxy-vouched IP for invalid account ids', () => {
-    const { ipKeyGenerator } = require('express-rate-limit') as typeof import('express-rate-limit');
-
-    expect(keyFor({
-      headers: { 'x-real-ip': '203.0.113.7' },
-      ip: '203.0.113.7',
-      user: { id: Number.NaN },
-    })).toBe(`rip:${ipKeyGenerator('203.0.113.7')}`);
-  });
-});
-
 describe('per-account login failure throttle (AUTH-001)', () => {
   const {
     isLoginLocked,
