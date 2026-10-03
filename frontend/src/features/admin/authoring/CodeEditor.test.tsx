@@ -7,6 +7,9 @@ import { DraftSolution } from './DraftWorkspace';
 
 jest.mock('../../../services/api');
 jest.mock('../../../context/AuthContext', () => ({ useAuth: jest.fn() }));
+jest.mock('./useStatementPreview', () => ({
+  __esModule: true, default: jest.fn(() => ({ html: '', state: 'waiting', error: '' })),
+}));
 
 const draft = {
   id: 'd1', problemId: 'sum', title: 'Sum', authorProfileId: null,
