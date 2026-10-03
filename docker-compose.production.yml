@@ -9,6 +9,7 @@ services:
   migrate:
     environment:
       NODE_ENV: production
+      COOKIE_SECURE: "true"
 
   nginx-proxy:
     ports:
