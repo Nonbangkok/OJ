@@ -59,27 +59,32 @@ export default function useStatementPreview(
     }
 
     const currentGeneration = ++generation.current;
-    const worker = createStatementPreviewWorker();
     let active = true;
+    let worker: Worker | undefined;
     setResult(current => ({ ...current, state: 'loading', error: '' }));
-    const assets: PreviewAsset[] = context.assets.map(({ id, filename }) => ({
-      filename, url: authoringService.draftAssetUrl(draftId, id),
-    }));
-    worker.onmessage = event => {
-      const message = event.data as { type: string; generation: number; html?: string; error?: string };
-      if (!active || message.generation !== currentGeneration) return;
-      if (message.type === 'rendered' && message.html) {
-        setResult({ html: message.html, state: 'ready', error: '' });
-      } else if (message.type === 'error') {
-        setResult(current => ({ ...current, state: 'error', error: message.error || 'Statement preview failed.' }));
-      }
-    };
-    worker.onerror = () => {
-      if (active) setResult(current => ({ ...current, state: 'error', error: 'Statement preview failed. Your source is unchanged.' }));
-    };
-    worker.postMessage({ type: 'initialize', shell: context.html, assets });
-    worker.postMessage({ type: 'render', generation: currentGeneration, source });
-    return () => { active = false; worker.terminate(); };
+    try {
+      const assets: PreviewAsset[] = context.assets.map(({ id, filename }) => ({
+        filename, url: authoringService.draftAssetUrl(draftId, id),
+      }));
+      worker = createStatementPreviewWorker();
+      worker.onmessage = event => {
+        const message = event.data as { type: string; generation: number; html?: string; error?: string };
+        if (!active || message.generation !== currentGeneration) return;
+        if (message.type === 'rendered' && message.html) {
+          setResult({ html: message.html, state: 'ready', error: '' });
+        } else if (message.type === 'error') {
+          setResult(current => ({ ...current, state: 'error', error: message.error || 'Statement preview failed.' }));
+        }
+      };
+      worker.onerror = () => {
+        if (active) setResult(current => ({ ...current, state: 'error', error: 'Statement preview failed. Your source is unchanged.' }));
+      };
+      worker.postMessage({ type: 'initialize', shell: context.html, assets });
+      worker.postMessage({ type: 'render', generation: currentGeneration, source });
+    } catch (error) {
+      setResult(current => ({ ...current, state: 'error', error: error instanceof Error ? error.message : 'Statement preview failed.' }));
+    }
+    return () => { active = false; worker?.terminate(); };
   }, [context, contextError, draftId, source]);
 
   return result;

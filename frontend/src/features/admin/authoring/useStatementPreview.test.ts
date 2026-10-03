@@ -81,3 +81,12 @@ test('reports preview errors while leaving the editor source in caller-owned sta
   expect(result.current.error).toContain('Unsupported statement element');
   expect(result.current.html).toBe('');
 });
+
+test('reports an unusable asset URL as preview error instead of throwing through the editor', async () => {
+  mockedService.draftAssetUrl.mockImplementation(() => { throw new Error('Statement assets must be served from this site'); });
+  const { result } = renderHook(() => useStatementPreview('d1', '![diagram]({{ASSET_BASE}}/diagram.png'));
+
+  await waitFor(() => expect(result.current.state).toBe('error'));
+  expect(result.current.error).toContain('Statement assets must be served from this site');
+  expect(mockCreateWorker).not.toHaveBeenCalled();
+});
