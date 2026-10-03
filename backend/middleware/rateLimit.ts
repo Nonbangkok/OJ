@@ -56,6 +56,20 @@ export const proxyClientKey = (req: Request): string => {
 };
 
 /**
+ * Give each authenticated account its own general API budget so users behind
+ * the same school/VPN/NAT address do not consume one shared bucket. Requests
+ * without an authenticated user still need an IP key (for example login and
+ * public browsing, before an account id is available).
+ */
+export const generalApiKey = (req: Request): string => {
+  const userId = req.user?.id;
+  if (typeof userId === 'number' && Number.isSafeInteger(userId) && userId > 0) {
+    return `user:${userId}`;
+  }
+  return proxyClientKey(req);
+};
+
+/**
  * General API limiter — applied to every request before routing.
  * Read-heavy authoring workspace traffic (draft/job polling and the debounced
  * statement preview) is excluded: a single editing session legitimately issues
@@ -88,9 +102,9 @@ export const generalApiLimiter: RateLimitRequestHandler = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: skipGeneralLimit,
-  // Key on the proxy-vouched client address, not the spoofable XFF leftmost
-  // entry (AUTH-001).
-  keyGenerator: proxyClientKey,
+  // Authenticated users get independent budgets; guests fall back to the
+  // proxy-vouched client address, not the spoofable XFF leftmost entry.
+  keyGenerator: generalApiKey,
   message: tooManyRequests('Too many requests, please try again later.'),
 });
 
