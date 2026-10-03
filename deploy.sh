@@ -9,6 +9,10 @@ compose=(docker compose -f docker-compose.yml -f docker-compose.production.yml)
 "${compose[@]}" build
 "${compose[@]}" up -d --remove-orphans
 
+proxy_id=$("${compose[@]}" ps -q nginx-proxy)
+docker exec "$proxy_id" nginx -t
+docker exec "$proxy_id" nginx -s reload
+
 deadline=$((SECONDS + 180))
 while (( SECONDS < deadline )); do
     unhealthy=$("${compose[@]}" ps --format json | python3 -c '
