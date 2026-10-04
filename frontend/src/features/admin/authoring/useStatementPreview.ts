@@ -8,6 +8,16 @@ export interface StatementPreviewResult {
   html: string;
   state: StatementPreviewState;
   error: string;
+  shell: string;
+}
+
+type PreviewContentState = Omit<StatementPreviewResult, 'shell'>;
+
+function extractStatementFragment(html: string): string {
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  const statement = document.getElementById('statement');
+  if (!statement) throw new Error('Server preview did not contain the statement');
+  return statement.innerHTML;
 }
 
 export default function useStatementPreview(
@@ -17,7 +27,7 @@ export default function useStatementPreview(
 ): StatementPreviewResult {
   const [context, setContext] = useState<StatementPreviewContext | null>(null);
   const [contextError, setContextError] = useState('');
-  const [result, setResult] = useState<StatementPreviewResult>({ html: '', state: 'waiting', error: '' });
+  const [result, setResult] = useState<PreviewContentState>({ html: '', state: 'waiting', error: '' });
   const generation = useRef(0);
   const workerRef = useRef<Worker | null>(null);
   const renderTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,7 +85,7 @@ export default function useStatementPreview(
         if (!active || generation.current !== currentGeneration || sourceRef.current !== fallbackSource) return;
         if (renderTimeout.current) clearTimeout(renderTimeout.current);
         renderTimeout.current = null;
-        setResult({ html, state: 'ready', error: '' });
+        setResult({ html: extractStatementFragment(html), state: 'ready', error: '' });
       }).catch(() => {
         if (!active || generation.current !== currentGeneration || sourceRef.current !== fallbackSource) return;
         if (renderTimeout.current) clearTimeout(renderTimeout.current);
@@ -108,7 +118,7 @@ export default function useStatementPreview(
         renderTimeout.current = null;
         fallbackToServer(generation.current, 'Statement preview failed. Your source is unchanged.');
       };
-      worker.postMessage({ type: 'initialize', shell: context.html, assets });
+      worker.postMessage({ type: 'initialize', assets });
     } catch (error) {
       workerRef.current = null;
       setResult(current => ({ ...current, state: 'error', error: error instanceof Error ? error.message : 'Statement preview failed.' }));
@@ -150,5 +160,5 @@ export default function useStatementPreview(
     }
   }, [context, contextError, draftId, source]);
 
-  return result;
+  return { ...result, shell: context?.html ?? '' };
 }

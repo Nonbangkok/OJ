@@ -30,7 +30,7 @@ afterEach(() => jest.clearAllMocks());
 
 test('source remains editable while autosave is pending', () => {
   mockedUseAuthoringDraft.mockReturnValue(model() as unknown as ReturnType<typeof useAuthoringDraft>);
-  mockedUseStatementPreview.mockReturnValue({ html: '', state: 'waiting', error: '' });
+  mockedUseStatementPreview.mockReturnValue({ html: '', state: 'waiting', error: '', shell: '' });
 
   render(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
 
@@ -39,7 +39,7 @@ test('source remains editable while autosave is pending', () => {
 
 test('source locks while an authoring job is active', () => {
   mockedUseAuthoringDraft.mockReturnValue(model({ id: 'j1', jobType: 'pdf', status: 'running' }) as unknown as ReturnType<typeof useAuthoringDraft>);
-  mockedUseStatementPreview.mockReturnValue({ html: '', state: 'waiting', error: '' });
+  mockedUseStatementPreview.mockReturnValue({ html: '', state: 'waiting', error: '', shell: '' });
 
   render(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
 
@@ -48,7 +48,7 @@ test('source locks while an authoring job is active', () => {
 
 test('keeps source writable and visible when local preview reports an error', () => {
   mockedUseAuthoringDraft.mockReturnValue(model() as unknown as ReturnType<typeof useAuthoringDraft>);
-  mockedUseStatementPreview.mockReturnValue({ html: '', state: 'error', error: 'Invalid statement markup' });
+  mockedUseStatementPreview.mockReturnValue({ html: '', state: 'error', error: 'Invalid statement markup', shell: '' });
 
   render(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
 
@@ -59,7 +59,7 @@ test('keeps source writable and visible when local preview reports an error', ()
 
 test('shows a clear loading state in the preview viewport', () => {
   mockedUseAuthoringDraft.mockReturnValue(model() as unknown as ReturnType<typeof useAuthoringDraft>);
-  mockedUseStatementPreview.mockReturnValue({ html: '', state: 'loading', error: '' });
+  mockedUseStatementPreview.mockReturnValue({ html: '', state: 'loading', error: '', shell: '' });
 
   render(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
 

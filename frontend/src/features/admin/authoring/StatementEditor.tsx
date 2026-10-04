@@ -6,6 +6,7 @@ import { Button, Dialog } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
 import useAuthoringDraft from './useAuthoringDraft';
 import useStatementPreview from './useStatementPreview';
+import LivePreview from './LivePreview';
 import { jobLabel } from './status';
 import { StatementAssets } from './StatementTab';
 import styles from './Authoring.module.css';
@@ -82,35 +83,6 @@ function PreviewModeTab({ selected, onSelect, children }: {
     onFocus={() => setHovered(true)} onBlur={() => setHovered(false)}>
     {children}
   </button>;
-}
-
-/** Live HTML preview: the sanitized statement rendered in a sandboxed frame
- *  that fills the pane — continuous flow, no page slicing. The iframe is
- *  sized to the document's full rendered height (measured after load), so the
- *  whole statement paints at every zoom level and the pane scrolls instead of
- *  clipping content inside the frame. The outer box reserves layout space at
- *  the SCALED size (height × zoom) while the inner box zooms visually — a
- *  bare transform reserves the unscaled height, letting the pane scroll past
- *  the end of the shrunken content. The Actual PDF tab is where exact
- *  pagination lives (the runner-built file itself). */
-function LivePreview({ preview, zoomScale }: { preview: string; zoomScale: number }) {
-  const frameRef = useRef<HTMLIFrameElement>(null);
-  const [docHeight, setDocHeight] = useState(0);
-  useEffect(() => { setDocHeight(0); }, [preview]);
-  const measure = () => {
-    try {
-      const doc = frameRef.current?.contentDocument;
-      if (doc?.body) setDocHeight(Math.ceil(doc.documentElement.scrollHeight));
-    } catch { /* same-origin srcdoc; ignore transient access errors */ }
-  };
-  return <div className={styles.previewLive}
-    style={{ width: `${100 / zoomScale}%`, height: docHeight ? `${Math.ceil(docHeight * zoomScale)}px` : undefined }}>
-    <div className={styles.previewLiveZoom} style={{ transform: `scale(${zoomScale})` }}>
-      <iframe title="Live statement preview" sandbox="allow-same-origin" srcDoc={preview}
-        ref={frameRef} onLoad={measure} className={styles.previewLiveFrame}
-        style={docHeight ? { height: `${docHeight}px` } : undefined} />
-    </div>
-  </div>;
 }
 
 /** Embeds the runner-built PDF. While a build job runs, the currently loaded
@@ -291,7 +263,8 @@ export default function StatementEditor({ id }: { id: string }) {
               ? <PdfEmbed draftId={draft.id} revision={draft.latestPdfRevision}
                 buildRunning={!!model.activeJob} />
               : <div className={styles.previewEmpty}>No PDF built yet.</div>)
-            : (preview.html ? <LivePreview preview={preview.html} zoomScale={zoomScale} />
+            : (preview.shell && preview.state !== 'error'
+              ? <LivePreview shell={preview.shell} statement={preview.html} zoomScale={zoomScale} />
               : <div className={styles.previewEmpty} role={preview.state === 'error' ? 'alert' : 'status'}>
                 {preview.state === 'error' ? preview.error
                   : preview.state === 'loading' ? 'Rendering live preview…' : 'Preparing live preview…'}

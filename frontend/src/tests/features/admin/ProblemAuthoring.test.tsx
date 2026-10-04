@@ -61,7 +61,7 @@ function show(path = '/admin/authoring') {
 }
 beforeEach(() => {
   jest.resetAllMocks();
-  jest.mocked(useStatementPreview).mockReturnValue({ html: '', state: 'waiting', error: '' });
+  jest.mocked(useStatementPreview).mockReturnValue({ html: '', state: 'waiting', error: '', shell: '' });
   window.sessionStorage.clear();
   window.localStorage.clear();
   (useAuth as jest.Mock).mockReturnValue({ user: { role: 'admin' }, isLoading: false });
@@ -301,13 +301,14 @@ test('a new edit after clean auto-sync uses the refreshed server revision as its
 test('full-screen editor previews the current unsaved source automatically in a sandbox', async () => {
   jest.mocked(useStatementPreview).mockReturnValue({
     html: '<p>Sanitized preview</p>', state: 'ready', error: '',
+    shell: '<html><article id="statement" class="statement"></article></html>',
   });
   show('/admin/authoring/d1/editor');
   const source = await screen.findByLabelText('Statement source');
   expect(screen.queryByRole('button', { name: 'Preview statement' })).not.toBeInTheDocument();
   const frame = await screen.findByTitle('Live statement preview');
   expect(frame).toHaveAttribute('sandbox', 'allow-same-origin');
-  expect(frame).toHaveAttribute('srcdoc', '<p>Sanitized preview</p>');
+  expect(frame).toHaveAttribute('srcdoc', '<html><article id="statement" class="statement"></article></html>');
   fireEvent.change(source, { target: { value: '# Live edit' } });
   expect(source).toHaveValue('# Live edit');
 });

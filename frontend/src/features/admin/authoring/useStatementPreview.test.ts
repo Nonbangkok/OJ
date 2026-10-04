@@ -48,6 +48,20 @@ test('renders unsaved source in the worker without requesting server preview HTM
   expect(result.current.state).toBe('loading');
 });
 
+test('keeps the static shell out of worker updates and returns only the statement fragment', async () => {
+  const shell = '<html><article id="statement" class="statement"></article></html>';
+  mockedService.getPreviewContext.mockResolvedValue({ html: shell, assets: [] });
+  const { result } = renderHook(() => useStatementPreview('d1', '# Current edit'));
+  await waitFor(() => expect(worker.postMessage).toHaveBeenCalledWith({ type: 'render', generation: 1, source: '# Current edit' }));
+
+  expect(worker.postMessage).toHaveBeenCalledWith({ type: 'initialize', assets: [] });
+  act(() => worker.emit({ type: 'rendered', generation: 1, html: '<h1>Current edit</h1>' }));
+
+  await waitFor(() => expect(result.current.state).toBe('ready'));
+  expect(result.current.shell).toBe(shell);
+  expect(result.current.html).toBe('<h1>Current edit</h1>');
+});
+
 test('ignores stale render generations and accepts only the newest result', async () => {
   const { result, rerender } = renderHook(({ source }) => useStatementPreview('d1', source), {
     initialProps: { source: '# First' },
@@ -70,7 +84,7 @@ test('ignores stale render generations and accepts only the newest result', asyn
   expect(result.current.state).toBe('ready');
 });
 
-test('reuses the initialized worker and large preview shell when source changes', async () => {
+test('reuses the initialized worker and keeps the static shell out of source updates', async () => {
   const { rerender } = renderHook(({ source }) => useStatementPreview('d1', source), {
     initialProps: { source: '# First' },
   });
@@ -99,7 +113,7 @@ test('reports preview errors while leaving the editor source in caller-owned sta
 });
 
 test('falls back to the server renderer when local worker parsing fails', async () => {
-  mockedService.previewStatement.mockResolvedValue({ html: '<html><article>server preview</article></html>' });
+  mockedService.previewStatement.mockResolvedValue({ html: '<html><article id="statement"><p>server preview</p></article></html>' });
   const { result } = renderHook(() => useStatementPreview('d1', '# Saved statement'));
   await waitFor(() => expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'render' })));
   const render = worker.postMessage.mock.calls.find(([message]) => message.type === 'render')?.[0];
@@ -108,7 +122,7 @@ test('falls back to the server renderer when local worker parsing fails', async 
 
   await waitFor(() => expect(mockedService.previewStatement).toHaveBeenCalledWith('d1', '# Saved statement'));
   await waitFor(() => expect(result.current.state).toBe('ready'));
-  expect(result.current.html).toContain('server preview');
+  expect(result.current.html).toBe('<p>server preview</p>');
   expect(result.current.error).toBe('');
 });
 
