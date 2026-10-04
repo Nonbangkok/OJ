@@ -85,15 +85,31 @@ test('reuses the initialized worker and large preview shell when source changes'
 });
 
 test('reports preview errors while leaving the editor source in caller-owned state', async () => {
+  mockedService.previewStatement.mockRejectedValue(new Error('server preview rejected source'));
   const { result } = renderHook(() => useStatementPreview('d1', '<script>bad()</script>'));
   await waitFor(() => expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'render' })));
   const render = worker.postMessage.mock.calls.find(([message]) => message.type === 'render')?.[0];
 
   act(() => worker.emit({ type: 'error', generation: render.generation, error: 'Unsupported statement element: script' }));
 
+  await waitFor(() => expect(result.current.state).toBe('error'));
   expect(result.current.state).toBe('error');
-  expect(result.current.error).toContain('Unsupported statement element');
+  expect(result.current.error).toContain('Server preview also failed');
   expect(result.current.html).toBe('');
+});
+
+test('falls back to the server renderer when local worker parsing fails', async () => {
+  mockedService.previewStatement.mockResolvedValue({ html: '<html><article>server preview</article></html>' });
+  const { result } = renderHook(() => useStatementPreview('d1', '# Saved statement'));
+  await waitFor(() => expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'render' })));
+  const render = worker.postMessage.mock.calls.find(([message]) => message.type === 'render')?.[0];
+
+  act(() => worker.emit({ type: 'error', generation: render.generation, error: 'Statement Markdown could not be parsed' }));
+
+  await waitFor(() => expect(mockedService.previewStatement).toHaveBeenCalledWith('d1', '# Saved statement'));
+  await waitFor(() => expect(result.current.state).toBe('ready'));
+  expect(result.current.html).toContain('server preview');
+  expect(result.current.error).toBe('');
 });
 
 test('reports an unusable asset URL as preview error instead of throwing through the editor', async () => {

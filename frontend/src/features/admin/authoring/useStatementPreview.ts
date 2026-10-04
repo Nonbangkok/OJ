@@ -21,6 +21,9 @@ export default function useStatementPreview(
   const generation = useRef(0);
   const workerRef = useRef<Worker | null>(null);
   const renderTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sourceRef = useRef(source);
+  const fallbackPreviewRef = useRef<(generation: number, error: string) => void>(() => {});
+  sourceRef.current = source;
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +58,33 @@ export default function useStatementPreview(
 
     let active = true;
     let worker: Worker | undefined;
+    const fallbackToServer = (currentGeneration: number, localError: string) => {
+      const fallbackSource = sourceRef.current;
+      if (fallbackSource === undefined) {
+        setResult({ html: '', state: 'error', error: localError || 'Statement preview failed.' });
+        return;
+      }
+      setResult(current => ({ ...current, state: 'loading', error: '' }));
+      if (renderTimeout.current) clearTimeout(renderTimeout.current);
+      renderTimeout.current = setTimeout(() => {
+        if (active && generation.current === currentGeneration) {
+          setResult({ html: '', state: 'error', error: 'Live preview did not finish. Your source is unchanged.' });
+        }
+      }, 15000);
+      authoringService.previewStatement(draftId, fallbackSource).then(({ html }) => {
+        if (!active || generation.current !== currentGeneration || sourceRef.current !== fallbackSource) return;
+        if (renderTimeout.current) clearTimeout(renderTimeout.current);
+        renderTimeout.current = null;
+        setResult({ html, state: 'ready', error: '' });
+      }).catch(() => {
+        if (!active || generation.current !== currentGeneration || sourceRef.current !== fallbackSource) return;
+        if (renderTimeout.current) clearTimeout(renderTimeout.current);
+        renderTimeout.current = null;
+        setResult({ html: '', state: 'error', error: localError
+          ? `${localError}. Server preview also failed.` : 'Statement preview failed. Your source is unchanged.' });
+      });
+    };
+    fallbackPreviewRef.current = fallbackToServer;
     try {
       const assets: PreviewAsset[] = context.assets.map(({ id, filename }) => ({
         filename, url: authoringService.draftAssetUrl(draftId, id),
@@ -69,14 +99,14 @@ export default function useStatementPreview(
         if (message.type === 'rendered' && message.html) {
           setResult({ html: message.html, state: 'ready', error: '' });
         } else if (message.type === 'error') {
-          setResult(current => ({ ...current, state: 'error', error: message.error || 'Statement preview failed.' }));
+          fallbackToServer(message.generation, message.error || 'Statement preview failed.');
         }
       };
       worker.onerror = () => {
         if (!active) return;
         if (renderTimeout.current) clearTimeout(renderTimeout.current);
         renderTimeout.current = null;
-        setResult(current => ({ ...current, state: 'error', error: 'Statement preview failed. Your source is unchanged.' }));
+        fallbackToServer(generation.current, 'Statement preview failed. Your source is unchanged.');
       };
       worker.postMessage({ type: 'initialize', shell: context.html, assets });
     } catch (error) {
@@ -88,6 +118,7 @@ export default function useStatementPreview(
       if (renderTimeout.current) clearTimeout(renderTimeout.current);
       renderTimeout.current = null;
       worker?.terminate();
+      fallbackPreviewRef.current = () => {};
       if (workerRef.current === worker) workerRef.current = null;
     };
   }, [context, draftId]);
@@ -111,7 +142,7 @@ export default function useStatementPreview(
       if (renderTimeout.current) clearTimeout(renderTimeout.current);
       renderTimeout.current = setTimeout(() => {
         if (generation.current === currentGeneration) {
-          setResult(current => ({ ...current, state: 'error', error: 'Live preview did not finish. Your source is unchanged.' }));
+          fallbackPreviewRef.current(currentGeneration, 'Live preview did not finish. Your source is unchanged.');
         }
       }, 15000);
     } catch (error) {

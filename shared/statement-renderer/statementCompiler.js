@@ -1,6 +1,7 @@
 'use strict';
 
-const { marked } = require('marked');
+const markedModule = require('marked');
+const marked = markedModule.marked || (typeof self !== 'undefined' ? self.marked : undefined);
 const { sanitizeStatement, StatementError } = require('./statementSanitizer');
 
 const MAX_SOURCE_BYTES = 2 * 1024 * 1024;

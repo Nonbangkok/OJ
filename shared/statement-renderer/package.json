@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "main": "index.js",
+  "browser": {
+    "marked": "../../marked/lib/marked.umd.js"
+  },
   "types": "index.d.ts",
   "dependencies": {
     "htmlparser2": "10.0.0",
