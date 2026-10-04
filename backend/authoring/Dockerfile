@@ -14,8 +14,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends g++ util-linux 
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /usr/local/bin/node /usr/local/bin/node
 WORKDIR /runner
+COPY --from=build /build/backend/node_modules/@oj ./node_modules/@oj
 COPY --from=build /build/backend/node_modules/zod ./node_modules/zod
 COPY --from=build /build/backend/node_modules/htmlparser2 ./node_modules/htmlparser2
+COPY --from=build /build/backend/node_modules/katex ./node_modules/katex
+COPY --from=build /build/backend/node_modules/marked ./node_modules/marked
 COPY --from=build /build/backend/node_modules/domhandler ./node_modules/domhandler
 COPY --from=build /build/backend/node_modules/domutils ./node_modules/domutils
 COPY --from=build /build/backend/node_modules/dom-serializer ./node_modules/dom-serializer
