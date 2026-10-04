@@ -70,6 +70,20 @@ test('ignores stale render generations and accepts only the newest result', asyn
   expect(result.current.state).toBe('ready');
 });
 
+test('reuses the initialized worker and large preview shell when source changes', async () => {
+  const { rerender } = renderHook(({ source }) => useStatementPreview('d1', source), {
+    initialProps: { source: '# First' },
+  });
+  await waitFor(() => expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'render', source: '# First' })));
+
+  rerender({ source: '# Second' });
+  await waitFor(() => expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'render', source: '# Second' })));
+
+  expect(mockCreateWorker).toHaveBeenCalledTimes(1);
+  expect(worker.postMessage.mock.calls.filter(([message]) => message.type === 'initialize')).toHaveLength(1);
+  expect(worker.postMessage.mock.calls.filter(([message]) => message.type === 'render')).toHaveLength(2);
+});
+
 test('reports preview errors while leaving the editor source in caller-owned state', async () => {
   const { result } = renderHook(() => useStatementPreview('d1', '<script>bad()</script>'));
   await waitFor(() => expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'render' })));

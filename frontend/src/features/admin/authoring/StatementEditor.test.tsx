@@ -54,5 +54,15 @@ test('keeps source writable and visible when local preview reports an error', ()
 
   expect(screen.getByRole('textbox', { name: 'Statement source' })).toHaveValue('# Sum');
   expect(screen.getByRole('textbox', { name: 'Statement source' })).not.toHaveAttribute('readonly');
-  expect(screen.getByText('Invalid statement markup')).toBeInTheDocument();
+  expect(screen.getByRole('alert')).toHaveTextContent('Invalid statement markup');
+});
+
+test('shows a clear loading state in the preview viewport', () => {
+  mockedUseAuthoringDraft.mockReturnValue(model() as unknown as ReturnType<typeof useAuthoringDraft>);
+  mockedUseStatementPreview.mockReturnValue({ html: '', state: 'loading', error: '' });
+
+  render(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
+
+  expect(screen.getAllByText('Rendering live preview…')).toHaveLength(2);
+  expect(screen.queryByText('Preview will appear here.')).not.toBeInTheDocument();
 });

@@ -19,6 +19,8 @@ export default function useStatementPreview(
   const [contextError, setContextError] = useState('');
   const [result, setResult] = useState<StatementPreviewResult>({ html: '', state: 'waiting', error: '' });
   const generation = useRef(0);
+  const workerRef = useRef<Worker | null>(null);
+  const renderTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,6 +51,48 @@ export default function useStatementPreview(
   }, [draftId, revision]);
 
   useEffect(() => {
+    if (!draftId || !context) return;
+
+    let active = true;
+    let worker: Worker | undefined;
+    try {
+      const assets: PreviewAsset[] = context.assets.map(({ id, filename }) => ({
+        filename, url: authoringService.draftAssetUrl(draftId, id),
+      }));
+      worker = createStatementPreviewWorker();
+      workerRef.current = worker;
+      worker.onmessage = event => {
+        const message = event.data as { type: string; generation: number; html?: string; error?: string };
+        if (!active || message.generation !== generation.current) return;
+        if (renderTimeout.current) clearTimeout(renderTimeout.current);
+        renderTimeout.current = null;
+        if (message.type === 'rendered' && message.html) {
+          setResult({ html: message.html, state: 'ready', error: '' });
+        } else if (message.type === 'error') {
+          setResult(current => ({ ...current, state: 'error', error: message.error || 'Statement preview failed.' }));
+        }
+      };
+      worker.onerror = () => {
+        if (!active) return;
+        if (renderTimeout.current) clearTimeout(renderTimeout.current);
+        renderTimeout.current = null;
+        setResult(current => ({ ...current, state: 'error', error: 'Statement preview failed. Your source is unchanged.' }));
+      };
+      worker.postMessage({ type: 'initialize', shell: context.html, assets });
+    } catch (error) {
+      workerRef.current = null;
+      setResult(current => ({ ...current, state: 'error', error: error instanceof Error ? error.message : 'Statement preview failed.' }));
+    }
+    return () => {
+      active = false;
+      if (renderTimeout.current) clearTimeout(renderTimeout.current);
+      renderTimeout.current = null;
+      worker?.terminate();
+      if (workerRef.current === worker) workerRef.current = null;
+    };
+  }, [context, draftId]);
+
+  useEffect(() => {
     if (contextError) {
       setResult({ html: '', state: 'error', error: contextError });
       return;
@@ -58,33 +102,21 @@ export default function useStatementPreview(
       return;
     }
 
+    const worker = workerRef.current;
+    if (!worker) return;
     const currentGeneration = ++generation.current;
-    let active = true;
-    let worker: Worker | undefined;
     setResult(current => ({ ...current, state: 'loading', error: '' }));
     try {
-      const assets: PreviewAsset[] = context.assets.map(({ id, filename }) => ({
-        filename, url: authoringService.draftAssetUrl(draftId, id),
-      }));
-      worker = createStatementPreviewWorker();
-      worker.onmessage = event => {
-        const message = event.data as { type: string; generation: number; html?: string; error?: string };
-        if (!active || message.generation !== currentGeneration) return;
-        if (message.type === 'rendered' && message.html) {
-          setResult({ html: message.html, state: 'ready', error: '' });
-        } else if (message.type === 'error') {
-          setResult(current => ({ ...current, state: 'error', error: message.error || 'Statement preview failed.' }));
-        }
-      };
-      worker.onerror = () => {
-        if (active) setResult(current => ({ ...current, state: 'error', error: 'Statement preview failed. Your source is unchanged.' }));
-      };
-      worker.postMessage({ type: 'initialize', shell: context.html, assets });
       worker.postMessage({ type: 'render', generation: currentGeneration, source });
+      if (renderTimeout.current) clearTimeout(renderTimeout.current);
+      renderTimeout.current = setTimeout(() => {
+        if (generation.current === currentGeneration) {
+          setResult(current => ({ ...current, state: 'error', error: 'Live preview did not finish. Your source is unchanged.' }));
+        }
+      }, 15000);
     } catch (error) {
       setResult(current => ({ ...current, state: 'error', error: error instanceof Error ? error.message : 'Statement preview failed.' }));
     }
-    return () => { active = false; worker?.terminate(); };
   }, [context, contextError, draftId, source]);
 
   return result;

@@ -292,7 +292,10 @@ export default function StatementEditor({ id }: { id: string }) {
                 buildRunning={!!model.activeJob} />
               : <div className={styles.previewEmpty}>No PDF built yet.</div>)
             : (preview.html ? <LivePreview preview={preview.html} zoomScale={zoomScale} />
-              : <div className={styles.previewEmpty}>Preview will appear here.</div>)}
+              : <div className={styles.previewEmpty} role={preview.state === 'error' ? 'alert' : 'status'}>
+                {preview.state === 'error' ? preview.error
+                  : preview.state === 'loading' ? 'Rendering live preview…' : 'Preparing live preview…'}
+              </div>)}
         </div>
         {pdfMode && pdfStale && !model.activeJob && (
           <div className={styles.pdfStaleBar} role="status">
