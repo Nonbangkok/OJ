@@ -85,8 +85,8 @@ services:
 
   authoring-runner:
     build:
-      context: ./backend
-      dockerfile: authoring/Dockerfile
+      context: .
+      dockerfile: backend/authoring/Dockerfile
     network_mode: none
     read_only: true
     init: true
