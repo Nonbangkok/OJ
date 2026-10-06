@@ -50,6 +50,10 @@ const ContestScoreboard = () => {
     '--sb-problem-narrow': '96px',
     '--sb-problem-count': String(problems.length),
   } as CSSProperties;
+  const widePageStyle = {
+    '--sb-problem-count': String(problems.length),
+    '--sb-scoreboard-width': `${COL_WIDTHS.rank + COL_WIDTHS.participant + COL_WIDTHS.total + problems.length * COL_WIDTHS.problem}px`,
+  } as CSSProperties;
 
   if (loading) return <LoadingPage />;
 
@@ -65,7 +69,10 @@ const ContestScoreboard = () => {
   }
 
   return (
-    <div className={shared.page}>
+    <div
+      className={`${shared.page} ${problems.length > 7 ? styles.widePage : ''}`}
+      style={widePageStyle}
+    >
       <div className={shared.pageHeader}>
         <h1 className={shared.pageTitle}>Contest Scoreboard</h1>
         {lastUpdate && contest?.status !== 'finished' && (
@@ -79,7 +86,7 @@ const ContestScoreboard = () => {
           <p>No participants have submitted solutions in this contest yet</p>
         </div>
       ) : (
-        <div className={tableStyles['table-container']}>
+        <div className={`${tableStyles['table-container']} ${styles.scoreboardTableContainer}`}>
           <table className={`${tableStyles.table} ${styles.scoreboardTable}`} style={tableStyle}>
             <thead>
               <tr>

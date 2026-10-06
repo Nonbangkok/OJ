@@ -23,6 +23,26 @@
   min-width: 100%;
 }
 
+/* Give larger contests more of the available desktop width. The capped
+   width still follows the number of problems, while smaller contests keep
+   the shared page width. On compact viewports the media query below uses
+   the narrower problem-column plan. */
+.widePage {
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(100vw - 3rem), var(--sb-scoreboard-width, 1800px));
+}
+
+/* This specific table can exceed its viewport. Keep scrolling scoped to the
+   scoreboard instead of changing overflow behavior for every site table. */
+.scoreboardTableContainer.scoreboardTableContainer {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
 /* Leading columns stay visible while problem columns scroll horizontally.
    The header must match the body cells' background so rows don't show
    through the sticky cells above them. */
