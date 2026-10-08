@@ -7,7 +7,7 @@ import {
 } from '../types/models';
 import { SubmissionListQuery, SubmitRequestBody } from '../types/api';
 import { AppError } from '../middleware/errorHandler';
-import { isContestParticipant } from './contestAccess';
+import { isContestManagementRole, isContestParticipant } from './contestAccess';
 import {
     ExistsRow,
     GlobalScoreboardRow,
@@ -21,6 +21,7 @@ import {
 export const validateAndQueueSubmission = async (
     submission: SubmitRequestBody,
     userId: number,
+    role?: string,
 ): Promise<QueueSubmissionResult> => {
     const { problemId, language, code, contestId } = submission;
 
@@ -94,9 +95,11 @@ export const validateAndQueueSubmission = async (
         };
     }
 
+    const isStaffOrAdmin = isContestManagementRole({ role });
     const problemResult = await db.query<ExistsRow>(
-        'SELECT 1 AS exists FROM problems WHERE id = $1 AND is_visible = true AND contest_id IS NULL',
-        [problemId],
+        `SELECT 1 AS exists FROM problems
+         WHERE id = $1 AND contest_id IS NULL AND (is_visible = true OR $2 = true)`,
+        [problemId, isStaffOrAdmin],
     );
     if (problemResult.rows.length === 0) {
         throw new AppError('Problem is not available for submission.', 400);

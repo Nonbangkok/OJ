@@ -49,7 +49,7 @@ router.post(
     }
 
     const submissionPayload = req.body as SubmitRequestBody;
-    const queueResult = await validateAndQueueSubmission(submissionPayload, userId);
+    const queueResult = await validateAndQueueSubmission(submissionPayload, userId, req.user?.role);
 
     res.status(202).json({
       message: queueResult.isContestSubmission
