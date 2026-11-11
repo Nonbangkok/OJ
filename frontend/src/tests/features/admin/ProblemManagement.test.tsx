@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor, within, act } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import ProblemManagement from '../../../features/admin/problems/ProblemManagement';
 import adminService from '../../../services/adminService';
+import { ADMIN_PROBLEMS_PAGE } from '../../../config/constants';
 import { BrowserRouter } from 'react-router-dom';
 import { installMockIntersectionObserver, restoreMockIntersectionObserver, triggerIntersectionObservers } from '../../utils/mockIntersectionObserver';
 
@@ -471,16 +472,14 @@ describe('ProblemManagement Component', () => {
         /** Types into the server-queried, debounced search box and waits for the
          *  refetched page to render. An empty value restores the full page. */
         const searchFor = async (value) => {
-            jest.useFakeTimers();
-            try {
-                fireEvent.change(screen.getByLabelText('Search problems'), { target: { value } });
-                await act(async () => { jest.advanceTimersByTime(300); });
-            } finally {
-                jest.useRealTimers();
-            }
+            // Real timers on purpose: the component mounted under real timers, so
+            // its pending mount-time debounce timer can only be cancelled by the
+            // real clearTimeout. Switching to fake timers here let that stale
+            // timer fire later and reset the search (flaky under load).
+            fireEvent.change(screen.getByLabelText('Search problems'), { target: { value } });
             await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(
                 expect.objectContaining(value ? { search: value } : { limit: 25 }),
-            ));
+            ), { timeout: ADMIN_PROBLEMS_PAGE.SEARCH_DEBOUNCE_MS + 2000 });
             const expectedRows = value === 'zzz-no-match' ? 2 : value ? matching.length + 1 : searchMockProblems.length + 1;
             await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(expectedRows));
         };
@@ -592,26 +591,9 @@ describe('ProblemManagement Component', () => {
 
         it('header checkbox is disabled when no rows are displayed', async () => {
             await renderWithSearchProblems();
-            jest.useFakeTimers();
-            try {
-                // 'zzz-no-match' is a truthy search: the mocked server returns
-                // the empty match page after the debounced re-query.
-                fireEvent.change(screen.getByLabelText('Search problems'), { target: { value: 'zzz-no-match' } });
-                await act(async () => { jest.advanceTimersByTime(300); });
-                await waitFor(
-                    () => expect(jest.mocked(adminService.getProblems)).toHaveBeenLastCalledWith(
-                        expect.objectContaining({ search: 'zzz-no-match' }),
-                    ),
-                    { timeout: 3000 },
-                );
-                await act(async () => { jest.runOnlyPendingTimers(); });
-            } finally {
-                jest.useRealTimers();
-            }
-            await waitFor(
-                () => expect(screen.getAllByRole('row')).toHaveLength(2),
-                { timeout: 3000 },
-            );
+            // 'zzz-no-match' is a truthy search: the mocked server returns
+            // the empty match page after the debounced re-query.
+            await searchFor('zzz-no-match');
             expect(headerCheckbox()).toBeDisabled();
         });
 

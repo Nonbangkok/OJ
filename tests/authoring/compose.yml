@@ -15,8 +15,8 @@ services:
       retries: 30
   authoring-runner:
     build:
-      context: ../../backend
-      dockerfile: authoring/Dockerfile
+      context: ../..
+      dockerfile: backend/authoring/Dockerfile
     network_mode: none
     read_only: true
     init: true
@@ -40,7 +40,8 @@ services:
     cpus: 1.0
   tests:
     build:
-      context: ../../backend
+      context: ../..
+      dockerfile: backend/Dockerfile
     environment:
       INTEGRATION_DATABASE_URL: postgres://oj_test:oj_test@database:5432/oj_test
       INTEGRATION_RUNNER_SPOOL: /jobs

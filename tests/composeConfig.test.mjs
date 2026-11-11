@@ -128,7 +128,10 @@ test('production defaults consistently target nonbangkokgrader.com', () => {
   const productionText = productionFiles.join('\n');
 
   assert.doesNotMatch(productionText, /(?:^|\.)woi-grader\.com/m);
-  assert.match(productionText, /server_name nonbangkokgrader\.com www\.nonbangkokgrader\.com/);
+  // Apex is the canonical origin; www has its own block that redirects to it.
+  assert.match(productionText, /server_name nonbangkokgrader\.com;/);
+  assert.match(productionText, /server_name www\.nonbangkokgrader\.com;/);
+  assert.match(productionText, /return 301 https:\/\/nonbangkokgrader\.com\$request_uri;/);
   assert.match(productionText, /server_name upload\.nonbangkokgrader\.com/);
   assert.match(productionText, /\/etc\/letsencrypt\/live\/nonbangkokgrader\.com\/fullchain\.pem/);
   assert.match(productionText, /Host: nonbangkokgrader\.com/);

@@ -273,7 +273,7 @@ so run the complete integration suite only on a disposable database.
 From the repository root, build the backend and start a dedicated test database:
 
 ```bash
-docker build -t oj-authoring-test-backend backend
+docker build -f backend/Dockerfile -t oj-authoring-test-backend .
 docker run --rm -d --name oj-authoring-test-db \
   -e POSTGRES_USER=oj_test -e POSTGRES_PASSWORD=oj_test -e POSTGRES_DB=oj_test \
   postgres:16-alpine
