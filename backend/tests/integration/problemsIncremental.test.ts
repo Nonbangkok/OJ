@@ -13,6 +13,7 @@ import {
   getPublicProblemFilterOptions,
 } from '../../services/problemQueryService';
 import type { ProblemsPage } from '../../types/service';
+import { attachRequestUser } from '../../middleware/requestContext';
 
 jest.unmock('pg');
 jest.mock('../../db', () => ({ query: jest.fn(), pool: { connect: jest.fn() } }));
@@ -25,6 +26,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   app.use(session({ secret: 'incremental-test', resave: false, saveUninitialized: false }));
   app.use((req, _res, next) => { const role = req.header('x-test-role');
     if (role) { req.session.userId = 1; req.session.role = role; } next(); });
+  app.use(attachRequestUser);
   app.use(problemRoutes); app.use(errorHandler);
   beforeAll(async () => { await admin.query(`CREATE SCHEMA ${schema}`); await runMigrationsFromPool(pool); });
   beforeEach(async () => {

@@ -15,6 +15,7 @@ import { createProblemDraft, updateProblemDraft } from '../../services/authoring
 import { queueCompileJob, queueGeneratorJob, applyJobResult, getAuthoringJob, failAuthoringJob } from '../../services/authoringJobQueryService';
 import { reconcileAuthoringJobs } from '../../services/authoringJobCoordinator';
 import { AuthoringSpool } from '../../authoring/spool';
+import { attachRequestUser } from '../../middleware/requestContext';
 
 jest.unmock('pg');
 jest.mock('../../db', () => ({ query: jest.fn(), pool: { query: jest.fn(), connect: jest.fn() } }));
@@ -204,6 +205,7 @@ int main(int argc,char**argv){
     app.use(express.json());
     app.use(session({ secret: 'job-test', resave: false, saveUninitialized: false }));
     app.use((req, _res, next) => { req.session.userId = 1; req.session.role = 'admin'; next(); });
+    app.use(attachRequestUser);
     app.use(createAuthoringJobRouter(true));
     app.use(errorHandler);
     const response = await request(app).post(`/admin/authoring/drafts/${d.id}/jobs/generate`)
@@ -239,6 +241,7 @@ int main(int argc,char**argv){
     app.use(express.json());
     app.use(session({ secret: 'job-test', resave: false, saveUninitialized: false }));
     app.use((req, _res, next) => { req.session.userId = 1; req.session.role = 'admin'; next(); });
+    app.use(attachRequestUser);
     app.use(createAuthoringJobRouter(true));
     app.use(errorHandler);
     const response = await request(app).post(`/admin/authoring/drafts/${d.id}/jobs/compile`).send({ expectedRevision: 2, target });

@@ -12,6 +12,7 @@ import * as db from '../../db';
 import { errorHandler } from '../../middleware/errorHandler';
 import { runMigrationsFromPool } from '../../scripts/migrate';
 import { createProblemDraft } from '../../services/authoringDraftQueryService';
+import { attachRequestUser } from '../../middleware/requestContext';
 
 jest.unmock('pg');
 jest.mock('../../db', () => ({ query: jest.fn(), pool: { query: jest.fn(), connect: jest.fn() } }));
@@ -40,6 +41,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     const a = express(); a.use(express.json());
     a.use(session({ secret: 'manual-test', resave: false, saveUninitialized: false }));
     a.use((req, _res, next) => { if (role) { req.session.userId = 1; req.session.role = role; } next(); });
+    a.use(attachRequestUser);
     a.use(require('../../controllers/authoringTestcaseController').default); a.use(errorHandler); return a;
   }
   const stored = () => pool.query('SELECT revision, status, verified_revision FROM problem_drafts WHERE id=$1', [id]);

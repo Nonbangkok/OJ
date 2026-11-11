@@ -65,6 +65,10 @@ describe('Submission Service', () => {
         // Default: a solve earns nothing new (reward already existed).
         (awardSolveReward as jest.Mock).mockResolvedValue(0);
         console.error = jest.fn(); // Suppress expected errors in tests
+        // Default to the unprivileged dev path regardless of who runs the
+        // suite (CI runs it as root inside the backend image, where the real
+        // check returns true). Privileged-path tests override this to true.
+        jest.spyOn(jest.requireActual('../../utils/sandboxProcess'), 'canDropPrivileges').mockReturnValue(false);
     });
 
     describe('processSubmission', () => {
