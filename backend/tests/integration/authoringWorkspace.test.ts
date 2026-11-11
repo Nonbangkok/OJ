@@ -8,6 +8,7 @@ import router from '../../controllers/authoringWorkspaceController';
 import { errorHandler } from '../../middleware/errorHandler';
 import { runMigrationsFromPool } from '../../scripts/migrate';
 import { createProblemDraft } from '../../services/authoringDraftQueryService';
+import { attachRequestUser } from '../../middleware/requestContext';
 
 jest.unmock('pg');
 jest.mock('../../db', () => ({ query: jest.fn(), pool: { connect: jest.fn() } }));
@@ -20,6 +21,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   const app = express(); app.use(express.json());
   app.use(session({ secret: 'workspace-integration', resave: false, saveUninitialized: false }));
   app.use((req, _res, next) => { req.session.userId = 1; req.session.role = 'admin'; next(); });
+  app.use(attachRequestUser);
   app.use(router); app.use(errorHandler);
   beforeAll(async () => {
     await admin.query(`CREATE SCHEMA ${schema}`); await runMigrationsFromPool(pool);
