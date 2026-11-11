@@ -109,8 +109,9 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     expect(published.solution_cpp).toBe(source); expect(published.generator_cpp).toContain('PRIVATE_GENERATOR');
     expect(JSON.stringify(response.body)).not.toContain('PRIVATE_');
     expect((await request(app).get('/problems')).body).toEqual([]);
-    expect((await request(app).get('/problems/publish-test').set('x-test-role', 'user')).status).toBe(403);
-    expect((await request(app).get('/problems/publish-test/pdf').set('x-test-role', 'user')).status).toBe(403);
+    // Hidden problems read as plain 404s to non-staff (PROBLEM-002 non-enumeration).
+    expect((await request(app).get('/problems/publish-test').set('x-test-role', 'user')).status).toBe(404);
+    expect((await request(app).get('/problems/publish-test/pdf').set('x-test-role', 'user')).status).toBe(404);
     const detail = await request(app).get('/admin/problems/publish-test').set('x-test-role', 'admin');
     expect(detail.status).toBe(200); expect(detail.text).not.toContain('PRIVATE_');
     const exported = await request(app).post('/admin/problems/export').set('x-test-role', 'admin').send({ problemIds: ['publish-test'] })

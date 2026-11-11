@@ -128,7 +128,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
       expect(detail.status).toBe(200);
       expect(detail.body.difficulty).toBe(1900);
       const adminList = await request(app).get('/admin/problems').set('x-test-role', 'admin');
-      expect(adminList.body.find((p: { id: string }) => p.id === 'detail-1').difficulty).toBe(1900);
+      expect(adminList.body.problems.find((p: { id: string }) => p.id === 'detail-1').difficulty).toBe(1900);
     });
   });
 
