@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  backend:
+    name: Backend (build + unit tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # Same native toolchain + fonts as backend/Dockerfile (judge compile tests,
+      # fallback-avatar font registry test on Linux).
+      - name: Install system dependencies
+        working-directory: .
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential time python3 fontconfig fonts-dejavu-core fonts-tlwg-garuda
+
+      - run: npm ci --no-audit --install-links
+      - run: npm run build
+      # Integration suites skip themselves without INTEGRATION_DATABASE_URL;
+      # they run in the `integration` job against a real Postgres + runner.
+      - run: npm test -- --ci
+
+  frontend:
+    name: Frontend (type-check + lint + tests + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci --legacy-peer-deps --no-audit --install-links
+      - run: npm run validate
+      - name: Production build
+        run: npm run build
+        env:
+          REACT_APP_API_URL: /api
+          DISABLE_ESLINT_PLUGIN: "true"
+          INLINE_RUNTIME_CHUNK: "false"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+          if-no-files-found: ignore
+          retention-days: 7
+
+  docker:
+    name: Docker (compose config + image build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Compose config tests
+        run: node --test tests/composeConfig.test.mjs
+
+      - name: Build all images (local + production overlay)
+        run: |
+          docker compose --env-file .env.example config --quiet
+          docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.production.yml config --quiet
+          docker compose --env-file .env.example build
+
+  integration:
+    name: Integration (Postgres + authoring runner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      COMPOSE_PROJECT_NAME: oj-authoring-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build test stack
+        run: docker compose -f tests/authoring/compose.yml build
+
+      - name: Run full backend suite against real Postgres + runner
+        run: >
+          docker compose -f tests/authoring/compose.yml up
+          --abort-on-container-exit --exit-code-from tests
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f tests/authoring/compose.yml logs --no-color --tail=300
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f tests/authoring/compose.yml down -v
