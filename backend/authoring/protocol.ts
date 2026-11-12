@@ -21,8 +21,11 @@ export const AUTHORING_RUNNER = {
   MAX_SOLUTION_MEMORY_MB: 736,
   PDF_TIMEOUT_MS: 60_000,
   MAX_PDF_BYTES: 64 * 1024 * 1024,
-  // Qt reserves virtual address ranges beyond its resident memory usage.
-  PDF_ADDRESS_SPACE_BYTES: 2 * 1024 * 1024 * 1024,
+  // Qt/WebKit reserves virtual address ranges far beyond its resident memory
+  // (JS heap, per-thread stacks). On x86_64 2 GiB was not enough: printing hit
+  // std::bad_alloc / "QThread::start: Thread creation error". Resident memory
+  // stays bounded by the runner container's cgroup limit.
+  PDF_ADDRESS_SPACE_BYTES: 4 * 1024 * 1024 * 1024,
 } as const;
 
 export const seedSchema = z.string().regex(/^(0|[1-9][0-9]{0,19})$/)

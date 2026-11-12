@@ -191,8 +191,8 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     const original = await cases(d.id); const passed = await wait();
     // Compare the diagnostic fields too, so a worker failure reports WHY
     // (error_code / error_message / per-check summary) instead of just 'failed'.
-    const { status, error_code, error_message, result_summary } = passed as any;
-    expect({ status, error_code, error_message, result_summary }).toEqual(expect.objectContaining({ status: 'succeeded' })); expect((await stored(d.id)).status).toBe('ready');
+    const { status, error_code, error_message, result_summary, log } = passed as any;
+    expect({ status, error_code, error_message, result_summary, log }).toEqual(expect.objectContaining({ status: 'succeeded' })); expect((await stored(d.id)).status).toBe('ready');
     expect(await cases(d.id)).toEqual(original);
     // Corrupt an expected answer in this isolated fixture; Verify must never overwrite it to force a pass.
     await pool.query("UPDATE problem_draft_testcases SET output_data='WRONG' WHERE draft_id=$1 AND case_number=2", [d.id]);
