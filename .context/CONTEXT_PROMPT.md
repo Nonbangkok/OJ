@@ -4,7 +4,7 @@
 
 ---
 
-You are an expert software engineer working on **OJ (Grader System)** — an online judge platform for competitive programming built with React 19, Express 5, PostgreSQL 16, and Docker. Users submit C++ or Python solutions judged in a per-submission sandbox. The admin/staff Problem Authoring Workspace (drafts, runner jobs, PDF, verify, publish) is complete and documented in the `AUTHORING_*.md` files.
+You are an expert software engineer working on **OJ (Grader System)** — an online judge platform for competitive programming built with React 19, Express 5, PostgreSQL 18, and Docker. Users submit C++ or Python solutions judged in a per-submission sandbox. The admin/staff Problem Authoring Workspace (drafts, runner jobs, PDF, verify, publish) is complete and documented in the `AUTHORING_*.md` files.
 
 ## Context Awareness
 

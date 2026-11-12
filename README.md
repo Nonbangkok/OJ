@@ -123,6 +123,11 @@ Once the installation and setup are complete, you can start the application:
     ```bash
     docker compose up --build -d
     ```
+    *   Already have a local stack with data from before Postgres 18? Run
+        `scripts/pg18-migrate.sh --env-file .env -f docker-compose.yml` first (see
+        [the runbook](docs/runbooks/postgres-18-upgrade.md)); otherwise compose
+        creates an empty Postgres 18 database and the old data stays in
+        `<project>_db-data`.
     *   The first time you run this command, it might take several minutes as Docker downloads the PostgreSQL image and builds the frontend and backend images. The stack runs six services: `database`, a one-shot `migrate` job, `backend`, an isolated `authoring-runner` (no network), `frontend`, and `nginx-proxy`.
 2.  **Access the Application:**
     After the containers have successfully started, open your web browser and navigate to:
@@ -173,6 +178,10 @@ cp .env.production.example .env
 docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
 ./deploy.sh
 ```
+
+Upgrading an existing Postgres 16 deployment to Postgres 18 is a one-time manual
+migration: `deploy.sh` refuses to start until it is done. Follow
+[docs/runbooks/postgres-18-upgrade.md](docs/runbooks/postgres-18-upgrade.md).
 
 The production overlay sets `NODE_ENV=production`, enables secure cookies, mounts
 the production Nginx configuration and certificate directories, publishes HTTPS
@@ -276,7 +285,7 @@ From the repository root, build the backend and start a dedicated test database:
 docker build -f backend/Dockerfile -t oj-authoring-test-backend .
 docker run --rm -d --name oj-authoring-test-db \
   -e POSTGRES_USER=oj_test -e POSTGRES_PASSWORD=oj_test -e POSTGRES_DB=oj_test \
-  postgres:16-alpine
+  postgres:18-alpine
 docker exec oj-authoring-test-db pg_isready -U oj_test -d oj_test
 ```
 

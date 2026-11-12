@@ -15,3 +15,5 @@
 **/*.crt
 backend/uploads
 certbot-www
+# database backups written by scripts/pg18-migrate.sh
+backups
