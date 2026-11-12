@@ -834,6 +834,12 @@
 .editorWorkspace {
   min-height: 0;
 }
+/* Set while the divider is dragged so the preview iframe/embed cannot capture the pointer. */
+.editorWorkspaceResizing iframe,
+.editorWorkspaceResizing object,
+.editorWorkspaceResizing embed {
+  pointer-events: none;
+}
 .sourcePane,
 .previewPane {
   min-width: 0;

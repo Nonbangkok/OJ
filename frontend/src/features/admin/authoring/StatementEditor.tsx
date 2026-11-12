@@ -151,6 +151,21 @@ export default function StatementEditor({ id }: { id: string }) {
     storage: layoutStorage,
   });
   const compactLayout = useCompactEditorLayout();
+  // While the divider is dragged, embedded documents (preview iframe / PDF embed) must not swallow the
+  // pointer events, or the drag never sees its pointermove/pointerup and gets stuck.
+  const [resizing, setResizing] = useState(false);
+  useEffect(() => {
+    if (!resizing) return;
+    const stop = () => setResizing(false);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+    window.addEventListener('blur', stop);
+    return () => {
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+      window.removeEventListener('blur', stop);
+    };
+  }, [resizing]);
   const [previewZoom, setPreviewZoom] = useState(() => readPreviewZoom(id));
   const draftId = draft?.id;
   const draftRevision = draft?.revision;
@@ -257,7 +272,7 @@ export default function StatementEditor({ id }: { id: string }) {
     {/* resizeTargetMinimumSize keeps v2's grab zone (8px bar +-5px mouse, +-15px touch). */}
     <Group groupRef={panels} defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}
       resizeTargetMinimumSize={{ fine: 18, coarse: 38 }}
-      orientation={compactLayout ? 'vertical' : 'horizontal'} className={styles.editorWorkspace} role="region" aria-label="Statement editor">
+      orientation={compactLayout ? 'vertical' : 'horizontal'} className={resizing ? `${styles.editorWorkspace} ${styles.editorWorkspaceResizing}` : styles.editorWorkspace} role="region" aria-label="Statement editor">
       <Panel id="source" defaultSize="50" minSize="25" className={styles.sourcePane}>
         <textarea id="statement-source" aria-label="Statement source" spellCheck={false} value={form.statementHtml}
           readOnly={editorDisabled} onChange={event => {
@@ -268,7 +283,7 @@ export default function StatementEditor({ id }: { id: string }) {
             model.edit('statementHtml', statementHtml);
           }} />
       </Panel>
-      <Separator className={styles.editorResizeHandle} aria-label="Resize source and preview panes" disableDoubleClick
+      <Separator className={styles.editorResizeHandle} aria-label="Resize source and preview panes" disableDoubleClick onPointerDown={() => setResizing(true)}
         onDoubleClick={() => panels.current?.setLayout({ source: 50, preview: 50 })} />
       <Panel id="preview" defaultSize="50" minSize="25" className={styles.previewPane}>
         <div className={styles.previewModeBar} role="tablist" aria-label="Preview mode">

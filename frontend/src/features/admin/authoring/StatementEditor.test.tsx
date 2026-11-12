@@ -133,6 +133,18 @@ describe('statement editor layout', () => {
     expect(getSeparator()).toHaveAttribute('aria-valuenow', moved);
   });
 
+  test('marks the workspace as resizing from divider press until pointer release', () => {
+    renderEditor();
+    const region = screen.getByRole('region', { name: 'Statement editor' });
+    expect(region.className).not.toContain('editorWorkspaceResizing');
+
+    fireEvent.pointerDown(getSeparator());
+    expect(region.className).toContain('editorWorkspaceResizing');
+
+    fireEvent.pointerUp(window);
+    expect(region.className).not.toContain('editorWorkspaceResizing');
+  });
+
   test('ignores a corrupt saved layout', () => {
     window.localStorage.setItem('react-resizable-panels:oj-authoring-statement-layout:d1', 'not json{');
 
