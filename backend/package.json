@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "cross-env NODE_ENV=test jest",
+    "test": "cross-env NODE_ENV=test \"NODE_OPTIONS=--experimental-vm-modules --no-warnings=ExperimentalWarning\" jest",
     "build": "tsc && node scripts/copyAuthoringTemplates.cjs",
     "db:migrate": "tsx scripts/migrate.ts",
     "migrate": "npm run build && node dist/scripts/migrate.js",
@@ -19,8 +19,8 @@
     "node": "26.x"
   },
   "dependencies": {
-    "archiver": "^7.0.1",
     "@oj/statement-renderer": "file:../shared/statement-renderer",
+    "archiver": "^8.0.0",
     "bcrypt": "^6.0.0",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.5",
@@ -37,7 +37,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/archiver": "^7.0.0",
+    "@types/archiver": "^8.0.0",
     "@types/bcrypt": "^6.0.0",
     "@types/connect-pg-simple": "^7.0.3",
     "@types/cors": "^2.8.19",

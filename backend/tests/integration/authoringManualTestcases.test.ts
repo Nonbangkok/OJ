@@ -5,7 +5,7 @@ import pg from 'pg';
 import express from 'express';
 import session from 'express-session';
 import request from 'supertest';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import http from 'node:http';
 import { setTimeout as delay } from 'node:timers/promises';
 import * as db from '../../db';
@@ -89,7 +89,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     const a = app();
     await request(a).post(base).field('expectedRevision', '1').attach('input', Buffer.from('old'), 'old.in');
     async function zip(entries: [string, string][]) {
-      const z = archiver('zip'); const chunks: Buffer[] = []; z.on('data', chunk => chunks.push(chunk));
+      const z = new ZipArchive(); const chunks: Buffer[] = []; z.on('data', (chunk: Buffer) => chunks.push(chunk));
       entries.forEach(([name, value]) => z.append(value, { name })); await z.finalize(); return Buffer.concat(chunks);
     }
     const bad = await request(a).post(base).field('expectedRevision', '2').attach('archive', await zip([['1.out', 'orphan']]), 'bad.zip');
