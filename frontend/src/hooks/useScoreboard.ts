@@ -31,6 +31,7 @@ export const useScoreboard = (contestId = null) => {
   }, [contestId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- contestId-keyed fetch that flips loading on before its request starts
     fetchScoreboard();
   }, [fetchScoreboard]);
 

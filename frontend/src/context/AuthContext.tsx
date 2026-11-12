@@ -66,6 +66,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- bootstrap /me fetch; checkLoggedIn only sets state after its await resolves
     void checkLoggedIn();
   }, [checkLoggedIn]);
 

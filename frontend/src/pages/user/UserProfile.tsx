@@ -48,10 +48,17 @@ const UserProfile = () => {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  // Navigating to another profile (same route, new :username) goes back to
+  // the loading state before its fetch starts (adjust-state-while-rendering).
+  const [loadedUsername, setLoadedUsername] = useState(username);
+  if (username !== loadedUsername) {
+    setLoadedUsername(username);
     setLoading(true);
     setError(null);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
 
     userService.getProfile(username ?? '')
       .then((data) => {

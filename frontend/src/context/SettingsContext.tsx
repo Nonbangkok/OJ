@@ -75,6 +75,7 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- bootstrap /site-config fetch; fetchSettings only sets state after its await resolves
     void fetchSettings();
   }, [fetchSettings]);
 

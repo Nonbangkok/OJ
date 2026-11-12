@@ -104,6 +104,16 @@ export function ActionMenu({ label, items, trigger = 'ellipsis' }: ActionMenuPro
   const [position, setPosition] = useState<MenuPosition | null>(null);
   const menuId = useId();
 
+  // Drop the last placement as soon as the menu closes, so the next open
+  // renders hidden until it is re-measured (adjust-state-while-rendering).
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (!open) {
+      setPosition(null);
+    }
+  }
+
   // Register as the single open menu while open; opening another instance
   // closes this one via the module-level slot.
   useEffect(() => {
@@ -140,7 +150,6 @@ export function ActionMenu({ label, items, trigger = 'ellipsis' }: ActionMenuPro
   // Measure and place the menu before paint so it never flashes at (0, 0).
   useLayoutEffect(() => {
     if (!open) {
-      setPosition(null);
       return;
     }
     updatePosition();

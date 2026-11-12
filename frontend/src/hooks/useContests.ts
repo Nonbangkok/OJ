@@ -23,6 +23,7 @@ export const useContests = () => {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount fetch; its only synchronous setState is setLoading(true), already the initial value
     fetchContests();
   }, [fetchContests]);
 

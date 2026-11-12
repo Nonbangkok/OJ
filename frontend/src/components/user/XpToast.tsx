@@ -23,20 +23,32 @@ interface XpToastProps {
  * qualifying event replaces the current toast and restarts the timer.
  */
 const XpToast = ({ event }: XpToastProps) => {
-  const [visibleXp, setVisibleXp] = useState<number | null>(null);
-
   const qualifies =
     event?.overall_status === SUBMISSION_STATUS.ACCEPTED &&
     typeof event.xp_awarded === 'number' &&
     event.xp_awarded > 0;
+  const qualifyingXp = qualifies && event?.xp_awarded != null ? event.xp_awarded : null;
 
+  const [visibleXp, setVisibleXp] = useState<number | null>(qualifyingXp);
+
+  // Show the toast as soon as a newer qualifying event arrives
+  // (adjust-state-while-rendering on the event identity). A non-qualifying
+  // event leaves whatever is on screen untouched.
+  const [shownEvent, setShownEvent] = useState(event);
+  if (event !== shownEvent) {
+    setShownEvent(event);
+    if (qualifyingXp != null) {
+      setVisibleXp(qualifyingXp);
+    }
+  }
+
+  // Auto-dismiss timer; a newer event clears it and starts a fresh one.
   useEffect(() => {
-    if (!qualifies || event?.xp_awarded == null) return;
+    if (qualifyingXp == null) return;
 
-    setVisibleXp(event.xp_awarded);
     const timer = window.setTimeout(() => setVisibleXp(null), DISMISS_AFTER_MS);
     return () => window.clearTimeout(timer);
-  }, [qualifies, event]);
+  }, [qualifyingXp, event]);
 
   if (visibleXp == null) return null;
 

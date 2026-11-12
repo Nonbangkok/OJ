@@ -64,6 +64,7 @@ const useCodeSubmission = (
       const timeDiff = new Date().getTime() - problemCache.timestamp;
 
       if (timeDiff < APP_CONSTANTS.SUBMISSION_CACHE_EXPIRY) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- restores the cached draft from localStorage (external store) when problem/language changes
         setCode(problemCache.code);
       } else {
         // Clear expired cache for this problem/language
