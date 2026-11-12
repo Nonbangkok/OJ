@@ -18,16 +18,14 @@ export default defineConfig(
     rules: {
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
-      // React Compiler rules (react-hooks v7): immutability,
-      // preserve-manual-memoization and use-memo are enforced (their findings
-      // were fixed). set-state-in-effect and refs stay off until their
-      // remaining findings are worked through -- see
-      // docs/superpowers/followups/2026-11-12-react-compiler-rules.md
+      // React Compiler rules (react-hooks v7): all five are enforced. The few
+      // justified exceptions carry an inline eslint-disable with a reason --
+      // see docs/superpowers/followups/2026-11-12-react-compiler-rules.md
       'react-hooks/immutability': 'error',
       'react-hooks/preserve-manual-memoization': 'error',
       'react-hooks/use-memo': 'error',
-      'react-hooks/set-state-in-effect': 'off',
-      'react-hooks/refs': 'off',
+      'react-hooks/set-state-in-effect': 'error',
+      'react-hooks/refs': 'error',
     },
   },
   prettier,
