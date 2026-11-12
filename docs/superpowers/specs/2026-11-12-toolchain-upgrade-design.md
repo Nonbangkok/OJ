@@ -1,7 +1,7 @@
 # Toolchain & Dependency Upgrade — Design
 
 Date: 2026-11-12
-Status: draft, awaiting approval
+Status: approved 2026-11-12
 
 ## Intent
 
