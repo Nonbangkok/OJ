@@ -122,6 +122,20 @@ describe('ProblemManagement Component', () => {
         await waitFor(() => expect(new URLSearchParams(window.location.search).get('pages')).toBe('3'));
     });
 
+    it('keeps a search for the literal word "all" in the box and the URL', async () => {
+        renderProblemManagement();
+        await waitFor(() => expect(screen.getByText('Problem 1')).toBeInTheDocument());
+
+        const box = screen.getByLabelText('Search problems');
+        await userEvent.type(box, 'all');
+
+        // 'all' is the "no filter" sentinel for the dropdowns only; a search
+        // term must survive, or the URL->control sync wipes the box mid-word.
+        expect(box).toHaveValue('all');
+        await waitFor(() => expect(new URLSearchParams(window.location.search).get('search')).toBe('all'));
+        await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'all' })));
+    });
+
     it('re-syncs the filter controls from the URL on history navigation (browser Back/Forward)', async () => {
         renderProblemManagement();
         await waitFor(() => expect(screen.getByText('Problem 1')).toBeInTheDocument());

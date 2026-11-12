@@ -57,6 +57,13 @@ These were in "Left for later" above and are fixed on `fix/deferred-cleanup`:
 - **Pre-existing bug, XP toast stuck on screen** (found while clearing those findings): the "+N XP" toast's auto-dismiss effect depended on the latest realtime event. A non-qualifying event arriving while the toast was up cleared the timer and started none, so the toast stayed until the next first-solve. A typical trigger is submitting again within 4 s, which sends a Running update. The timer is now keyed on the toast itself. A new test failed before the fix and passes after it.
 - **Pre-existing bug, live preview stuck on "Rendering live preview…" for an empty statement** (found in the browser smoke of this PR): the preview worker renders an empty statement to `''`, and `useStatementPreview` only accepted a `rendered` message with truthy `html`. It had already cleared the 15 s fallback timer, so a new draft, or a statement cleared to nothing, showed "Rendering live preview…" forever and kept the old preview body. An empty render now counts as finished. A new test failed before the fix.
 
+## Fixed (404 page / admin search PR)
+
+Both found during the React Compiler PR (browser smoke and final review); both predate it.
+
+- **Unknown URLs showed React Router's developer error screen** ("Unexpected Application Error! 404 Not Found … Hey developer 👋"): there was no catch-all route. A `path="*"` route now renders a "Page not found" page with a link home, including for unknown `/admin/...` paths. The route tree is exported as `appRoutes` so the test can render it in a memory router. The tests fail without the route.
+- **Searching admin problems for the word "all" wiped the search box**: `updateUrlFilter` treated `'all'` as the "no filter" sentinel for every key, including the free-text search. Typing `all` deleted the `search` URL param, and the URL→control sync then cleared the box mid-word. The sentinel now applies only to the dropdown filters. A new test failed before the fix.
+
 ## Production action needed (you)
 
 After PR #15 (step 9) is merged, `deploy.sh` **refuses** to deploy on a server that still has Postgres 16 data. Follow `docs/runbooks/postgres-18-upgrade.md` to migrate. Run it inside tmux, with ≥ 4–6× the database size in free disk, and keep the old `db-data` volume until you're sure.

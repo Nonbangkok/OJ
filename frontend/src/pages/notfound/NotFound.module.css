@@ -1,0 +1,39 @@
+.notFound {
+  max-width: 32rem;
+  margin: 4rem auto;
+  padding: 0 1rem;
+  text-align: center;
+}
+
+.code {
+  margin: 0;
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.title {
+  margin: 0.5rem 0;
+  font-size: var(--font-size-page-title);
+  color: var(--text-primary);
+}
+
+.message {
+  margin: 0 0 1.5rem;
+  color: var(--text-secondary);
+}
+
+.homeLink {
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius-md);
+  background: var(--action-primary-background);
+  color: var(--action-primary-foreground);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.homeLink:hover,
+.homeLink:focus-visible {
+  background: var(--action-primary-hover-background);
+}

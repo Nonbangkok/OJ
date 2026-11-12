@@ -80,8 +80,11 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
   const updateUrlFilter = (key: string, value: string) => {
     setSearchParams(previous => {
       const next = new URLSearchParams(previous);
-      if (value && value !== 'all') next.set(key, value);
-      else next.delete(key);
+      // 'all' is the "no filter" sentinel of the dropdowns; the free-text
+      // search has no sentinel, so a search for the word "all" is kept.
+      const isDefault = !value || (key !== 'search' && value === 'all');
+      if (isDefault) next.delete(key);
+      else next.set(key, value);
       next.delete('pages');
       return next;
     }, { replace: true, preventScrollReset: true });
