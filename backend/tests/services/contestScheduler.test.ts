@@ -1,7 +1,8 @@
-import contestScheduler from '../../services/contestScheduler';
+import contestScheduler, { cronLogger } from '../../services/contestScheduler';
 import * as db from '../../db';
 import { migrateSubmissionsAfterContest } from '../../services/problemMigration';
 import cron from 'node-cron';
+import { logger } from '../../utils/logger';
 
 jest.mock('../../db');
 jest.mock('../../services/problemMigration');
@@ -27,6 +28,28 @@ describe('Contest Scheduler Service', () => {
             contestScheduler.start();
             expect(contestScheduler.getStatus().isRunning).toBe(true);
             expect(cron.schedule).toHaveBeenCalledWith('* * * * *', expect.any(Function), expect.any(Object));
+        });
+
+        it('registers the per-minute job in Asia/Bangkok with the structured logger', () => {
+            contestScheduler.start();
+            expect(cron.schedule).toHaveBeenCalledWith('* * * * *', expect.any(Function), {
+                timezone: 'Asia/Bangkok',
+                logger: cronLogger,
+            });
+        });
+
+        it('forwards node-cron log calls to the structured logger', () => {
+            const warn = jest.spyOn(logger, 'warn').mockImplementation(() => undefined);
+            const error = jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+            cronLogger.warn('missed execution at X!');
+            expect(warn).toHaveBeenCalledWith('missed execution at X!');
+            const boom = new Error('boom');
+            cronLogger.error(boom);
+            expect(error).toHaveBeenCalledWith('contest scheduler task failed', { err: boom });
+            cronLogger.error('plain');
+            expect(error).toHaveBeenCalledWith('plain', undefined);
+            warn.mockRestore();
+            error.mockRestore();
         });
 
         it('should not start multiple instances', () => {

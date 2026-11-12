@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { promises as realFs } from 'fs';
 import os from 'os';
 import path from 'path';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import pg, { PoolClient } from 'pg';
 import * as db from '../../db';
 import express from 'express';
@@ -102,7 +102,7 @@ type CollectionRow = { id: number; name: string };
     const zipPath = path.join(workDir, `batch-${randomUUID()}.zip`);
     await new Promise<void>((resolve, reject) => {
       const output = fsSync.createWriteStream(zipPath);
-      const archive = archiver('zip', { zlib: { level: 9 } });
+      const archive = new ZipArchive({ zlib: { level: 9 } });
       output.on('close', () => resolve());
       output.on('error', reject);
       archive.on('error', reject);

@@ -4,7 +4,7 @@ import multer from 'multer';
 import { requireAuth, requireStaffOrAdmin } from '../middleware/auth';
 import { requirePublicAccess } from '../middleware/siteAccess';
 import { chunkDiskUpload, diskUpload, memoryUpload } from '../middleware/upload';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import { processBatchUpload } from '../services/batchUploadService';
 import { registerProgressClient, streamBatchUpload } from '../services/batchUploadProgress';
 import {
@@ -574,7 +574,7 @@ router.post('/admin/problems/export', requireAuth, requireStaffOrAdmin,
   async (req: Request, res: Response) => {
   const { problemIds } = req.body as ProblemExportRequestBody; // Expects an array of problem IDs to export
 
-  const archive = archiver('zip', {
+  const archive = new ZipArchive({
     zlib: { level: 9 } // Sets the compression level.
   });
 

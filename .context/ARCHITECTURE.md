@@ -12,16 +12,16 @@
 | Charts | recharts | 3.10 |
 | Code Editor | react-simple-code-editor | 0.14 |
 | Syntax Highlight | highlight.js | 11.11 |
-| Backend | Express | 5.1 |
+| Backend | Express | 5.3 |
 | Database | PostgreSQL (Alpine) | 16 |
-| Session Store | connect-pg-simple | 9.0 |
-| Rate Limiting | express-rate-limit | 8.5 |
+| Session Store | connect-pg-simple | 10.0 |
+| Rate Limiting | express-rate-limit | 8.7 |
 | Auth (passwords) | bcrypt | 6.0 |
 | Validation | zod | 4.x |
-| File Upload | multer | 2.0 |
-| Image Processing | sharp | 0.34 |
+| File Upload | multer | 2.5 |
+| Image Processing | sharp | 0.35 |
 | ZIP Processing | unzipper | 0.12 |
-| Scheduling | node-cron | 3.0 |
+| Scheduling | node-cron | 4.6 |
 | Reverse Proxy | Nginx | 1.30 |
 | Containerization | Docker + Compose | — |
 | Testing (BE) | Jest 30 + Supertest 7 | — |

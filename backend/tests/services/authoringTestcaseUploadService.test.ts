@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 
 const servicePath = '../../services/authoringTestcaseUploadService';
 it('reads the exact validated EOCD, including a long ZIP comment', async () => {
@@ -35,9 +35,9 @@ beforeEach(async () => { root = await mkdtemp(path.join(os.tmpdir(), 'oj-upload-
 afterEach(async () => { await rm(root, { recursive: true, force: true }); });
 
 async function archive(entries: [string, string | Buffer][], symlink = false): Promise<string> {
-  const zip = archiver('zip');
+  const zip = new ZipArchive();
   const chunks: Buffer[] = [];
-  zip.on('data', chunk => chunks.push(chunk));
+  zip.on('data', (chunk: Buffer) => chunks.push(chunk));
   for (const [name, data] of entries) zip.append(data, { name });
   if (symlink) zip.symlink('2.in', '/etc/passwd');
   await zip.finalize();
