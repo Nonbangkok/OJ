@@ -243,7 +243,7 @@ Playwright visual baselines cover the admin authoring shell and author profiles 
   It uses a unique schema per suite and cleans that schema up afterwards.
 - Set `INTEGRATION_DATABASE_URL` to a disposable database when running integration tests.
   Older migration/restore suites reset `public`; never point the full suite at a working stack.
-- Run final authoring checks inside the backend Docker image to exercise Node 20,
+- Run final authoring checks inside the backend Docker image to exercise Node 26,
   native sharp, PostgreSQL client tools, and Thai/Latin avatar fonts. See README commands.
 
 ### Frontend (Jest + React Testing Library)
