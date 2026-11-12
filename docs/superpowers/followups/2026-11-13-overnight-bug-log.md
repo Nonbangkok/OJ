@@ -26,11 +26,7 @@ Earlier in the same run, the toolchain steps also caught and fixed these (detail
 
 ## Left for later (not fixed on purpose)
 
-- **`npx tsc -p backend/tsconfig.test.json`** already reports 145 errors on `main` (`req.user` / `SessionData` augmentation). CI doesn't run it, and the count is unchanged.
 - **React Compiler lint rules** (react-hooks v7) are off and tracked in `docs/superpowers/followups/2026-11-12-react-compiler-rules.md`.
-- **Playwright visual baselines are stale on `main`.** admin-shell desktop and mobile fail because the fixtures don't cover `/admin/authoring/drafts?scope=mine`.
-- **node-cron's global logger** (`setLogger`) is still used for its own shutdown and start-failure messages. Only the per-task hook is routed.
-- **The Postgres 18 migration script has no run lock.** The runbook says to run one migration at a time.
 - **Bare `npx jest` in `backend/`** fails because the ESM flag is only set by `npm test`. This is documented in CLAUDE.md and CONTRIBUTING.
 
 ## Fixed in the follow-up PR
@@ -46,6 +42,15 @@ These were in "Left for later" above and are fixed on `fix/overnight-residuals`:
   - the `--force-recreate-18` section warns that a rolled-back 18 volume may still hold 18-era writes, and to export first.
 - **Runbook manual backup commands** run in a `( umask 077; … )` subshell, so the files are mode 600 like the script's.
 - **Guard exit 1** in the runbook's exit table also lists "`docker compose … config` failed / project name unreadable".
+
+## Fixed (deferred-cleanup PR)
+
+These were in "Left for later" above and are fixed on `fix/deferred-cleanup`:
+
+- **`npx tsc -p backend/tsconfig.test.json`** reported 145 errors on `main`: 140 TS2339, 4 TS2352 and 1 TS2353, all from the `req.user` / `SessionData` augmentation. Its `include` (`tests/**/*.ts`) left out `types/express/index.d.ts` and `types/express-session/index.d.ts`. It now includes `types/**/*.d.ts` and reports 0 errors, with no test changes. CI's backend job runs it after `npm run build` (about 3 s).
+- **node-cron's global logger:** `contestScheduler.start()` also calls `cron.setLogger(cronLogger)`, so node-cron's own shutdown and start-failure messages go through `utils/logger` too, and there is a unit test.
+- **The Postgres 18 migration script has a run lock.** `backups/.pg18-migrate.lock` is created with an atomic `mkdir` and holds `pid`/`started_at`. It is taken before the script touches Docker and released in `on_exit`, after the container cleanup and the status file. A second run refuses (exit 1) and leaves the lock and the status file alone. The runbook says how to clear a stale lock.
+- **Playwright visual fixtures:** `**/api/admin/authoring/drafts?scope=mine` is stubbed (`[]`). All 4 visual tests pass against the existing baselines, and none were regenerated.
 
 ## Production action needed (you)
 
