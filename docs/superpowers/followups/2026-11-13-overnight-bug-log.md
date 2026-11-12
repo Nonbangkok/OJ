@@ -55,6 +55,7 @@ These were in "Left for later" above and are fixed on `fix/deferred-cleanup`:
 
 - **React Compiler lint rules** were partly off (69 findings). All five rules are now `'error'`; see `docs/superpowers/followups/2026-11-12-react-compiler-rules.md`.
 - **Pre-existing bug, XP toast stuck on screen** (found while clearing those findings): the "+N XP" toast's auto-dismiss effect depended on the latest realtime event. A non-qualifying event arriving while the toast was up cleared the timer and started none, so the toast stayed until the next first-solve. A typical trigger is submitting again within 4 s, which sends a Running update. The timer is now keyed on the toast itself. A new test failed before the fix and passes after it.
+- **Pre-existing bug, live preview stuck on "Rendering live preview…" for an empty statement** (found in the browser smoke of this PR): the preview worker renders an empty statement to `''`, and `useStatementPreview` only accepted a `rendered` message with truthy `html`. It had already cleared the 15 s fallback timer, so a new draft, or a statement cleared to nothing, showed "Rendering live preview…" forever and kept the old preview body. An empty render now counts as finished. A new test failed before the fix.
 
 ## Production action needed (you)
 

@@ -106,7 +106,8 @@ export default function useStatementPreview(
         if (!active || message.generation !== generation.current) return;
         if (renderTimeout.current) clearTimeout(renderTimeout.current);
         renderTimeout.current = null;
-        if (message.type === 'rendered' && message.html) {
+        // An empty statement legitimately renders to '' -- still a finished render.
+        if (message.type === 'rendered' && typeof message.html === 'string') {
           setResult({ html: message.html, state: 'ready', error: '' });
         } else if (message.type === 'error') {
           fallbackToServer(message.generation, message.error || 'Statement preview failed.');

@@ -134,3 +134,14 @@ test('reports an unusable asset URL as preview error instead of throwing through
   expect(result.current.error).toContain('Statement assets must be served from this site');
   expect(mockCreateWorker).not.toHaveBeenCalled();
 });
+
+test('an empty statement renders to an empty, up-to-date preview instead of loading forever', async () => {
+  const { result } = renderHook(() => useStatementPreview('d1', ''));
+  await waitFor(() => expect(worker.postMessage).toHaveBeenCalledWith({ type: 'render', generation: 1, source: '' }));
+
+  act(() => worker.emit({ type: 'rendered', generation: 1, html: '' }));
+
+  await waitFor(() => expect(result.current.state).toBe('ready'));
+  expect(result.current.html).toBe('');
+  expect(mockedService.previewStatement).not.toHaveBeenCalled();
+});
