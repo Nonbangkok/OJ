@@ -7,7 +7,9 @@ import { logger } from '../utils/logger';
 
 /**
  * node-cron 4 reports missed ticks and task failures through its own
- * ANSI-coloured console logger. Route them through the structured logger.
+ * ANSI-coloured console logger. Route them through the structured logger:
+ * per task via the `logger` option, and globally (shutdown errors etc.) via
+ * setLogger in start().
  */
 export const cronLogger = {
   info: (message: string): void => logger.info(message),
@@ -55,6 +57,9 @@ class ContestScheduler {
     }
 
     logger.info('starting contest scheduler');
+
+    // node-cron's global logger (used outside any task, e.g. shutdown()).
+    cron.setLogger(cronLogger);
 
     // Check every minute for contests that need to start or end
     this.checkInterval = cron.schedule('* * * * *', async () => {
