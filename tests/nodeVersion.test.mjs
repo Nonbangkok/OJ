@@ -52,7 +52,7 @@ test('Node base images in every Dockerfile match .nvmrc', () => {
   assert.ok(found > 0, 'found at least one node base image');
 });
 
-test('judge and runner build stages stay on bookworm', () => {
-  assert.match(readText('backend/Dockerfile'), /^FROM node:26-bookworm-slim/m);
+test('judge image is on trixie; runner build stage stays on bookworm', () => {
+  assert.match(readText('backend/Dockerfile'), /^FROM node:26-trixie-slim/m);
   assert.match(readText('backend/authoring/Dockerfile'), /^FROM node:26-bookworm-slim AS build/m);
 });
