@@ -117,7 +117,7 @@ describe('Submission Service', () => {
             expect(compileArgs).toContain('--');
             const gccIndex = compileArgs.indexOf('--') + 1;
             expect(compileArgs[gccIndex]).toContain('g++');
-            expect(compileArgs).toEqual(expect.arrayContaining(['-std=c++20', '-fsanitize=signed-integer-overflow']));
+            expect(compileArgs).toEqual(expect.arrayContaining(['-std=c++20', '-fsanitize=signed-integer-overflow', '-fno-sanitize-recover=signed-integer-overflow']));
             expect(compileArgs).not.toContain(expect.stringContaining('/tmp')); // no absolute server paths in argv
             expect(compileCmd).toBe(JUDGE_CONFIG.PRLIMIT_PATH);
             // prlimit caps mirror the authoring compiler recipe (RUNNER-005).

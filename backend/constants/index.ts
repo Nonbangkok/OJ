@@ -305,12 +305,13 @@ export const LANGUAGE_PREPARE: Record<SubmissionLanguage, {
 }> = {
     cpp: {
         sourceExtension: '.cpp',
-        // UndefinedBehaviorSanitizer reports signed integer overflow to stderr
-        // but does not abort (no -fno-sanitize-recover), so it is not yet a
-        // Runtime Error; tracked as a follow-up.
+        // UndefinedBehaviorSanitizer traps signed integer overflow, and
+        // -fno-sanitize-recover makes it fatal: the program prints the UBSan
+        // report to stderr and exits 1, which the judge classifies as a
+        // Runtime Error (without it UBSan only reports and the run continues).
         checkCommand: (sourcePath, outputPath) => ({
             command: 'g++',
-            args: ['-std=c++20', '-fsanitize=signed-integer-overflow', sourcePath, '-o', outputPath],
+            args: ['-std=c++20', '-fsanitize=signed-integer-overflow', '-fno-sanitize-recover=signed-integer-overflow', sourcePath, '-o', outputPath],
         }),
         runCommand: (binaryPath) => ({ command: binaryPath, args: [] }),
         compiledArtifactPath: (outputPath) => outputPath,
