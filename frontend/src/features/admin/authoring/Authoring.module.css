@@ -860,8 +860,11 @@
 .sourcePane textarea:focus {
   box-shadow: inset 0 0 0 2px var(--accent-primary);
 }
+/* react-resizable-panels 4 sets an inline `flex: 0 0 auto` on the separator, which
+   beats any flex shorthand here; the thickness comes from width/height instead. */
 .editorResizeHandle {
-  flex: 0 0 8px;
+  flex: 0 0 auto;
+  width: 8px;
   position: relative;
   z-index: 1;
   background: var(--border-color);
@@ -1046,7 +1049,8 @@
     min-height: 100dvh;
   }
   .editorResizeHandle {
-    flex-basis: 8px;
+    width: auto;
+    height: 8px;
     cursor: row-resize;
   }
 }
