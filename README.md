@@ -123,6 +123,11 @@ Once the installation and setup are complete, you can start the application:
     ```bash
     docker compose up --build -d
     ```
+    *   Already have a local stack with data from before Postgres 18? Run
+        `scripts/pg18-migrate.sh --env-file .env -f docker-compose.yml` first (see
+        [the runbook](docs/runbooks/postgres-18-upgrade.md)); otherwise compose
+        creates an empty Postgres 18 database and the old data stays in
+        `<project>_db-data`.
     *   The first time you run this command, it might take several minutes as Docker downloads the PostgreSQL image and builds the frontend and backend images. The stack runs six services: `database`, a one-shot `migrate` job, `backend`, an isolated `authoring-runner` (no network), `frontend`, and `nginx-proxy`.
 2.  **Access the Application:**
     After the containers have successfully started, open your web browser and navigate to:

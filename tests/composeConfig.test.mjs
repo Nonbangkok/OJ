@@ -219,3 +219,16 @@ test('backend image installs the Postgres 18 client and retries the pgdg key fet
   assert.match(keyLine, /--retry 5/);
   assert.match(keyLine, /--retry-all-errors/);
 });
+
+test('deploy.sh runs the Postgres 18 upgrade guard before it builds or starts anything', () => {
+  const lines = readFileSync(path.join(repositoryRoot, 'deploy.sh'), 'utf8').split('\n');
+  const firstLine = (pattern) => lines.findIndex((line) => pattern.test(line));
+  const guard = firstLine(/^scripts\/pg18-guard\.sh "\$\{compose_files\[@\]\}" \|\| exit \$\?$/);
+  const build = firstLine(/^"\$\{compose\[@\]\}" build\b/);
+  const up = firstLine(/^"\$\{compose\[@\]\}" up\b/);
+
+  assert.notEqual(guard, -1, 'deploy.sh must call scripts/pg18-guard.sh with the shared compose files');
+  assert.notEqual(build, -1);
+  assert.notEqual(up, -1);
+  assert.ok(guard < build && guard < up, 'the guard must run before build and up');
+});

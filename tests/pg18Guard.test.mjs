@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { after, test } from 'node:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -69,7 +69,10 @@ test('(b) old 16 volume without an 18 volume requires the migration', () => {
   assert.match(result.stdout, new RegExp(`${project}_db-data-18`));
 });
 
-test('(c) old 16 volume plus a migrated 18 cluster (marker present) passes', () => {
+// seedVolume writes `echo <content>`, so files end with a newline.
+const sha256OfEcho = (content) => createHash('sha256').update(`${content}\n`).digest('hex');
+
+test('(c) old 16 volume plus a migrated 18 cluster whose marker has no hash passes with a warning', () => {
   const project = prefix('c');
   seedVolume(`${project}_db-data`, { PG_VERSION: '16' });
   seedVolume(`${project}_db-data-18`, {
@@ -79,6 +82,61 @@ test('(c) old 16 volume plus a migrated 18 cluster (marker present) passes', () 
 
   const result = runGuard(project);
   assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stderr, /warning: .*no pg16_pg_control_sha256/);
+});
+
+test('(h1) migrated marker whose pg_control hash matches the old volume passes', () => {
+  const project = prefix('h1');
+  seedVolume(`${project}_db-data`, { PG_VERSION: '16', 'global/pg_control': 'control-at-migration' });
+  seedVolume(`${project}_db-data-18`, {
+    '18/docker/PG_VERSION': '18',
+    '.oj-pg18-migrated-from-16': `pg16_pg_control_sha256=${sha256OfEcho('control-at-migration')}`,
+  });
+
+  const result = runGuard(project);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.doesNotMatch(result.stderr, /warning/);
+});
+
+test('(h2) old volume started again after the migration (rollback) is refused', () => {
+  const project = prefix('h2');
+  seedVolume(`${project}_db-data`, { PG_VERSION: '16', 'global/pg_control': 'control-after-rollback' });
+  seedVolume(`${project}_db-data-18`, {
+    '18/docker/PG_VERSION': '18',
+    '.oj-pg18-migrated-from-16': `pg16_pg_control_sha256=${sha256OfEcho('control-at-migration')}`,
+  });
+
+  const result = runGuard(project);
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.match(result.stdout, /docs\/runbooks\/postgres-18-upgrade\.md/);
+  assert.match(result.stdout, /rollback/);
+  assert.match(result.stdout, /scripts\/pg18-migrate\.sh --force-recreate-18/);
+});
+
+test('(j) an 18 volume whose marker was invalidated by the runbook rollback step is refused', () => {
+  const project = prefix('j');
+  seedVolume(`${project}_db-data`, { PG_VERSION: '16' });
+  seedVolume(`${project}_db-data-18`, {
+    '18/docker/PG_VERSION': '18',
+    '.oj-pg18-rolled-back': 'pg16_pg_control_sha256=abc',
+  });
+
+  const result = runGuard(project);
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.match(result.stdout, /rolled back/);
+  assert.match(result.stdout, /--force-recreate-18/);
+});
+
+test('(i) an incomplete-migration marker is refused even without an old volume', () => {
+  const project = prefix('i');
+  seedVolume(`${project}_db-data-18`, {
+    '18/docker/PG_VERSION': '18',
+    '.oj-pg18-migration-incomplete': 'started',
+  });
+
+  const result = runGuard(project);
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.match(result.stdout, /--force-recreate-18/);
 });
 
 test('(c1) old 16 volume plus an 18 cluster without the migrated marker requires the migration', () => {

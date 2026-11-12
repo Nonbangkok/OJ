@@ -7,21 +7,23 @@
 #   1. resolve the compose project name (docker compose <args> config --format json)
 #   2. preconditions: old volume holds a Postgres 16 cluster; the 18 volume is
 #      missing or empty (--force-recreate-18 deletes and recreates ONLY the 18
-#      volume, after a typed confirmation)
-#      free disk is checked, images are pulled and `docker compose build` runs
-#      while the site is still up
+#      volume, after a typed confirmation); images are pulled, `docker compose
+#      build` runs and free disk is checked, all while the site is still up
 #   3. stop every service of the project
 #   4. start a temporary postgres:16-alpine on the old volume (no network)
 #   5. back up: backups/pg16-<UTC>.sql (pg_dumpall, kept), .globals.sql,
 #      .dump (pg_dump -Fc of the app database) and .counts (exact row counts
 #      of every table in the app database's public schema)
-#   6. stop and remove the temporary container (the old volume stays)
+#   6. stop the temporary container cleanly, record the sha256 of the old
+#      volume's global/pg_control, remove the container (the old volume stays)
 #   7. start the compose `database` service, which initialises Postgres 18
 #   8. restore roles, then the app database
 #   9. count every public table again and compare; any mismatch exits 1 with
 #      the app stopped
-#  10. write the migrated marker <18 volume>/.oj-pg18-migrated-from-16 (the
-#      deploy guard requires it while the old volume exists), start the whole
+#  10. write the migrated marker <18 volume>/.oj-pg18-migrated-from-16 with
+#      that pg_control hash (the deploy guard requires the marker while the old
+#      volume exists, and refuses it once the old volume was started again,
+#      e.g. after a rollback), start the whole
 #      stack, check the backend's pg_dump is 18, and print the runbook's
 #      verification checklist
 #
@@ -31,9 +33,14 @@
 # Runbook: docs/runbooks/postgres-18-upgrade.md
 #
 # Run it inside tmux/screen: a dropped SSH session must not interrupt it.
-# HUP/INT/TERM/PIPE are trapped and always stop the temporary 16 server first.
-# Free space is checked up front (>= 4x the old cluster's data on the backups/
-# filesystem, >= 2x on Docker's); OJ_PG18_SKIP_DISK_CHECK=1 skips the abort.
+# HUP/INT/TERM/PIPE are trapped: the temporary 16 server is always stopped
+# first (docker stop, then waiting up to 120 s for it to exit; it is
+# force-removed only after that, and the script says so). The final status is
+# also written to backups/pg18-migrate.status. Run one migration at a time.
+# Free space is checked before anything is stopped (>= 4x the old cluster's
+# data on the backups/ filesystem and >= 2x on Docker's, or >= 6x when both
+# are the same filesystem); OJ_PG18_SKIP_DISK_CHECK=1 turns the abort into a
+# warning.
 #
 # Example (production, from the repository root):
 #   scripts/pg18-migrate.sh -f docker-compose.yml -f docker-compose.production.yml
@@ -108,25 +115,29 @@ die() {
     exit 1
 }
 
-on_exit() {
-    status=$?
-    # Cleanup first, before printing anything: stdout may be a pipe whose
-    # reader (tee) is already gone, and a second Ctrl-C/HUP must not cut the
-    # temporary server's shutdown short.
-    trap '' PIPE HUP INT TERM
-    trap - EXIT
-    set +e
-    if [ -n "$pg16_container" ] && docker container inspect "$pg16_container" >/dev/null 2>&1; then
-        docker stop -t 120 "$pg16_container" >/dev/null 2>&1
-        docker rm -f "$pg16_container" >/dev/null 2>&1
-        pg16_cleanup="stopped and removed the temporary Postgres 16 container $pg16_container"
+# Stops container $1 (docker stop -t 120), waits until it is no longer
+# running (bounded, 120 s), then removes it. Force-removes it only after that
+# timeout, and says so. Returns 0 only for a clean stop (exit code 0).
+stop_container() {
+    docker stop -t 120 "$1" >/dev/null 2>&1 || true
+    waited=0
+    while [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = true ] && [ "$waited" -lt 120 ]; do
+        sleep 2
+        waited=$((waited + 2))
+    done
+    if [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = true ]; then
+        docker rm -f "$1" >/dev/null 2>&1
+        echo "WARNING: $1 was still running 120 s after docker stop; force-removed it"
+        return 1
     fi
-    if [ -n "$tmp_dir" ]; then
-        rm -rf "$tmp_dir"
-    fi
-    [ -n "${pg16_cleanup:-}" ] && echo "$pg16_cleanup"
-    echo
-    if [ "$status" -eq 0 ]; then
+    code=$(docker inspect -f '{{.State.ExitCode}}' "$1" 2>/dev/null || echo '?')
+    docker rm "$1" >/dev/null 2>&1 || docker rm -f "$1" >/dev/null 2>&1
+    echo "stopped (exit code $code) and removed $1"
+    [ "$code" = 0 ]
+}
+
+exit_report() { # status
+    if [ "$1" -eq 0 ]; then
         cat <<EOF
 pg18-migrate: DONE.
   Postgres 18 data: $new_volume (migrated, row counts match)
@@ -135,9 +146,9 @@ pg18-migrate: DONE.
 Next: ./deploy.sh   (builds this release, passes the upgrade guard, health-checks the site)
       then run the manual verification checklist above.
 EOF
-        exit 0
+        return 0
     fi
-    printf 'pg18-migrate: FAILED (exit %s) during stage: %s\n' "$status" "$stage"
+    printf 'pg18-migrate: FAILED (exit %s) during stage: %s\n' "$1" "$stage"
     echo "  Postgres 16 data: ${old_volume:-<project>_db-data} was NOT removed, recreated or modified."
     case $stage in
         preflight)
@@ -174,6 +185,33 @@ EOF
             echo "      docker compose$compose_args exec -T backend pg_dump --version"
             ;;
     esac
+}
+
+on_exit() {
+    status=$?
+    # Cleanup first, before printing anything: stdout may be a pipe whose
+    # reader (tee) is already gone, and a second Ctrl-C/HUP must not cut the
+    # temporary server's shutdown short.
+    trap '' PIPE HUP INT TERM
+    trap - EXIT
+    set +e
+    if [ -n "$pg16_container" ] && docker container inspect "$pg16_container" >/dev/null 2>&1; then
+        pg16_cleanup=$(stop_container "$pg16_container")
+    fi
+    if [ -n "$tmp_dir" ]; then
+        rm -rf "$tmp_dir"
+    fi
+    report=$(exit_report "$status")
+    # A status file survives even when nobody is reading stdout any more.
+    if [ -d backups ]; then
+        {
+            date -u +%Y-%m-%dT%H:%M:%SZ
+            [ -n "$pg16_cleanup" ] && printf '%s\n' "$pg16_cleanup"
+            printf '%s\n' "$report"
+        } >backups/pg18-migrate.status 2>/dev/null
+    fi
+    [ -n "$pg16_cleanup" ] && printf '%s\n' "$pg16_cleanup"
+    printf '\n%s\n' "$report"
     exit "$status"
 }
 pg16_cleanup=
@@ -221,6 +259,13 @@ volume_data_files() {
     docker run --rm --network none -v "$1:/v:ro" "$HELPER_IMAGE" \
         sh -c 'find /v -type f ! -name "$1" | head -n 5' sh "$MARKER" ||
         die "could not list volume $1"
+}
+
+# Value of key=<value> lines in <file> inside volume <vol>, or empty.
+volume_marker_value() {
+    docker run --rm --network none -v "$1:/v:ro" "$HELPER_IMAGE" \
+        sh -c 'sed -n "s/^$2=//p" "/v/$1" 2>/dev/null | head -n 1' sh "$2" "$3" ||
+        die "could not read $2 from volume $1"
 }
 
 # Runs SQL from stdin with psql inside container $1, against database $2
@@ -295,6 +340,16 @@ if volume_exists "$new_volume"; then
             *) die "refusing to delete unexpected volume name $new_volume" ;;
         esac
         [ "$new_volume" != "$old_volume" ] || die "refusing: source and target volume are the same"
+        if [ "$(volume_file "$new_volume" "$DONE_MARKER")" != __MISSING__ ]; then
+            done_at=$(volume_marker_value "$new_volume" "$DONE_MARKER" migrated_at)
+            [ -n "$done_at" ] || done_at=$(volume_marker_value "$new_volume" "$DONE_MARKER" at)
+            printf '%s\n' \
+                "" \
+                "!!! WARNING: $new_volume holds a COMPLETED migration (from ${done_at:-an unknown time})." \
+                "!!! Everything written to Postgres 18 since then will be LOST. Export it first" \
+                "!!! (see 'Rollback' in $RUNBOOK) unless you are sure it is not needed." \
+                ""
+        fi
         printf 'This DELETES volume %s and everything in it (%s is kept).\n' "$new_volume" "$old_volume"
         printf 'Type the volume name to confirm: '
         answer=
@@ -312,30 +367,6 @@ fi
 mkdir -p backups
 [ -w backups ] || die "backups/ is not writable"
 
-# Disk: the plain pg_dumpall writes bytea as hex (~2x), plus the .dump, plus
-# transient copies in the containers, plus the new 18 cluster.
-data_kb=$(docker run --rm --network none -v "$old_volume:/v:ro" "$HELPER_IMAGE" du -sk /v/base | awk '{ print $1 }') ||
-    die "could not measure $old_volume"
-backups_free_kb=$(df -Pk backups | awk 'NR == 2 { print $4 }')
-docker_free_kb=$(docker run --rm --network none -v "$old_volume:/v:ro" "$HELPER_IMAGE" df -Pk /v | awk 'NR == 2 { print $4 }') ||
-    die "could not measure free space on the Docker data filesystem"
-docker_root=$(docker info -f '{{.DockerRootDir}}' 2>/dev/null || echo unknown)
-mb() { awk -v k="$1" 'BEGIN { printf "%.0f MiB", k / 1024 }'; }
-echo "Old cluster data (base/):        $(mb "$data_kb")"
-echo "Free on backups/ filesystem:     $(mb "$backups_free_kb") (need >= 4x = $(mb $((data_kb * 4))))"
-echo "Free on Docker data filesystem:  $(mb "$docker_free_kb") (need >= 2x = $(mb $((data_kb * 2)))); DockerRootDir=$docker_root"
-df -h backups | sed 's/^/    /'
-if [ -d "$docker_root" ]; then
-    df -h "$docker_root" | sed 's/^/    /'
-fi
-if [ "$backups_free_kb" -lt $((data_kb * 4)) ] || [ "$docker_free_kb" -lt $((data_kb * 2)) ]; then
-    if [ "${OJ_PG18_SKIP_DISK_CHECK:-}" = 1 ]; then
-        echo "warning: not enough free space by the rule above; continuing because OJ_PG18_SKIP_DISK_CHECK=1"
-    else
-        die "not enough free disk space (see above); free space or set OJ_PG18_SKIP_DISK_CHECK=1 if you are sure"
-    fi
-fi
-
 echo "Pulling images (best effort, before the app is stopped) ..."
 docker image inspect "$PG16_IMAGE" >/dev/null 2>&1 || docker pull -q "$PG16_IMAGE" >/dev/null
 docker image inspect "$HELPER_IMAGE" >/dev/null 2>&1 || docker pull -q "$HELPER_IMAGE" >/dev/null
@@ -347,16 +378,69 @@ dc pull -q database || echo "warning: could not pull the database image; using t
 log "Building this release's images (the app is still running)"
 dc build || die "docker compose build failed; nothing was stopped"
 
+# Disk (measured after the build, which also uses disk). The plain pg_dumpall
+# writes bytea as hex (~2x) and TOAST-compressed text uncompressed; add the
+# .dump, its transient copies inside the containers, and the new 18 cluster.
+log "Checking free disk space"
+numeric() { # name value
+    case $2 in
+        '' | *[!0-9]*) die "could not measure $1 (got '$2')" ;;
+    esac
+}
+du_out=$(docker run --rm --network none -v "$old_volume:/v:ro" "$HELPER_IMAGE" du -sk /v/base) ||
+    die "could not measure $old_volume"
+data_kb=$(printf '%s\n' "$du_out" | awk 'NR == 1 { print $1 }')
+numeric "the old cluster's data size" "$data_kb"
+backups_df=$(df -Pk backups) || die "df failed for backups/"
+backups_fs=$(printf '%s\n' "$backups_df" | awk 'NR == 2 { print $1 }')
+backups_free_kb=$(printf '%s\n' "$backups_df" | awk 'NR == 2 { print $4 }')
+numeric "free space on the backups/ filesystem" "$backups_free_kb"
+docker_df=$(docker run --rm --network none -v "$old_volume:/v:ro" "$HELPER_IMAGE" df -Pk /v) ||
+    die "could not measure free space on the Docker data filesystem"
+docker_fs=$(printf '%s\n' "$docker_df" | awk 'NR == 2 { print $1 }')
+docker_free_kb=$(printf '%s\n' "$docker_df" | awk 'NR == 2 { print $4 }')
+numeric "free space on the Docker data filesystem" "$docker_free_kb"
+docker_root=$(docker info -f '{{.DockerRootDir}}' 2>/dev/null) || docker_root=unknown
+same_fs=0
+[ "$backups_fs" = "$docker_fs" ] && same_fs=1
+if [ -d "$docker_root" ] && root_df=$(df -Pk "$docker_root" 2>/dev/null); then
+    [ "$(printf '%s\n' "$root_df" | awk 'NR == 2 { print $1 }')" = "$backups_fs" ] && same_fs=1
+fi
+mb() { awk -v k="$1" 'BEGIN { printf "%.0f MiB", k / 1024 }'; }
+echo "Old cluster data (base/):        $(mb "$data_kb")"
+if [ "$same_fs" -eq 1 ]; then
+    echo "backups/ and Docker data share one filesystem ($backups_fs)"
+    echo "Free there:                      $(mb "$backups_free_kb") (need >= 6x = $(mb $((data_kb * 6))))"
+    short=0
+    [ "$backups_free_kb" -ge $((data_kb * 6)) ] || short=1
+else
+    echo "Free on backups/ filesystem:     $(mb "$backups_free_kb") on $backups_fs (need >= 4x = $(mb $((data_kb * 4))))"
+    echo "Free on Docker data filesystem:  $(mb "$docker_free_kb") on $docker_fs (need >= 2x = $(mb $((data_kb * 2)))); DockerRootDir=$docker_root"
+    short=0
+    [ "$backups_free_kb" -ge $((data_kb * 4)) ] && [ "$docker_free_kb" -ge $((data_kb * 2)) ] || short=1
+fi
+df -h backups | sed 's/^/    /'
+if [ -d "$docker_root" ]; then
+    df -h "$docker_root" | sed 's/^/    /'
+fi
+if [ "$short" -eq 1 ]; then
+    if [ "${OJ_PG18_SKIP_DISK_CHECK:-}" = 1 ]; then
+        echo "warning: not enough free space by the rule above; continuing because OJ_PG18_SKIP_DISK_CHECK=1"
+    else
+        die "not enough free disk space (see above); free space or set OJ_PG18_SKIP_DISK_CHECK=1 if you are sure"
+    fi
+fi
+
 # --- 3. stop the app ----------------------------------------------------------
 stage=stop
 log "Stopping every service of project $project"
-dc stop
+# -t 60: give a busy Postgres 16 time for its shutdown checkpoint.
+dc stop -t 60
 # A temporary 16 server left by an earlier run that was killed outright
 # (SIGKILL, power loss) would otherwise keep the old volume open.
 if docker container inspect "$pg16_name" >/dev/null 2>&1; then
-    echo "stopping a leftover $pg16_name container from an earlier run"
-    docker stop -t 120 "$pg16_name" >/dev/null || true
-    docker rm -f "$pg16_name" >/dev/null
+    echo "found a leftover $pg16_name container from an earlier run"
+    stop_container "$pg16_name" || true
 fi
 running=$(docker ps -q --filter "volume=$old_volume")
 [ -z "$running" ] || die "containers still running on $old_volume: $running"
@@ -425,7 +509,7 @@ grep -q 'PostgreSQL database cluster dump complete' "$backup_base.sql" ||
 docker exec "$pg16_container" sh -c 'pg_dumpall -U "$POSTGRES_USER" --globals-only' >"$backup_base.globals.sql"
 docker exec "$pg16_container" sh -c \
     'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -f /tmp/oj-app.dump && pg_restore -l /tmp/oj-app.dump >/dev/null'
-docker cp -q "$pg16_container:/tmp/oj-app.dump" "$backup_base.dump"
+docker cp "$pg16_container:/tmp/oj-app.dump" "$backup_base.dump" >/dev/null
 chmod 600 "$backup_base.dump"
 write_counts "$pg16_container" "$counts16"
 [ -s "$counts16" ] || die "no tables found in the public schema of $pg_db"
@@ -444,9 +528,22 @@ done
 # --- 6. stop the temporary server -----------------------------------------------
 stage=pg16-stop
 log "Stopping the temporary Postgres 16 (the volume stays)"
-docker stop -t 120 "$pg16_container" >/dev/null
-docker rm "$pg16_container" >/dev/null
+if ! stop_container "$pg16_container"; then
+    echo "warning: the temporary Postgres 16 did not shut down cleanly; the backups are complete," \
+        "and Postgres will run crash recovery the next time 16 starts on $old_volume"
+fi
 pg16_container=
+# Fingerprint of the old cluster as the migration left it. Any later start of
+# Postgres 16 on it (e.g. a rollback) rewrites pg_control, and the guard then
+# refuses the (by then stale) 18 data.
+control_out=$(docker run --rm --network none -v "$old_volume:/v:ro" "$HELPER_IMAGE" sha256sum /v/global/pg_control) ||
+    die "could not hash global/pg_control in $old_volume"
+pg16_control_sha=${control_out%% *}
+case $pg16_control_sha in
+    *[!0-9a-f]* | '') die "unexpected sha256 output for $old_volume/global/pg_control: $control_out" ;;
+esac
+[ "${#pg16_control_sha}" -eq 64 ] || die "unexpected sha256 output for $old_volume/global/pg_control: $control_out"
+echo "old volume fingerprint: global/pg_control sha256 $pg16_control_sha"
 
 # --- 7. Postgres 18 ---------------------------------------------------------------
 stage=pg18-init
@@ -497,7 +594,7 @@ fi
 grep 'already exists' "$tmp_dir/globals.err" | sed 's/^/    ignored: /' || true
 
 log "Restoring $pg_db from $backup_base.dump"
-docker cp -q "$backup_base.dump" "$db_container:/tmp/oj-app.dump"
+docker cp "$backup_base.dump" "$db_container:/tmp/oj-app.dump" >/dev/null
 docker exec "$db_container" sh -c \
     'pg_restore --no-owner --role="$POSTGRES_USER" --exit-on-error --single-transaction -U "$POSTGRES_USER" -d "$POSTGRES_DB" /tmp/oj-app.dump; s=$?; rm -f /tmp/oj-app.dump; exit $s'
 
@@ -524,9 +621,10 @@ stage=finalise
 # never leaves it behind.
 docker exec "$db_container" sh -c \
     'cd /var/lib/postgresql && rm -f "$4" &&
-     printf "from=%s\nbackup=%s\nat=%s\n" "$1" "$2" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$3.tmp" &&
+     printf "from=%s\nbackup=%s\nmigrated_at=%s\npg16_pg_control_sha256=%s\n" \
+         "$1" "$2" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$5" >"$3.tmp" &&
      mv -f "$3.tmp" "$3"' \
-    sh "$old_volume" "$backup_base" "$DONE_MARKER" "$MARKER"
+    sh "$old_volume" "$backup_base" "$DONE_MARKER" "$MARKER" "$pg16_control_sha"
 eval "scripts/pg18-guard.sh $compose_args" || die "the upgrade guard still refuses this state"
 
 stage=start
