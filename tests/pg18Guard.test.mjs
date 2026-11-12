@@ -50,6 +50,14 @@ test('(a) fresh install: no volumes passes', () => {
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
+test('(a2) fresh install on 18: an 18 cluster without the marker and no old volume passes', () => {
+  const project = prefix('a2');
+  seedVolume(`${project}_db-data-18`, { '18/docker/PG_VERSION': '18' });
+
+  const result = runGuard(project);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
 test('(b) old 16 volume without an 18 volume requires the migration', () => {
   const project = prefix('b');
   seedVolume(`${project}_db-data`, { PG_VERSION: '16' });
@@ -61,13 +69,29 @@ test('(b) old 16 volume without an 18 volume requires the migration', () => {
   assert.match(result.stdout, new RegExp(`${project}_db-data-18`));
 });
 
-test('(c) old 16 volume plus an initialised 18 cluster passes', () => {
+test('(c) old 16 volume plus a migrated 18 cluster (marker present) passes', () => {
   const project = prefix('c');
+  seedVolume(`${project}_db-data`, { PG_VERSION: '16' });
+  seedVolume(`${project}_db-data-18`, {
+    '18/docker/PG_VERSION': '18',
+    '.oj-pg18-migrated-from-16': 'migrated',
+  });
+
+  const result = runGuard(project);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+test('(c1) old 16 volume plus an 18 cluster without the migrated marker requires the migration', () => {
+  // e.g. a plain `docker compose up` on the new release initialised an EMPTY 18 cluster
+  const project = prefix('c1');
   seedVolume(`${project}_db-data`, { PG_VERSION: '16' });
   seedVolume(`${project}_db-data-18`, { '18/docker/PG_VERSION': '18' });
 
   const result = runGuard(project);
-  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.match(result.stdout, /Postgres 18 upgrade required: see docs\/runbooks\/postgres-18-upgrade\.md/);
+  assert.match(result.stdout, /initialised WITHOUT migrating/);
+  assert.match(result.stdout, /scripts\/pg18-migrate\.sh --force-recreate-18/);
 });
 
 test('(c2) old 16 volume plus an 18 volume without a cluster requires the migration', () => {
@@ -86,11 +110,14 @@ test('(c3) an 18 cluster left by an interrupted migration is refused', () => {
   seedVolume(`${project}_db-data-18`, {
     '18/docker/PG_VERSION': '18',
     '.oj-pg18-migration-incomplete': 'started',
+    // even with the migrated marker, an incomplete marker still refuses
+    '.oj-pg18-migrated-from-16': 'migrated',
   });
 
   const result = runGuard(project);
   assert.equal(result.status, 2, result.stdout + result.stderr);
   assert.match(result.stdout, /docs\/runbooks\/postgres-18-upgrade\.md/);
+  assert.match(result.stdout, /--force-recreate-18/);
 });
 
 test('(d) 16-era data at the root of the 18 volume is refused', () => {

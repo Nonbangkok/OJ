@@ -18,7 +18,9 @@
 #   8. restore roles, then the app database
 #   9. count every public table again and compare; any mismatch exits 1 with
 #      the app stopped
-#  10. start the whole stack and print the runbook's verification checklist
+#  10. write the migrated marker <18 volume>/.oj-pg18-migrated-from-16 (the
+#      deploy guard requires it while the old volume exists), start the whole
+#      stack and print the runbook's verification checklist
 #
 # The old volume is never removed, recreated or written to by this script
 # (other than by the temporary Postgres 16 server reading it). Runbook:
@@ -142,9 +144,14 @@ EOF
             echo "        scripts/pg18-migrate.sh --force-recreate-18$compose_args"
             echo "      or roll back to Postgres 16: see 'Rollback' in $RUNBOOK"
             ;;
-        finalise | start)
+        finalise)
+            echo "  Row counts matched, but writing the migrated marker $DONE_MARKER failed;"
+            echo "  the app is STOPPED and deploy.sh still refuses."
+            echo "Next: start over with: scripts/pg18-migrate.sh --force-recreate-18$compose_args"
+            ;;
+        start)
             echo "  The data migration completed and was verified, but starting the stack failed."
-            echo "Next: ./deploy.sh   (or: docker compose$compose_args up -d)"
+            echo "Next: ./deploy.sh"
             ;;
     esac
     exit "$status"
@@ -443,8 +450,14 @@ echo "ok: all $(wc -l <"$counts16" | tr -d ' ') public tables have identical row
 
 # --- 10. finalise and start -----------------------------------------------------------
 stage=finalise
+# Only reached after the row counts matched. The migrated marker (root of the
+# 18 volume) is what lets deploy.sh's guard pass while the old 16 volume
+# exists; it is written last and atomically, so an interrupted or failed run
+# never leaves it behind.
 docker exec "$db_container" sh -c \
-    'printf "from=%s\nbackup=%s\nat=%s\n" "$1" "$2" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"/var/lib/postgresql/$3" && rm -f "/var/lib/postgresql/$4"' \
+    'cd /var/lib/postgresql && rm -f "$4" &&
+     printf "from=%s\nbackup=%s\nat=%s\n" "$1" "$2" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$3.tmp" &&
+     mv -f "$3.tmp" "$3"' \
     sh "$old_volume" "$backup_base" "$DONE_MARKER" "$MARKER"
 eval "scripts/pg18-guard.sh $compose_args" || die "the upgrade guard still refuses this state"
 

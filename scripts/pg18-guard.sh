@@ -9,10 +9,16 @@
 #   <project>_db-data-18  new volume (Postgres 18, cluster at 18/docker/)
 #
 # Exit codes:
-#   0  fresh install (no old 16 volume), or the 18 volume holds a completed cluster
+#   0  fresh install (no old 16 volume), or the 18 volume holds a cluster that
+#      scripts/pg18-migrate.sh migrated and verified (marker .oj-pg18-migrated-from-16)
 #   1  the guard could not inspect the volumes (fails closed)
-#   2  migration required: run scripts/pg18-migrate.sh (see the runbook)
+#   2  migration required: the old 16 volume exists and the 18 volume is missing,
+#      has no cluster, has a cluster WITHOUT the migrated marker (e.g. a plain
+#      `docker compose up` initialised it empty), or was left by an interrupted run
 #   3  the 18 volume holds a pre-18 data directory at its root
+#
+# The migrated marker lives at the root of the 18 volume (next to 18/); only
+# scripts/pg18-migrate.sh writes it, after the 16-vs-18 row counts matched.
 #
 # The project name is resolved the way docker compose resolves it:
 # `docker compose <args> config --format json` -> top-level "name".
@@ -22,6 +28,7 @@ set -eu
 
 RUNBOOK=docs/runbooks/postgres-18-upgrade.md
 MARKER=.oj-pg18-migration-incomplete
+DONE_MARKER=.oj-pg18-migrated-from-16
 HELPER_IMAGE=alpine:3
 
 cd "$(dirname "$0")/.."
@@ -77,10 +84,12 @@ fi
 new_root=absent
 new_version=absent
 new_marker=absent
+new_done=absent
 if volume_exists "$new_volume"; then
     new_root=$(volume_file "$new_volume" PG_VERSION)
     new_version=$(volume_file "$new_volume" 18/docker/PG_VERSION)
     new_marker=$(volume_file "$new_volume" "$MARKER")
+    new_done=$(volume_file "$new_volume" "$DONE_MARKER")
 fi
 
 if [ "$new_root" != absent ] && [ "$new_root" != __MISSING__ ]; then
@@ -93,23 +102,29 @@ if [ "$new_root" != absent ] && [ "$new_root" != __MISSING__ ]; then
 fi
 
 if [ "$old_version" = 16 ]; then
-    if [ "$new_version" != 18 ] || [ "$new_marker" != __MISSING__ ]; then
-        if [ "$new_version" = 18 ]; then
-            state="has an 18 cluster from an interrupted migration ($MARKER present)"
-        elif [ "$new_version" = absent ]; then
-            state="does not exist"
-        else
-            state="has no initialised Postgres 18 cluster"
-        fi
-        printf '%s\n' \
-            "Postgres 18 upgrade required: see $RUNBOOK" \
-            "  old volume: $old_volume (Postgres 16 data, kept untouched)" \
-            "  new volume: $new_volume ($state)" \
-            "Refusing to deploy: the site would start on an empty or incomplete database."
-        exit 2
+    if [ "$new_version" = 18 ] && [ "$new_marker" = __MISSING__ ] && [ "$new_done" != __MISSING__ ]; then
+        echo "pg18-guard: ok ($new_volume holds the migrated Postgres 18 cluster; $old_volume is kept)"
+        exit 0
     fi
-    echo "pg18-guard: ok ($new_volume holds the migrated Postgres 18 cluster; $old_volume is kept)"
-    exit 0
+    next="scripts/pg18-migrate.sh $*"
+    if [ "$new_version" = 18 ] && [ "$new_marker" != __MISSING__ ]; then
+        state="has an 18 cluster from an interrupted or failed migration ($MARKER present)"
+        next="scripts/pg18-migrate.sh --force-recreate-18 $*"
+    elif [ "$new_version" = 18 ]; then
+        state="was initialised WITHOUT migrating the 16 data (no $DONE_MARKER marker), e.g. by a plain docker compose up"
+        next="scripts/pg18-migrate.sh --force-recreate-18 $*"
+    elif [ "$new_version" = absent ]; then
+        state="does not exist"
+    else
+        state="has no initialised Postgres 18 cluster"
+    fi
+    printf '%s\n' \
+        "Postgres 18 upgrade required: see $RUNBOOK" \
+        "  old volume: $old_volume (Postgres 16 data, kept untouched)" \
+        "  new volume: $new_volume ($state)" \
+        "Refusing to deploy: the site would start on an empty or incomplete database." \
+        "Next: $next"
+    exit 2
 fi
 
 if [ "$old_version" = absent ]; then

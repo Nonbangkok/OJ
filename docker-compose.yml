@@ -29,6 +29,7 @@ services:
     volumes:
       # Postgres 18 layout (PGDATA is /var/lib/postgresql/18/docker). The old
       # `db-data` volume (PG16) is kept on purpose; see docs/runbooks/postgres-18-upgrade.md.
+      # Deploy only via ./deploy.sh: a raw `docker compose up` bypasses the upgrade guard and initialises an empty 18 cluster.
       - db-data-18:/var/lib/postgresql
     networks:
       - oj-network

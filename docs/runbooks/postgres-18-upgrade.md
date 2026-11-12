@@ -37,17 +37,51 @@ reads the volumes (through a read-only mount) and exits:
 
 | Exit | Meaning | What `deploy.sh` does |
 |---|---|---|
-| 0 | fresh install (no `<project>_db-data` with `PG_VERSION` 16), or `<project>_db-data-18` holds a completed 18 cluster | continues |
-| 2 | **migration required**: the old 16 volume exists and the 18 volume is missing, has no initialised cluster, or carries the "migration incomplete" marker left by an interrupted run | stops, prints this runbook's path and both volume names |
+| 0 | fresh install (no `<project>_db-data` with `PG_VERSION` 16; no marker needed), or `<project>_db-data-18` holds an 18 cluster **with the migrated marker** `.oj-pg18-migrated-from-16` | continues |
+| 2 | **migration required**: the old 16 volume exists and the 18 volume is missing, has no initialised cluster, has a cluster **without the migrated marker** (it was initialised without migrating, e.g. by a raw `docker compose up`), or carries the `.oj-pg18-migration-incomplete` marker of an interrupted/failed run | stops, prints this runbook's path, both volume names and the next command (`scripts/pg18-migrate.sh --force-recreate-18 …` when the 18 volume already holds a cluster) |
 | 3 | the 18 volume has a `PG_VERSION` at its root, i.e. old-layout data was put into it | stops; investigate before doing anything else |
 | 1 | the guard could not inspect the volumes (Docker error) | stops (fails closed) |
+
+> **Warning: deploy only with `./deploy.sh`.** A raw `docker compose up`
+> (or `up -d database`) on the 18 release bypasses the guard: Postgres 18
+> initialises an **empty** cluster in `<project>_db-data-18` and the site serves
+> an empty database. If that happens, stop the stack; the 16 data is still
+> intact in `<project>_db-data`. The guard keeps refusing that 18 volume (no
+> migrated marker), and `scripts/pg18-migrate.sh --force-recreate-18 …`
+> replaces it with a real migration.
+
+### The migrated marker
+
+`scripts/pg18-migrate.sh` writes `.oj-pg18-migrated-from-16` at the **root of
+the 18 volume** (`/var/lib/postgresql/.oj-pg18-migrated-from-16` inside the
+database container, next to `18/`). It holds the source volume, the backup name
+and a UTC timestamp. The script writes it as its very last data step, only
+after the 16-vs-18 row counts matched, and atomically (temp file + `mv`). An
+interrupted or failed run therefore never leaves it. While the old 16 volume
+exists, the guard passes only when this marker is present and the
+`.oj-pg18-migration-incomplete` marker is absent. Once the old volume has been
+removed (see Cleanup), the marker no longer matters.
+
+**Creating it by hand** is only for the case where you restored the 18 database
+some other way (for example from an admin export) **and** verified the data
+(row counts of users / problems / testcases / submissions / contests against
+the 16 data, plus the checklist below). Then, with the stack stopped:
+
+```bash
+docker run --rm -v <project>_db-data-18:/v alpine:3 \
+  sh -c 'printf "from=manual\nby=%s\nat=%s\n" "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /v/.oj-pg18-migrated-from-16' sh "$USER"
+```
+
+Never create it just to get past the guard: that is exactly the
+empty-database deploy the guard exists to stop.
 
 ## Prerequisites
 
 - **The release containing the Postgres 18 change** (this runbook,
   `scripts/pg18-migrate.sh`, `scripts/pg18-guard.sh`) is checked out on the
-  server: `git pull` / `git checkout <release>`. Do **not** run `./deploy.sh` or
-  `docker compose up` yet.
+  server: `git pull` / `git checkout <release>`. Do **not** run `./deploy.sh`
+  yet, and never run a raw `docker compose up` on this release (see the
+  warning above).
 - **Free disk ≥ 2× the database size**: one copy for the backups in `backups/`
   and one for the new 18 volume (the old volume is kept). Check with
   `df -h . /var/lib/docker` and, for the current size,
@@ -124,11 +158,11 @@ scripts/pg18-migrate.sh --force-recreate-18 -f docker-compose.yml -f docker-comp
    with `pg_restore --no-owner --role=$POSTGRES_USER --single-transaction --exit-on-error`.
 9. Writes `pg18-<UTC>.counts` and diffs it against the 16 counts, printing
    users / problems / testcases / submissions / contests side by side. **Any
-   difference exits 1 and leaves the app stopped** (the marker stays, so
-   `deploy.sh` refuses too).
-10. Removes the marker, records `.oj-pg18-migrated-from-16` in the 18 volume,
-    re-runs the guard (must pass), `docker compose <args> up -d`, and prints the
-    checklist below.
+   difference exits 1 and leaves the app stopped** (the incomplete marker stays
+   and no migrated marker is written, so `deploy.sh` refuses too).
+10. Removes the incomplete marker, then atomically writes the migrated marker
+    `.oj-pg18-migrated-from-16` (see above). It re-runs the guard (which must
+    pass), runs `docker compose <args> up -d`, and prints the checklist below.
 
 ## Manual verification
 
