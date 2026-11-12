@@ -19,7 +19,7 @@
     "react": "^19.3.1",
     "react-datepicker": "^9.1.0",
     "react-dom": "^19.3.1",
-    "react-resizable-panels": "^2.0.20",
+    "react-resizable-panels": "^4.21.0",
     "react-router-dom": "^7.18.5",
     "react-simple-code-editor": "^0.14.1",
     "recharts": "^3.10.1",

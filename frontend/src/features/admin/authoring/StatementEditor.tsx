@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ImperativePanelGroupHandle, Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import { Group, Panel, Separator, useDefaultLayout, useGroupRef } from 'react-resizable-panels';
 import { Button, Dialog } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
 import useAuthoringDraft from './useAuthoringDraft';
@@ -41,6 +41,16 @@ function readPreviewZoom(id: string) {
     return Number.isFinite(zoom) && zoom >= MIN_PREVIEW_ZOOM && zoom <= MAX_PREVIEW_ZOOM ? zoom : 100;
   } catch { return 100; }
 }
+
+// Layout persistence must never crash the editor when browser storage is unavailable (private mode).
+const layoutStorage = {
+  getItem(key: string) {
+    try { return window.localStorage.getItem(key); } catch { return null; }
+  },
+  setItem(key: string, value: string) {
+    try { window.localStorage.setItem(key, value); } catch { /* Remembering the split is optional. */ }
+  },
+};
 
 function useCompactEditorLayout() {
   const [compact, setCompact] = useState(false);
@@ -130,7 +140,11 @@ export default function StatementEditor({ id }: { id: string }) {
   const recoveryHandled = useRef(false);
   const recoveryBaseRevision = useRef<number | null>(null);
   const wasDirty = useRef(false);
-  const panels = useRef<ImperativePanelGroupHandle>(null);
+  const panels = useGroupRef();
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: `oj-authoring-statement-layout:${id}`,
+    storage: layoutStorage,
+  });
   const compactLayout = useCompactEditorLayout();
   const [previewZoom, setPreviewZoom] = useState(() => readPreviewZoom(id));
   const draftId = draft?.id;
@@ -235,9 +249,9 @@ export default function StatementEditor({ id }: { id: string }) {
       {model.activeJob && <p className={styles.editorStatus} role="status">Active job: {jobLabel(model.activeJob.jobType)} — {model.activeJob.status}</p>}
       {recovered && <p className={styles.editorStatus} role="status">Recovered unsaved statement from this browser tab.</p>}
     </section>
-    <PanelGroup ref={panels} autoSaveId={`oj-authoring-statement-layout:${id}`} direction={compactLayout ? 'vertical' : 'horizontal'}
-      className={styles.editorWorkspace} role="region" aria-label="Statement editor">
-      <Panel defaultSize={50} minSize={25} className={styles.sourcePane}>
+    <Group groupRef={panels} defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}
+      orientation={compactLayout ? 'vertical' : 'horizontal'} className={styles.editorWorkspace} role="region" aria-label="Statement editor">
+      <Panel id="source" defaultSize="50" minSize="25" className={styles.sourcePane}>
         <textarea id="statement-source" aria-label="Statement source" spellCheck={false} value={form.statementHtml}
           readOnly={editorDisabled} onChange={event => {
             const statementHtml = event.target.value;
@@ -247,9 +261,9 @@ export default function StatementEditor({ id }: { id: string }) {
             model.edit('statementHtml', statementHtml);
           }} />
       </Panel>
-      <PanelResizeHandle className={styles.editorResizeHandle} aria-label="Resize source and preview panes"
-        onDoubleClick={() => panels.current?.setLayout([50, 50])} />
-      <Panel defaultSize={50} minSize={25} className={styles.previewPane}>
+      <Separator className={styles.editorResizeHandle} aria-label="Resize source and preview panes" disableDoubleClick
+        onDoubleClick={() => panels.current?.setLayout({ source: 50, preview: 50 })} />
+      <Panel id="preview" defaultSize="50" minSize="25" className={styles.previewPane}>
         <div className={styles.previewModeBar} role="tablist" aria-label="Preview mode">
           <PreviewModeTab selected={pdfMode === false} onSelect={() => setPdfMode(false)}>Live HTML</PreviewModeTab>
           <PreviewModeTab selected={pdfMode === true} onSelect={() => setPdfMode(true)}>
@@ -277,7 +291,7 @@ export default function StatementEditor({ id }: { id: string }) {
           </div>
         )}
       </Panel>
-    </PanelGroup>
+    </Group>
     {showAssets && <Dialog open wide title="Statement assets & syntax help"
       description={'The runner-built PDF remains authoritative.'}
       onClose={() => setShowAssets(false)}

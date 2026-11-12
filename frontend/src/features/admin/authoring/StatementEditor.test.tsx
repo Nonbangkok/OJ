@@ -80,6 +80,11 @@ test('statement editor splits source and preview 50/50 by default', () => {
 });
 
 test('double-clicking the pane divider resets the split to 50/50', () => {
+  // jsdom does no layout; the panel library refuses keyboard resizes while the group measures 0px.
+  const rect = jest.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(
+    { x: 0, y: 0, top: 0, left: 0, right: 400, bottom: 400, width: 400, height: 400, toJSON: () => ({}) });
+  const width = jest.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(400);
+  const height = jest.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(400);
   renderEditor();
   const separator = screen.getByRole('separator', { name: 'Resize source and preview panes' });
 
@@ -88,6 +93,7 @@ test('double-clicking the pane divider resets the split to 50/50', () => {
   fireEvent.doubleClick(separator);
 
   expect(separator).toHaveAttribute('aria-valuenow', '50');
+  [rect, width, height].forEach(spy => spy.mockRestore());
 });
 
 test('divider keeps its accessible name', () => {
