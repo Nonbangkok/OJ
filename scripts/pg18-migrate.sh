@@ -34,9 +34,11 @@
 #
 # Run it inside tmux/screen: a dropped SSH session must not interrupt it.
 # HUP/INT/TERM/PIPE are trapped: the temporary 16 server is always stopped
-# first (docker stop, then waiting up to 120 s for it to exit; it is
-# force-removed only after that, and the script says so). The final status is
-# also written to backups/pg18-migrate.status. Run one migration at a time.
+# first (docker stop -t 120, which SIGKILLs it if it has not shut down within
+# 120 s; the script then polls up to another 120 s until docker confirms it is
+# no longer running, and force-removes a container that survives that, saying
+# so). The final status is also written to backups/pg18-migrate.status. Run one
+# migration at a time.
 # Free space is checked before anything is stopped (>= 4x the old cluster's
 # data on the backups/ filesystem and >= 2x on Docker's, or >= 6x when both
 # are the same filesystem); OJ_PG18_SKIP_DISK_CHECK=1 turns the abort into a
@@ -115,24 +117,42 @@ die() {
     exit 1
 }
 
-# Stops container $1 (docker stop -t 120), waits until it is no longer
-# running (bounded, 120 s), then removes it. Force-removes it only after that
-# timeout, and says so. Returns 0 only for a clean stop (exit code 0).
+# Prints the container's State.Running ("true"/"false"), or nothing when
+# docker inspect failed (daemon hiccup, or the container is gone).
+container_running() {
+    docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null || true
+}
+
+# Stops container $1 with docker stop -t 120 (Postgres gets 120 s for a clean
+# shutdown, then docker SIGKILLs it). Then polls, bounded (120 s), until
+# docker confirms State.Running=false: an unreadable state counts as "not
+# confirmed", so a docker inspect hiccup can never lead to a force-removal of
+# a server that is still shutting down. Only a container that is still not
+# confirmed stopped after that wait is force-removed, with a warning. Returns
+# 0 only for a confirmed clean stop (exit code 0).
 stop_container() {
     docker stop -t 120 "$1" >/dev/null 2>&1 || true
     waited=0
-    while [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = true ] && [ "$waited" -lt 120 ]; do
+    pg_running=$(container_running "$1")
+    while [ "$pg_running" != false ] && [ "$waited" -lt 120 ]; do
         sleep 2
         waited=$((waited + 2))
+        pg_running=$(container_running "$1")
     done
-    if [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = true ]; then
-        docker rm -f "$1" >/dev/null 2>&1
-        echo "WARNING: $1 was still running 120 s after docker stop; force-removed it"
+    if [ "$pg_running" != false ]; then
+        docker rm -f "$1" >/dev/null 2>&1 || true
+        echo "WARNING: $1 was not confirmed stopped (State.Running=${pg_running:-unreadable})" \
+            "$waited s after docker stop; force-removed it"
         return 1
     fi
     code=$(docker inspect -f '{{.State.ExitCode}}' "$1" 2>/dev/null || echo '?')
-    docker rm "$1" >/dev/null 2>&1 || docker rm -f "$1" >/dev/null 2>&1
-    echo "stopped (exit code $code) and removed $1"
+    # Confirmed stopped above; a forced removal still re-checks first.
+    if docker rm "$1" >/dev/null 2>&1 ||
+        { [ "$(container_running "$1")" = false ] && docker rm -f "$1" >/dev/null 2>&1; }; then
+        echo "stopped (exit code $code) and removed $1"
+    else
+        echo "WARNING: $1 stopped (exit code $code) but could not be removed; remove it by hand"
+    fi
     [ "$code" = 0 ]
 }
 
@@ -340,7 +360,10 @@ if volume_exists "$new_volume"; then
             *) die "refusing to delete unexpected volume name $new_volume" ;;
         esac
         [ "$new_volume" != "$old_volume" ] || die "refusing: source and target volume are the same"
-        if [ "$(volume_file "$new_volume" "$DONE_MARKER")" != __MISSING__ ]; then
+        # Captured first so that a die (Docker error) inside volume_file aborts
+        # the script; inside [ "$(…)" ] it would only end the subshell.
+        done_marker=$(volume_file "$new_volume" "$DONE_MARKER")
+        if [ "$done_marker" != __MISSING__ ]; then
             done_at=$(volume_marker_value "$new_volume" "$DONE_MARKER" migrated_at)
             [ -n "$done_at" ] || done_at=$(volume_marker_value "$new_volume" "$DONE_MARKER" at)
             printf '%s\n' \
