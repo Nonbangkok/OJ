@@ -28,5 +28,13 @@ test('reverse proxy and frontend runtime use the same nginx image', () => {
 });
 
 test('nginx is on the 1.30 stable line', () => {
-  assert.equal(proxyImage(), 'nginx:1.30-alpine');
+  assert.match(proxyImage(), /^nginx:1\.30(\.\d+)?-alpine$/);
+});
+
+test('production overlay does not override the nginx-proxy image', () => {
+  const overlay = readText('docker-compose.production.yml');
+  if (!/^ {2}nginx-proxy:/m.test(overlay)) return;
+  const service = overlay.match(/^ {2}nginx-proxy:\n((?: {4}.*\n|\n)+)/m);
+  assert.ok(service, 'nginx-proxy block in docker-compose.production.yml can be delimited');
+  assert.doesNotMatch(service[1], /^\s*image:/m);
 });
