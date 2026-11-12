@@ -4,7 +4,7 @@ import { AppError } from './errorHandler';
 
 /**
  * Site-level access gate for public-browsing content routes
- * (problems, contests, scoreboard...).
+ * (problems, contests, scoreboard, profiles, and avatars).
  *
  * PUBLIC mode: the request passes through — the route's own visibility /
  * permission logic (hidden problems, per-contest access, ...) applies as
