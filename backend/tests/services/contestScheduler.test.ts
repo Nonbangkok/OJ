@@ -29,6 +29,11 @@ describe('Contest Scheduler Service', () => {
             expect(cron.schedule).toHaveBeenCalledWith('* * * * *', expect.any(Function), expect.any(Object));
         });
 
+        it('registers the per-minute job in Asia/Bangkok with no extra options', () => {
+            contestScheduler.start();
+            expect(cron.schedule).toHaveBeenCalledWith('* * * * *', expect.any(Function), { timezone: 'Asia/Bangkok' });
+        });
+
         it('should not start multiple instances', () => {
             contestScheduler.start();
             contestScheduler.start();

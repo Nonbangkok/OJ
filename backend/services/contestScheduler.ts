@@ -50,7 +50,6 @@ class ContestScheduler {
         logger.error('contest scheduler start failed', { err: error });
       }
     }, {
-      scheduled: true,
       timezone: 'Asia/Bangkok'
     });
 
