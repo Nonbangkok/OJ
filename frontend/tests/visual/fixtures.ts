@@ -106,6 +106,9 @@ export async function mockAdminApi(page: Page): Promise<void> {
     )
   );
   await page.route('**/api/admin/authoring/drafts', (route) => route.fulfill(json(drafts)));
+  // ProblemAuthoring also loads the "My drafts" list up front. The backend
+  // matches the username to an Author Profile AKA; 'author.admin' matches none.
+  await page.route('**/api/admin/authoring/drafts?scope=mine', (route) => route.fulfill(json([])));
   await page.route('**/api/admin/author-profiles', (route) => route.fulfill(json(profiles)));
 }
 
