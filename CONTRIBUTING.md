@@ -95,7 +95,7 @@ npm run validate                           # type-check + lint:check + test:ci (
 Compose and localhost authentication smoke tests:
 
 ```bash
-node --test tests/composeConfig.test.mjs
+node --test tests/composeConfig.test.mjs tests/nodeVersion.test.mjs tests/nginxVersion.test.mjs
 BASE_URL=http://127.0.0.1 node --test tests/localSessionSmoke.test.mjs
 ```
 

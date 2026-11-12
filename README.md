@@ -300,7 +300,7 @@ Thai/Latin coverage. The font-registry check runs on Linux and is skipped on mac
 With the stack running on the default port:
 
 ```bash
-node --test tests/composeConfig.test.mjs
+node --test tests/composeConfig.test.mjs tests/nodeVersion.test.mjs tests/nginxVersion.test.mjs
 BASE_URL=http://127.0.0.1 node --test tests/localSessionSmoke.test.mjs
 ```
 
