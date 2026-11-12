@@ -71,6 +71,9 @@ npm test -- path/to/file.test.ts           # a single test file
 npm test -- -t "test name substring"       # a single test by name
 ```
 
+Run backend tests through `npm test`, not bare `npx jest`: the script sets
+`NODE_OPTIONS=--experimental-vm-modules` for ESM-only archiver 8.
+
 ### Frontend (`frontend/`)
 
 Vite + Jest. `npm test` runs in **watch mode** — use `npm run test:ci` for a

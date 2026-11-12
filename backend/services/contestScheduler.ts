@@ -5,6 +5,20 @@ import { CONTEST_STATUS } from '../constants';
 import { ContestSchedulerStatus, ContestTimingRow } from '../types/service';
 import { logger } from '../utils/logger';
 
+/**
+ * node-cron 4 reports missed ticks and task failures through its own
+ * ANSI-coloured console logger. Route them through the structured logger.
+ */
+export const cronLogger = {
+  info: (message: string): void => logger.info(message),
+  warn: (message: string): void => logger.warn(message),
+  error: (message: string | Error, err?: Error): void => {
+    const cause = message instanceof Error ? message : err;
+    logger.error(message instanceof Error ? 'contest scheduler task failed' : message, cause ? { err: cause } : undefined);
+  },
+  debug: (message: string | Error): void => logger.debug(message instanceof Error ? message.message : message),
+};
+
 /** XSYS-006: how many consecutive ticks a failing migration is retried before giving up. */
 const MIGRATION_MAX_RETRIES = 5;
 
@@ -50,7 +64,8 @@ class ContestScheduler {
         logger.error('contest scheduler start failed', { err: error });
       }
     }, {
-      timezone: 'Asia/Bangkok'
+      timezone: 'Asia/Bangkok',
+      logger: cronLogger,
     });
 
     this.isRunning = true;

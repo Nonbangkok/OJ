@@ -237,7 +237,7 @@ Playwright visual baselines cover the admin authoring shell and author profiles 
 - Use `ts-jest` for running TypeScript tests.
 - Use `supertest` to make HTTP requests against the Express app.
 - Test files named by domain: e.g., `auth.test.ts`, `submissions.test.ts`.
-- Run with `npm test` (uses `cross-env NODE_ENV=test`).
+- Run with `npm test` (uses `cross-env NODE_ENV=test`). Always go through `npm test` (single file: `npm test -- path/to/file.test.ts`; by name: `npm test -- -t "name"`), never bare `npx jest`: the script sets `NODE_OPTIONS=--experimental-vm-modules` for ESM-only archiver 8.
 - Slice 3 HTTP/PostgreSQL coverage lives in `tests/integration/authoringProfilesAndAssets.test.ts`.
   Only DB transport is redirected; controllers, image decoding, services, and transactions run for real.
   It uses a unique schema per suite and cleans that schema up afterwards.
