@@ -146,6 +146,10 @@ User decision: upgrade the judge's compiler and interpreter.
   same tests, same coverage thresholds on `src/services/*.ts`.
   `tsconfig.tests.*.json` keep working.
 - Drop `--legacy-peer-deps` everywhere (Dockerfile, CI) once peers resolve.
+- Remove `"noUncheckedSideEffectImports": false` from `frontend/tsconfig.json`
+  (added in Step 4 only because CRA's types declare `*.module.css` but not
+  `*.css`); with Vite, `vite/client` types declare `*.css`, so TS 6's default
+  check on side-effect imports can come back on.
 - Dev server proxy keeps `/api` → backend like CRA's `proxy` field did.
 - Browser support: set an explicit `build.target` close to today's
   browserslist (`>0.2%, not dead`) — e.g. `['es2020', 'chrome87', 'safari14',
