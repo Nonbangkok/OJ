@@ -26,7 +26,7 @@ Earlier in the same run, the toolchain steps also caught and fixed these (detail
 
 ## Left for later (not fixed on purpose)
 
-- **React Compiler lint rules** (react-hooks v7) are off and tracked in `docs/superpowers/followups/2026-11-12-react-compiler-rules.md`.
+- **React Compiler lint rules** (react-hooks v7): the 5 likely-bug findings are fixed and `immutability`, `preserve-manual-memoization` and `use-memo` are now `'error'`; `set-state-in-effect` and `refs` stay off with 69 findings remaining, tracked in `docs/superpowers/followups/2026-11-12-react-compiler-rules.md`.
 - **Bare `npx jest` in `backend/`** fails because the ESM flag is only set by `npm test`. This is documented in CLAUDE.md and CONTRIBUTING.
 
 ## Fixed in the follow-up PR

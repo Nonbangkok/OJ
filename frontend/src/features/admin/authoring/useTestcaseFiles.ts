@@ -43,6 +43,29 @@ export default function useTestcaseFiles({ draftId, revision, disabled, onMutate
   errorHandler.current = onError;
   const locked = disabled || busy || loading || !loaded || savedRevision > revision;
 
+  // File selections and dialogs, reset after every successful mutation.
+  const [input, setInput] = useState<File | null>(null);
+  const [output, setOutput] = useState<File | null>(null);
+  const [archive, setArchive] = useState<File | null>(null);
+  const [editing, setEditing] = useState<TestcaseMetadata | null>(null);
+  const [replacementInput, setReplacementInput] = useState<File | null>(null);
+  const [replacementOutput, setReplacementOutput] = useState<File | null>(null);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [formVersion, setFormVersion] = useState(0);
+  const [replacementVersion, setReplacementVersion] = useState(0);
+
+  function resetFiles() {
+    setInput(null);
+    setOutput(null);
+    setArchive(null);
+    setReplacementInput(null);
+    setReplacementOutput(null);
+    setEditing(null);
+    setConfirmation(null);
+    setPreview(null);
+    setFormVersion((value) => value + 1);
+  }
+
   const reportError = useCallback((error: unknown) => {
     if (!mounted.current) return;
     setErrorMessage(
@@ -159,29 +182,6 @@ export default function useTestcaseFiles({ draftId, revision, disabled, onMutate
       if (mounted.current) setBusy(false);
     }
   }, [busy, loading, onBusyChange, onMutated, refreshList, reportError, revision, savedRevision]);
-
-  // File selections and dialogs, reset after every successful mutation.
-  const [input, setInput] = useState<File | null>(null);
-  const [output, setOutput] = useState<File | null>(null);
-  const [archive, setArchive] = useState<File | null>(null);
-  const [editing, setEditing] = useState<TestcaseMetadata | null>(null);
-  const [replacementInput, setReplacementInput] = useState<File | null>(null);
-  const [replacementOutput, setReplacementOutput] = useState<File | null>(null);
-  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-  const [formVersion, setFormVersion] = useState(0);
-  const [replacementVersion, setReplacementVersion] = useState(0);
-
-  function resetFiles() {
-    setInput(null);
-    setOutput(null);
-    setArchive(null);
-    setReplacementInput(null);
-    setReplacementOutput(null);
-    setEditing(null);
-    setConfirmation(null);
-    setPreview(null);
-    setFormVersion((value) => value + 1);
-  }
 
   const appendTestcase = useCallback(() => {
     if (!input) return;
