@@ -24,6 +24,7 @@ import ProblemDetail from './pages/problem/ProblemDetail';
 import Scoreboard from './pages/scoreboard/Scoreboard';
 import Submissions from './pages/submission/Submissions';
 import UserProfile from './pages/user/UserProfile';
+import NotFound from './pages/notfound/NotFound';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import Admin from './pages/admin/Admin';
@@ -99,7 +100,8 @@ const RootLayout = () => {
   );
 };
 
-const router = createBrowserRouter(createRoutesFromElements(
+// Exported so routing can be tested with a memory router.
+export const appRoutes = createRoutesFromElements(
   <Route element={<RootLayout />} hydrateFallbackElement={<main className="container">Loading…</main>}>
     <Route element={<MainLayout />}>
       <Route path="/" element={<Home />} />
@@ -111,6 +113,10 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/contests" element={<PrivateRoute><Contests /></PrivateRoute>} />
+      {/* Anything no other route matches (including unknown /admin and
+          /contests/:id sub-paths) gets a real 404 page, not the router's
+          developer error screen. */}
+      <Route path="*" element={<NotFound />} />
     </Route>
 
     <Route path="/admin" element={<AdminLayout />}>
@@ -145,7 +151,9 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="scoreboard" element={<ContestScoreboard />} />
     </Route>
   </Route>,
-));
+);
+
+const router = createBrowserRouter(appRoutes);
 
 const App = () => {
   return (
