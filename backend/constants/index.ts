@@ -305,8 +305,9 @@ export const LANGUAGE_PREPARE: Record<SubmissionLanguage, {
 }> = {
     cpp: {
         sourceExtension: '.cpp',
-        // UndefinedBehaviorSanitizer reliably catches signed integer overflow
-        // as a runtime error.
+        // UndefinedBehaviorSanitizer reports signed integer overflow to stderr
+        // but does not abort (no -fno-sanitize-recover), so it is not yet a
+        // Runtime Error; tracked as a follow-up.
         checkCommand: (sourcePath, outputPath) => ({
             command: 'g++',
             args: ['-std=c++20', '-fsanitize=signed-integer-overflow', sourcePath, '-o', outputPath],

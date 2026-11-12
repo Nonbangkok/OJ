@@ -45,6 +45,7 @@ services:
     environment:
       INTEGRATION_DATABASE_URL: postgres://oj_test:oj_test@database:5432/oj_test
       INTEGRATION_RUNNER_SPOOL: /jobs
+      JUDGE_RUNTIME_REQUIRED: "1"
     volumes:
       - authoring-jobs:/jobs
     depends_on:

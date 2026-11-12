@@ -53,6 +53,6 @@ test('Node base images in every Dockerfile match .nvmrc', () => {
 });
 
 test('judge image is on trixie; runner build stage stays on bookworm', () => {
-  assert.match(readText('backend/Dockerfile'), /^FROM node:26-trixie-slim/m);
+  assert.match(readText('backend/Dockerfile'), new RegExp(`^FROM node:${major}-trixie-slim`, 'm'));
   assert.match(readText('backend/authoring/Dockerfile'), /^FROM node:26-bookworm-slim AS build/m);
 });
