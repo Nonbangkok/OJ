@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import api from '../../../services/api';
-import useAuthoringDraft from '../../../features/admin/authoring/useAuthoringDraft';
+import useAuthoringDraft, { AUTOSAVE_DELAY_MS } from '../../../features/admin/authoring/useAuthoringDraft';
 
 jest.mock('../../../services/api');
 const draft = { id: 'd1', problemId: 'sum', title: 'Sum', authorProfileId: null,
@@ -263,4 +263,41 @@ test('refresh after an external file change preserves text typed in the meantime
   await act(async () => { await result.current.refresh(); });
   expect(result.current.form?.title).toBe('My unsaved work');
   expect(result.current.conflict).toBe(true);
+});
+
+describe('debounced autosave', () => {
+  afterEach(() => jest.useRealTimers());
+
+  test('marks the draft dirty on each edit and saves the latest text once, AUTOSAVE_DELAY_MS after typing stops', async () => {
+    const { result } = renderHook(() => useAuthoringDraft('d1'));
+    await waitFor(() => expect(result.current.draft?.revision).toBe(3));
+    jest.useFakeTimers();
+    jest.mocked(api.patch).mockResolvedValue({ data: { ...draft, title: 'Second', revision: 4, status: 'draft', verifiedRevision: null } });
+
+    act(() => result.current.edit('title', 'First'));
+    expect(result.current.saveState).toBe('dirty');
+    act(() => { jest.advanceTimersByTime(AUTOSAVE_DELAY_MS - 1); });
+    act(() => result.current.edit('title', 'Second'));
+    act(() => { jest.advanceTimersByTime(AUTOSAVE_DELAY_MS - 1); });
+    expect(api.patch).not.toHaveBeenCalled();
+
+    await act(async () => { jest.advanceTimersByTime(1); });
+    expect(api.patch).toHaveBeenCalledTimes(1);
+    expect(api.patch).toHaveBeenCalledWith('/admin/authoring/drafts/d1', { expectedRevision: 3, title: 'Second' });
+    expect(result.current.saveState).toBe('saved');
+    expect(result.current.dirty).toBe(false);
+  });
+
+  test('flushes a pending autosave when the workspace unmounts', async () => {
+    const { result, unmount } = renderHook(() => useAuthoringDraft('d1'));
+    await waitFor(() => expect(result.current.draft?.revision).toBe(3));
+    jest.useFakeTimers();
+    jest.mocked(api.patch).mockResolvedValue({ data: { ...draft, title: 'Unsaved', revision: 4, status: 'draft', verifiedRevision: null } });
+
+    act(() => result.current.edit('title', 'Unsaved'));
+    unmount();
+
+    expect(api.patch).toHaveBeenCalledTimes(1);
+    expect(api.patch).toHaveBeenCalledWith('/admin/authoring/drafts/d1', { expectedRevision: 3, title: 'Unsaved' });
+  });
 });

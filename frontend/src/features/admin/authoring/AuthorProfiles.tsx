@@ -37,12 +37,10 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
   const [pendingSync, setPendingSync] = useState<PendingSync | null>(null);
   const [deleting, setDeleting] = useState<Profile | null>(null);
   const listRequest = useRef(0);
-  const setErrorRef = useRef(setError);
-  setErrorRef.current = setError;
   const {
     image, imageLoading, removeImage, zoom, x, y, canvas,
     setZoom, setX, setY, reset: resetImage, choose: chooseImage, requestRemoval,
-  } = useProfileImageCrop((message) => setErrorRef.current(message));
+  } = useProfileImageCrop((message) => setError(message));
 
   const load = useCallback(async () => {
     const request = ++listRequest.current;
@@ -58,6 +56,7 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
     }
   }, []);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount fetch; load()'s leading setLoading(true)/setListError('') are no-ops against the initial state
     void load();
     return () => {
       listRequest.current += 1;
