@@ -77,7 +77,7 @@ Create React App. `npm test` runs in **watch mode** by default — use `CI=true`
 for a one-shot run.
 
 ```bash
-npm start                                  # dev server
+npm start                                  # dev server (no longer reports lint errors; run `npm run lint:check` or `validate` -- CI enforces it)
 npm run build
 CI=true npm test                           # run once
 npm test -- src/tests/foo.test.tsx         # a single test file

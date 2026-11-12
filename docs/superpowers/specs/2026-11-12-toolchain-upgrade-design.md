@@ -164,6 +164,11 @@ User decision: upgrade the judge's compiler and interpreter.
   bug, not a baseline update. Visual tests are not added to CI in this
   project. *(Builder's call.)*
 - Update `CLAUDE.md`, `CONTRIBUTING.md`, `README.md` commands.
+- Decide explicitly whether to restore lint feedback in the Vite dev server
+  (e.g. a lint plugin) or keep lint CLI/CI-only (since Step 5 the CRA dev
+  server no longer reports lint errors).
+- Remove the now-redundant `DISABLE_ESLINT_PLUGIN` from `frontend/Dockerfile`,
+  `.github/workflows/ci.yml` and the `start`/`build` scripts once CRA is gone.
 
 ### 7. Frontend library majors
 Each with only the code changes its breaking changes require:
@@ -224,3 +229,7 @@ Code/config PR only:
   and coverage are unchanged.
 - Splitting a step into more PRs if it grows; never merging two steps into one
   except the TS-6/Vite case noted in step 4.
+
+## Follow-ups
+
+- [React Compiler lint rules (react-hooks v7), deferred from Step 5](../followups/2026-11-12-react-compiler-rules.md)

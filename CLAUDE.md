@@ -33,7 +33,7 @@ npm test -- -t "test name substring"      # single test by name
 Create React App (react-scripts). `npm test` runs in **watch mode** by default — use `CI=true` for one-shot.
 
 ```bash
-npm start                                  # dev server
+npm start                                  # dev server (no longer reports lint errors; run `npm run lint:check` or `validate` -- CI enforces it)
 npm run build
 CI=true npm test                           # run once
 npm test -- src/tests/foo.test.tsx         # single test file
