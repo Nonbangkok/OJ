@@ -12,12 +12,17 @@ jest.mock('../../db', () => ({ query: jest.fn(), pool: { connect: jest.fn() }, w
 
 // Drives the REAL judge pipeline (compile, sandbox, time_wrapper, seccomp) and
 // therefore needs the backend image: linux, root, and the compiled wrapper in cwd.
-const enabled = Boolean(
-  process.env.INTEGRATION_DATABASE_URL
-  && process.platform === 'linux'
-  && process.getuid?.() === 0
-  && fs.existsSync('scripts/time_wrapper'),
-);
+const gateConditions: Array<[string, boolean]> = [
+  ['INTEGRATION_DATABASE_URL is set', Boolean(process.env.INTEGRATION_DATABASE_URL)],
+  ['platform is linux', process.platform === 'linux'],
+  ['running as uid 0', process.getuid?.() === 0],
+  ['scripts/time_wrapper exists in cwd', fs.existsSync('scripts/time_wrapper')],
+];
+const unmet = gateConditions.filter(([, ok]) => !ok).map(([name]) => name);
+if (process.env.JUDGE_RUNTIME_REQUIRED === '1' && unmet.length > 0) {
+  throw new Error(`judge runtime suite is required (JUDGE_RUNTIME_REQUIRED=1) but unmet conditions: ${unmet.join('; ')}`);
+}
+const enabled = unmet.length === 0;
 
 (enabled ? describe : describe.skip)('judge runtime verdicts (end to end)', () => {
   jest.setTimeout(30_000);
@@ -113,13 +118,15 @@ const enabled = Boolean(
     ['py-tle', 'double', 'python', 'while True: pass', SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED],
   ];
 
-  it.each(cases)('%s', async (_name, problemId, language, code, expected) => {
+  it.each(cases)('%s', async (name, problemId, language, code, expected) => {
     const row = await judgeOnce(problemId, language, code);
-    if (row.overall_status !== expected) process.stderr.write(`${_name} ${JSON.stringify(row)}\n`);
-    expect(row.overall_status).toBe(expected);
+    expect({ name, status: row.overall_status, results: row.overall_status === expected ? undefined : row.results })
+      .toEqual({ name, status: expected, results: undefined });
     if (expected === SUBMISSION_STATUS.ACCEPTED) expect(row.score).toBe(100);
     if (expected === SUBMISSION_STATUS.COMPILATION_ERROR) {
-      expect(JSON.stringify(row.results)).not.toContain('oj-submissions');
+      const output = String(row.results?.[0]?.output ?? '');
+      expect(output).toMatch(/error/i);
+      expect(output).not.toContain('oj-submissions');
     }
   });
 
