@@ -173,7 +173,6 @@ export const useAdminProblemsPage = (
       });
     // The serialized query participates in the closure: a query change
     // while a Show More is in flight invalidates its response.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryKey]);
 
   /** Walk the remaining pages for the current filter and loaded cursor. */

@@ -124,7 +124,6 @@ export function useNavSlider<T extends HTMLElement = HTMLElement>(
       resetSlider();
     }, 150);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetSlider, recalcKey]);
 
   return { navRef, sliderStyle, handleItemMouseEnter, resetSlider };

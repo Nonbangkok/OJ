@@ -140,7 +140,6 @@ export default function useTestcaseFiles({ draftId, revision, disabled, onMutate
       onBusyChange?.(false);
       if (mounted.current) setBusy(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locked, onBusyChange, onMutated, refreshList, reportError]);
 
   const retryRefresh = useCallback(async () => {
