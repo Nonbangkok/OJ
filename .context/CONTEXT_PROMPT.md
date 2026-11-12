@@ -59,7 +59,7 @@ Before finalizing any implementation:
 - Frontend validation gates are stable:
   - `npm run type-check`
   - `npm run lint:check`
-  - `CI=true npm test -- --watchAll=false --coverage`
+  - `npm run test:ci`
 - Test typing now has dedicated progressive gates:
   - `npm run type-check:tests:services`
   - `npm run type-check:tests:hooks`
