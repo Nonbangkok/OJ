@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import pg from 'pg';
 import * as db from '../../db';
@@ -120,5 +121,11 @@ const enabled = Boolean(
     if (expected === SUBMISSION_STATUS.COMPILATION_ERROR) {
       expect(JSON.stringify(row.results)).not.toContain('oj-submissions');
     }
+  });
+
+  it('judge toolchain is g++ 14 and Python 3.13', () => {
+    expect(execFileSync('g++', ['-dumpversion']).toString().trim().startsWith('14')).toBe(true);
+    const py = execFileSync('/usr/bin/python3', ['-c', 'import sys;print(f"{sys.version_info[0]}.{sys.version_info[1]}")']);
+    expect(py.toString().trim()).toBe('3.13');
   });
 });
