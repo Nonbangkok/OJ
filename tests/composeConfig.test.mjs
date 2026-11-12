@@ -7,6 +7,22 @@ import { fileURLToPath } from 'node:url';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+// Only what the docker CLI itself needs. The rest of the developer's shell env
+// (an exported HTTP_PORT, COMPOSE_*, POSTGRES_*, …) would override
+// .env.example and make the assertions depend on the machine.
+const DOCKER_ENV_KEYS = new Set(['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP', 'USER', 'LANG']);
+const DOCKER_ENV_PREFIXES = ['DOCKER_', 'XDG_', 'LC_'];
+
+const dockerEnvironment = (overrides) => {
+  const env = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (DOCKER_ENV_KEYS.has(key) || DOCKER_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+      env[key] = value;
+    }
+  }
+  return { ...env, ...overrides };
+};
+
 const renderComposeConfig = (files, environment = {}) => {
   const args = ['compose', '--env-file', '.env.example'];
   for (const file of files) {
@@ -17,7 +33,7 @@ const renderComposeConfig = (files, environment = {}) => {
   const result = spawnSync('docker', args, {
     cwd: repositoryRoot,
     encoding: 'utf8',
-    env: { ...process.env, ...environment },
+    env: dockerEnvironment(environment),
   });
 
   assert.equal(result.status, 0, result.stderr);

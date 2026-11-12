@@ -38,7 +38,7 @@ reads the volumes (through a read-only mount) and exits:
 | Exit | Meaning | What `deploy.sh` does |
 |---|---|---|
 | 0 | no old volume `<project>_db-data`, or an old volume without `PG_VERSION` (fresh install / already cleaned up); **or** `<project>_db-data-18` holds an 18 cluster with the migrated marker `.oj-pg18-migrated-from-16` whose pg_control fingerprint still matches the old volume (a hand-made marker without a fingerprint passes with a warning) | continues |
-| 1 | Docker is unreachable, or a volume could not be read | stops (fails closed) |
+| 1 | Docker is unreachable, a volume could not be read, or `docker compose … config` failed / the project name could not be read from it | stops (fails closed) |
 | 2 | the old volume holds a cluster (**any** `PG_VERSION`) that was not migrated: the 18 volume is missing, has no cluster, or has a cluster **without the migrated marker** (e.g. initialised empty by a raw `docker compose up`); **or** the marker's fingerprint no longer matches, i.e. Postgres 16 was started on the old volume after the migration (a **rollback**); **or** the 18 volume carries `.oj-pg18-migration-incomplete` (an interrupted or failed run; refused even when no old volume exists) | stops, prints this runbook's path, both volume names and the exact next command |
 | 3 | the 18 volume has a `PG_VERSION` at its root, i.e. 16-era data was put into it | stops; investigate before doing anything else |
 
@@ -114,8 +114,10 @@ empty-database deploy the guard exists to stop.
   so the build doesn't add to the downtime.
 - **Run it inside `tmux` or `screen`.** A dropped SSH session sends SIGHUP.
   The script traps HUP/INT/TERM/PIPE. Before exiting it stops its temporary
-  Postgres 16 server (`docker stop`, then waits up to 120 s for it to exit; it
-  force-removes the container only after that timeout and says so). A detached
+  Postgres 16 server with `docker stop -t 120`, which gives Postgres 120 s for
+  a clean shutdown and then SIGKILLs it. The script then polls (up to another
+  120 s) until Docker confirms the container is no longer running; only a
+  container that survives that is force-removed, and the script says so. A detached
   session avoids the interruption altogether. On Ctrl-C the same cleanup runs:
   wait for it rather than pressing Ctrl-C again or killing the terminal.
 - **Run one migration at a time.** There is no lock; two concurrent runs on the
@@ -173,6 +175,12 @@ script first prints a loud warning with its `migrated_at` time: everything
 written to 18 since then will be lost. Export it first (see "Backups of the 18
 database" below) unless you are sure.
 
+An 18 volume left over from a **rollback** (marker renamed to
+`.oj-pg18-rolled-back`, see Rollback step 2) gets no such warning, because it
+has no migrated marker any more. It may still hold writes made on 18 between
+the migration and the rollback, so export it first in the same way if any of
+them could matter.
+
 ## What the script checks and does
 
 1. Resolves the project name with `docker compose <args> config --format json`.
@@ -199,7 +207,8 @@ database" below) unless you are sure.
    - `pg16-<UTC>.counts`: exact `count(*)` of every table in the app
      database's `public` schema. The script refuses to continue if `users`,
      `problems`, `testcases`, `submissions` or `contests` is missing.
-6. Stops the temporary container (clean shutdown, waiting up to 120 s), records
+6. Stops the temporary container (`docker stop -t 120`: clean shutdown, SIGKILL
+   at 120 s; then it waits until Docker confirms it has exited), records
    the sha256 of the old volume's `global/pg_control` (read-only mount), and
    removes the container; the volume stays.
 7. `docker compose <args> up -d database`, which initialises Postgres 18 with
@@ -249,16 +258,19 @@ Run these from the repository root. The `sh -c '…'` makes `$POSTGRES_USER` /
 your host shell does not have them. `-T` disables the TTY, which would
 otherwise corrupt a binary archive.
 
+The `( umask 077; … )` subshell makes the files mode 600, like the script's
+own backups (they contain password hashes), without changing your shell's umask.
+
 ```bash
 # custom-format archive of the app database, then check that it is readable
-docker compose -f docker-compose.yml -f docker-compose.production.yml exec -T database \
-  sh -c 'pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB"' > backups/pg18-$(date -u +%Y%m%dT%H%M%SZ).dump
+( umask 077; docker compose -f docker-compose.yml -f docker-compose.production.yml exec -T database \
+  sh -c 'pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB"' > backups/pg18-$(date -u +%Y%m%dT%H%M%SZ).dump )
 docker compose -f docker-compose.yml -f docker-compose.production.yml exec -T database \
   pg_restore -l < backups/pg18-<UTC>.dump | head
 
 # whole cluster (roles + all databases) as plain SQL
-docker compose -f docker-compose.yml -f docker-compose.production.yml exec -T database \
-  sh -c 'pg_dumpall -U "$POSTGRES_USER"' > backups/pg18-$(date -u +%Y%m%dT%H%M%SZ).sql
+( umask 077; docker compose -f docker-compose.yml -f docker-compose.production.yml exec -T database \
+  sh -c 'pg_dumpall -U "$POSTGRES_USER"' > backups/pg18-$(date -u +%Y%m%dT%H%M%SZ).sql )
 tail -n 3 backups/pg18-<UTC>.sql   # ends with "PostgreSQL database cluster dump complete"
 ```
 
@@ -294,6 +306,19 @@ the commands under "Backups of the 18 database" above, e.g. to
    ```bash
    docker run --rm -v <project>_db-data-18:/v alpine:3 mv /v/.oj-pg18-migrated-from-16 /v/.oj-pg18-rolled-back
    ```
+   If you are rolling back from a **failed** migration there is no migrated
+   marker, so this `mv` fails with "No such file or directory". That is
+   harmless: without the marker the guard already refuses that 18 volume.
+
+   **Changed your mind before step 4?** As long as Postgres 16 has **not**
+   been started on `<project>_db-data`, undo the rename and deploy the 18
+   release again with `./deploy.sh`:
+   ```bash
+   docker run --rm -v <project>_db-data-18:/v alpine:3 mv /v/.oj-pg18-rolled-back /v/.oj-pg18-migrated-from-16
+   ```
+   Once 16 has run on the old volume, the undo is not valid: the old volume's
+   `pg_control` has changed, so the guard refuses the restored marker anyway
+   (exit 2). Finish the rollback, then use "Migrating again later".
 3. Check out the previous release (the one that used `postgres:16-alpine`
    with `db-data:/var/lib/postgresql/data`):
    `git checkout <previous release tag or commit>`
