@@ -230,3 +230,36 @@ describe('health endpoints', () => {
     expect(response.text).not.toContain('password authentication failed');
   });
 });
+
+describe('site access gate on user profiles', () => {
+  const buildApp = (mode: 'public' | 'private') => {
+    (db.query as jest.Mock).mockReset().mockImplementation(async (_sql: string, params: unknown[] = []) => (
+      params[0] === 'site_access_mode' ? { rows: [{ setting_value: mode }] } : { rows: [] }
+    ));
+    const createApp = loadCreateApp();
+    return createApp({
+      runtimeEnv: parseRuntimeEnv({ ...baseEnv }),
+      sessionStore: new session.MemoryStore(),
+    });
+  };
+
+  beforeEach(() => {
+    require('../services/siteSettingsService').resetSiteAccessModeCache();
+  });
+
+  it.each(['/users/alice/profile', '/users/alice/avatar'])(
+    'rejects guests on %s in PRIVATE mode',
+    async (path) => {
+      const response = await request(buildApp('private')).get(path);
+      expect(response.status).toBe(401);
+    },
+  );
+
+  it.each(['/users/alice/profile', '/users/alice/avatar'])(
+    'lets guests reach the %s handler in PUBLIC mode',
+    async (path) => {
+      const response = await request(buildApp('public')).get(path);
+      expect(response.status).not.toBe(401);
+    },
+  );
+});
