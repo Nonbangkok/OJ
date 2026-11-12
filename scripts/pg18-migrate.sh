@@ -37,8 +37,10 @@
 # first (docker stop -t 120, which SIGKILLs it if it has not shut down within
 # 120 s; the script then polls up to another 120 s until docker confirms it is
 # no longer running, and force-removes a container that survives that, saying
-# so). The final status is also written to backups/pg18-migrate.status. Run one
-# migration at a time.
+# so). The final status is also written to backups/pg18-migrate.status.
+# One migration at a time: a run holds the lock directory
+# backups/.pg18-migrate.lock (atomic mkdir; pid/started_at inside) and a second
+# run refuses before touching Docker. The lock is removed on exit.
 # Free space is checked before anything is stopped (>= 4x the old cluster's
 # data on the backups/ filesystem and >= 2x on Docker's, or >= 6x when both
 # are the same filesystem); OJ_PG18_SKIP_DISK_CHECK=1 turns the abort into a
@@ -85,6 +87,7 @@ fi
 
 cd "$(dirname "$0")/.."
 umask 077
+repo_root=$(pwd -P)
 
 # Keep the compose arguments as one shell-quoted string so helper functions
 # can reuse them (POSIX sh has no arrays).
@@ -101,6 +104,8 @@ dc() {
 rerun_cmd="scripts/pg18-migrate.sh$compose_args"
 
 stage=preflight
+lock_dir="$repo_root/backups/.pg18-migrate.lock"
+lock_held=0
 project=
 old_volume=
 new_volume=
@@ -230,6 +235,10 @@ on_exit() {
             printf '%s\n' "$report"
         } >backups/pg18-migrate.status 2>/dev/null
     fi
+    # Released only after the temporary server is gone and the status written.
+    if [ "$lock_held" -eq 1 ]; then
+        rm -rf "$lock_dir"
+    fi
     [ -n "$pg16_cleanup" ] && printf '%s\n' "$pg16_cleanup"
     printf '\n%s\n' "$report"
     exit "$status"
@@ -327,6 +336,33 @@ wait_until() { # description command...
         sleep 2
     done
 }
+
+# --- 0. run lock --------------------------------------------------------------
+# Two concurrent runs would share the temporary container name
+# <project>-pg16-migrate and could stop each other's server. mkdir is atomic.
+mkdir -p backups || die "cannot create backups/"
+if mkdir "$lock_dir" 2>/dev/null; then
+    lock_held=1
+    printf 'pid=%s\nstarted_at=%s\n' "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$lock_dir/owner" ||
+        die "cannot write $lock_dir/owner"
+elif [ -d "$lock_dir" ]; then
+    # Not ours: leave the lock and the running migration's status file alone.
+    trap - EXIT
+    lock_pid=$(sed -n 's/^pid=//p' "$lock_dir/owner" 2>/dev/null | head -n 1)
+    lock_at=$(sed -n 's/^started_at=//p' "$lock_dir/owner" 2>/dev/null | head -n 1)
+    cat >&2 <<EOF
+pg18-migrate: ERROR: another migration holds the lock $lock_dir
+  (pid ${lock_pid:-unknown}, started ${lock_at:-at an unknown time}). Run one migration at a time.
+  Nothing was changed. If no migration is running any more (a killed run leaves
+  a stale lock), confirm that nothing shows up in
+    ps -p ${lock_pid:-<pid>} -o pid,args; ps -ef | grep '[p]g18-migrate'
+    docker ps -a --filter name=pg16-migrate
+  then remove the stale lock with: rm -rf '$lock_dir'
+EOF
+    exit 1
+else
+    die "cannot create the lock directory $lock_dir"
+fi
 
 # --- 1. project ---------------------------------------------------------------
 log "Resolving the compose project"

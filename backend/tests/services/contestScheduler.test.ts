@@ -7,7 +7,8 @@ import { logger } from '../../utils/logger';
 jest.mock('../../db');
 jest.mock('../../services/problemMigration');
 jest.mock('node-cron', () => ({
-    schedule: jest.fn(() => ({ stop: jest.fn() }))
+    schedule: jest.fn(() => ({ stop: jest.fn() })),
+    setLogger: jest.fn(),
 }));
 
 describe('Contest Scheduler Service', () => {
@@ -36,6 +37,12 @@ describe('Contest Scheduler Service', () => {
                 timezone: 'Asia/Bangkok',
                 logger: cronLogger,
             });
+        });
+
+        it("routes node-cron's global logger through the structured logger", () => {
+            contestScheduler.start();
+            expect(cron.setLogger).toHaveBeenCalledTimes(1);
+            expect(cron.setLogger).toHaveBeenCalledWith(cronLogger);
         });
 
         it('forwards node-cron log calls to the structured logger', () => {
