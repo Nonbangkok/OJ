@@ -40,7 +40,7 @@ describe('language constants', () => {
             // the source and output paths.
             expect(LANGUAGE_PREPARE.cpp.checkCommand('/src/s.cpp', '/out/s.out')).toEqual({
                 command: 'g++',
-                args: ['-std=c++20', '-fsanitize=signed-integer-overflow', '/src/s.cpp', '-o', '/out/s.out'],
+                args: ['-std=c++20', '-fsanitize=signed-integer-overflow', '-fno-sanitize-recover=signed-integer-overflow', '/src/s.cpp', '-o', '/out/s.out'],
             });
         });
 
