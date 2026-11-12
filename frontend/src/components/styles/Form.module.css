@@ -68,8 +68,12 @@
   color: black;
 }
 
-/* General Button Style */
-.form-container button,
+/* General Button Style. The `:where(:not(...))` guard keeps react-datepicker's
+   own buttons (month navigation, clear icon, dropdown toggles) out of the
+   full-width accent style when a date picker sits inside a .form-container;
+   `:where` adds no specificity, so every other button resolves exactly as
+   before. */
+.form-container button:where(:not([class*='react-datepicker__'])),
 .form-button,
 .submit-button,
 .button {
@@ -90,14 +94,14 @@
   transition: background-color 0.2s ease;
 }
 
-.form-container button:hover,
+.form-container button:where(:not([class*='react-datepicker__'])):hover,
 .form-button:hover,
 .submit-button:hover,
 .button:hover {
   background-color: var(--accent-primary-hover);
 }
 
-.form-container button:disabled,
+.form-container button:where(:not([class*='react-datepicker__'])):disabled,
 .form-button:disabled,
 .submit-button:disabled,
 .button:disabled {

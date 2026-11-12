@@ -510,3 +510,38 @@ code {
 [data-theme='dark'] .react-datepicker__time-list-item {
   color: var(--text-primary);
 }
+
+/* The time column keeps the library's white surface and light grey hover/
+   disabled colors otherwise. Selectors mirror the library's long chains so
+   the dark values win on specificity, not !important. */
+[data-theme='dark'] .react-datepicker__time-container {
+  border-left-color: var(--border-color);
+}
+
+[data-theme='dark'] .react-datepicker__time-container .react-datepicker__time {
+  background-color: var(--background-secondary);
+}
+
+[data-theme='dark']
+  .react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list li.react-datepicker__time-list-item:hover {
+  background-color: var(--background-hover);
+}
+
+[data-theme='dark']
+  .react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list li.react-datepicker__time-list-item--selected,
+[data-theme='dark']
+  .react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list li.react-datepicker__time-list-item--selected:hover {
+  background-color: var(--accent-primary);
+  color: var(--text-on-primary);
+}
+
+[data-theme='dark']
+  .react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list li.react-datepicker__time-list-item--disabled {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+[data-theme='dark']
+  .react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list li.react-datepicker__time-list-item--disabled:hover {
+  background-color: transparent;
+}
