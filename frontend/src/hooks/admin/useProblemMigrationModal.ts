@@ -19,11 +19,13 @@ const useProblemMigrationModal = (contest, onSuccess) => {
     }
 
     // Loads without raising `loading` itself (see above / fetchProblems). A
-    // promise chain so state only changes once the (async) requests settle.
-    const loadProblems = useCallback(() => Promise.all([
-        adminService.getAvailableProblems(),
-        adminService.getContestProblemsAdmin(contest.id)
-    ])
+    // promise chain so state only changes once the (async) requests settle;
+    // starting from Promise.resolve() also routes a synchronous throw into .catch.
+    const loadProblems = useCallback(() => Promise.resolve()
+        .then(() => Promise.all([
+            adminService.getAvailableProblems(),
+            adminService.getContestProblemsAdmin(contest.id)
+        ]))
         .then(([availableData, contestData]) => {
             setAvailableProblems(availableData);
             setContestProblems(contestData);

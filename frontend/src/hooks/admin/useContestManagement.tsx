@@ -19,8 +19,10 @@ const useContestManagement = (styles) => {
 
     // Loads without raising `loading` itself: on mount `loading` already
     // starts true, and refreshes go through fetchContests below. A promise
-    // chain so state only changes once the (async) request settles.
-    const loadContests = useCallback(() => adminService.getContests()
+    // chain so state only changes once the (async) request settles; starting
+    // from Promise.resolve() also routes a synchronous throw into .catch.
+    const loadContests = useCallback(() => Promise.resolve()
+        .then(() => adminService.getContests())
         .then((data) => {
             setContests(data);
         })

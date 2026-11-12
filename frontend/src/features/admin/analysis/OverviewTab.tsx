@@ -46,8 +46,9 @@ const OverviewTab = () => {
   const colors = useChartColors();
 
   // Promise callbacks (not try/await) so state is only set once the request
-  // settles; fetchOverview is async, so it never throws synchronously.
-  const load = useCallback((windowDays: number) => fetchOverview(windowDays).then(
+  // settles; starting from Promise.resolve() also routes a synchronous throw
+  // into the error callback.
+  const load = useCallback((windowDays: number) => Promise.resolve().then(() => fetchOverview(windowDays)).then(
     (overview) => { setData(overview); },
     () => { setError('Failed to load analytics. Please try again.'); },
   ), []);

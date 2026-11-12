@@ -75,11 +75,11 @@ external system, where restructuring would change timing:
 - `frontend/src/features/admin/authoring/StatementEditor.tsx:191` — one-shot restore from sessionStorage once the draft loads; the notice must flip in the same step as restoreStatement
 - `frontend/src/features/admin/authoring/useAuthoringDraft.ts:294` — the 'dirty' status flips in the same step that (re)arms the debounce timer below, so it can never disagree with a pending autosave
 - `frontend/src/features/admin/authoring/useTestcaseFiles.ts:98` — a new revision must clear the preview in the same step that bumps inspectionRequest; resetting during render would let an in-flight inspection land a stale preview before this effect invalidates it
-- `frontend/src/hooks/useCodeSubmission.ts:67` — restores the cached draft from localStorage (external store) when problem/language changes
+- `frontend/src/hooks/useCodeSubmission.ts:67` — restores the cached draft from localStorage (external store) when problem/language changes, or clears the editor when there is none
 - `frontend/src/hooks/useContestDetail.ts:65` — contestId-keyed initial fetch + poll; the initial fetch flips the full-page loading state
 - `frontend/src/hooks/useContestScoreboard.ts:97` — contestId-keyed fetch that flips loading before its request starts
 - `frontend/src/hooks/useContests.ts:26` — mount fetch; its only synchronous setState is setLoading(true), already the initial value
-- `frontend/src/hooks/useProblems.ts:57` — fetch keyed on contestId/enabled/difficulty that flips loading before its request starts
+- `frontend/src/hooks/useProblems.ts:57` — fetch keyed on contestId/enabled/difficulty that flips loading before its request starts (or, when disabled, clears loading and error)
 - `frontend/src/hooks/useScoreboard.ts:34` — contestId-keyed fetch that flips loading on before its request starts
 - `frontend/src/hooks/useSubmissions.ts:96` — deps-keyed list fetch; fetchData only sets state after its await resolves
 
