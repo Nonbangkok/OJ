@@ -24,9 +24,12 @@ const AdminNavbar = () => {
     resetSlider,
   } = useNavSlider<HTMLUListElement>('horizontal', { recalcKey: location.pathname + String(user?.role) });
 
-  useEffect(() => {
+  // Close the mobile menu on navigation (adjusted during render).
+  const [menuPathname, setMenuPathname] = useState(location.pathname);
+  if (location.pathname !== menuPathname) {
+    setMenuPathname(location.pathname);
     setMenuOpen(false);
-  }, [location.pathname]);
+  }
 
   useEffect(() => {
     if (!menuOpen) return undefined;

@@ -38,4 +38,23 @@ describe('useEditUserModal', () => {
         });
         expect(mockClose).toHaveBeenCalled();
     });
+
+    it('re-seeds the form when a different user is edited and keeps it when the user becomes null', () => {
+        const other = { id: 2, username: 'other', role: 'staff' };
+        const { result, rerender } = renderHook(
+            ({ user }) => useEditUserModal(user, jest.fn(), jest.fn()),
+            { initialProps: { user: mockUser } as { user: typeof mockUser | null } },
+        );
+
+        act(() => {
+            result.current.handleChange({ target: { id: 'username', value: 'edited' } });
+        });
+        expect(result.current.formData.username).toBe('edited');
+
+        rerender({ user: other });
+        expect(result.current.formData).toEqual({ username: 'other', role: 'staff' });
+
+        rerender({ user: null });
+        expect(result.current.formData).toEqual({ username: 'other', role: 'staff' });
+    });
 });

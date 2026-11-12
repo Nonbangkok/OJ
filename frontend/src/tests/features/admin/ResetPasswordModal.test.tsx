@@ -91,4 +91,26 @@ describe('ResetPasswordModal (AUTH-004)', () => {
             await screen.findByText(/can only be changed by its owner/i),
         ).toBeInTheDocument();
     });
+
+    it('starts with a fresh form when reopened for another user or the same user', () => {
+        const otherUser: AdminUser = { id: 3, username: 'user2', role: 'user' };
+        const { rerender } = render(<ResetPasswordModal user={mockUser} onClose={onClose} />);
+        fillField(/^new password/i, 'short');
+        fillField(/confirm new password/i, 'short');
+        fireEvent.click(screen.getByRole('button', { name: /reset password/i }));
+        expect(screen.getByText(/must be at least 8 characters/i)).toBeInTheDocument();
+
+        // Switching straight to another user resets every field and message.
+        rerender(<ResetPasswordModal user={otherUser} onClose={onClose} />);
+        expect(screen.getByRole('heading', { name: 'Reset Password — user2' })).toBeInTheDocument();
+        expect(screen.getByLabelText(/^new password/i)).toHaveValue('');
+        expect(screen.getByLabelText(/confirm new password/i)).toHaveValue('');
+        expect(screen.queryByText(/must be at least 8 characters/i)).not.toBeInTheDocument();
+
+        // Close, then reopen for the same user: still fresh.
+        fillField(/^new password/i, 'typed-before-close');
+        rerender(<ResetPasswordModal user={null} onClose={onClose} />);
+        rerender(<ResetPasswordModal user={otherUser} onClose={onClose} />);
+        expect(screen.getByLabelText(/^new password/i)).toHaveValue('');
+    });
 });

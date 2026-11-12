@@ -1,17 +1,34 @@
 import { useState, useEffect, useRef } from 'react';
 import adminService from '../../services/adminService';
 
-const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
-    const [formData, setFormData] = useState({
+const buildProblemForm = (problem, username) => {
+    if (problem) {
+        return {
+            id: problem.id,
+            title: problem.title ?? '',
+            author: problem.author ?? '',
+            categories: problem.categories ?? [],
+            collection_id: problem.collection_id ?? null,
+            difficulty: problem.difficulty ?? null,
+            time_limit_ms: problem.time_limit_ms ?? 3000,
+            memory_limit_mb: problem.memory_limit_mb ?? 256,
+        };
+    }
+    // Fresh form for creating a new problem
+    return {
         id: '',
         title: '',
-        author: '',
+        author: username ?? '',
         categories: [],
         collection_id: null,
         difficulty: null,
-        time_limit_ms: 2000,
-        memory_limit_mb: 512,
-    });
+        time_limit_ms: 1000,
+        memory_limit_mb: 256,
+    };
+};
+
+const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
+    const [formData, setFormData] = useState(() => buildProblemForm(problem, currentUser?.username));
     const [authors, setAuthors] = useState([]);
     const [validationError, setValidationError] = useState('');
     const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -34,37 +51,23 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
         fetchAuthors();
     }, []);
 
-    useEffect(() => {
-        if (problem) {
-            setFormData({
-                id: problem.id,
-                title: problem.title ?? '',
-                author: problem.author ?? '',
-                categories: problem.categories ?? [],
-                collection_id: problem.collection_id ?? null,
-                difficulty: problem.difficulty ?? null,
-                time_limit_ms: problem.time_limit_ms ?? 3000,
-                memory_limit_mb: problem.memory_limit_mb ?? 256,
-            });
-        } else {
-            // Reset form for creating new problem
-            setFormData({
-                id: '',
-                title: '',
-                author: currentUser?.username ?? '',
-                categories: [],
-                collection_id: null,
-                difficulty: null,
-                time_limit_ms: 1000,
-                memory_limit_mb: 256,
-            });
-        }
-        // Clear file inputs on open
-        if (pdfRef.current) pdfRef.current.value = null;
-        if (zipRef.current) zipRef.current.value = null;
+    // Re-seed the form and drop picked files whenever the edited problem (or
+    // the default author for a new one) changes. Adjusted during render; the
+    // initial form comes from the lazy init above.
+    const currentUsername = currentUser?.username;
+    const [formSource, setFormSource] = useState({ problem, username: currentUsername });
+    if (formSource.problem !== problem || formSource.username !== currentUsername) {
+        setFormSource({ problem, username: currentUsername });
+        setFormData(buildProblemForm(problem, currentUsername));
         setPdfFile(null);
         setZipFile(null);
-    }, [problem, currentUser?.username]);
+    }
+
+    // Clear the native file inputs on open / when the form is re-seeded.
+    useEffect(() => {
+        if (pdfRef.current) pdfRef.current.value = null;
+        if (zipRef.current) zipRef.current.value = null;
+    }, [problem, currentUsername]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;

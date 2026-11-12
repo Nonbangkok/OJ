@@ -42,12 +42,20 @@ const useUserManagement = (search = '', roleFilter = 'all') => {
         }
     }, [search, roleFilter]);
 
+    // A new query shows the loading state (and drops a stale error) right
+    // away, before the debounced fetch fires. Adjusted during render; on
+    // mount the initial state already matches.
+    const [loadingQuery, setLoadingQuery] = useState({ search, roleFilter });
+    if (loadingQuery.search !== search || loadingQuery.roleFilter !== roleFilter) {
+        setLoadingQuery({ search, roleFilter });
+        setLoading(true);
+        setError('');
+    }
+
     useEffect(() => {
         // Invalidate an in-flight request as soon as the query changes. The
         // toolbar stays mounted while the first page for the new query loads.
         latestRequestId.current += 1;
-        setLoading(true);
-        setError('');
         const timeout = window.setTimeout(() => fetchUsers(1), search.trim() ? 300 : 0);
         return () => {
             window.clearTimeout(timeout);

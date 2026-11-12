@@ -122,6 +122,34 @@ describe('ProblemManagement Component', () => {
         await waitFor(() => expect(new URLSearchParams(window.location.search).get('pages')).toBe('3'));
     });
 
+    it('re-syncs the filter controls from the URL on history navigation (browser Back/Forward)', async () => {
+        renderProblemManagement();
+        await waitFor(() => expect(screen.getByText('Problem 1')).toBeInTheDocument());
+        expect(adminService.getProblems).toHaveBeenCalledTimes(1);
+
+        act(() => {
+            window.history.pushState({}, '', '/admin/problems?search=needle&visibility=hidden&collection=none');
+            window.dispatchEvent(new PopStateEvent('popstate'));
+        });
+        expect(screen.getByLabelText('Search problems')).toHaveValue('needle');
+        expect(screen.getByLabelText('Filter problems by visibility')).toHaveValue('hidden');
+        expect(screen.getByLabelText('Filter problems by collection')).toHaveValue('none');
+        await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(
+            expect.objectContaining({ search: 'needle', visibility: 'hidden', collection: 'none' }),
+        ));
+        // Initial load, then the select filters apply at once and the search
+        // follows after its debounce — same request count as before.
+        expect(adminService.getProblems).toHaveBeenCalledTimes(3);
+
+        act(() => {
+            window.history.pushState({}, '', '/admin/problems');
+            window.dispatchEvent(new PopStateEvent('popstate'));
+        });
+        expect(screen.getByLabelText('Search problems')).toHaveValue('');
+        expect(screen.getByLabelText('Filter problems by visibility')).toHaveValue('all');
+        expect(screen.getByLabelText('Filter problems by collection')).toHaveValue('all');
+    });
+
     it('shows chunk upload progress before SSE processing without replacing upload controls', async () => {
         let finishSecondChunk: (value: { success: true; chunkIndex: number }) => void = () => undefined;
         (jest.mocked(adminService.initBatchUpload) as jest.Mock).mockResolvedValueOnce({ uploadId: 'upload-1' });

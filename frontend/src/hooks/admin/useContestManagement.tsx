@@ -17,22 +17,29 @@ const useContestManagement = (styles) => {
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [contestToDelete, setContestToDelete] = useState(null);
 
-    const fetchContests = useCallback(async () => {
-        try {
-            setLoading(true);
-            const data = await adminService.getContests();
+    // Loads without raising `loading` itself: on mount `loading` already
+    // starts true, and refreshes go through fetchContests below. A promise
+    // chain so state only changes once the (async) request settles.
+    const loadContests = useCallback(() => adminService.getContests()
+        .then((data) => {
             setContests(data);
-        } catch (err) {
+        })
+        .catch((err) => {
             console.error('Error fetching contests:', err);
             setError('Failed to load contests');
-        } finally {
+        })
+        .finally(() => {
             setLoading(false);
-        }
-    }, []);
+        }), []);
+
+    const fetchContests = useCallback(() => {
+        setLoading(true);
+        return loadContests();
+    }, [loadContests]);
 
     useEffect(() => {
-        fetchContests();
-    }, [fetchContests]);
+        loadContests();
+    }, [loadContests]);
 
     const handleDelete = async () => {
         if (contestToDelete) {

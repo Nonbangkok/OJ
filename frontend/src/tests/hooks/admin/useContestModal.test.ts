@@ -89,4 +89,27 @@ describe('useContestModal', () => {
         expect(adminService.createContest).toHaveBeenCalled();
         expect(mockSuccess).toHaveBeenCalled();
     });
+
+    it('re-seeds the form when the edited contest changes', () => {
+        const first = { id: 1, title: 'First', description: 'A', start_time: '2025-01-01T10:00:00.000Z', end_time: '2025-01-01T12:00:00.000Z' };
+        const second = { id: 2, title: 'Second', description: 'B', start_time: '2025-02-01T10:00:00.000Z', end_time: '2025-02-01T12:00:00.000Z' };
+        const { result, rerender } = renderHook(
+            ({ contest }) => useContestModal(contest, jest.fn(), jest.fn()),
+            { initialProps: { contest: first } as { contest: typeof first | null } },
+        );
+
+        act(() => {
+            result.current.handleChange({ target: { name: 'title', value: 'Edited' } });
+        });
+        expect(result.current.formData.title).toBe('Edited');
+
+        rerender({ contest: second });
+        expect(result.current.formData.title).toBe('Second');
+        expect(result.current.formData.start_time).toEqual(new Date(second.start_time));
+
+        // Switching to "new contest" seeds the empty default form.
+        rerender({ contest: null });
+        expect(result.current.formData.title).toBe('');
+        expect(result.current.formData.start_time).toBeInstanceOf(Date);
+    });
 });

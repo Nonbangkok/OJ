@@ -1,41 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import adminService from '../../services/adminService';
 
-const useContestModal = (contest, onClose, onSuccess) => {
-    const [formData, setFormData] = useState({
+const buildContestForm = (contest) => {
+    if (contest) {
+        return {
+            title: contest.title || '',
+            description: contest.description || '',
+            start_time: new Date(contest.start_time),
+            end_time: new Date(contest.end_time)
+        };
+    }
+    // Default to tomorrow for new contests
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(10, 0, 0, 0); // 10:00 AM
+
+    const dayAfter = new Date(tomorrow);
+    dayAfter.setHours(16, 0, 0, 0); // 4:00 PM same day
+
+    return {
         title: '',
         description: '',
-        start_time: null,
-        end_time: null
-    });
+        start_time: tomorrow,
+        end_time: dayAfter
+    };
+};
+
+const useContestModal = (contest, onClose, onSuccess) => {
+    const [formData, setFormData] = useState(() => buildContestForm(contest));
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    useEffect(() => {
-        if (contest) {
-            setFormData({
-                title: contest.title || '',
-                description: contest.description || '',
-                start_time: new Date(contest.start_time),
-                end_time: new Date(contest.end_time)
-            });
-        } else {
-            // Default to tomorrow for new contests
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            tomorrow.setHours(10, 0, 0, 0); // 10:00 AM
-
-            const dayAfter = new Date(tomorrow);
-            dayAfter.setHours(16, 0, 0, 0); // 4:00 PM same day
-
-            setFormData({
-                title: '',
-                description: '',
-                start_time: tomorrow,
-                end_time: dayAfter
-            });
-        }
-    }, [contest]);
+    // Re-seed the form whenever a different contest (or "new") is edited.
+    // Adjusted during render; the initial form comes from the lazy init.
+    const [formContest, setFormContest] = useState(contest);
+    if (contest !== formContest) {
+        setFormContest(contest);
+        setFormData(buildContestForm(contest));
+    }
 
     const handleSubmit = async (e) => {
         e.preventDefault();

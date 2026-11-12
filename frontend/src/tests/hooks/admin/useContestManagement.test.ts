@@ -63,4 +63,26 @@ describe('useContestManagement', () => {
         // Should re-fetch
         expect(adminService.getContests).toHaveBeenCalledTimes(2);
     });
+
+    it('shows loading again while a manual refresh is in flight', async () => {
+        (jest.mocked(adminService.getContests) as jest.Mock).mockResolvedValueOnce(mockContests);
+        const { result } = renderHook(() => useContestManagement(undefined));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        let resolveRefresh: (value: unknown) => void = () => {};
+        (jest.mocked(adminService.getContests) as jest.Mock).mockReturnValueOnce(
+            new Promise((resolve) => { resolveRefresh = resolve; }),
+        );
+        act(() => {
+            result.current.fetchContests();
+        });
+        expect(result.current.loading).toBe(true);
+
+        await act(async () => {
+            resolveRefresh([mockContests[0]]);
+        });
+        expect(result.current.loading).toBe(false);
+        expect(result.current.contests).toEqual([mockContests[0]]);
+        expect(adminService.getContests).toHaveBeenCalledTimes(2);
+    });
 });

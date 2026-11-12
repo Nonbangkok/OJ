@@ -45,14 +45,12 @@ const OverviewTab = () => {
   const [error, setError] = useState<string | null>(null);
   const colors = useChartColors();
 
-  const load = useCallback(async (windowDays: number) => {
-    setError(null);
-    try {
-      setData(await fetchOverview(windowDays));
-    } catch {
-      setError('Failed to load analytics. Please try again.');
-    }
-  }, []);
+  // Promise callbacks (not try/await) so state is only set once the request
+  // settles; fetchOverview is async, so it never throws synchronously.
+  const load = useCallback((windowDays: number) => fetchOverview(windowDays).then(
+    (overview) => { setData(overview); },
+    () => { setError('Failed to load analytics. Please try again.'); },
+  ), []);
 
   useEffect(() => {
     void load(days);
@@ -71,7 +69,11 @@ const OverviewTab = () => {
             key={option}
             type="button"
             className={option === days ? actionStyles['range-active'] : actionStyles['range-button']}
-            onClick={() => setDays(option)}
+            onClick={() => {
+              // Clear a stale error before the effect refetches for the new window.
+              setError(null);
+              setDays(option);
+            }}
           >
             {rangeLabel(option)}
           </button>

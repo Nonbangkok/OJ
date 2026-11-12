@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 
 import type { AdminProblem } from '../../types';
@@ -30,17 +30,20 @@ const useProblemSelection = ({ displayedProblems }: UseProblemSelectionArgs) => 
   // Keep an always-fresh copy of the displayed rows inside drag handlers:
   // they run outside the render cycle (window listeners) and must see the
   // current display order, not the one captured when the drag began.
+  // Synced in a layout effect so it is current before any event handler runs.
   const displayedProblemsRef = useRef(displayedProblems);
-  displayedProblemsRef.current = displayedProblems;
-  const selectionRef = useRef(selection);
-  selectionRef.current = selection;
+  useLayoutEffect(() => {
+    displayedProblemsRef.current = displayedProblems;
+  }, [displayedProblems]);
 
   /** Drop selected ids that fell out of the display (deleted rows, data
-   *  refreshes). Idempotent — a no-op when every selection is still
-   *  visible, which keeps Show More row appends non-destructive. */
-  useEffect(() => {
-    setSelection((prev) => pruneSelectionToDisplayed(prev, displayedProblems));
-  }, [displayedProblems]);
+   *  refreshes). Idempotent — returns the same state object when every
+   *  selection is still visible, which keeps Show More row appends
+   *  non-destructive and makes this render-time adjustment settle at once. */
+  const prunedSelection = pruneSelectionToDisplayed(selection, displayedProblems);
+  if (prunedSelection !== selection) {
+    setSelection(prunedSelection);
+  }
 
   /** Clear the selection entirely (e.g. when the user changes a filter and
    *  the previously selected rows may no longer be visible). */
@@ -108,8 +111,9 @@ const useProblemSelection = ({ displayedProblems }: UseProblemSelectionArgs) => 
     visitedIds: ReadonlySet<string>;
   } | null>(null);
 
+  // Every setDragState call below writes this ref first, so it never needs
+  // re-syncing from render.
   const dragStateRef = useRef(dragState);
-  dragStateRef.current = dragState;
 
   /** Rows enter the gesture as the pointer passes over them. The active
    *  drag's feedback tint is driven by `dragState.visitedIds`. */

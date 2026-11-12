@@ -10,28 +10,40 @@ const useProblemMigrationModal = (contest, onSuccess) => {
     const [selectedAvailable, setSelectedAvailable] = useState([]);
     const [selectedContest, setSelectedContest] = useState([]);
 
-    const fetchProblems = useCallback(async () => {
-        try {
-            setLoading(true);
+    // A different contest starts a fresh load (adjusted during render). On
+    // mount `loading` already starts true; refreshes go through fetchProblems.
+    const [loadingContestId, setLoadingContestId] = useState(contest.id);
+    if (contest.id !== loadingContestId) {
+        setLoadingContestId(contest.id);
+        setLoading(true);
+    }
 
-            const [availableData, contestData] = await Promise.all([
-                adminService.getAvailableProblems(),
-                adminService.getContestProblemsAdmin(contest.id)
-            ]);
-
+    // Loads without raising `loading` itself (see above / fetchProblems). A
+    // promise chain so state only changes once the (async) requests settle.
+    const loadProblems = useCallback(() => Promise.all([
+        adminService.getAvailableProblems(),
+        adminService.getContestProblemsAdmin(contest.id)
+    ])
+        .then(([availableData, contestData]) => {
             setAvailableProblems(availableData);
             setContestProblems(contestData);
-        } catch (err) {
+        })
+        .catch((err) => {
             console.error('Error fetching problems:', err);
             setError('Failed to load problems');
-        } finally {
+        })
+        .finally(() => {
             setLoading(false);
-        }
-    }, [contest.id]);
+        }), [contest.id]);
+
+    const fetchProblems = useCallback(() => {
+        setLoading(true);
+        return loadProblems();
+    }, [loadProblems]);
 
     useEffect(() => {
-        fetchProblems();
-    }, [fetchProblems]);
+        loadProblems();
+    }, [loadProblems]);
 
     const handleMoveToContest = async () => {
         if (selectedAvailable.length === 0) return;

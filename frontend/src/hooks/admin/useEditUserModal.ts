@@ -1,19 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 const useEditUserModal = (user, onClose, onSave) => {
-    const [formData, setFormData] = useState({
-        username: user?.username || '',
-        role: user?.role || 'user',
-    });
+    const [formData, setFormData] = useState(() => (user
+        ? { username: user.username, role: user.role }
+        : { username: '', role: 'user' }));
 
-    useEffect(() => {
+    // Re-seed the form when a different user is being edited (a null user
+    // keeps the current form). Adjusted during render instead of an effect.
+    const [formUser, setFormUser] = useState(user);
+    if (user !== formUser) {
+        setFormUser(user);
         if (user) {
             setFormData({
                 username: user.username,
                 role: user.role,
             });
         }
-    }, [user]);
+    }
 
     const handleChange = (e) => {
         const { id, value } = e.target;

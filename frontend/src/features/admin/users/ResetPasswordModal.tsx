@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { Button, Dialog, Field, Input } from '../../../components/ui';
 import adminService from '../../../services/adminService';
@@ -29,8 +29,10 @@ const ResetPasswordModal = ({ user, onClose }: ResetPasswordModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Reset the form each time the dialog opens so no password ever carries
-  // over between users.
-  useEffect(() => {
+  // over between users. Adjusted during render when `user` changes.
+  const [formUser, setFormUser] = useState(user);
+  if (user !== formUser) {
+    setFormUser(user);
     if (user) {
       setNewPassword('');
       setConfirmPassword('');
@@ -38,7 +40,7 @@ const ResetPasswordModal = ({ user, onClose }: ResetPasswordModalProps) => {
       setServerError('');
       setSuccessMessage('');
     }
-  }, [user]);
+  }
 
   if (!user) return null;
 

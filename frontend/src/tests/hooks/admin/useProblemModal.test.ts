@@ -169,4 +169,34 @@ describe('useProblemModal', () => {
         });
         expect(result.current.formData.difficulty).toBeNull();
     });
+
+    it('re-seeds the form and clears picked files when the edited problem changes', async () => {
+        const first = { id: 'P1', title: 'First', time_limit_ms: 2000, memory_limit_mb: 128, author: 'a1' };
+        const second = { id: 'P2', title: 'Second', time_limit_ms: 4000, memory_limit_mb: 64, author: 'a2' };
+        const { result, rerender } = renderHook(
+            ({ problem }) => useProblemModal(problem, jest.fn(), null, { username: 'admin' }),
+            { initialProps: { problem: first } as { problem: typeof first | null } },
+        );
+        await waitFor(() => expect(result.current.authors).toHaveLength(1));
+
+        const pdf = new File(['%PDF'], 'statement.pdf', { type: 'application/pdf' });
+        act(() => {
+            result.current.handleChange({ target: { name: 'title', value: 'Edited' } });
+            result.current.setPdfFile(pdf);
+        });
+        expect(result.current.formData.title).toBe('Edited');
+        expect(result.current.pdfFile).toBe(pdf);
+
+        rerender({ problem: second });
+        expect(result.current.formData.title).toBe('Second');
+        expect(result.current.formData.time_limit_ms).toBe(4000);
+        expect(result.current.pdfFile).toBeNull();
+
+        rerender({ problem: null });
+        expect(result.current.formData.id).toBe('');
+        expect(result.current.formData.author).toBe('admin');
+        expect(result.current.formData.time_limit_ms).toBe(1000);
+        // The authors list is fetched once per mount, not per re-seed.
+        expect(adminService.getAuthors).toHaveBeenCalledTimes(1);
+    });
 });
