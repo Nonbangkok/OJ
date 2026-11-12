@@ -19,7 +19,7 @@ You only need these on your host machine — everything else runs in containers:
 
 - [Docker](https://www.docker.com/) (with Docker Compose v2, i.e. `docker compose`)
 - [Git](https://git-scm.com/)
-- Node.js 20 when running npm or root-level smoke tests on the host (optional
+- Node.js 26 when running npm or root-level smoke tests on the host (optional
   when using only the container workflow; see `.nvmrc`)
 
 ## Getting started (local development)
