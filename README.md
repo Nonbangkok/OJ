@@ -276,7 +276,7 @@ From the repository root, build the backend and start a dedicated test database:
 docker build -f backend/Dockerfile -t oj-authoring-test-backend .
 docker run --rm -d --name oj-authoring-test-db \
   -e POSTGRES_USER=oj_test -e POSTGRES_PASSWORD=oj_test -e POSTGRES_DB=oj_test \
-  postgres:16-alpine
+  postgres:18-alpine
 docker exec oj-authoring-test-db pg_isready -U oj_test -d oj_test
 ```
 

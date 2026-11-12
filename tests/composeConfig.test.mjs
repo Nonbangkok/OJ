@@ -179,3 +179,43 @@ test('production overlay enables public security and tunnel configuration', () =
   assert.doesNotMatch(productionNginx, /proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for/);
   assert.match(productionNginx, /proxy_set_header X-Forwarded-For \$remote_addr/);
 });
+
+test('database runs Postgres 18 on the 18 volume layout', () => {
+  const config = renderComposeConfig(['docker-compose.yml']);
+  const database = config.services.database;
+
+  assert.equal(database.image, 'postgres:18-alpine');
+  assert.equal(
+    database.volumes.some(v => v.type === 'volume' && v.source === 'db-data-18' && v.target === '/var/lib/postgresql'),
+    true,
+  );
+  assert.equal(database.volumes.some(v => v.target === '/var/lib/postgresql/data'), false);
+  assert.ok(config.volumes['db-data-18']);
+  assert.equal(config.volumes['db-data'], undefined);
+
+  const production = renderComposeConfig(
+    ['docker-compose.yml', 'docker-compose.production.yml'],
+    { CLOUDFLARE_TUNNEL_TOKEN: 'test-tunnel-token' },
+  );
+  assert.equal(production.services.database.image, 'postgres:18-alpine');
+  assert.deepEqual(production.services.database.volumes, database.volumes);
+  assert.ok(production.volumes['db-data-18']);
+  assert.equal(production.volumes['db-data'], undefined);
+});
+
+test('integration stack uses Postgres 18', () => {
+  const text = readFileSync(path.join(repositoryRoot, 'tests/authoring/compose.yml'), 'utf8');
+  assert.match(text, /^\s+image: postgres:18-alpine\s*$/m);
+  assert.match(text, /^\s+- \/var\/lib\/postgresql\s*$/m);
+  assert.doesNotMatch(text, /\/var\/lib\/postgresql\/data/);
+});
+
+test('backend image installs the Postgres 18 client and retries the pgdg key fetch', () => {
+  const dockerfile = readFileSync(path.join(repositoryRoot, 'backend/Dockerfile'), 'utf8');
+  assert.match(dockerfile, /postgresql-client-18\b/);
+  assert.doesNotMatch(dockerfile, /postgresql-client-16/);
+  const keyLine = dockerfile.split('\n').find(line => line.includes('ACCC4CF8.asc'));
+  assert.ok(keyLine);
+  assert.match(keyLine, /--retry 5/);
+  assert.match(keyLine, /--retry-all-errors/);
+});

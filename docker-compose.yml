@@ -21,13 +21,15 @@ x-backend-environment: &backend-environment
 
 services:
   database:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - db-data:/var/lib/postgresql/data
+      # Postgres 18 layout (PGDATA is /var/lib/postgresql/18/docker). The old
+      # `db-data` volume (PG16) is kept on purpose; see docs/runbooks/postgres-18-upgrade.md.
+      - db-data-18:/var/lib/postgresql
     networks:
       - oj-network
     restart: unless-stopped
@@ -158,5 +160,5 @@ networks:
 volumes:
   authoring-jobs:
     driver: local
-  db-data:
+  db-data-18:
     driver: local
