@@ -124,7 +124,7 @@ All colors, shadows, and radii live as CSS custom properties in `frontend/src/in
 
 1. Never hardcode hex/rgb values in components — reference a token, or add a new one to `index.css` if no existing token fits.
 2. Dark mode works by overriding token values under `[data-theme='dark']` in `index.css` (set on `<html>` by `ThemeContext`). Any new token that should change between themes needs both a `:root` and a `[data-theme='dark']` value.
-3. Guard tests enforce the contract (run via `CI=true npm test`):
+3. Guard tests enforce the contract (run via `npm run test:ci`):
    - `src/tests/styles/cssVariableDefinitions.test.ts` — every `var(--x)` referenced anywhere must be defined in `index.css` (no fallback-only vars).
    - `src/tests/styles/cssModuleIsolation.test.ts` — CSS modules must not leak bare element selectors.
    - `src/tests/styles/actionTokenContrast.test.ts` / `statusBadgeContrast.test.ts` — action and status token colors must meet AA contrast (including the `--action-*-hover` and `--status-success-hover` semantic-hover tokens — green buttons must stay green on hover).
@@ -252,7 +252,7 @@ Playwright visual baselines cover the admin authoring shell and author profiles 
 - Use `@testing-library/react` for rendering and assertions.
 - Use `@testing-library/user-event` for user interaction simulation.
 - Mock services and context providers in tests.
-- Run with `npm test` (watch mode) or `CI=true npm test` (single run).
+- Run with `npm test` (watch mode) or `npm run test:ci` (single run).
 - Jest config includes custom `moduleNameMapper` for `react-router-dom` v7 compatibility.
 - Frontend CI validation gates:
   - `npm run type-check`

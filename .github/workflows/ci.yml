@@ -61,14 +61,12 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - run: npm ci --legacy-peer-deps --no-audit --install-links
+      - run: npm ci --no-audit --install-links
       - run: npm run validate
       - name: Production build
         run: npm run build
         env:
           REACT_APP_API_URL: /api
-          DISABLE_ESLINT_PLUGIN: "true"
-          INLINE_RUNTIME_CHUNK: "false"
 
       - uses: actions/upload-artifact@v7
         if: always()

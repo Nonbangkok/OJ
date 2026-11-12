@@ -4,7 +4,9 @@
     "lib": [
       "DOM",
       "DOM.Iterable",
-      "ES2020"
+      "ES2020",
+      "ES2022.Array",
+      "ES2022.String"
     ],
     "allowJs": true,
     "skipLibCheck": true,
@@ -34,8 +36,7 @@
     "noPropertyAccessFromIndexSignature": false,
     "noUncheckedIndexedAccess": false,
     "allowUnusedLabels": false,
-    "allowUnreachableCode": false,
-    "noUncheckedSideEffectImports": false
+    "allowUnreachableCode": false
   },
   "include": [
     "src"

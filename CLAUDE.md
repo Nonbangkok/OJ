@@ -30,12 +30,12 @@ npm test -- -t "test name substring"      # single test by name
 
 ### Frontend (`frontend/`)
 
-Create React App (react-scripts). `npm test` runs in **watch mode** by default — use `CI=true` for one-shot.
+Vite + Jest. `npm test` runs in **watch mode** — use `npm run test:ci` for a one-shot run with coverage.
 
 ```bash
-npm start                                  # dev server (no longer reports lint errors; run `npm run lint:check` or `validate` -- CI enforces it)
-npm run build
-CI=true npm test                           # run once
+npm start                                  # Vite dev server on :3000, proxies /api to :8080 (reports no lint or type errors; run `npm run lint:check` / `type-check` or `validate` -- CI enforces it)
+npm run build                              # tsc --noEmit + vite build + fails if build/index.html has an inline script (CSP)
+npm run test:ci                            # run once (jest --ci --coverage)
 npm test -- src/tests/foo.test.tsx         # single test file
 npm run validate                           # type-check + lint:check + test:ci (run before pushing)
 npm run lint                               # eslint --fix

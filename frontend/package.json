@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "license": "GPL-3.0-or-later",
-  "proxy": "http://localhost:8080",
   "engines": {
     "node": "26.x"
   },
@@ -13,7 +12,7 @@
     "@testing-library/jest-dom": "^6.7.0",
     "@testing-library/react": "^16.3.0",
     "@oj/statement-renderer": "file:../shared/statement-renderer",
-    "@types/node": "^18.0.0",
+    "@types/node": "^26.6.6",
     "ajv": "^8.12.0",
     "ajv-formats": "^2.1.1",
     "ajv-keywords": "^5.1.0",
@@ -25,7 +24,6 @@
     "react-dom": "^19.1.1",
     "react-resizable-panels": "^2.0.20",
     "react-router-dom": "^7.8.1",
-    "react-scripts": "5.0.1",
     "react-simple-code-editor": "^0.14.1",
     "recharts": "^3.10.1",
     "web-vitals": "^2.1.4"
@@ -41,6 +39,7 @@
     "@types/jest": "^30.0.0",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
     "babel-jest": "^30.5.2",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
@@ -56,16 +55,16 @@
     "prettier": "^3.0.0",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.72.2",
+    "vite": "^8.3.8",
     "whatwg-fetch": "^3.6.20"
   },
   "scripts": {
-    "start": "DISABLE_ESLINT_PLUGIN=true react-scripts start",
-    "build": "DISABLE_ESLINT_PLUGIN=true react-scripts build",
+    "start": "vite",
+    "build": "tsc --noEmit && vite build && node scripts/check-no-inline-scripts.mjs",
     "test": "jest --watch",
     "test:ci": "jest --ci --coverage",
     "test:visual": "playwright test",
     "test:visual:update": "playwright test --update-snapshots",
-    "eject": "react-scripts eject",
     "type-check": "tsc --noEmit",
     "type-check:tests:services": "tsc -p tsconfig.tests.services.json --noEmit",
     "lint": "eslint src --fix",
@@ -76,16 +75,7 @@
     "type-check:tests:hooks": "tsc -p tsconfig.tests.hooks.json --noEmit",
     "type-check:tests:all": "tsc -p tsconfig.tests.all.json --noEmit"
   },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+  "overrides": {
+    "@babel/core": "$@babel/core"
   }
 }

@@ -10,10 +10,8 @@ COPY frontend/.npmrc ./
 COPY shared/statement-renderer /app/shared/statement-renderer
 
 # Install dependencies
-# CRA 5 + modern lint/tooling can emit peer-dependency conflicts in npm v10+.
-# Use legacy peer resolution in container build to avoid ERESOLVE hard-fail.
 # Use `npm ci` for reproducible, lockfile-exact installs (requires package-lock.json).
-RUN npm ci --legacy-peer-deps --no-audit --install-links
+RUN npm ci --no-audit --install-links
 
 # Copy the rest of the application source code
 COPY frontend/. ./
@@ -23,14 +21,7 @@ ARG REACT_APP_API_URL
 ARG REACT_APP_LARGE_UPLOAD_API_URL
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
 ENV REACT_APP_LARGE_UPLOAD_API_URL=$REACT_APP_LARGE_UPLOAD_API_URL
-# CRA's bundled ESLint 8 webpack plugin cannot read the flat config
-# (eslint.config.mjs), so it is disabled here. Lint runs separately
-# (`npm run lint:check` / `validate`, and in CI).
-ENV DISABLE_ESLINT_PLUGIN=true
-# Emit the webpack runtime as a separate self-hosted file instead of an inline
-# <script>. The reverse-proxy CSP uses `script-src 'self'` (no 'unsafe-inline'),
-# which would otherwise block CRA's inlined runtime chunk and break the app.
-ENV INLINE_RUNTIME_CHUNK=false
+# vite.config.mts maps these build args into the bundle; `npm run build` fails on inline scripts (CSP).
 RUN npm run build
 
 # Stage 2: Serve the application with Nginx
