@@ -33,7 +33,7 @@ ENV INLINE_RUNTIME_CHUNK=false
 RUN npm run build
 
 # Stage 2: Serve the application with Nginx
-FROM nginx:1.25-alpine
+FROM nginx:1.30-alpine
 
 # Copy the build output from the build stage
 COPY --from=build /app/frontend/build /usr/share/nginx/html

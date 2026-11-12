@@ -22,7 +22,7 @@
 | Image Processing | sharp | 0.34 |
 | ZIP Processing | unzipper | 0.12 |
 | Scheduling | node-cron | 3.0 |
-| Reverse Proxy | Nginx | 1.25 |
+| Reverse Proxy | Nginx | 1.30 |
 | Containerization | Docker + Compose | — |
 | Testing (BE) | Jest 30 + Supertest 7 | — |
 | Testing (FE) | Jest + React Testing Library 16 | — |
