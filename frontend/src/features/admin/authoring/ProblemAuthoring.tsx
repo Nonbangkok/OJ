@@ -74,7 +74,7 @@ function DraftList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [createError, setCreateError] = useState('');
-  const initialPrefs = useMemo(readPrefs, []);
+  const [initialPrefs] = useState(readPrefs);
   const [search, setSearch] = useState('');
   const [scope, setScope] = useState<ScopeFilter>(initialPrefs.scope);
   const [authorFilter, setAuthorFilter] = useState('all');

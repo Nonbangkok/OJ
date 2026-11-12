@@ -22,7 +22,8 @@ const DIFFICULTY_SORT_DESC = 'difficulty-desc';
 
 const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemListLoaderData }) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const selectedCategories = (searchParams.get('category') || '').split(',').filter(Boolean);
+  const categoryParam = searchParams.get('category') || '';
+  const selectedCategories = useMemo(() => categoryParam.split(',').filter(Boolean), [categoryParam]);
   const hasCategoryFilter = selectedCategories.length > 0;
   const categoryQueryValue = selectedCategories.join(',');
   const [search, setSearch] = useState(() => searchParams.get('search') || '');

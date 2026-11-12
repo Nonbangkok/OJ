@@ -189,6 +189,78 @@ describe('useContestDetail Hook', () => {
         await waitFor(() => expect(contestService.getById).toHaveBeenCalledTimes(3));
     });
 
+    it('fetches once on mount, without a second loading pass once the status is known', async () => {
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValue({ id: '123', status: 'running' });
+        const loadingHistory: boolean[] = [];
+
+        const { result } = renderHook(() => {
+            const value = useContestDetail();
+            loadingHistory.push(value.loading);
+            return value;
+        });
+
+        await waitFor(() => expect(result.current.contest).toEqual({ id: '123', status: 'running' }));
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(contestService.getById).toHaveBeenCalledTimes(1);
+        // loading goes true -> false exactly once; it never flips back to true.
+        expect(loadingHistory.lastIndexOf(true)).toBeLessThan(loadingHistory.indexOf(false));
+        expect(result.current.loading).toBe(false);
+    });
+
+    it('keeps the page mounted when a poll observes a status change', async () => {
+        (jest.mocked(contestService.getById) as jest.Mock)
+            .mockResolvedValueOnce({ id: '123', status: 'scheduled' })
+            .mockResolvedValue({ id: '123', status: 'running' });
+        const loadingHistory: boolean[] = [];
+
+        const { result } = renderHook(() => {
+            const value = useContestDetail();
+            loadingHistory.push(value.loading);
+            return value;
+        });
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        await act(async () => {
+            jest.advanceTimersByTime(15000);
+        });
+        await waitFor(() => expect(result.current.contest).toEqual({ id: '123', status: 'running' }));
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        // One mount fetch plus one poll -- the status change must not restart
+        // the effect (which re-fetched with the full-page loading state).
+        expect(contestService.getById).toHaveBeenCalledTimes(2);
+        expect(loadingHistory.lastIndexOf(true)).toBeLessThan(loadingHistory.indexOf(false));
+    });
+
+    it('passes the last fetched status to the forbidden re-check', async () => {
+        const forbidden = Object.assign(new Error('Forbidden'), { response: { status: 403 } });
+        (jest.mocked(contestService.getById) as jest.Mock)
+            .mockResolvedValueOnce({ id: '123', status: 'running' })
+            .mockResolvedValueOnce({ id: '123', status: 'finished', is_participant: false, title: 'x' })
+            .mockRejectedValue(forbidden);
+
+        const { result } = renderHook(() => useContestDetail());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        mockNavigate.mockClear();
+
+        // Poll 1 sees "finished" (redirects); a later 403 must still know the
+        // contest finished and redirect to the list.
+        await act(async () => {
+            jest.advanceTimersByTime(15000);
+        });
+        await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/contests'));
+        mockNavigate.mockClear();
+        await act(async () => {
+            jest.advanceTimersByTime(15000);
+        });
+        await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/contests'));
+    });
+
     it('clears interval on unmount', () => {
         const clearIntervalSpy = jest.spyOn(window, 'clearInterval');
         const { unmount } = renderHook(() => useContestDetail());

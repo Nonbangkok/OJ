@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import contestService from '../services/contestService';
 import { POLLING_INTERVALS } from '../config/constants';
@@ -18,6 +18,10 @@ const useContestDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [joining, setJoining] = useState(false);
+  // Last fetched status, for the forbidden-after-finish re-check. Kept in a ref
+  // so a status change does not recreate fetchContestData and restart the
+  // polling effect (which re-fetched with the full-page loading state).
+  const lastStatus = useRef<string | undefined>(undefined);
 
   const fetchContestData = useCallback(
     async (isInitial = false) => {
@@ -25,11 +29,12 @@ const useContestDetail = () => {
         if (isInitial) setLoading(true);
 
         const outcome = await fetchContestOutcome(contestId as string, {
-          previousStatus: contest?.status,
+          previousStatus: lastStatus.current,
         });
 
         if (outcome.kind === 'finished' || outcome.kind === 'loaded' || outcome.kind === 'forbidden') {
           if (outcome.contest !== null) {
+            lastStatus.current = outcome.contest.status;
             setContest(outcome.contest);
           }
         }
@@ -53,7 +58,7 @@ const useContestDetail = () => {
         if (isInitial) setLoading(false);
       }
     },
-    [contestId, navigate, contest?.status]
+    [contestId, navigate]
   );
 
   useEffect(() => {
