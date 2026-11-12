@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import styles from './Problems.module.css';
 import { useIncrementalProblems } from '../../hooks/useIncrementalProblems';
@@ -41,8 +41,18 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
   const urlAuthor = searchParams.get('author') || '';
   // Same-route navigation keeps this component mounted. Mirror an externally
   // changed URL into the text boxes; the existing debounce governs queries.
-  useEffect(() => { setSearch(urlSearch); }, [urlSearch]);
-  useEffect(() => { setAuthor(urlAuthor); }, [urlAuthor]);
+  // Adjusted during render (not in an effect) so the box never commits a
+  // stale value for one frame.
+  const [mirroredUrlSearch, setMirroredUrlSearch] = useState(urlSearch);
+  if (urlSearch !== mirroredUrlSearch) {
+    setMirroredUrlSearch(urlSearch);
+    setSearch(urlSearch);
+  }
+  const [mirroredUrlAuthor, setMirroredUrlAuthor] = useState(urlAuthor);
+  if (urlAuthor !== mirroredUrlAuthor) {
+    setMirroredUrlAuthor(urlAuthor);
+    setAuthor(urlAuthor);
+  }
 
   const updateUrlFilter = (key: string, value: string, preserveEmpty = false) => {
     setSearchParams(previous => {
@@ -99,8 +109,10 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
   // True once any first page has finished loading. After that the controls
   // stay mounted forever — a later query change refreshes only the result
   // area, so the search input never remounts and typing keeps its focus.
-  const hasLoadedRef = useRef(false);
-  if (!loading && !error) hasLoadedRef.current = true;
+  // Sticky, so it is state set during render: React re-renders before
+  // committing, so the first committed frame after a load already sees it.
+  const [hasLoaded, setHasLoaded] = useState(false);
+  if (!hasLoaded && !loading && !error) setHasLoaded(true);
 
   // Global category counts — one cheap aggregate, independent of the loaded
   // batch, so category choices stay correct while pages stream in.
@@ -206,9 +218,9 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
   // refresh (typing in search, changing a filter) keeps the controls
   // mounted — replacing the page would unmount the search input and drop
   // the user's focus mid-word. Only the result area shows the refresh.
-  const isInitialLoad = loading && !hasLoadedRef.current;
+  const isInitialLoad = loading && !hasLoaded;
   if (isInitialLoad && !error) return <LoadingPage />;
-  if (error && !hasLoadedRef.current) return <div className="error-message">{error}</div>;
+  if (error && !hasLoaded) return <div className="error-message">{error}</div>;
 
   return (
     <div className={styles['problems-page-container']}>

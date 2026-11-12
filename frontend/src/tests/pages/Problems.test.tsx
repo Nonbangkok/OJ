@@ -115,6 +115,36 @@ describe('Problems Page', () => {
         await waitFor(() => {
             expect(screen.getByText(/failed to fetch problems/i)).toBeInTheDocument();
         });
+        // Before any page has loaded, the error replaces the whole page.
+        expect(screen.queryByLabelText('Search problems')).not.toBeInTheDocument();
+    });
+
+    it('after a first load, later refreshes and failures stay in the result area', async () => {
+        const mock = jest.mocked(problemService.getProblemsPage) as jest.Mock;
+        let rejectRefresh: (reason: Error) => void = () => { };
+        mock
+            .mockResolvedValueOnce(firstPage)
+            .mockReturnValueOnce(new Promise((_, reject) => { rejectRefresh = reject; }));
+
+        renderProblems();
+        await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
+        const input = screen.getByLabelText('Search problems');
+        openFilters();
+        fireEvent.click(screen.getByRole('checkbox', { name: /^Greedy/ }));
+
+        // The refresh is in flight: no full-page loader, controls and the
+        // previous batch stay mounted.
+        await waitFor(() => expect(mock).toHaveBeenCalledTimes(2));
+        expect(screen.queryByText('Loading Problems...')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Search problems')).toBe(input);
+        expect(screen.getByText('Knapsack')).toBeInTheDocument();
+
+        await act(async () => { rejectRefresh(new Error('Fetch failed')); });
+
+        // The failure is an inline alert; the controls are never replaced.
+        expect(screen.getByRole('alert')).toHaveTextContent(/failed to fetch problems/i);
+        expect(screen.getByLabelText('Search problems')).toBe(input);
+        expect(mock).toHaveBeenCalledTimes(2);
     });
 
     describe('Show More (incremental loading)', () => {
