@@ -1,3 +1,5 @@
+import StatementPreviewWorker from './statementPreview.worker?worker';
+
 export default function createStatementPreviewWorker(): Worker {
-  return new Worker(new URL('./statementPreview.worker.ts', import.meta.url));
+  return new StatementPreviewWorker();
 }

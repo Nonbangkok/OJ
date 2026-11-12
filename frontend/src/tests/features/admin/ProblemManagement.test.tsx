@@ -56,7 +56,7 @@ describe('ProblemManagement Component', () => {
         window.history.replaceState({}, '', '/admin/problems');
         window.sessionStorage.clear();
         (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(makePage(mockProblems));
-        // Auto-mocks reset between tests (react-scripts sets resetMocks), so
+        // Auto-mocks reset between tests (jest.config.cjs sets resetMocks), so
         // the collections fetch the page performs on mount must be re-stubbed
         // every time — it defaults to an empty list.
         (jest.mocked(adminService.getCollections) as jest.Mock).mockResolvedValue([]);

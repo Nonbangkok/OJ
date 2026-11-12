@@ -6,7 +6,7 @@
 
 | Layer | Technology | Version |
 |---|---|---|
-| Frontend | React (CRA) | 19.1 |
+| Frontend | React (Vite) | 19.1 |
 | Routing | react-router-dom | 7.8 |
 | HTTP Client | Axios | 1.11 |
 | Charts | recharts | 3.10 |
@@ -124,7 +124,7 @@ OJ/
 │       ├── middleware/     # Middleware tests
 │       └── integration/    # Real-PostgreSQL authoring suites
 │
-├── frontend/               # React SPA (Create React App)
+├── frontend/               # React SPA (Vite)
 │   └── src/
 │       ├── App.tsx         # Root component, routing, provider tree
 │       ├── index.tsx       # ReactDOM entry

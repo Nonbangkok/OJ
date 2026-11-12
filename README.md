@@ -331,7 +331,7 @@ npm test
 *   Frontend tests use **Jest** and **React Testing Library** (`@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`) to test pages, hooks, services, and components.
 *   By default, `npm test` runs in **watch mode** (re-runs on file changes). To run once and exit (e.g., in CI), use:
     ```bash
-    CI=true npm test
+    npm run test:ci
     ```
 *   Frontend tests are located in `frontend/src/tests/`.
 

@@ -21,8 +21,8 @@ echo "------------------------------------------------------"
 echo "Running Frontend Tests (Non-interactive)"
 echo "------------------------------------------------------"
 cd frontend
-# Setting CI=true ensures Jest runs in non-interactive mode and exits after completion
-CI=true npm test -- --watchAll=false
+# test:ci runs Jest once (--ci --coverage) and exits; `npm test` is watch mode
+npm run test:ci
 FRONTEND_STATUS=$?
 cd ..
 
