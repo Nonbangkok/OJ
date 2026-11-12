@@ -120,8 +120,16 @@ empty-database deploy the guard exists to stop.
   container that survives that is force-removed, and the script says so. A detached
   session avoids the interruption altogether. On Ctrl-C the same cleanup runs:
   wait for it rather than pressing Ctrl-C again or killing the terminal.
-- **Run one migration at a time.** There is no lock; two concurrent runs on the
-  same project would fight over the same volumes and containers.
+- **Run one migration at a time.** Two concurrent runs on the same project would
+  fight over the same volumes and the same temporary container
+  (`<project>-pg16-migrate`), so the script takes a lock first: it creates
+  `backups/.pg18-migrate.lock` (with a `pid`/`started_at` file inside) before
+  it touches Docker, and removes it on exit, also after a failure or Ctrl-C. A
+  second run refuses while the lock exists, and changes nothing. A run that was
+  killed outright (`kill -9`, power loss) leaves a stale lock. Remove it only
+  after you confirm that no migration is running: `ps -ef | grep '[p]g18-migrate'`
+  shows nothing, and neither does `docker ps -a --filter name=pg16-migrate`.
+  Then run `rm -rf backups/.pg18-migrate.lock`.
 - The server's `.env` is the one production uses (the scripts read
   `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` through compose).
 - Announce the window to users.
