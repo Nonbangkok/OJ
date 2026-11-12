@@ -29,7 +29,11 @@ const XpToast = ({ event }: XpToastProps) => {
     event.xp_awarded > 0;
   const qualifyingXp = qualifies && event?.xp_awarded != null ? event.xp_awarded : null;
 
-  const [visibleXp, setVisibleXp] = useState<number | null>(qualifyingXp);
+  // One object per toast shown: a newer qualifying event creates a new
+  // object (restarting the dismiss timer), anything else leaves it alone.
+  const [toast, setToast] = useState<{ xp: number } | null>(
+    qualifyingXp != null ? { xp: qualifyingXp } : null,
+  );
 
   // Show the toast as soon as a newer qualifying event arrives
   // (adjust-state-while-rendering on the event identity). A non-qualifying
@@ -38,23 +42,24 @@ const XpToast = ({ event }: XpToastProps) => {
   if (event !== shownEvent) {
     setShownEvent(event);
     if (qualifyingXp != null) {
-      setVisibleXp(qualifyingXp);
+      setToast({ xp: qualifyingXp });
     }
   }
 
-  // Auto-dismiss timer; a newer event clears it and starts a fresh one.
+  // Auto-dismiss timer, keyed on the toast itself (not the latest event), so
+  // a non-qualifying event arriving mid-toast cannot cancel it.
   useEffect(() => {
-    if (qualifyingXp == null) return;
+    if (toast == null) return;
 
-    const timer = window.setTimeout(() => setVisibleXp(null), DISMISS_AFTER_MS);
+    const timer = window.setTimeout(() => setToast(null), DISMISS_AFTER_MS);
     return () => window.clearTimeout(timer);
-  }, [qualifyingXp, event]);
+  }, [toast]);
 
-  if (visibleXp == null) return null;
+  if (toast == null) return null;
 
   return (
     <div className={styles.toast} role="status" aria-live="polite">
-      +{visibleXp} XP
+      +{toast.xp} XP
     </div>
   );
 };

@@ -99,4 +99,48 @@ describe('XpToast', () => {
 
         expect(screen.getByText('+46 XP')).toBeInTheDocument();
     });
+
+    it('still auto-dismisses on schedule after a non-qualifying event arrives mid-toast', () => {
+        const { rerender } = render(
+            <XpToast event={makeEvent({ submissionId: 1, xp_awarded: 46 })} />,
+        );
+
+        act(() => {
+            jest.advanceTimersByTime(1000);
+        });
+        // The user submits again while the toast is up: a Running update for
+        // the new submission must not cancel the running dismiss timer.
+        rerender(<XpToast event={makeEvent({ submissionId: 2, overall_status: 'Running', xp_awarded: undefined })} />);
+
+        act(() => {
+            jest.advanceTimersByTime(2999);
+        });
+        expect(screen.getByText('+46 XP')).toBeInTheDocument();
+
+        act(() => {
+            jest.advanceTimersByTime(1);
+        });
+        expect(screen.queryByText('+46 XP')).not.toBeInTheDocument();
+    });
+
+    it('restarts the timer when a newer qualifying event replaces the toast', () => {
+        const { rerender } = render(
+            <XpToast event={makeEvent({ submissionId: 1, xp_awarded: 46 })} />,
+        );
+
+        act(() => {
+            jest.advanceTimersByTime(3000);
+        });
+        rerender(<XpToast event={makeEvent({ submissionId: 2, xp_awarded: 46 })} />);
+
+        act(() => {
+            jest.advanceTimersByTime(3999);
+        });
+        expect(screen.getByText('+46 XP')).toBeInTheDocument();
+
+        act(() => {
+            jest.advanceTimersByTime(1);
+        });
+        expect(screen.queryByText('+46 XP')).not.toBeInTheDocument();
+    });
 });
