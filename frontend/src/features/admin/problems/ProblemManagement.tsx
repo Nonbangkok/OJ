@@ -51,10 +51,31 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
 
   // Keep admin list filters shareable and tied to this history entry. This
   // also lets browser Back restore the same controls without a separate cache.
-  useEffect(() => { setSearch(urlSearch); }, [urlSearch]);
-  useEffect(() => { setCollectionFilter(urlCollection); }, [urlCollection]);
-  useEffect(() => { setVisibilityFilter(validVisibility); }, [validVisibility]);
-  useEffect(() => { setAuthorFilter(urlAuthor); }, [urlAuthor]);
+  // Each control is re-synced only when its own URL value changes (adjusted
+  // during render rather than in an effect).
+  const [syncedUrlFilters, setSyncedUrlFilters] = useState({
+    search: urlSearch,
+    collection: urlCollection,
+    visibility: validVisibility,
+    author: urlAuthor,
+  });
+  if (
+    syncedUrlFilters.search !== urlSearch
+    || syncedUrlFilters.collection !== urlCollection
+    || syncedUrlFilters.visibility !== validVisibility
+    || syncedUrlFilters.author !== urlAuthor
+  ) {
+    if (syncedUrlFilters.search !== urlSearch) setSearch(urlSearch);
+    if (syncedUrlFilters.collection !== urlCollection) setCollectionFilter(urlCollection);
+    if (syncedUrlFilters.visibility !== validVisibility) setVisibilityFilter(validVisibility);
+    if (syncedUrlFilters.author !== urlAuthor) setAuthorFilter(urlAuthor);
+    setSyncedUrlFilters({
+      search: urlSearch,
+      collection: urlCollection,
+      visibility: validVisibility,
+      author: urlAuthor,
+    });
+  }
 
   const updateUrlFilter = (key: string, value: string) => {
     setSearchParams(previous => {
@@ -169,14 +190,13 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
   // If the selected author disappears from the pool (e.g. its only problem
   // was deleted), reset to 'all' — the query recomputes and refetches, so
   // the control never shows (or queries by) a phantom selection. Skipped
-  // while the options list is still empty (first page in flight).
-  useEffect(() => {
-    if (authorFilter !== 'all' && authorOptions.length > 0 && !authorOptions.includes(authorFilter)) {
-      setAuthorFilter('all');
-    }
-  }, [authorFilter, authorOptions]);
+  // while the options list is still empty (first page in flight). Adjusted
+  // during render; the guard is false after the reset, so it runs once.
+  if (authorFilter !== 'all' && authorOptions.length > 0 && !authorOptions.includes(authorFilter)) {
+    setAuthorFilter('all');
+  }
   // Display uses the sanitized value so the select never shows a phantom
-  // selection even for the one render before the reset effect lands.
+  // selection, even in the render pass that triggers the reset above.
   const displayAuthorFilter = authorFilter !== 'all' && authorOptions.includes(authorFilter)
     ? authorFilter
     : 'all';

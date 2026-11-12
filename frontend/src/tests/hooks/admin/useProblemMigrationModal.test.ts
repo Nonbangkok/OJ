@@ -90,4 +90,20 @@ describe('useProblemMigrationModal', () => {
         });
         expect(result.current.selectedAvailable).toHaveLength(0);
     });
+
+    it('shows loading and refetches once when the contest changes', async () => {
+        const { result, rerender } = renderHook(
+            ({ contest }) => useProblemMigrationModal(contest, jest.fn()),
+            { initialProps: { contest: mockContest } },
+        );
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(adminService.getContestProblemsAdmin).toHaveBeenCalledTimes(1);
+
+        rerender({ contest: { id: 2, title: 'Other Contest' } });
+        expect(result.current.loading).toBe(true);
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(adminService.getContestProblemsAdmin).toHaveBeenCalledTimes(2);
+        expect(adminService.getContestProblemsAdmin).toHaveBeenLastCalledWith(2);
+    });
 });

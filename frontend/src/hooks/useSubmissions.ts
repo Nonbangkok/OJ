@@ -93,6 +93,7 @@ export const useSubmissions = (
   }, [problemId, filter, contestId, currentUser, appliedFilters]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- deps-keyed list fetch; fetchData only sets state after its await resolves
     fetchData();
   }, [fetchData]);
 

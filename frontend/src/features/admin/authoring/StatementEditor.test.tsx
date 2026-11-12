@@ -153,3 +153,43 @@ describe('statement editor layout', () => {
     expect(getSeparator()).toHaveAttribute('aria-valuenow', '50');
   });
 });
+
+test('Ctrl+S calls the save of the latest render, not the first one', () => {
+  mockedUseStatementPreview.mockReturnValue({ html: '', state: 'waiting', error: '', shell: '' });
+  const first = model();
+  mockedUseAuthoringDraft.mockReturnValue(first as unknown as ReturnType<typeof useAuthoringDraft>);
+  const { rerender } = render(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
+  const second = model();
+  mockedUseAuthoringDraft.mockReturnValue(second as unknown as ReturnType<typeof useAuthoringDraft>);
+  rerender(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
+
+  fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+
+  expect(first.save).not.toHaveBeenCalled();
+  expect(second.save).toHaveBeenCalledTimes(1);
+});
+
+test('the Actual PDF embed keeps the loaded revision while a build runs, then swaps once', () => {
+  mockedUseStatementPreview.mockReturnValue({ html: '', state: 'waiting', error: '', shell: '' });
+  const withPdf = (latestPdfRevision: number, activeJob?: { id: string; jobType: string; status: string }) => {
+    const pdfDraft = { ...draft, hasLatestPdf: true, latestPdfRevision };
+    return { ...model(activeJob), draft: pdfDraft, form: pdfDraft } as unknown as ReturnType<typeof useAuthoringDraft>;
+  };
+  const job = { id: 'j1', jobType: 'pdf', status: 'running' };
+  mockedUseAuthoringDraft.mockReturnValue(withPdf(2, job));
+  const { rerender } = render(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
+  fireEvent.click(screen.getByRole('tab', { name: /Actual PDF/ }));
+  const pdfFrame = () => screen.getByTitle('Latest runner-built PDF');
+  expect(pdfFrame().getAttribute('src')).toContain('revision=2');
+  const loaded = pdfFrame();
+
+  mockedUseAuthoringDraft.mockReturnValue(withPdf(3, job));
+  rerender(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
+  expect(pdfFrame()).toBe(loaded);
+  expect(pdfFrame().getAttribute('src')).toContain('revision=2');
+
+  mockedUseAuthoringDraft.mockReturnValue(withPdf(3));
+  rerender(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
+  expect(pdfFrame()).not.toBe(loaded);
+  expect(pdfFrame().getAttribute('src')).toContain('revision=3');
+});

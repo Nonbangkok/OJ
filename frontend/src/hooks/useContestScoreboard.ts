@@ -94,6 +94,7 @@ const useContestScoreboard = (contestId?: string | number): UseContestScoreboard
   }, [contestId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- contestId-keyed fetch that flips loading before its request starts
     void fetchContestData();
   }, [fetchContestData]);
 

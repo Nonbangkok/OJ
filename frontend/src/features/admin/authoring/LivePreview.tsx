@@ -10,11 +10,9 @@ interface LivePreviewProps {
 /** Keep the heavy document shell loaded while replacing only the statement body. */
 export default function LivePreview({ shell, statement, zoomScale }: LivePreviewProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const statementRef = useRef(statement);
   const observerRef = useRef<ResizeObserver | null>(null);
   const observedDocumentRef = useRef<Document | null>(null);
   const [docHeight, setDocHeight] = useState(0);
-  statementRef.current = statement;
 
   const measure = useCallback(() => {
     try {
@@ -38,10 +36,10 @@ export default function LivePreview({ shell, statement, zoomScale }: LivePreview
   const applyStatement = useCallback(() => {
     try {
       const article = frameRef.current?.contentDocument?.getElementById('statement');
-      if (article && article.innerHTML !== statementRef.current) article.innerHTML = statementRef.current;
+      if (article && article.innerHTML !== statement) article.innerHTML = statement;
       measure();
     } catch { /* the iframe may still be navigating to a new shell */ }
-  }, [measure]);
+  }, [measure, statement]);
 
   const handleLoad = useCallback(() => {
     const doc = frameRef.current?.contentDocument;

@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Group, Panel, Separator, useDefaultLayout, useGroupRef } from 'react-resizable-panels';
 import { Button, Dialog } from '../../../components/ui';
@@ -106,12 +106,12 @@ function PreviewModeTab({ selected, onSelect, children }: {
  *  finishes and the refreshed draft reports it. */
 function PdfEmbed({ draftId, revision, buildRunning }: { draftId: string; revision: number | null; buildRunning: boolean }) {
   // The revision actually loaded in the iframe; lags `revision` while a job runs.
+  // Adjusted while rendering (not in an effect) so the swap happens in the same
+  // render that sees the finished build.
   const [loadedRevision, setLoadedRevision] = useState(revision);
-  useEffect(() => {
-    if (!buildRunning && revision !== null && revision !== loadedRevision) {
-      setLoadedRevision(revision);
-    }
-  }, [buildRunning, revision, loadedRevision]);
+  if (!buildRunning && revision !== null && revision !== loadedRevision) {
+    setLoadedRevision(revision);
+  }
   if (loadedRevision === null) return <div className={styles.previewEmpty}>No PDF built yet.</div>;
   return <iframe title="Latest runner-built PDF" className={styles.previewPdfEmbed}
     key={loadedRevision}
@@ -188,6 +188,7 @@ export default function StatementEditor({ id }: { id: string }) {
       return;
     }
     model.restoreStatement(recovery.statementHtml, recovery.baseRevision);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot restore from sessionStorage once the draft loads; the notice must flip in the same step as restoreStatement
     setRecovered(true);
   }, [draft, form, id, model]);
 
@@ -208,13 +209,12 @@ export default function StatementEditor({ id }: { id: string }) {
   }, [dirty]);
 
   // Ctrl/Cmd+S saves the statement from the editor.
-  const saveRef = useRef(model.save);
-  saveRef.current = model.save;
+  const saveLatest = useEffectEvent(() => model.save());
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
-        void saveRef.current();
+        void saveLatest();
       }
     };
     window.addEventListener('keydown', onKeyDown);

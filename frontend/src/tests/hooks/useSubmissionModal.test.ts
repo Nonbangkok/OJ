@@ -34,6 +34,26 @@ describe('useSubmissionModal', () => {
         expect(result.current.lineCount).toBe(2);
     });
 
+    it('follows a new submission and keeps the last code when the next one has none', () => {
+        const { result, rerender } = renderHook(
+            ({ submission }: { submission: { code?: string } | null }) => useSubmissionModal(submission),
+            { initialProps: { submission: { code: 'a\nb' } as { code?: string } | null } },
+        );
+        expect(result.current.code).toBe('a\nb');
+        expect(result.current.lineCount).toBe(2);
+
+        rerender({ submission: { code: 'x\ny\nz' } });
+        expect(result.current.code).toBe('x\ny\nz');
+        expect(result.current.lineCount).toBe(3);
+
+        rerender({ submission: null });
+        expect(result.current.code).toBe('x\ny\nz');
+        expect(result.current.lineCount).toBe(3);
+
+        rerender({ submission: { code: '' } });
+        expect(result.current.code).toBe('x\ny\nz');
+    });
+
     it('handles copy code button functionality', async () => {
         const mockSubmission = { code: 'test code' };
         const { result } = renderHook(() => useSubmissionModal(mockSubmission));

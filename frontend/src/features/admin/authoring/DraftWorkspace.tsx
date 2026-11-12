@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate, useOutletContext } from 'react-router-dom';
 import { Button, Dialog, StatusBadge } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
@@ -58,13 +58,12 @@ export default function DraftWorkspace({ id }: { id: string }) {
     return () => window.removeEventListener('beforeunload', unload);
   }, [model.dirty]);
   // Ctrl/Cmd+S saves the draft from anywhere in the workspace.
-  const saveRef = useRef(model.save);
-  saveRef.current = model.save;
+  const saveLatest = useEffectEvent(() => model.save());
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
-        void saveRef.current();
+        void saveLatest();
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -207,20 +206,19 @@ function MetadataSection() {
     ? [draft.id, linked.akaName, linked.realName, linked.defaultLanguage, linked.countryCode,
       draft.authorAkaName, draft.authorRealName, draft.language, draft.countryCode].join(' ')
     : '';
-  const modelRef = useRef(model); modelRef.current = model;
   const syncAttemptedKey = useRef('');
   useEffect(() => {
     // Never sync a published draft; unsaved edits / conflicts / jobs leave the
     // sync for after autosave resolves rather than fighting it. A skip does
     // NOT mark the key as attempted, so it retries once the blocker clears.
-    if (!linked || draft.status === 'published' || modelRef.current.actionsDisabled) return;
+    if (!linked || draft.status === 'published' || model.actionsDisabled) return;
     if (JSON.stringify([linked.akaName, linked.realName, linked.defaultLanguage, linked.countryCode])
       === JSON.stringify([draft.authorAkaName, draft.authorRealName, draft.language, draft.countryCode])) return;
     if (syncAttemptedKey.current === syncKey) return; // already tried this exact mismatch
     syncAttemptedKey.current = syncKey;
     // One attempt per mismatch: a failed POST surfaces via model.error and is
     // not auto-retried, so a persistently failing sync can never loop.
-    void modelRef.current.mutate(() => authoringService.refreshAuthorProfile(draft.id, draft.revision));
+    void mutate(() => authoringService.refreshAuthorProfile(draft.id, draft.revision));
     // syncKey covers draft.id plus every compared value, so this re-runs when a
     // real profile edit (or a successful refresh) changes them — once each time;
     // actionsDisabled (a plain boolean) re-runs a sync skipped mid-autosave.

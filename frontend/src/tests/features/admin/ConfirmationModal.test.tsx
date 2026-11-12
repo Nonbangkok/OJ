@@ -115,4 +115,25 @@ describe('ConfirmationModal', () => {
     fireEvent.click(confirmButton);
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
+
+  it('clears the typed phrase when the dialog is closed and reopened', () => {
+    const props = {
+      onClose: jest.fn(),
+      onConfirm: jest.fn(),
+      title: 'Import database?',
+      message: 'This will permanently replace all existing database data.',
+      confirmText: 'Import Database',
+      confirmationPhrase: 'IMPORT',
+    };
+    const { rerender } = render(<ConfirmationModal isOpen {...props} />);
+    fireEvent.change(screen.getByLabelText('Type IMPORT to confirm'), { target: { value: 'IMPORT' } });
+    expect(screen.getByRole('button', { name: 'Import Database' })).toBeEnabled();
+
+    rerender(<ConfirmationModal isOpen={false} {...props} />);
+    expect(screen.queryByLabelText('Type IMPORT to confirm')).not.toBeInTheDocument();
+    rerender(<ConfirmationModal isOpen {...props} />);
+
+    expect(screen.getByLabelText('Type IMPORT to confirm')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Import Database' })).toBeDisabled();
+  });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import authoringService from '../../../services/admin/authoringService';
 import { TestcaseMetadata } from './types';
 import { previewText } from './testcasePreview';
@@ -40,7 +40,7 @@ export default function useTestcaseFiles({ draftId, revision, disabled, onMutate
   const listRequest = useRef(0);
   const inspectionRequest = useRef(0);
   const errorHandler = useRef(onError);
-  errorHandler.current = onError;
+  useLayoutEffect(() => { errorHandler.current = onError; });
   const locked = disabled || busy || loading || !loaded || savedRevision > revision;
 
   // File selections and dialogs, reset after every successful mutation.
@@ -95,6 +95,7 @@ export default function useTestcaseFiles({ draftId, revision, disabled, onMutate
     };
   }, []);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a new revision must clear the preview in the same step that bumps inspectionRequest; resetting during render would let an in-flight inspection land a stale preview before this effect invalidates it
     setPreview(null);
     inspectionRequest.current++;
     setInspecting(false);

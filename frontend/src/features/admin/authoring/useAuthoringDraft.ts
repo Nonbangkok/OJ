@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import authoringService from '../../../services/admin/authoringService';
 import { getErrorMessage, toApiLikeError } from '../../../utils/error';
 import { Draft, DraftFields, editableFields, isActive, Job } from './types';
@@ -43,8 +43,11 @@ export default function useAuthoringDraft(id: string, options: AuthoringDraftOpt
   const [loaded, setLoaded] = useState(false);
   const [saveState, setSaveState] = useState<'saved' | 'dirty' | 'saving' | 'error'>('saved');
   const [recovered, setRecovered] = useState(false);
-  const draftRef = useRef(draft); draftRef.current = draft;
-  const formRef = useRef(form); formRef.current = form;
+  // Latest committed draft/form/dirty for async code (save, refresh, polls, timers).
+  // Handlers also write these imperatively ahead of the next commit; the layout
+  // effect below re-syncs them on every commit, before any timer or event runs.
+  const draftRef = useRef(draft);
+  const formRef = useRef(form);
   const recoveryHandled = useRef(false);
   const busyRef = useRef(false);
   const saveInFlightRef = useRef(false);
@@ -54,7 +57,12 @@ export default function useAuthoringDraft(id: string, options: AuthoringDraftOpt
     epoch.current++; busyRef.current = value; setBusy(value);
   }, []);
   const dirty = !!draft && !!form && editableFields.some(key => draft[key] !== form[key]);
-  const dirtyRef = useRef(dirty); dirtyRef.current = dirty;
+  const dirtyRef = useRef(dirty);
+  useLayoutEffect(() => {
+    draftRef.current = draft;
+    formRef.current = form;
+    dirtyRef.current = dirty;
+  });
   const activeJob = jobs.find(isActive);
   const activeJobId = activeJob?.id;
   const actionsDisabled = !loaded || !draft || busy || dirty || conflict || !!activeJob || draft.status === 'published';
@@ -278,11 +286,12 @@ export default function useAuthoringDraft(id: string, options: AuthoringDraftOpt
   // edits must autosave too — the save itself transitions it back to a draft.
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveRef = useRef(save);
-  autosaveRef.current = save;
+  useLayoutEffect(() => { autosaveRef.current = save; });
   const autosaveEnabled = !conflict;
   useEffect(() => {
     if (autosaveTimer.current) { clearTimeout(autosaveTimer.current); autosaveTimer.current = null; }
     if (!dirty || !autosaveEnabled) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the 'dirty' status flips in the same step that (re)arms the debounce timer below, so it can never disagree with a pending autosave
     setSaveState('dirty');
     autosaveTimer.current = setTimeout(() => { void autosaveRef.current(); }, AUTOSAVE_DELAY_MS);
     return () => { if (autosaveTimer.current) { clearTimeout(autosaveTimer.current); autosaveTimer.current = null; } };

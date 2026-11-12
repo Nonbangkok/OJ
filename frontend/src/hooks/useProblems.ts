@@ -54,6 +54,7 @@ export const useProblems = (
   }, [contestId, enabled, difficultyKey]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch keyed on contestId/enabled/difficulty that flips loading before its request starts (or, when disabled, clears loading and error)
     void fetchProblems();
   }, [fetchProblems]);
 

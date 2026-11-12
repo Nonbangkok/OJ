@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef } from 'react';
 import type React from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from './Button';
@@ -27,8 +27,12 @@ export function Drawer({
   const onCloseRef = useRef(onClose);
   const initialFocusRefRef = useRef(initialFocusRef);
 
-  onCloseRef.current = onClose;
-  initialFocusRefRef.current = initialFocusRef;
+  // Latest-value refs, refreshed after every commit and before the passive
+  // open effect below runs (see Dialog).
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose;
+    initialFocusRefRef.current = initialFocusRef;
+  });
 
   useEffect(() => {
     if (!open) {

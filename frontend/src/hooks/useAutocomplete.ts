@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ChangeEvent, Dispatch, SetStateAction } from 'react';
 import type { ProblemSuggestion, UserSuggestion } from '../types';
 
@@ -27,8 +27,12 @@ export const useAutocomplete = <T extends AutocompleteSuggestion>(
   const extraParamsRef = useRef(extraParams);
   const extraParamsKey = JSON.stringify(Object.entries(extraParams));
   const extraParamsKeyRef = useRef(extraParamsKey);
-  extraParamsRef.current = extraParams;
-  extraParamsKeyRef.current = extraParamsKey;
+  // Latest-value refs read by the debounced fetch and its stale-context guard;
+  // refreshed on commit, before the context-change effect below runs.
+  useLayoutEffect(() => {
+    extraParamsRef.current = extraParams;
+    extraParamsKeyRef.current = extraParamsKey;
+  });
 
   const cancelPending = useCallback(() => {
     requestIdRef.current += 1;

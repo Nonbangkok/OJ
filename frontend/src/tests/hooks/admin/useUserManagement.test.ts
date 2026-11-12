@@ -76,4 +76,27 @@ describe('useUserManagement', () => {
 
         expect(result.current.error).toBe('Failed to fetch users.');
     });
+
+    it('enters loading and clears a stale error as soon as the query changes', async () => {
+        (jest.mocked(adminService.getUsers) as jest.Mock)
+            .mockRejectedValueOnce(new Error('boom'))
+            .mockResolvedValueOnce(mockPage);
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        const { result, rerender } = renderHook(
+            ({ search }) => useUserManagement(search),
+            { initialProps: { search: '' } },
+        );
+        await waitFor(() => expect(result.current.error).toBe('Failed to fetch users.'));
+        expect(result.current.loading).toBe(false);
+
+        rerender({ search: 'admin' });
+        expect(result.current.loading).toBe(true);
+        expect(result.current.error).toBe('');
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(adminService.getUsers).toHaveBeenCalledTimes(2);
+        expect(adminService.getUsers).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, search: 'admin' }));
+        (console.error as jest.Mock).mockRestore();
+    });
 });

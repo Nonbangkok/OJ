@@ -26,7 +26,6 @@ Earlier in the same run, the toolchain steps also caught and fixed these (detail
 
 ## Left for later (not fixed on purpose)
 
-- **React Compiler lint rules** (react-hooks v7): the 5 likely-bug findings are fixed and `immutability`, `preserve-manual-memoization` and `use-memo` are now `'error'`; `set-state-in-effect` and `refs` stay off with 69 findings remaining, tracked in `docs/superpowers/followups/2026-11-12-react-compiler-rules.md`.
 - **Bare `npx jest` in `backend/`** fails because the ESM flag is only set by `npm test`. This is documented in CLAUDE.md and CONTRIBUTING.
 
 ## Fixed in the follow-up PR
@@ -51,6 +50,12 @@ These were in "Left for later" above and are fixed on `fix/deferred-cleanup`:
 - **node-cron's global logger:** `contestScheduler.start()` also calls `cron.setLogger(cronLogger)`, so node-cron's own shutdown and start-failure messages go through `utils/logger` too, and there is a unit test.
 - **The Postgres 18 migration script has a run lock.** `backups/.pg18-migrate.lock` is created with an atomic `mkdir` and holds `pid`/`started_at`. It is taken before the script touches Docker and released in `on_exit`, after the container cleanup and the status file. A second run refuses (exit 1) and leaves the lock and the status file alone. The runbook says how to clear a stale lock.
 - **Playwright visual fixtures:** `**/api/admin/authoring/drafts?scope=mine` is stubbed (`[]`). All 4 visual tests pass against the existing baselines, and none were regenerated.
+
+## Fixed (React Compiler rules PR)
+
+- **React Compiler lint rules** were partly off (69 findings). All five rules are now `'error'`; see `docs/superpowers/followups/2026-11-12-react-compiler-rules.md`.
+- **Pre-existing bug, XP toast stuck on screen** (found while clearing those findings): the "+N XP" toast's auto-dismiss effect depended on the latest realtime event. A non-qualifying event arriving while the toast was up cleared the timer and started none, so the toast stayed until the next first-solve. A typical trigger is submitting again within 4 s, which sends a Running update. The timer is now keyed on the toast itself. A new test failed before the fix and passes after it.
+- **Pre-existing bug, live preview stuck on "Rendering live preview…" for an empty statement** (found in the browser smoke of this PR): the preview worker renders an empty statement to `''`, and `useStatementPreview` only accepted a `rendered` message with truthy `html`. It had already cleared the 15 s fallback timer, so a new draft, or a statement cleared to nothing, showed "Rendering live preview…" forever and kept the old preview body. An empty render now counts as finished. A new test failed before the fix.
 
 ## Production action needed (you)
 

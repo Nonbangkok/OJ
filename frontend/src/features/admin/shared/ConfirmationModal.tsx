@@ -44,11 +44,14 @@ const ConfirmationModal = ({
 
   // Reset the type-to-confirm input each time the dialog opens so a
   // previously confirmed phrase never carries over to a new confirmation.
-  useEffect(() => {
+  // Adjusted during render when `isOpen` flips to true.
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
     if (isOpen) {
       setPhraseInput('');
     }
-  }, [isOpen]);
+  }
 
   useEffect(() => {
     mountedRef.current = true;

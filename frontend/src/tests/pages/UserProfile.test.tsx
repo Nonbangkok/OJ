@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import UserProfile from '../../pages/user/UserProfile';
 import userService from '../../services/userService';
 import { useAuth } from '../../context/AuthContext';
@@ -107,6 +107,36 @@ describe('User Profile Page', () => {
         renderPage();
         expect(screen.getByText(/loading profile\.\.\.$/i)).toBeInTheDocument();
     });
+
+    it('shows the loading state again and fetches once when navigating to another profile', async () => {
+        const GoToOther = () => {
+            const navigate = useNavigate();
+            return <button type="button" onClick={() => navigate('/profile/other')}>go-other</button>;
+        };
+        let resolveOther: (value: typeof profileData) => void = () => {};
+        jest.mocked(userService.getProfile)
+            .mockResolvedValueOnce(profileData)
+            .mockReturnValueOnce(new Promise((resolve) => { resolveOther = resolve; }));
+
+        render(
+            <MemoryRouter initialEntries={['/profile/tester']}>
+                <GoToOther />
+                <Routes>
+                    <Route path="/profile/:username" element={<UserProfile />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+        // Two full profile renders: allow for a slow, loaded CI worker.
+        expect(await screen.findByRole('heading', { name: 'tester' }, { timeout: 10000 })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'go-other' }));
+        expect(screen.getByText(/loading profile\.\.\.$/i)).toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: 'tester' })).not.toBeInTheDocument();
+
+        resolveOther({ ...profileData, username: 'other' });
+        expect(await screen.findByRole('heading', { name: 'other' }, { timeout: 10000 })).toBeInTheDocument();
+        expect(jest.mocked(userService.getProfile).mock.calls.map((call) => call[0])).toEqual(['tester', 'other']);
+    }, 30000);
 
     it('displays profile stats on success', async () => {
         jest.mocked(userService.getProfile).mockResolvedValueOnce(profileData);

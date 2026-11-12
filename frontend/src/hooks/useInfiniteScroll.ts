@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 
 type UseInfiniteScrollOptions = {
   enabled: boolean;
@@ -21,7 +21,10 @@ export const useInfiniteScroll = ({
 }: UseInfiniteScrollOptions) => {
   const targetRef = useRef<HTMLDivElement | null>(null);
   const onLoadMoreRef = useRef(onLoadMore);
-  onLoadMoreRef.current = onLoadMore;
+  // Latest-callback ref: the observer is not recreated when onLoadMore changes.
+  useLayoutEffect(() => {
+    onLoadMoreRef.current = onLoadMore;
+  });
 
   useEffect(() => {
     const target = targetRef.current;

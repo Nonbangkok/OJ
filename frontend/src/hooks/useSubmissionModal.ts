@@ -19,18 +19,20 @@ type SubmissionModalInput = Partial<SubmissionDetail> | null;
 
 const useSubmissionModal = (submission: SubmissionModalInput) => {
   const [copySuccess, setCopySuccess] = useState(false);
-  const [code, setCode] = useState('');
-  const [lineCount, setLineCount] = useState(1);
+  // Shown code follows the submission, but a submission without code keeps
+  // the previous code, as before (adjust-state-while-rendering).
+  const [code, setCode] = useState(() => submission?.code || '');
+  const [codeSource, setCodeSource] = useState(submission);
+  if (submission !== codeSource) {
+    setCodeSource(submission);
+    if (submission?.code) {
+      setCode(submission.code);
+    }
+  }
+  const lineCount = code.split('\n').length;
   const [hasScrollbar, setHasScrollbar] = useState(false);
   const lineNumbersRef = useRef<HTMLDivElement | null>(null);
   const editorWrapperRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (submission?.code) {
-      setCode(submission.code);
-      setLineCount(submission.code.split('\n').length);
-    }
-  }, [submission]);
 
   // Sync scrolling between line numbers and code
   useEffect(() => {

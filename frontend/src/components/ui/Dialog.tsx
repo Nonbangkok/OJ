@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef } from 'react';
 import type React from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from './Button';
@@ -40,9 +40,14 @@ export function Dialog({
   const initialFocusRefRef = useRef(initialFocusRef);
   const closeOnEscapeRef = useRef(closeOnEscape);
 
-  onCloseRef.current = onClose;
-  initialFocusRefRef.current = initialFocusRef;
-  closeOnEscapeRef.current = closeOnEscape;
+  // Latest-value refs, refreshed after every commit and before the passive
+  // open effect below runs, so it and its keydown handler see current props
+  // without re-running the focus/scroll-lock setup on every render.
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose;
+    initialFocusRefRef.current = initialFocusRef;
+    closeOnEscapeRef.current = closeOnEscape;
+  });
 
   useEffect(() => {
     if (!open) {

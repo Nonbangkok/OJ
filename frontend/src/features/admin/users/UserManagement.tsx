@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import useUserManagement from '../../../hooks/admin/useUserManagement';
 import { useAuth } from '../../../context/AuthContext';
 import EditUserModal from './EditUserModal';
@@ -53,12 +53,19 @@ const UserManagement = () => {
   const [bulkError, setBulkError] = useState('');
 
   // A selection belongs to the visible query and page, never to another page.
-  useEffect(() => {
+  // Adjusted during render whenever the page or query changes.
+  const [selectionScope, setSelectionScope] = useState({ page, search, roleFilter });
+  if (
+    selectionScope.page !== page
+    || selectionScope.search !== search
+    || selectionScope.roleFilter !== roleFilter
+  ) {
+    setSelectionScope({ page, search, roleFilter });
     setSelectedIds(new Set());
     setBulkLockAction(null);
     setBulkMessage('');
     setBulkError('');
-  }, [page, search, roleFilter]);
+  }
 
   const displayedIds = users.map((user) => user.id);
   const selectedDisplayedIds = displayedIds.filter((id) => selectedIds.has(id));

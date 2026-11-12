@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Key } from '@phosphor-icons/react';
 
 import { Button, Dialog, Field, Input } from '../ui';
@@ -31,8 +31,10 @@ const ChangePasswordDialog = ({ open, onClose }: ChangePasswordDialogProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Reset the form each time the dialog opens so no password ever carries
-  // over between opens.
-  useEffect(() => {
+  // over between opens (adjust-state-while-rendering on the open transition).
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (open) {
       setCurrentPassword('');
       setNewPassword('');
@@ -41,7 +43,7 @@ const ChangePasswordDialog = ({ open, onClose }: ChangePasswordDialogProps) => {
       setServerError('');
       setSuccessMessage('');
     }
-  }, [open]);
+  }
 
   if (!open) return null;
 

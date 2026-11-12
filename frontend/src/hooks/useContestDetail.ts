@@ -62,6 +62,7 @@ const useContestDetail = () => {
   );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- contestId-keyed initial fetch + poll; the initial fetch flips the full-page loading state
     fetchContestData(true);
 
     const intervalId = setInterval(() => {
