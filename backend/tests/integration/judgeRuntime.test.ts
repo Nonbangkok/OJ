@@ -100,13 +100,13 @@ const enabled = unmet.length === 0;
       SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED],
     ['cpp-segfault', 'double', 'cpp',
       'int main(){volatile int* p = nullptr; *p = 1; return 0;}', SUBMISSION_STATUS.RUNTIME_ERROR],
-    // Characterises today's judge: UBSan is compiled without -fno-sanitize-recover
-    // (constants/index.ts LANGUAGE_PREPARE.cpp), so it only reports to stderr and the
-    // program exits 0. The documented "signed overflow -> Runtime Error" does not hold
-    // today; tracked as a follow-up, and this expectation flips when that is fixed.
     ['cpp-signed-overflow', 'double', 'cpp',
       '#include <climits>\n#include <iostream>\nint main(){volatile int x = INT_MAX; x = x + 1; std::cout << x << "\\n";}',
-      SUBMISSION_STATUS.WRONG_ANSWER],
+      SUBMISSION_STATUS.RUNTIME_ERROR],
+    // Prints (and flushes) the correct answer before overflowing: still a Runtime Error.
+    ['cpp-signed-overflow-correct-output', 'double', 'cpp',
+      '#include <climits>\n#include <iostream>\nint main(){long long n;std::cin>>n;std::cout<<n*2<<std::endl;volatile int x = INT_MAX; x = x + 1; return x == 0;}',
+      SUBMISSION_STATUS.RUNTIME_ERROR],
     ['cpp-socket-blocked', 'sock', 'cpp',
       '#include <sys/socket.h>\n#include <iostream>\nint main(){std::cout << (socket(AF_INET, SOCK_STREAM, 0) < 0 ? "blocked" : "open") << "\\n";}',
       SUBMISSION_STATUS.ACCEPTED],
@@ -123,6 +123,11 @@ const enabled = unmet.length === 0;
     expect({ name, status: row.overall_status, results: row.overall_status === expected ? undefined : row.results })
       .toEqual({ name, status: expected, results: undefined });
     if (expected === SUBMISSION_STATUS.ACCEPTED) expect(row.score).toBe(100);
+    if (name.startsWith('cpp-signed-overflow')) {
+      const output = String(row.results?.[0]?.output ?? '');
+      expect(output).toContain('signed integer overflow');
+      expect(output).not.toContain('oj-submissions');
+    }
     if (expected === SUBMISSION_STATUS.COMPILATION_ERROR) {
       const output = String(row.results?.[0]?.output ?? '');
       expect(output).toMatch(/error/i);
