@@ -6,6 +6,7 @@
     "types": ["node", "jest"]
   },
   "include": [
+    "src/setupTests.ts",
     "src/hooks/**/*.ts",
     "src/hooks/**/*.tsx",
     "src/services/**/*.ts",

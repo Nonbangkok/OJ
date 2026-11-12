@@ -15,6 +15,7 @@ export const installMockIntersectionObserver = () => {
   class MockIntersectionObserver implements IntersectionObserver {
     readonly root = null;
     readonly rootMargin: string;
+    readonly scrollMargin = '0px';
     readonly thresholds: ReadonlyArray<number> = [0];
     private readonly instance: MockObserverInstance;
 
