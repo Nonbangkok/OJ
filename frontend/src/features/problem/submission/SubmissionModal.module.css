@@ -101,6 +101,37 @@
   margin: 0;
 }
 
+/* Compiler output panel (Compilation Error): heading + an independently
+   scrolling monospace block. Whitespace is preserved so caret/column markers
+   in g++ diagnostics line up; long lines scroll horizontally. */
+.panel-heading {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--background-secondary);
+  flex-shrink: 0;
+}
+
+.compiler-output {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 1rem;
+  overflow: auto;
+  white-space: pre;
+  tab-size: 4;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background-color: var(--background-primary);
+}
+
 /* Copy Button */
 .copy-button {
   position: absolute;

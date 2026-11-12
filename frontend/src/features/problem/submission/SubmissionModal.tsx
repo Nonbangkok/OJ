@@ -24,6 +24,8 @@ const SubmissionModal = ({ submission, onClose }) => {
     getStatusClass,
     formatDate,
     parsedResults,
+    isCompilationError,
+    compilerOutput,
   } = useSubmissionModal(submission);
 
   if (!submission) return null;
@@ -142,11 +144,23 @@ const SubmissionModal = ({ submission, onClose }) => {
           </div>
         </section>
 
-        <section className={`${styles['right-panel']} ${styles.panel}`} aria-label="Testcase results">
-          <div className={styles['testcase-container']}>
-            {renderTestcaseResults()}
-          </div>
-        </section>
+        {isCompilationError ? (
+          <section className={`${styles['right-panel']} ${styles.panel}`} aria-label="Compiler output">
+            <h3 className={styles['panel-heading']}>Compiler output</h3>
+            {compilerOutput ? (
+              // Rendered as a text child (React escapes it); never as HTML.
+              <pre className={styles['compiler-output']}>{compilerOutput}</pre>
+            ) : (
+              <p className={styles['empty-message']}>No compiler output was recorded for this submission.</p>
+            )}
+          </section>
+        ) : (
+          <section className={`${styles['right-panel']} ${styles.panel}`} aria-label="Testcase results">
+            <div className={styles['testcase-container']}>
+              {renderTestcaseResults()}
+            </div>
+          </section>
+        )}
       </div>
     </Dialog>
   );

@@ -83,4 +83,74 @@ describe('SubmissionModal', () => {
     expect(screen.getByRole('dialog', { name: 'Submission Detail' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Close dialog' })).toBeInTheDocument();
   });
+
+  describe('compiler output', () => {
+    const compilerMessage =
+      "submission.cpp:2:12: error: 'uint64_t' was not declared in this scope\n" +
+      "submission.cpp:1:1: note: 'uint64_t' is defined in header '<cstdint>'; " +
+      "this is probably fixable by adding '#include <cstdint>'";
+
+    const compileErrorSubmission: SubmissionDetail = {
+      ...sampleSubmission,
+      overall_status: 'Compilation Error',
+      score: 0,
+      results: [{ status: 'Compilation Error', output: compilerMessage }],
+    };
+
+    it('shows the compiler message for a Compilation Error instead of the testcase table', () => {
+      render(<SubmissionModal submission={compileErrorSubmission} onClose={jest.fn()} />);
+
+      const region = screen.getByRole('region', { name: 'Compiler output' });
+      const block = region.querySelector('pre');
+      expect(block).not.toBeNull();
+      expect(block).toHaveTextContent("this is probably fixable by adding '#include <cstdint>'");
+      // Exact text, newlines preserved.
+      expect(block?.textContent).toBe(compilerMessage);
+      expect(screen.queryByRole('columnheader', { name: /status/i })).not.toBeInTheDocument();
+    });
+
+    it('parses a JSON-string results payload too', () => {
+      render(
+        <SubmissionModal
+          submission={{ ...compileErrorSubmission, results: JSON.stringify(compileErrorSubmission.results) }}
+          onClose={jest.fn()}
+        />
+      );
+
+      expect(screen.getByRole('region', { name: 'Compiler output' }).querySelector('pre')?.textContent)
+        .toBe(compilerMessage);
+    });
+
+    it('renders markup in the message as literal text, never as HTML', () => {
+      const hostile = '<img src=x onerror="alert(1)"><b>bold</b>';
+      render(
+        <SubmissionModal
+          submission={{ ...compileErrorSubmission, results: [{ status: 'Compilation Error', output: hostile }] }}
+          onClose={jest.fn()}
+        />
+      );
+
+      const block = screen.getByRole('region', { name: 'Compiler output' }).querySelector('pre');
+      expect(block?.textContent).toBe(hostile);
+      expect(block?.querySelector('img')).toBeNull();
+      expect(block?.querySelector('b')).toBeNull();
+    });
+
+    it('falls back to a friendly message when no compiler output was recorded', () => {
+      render(
+        <SubmissionModal
+          submission={{ ...compileErrorSubmission, results: [{ status: 'Compilation Error' }] }}
+          onClose={jest.fn()}
+        />
+      );
+
+      expect(screen.getByText(/no compiler output was recorded/i)).toBeInTheDocument();
+    });
+
+    it('does not show a compiler output block for other verdicts', () => {
+      render(<SubmissionModal submission={sampleSubmission} onClose={jest.fn()} />);
+
+      expect(screen.queryByRole('region', { name: 'Compiler output' })).not.toBeInTheDocument();
+    });
+  });
 });

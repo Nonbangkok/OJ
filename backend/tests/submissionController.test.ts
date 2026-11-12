@@ -404,6 +404,90 @@ describe('Submission Controller', () => {
             expect(res.body.message).toBe('You are not authorized to view this submission.');
         });
 
+        describe('compiler output visibility', () => {
+            // The sanitised compiler message lives in results[0].output; it
+            // must reach only the people allowed to see the code.
+            const compilerMessage = "submission.cpp:2:12: error: 'uint64_t' was not declared in this scope; "
+                + "this is probably fixable by adding '#include <cstdint>'";
+            const compileErrorRow = (userId: number) => ({
+                id: 10,
+                user_id: userId,
+                username: userId === 1 ? 'user1' : 'other-user',
+                problem_id: 'P1',
+                problem_name: 'Problem 1',
+                code: 'int main(){uint64_t x;}',
+                language: 'cpp',
+                overall_status: 'Compilation Error',
+                score: 0,
+                results: [{ status: 'Compilation Error', output: compilerMessage }],
+            });
+
+            it('returns the compiler output to the submitter', async () => {
+                (db.query as jest.Mock).mockResolvedValueOnce({ rows: [compileErrorRow(1)] });
+
+                const res = await request(app).get('/submissions/10');
+
+                expect(res.status).toBe(200);
+                expect(res.body.results[0].output).toBe(compilerMessage);
+            });
+
+            it.each(['staff', 'admin'] as const)('returns the compiler output to %s', async (role) => {
+                requestUser = { id: 5, username: role, role, hasAvatar: false };
+                (db.query as jest.Mock).mockResolvedValueOnce({ rows: [compileErrorRow(99)] });
+
+                const res = await request(app).get('/submissions/10');
+
+                expect(res.status).toBe(200);
+                expect(res.body.results[0].output).toBe(compilerMessage);
+            });
+
+            it('does not return the compiler output to another regular user', async () => {
+                (db.query as jest.Mock).mockResolvedValueOnce({ rows: [compileErrorRow(99)] });
+
+                const res = await request(app).get('/submissions/10');
+
+                expect(res.status).toBe(403);
+                expect(res.body).not.toHaveProperty('results');
+                expect(res.body).not.toHaveProperty('code');
+                expect(JSON.stringify(res.body)).not.toContain('uint64_t');
+            });
+
+            it('does not return a contest submission\'s compiler output to another participant', async () => {
+                (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ ...compileErrorRow(99), contest_id: 3 }] });
+
+                const res = await request(app).get('/submissions/10?contestId=3');
+
+                expect(res.status).toBe(403);
+                expect(JSON.stringify(res.body)).not.toContain('uint64_t');
+                // The lookup was scoped to the contest table.
+                expect((db.query as jest.Mock).mock.calls[0][0]).toContain('FROM contest_submissions cs');
+            });
+
+            it.each([
+                ['general feed', '/submissions', []],
+                ['contest feed', '/submissions?contestId=3', [
+                    { rows: [{ id: 3, status: 'running', is_visible: true }] },
+                    { rows: [{ exists: 1 }] },
+                ]],
+            ])('keeps results out of the %s query', async (_label, url, setup) => {
+                for (const response of setup) {
+                    (db.query as jest.Mock).mockResolvedValueOnce(response);
+                }
+                (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+
+                const res = await request(app).get(url);
+
+                expect(res.status).toBe(200);
+                const feedSql = (db.query as jest.Mock).mock.calls
+                    .map(([sql]) => String(sql))
+                    .find((sql) => /FROM (contest_)?submissions/.test(sql) && /overall_status/.test(sql));
+                expect(feedSql).toBeDefined();
+                expect(feedSql).not.toMatch(/\bresults\b/);
+                expect(feedSql).not.toMatch(/\.\*/);
+                expect(feedSql).not.toMatch(/\bcode\b/);
+            });
+        });
+
         it('should return 400 for a non-numeric id instead of a 500 cast error (SUB-003)', async () => {
             const res = await request(app).get('/submissions/abc');
 

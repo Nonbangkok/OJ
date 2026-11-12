@@ -4,6 +4,7 @@ import cpp from 'highlight.js/lib/languages/cpp';
 import python from 'highlight.js/lib/languages/python';
 import { UI_TIMEOUTS } from '../config/constants';
 import { getStatusClass } from '../utils/formatters';
+import { SUBMISSION_STATUS } from '../utils/constants';
 import type { SubmissionDetail, TestCaseResult } from '../types';
 
 // Register the highlight.js grammar for every supported language so viewed
@@ -143,6 +144,14 @@ const useSubmissionModal = (submission: SubmissionModalInput) => {
 
   const parsedResults = parseResults();
 
+  // A Compilation Error stores the sanitised compiler / syntax-check message
+  // as the single results entry's `output`. Only the submitter and staff can
+  // load this detail (GET /submissions/:id), so it is safe to show here.
+  const isCompilationError = submission?.overall_status === SUBMISSION_STATUS.COMPILATION_ERROR;
+  const compilerOutput: string | null = isCompilationError && Array.isArray(parsedResults)
+    ? parsedResults.find((r) => typeof r?.output === 'string' && r.output.length > 0)?.output ?? null
+    : null;
+
   return {
     copySuccess,
     code,
@@ -156,6 +165,8 @@ const useSubmissionModal = (submission: SubmissionModalInput) => {
     getStatusClass,
     formatDate,
     parsedResults,
+    isCompilationError,
+    compilerOutput,
   };
 };
 
