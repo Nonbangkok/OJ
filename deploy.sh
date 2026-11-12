@@ -4,6 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 compose=(docker compose -f docker-compose.yml -f docker-compose.production.yml)
+# Refuse to start Postgres 18 on an empty volume while the Postgres 16 data is
+# still waiting to be migrated (docs/runbooks/postgres-18-upgrade.md).
+scripts/pg18-guard.sh -f docker-compose.yml -f docker-compose.production.yml || exit $?
 
 "${compose[@]}" config --quiet
 "${compose[@]}" build

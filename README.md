@@ -174,6 +174,10 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml config --q
 ./deploy.sh
 ```
 
+Upgrading an existing Postgres 16 deployment to Postgres 18 is a one-time manual
+migration: `deploy.sh` refuses to start until it is done. Follow
+[docs/runbooks/postgres-18-upgrade.md](docs/runbooks/postgres-18-upgrade.md).
+
 The production overlay sets `NODE_ENV=production`, enables secure cookies, mounts
 the production Nginx configuration and certificate directories, publishes HTTPS
 for the DNS-only large-upload hostname, and starts the Cloudflare tunnel. The

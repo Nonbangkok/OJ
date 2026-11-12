@@ -16,6 +16,8 @@ docker-compose exec backend node dist/scripts/create_admin.js # interactive: cre
 cd backend && npm run db:migrate                      # apply pending migrations from the host
 ```
 
+> Postgres 16 → 18 upgrade of an existing deployment: `deploy.sh` runs `scripts/pg18-guard.sh` and refuses to start until `scripts/pg18-migrate.sh` has migrated the data — see `docs/runbooks/postgres-18-upgrade.md`.
+
 > `backend/scripts/init_db.ts` is a **destructive development reset** (drops all tables). Never use it to upgrade an existing database — use migrations. Health checks: `/api/health/live` (process) and `/api/health/ready` (DB + schema readiness). Production refuses to boot without `COOKIE_SECURE=true` (startup-time env check).
 
 ### Backend (`backend/`)

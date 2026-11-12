@@ -32,6 +32,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 docker-compose.yml.bak.*
+# database backups written by scripts/pg18-migrate.sh
+/backups/
 /.worktrees/
 /.claude/
 
