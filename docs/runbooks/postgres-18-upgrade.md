@@ -82,13 +82,26 @@ empty-database deploy the guard exists to stop.
   server: `git pull` / `git checkout <release>`. Do **not** run `./deploy.sh`
   yet, and never run a raw `docker compose up` on this release (see the
   warning above).
-- **Free disk ≥ 2× the database size**: one copy for the backups in `backups/`
-  and one for the new 18 volume (the old volume is kept). Check with
-  `df -h . /var/lib/docker` and, for the current size,
+- **Free disk ≥ 4× the database size.** The data is mostly `bytea`
+  (testcases, assets), and the plain `pg_dumpall` writes bytea as hex, about
+  2× the raw size. On top of that come the `.dump`, its transient copies inside
+  the temporary containers, and the new 18 cluster; the old volume is kept. The
+  script measures the old cluster's data (`base/`). Before stopping anything it
+  **aborts** if the `backups/` filesystem has less than 4× that free, or
+  Docker's data filesystem (`docker info -f '{{.DockerRootDir}}'`, where the
+  18 volume lives) less than 2×. It prints `df -h` for both. Override only if
+  you are sure: `OJ_PG18_SKIP_DISK_CHECK=1`. Check by hand with
+  `df -h . "$(docker info -f '{{.DockerRootDir}}')"` and
   `docker system df -v | grep db-data`.
 - **A maintenance window.** The site is down from the moment the script stops
   the stack until it restarts it; plan for a few minutes plus dump/restore
-  time (roughly proportional to the database size).
+  time (roughly proportional to the database size). The script builds this
+  release's images (`docker compose … build`) **before** it stops anything,
+  so the build doesn't add to the downtime.
+- **Run it inside `tmux` or `screen`.** A dropped SSH session sends SIGHUP.
+  The script traps HUP/INT/TERM/PIPE and always stops its temporary Postgres 16
+  server before exiting, but a detached session avoids the interruption
+  altogether. Ctrl-C is safe in the same way.
 - The server's `.env` is the one production uses (the scripts read
   `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` through compose).
 - Announce the window to users.
@@ -98,15 +111,19 @@ empty-database deploy the guard exists to stop.
 From the repository root on the server:
 
 ```bash
+tmux new -s pg18        # or: screen -S pg18
+
 # 0. confirm the guard sees a pending migration (exit 2 expected)
 scripts/pg18-guard.sh -f docker-compose.yml -f docker-compose.production.yml; echo "guard exit: $?"
 
-# 1. migrate (stops the stack, backs up, restores into 18, verifies, starts the stack)
+# 1. migrate (checks disk, builds images, stops the stack, backs up, restores
+#    into 18, verifies, starts the stack, checks the backend's pg_dump is 18)
 mkdir -p backups
 scripts/pg18-migrate.sh -f docker-compose.yml -f docker-compose.production.yml 2>&1 \
   | tee "backups/pg18-migrate-$(date -u +%Y%m%dT%H%M%SZ).log"
 
-# 2. build and roll out this release properly (the guard now passes)
+# 2. the normal path from here on: deploy this release (the guard now passes;
+#    deploy.sh rebuilds, recreates and health-checks everything)
 ./deploy.sh
 ```
 
@@ -114,12 +131,15 @@ The `tee` keeps a log next to the backups; the script's own last lines say
 `DONE` or `FAILED` (the pipeline's exit status is `tee`'s).
 
 If the script stops with an error it prints the stage it reached, the state the
-system is in, and the exact next command. The old volume is never removed or
-recreated by either script.
+system is in, and the exact next command. No script removes, re-initialises or
+writes user data to the old volume. Postgres itself rewrites its own system,
+WAL and statistics files there when the temporary 16 server starts and stops
+cleanly, so the volume is not byte-identical afterwards, but its data is
+unchanged.
 
 If the 18 volume already holds data (for example after a failed attempt, or
 after someone ran `docker compose up` before migrating), the script refuses. To
-delete **only** the 18 volume and start over from the untouched 16 volume:
+delete **only** the 18 volume and start over from the (data-unmodified) 16 volume:
 
 ```bash
 scripts/pg18-migrate.sh --force-recreate-18 -f docker-compose.yml -f docker-compose.production.yml
@@ -129,14 +149,17 @@ scripts/pg18-migrate.sh --force-recreate-18 -f docker-compose.yml -f docker-comp
 ## What the script checks and does
 
 1. Resolves the project name with `docker compose <args> config --format json`.
-2. Preconditions (nothing is stopped if these fail):
+2. Preconditions (nothing is stopped if these fail; the Docker daemon must be
+   reachable):
    - `<project>_db-data` exists and its `PG_VERSION` is `16`;
    - `<project>_db-data-18` is missing or empty, else it refuses unless
      `--force-recreate-18` is given and the volume name is typed back;
-   - `backups/` is writable; prints free space; pulls `postgres:16-alpine`,
-     `alpine:3` and the compose database image ahead of the downtime.
-3. `docker compose <args> stop` for all services, then verifies that no
-   running container still uses either volume.
+   - `backups/` is writable; free disk passes the 4× / 2× check above; pulls
+     `postgres:16-alpine`, `alpine:3` and the compose database image, and runs
+     `docker compose <args> build` (fails → aborts with the site still up).
+3. `docker compose <args> stop` for all services, removes a leftover
+   `<project>-pg16-migrate` container from an earlier killed run, then
+   verifies that no running container still uses either volume.
 4. Reads `POSTGRES_*` exactly as compose passes them to the database service,
    writes a `.oj-pg18-migration-incomplete` marker into the 18 volume (the guard
    refuses to deploy while it is there), and starts a temporary
@@ -154,20 +177,33 @@ scripts/pg18-migrate.sh --force-recreate-18 -f docker-compose.yml -f docker-comp
    the same env; waits until it is healthy and accepting TCP connections,
    checks the server version is 18 and the app database is empty.
 8. Restores roles from the globals (the compose-created superuser is kept as
-   is; only "role already exists" errors are tolerated), then the app database
-   with `pg_restore --no-owner --role=$POSTGRES_USER --single-transaction --exit-on-error`.
+   is; only "role already exists" errors are tolerated, and psql failing to
+   connect or run aborts), then the app database with
+   `pg_restore --no-owner --role=$POSTGRES_USER --single-transaction --exit-on-error`.
+
+   **Not carried over:** database-level settings, i.e. `ALTER DATABASE … SET`,
+   database-level `GRANT`/`REVOKE CONNECT`, and per-role-in-database settings
+   (`ALTER ROLE … IN DATABASE … SET`). `pg_dump` without `--create` doesn't emit
+   them, and the database itself is created by the 18 image. The app uses none
+   of these. If you added any by hand, re-apply them on 18 after the migration.
 9. Writes `pg18-<UTC>.counts` and diffs it against the 16 counts, printing
    users / problems / testcases / submissions / contests side by side. **Any
    difference exits 1 and leaves the app stopped** (the incomplete marker stays
    and no migrated marker is written, so `deploy.sh` refuses too).
 10. Removes the incomplete marker, then atomically writes the migrated marker
     `.oj-pg18-migrated-from-16` (see above). It re-runs the guard (which must
-    pass), runs `docker compose <args> up -d`, and prints the checklist below.
+    pass), and runs `docker compose <args> up -d` with the images built in
+    step 2. It then checks that `docker compose <args> exec -T backend pg_dump --version`
+    reports major version **18**. A backend image left over from the 16 release
+    (pg_dump 16) would make Admin → DB export fail with "server version
+    mismatch", so the script fails loudly instead. Finally it prints the
+    checklist below. Running `./deploy.sh` afterwards is still the normal path.
 
 ## Manual verification
 
 <!-- checklist:start -->
 Manual verification (docs/runbooks/postgres-18-upgrade.md):
+  [ ] docker compose -f docker-compose.yml -f docker-compose.production.yml exec -T backend pg_dump --version  -> 18.x
   [ ] ./deploy.sh finished with "OJ deployment healthy"
   [ ] Log in with an existing account (old sessions may need a fresh login)
   [ ] Submissions: the most recent submissions from before the window are listed with their verdicts
@@ -179,12 +215,23 @@ Manual verification (docs/runbooks/postgres-18-upgrade.md):
 
 ## Rollback
 
-The old volume `<project>_db-data` is untouched and still holds the Postgres 16
-data as of the moment the script stopped the stack. Rolling back loses anything
+The old volume `<project>_db-data` still holds the Postgres 16 data as of the
+moment the script stopped the stack (its data is unmodified; only Postgres's
+own system/WAL files were rewritten by the clean start/stop of the temporary
+server). Rolling back loses anything
 written to Postgres 18 after the migration (new users, submissions, …); if that
 matters, export it first (admin export, or
 `docker compose … exec database pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB" > backups/pg18-before-rollback.dump`).
 
+0. **Make sure nothing else has the old volume open.** A second Postgres on
+   the same data directory corrupts it:
+   ```bash
+   docker ps -a --filter volume=<project>_db-data --format '{{.Names}} {{.Status}}'
+   ```
+   This must list nothing except the compose database container
+   (`<project>-database-1`). If `<project>-pg16-migrate` is listed (left by a
+   migration that was killed outright), remove it first:
+   `docker rm -f <project>-pg16-migrate`.
 1. Stop the stack:
    `docker compose -f docker-compose.yml -f docker-compose.production.yml stop`
 2. Check out the previous release (the one that used `postgres:16-alpine`

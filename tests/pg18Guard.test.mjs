@@ -30,11 +30,11 @@ const seedVolume = (name, files) => {
   docker(['run', '--rm', '--network', 'none', '-v', `${name}:/v`, 'alpine:3', 'sh', '-c', script]);
 };
 
-const runGuard = (project) =>
+const runGuard = (project, extraEnv = {}) =>
   spawnSync('sh', [guard], {
     cwd: repositoryRoot,
     encoding: 'utf8',
-    env: { ...process.env, OJ_PG_GUARD_PROJECT: project },
+    env: { ...process.env, OJ_PG_GUARD_PROJECT: project, ...extraEnv },
   });
 
 const prefix = (label) => `ojpgguard-${runId}-${label}`;
@@ -138,6 +138,26 @@ test('(e) a different project name behaves like (b): the name is not hardcoded',
   assert.match(result.stdout, new RegExp(`${project}_db-data-18`));
   // The (b) project's volumes must not leak into this result.
   assert.doesNotMatch(result.stdout, new RegExp(prefix('b')));
+});
+
+test('(m4) an old volume with another PG_VERSION (15) and no migrated 18 cluster is refused', () => {
+  const project = prefix('m4');
+  seedVolume(`${project}_db-data`, { PG_VERSION: '15' });
+
+  const result = runGuard(project);
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.match(result.stdout, /Postgres 18 upgrade required: see docs\/runbooks\/postgres-18-upgrade\.md/);
+  assert.match(result.stdout, /PG_VERSION=15/);
+});
+
+test('(m3) an unreachable Docker daemon fails closed (exit 1), never "fresh install"', () => {
+  const result = runGuard(prefix('m3'), {
+    DOCKER_HOST: 'unix:///nonexistent/ojpgguard-docker.sock',
+    DOCKER_CONTEXT: '',
+  });
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stderr, /cannot reach the Docker daemon/);
+  assert.doesNotMatch(result.stdout, /ok/);
 });
 
 test('without the override, the project name comes from docker compose config', () => {

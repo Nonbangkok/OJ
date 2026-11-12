@@ -3,10 +3,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-compose=(docker compose -f docker-compose.yml -f docker-compose.production.yml)
+compose_files=(-f docker-compose.yml -f docker-compose.production.yml)
+compose=(docker compose "${compose_files[@]}")
 # Refuse to start Postgres 18 on an empty volume while the Postgres 16 data is
 # still waiting to be migrated (docs/runbooks/postgres-18-upgrade.md).
-scripts/pg18-guard.sh -f docker-compose.yml -f docker-compose.production.yml || exit $?
+scripts/pg18-guard.sh "${compose_files[@]}" || exit $?
 
 "${compose[@]}" config --quiet
 "${compose[@]}" build
