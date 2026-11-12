@@ -70,34 +70,74 @@ test('shows a clear loading state in the preview viewport', () => {
 const renderEditor = () => {
   mockedUseAuthoringDraft.mockReturnValue(model() as unknown as ReturnType<typeof useAuthoringDraft>);
   mockedUseStatementPreview.mockReturnValue({ html: '', state: 'waiting', error: '', shell: '' });
-  render(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
+  return render(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
 };
+const getSeparator = () => screen.getByRole('separator', { name: 'Resize source and preview panes' });
 
-test('statement editor splits source and preview 50/50 by default', () => {
-  renderEditor();
+describe('statement editor layout', () => {
+  let spies: jest.SpyInstance[] = [];
+  beforeEach(() => {
+    window.localStorage.clear();
+    // jsdom does no layout; the panel library refuses keyboard resizes while the group measures 0px.
+    spies = [
+      jest.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(
+        { x: 0, y: 0, top: 0, left: 0, right: 400, bottom: 400, width: 400, height: 400, toJSON: () => ({}) }),
+      jest.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(400),
+      jest.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(400),
+    ];
+  });
+  afterEach(() => spies.forEach(spy => spy.mockRestore()));
 
-  expect(screen.getByRole('separator', { name: 'Resize source and preview panes' })).toHaveAttribute('aria-valuenow', '50');
-});
+  test('statement editor splits source and preview 50/50 by default', () => {
+    renderEditor();
 
-test('double-clicking the pane divider resets the split to 50/50', () => {
-  // jsdom does no layout; the panel library refuses keyboard resizes while the group measures 0px.
-  const rect = jest.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(
-    { x: 0, y: 0, top: 0, left: 0, right: 400, bottom: 400, width: 400, height: 400, toJSON: () => ({}) });
-  const width = jest.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(400);
-  const height = jest.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(400);
-  renderEditor();
-  const separator = screen.getByRole('separator', { name: 'Resize source and preview panes' });
+    expect(getSeparator()).toHaveAttribute('aria-valuenow', '50');
+  });
 
-  fireEvent.keyDown(separator, { key: 'ArrowRight' });
-  expect(separator).not.toHaveAttribute('aria-valuenow', '50');
-  fireEvent.doubleClick(separator);
+  test('double-clicking the pane divider resets the split to 50/50', () => {
+    renderEditor();
+    const separator = getSeparator();
 
-  expect(separator).toHaveAttribute('aria-valuenow', '50');
-  [rect, width, height].forEach(spy => spy.mockRestore());
-});
+    fireEvent.keyDown(separator, { key: 'ArrowRight' });
+    expect(separator).not.toHaveAttribute('aria-valuenow', '50');
+    fireEvent.doubleClick(separator);
 
-test('divider keeps its accessible name', () => {
-  renderEditor();
+    expect(separator).toHaveAttribute('aria-valuenow', '50');
+  });
 
-  expect(screen.getByRole('separator', { name: 'Resize source and preview panes' })).toBeInTheDocument();
+  test('divider keeps its accessible name', () => {
+    renderEditor();
+
+    expect(getSeparator()).toBeInTheDocument();
+  });
+
+  test('panes stop at 25 percent', () => {
+    renderEditor();
+    const separator = getSeparator();
+
+    fireEvent.keyDown(separator, { key: 'Home' });
+
+    expect(separator).toHaveAttribute('aria-valuenow', '25');
+    expect(separator).toHaveAttribute('aria-valuemin', '25');
+  });
+
+  test('remembers the split per draft', () => {
+    const { unmount } = renderEditor();
+    fireEvent.keyDown(getSeparator(), { key: 'ArrowRight' });
+    const moved = getSeparator().getAttribute('aria-valuenow');
+    expect(moved).not.toBe('50');
+    unmount();
+
+    renderEditor();
+
+    expect(getSeparator()).toHaveAttribute('aria-valuenow', moved);
+  });
+
+  test('ignores a corrupt saved layout', () => {
+    window.localStorage.setItem('react-resizable-panels:oj-authoring-statement-layout:d1', 'not json{');
+
+    renderEditor();
+
+    expect(getSeparator()).toHaveAttribute('aria-valuenow', '50');
+  });
 });

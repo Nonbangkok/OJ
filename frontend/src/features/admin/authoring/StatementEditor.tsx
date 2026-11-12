@@ -45,7 +45,12 @@ function readPreviewZoom(id: string) {
 // Layout persistence must never crash the editor when browser storage is unavailable (private mode).
 const layoutStorage = {
   getItem(key: string) {
-    try { return window.localStorage.getItem(key); } catch { return null; }
+    try {
+      const value = window.localStorage.getItem(key);
+      // v4 JSON.parses the string while rendering; a corrupt value must fall back to the default split.
+      if (value !== null) JSON.parse(value);
+      return value;
+    } catch { return null; }
   },
   setItem(key: string, value: string) {
     try { window.localStorage.setItem(key, value); } catch { /* Remembering the split is optional. */ }
@@ -249,7 +254,9 @@ export default function StatementEditor({ id }: { id: string }) {
       {model.activeJob && <p className={styles.editorStatus} role="status">Active job: {jobLabel(model.activeJob.jobType)} — {model.activeJob.status}</p>}
       {recovered && <p className={styles.editorStatus} role="status">Recovered unsaved statement from this browser tab.</p>}
     </section>
+    {/* resizeTargetMinimumSize keeps v2's grab zone (8px bar +-5px mouse, +-15px touch). */}
     <Group groupRef={panels} defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}
+      resizeTargetMinimumSize={{ fine: 18, coarse: 38 }}
       orientation={compactLayout ? 'vertical' : 'horizontal'} className={styles.editorWorkspace} role="region" aria-label="Statement editor">
       <Panel id="source" defaultSize="50" minSize="25" className={styles.sourcePane}>
         <textarea id="statement-source" aria-label="Statement source" spellCheck={false} value={form.statementHtml}
