@@ -74,13 +74,15 @@ npm test -- -t "test name substring"       # a single test by name
 ### Frontend (`frontend/`)
 
 Vite + Jest. `npm test` runs in **watch mode** — use `npm run test:ci` for a
-one-shot run with coverage.
+one-shot run with coverage. `npm start` proxies `/api` to `http://localhost:8080`, so run
+the stack with `HTTP_PORT=8080` (e.g. `HTTP_PORT=8080 docker compose up -d`).
 
 ```bash
 npm start                                  # Vite dev server on :3000, proxies /api to :8080 (reports no lint or type errors; run `npm run lint:check` / `type-check` or `validate` -- CI enforces it)
 npm run build                              # tsc --noEmit + vite build + fails if build/index.html has an inline script (CSP)
 npm run test:ci                            # run once (jest --ci --coverage)
-npm test -- src/tests/foo.test.tsx         # a single test file
+npx jest src/tests/foo.test.tsx          # one file, run once, no coverage gate
+npx jest -t "name"                         # a single test by name
 npm run type-check                         # tsc --noEmit
 npm run lint                               # eslint --fix
 npm run validate                           # type-check + lint:check + test:ci (run before pushing)

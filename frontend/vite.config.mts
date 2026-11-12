@@ -20,8 +20,8 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 3000,
-      // The backend is mounted behind nginx, which strips `/api`; the dev proxy
-      // forwards the path unchanged.
+      // :8080 is the compose stack's nginx reverse proxy (HTTP_PORT=8080), which
+      // strips `/api` before the backend; the dev proxy forwards the path unchanged.
       proxy: {
         '/api': { target: 'http://localhost:8080', changeOrigin: true },
       },

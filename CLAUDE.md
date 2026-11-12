@@ -36,7 +36,8 @@ Vite + Jest. `npm test` runs in **watch mode** — use `npm run test:ci` for a o
 npm start                                  # Vite dev server on :3000, proxies /api to :8080 (reports no lint or type errors; run `npm run lint:check` / `type-check` or `validate` -- CI enforces it)
 npm run build                              # tsc --noEmit + vite build + fails if build/index.html has an inline script (CSP)
 npm run test:ci                            # run once (jest --ci --coverage)
-npm test -- src/tests/foo.test.tsx         # single test file
+npx jest src/tests/foo.test.tsx          # one file, run once, no coverage gate
+npx jest -t "name"                         # a single test by name
 npm run validate                           # type-check + lint:check + test:ci (run before pushing)
 npm run lint                               # eslint --fix
 npm run type-check                         # tsc --noEmit

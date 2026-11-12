@@ -21,6 +21,7 @@ module.exports = {
     '^(?!.*\\.(js|jsx|mjs|cjs|ts|tsx|css|json)$)': '<rootDir>/jest/fileTransform.cjs',
   },
   moduleNameMapper: {
+    '\\?worker$': '<rootDir>/jest/workerStub.cjs',
     '^.+\\.module\\.(css|sass|scss)$': 'identity-obj-proxy',
     '^react-router-dom$': '<rootDir>/node_modules/react-router-dom/dist/index.js',
     '^react-router/dom$': '<rootDir>/node_modules/react-router/dist/development/dom-export.js',
