@@ -41,6 +41,9 @@ jobs:
 
       - run: npm ci --no-audit --install-links
       - run: npm run build
+      # Type-check the tests too (ts-jest compiles them per file without a
+      # whole-program check, and `build` uses tsconfig.json).
+      - run: npx tsc -p tsconfig.test.json --noEmit
       # Integration suites skip themselves without INTEGRATION_DATABASE_URL;
       # they run in the `integration` job against a real Postgres + runner.
       - run: npm test -- --ci
