@@ -60,7 +60,7 @@ describe('history-entry scroll restoration after list route data loads', () => {
         <Route path="/problems/:problemId" element={<DetailRoute />} />
       </Route>,
     ));
-    const view = render(<RouterProvider router={router} fallbackElement={<p>Loading list data…</p>} />);
+    const view = render(<RouterProvider router={router} />);
 
     try {
       expect(await screen.findByText('restored batch')).toBeInTheDocument();

@@ -14,7 +14,7 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
@@ -35,42 +35,7 @@
     "noUncheckedIndexedAccess": false,
     "allowUnusedLabels": false,
     "allowUnreachableCode": false,
-    "baseUrl": "src",
-    "paths": {
-      "@/*": [
-        "*"
-      ],
-      "@/components/*": [
-        "components/*"
-      ],
-      "@/pages/*": [
-        "pages/*"
-      ],
-      "@/hooks/*": [
-        "hooks/*"
-      ],
-      "@/services/*": [
-        "services/*"
-      ],
-      "@/utils/*": [
-        "utils/*"
-      ],
-      "@/context/*": [
-        "context/*"
-      ],
-      "@/features/*": [
-        "features/*"
-      ],
-      "@/layouts/*": [
-        "layouts/*"
-      ],
-      "@/assets/*": [
-        "assets/*"
-      ],
-      "@/styles/*": [
-        "components/styles/*"
-      ]
-    }
+    "noUncheckedSideEffectImports": false
   },
   "include": [
     "src"

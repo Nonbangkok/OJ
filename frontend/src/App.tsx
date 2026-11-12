@@ -153,7 +153,7 @@ const App = () => {
       <ThemeProvider>
         <AuthProvider>
           <SettingsProvider>
-            <RouterProvider router={router} fallbackElement={<main className="container">Loading…</main>} />
+            <RouterProvider router={router} />
           </SettingsProvider>
         </AuthProvider>
       </ThemeProvider>
