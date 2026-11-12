@@ -26,6 +26,14 @@ const patch = jest.mocked(api.patch);
 const remove = jest.mocked(api.delete);
 const selectFile = (label: string, file: File) =>
   fireEvent.change(screen.getByLabelText(label), { target: { files: [file] } });
+// jsdom validates required inputs before a submit-button click submits, but it cannot
+// see files set through fireEvent.change, so it would block the click. Mirror a browser
+// click instead: a disabled button does nothing, an enabled one submits its form.
+const clickSubmit = (button: HTMLElement) => {
+  const { form } = button as HTMLButtonElement;
+  if (!form) throw new Error('submit button is not inside a form');
+  if (!button.matches(':disabled')) fireEvent.submit(form);
+};
 function setup(disabled = false) {
   const onMutated = jest.fn(async () => {});
   const onError = jest.fn();
@@ -76,7 +84,7 @@ test.each([false, true])(
         testcases: [metadata, { ...metadata, id: 'case-2', filename: 'next.in', caseNumber: 2 }],
       },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Append testcase' }));
+    clickSubmit(screen.getByRole('button', { name: 'Append testcase' }));
     await screen.findByText('next.in');
     expect(post).toHaveBeenCalledTimes(1);
     const [url, payload] = post.mock.calls[0];
@@ -96,12 +104,12 @@ test('ZIP replacement requires explicit confirmation and cancellation preserves 
   await screen.findByText('sample.in');
   const archive = new File(['zip'], 'cases.zip');
   selectFile('ZIP archive (replaces all)', archive);
-  fireEvent.click(screen.getByRole('button', { name: 'Replace all from ZIP' }));
+  clickSubmit(screen.getByRole('button', { name: 'Replace all from ZIP' }));
   expect(post).not.toHaveBeenCalled();
   let dialog = screen.getByRole('dialog');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Replace all from ZIP' }));
+  clickSubmit(screen.getByRole('button', { name: 'Replace all from ZIP' }));
   dialog = screen.getByRole('dialog');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm replacement' }));
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
@@ -165,8 +173,8 @@ test('failed append retains selected files and old cases and prevents duplicate 
   const input = new File(['42'], 'next.in');
   selectFile('Input file', input);
   const button = screen.getByRole('button', { name: 'Append testcase' });
-  fireEvent.click(button);
-  fireEvent.click(button);
+  clickSubmit(button);
+  clickSubmit(button);
   expect(post).toHaveBeenCalledTimes(1);
   expect(button).toBeDisabled();
   const error = new Error('Conflict');
@@ -175,7 +183,7 @@ test('failed append retains selected files and old cases and prevents duplicate 
   expect(screen.getByText('sample.in')).toBeInTheDocument();
   expect((screen.getByLabelText('Input file') as HTMLInputElement).files?.[0]).toBe(input);
   expect(onMutated).not.toHaveBeenCalled();
-  fireEvent.click(button);
+  clickSubmit(button);
   await waitFor(() => expect(post).toHaveBeenCalledTimes(2));
   expect((post.mock.calls[1][1] as FormData).get('input')).toBe(input);
 });
@@ -200,7 +208,7 @@ test('a mutation discards any inspection response that arrives after the mutatio
   );
   fireEvent.click(screen.getByRole('button', { name: 'Inspect sample.in' }));
   selectFile('Input file', new File(['42'], 'next.in'));
-  fireEvent.click(screen.getByRole('button', { name: 'Append testcase' }));
+  clickSubmit(screen.getByRole('button', { name: 'Append testcase' }));
   await waitFor(() =>
     expect(screen.getByRole('button', { name: 'Refresh testcases' })).toBeEnabled()
   );
@@ -218,7 +226,7 @@ test('keeps mutations pending until the parent refresh finishes and uses the nex
     })
   );
   selectFile('Input file', new File(['42'], 'next.in'));
-  fireEvent.click(screen.getByRole('button', { name: 'Append testcase' }));
+  clickSubmit(screen.getByRole('button', { name: 'Append testcase' }));
   await waitFor(() => expect(onMutated).toHaveBeenCalledTimes(1));
   expect(screen.getByRole('button', { name: 'Delete sample.in' })).toBeDisabled();
   await act(async () => {
@@ -274,7 +282,7 @@ test('notifies the parent if an upload succeeds after switching away from the ta
     })
   );
   selectFile('Input file', new File(['42'], 'next.in'));
-  fireEvent.click(screen.getByRole('button', { name: 'Append testcase' }));
+  clickSubmit(screen.getByRole('button', { name: 'Append testcase' }));
   unmount();
   await act(async () => {
     finishUpload({ data: { revision: 8 } });

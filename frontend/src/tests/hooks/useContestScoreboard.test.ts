@@ -36,7 +36,7 @@ const lastSubscribeCall = (): {
 };
 
 describe('useContestScoreboard', () => {
-    // Auto-mocks reset between tests (react-scripts sets resetMocks), so the
+    // Auto-mocks reset between tests (jest.config.cjs sets resetMocks), so the
     // realtime service implementations must be (re)installed before each test.
     beforeEach(() => {
         jest.clearAllMocks();

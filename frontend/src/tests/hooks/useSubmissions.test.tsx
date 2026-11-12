@@ -38,7 +38,7 @@ const mockAuth = (user: object | null, refreshUser: () => Promise<void> = jest.f
 describe('useSubmissions', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        // Auto-mocks reset between tests (react-scripts sets resetMocks), so
+        // Auto-mocks reset between tests (jest.config.cjs sets resetMocks), so
         // realtime service implementations must be (re)installed here.
         (jest.mocked(isRealtimeSupported) as jest.Mock).mockReturnValue(true);
         (jest.mocked(subscribeSubmissions) as jest.Mock).mockImplementation(

@@ -68,6 +68,8 @@ describe('Login Page', () => {
             </BrowserRouter>
         );
 
+        fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'testuser' } });
+        fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'wrong-password' } });
         fireEvent.click(screen.getByRole('button', { name: /login/i }));
 
         await waitFor(() => {
