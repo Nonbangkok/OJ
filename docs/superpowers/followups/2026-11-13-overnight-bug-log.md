@@ -32,6 +32,14 @@ Earlier in the same run, the toolchain steps also caught and fixed these (detail
 - **node-cron's global logger** (`setLogger`) is still used for its own shutdown and start-failure messages. Only the per-task hook is routed.
 - **The Postgres 18 migration script has no run lock.** The runbook says to run one migration at a time.
 - **Bare `npx jest` in `backend/`** fails because the ESM flag is only set by `npm test`. This is documented in CLAUDE.md and CONTRIBUTING.
+- **`tests/composeConfig.test.mjs`** passes the developer's whole `process.env` to `docker compose`. An exported `HTTP_PORT`, `COMPOSE_*` or `POSTGRES_*` then overrides `.env.example` and fails the assertions locally. CI is unaffected. This predates the upgrade; the fix is to pass a minimal env.
+- **`scripts/pg18-migrate.sh` `stop_container`:** if `docker inspect` hiccups while the temporary 16 server is still running, the `rm` → `rm -f` fallback can SIGKILL it. That only means crash recovery on the next 16 start, and the backups are complete by then. Fix: re-confirm `Running=false` before `rm -f`.
+- **Runbook Rollback step 2:**
+  - the marker `mv` errors harmlessly when no marker exists (rolling back a failed migration);
+  - there is no "undo" step if the operator cancels the rollback after invalidating the marker;
+  - `--force-recreate-18` on a rolled-back 18 volume doesn't warn that it may still hold 18-era writes. The guard does say "export first".
+- **Runbook manual backup commands** write files with the host umask; the script itself uses 077.
+- **Guard exit 1** also covers "`docker compose config` failed / project name unreadable". The runbook's exit table doesn't say so.
 
 ## Production action needed (you)
 
