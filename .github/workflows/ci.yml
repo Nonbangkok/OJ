@@ -90,7 +90,7 @@ jobs:
           node-version-file: .nvmrc
 
       - name: Compose config tests
-        run: node --test tests/composeConfig.test.mjs
+        run: node --test tests/composeConfig.test.mjs tests/nodeVersion.test.mjs
 
       - name: Build all images (local + production overlay)
         run: |

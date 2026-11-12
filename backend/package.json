@@ -16,7 +16,7 @@
   "license": "GPL-3.0-or-later",
   "type": "commonjs",
   "engines": {
-    "node": "20.x"
+    "node": "26.x"
   },
   "dependencies": {
     "archiver": "^7.0.1",
