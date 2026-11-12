@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import useAuthoringDraft from './useAuthoringDraft';
 import useStatementPreview from './useStatementPreview';
@@ -65,4 +65,33 @@ test('shows a clear loading state in the preview viewport', () => {
 
   expect(screen.getAllByText('Rendering live preview…')).toHaveLength(2);
   expect(screen.queryByText('Preview will appear here.')).not.toBeInTheDocument();
+});
+
+const renderEditor = () => {
+  mockedUseAuthoringDraft.mockReturnValue(model() as unknown as ReturnType<typeof useAuthoringDraft>);
+  mockedUseStatementPreview.mockReturnValue({ html: '', state: 'waiting', error: '', shell: '' });
+  render(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
+};
+
+test('statement editor splits source and preview 50/50 by default', () => {
+  renderEditor();
+
+  expect(screen.getByRole('separator', { name: 'Resize source and preview panes' })).toHaveAttribute('aria-valuenow', '50');
+});
+
+test('double-clicking the pane divider resets the split to 50/50', () => {
+  renderEditor();
+  const separator = screen.getByRole('separator', { name: 'Resize source and preview panes' });
+
+  fireEvent.keyDown(separator, { key: 'ArrowRight' });
+  expect(separator).not.toHaveAttribute('aria-valuenow', '50');
+  fireEvent.doubleClick(separator);
+
+  expect(separator).toHaveAttribute('aria-valuenow', '50');
+});
+
+test('divider keeps its accessible name', () => {
+  renderEditor();
+
+  expect(screen.getByRole('separator', { name: 'Resize source and preview panes' })).toBeInTheDocument();
 });
