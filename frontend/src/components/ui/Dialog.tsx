@@ -1,9 +1,9 @@
-import { useEffect, useId, useLayoutEffect, useRef } from 'react';
+import { useId, useRef } from 'react';
 import type React from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from './Button';
 import styles from './Dialog.module.css';
-import { getFocusableElements, wrapTabFocus } from './focusTrap';
+import { useModalFocus } from './useModalFocus';
 
 export interface DialogProps {
   open: boolean;
@@ -36,56 +36,7 @@ export function Dialog({
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
-  const onCloseRef = useRef(onClose);
-  const initialFocusRefRef = useRef(initialFocusRef);
-  const closeOnEscapeRef = useRef(closeOnEscape);
-
-  // Latest-value refs, refreshed after every commit and before the passive
-  // open effect below runs, so it and its keydown handler see current props
-  // without re-running the focus/scroll-lock setup on every render.
-  useLayoutEffect(() => {
-    onCloseRef.current = onClose;
-    initialFocusRefRef.current = initialFocusRef;
-    closeOnEscapeRef.current = closeOnEscape;
-  });
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    const dialog = dialogRef.current;
-
-    document.body.style.overflow = 'hidden';
-
-    const initialTarget = initialFocusRefRef.current?.current;
-    const fallbackTarget = dialog ? getFocusableElements(dialog)[0] : undefined;
-    (initialTarget ?? fallbackTarget ?? dialog)?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && closeOnEscapeRef.current) {
-        event.preventDefault();
-        onCloseRef.current();
-        return;
-      }
-
-      if (!dialog) {
-        return;
-      }
-
-      wrapTabFocus(event, dialog);
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-      previouslyFocused?.focus();
-    };
-  }, [open]);
+  useModalFocus(dialogRef, { open, onClose, closeOnEscape, initialFocusRef });
 
   if (!open) {
     return null;

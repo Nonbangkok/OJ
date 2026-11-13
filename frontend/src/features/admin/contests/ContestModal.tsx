@@ -1,4 +1,6 @@
+import { useId, useRef } from 'react';
 import useContestModal from '../../../hooks/admin/useContestModal';
+import { useModalFocus } from '../../../components/ui/useModalFocus';
 import formStyles from '../../../components/styles/Form.module.css';
 import modalStyles from '../shared/ModalLayout.module.css';
 import DatePicker from 'react-datepicker';
@@ -14,12 +16,24 @@ const ContestModal = ({ contest, onClose, onSuccess }) => {
     handleDateChange,
     getDurationText
   } = useContestModal(contest, onClose, onSuccess);
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Escape, focus trap and focus restore, like the shared Dialog. Escape is
+  // ignored while saving, matching the disabled Cancel button.
+  useModalFocus(dialogRef, { open: true, onClose, closeOnEscape: !loading });
 
 
   return (
     <div className={modalStyles['modal-overlay']}>
-      <div className={formStyles['form-container']}>
-        <h2>{contest ? 'Edit Contest' : 'Create New Contest'}</h2>
+      <div
+        ref={dialogRef}
+        className={formStyles['form-container']}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+      >
+        <h2 id={titleId}>{contest ? 'Edit Contest' : 'Create New Contest'}</h2>
 
         <form onSubmit={handleSubmit}>
           {error && (

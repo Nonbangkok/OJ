@@ -1,4 +1,6 @@
+import { useId, useRef } from 'react';
 import useProblemModal from '../../../hooks/admin/useProblemModal';
+import { useModalFocus } from '../../../components/ui/useModalFocus';
 import { Button } from '../../../components/ui';
 import { PROBLEM_CATEGORIES, PROBLEM_DIFFICULTY_OPTIONS, difficultyBand } from '../../../utils/constants';
 import formStyles from '../../../components/styles/Form.module.css';
@@ -23,6 +25,11 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser, c
   } = useProblemModal(problem, onSave, uploadProgress, currentUser);
   // The collection select is controlled directly (null vs number, not a string
   // form value) so the exact "No Collection" state survives round trips.
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Escape, focus trap and focus restore, like the shared Dialog. Escape is
+  // ignored while an upload runs, matching the disabled Cancel button.
+  useModalFocus(dialogRef, { open: true, onClose, closeOnEscape: !isUploading });
   const handleCollectionChange = (event) => {
     const { value } = event.target;
     handleChange({ target: { name: 'collection_id', value: value === '' ? null : Number(value) } });
@@ -30,9 +37,16 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser, c
 
   return (
     <div className={modalStyles['modal-backdrop']}>
-      <div className={`${formStyles['form-container']} ${formStyles['problem-form']}`}>
+      <div
+        ref={dialogRef}
+        className={`${formStyles['form-container']} ${formStyles['problem-form']}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+      >
         <header className={formStyles['problem-form-header']}>
-          <h2>{isEditing ? 'Edit Problem' : 'Create New Problem'}</h2>
+          <h2 id={titleId}>{isEditing ? 'Edit Problem' : 'Create New Problem'}</h2>
 
           {validationError && (
             <div className={formStyles['error-message']} role="alert">
