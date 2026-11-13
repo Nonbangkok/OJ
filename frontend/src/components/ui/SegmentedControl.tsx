@@ -14,6 +14,8 @@ export interface SegmentedControlProps<T extends string> {
   /** Accessible name for the group (rendered as aria-label). */
   'aria-label'?: string;
   className?: string;
+  /** Disables every segment (e.g. a locked setting). */
+  disabled?: boolean;
 }
 
 /**
@@ -29,6 +31,7 @@ export function SegmentedControl<T extends string>({
   onChange,
   'aria-label': ariaLabel,
   className,
+  disabled,
 }: SegmentedControlProps<T>) {
   return (
     <div
@@ -45,6 +48,7 @@ export function SegmentedControl<T extends string>({
             option.value === value ? styles.active : '',
           ].filter(Boolean).join(' ')}
           aria-pressed={option.value === value}
+          disabled={disabled}
           onClick={() => onChange(option.value)}
         >
           {option.label}

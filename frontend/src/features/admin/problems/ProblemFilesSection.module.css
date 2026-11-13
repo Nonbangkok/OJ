@@ -1,0 +1,55 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.role {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.fileList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.fileItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.fileName {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.fileName:hover {
+  text-decoration: underline;
+}
+
+.fileSize,
+.hint,
+.empty {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.error {
+  color: var(--danger, #c0392b);
+  font-size: 0.85rem;
+}

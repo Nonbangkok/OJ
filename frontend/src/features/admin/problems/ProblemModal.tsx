@@ -1,7 +1,8 @@
 import { useId, useRef } from 'react';
-import useProblemModal from '../../../hooks/admin/useProblemModal';
+import useProblemModal, { TYPE_LOCK_MESSAGE } from '../../../hooks/admin/useProblemModal';
 import { useModalFocus } from '../../../components/ui/useModalFocus';
-import { Button } from '../../../components/ui';
+import { Button, SegmentedControl } from '../../../components/ui';
+import ProblemFilesSection from './ProblemFilesSection';
 import { PROBLEM_CATEGORIES, PROBLEM_DIFFICULTY_OPTIONS, difficultyBand } from '../../../utils/constants';
 import formStyles from '../../../components/styles/Form.module.css';
 import modalStyles from '../shared/ModalLayout.module.css';
@@ -19,6 +20,8 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser, c
     zipRef,
     isEditing,
     isUploading,
+    filesInfo,
+    loadFiles,
     handleChange,
     handleCategoryToggle,
     handleSave
@@ -30,6 +33,11 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser, c
   // Escape, focus trap and focus restore, like the shared Dialog. Escape is
   // ignored while an upload runs, matching the disabled Cancel button.
   useModalFocus(dialogRef, { open: true, onClose, closeOnEscape: !isUploading });
+  // Type and filename lock once submissions exist: known up front when the
+  // problem says so, or learned from the 409 a save just got.
+  const typeLocked = Boolean(problem?.has_submissions)
+    || (uploadProgress?.status === 'failed' && uploadProgress.message === TYPE_LOCK_MESSAGE);
+  const isHeader = formData.problem_type === 'header';
   const handleCollectionChange = (event) => {
     const { value } = event.target;
     handleChange({ target: { name: 'collection_id', value: value === '' ? null : Number(value) } });
@@ -155,6 +163,43 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser, c
                 onChange={(e) => setZipFile(e.target.files[0])}
               />
             </div>
+
+            <div className={formStyles['form-group']}>
+              <span className={formStyles['group-label']}>Problem type</span>
+              <SegmentedControl
+                aria-label="Problem type"
+                options={[
+                  { value: 'standard', label: 'Standard' },
+                  { value: 'header', label: 'Header' },
+                ]}
+                value={isHeader ? 'header' : 'standard'}
+                onChange={(value) => handleChange({ target: { name: 'problem_type', value } })}
+                disabled={typeLocked}
+              />
+              {typeLocked && <span className={formStyles['group-label']}>Locked after the first submission.</span>}
+            </div>
+
+            {isHeader && (
+              <div className={formStyles['form-group']}>
+                <label htmlFor="submission_filename">Submission filename</label>
+                <input
+                  type="text"
+                  id="submission_filename"
+                  name="submission_filename"
+                  value={formData.submission_filename ?? ''}
+                  onChange={handleChange}
+                  disabled={typeLocked}
+                />
+              </div>
+            )}
+
+            {isHeader && isEditing && filesInfo && (
+              <ProblemFilesSection
+                problemId={problem.id}
+                files={filesInfo.files}
+                onChanged={loadFiles}
+              />
+            )}
 
             <div className={`${formStyles['form-group']} ${formStyles['category-group']}`}>
               <span className={formStyles['group-label']}>Categories</span>

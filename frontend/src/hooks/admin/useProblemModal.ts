@@ -1,5 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import adminService from '../../services/adminService';
+import type { ProblemFilesResponse } from '../../types';
+
+export const DEFAULT_SUBMISSION_FILENAME = 'student.h';
+export const TYPE_LOCK_MESSAGE = 'Problem type and submission filename cannot change after submissions exist.';
 
 const buildProblemForm = (problem, username) => {
     if (problem) {
@@ -12,6 +16,8 @@ const buildProblemForm = (problem, username) => {
             difficulty: problem.difficulty ?? null,
             time_limit_ms: problem.time_limit_ms ?? 3000,
             memory_limit_mb: problem.memory_limit_mb ?? 256,
+            problem_type: problem.problem_type ?? 'standard',
+            submission_filename: problem.submission_filename ?? DEFAULT_SUBMISSION_FILENAME,
         };
     }
     // Fresh form for creating a new problem
@@ -24,6 +30,8 @@ const buildProblemForm = (problem, username) => {
         difficulty: null,
         time_limit_ms: 1000,
         memory_limit_mb: 256,
+        problem_type: 'standard',
+        submission_filename: DEFAULT_SUBMISSION_FILENAME,
     };
 };
 
@@ -37,6 +45,10 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
     const zipRef = useRef<HTMLInputElement | null>(null);
 
     const isEditing = !!problem;
+    const problemId = problem?.id;
+    // The saved type + files come from the files endpoint (the list rows do
+    // not carry them); `null` until it answers or if it fails.
+    const [filesInfo, setFilesInfo] = useState<ProblemFilesResponse | null>(null);
     const isUploading = uploadProgress && !['completed', 'failed'].includes(uploadProgress.status);
 
     useEffect(() => {
@@ -50,6 +62,37 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
         };
         fetchAuthors();
     }, []);
+
+    // Resolves to the saved type + files, or undefined when unavailable.
+    const fetchFiles = useCallback(async (): Promise<ProblemFilesResponse | undefined> => {
+        if (!problemId) return undefined;
+        try {
+            return (await adminService.getProblemFiles(problemId)) || undefined;
+        } catch (err) {
+            console.error('Failed to fetch problem files', err);
+            return undefined;
+        }
+    }, [problemId]);
+
+    const loadFiles = useCallback(async () => {
+        const info = await fetchFiles();
+        if (info) setFilesInfo(info);
+        return info;
+    }, [fetchFiles]);
+
+    useEffect(() => {
+        let cancelled = false;
+        fetchFiles().then((info) => {
+            if (cancelled || !info) return;
+            setFilesInfo(info);
+            setFormData(prev => ({
+                ...prev,
+                problem_type: info.problem_type,
+                submission_filename: info.submission_filename ?? DEFAULT_SUBMISSION_FILENAME,
+            }));
+        });
+        return () => { cancelled = true; };
+    }, [fetchFiles]);
 
     // Re-seed the form and drop picked files whenever the edited problem (or
     // the default author for a new one) changes. Adjusted during render; the
@@ -106,12 +149,25 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
             return;
         }
 
+        const { problem_type, submission_filename, ...rest } = formData;
+        const isHeader = problem_type === 'header';
+        // Type fields go out for header problems, or when an existing header
+        // problem is switched back; otherwise omitted so standard saves (and
+        // edits made before the type loaded) never touch the locked fields.
+        const sendType = isHeader || (isEditing && filesInfo?.problem_type === 'header');
+        const filename = String(submission_filename).trim();
+        if (isHeader && !filename) {
+            setValidationError('Submission filename is required for header problems.');
+            return;
+        }
+
         // Send numeric values matching the backend schema, not DOM strings.
         onSave({
             problemData: {
-                ...formData,
+                ...rest,
                 time_limit_ms: timeLimit,
                 memory_limit_mb: memoryLimit,
+                ...(sendType ? { problem_type, submission_filename: isHeader ? filename : null } : {}),
             },
             pdfFile,
             zipFile,
@@ -130,6 +186,8 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
         zipRef,
         isEditing,
         isUploading,
+        filesInfo,
+        loadFiles,
         handleChange,
         handleCategoryToggle,
         handleSave

@@ -10,6 +10,8 @@ import type {
   BatchUploadInitRequest,
   BatchUploadInitResponse,
   BatchUploadStartResponse,
+  ProblemFileRole,
+  ProblemFilesResponse,
   ProblemMutationResponse,
   RejudgeResponse,
   TestcaseListResponse,
@@ -96,6 +98,32 @@ const problemsAdminService = {
     const response = await api.get<TestcaseViewResponse>(`/admin/problems/${problemId}/testcases`, {
       params: { caseNumber },
     });
+    return response.data;
+  },
+
+  // Header problem files (grader = secret, starter = student download).
+  getProblemFiles: async (problemId: string): Promise<ProblemFilesResponse> => {
+    const response = await api.get<ProblemFilesResponse>(`/admin/problems/${encodeURIComponent(problemId)}/files`);
+    return response.data;
+  },
+
+  /** Replaces the role's whole file set with the ZIP's contents. */
+  replaceProblemFiles: async (problemId: string, role: ProblemFileRole, zip: File): Promise<ApiMessageResponse> => {
+    const formData = new FormData();
+    formData.append('filesZip', zip);
+    const response = await api.put<ApiMessageResponse>(
+      `/admin/problems/${encodeURIComponent(problemId)}/files/${role}`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  },
+
+  downloadProblemFile: async (problemId: string, role: ProblemFileRole, filename: string): Promise<Blob> => {
+    const response = await api.get<Blob>(
+      `/admin/problems/${encodeURIComponent(problemId)}/files/${role}/${encodeURIComponent(filename)}`,
+      { responseType: 'blob' },
+    );
     return response.data;
   },
 

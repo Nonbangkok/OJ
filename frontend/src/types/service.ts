@@ -80,6 +80,9 @@ export interface CreateProblemRequest {
   difficulty?: number | null;
   time_limit_ms: number;
   memory_limit_mb: number;
+  /** Header problems take a single header file named submission_filename. */
+  problem_type?: 'standard' | 'header';
+  submission_filename?: string | null;
 }
 
 export interface UpdateProblemRequest extends CreateProblemRequest {}
