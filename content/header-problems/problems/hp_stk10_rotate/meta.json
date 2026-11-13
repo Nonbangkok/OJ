@@ -1,6 +1,6 @@
 {
   "id": "hp_stk10_rotate",
-  "title": "Stack Rotate — หมุน k ตัวบนสุดแบบเลื่อนงาน",
+  "title": "Stack Rotate",
   "author": "OJ Header Problem Set",
   "topic": "stack",
   "class": "CP::stack<T>",

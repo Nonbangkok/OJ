@@ -1,6 +1,6 @@
 {
   "id": "hp_stk08_min",
-  "title": "Stack Min — ค่าน้อยที่สุดในเวลาคงที่",
+  "title": "Stack Min",
   "author": "OJ Header Problem Set",
   "topic": "stack",
   "class": "CP::stack<T>",

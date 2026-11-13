@@ -1,6 +1,6 @@
 {
   "id": "hp_que03_push_front",
-  "title": "Queue Push Front — ใส่สมาชิกเข้าหน้าคิว",
+  "title": "Queue Push Front",
   "author": "OJ Header Problem Set",
   "topic": "queue",
   "class": "CP::queue<T>",

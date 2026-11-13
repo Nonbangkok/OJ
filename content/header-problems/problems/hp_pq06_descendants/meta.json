@@ -1,6 +1,6 @@
 {
   "id": "hp_pq06_descendants",
-  "title": "Priority Queue Descendants — นับลูกหลานของปุ่มในเวลา O(log n)",
+  "title": "Priority Queue Descendants",
   "author": "OJ Header Problem Set",
   "topic": "priority_queue",
   "class": "CP::priority_queue<T,Comp>",

@@ -1,6 +1,6 @@
 {
   "id": "hp_vec03_pop_front",
-  "title": "Vector Pop Front — ลบสมาชิกตัวหน้า",
+  "title": "Vector Pop Front",
   "author": "OJ Header Problem Set",
   "topic": "vector",
   "class": "CP::vector<T>",

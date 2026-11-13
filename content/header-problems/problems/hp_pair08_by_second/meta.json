@@ -1,6 +1,6 @@
 {
   "id": "hp_pair08_by_second",
-  "title": "Pair By Second — ตัวเปรียบเทียบที่เรียงด้วยสมาชิกตัวที่สอง",
+  "title": "Pair By Second",
   "author": "OJ Header Problem Set",
   "topic": "pair",
   "class": "CP::pair<T1,T2>",

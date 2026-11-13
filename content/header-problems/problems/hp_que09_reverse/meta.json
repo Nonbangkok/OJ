@@ -1,6 +1,6 @@
 {
   "id": "hp_que09_reverse",
-  "title": "Queue Reverse — กลับคิวในเวลาคงที่",
+  "title": "Queue Reverse",
   "author": "OJ Header Problem Set",
   "topic": "queue",
   "class": "CP::queue<T>",
@@ -25,12 +25,12 @@
     {
       "cases": 5,
       "percent": 50,
-      "note": "n ≤ 2,000 และ q ≤ 2,000 (วิธีที่กลับข้อมูลจริงทุกครั้งผ่านได้)"
+      "note": "$n \\leq 2{,}000$ และ $q \\leq 2{,}000$ (วิธีที่กลับข้อมูลจริงทุกครั้งผ่านได้)"
     },
     {
       "cases": 5,
       "percent": 50,
-      "note": "n ≤ 36,000 และ q ≤ 200,000 (ต้องทำ reverse ใน O(1))"
+      "note": "$n \\leq 36{,}000$ และ $q \\leq 200{,}000$ (ต้องทำ `reverse` ใน $O(1)$)"
     }
   ]
 }

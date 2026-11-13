@@ -1,6 +1,6 @@
 {
   "id": "hp_pair07_normalize",
-  "title": "Pair Normalize — จัดให้สมาชิกตัวแรกไม่เกินตัวที่สอง",
+  "title": "Pair Normalize",
   "author": "OJ Header Problem Set",
   "topic": "pair",
   "class": "CP::pair<T1,T2>",

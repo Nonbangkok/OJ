@@ -1,6 +1,6 @@
 {
   "id": "hp_pair09_accumulate",
-  "title": "Pair Accumulate — บวกสะสมในที่และคืนการอ้างอิง",
+  "title": "Pair Accumulate",
   "author": "OJ Header Problem Set",
   "topic": "pair",
   "class": "CP::pair<T1,T2>",

@@ -1,6 +1,6 @@
 {
   "id": "hp_vec08_block_swap",
-  "title": "Vector Block Swap — สลับสองช่วงที่ยาวเท่ากัน",
+  "title": "Vector Block Swap",
   "author": "OJ Header Problem Set",
   "topic": "vector",
   "class": "CP::vector<T>",

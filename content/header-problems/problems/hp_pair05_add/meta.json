@@ -1,6 +1,6 @@
 {
   "id": "hp_pair05_add",
-  "title": "Pair Add — บวกคู่อันดับทีละตำแหน่ง",
+  "title": "Pair Add",
   "author": "OJ Header Problem Set",
   "topic": "pair",
   "class": "CP::pair<T1,T2>",

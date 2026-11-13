@@ -1,6 +1,6 @@
 {
   "id": "hp_stk07_mitosis",
-  "title": "Stack Mitosis — ทำสำเนา k ตัวบนสุด",
+  "title": "Stack Mitosis",
   "author": "OJ Header Problem Set",
   "topic": "stack",
   "class": "CP::stack<T>",

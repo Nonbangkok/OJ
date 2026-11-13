@@ -1,6 +1,6 @@
 {
   "id": "hp_pair04_swapped",
-  "title": "Pair Swapped — สลับที่สมาชิกทั้งสองเป็นคู่อันดับใหม่",
+  "title": "Pair Swapped",
   "author": "OJ Header Problem Set",
   "topic": "pair",
   "class": "CP::pair<T1,T2>",

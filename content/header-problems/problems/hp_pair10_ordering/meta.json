@@ -1,6 +1,6 @@
 {
   "id": "hp_pair10_ordering",
-  "title": "Pair Ordering — ตัวดำเนินการเปรียบเทียบครบหกตัวที่สอดคล้องกัน",
+  "title": "Pair Ordering",
   "author": "OJ Header Problem Set",
   "topic": "pair",
   "class": "CP::pair<T1,T2>",

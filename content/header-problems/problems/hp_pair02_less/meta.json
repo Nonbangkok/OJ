@@ -1,6 +1,6 @@
 {
   "id": "hp_pair02_less",
-  "title": "Pair Less — เรียงลำดับคู่อันดับแบบพจนานุกรม",
+  "title": "Pair Less",
   "author": "OJ Header Problem Set",
   "topic": "pair",
   "class": "CP::pair<T1,T2>",

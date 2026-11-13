@@ -1,6 +1,6 @@
 {
   "id": "hp_stk05_swap_top",
-  "title": "Stack Swap Top — สลับสองตัวบนสุด",
+  "title": "Stack Swap Top",
   "author": "OJ Header Problem Set",
   "topic": "stack",
   "class": "CP::stack<T>",

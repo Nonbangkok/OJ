@@ -1,6 +1,6 @@
 {
   "id": "hp_stk01_top",
-  "title": "Stack Top — ค่าบนสุดของสแตก",
+  "title": "Stack Top",
   "author": "OJ Header Problem Set",
   "topic": "stack",
   "class": "CP::stack<T>",

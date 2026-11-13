@@ -1,6 +1,6 @@
 {
   "id": "hp_pq10_kth",
-  "title": "Priority Queue K-th — ค่าอันดับที่ k ในเวลา O(k log k)",
+  "title": "Priority Queue K-th",
   "author": "OJ Header Problem Set",
   "topic": "priority_queue",
   "class": "CP::priority_queue<T,Comp>",

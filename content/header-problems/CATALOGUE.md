@@ -6,8 +6,11 @@ functions marked "You MAY need to edit").
 
 Each problem ships:
 
-- `statement.pdf` — Thai, sections: คำอธิบาย / ข้อบังคับ / คำอธิบายฟังก์ชัน main /
-  ตัวอย่าง / การทดสอบใน grader / ชุดข้อมูลทดสอบ (with the subtask percentages).
+- `statement.pdf` — Thai body, English title, in the house template: a title
+  and an intro, then คำอธิบาย : / ข้อบังคับ : / คำอธิบายฟังก์ชัน main : /
+  Input : / Output : / Examples : / คำอธิบายตัวอย่างที่ 1 /
+  การทดสอบใน grader : / Constraints : / Subtasks : (the percentages) /
+  Limits : / Author : / Contacts :. See README.md for the per-section rules.
 - `starter/` — `main.cpp` (simple, the one students get), `<ds>.h`, `student.h`
   (target function left empty), downloadable as a ZIP.
 - `grader/` — the SECRET `main.cpp` (command-stream input, exercises the

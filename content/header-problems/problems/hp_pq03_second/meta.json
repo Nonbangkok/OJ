@@ -1,6 +1,6 @@
 {
   "id": "hp_pq03_second",
-  "title": "Priority Queue Second — สมาชิกที่สำคัญเป็นอันดับสอง",
+  "title": "Priority Queue Second",
   "author": "OJ Header Problem Set",
   "topic": "priority_queue",
   "class": "CP::priority_queue<T,Comp>",

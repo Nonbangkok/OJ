@@ -1,6 +1,6 @@
 {
   "id": "hp_vec10_rotate",
-  "title": "Vector Rotate — หมุนเวกเตอร์โดยไม่ใช้ที่เพิ่ม",
+  "title": "Vector Rotate",
   "author": "OJ Header Problem Set",
   "topic": "vector",
   "class": "CP::vector<T>",

@@ -1,6 +1,6 @@
 {
   "id": "hp_vec04_erase",
-  "title": "Vector Erase — ลบสมาชิกตามตำแหน่ง",
+  "title": "Vector Erase",
   "author": "OJ Header Problem Set",
   "topic": "vector",
   "class": "CP::vector<T>",

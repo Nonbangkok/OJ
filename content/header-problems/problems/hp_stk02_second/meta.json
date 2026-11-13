@@ -1,6 +1,6 @@
 {
   "id": "hp_stk02_second",
-  "title": "Stack Second — ตัวที่อยู่ใต้ตัวบนสุด",
+  "title": "Stack Second",
   "author": "OJ Header Problem Set",
   "topic": "stack",
   "class": "CP::stack<T>",

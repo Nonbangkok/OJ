@@ -1,6 +1,6 @@
 {
   "id": "hp_vec01_fill",
-  "title": "Vector Fill — เติมค่าเดียวกันทุกช่อง",
+  "title": "Vector Fill",
   "author": "OJ Header Problem Set",
   "topic": "vector",
   "class": "CP::vector<T>",

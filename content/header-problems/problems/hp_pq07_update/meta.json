@@ -1,6 +1,6 @@
 {
   "id": "hp_pq07_update",
-  "title": "Priority Queue Update — แก้ค่าหนึ่งช่องแล้วซ่อมฮีปใน O(log n)",
+  "title": "Priority Queue Update",
   "author": "OJ Header Problem Set",
   "topic": "priority_queue",
   "class": "CP::priority_queue<T,Comp>",

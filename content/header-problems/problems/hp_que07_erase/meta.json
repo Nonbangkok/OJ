@@ -1,6 +1,6 @@
 {
   "id": "hp_que07_erase",
-  "title": "Queue Erase — ลบสมาชิกตัวที่ i โดยย้ายข้อมูลฝั่งที่สั้นกว่า",
+  "title": "Queue Erase",
   "author": "OJ Header Problem Set",
   "topic": "queue",
   "class": "CP::queue<T>",

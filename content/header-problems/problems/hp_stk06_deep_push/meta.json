@@ -1,6 +1,6 @@
 {
   "id": "hp_stk06_deep_push",
-  "title": "Stack Deep Push — แทรกใต้ k ตัวบนสุด",
+  "title": "Stack Deep Push",
   "author": "OJ Header Problem Set",
   "topic": "stack",
   "class": "CP::stack<T>",
