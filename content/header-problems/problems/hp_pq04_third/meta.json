@@ -1,0 +1,36 @@
+{
+  "id": "hp_pq04_third",
+  "title": "Priority Queue Third — สมาชิกที่สำคัญเป็นอันดับสาม",
+  "author": "OJ Header Problem Set",
+  "topic": "priority_queue",
+  "class": "CP::priority_queue<T,Comp>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 2000,
+  "collection": "Header Problems — Priority Queue",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "// for student.h\nT third() const;",
+    "",
+    "// already implemented here on top of your third(): นำสมาชิกที่สำคัญ\n// ที่สุดสามตัวออกจากฮีป แล้วคืนตัวที่สำคัญเป็นอันดับสาม\nT take_three()\n{\n  T held = third();\n  pop();\n  pop();\n  pop();\n  return held;\n}",
+    "",
+    "// already implemented here, and only the grader calls it: does the array\n// still satisfy the heap property (every parent at least as important as its\n// children, measured with mLess)? You never need to call it yourself.\nbool heap_ok() const\n{\n  for (size_t c = 1; c < mSize; c++)\n    if (mLess(mData[(c - 1) / 2], mData[c]))\n      return false;\n  return true;\n}"
+  ],
+  "pdf_probe": "ผู้ท้าชิงอันดับสามมีเพียงลูกอีกตัวของรากกับลูกสองตัวของอันดับสอง",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "ไม่เกิน 2,000 สมาชิก (วิธีไล่ดูทุกตัวทุกครั้งผ่านได้)"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "สมาชิกถึง 120,000 ตัว และถาม third() กว่าหมื่นครั้ง (ต้องตอบใน O(1))"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "id": "hp_pq07_update",
+  "title": "Priority Queue Update — แก้ค่าหนึ่งช่องแล้วซ่อมฮีปใน O(log n)",
+  "author": "OJ Header Problem Set",
+  "topic": "priority_queue",
+  "class": "CP::priority_queue<T,Comp>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 2600,
+  "collection": "Header Problems — Priority Queue",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "// for student.h\nvoid update(size_t i, const T &value);",
+    "",
+    "// already implemented here, and only the grader calls it: does the array\n// still satisfy the heap property (every parent at least as important as its\n// children, measured with mLess)? You never need to call it yourself.\nbool heap_ok() const\n{\n  for (size_t c = 1; c < mSize; c++)\n    if (mLess(mData[(c - 1) / 2], mData[c]))\n      return false;\n  return true;\n}"
+  ],
+  "pdf_probe": "ช่องที่ถูกแก้อาจต้องขึ้นหรือลงก็ได้",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "สมาชิกไม่เกิน 20,000 ตัว (วิธีสร้างฮีปใหม่ทั้งก้อนทุกครั้งผ่านได้)"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "สมาชิกถึง 300,000 ตัว และแก้ค่ารวมกว่า 5,000 ครั้งต่อบล็อก (ต้องซ่อมใน O(log n))"
+    }
+  ]
+}

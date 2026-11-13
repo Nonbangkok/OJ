@@ -1,0 +1,41 @@
+{
+  "id": "hp_pq05_rank",
+  "title": "Priority Queue Rank — นับสมาชิกที่สำคัญกว่าช่องที่กำหนด",
+  "author": "OJ Header Problem Set",
+  "topic": "priority_queue",
+  "class": "CP::priority_queue<T,Comp>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 2200,
+  "collection": "Header Problems — Priority Queue",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "// for student.h\nsize_t rank(size_t i) const;",
+    "",
+    "// already implemented here on top of your rank(): สมาชิกในช่อง i เป็น\n// ตัวที่สำคัญที่สุดของฮีปหรือไม่ (ถ้ามีตัวที่สำคัญเท่ากันหลายตัว ทุกตัว\n// ตอบ true)\nbool is_top(size_t i) const { return rank(i) == 0; }",
+    "",
+    "// already implemented here, and only the grader calls it: does the array\n// still satisfy the heap property (every parent at least as important as its\n// children, measured with mLess)? You never need to call it yourself.\nbool heap_ok() const\n{\n  for (size_t c = 1; c < mSize; c++)\n    if (mLess(mData[(c - 1) / 2], mData[c]))\n      return false;\n  return true;\n}"
+  ],
+  "pdf_probe": "นับเฉพาะตัวที่สำคัญกว่าอย่างเคร่งครัด",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "ไม่เกิน 40 สมาชิก และเป็น CP::priority_queue<int> เท่านั้น"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "ไม่เกิน 1,200 สมาชิก มีทั้ง min-heap, long long และชนิดข้อมูลที่ไม่มี operator<"
+    },
+    {
+      "cases": 4,
+      "percent": 40,
+      "note": "สมาชิกถึง 20,000 ตัว มีค่าซ้ำกันจำนวนมาก และถาม rank() หลายร้อยครั้ง"
+    }
+  ]
+}

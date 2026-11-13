@@ -1,0 +1,39 @@
+{
+  "id": "hp_pq08_erase",
+  "title": "Priority Queue Erase — ลบสมาชิกตามค่าแล้วรักษาสมบัติของฮีป",
+  "author": "OJ Header Problem Set",
+  "topic": "priority_queue",
+  "class": "CP::priority_queue<T,Comp>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 2800,
+  "collection": "Header Problems — Priority Queue",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "// for student.h\nvoid erase(const T &value);",
+    "",
+    "// already implemented here, and only the grader calls it: does the array\n// still satisfy the heap property (every parent at least as important as its\n// children, measured with mLess)? You never need to call it yourself.\nbool heap_ok() const\n{\n  for (size_t c = 1; c < mSize; c++)\n    if (mLess(mData[(c - 1) / 2], mData[c]))\n      return false;\n  return true;\n}"
+  ],
+  "pdf_probe": "สองตัวสำคัญเท่ากันเมื่อไม่มีตัวใดสำคัญน้อยกว่าอีกตัว",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 2,
+      "percent": 20,
+      "note": "ไม่เกิน 60 สมาชิก และเป็น CP::priority_queue<int> เท่านั้น"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "ไม่เกิน 1,500 สมาชิก มีทั้ง min-heap, long long และชนิดข้อมูลที่ไม่มี operator< หรือ operator=="
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "สมาชิกถึง 20,000 ตัว และสั่งลบหลายร้อยครั้ง ทั้งค่าที่มีอยู่ (ซ้ำกันหลายตัว) และค่าที่ไม่มี"
+    }
+  ]
+}
