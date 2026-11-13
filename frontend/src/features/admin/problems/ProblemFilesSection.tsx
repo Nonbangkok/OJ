@@ -13,9 +13,19 @@ interface ProblemFilesSectionProps {
   disabled?: boolean;
 }
 
-const ROLES: Array<{ role: ProblemFileRole; label: string }> = [
-  { role: 'grader', label: 'Grader files (ZIP)' },
-  { role: 'starter', label: 'Starter files (ZIP)' },
+const ROLES: Array<{ role: ProblemFileRole; name: string; note: string; rule: string }> = [
+  {
+    role: 'grader',
+    name: 'Grader files',
+    note: 'Compiled with every submission. Students never see these, so this is where the real main.cpp belongs.',
+    rule: 'Flat ZIP, up to 20 files, 1 MiB each. Needs at least one .cpp.',
+  },
+  {
+    role: 'starter',
+    name: 'Starter files',
+    note: 'What students download from the problem page to work from.',
+    rule: 'Flat ZIP, up to 20 files, 1 MiB each.',
+  },
 ];
 
 const formatBytes = (bytes: number): string => {
@@ -75,22 +85,32 @@ const ProblemFilesSection = ({ problemId, files, onChanged, disabled = false }: 
 
   return (
     <div className={styles.section}>
-      {ROLES.map(({ role, label }) => {
+      {ROLES.map(({ role, name, note, rule }) => {
         const roleFiles = files.filter(file => file.role === role);
         const inputId = `${idPrefix}-${role}`;
+        const totalBytes = roleFiles.reduce((sum, file) => sum + file.bytes, 0);
         return (
-          <div key={role} className={`${formStyles['form-group']} ${styles.role}`}>
-            <label htmlFor={inputId}>{label}</label>
+          <section key={role} className={styles.role} aria-label={name}>
+            <div className={styles.roleHead}>
+              <span className={styles.roleName}>{name}</span>
+              {roleFiles.length > 0 && (
+                <span className={styles.roleCount}>
+                  {roleFiles.length === 1 ? '1 file' : `${roleFiles.length} files`}, {formatBytes(totalBytes)}
+                </span>
+              )}
+            </div>
+            <p className={styles.roleNote}>{note}</p>
             {roleFiles.length === 0 ? (
-              <span className={styles.empty}>No files uploaded.</span>
+              <p className={styles.empty}>Nothing here yet. Upload a ZIP to add the files.</p>
             ) : (
-              <ul className={styles.fileList} aria-label={`${label} contents`}>
+              <ul className={styles.fileList} aria-label={`${name} contents`}>
                 {roleFiles.map(file => (
                   <li key={file.filename} className={styles.fileItem}>
                     <button
                       type="button"
                       className={styles.fileName}
                       onClick={() => handleDownload(role, file.filename)}
+                      title={`Download ${file.filename}`}
                     >
                       {file.filename}
                     </button>
@@ -99,20 +119,22 @@ const ProblemFilesSection = ({ problemId, files, onChanged, disabled = false }: 
                 ))}
               </ul>
             )}
-            <input
-              type="file"
-              id={inputId}
-              accept=".zip"
-              disabled={disabled || busyRole !== null}
-              onChange={event => handleUpload(role, event.target)}
-            />
-            <span className={styles.hint}>
-              Replaces all {role} files. Flat ZIP, up to 20 files, 1 MiB each.
-              {role === 'grader' ? ' Needs at least one .cpp.' : ''}
-            </span>
-            {busyRole === role && <span className={styles.hint}>Uploading…</span>}
-            {errors[role] && <span className={styles.error} role="alert">{errors[role]}</span>}
-          </div>
+            <div className={`${formStyles['form-group']} ${styles.replace}`}>
+              <label htmlFor={inputId}>
+                {roleFiles.length === 0 ? `Upload ${role} files` : `Replace all ${role} files`}
+              </label>
+              <input
+                type="file"
+                id={inputId}
+                accept=".zip"
+                disabled={disabled || busyRole !== null}
+                onChange={event => handleUpload(role, event.target)}
+              />
+              <span className={styles.hint}>{rule}</span>
+              {busyRole === role && <span className={styles.hint}>Uploading…</span>}
+              {errors[role] && <span className={styles.error} role="alert">{errors[role]}</span>}
+            </div>
+          </section>
         );
       })}
     </div>

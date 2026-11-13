@@ -1062,7 +1062,7 @@ describe('ProblemManagement Component', () => {
             fireEvent.click(within(dialog).getByRole('button', { name: 'Header' }));
             expect(within(dialog).getByLabelText('Submission filename')).toHaveValue('student.h');
             // Files can only be uploaded for a saved problem.
-            expect(within(dialog).queryByText('Grader files (ZIP)')).not.toBeInTheDocument();
+            expect(within(dialog).queryByText('Grader files')).not.toBeInTheDocument();
         });
 
         it('lists current files and replaces a role with the uploaded ZIP, then re-lists', async () => {
@@ -1077,7 +1077,7 @@ describe('ProblemManagement Component', () => {
             expect(within(dialog).getByLabelText('Submission filename')).toHaveValue('student.h');
 
             const zip = new File(['zip'], 'grader.zip', { type: 'application/zip' });
-            await userEvent.upload(within(dialog).getByLabelText('Grader files (ZIP)'), zip);
+            await userEvent.upload(within(dialog).getByLabelText('Replace all grader files'), zip);
 
             await waitFor(() => expect(adminService.replaceProblemFiles).toHaveBeenCalledWith('P1', 'grader', zip));
             expect(await within(dialog).findByText('new.cpp')).toBeInTheDocument();
@@ -1091,7 +1091,7 @@ describe('ProblemManagement Component', () => {
             });
             const dialog = await openEdit();
             await within(dialog).findByText('grader.cpp');
-            await userEvent.upload(within(dialog).getByLabelText('Starter files (ZIP)'), new File(['z'], 's.zip'));
+            await userEvent.upload(within(dialog).getByLabelText('Replace all starter files'), new File(['z'], 's.zip'));
             expect(await within(dialog).findByText('Grader files need at least one .cpp file.')).toBeInTheDocument();
         });
 
