@@ -190,4 +190,30 @@ describe('useCodeSubmission', () => {
         const cache = JSON.parse(localStorage.getItem('oj-submission-cache'));
         expect(cache[`${mockProblemId}:python`].code).toBe('print("py")');
     });
+
+    it('forces cpp for a header problem even if python is selected', async () => {
+        (jest.mocked(submissionService.submit) as jest.Mock).mockResolvedValueOnce({ success: true });
+
+        const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined, 'student.h'));
+
+        act(() => {
+            result.current.setLanguage('python');
+        });
+        act(() => {
+            result.current.setCode('int f();');
+        });
+
+        expect(result.current.language).toBe('cpp');
+
+        const mockEvent = { preventDefault: jest.fn() } as unknown as React.FormEvent<Element>;
+        await act(async () => {
+            await result.current.handleSubmit(mockEvent);
+        });
+
+        expect(submissionService.submit).toHaveBeenCalledWith({
+            problemId: mockProblemId,
+            language: 'cpp',
+            code: 'int f();'
+        });
+    });
 });

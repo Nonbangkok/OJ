@@ -133,4 +133,39 @@ describe('CodeSubmissionForm', () => {
       expect(screen.getByText(/submission rejected/i)).toBeInTheDocument();
     });
   });
+
+  describe('header problem mode', () => {
+    const renderHeader = () =>
+      render(
+        <BrowserRouter>
+          <CodeSubmissionForm problemId="hdr" contestId={undefined} submissionFilename="student.h" />
+        </BrowserRouter>
+      );
+
+    it('shows a static C++ label, the filename label and helper text without language buttons', () => {
+      renderHeader();
+
+      expect(screen.queryByRole('button', { name: 'Python' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'C++' })).not.toBeInTheDocument();
+      expect(screen.getByText('C++')).toBeInTheDocument();
+      expect(screen.getByText('Your student.h')).toBeInTheDocument();
+      expect(
+        screen.getByText("Submit only student.h \u2014 it is compiled with the grader's own main.cpp.")
+      ).toBeInTheDocument();
+    });
+
+    it('submits language cpp', async () => {
+      jest.mocked(submissionService.submit).mockResolvedValueOnce({ data: { submissionId: 1 } } as never);
+      renderHeader();
+
+      fireEvent.change(screen.getByLabelText('code editor'), { target: { value: 'int f();' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+      await waitFor(() => {
+        expect(submissionService.submit).toHaveBeenCalledWith(
+          expect.objectContaining({ problemId: 'hdr', language: 'cpp', code: 'int f();' })
+        );
+      });
+    });
+  });
 });

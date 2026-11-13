@@ -89,3 +89,19 @@
   color: var(--action-primary-foreground);
   font-weight: 600;
 }
+
+.languageLabel {
+  background-color: var(--background-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.headerHelp {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}

@@ -62,7 +62,11 @@ const ProblemDetail = () => {
       case 'submit':
         return (
           <div className={styles['submit-view']}>
-            <CodeSubmissionForm problemId={problemId} contestId={contestId} />
+            <CodeSubmissionForm
+              problemId={problemId}
+              contestId={contestId}
+              submissionFilename={problem.submission_filename}
+            />
           </div>
         );
       case 'submissions':
@@ -105,6 +109,15 @@ const ProblemDetail = () => {
               >
                 View Problem PDF
               </button>
+            )}
+            {problem.has_starter_files && (
+              <a
+                href={problemService.getStarterUrl(problemId, contestId)}
+                download
+                className={`${styles['view-pdf-btn']} ${styles['starter-link']}`}
+              >
+                Download starter files
+              </a>
             )}
           </div>
           <nav ref={navRef} className={styles['problem-nav']} onMouseLeave={() => resetSlider({ active: styles.active })}>
