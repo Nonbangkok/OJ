@@ -828,6 +828,26 @@ describe('Submission Service', () => {
         };
         const GOOD_HEADER = 'void push(int){}\n';
 
+        // "สวัสดี" encoded in TIS-620/CP874, the encoding a Thai course's
+        // editor still saves in. These bytes are NOT valid UTF-8, so decoding
+        // them to a JS string replaces every one with U+FFFD and re-encoding
+        // yields different bytes: the grader's literal becomes mojibake and
+        // every student gets Wrong Answer with nothing to see.
+        const TIS620_BYTES = Buffer.from([0xca, 0xc7, 0xd1, 0xca, 0xb4, 0xd5]);
+        const TIS620_GRADER = Buffer.concat([
+            Buffer.from('#include <cstdio>\n#include "queue.h"\nint main(){ std::printf("'),
+            TIS620_BYTES,
+            Buffer.from('\\n"); }\n'),
+        ]);
+        const TIS620_SPEC = {
+            problemType: 'header' as const,
+            submissionFilename: 'student.h',
+            graderFiles: [
+                { filename: 'main.cpp', content: TIS620_GRADER },
+                { filename: 'queue.h', content: Buffer.from('#include "student.h"\n') },
+            ],
+        };
+
         const mockRow = (code: string, language: 'cpp' | 'python' = 'cpp') =>
             ({ rows: [{ problem_id: 'H1', user_id: 7, code, language }] });
 
@@ -960,6 +980,30 @@ describe('Submission Service', () => {
                 }
             });
 
+            it('pipes grader file bytes into the workspace verbatim (no UTF-8 round trip)', async () => {
+                (getHeaderJudgeSpec as jest.Mock).mockResolvedValue(TIS620_SPEC);
+                const writtenBytes = new Map<string, unknown>();
+                (cp.spawn as unknown as jest.Mock).mockImplementation((command: string, args: string[]) => {
+                    const child = benignSpawn(command);
+                    if (command === 'dd') {
+                        const target = String(args[0]).replace(/^of=/, '');
+                        child.stdin.end = jest.fn((payload: unknown) => {
+                            writtenBytes.set(path.basename(target), payload);
+                        });
+                    }
+                    return child;
+                });
+
+                await runHeaderPipeline();
+
+                const mainCpp = writtenBytes.get('main.cpp');
+                expect(Buffer.isBuffer(mainCpp)).toBe(true);
+                expect(mainCpp).toEqual(TIS620_GRADER);
+                expect((mainCpp as Buffer).includes(TIS620_BYTES)).toBe(true);
+                // The submitted code stays a string: it comes from a TEXT column.
+                expect(writtenBytes.get('student.h')).toBe(GOOD_HEADER);
+            });
+
             it('scrubs every source file from the workspace BEFORE the binary runs', async () => {
                 await runHeaderPipeline();
 
@@ -1060,6 +1104,25 @@ describe('Submission Service', () => {
                     .map(([target]: [string]) => path.basename(String(target)));
                 expect(removed).toEqual(['main.cpp', 'queue.h', 'student.h']);
                 expect(judge).toHaveBeenCalledTimes(1);
+            });
+
+            it('writes grader bytes verbatim too (fs path stays byte-exact)', async () => {
+                (getHeaderJudgeSpec as jest.Mock).mockResolvedValue(TIS620_SPEC);
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce(mockRow(GOOD_HEADER))
+                    .mockResolvedValueOnce({}) // UPDATE Compiling
+                    .mockResolvedValueOnce({}) // UPDATE Running
+                    .mockResolvedValueOnce({ rowCount: 1 }); // final UPDATE (landed)
+                (judge as jest.Mock).mockResolvedValueOnce({
+                    results: [], score: 100, overallStatus: 'Accepted', maxTimeMs: 1, maxMemoryKb: 1024
+                });
+
+                await processSubmission(1);
+
+                const writes = (fs.promises.writeFile as jest.Mock).mock.calls;
+                const mainWrite = writes.find(([target]: [string]) => path.basename(String(target)) === 'main.cpp')!;
+                expect(Buffer.isBuffer(mainWrite[1])).toBe(true);
+                expect(mainWrite[1]).toEqual(TIS620_GRADER);
             });
         });
 

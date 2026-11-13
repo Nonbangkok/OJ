@@ -126,11 +126,40 @@ const STUDENT_INCBIN = `${STUDENT_OK}
 namespace { struct Leak { Leak() { asm(".incbin \\"main.cpp\\""); } } leak; }
 `;
 
-/** [problem id, testcase input, expected output] */
-const HEADER_PROBLEM_SEEDS: Array<[string, string, string]> = [
-  ['hstack', '3\n1 2 3\n', '3 2 1\n'],
+/**
+ * A grader saved in TIS-620/CP874 — the encoding a Thai course's editor still
+ * writes. These bytes are NOT valid UTF-8, so a judge that decoded the stored
+ * grader to a JS string would hand g++ six U+FFFD replacement characters
+ * (18 bytes) instead of the six authored ones. The grader prints the literal's
+ * bytes as hex so the expected output stays plain ASCII (testcase columns are
+ * TEXT, and a UTF-8 database cannot hold the raw bytes).
+ */
+const TIS620_BYTES = Buffer.from([0xca, 0xc7, 0xd1, 0xca, 0xb4, 0xd5]); // "สวัสดี"
+const TIS620_HEX = TIS620_BYTES.toString('hex');
+const GRADER_TIS620_MAIN = Buffer.concat([
+  Buffer.from(`// ${GRADER_MARKER}: grader saved in TIS-620.
+#include <cstdio>
+#include "stack.h"
+int main() {
+  const char* s = "`),
+  TIS620_BYTES,
+  Buffer.from('";\n  for (const unsigned char* p = (const unsigned char*)s; *p; ++p) std::printf("%02x", *p);\n  std::printf("\\n");\n  return 0;\n}\n'),
+]);
+
+const DEFAULT_GRADER_FILES: Array<[string, Buffer]> = [
+  ['main.cpp', Buffer.from(GRADER_MAIN, 'utf-8')],
+  ['stack.h', Buffer.from(GRADER_STACK_HEADER, 'utf-8')],
+];
+
+/** [problem id, testcase input, expected output, grader files] */
+const HEADER_PROBLEM_SEEDS: Array<[string, string, string, Array<[string, Buffer]>]> = [
+  ['hstack', '3\n1 2 3\n', '3 2 1\n', DEFAULT_GRADER_FILES],
   // The grader prints nothing for n = 0, so the probe's own line IS the output.
-  ['hprobe', '0\n', 'closed\n'],
+  ['hprobe', '0\n', 'closed\n', DEFAULT_GRADER_FILES],
+  ['htis620', '0\n', `${TIS620_HEX}\n`, [
+    ['main.cpp', GRADER_TIS620_MAIN],
+    ['stack.h', Buffer.from(GRADER_STACK_HEADER, 'utf-8')],
+  ]],
 ];
 
 (enabled ? describe : describe.skip)('judge runtime verdicts (end to end)', () => {
@@ -184,7 +213,7 @@ const HEADER_PROBLEM_SEEDS: Array<[string, string, string]> = [
     // problem's SECRET grader files include. `hstack` checks verdicts;
     // `hprobe` (same grader, empty-output testcase) lets a submission report
     // whether it could still READ the grader sources at run time.
-    for (const [id, input, output] of HEADER_PROBLEM_SEEDS) {
+    for (const [id, input, output, graderFiles] of HEADER_PROBLEM_SEEDS) {
       await pool.query(
         `INSERT INTO problems (id, title, time_limit_ms, memory_limit_mb, is_visible, problem_type, submission_filename)
          VALUES ($1, $1, 1000, 256, true, 'header', 'student.h')`,
@@ -194,10 +223,10 @@ const HEADER_PROBLEM_SEEDS: Array<[string, string, string]> = [
         'INSERT INTO testcases (problem_id, case_number, input_data, output_data) VALUES ($1, 1, $2, $3)',
         [id, input, output],
       );
-      for (const [filename, content] of [['main.cpp', GRADER_MAIN], ['stack.h', GRADER_STACK_HEADER]]) {
+      for (const [filename, content] of graderFiles) {
         await pool.query(
           `INSERT INTO problem_files (problem_id, role, filename, content) VALUES ($1, 'grader', $2, $3)`,
-          [id, filename, Buffer.from(content, 'utf-8')],
+          [id, filename, content],
         );
       }
     }
@@ -313,6 +342,17 @@ const HEADER_PROBLEM_SEEDS: Array<[string, string, string]> = [
       const output = String(row.results?.[0]?.output ?? '');
       expect(output).toContain('inline assembly');
       expect(output).not.toContain(GRADER_MARKER);
+    });
+
+    it('compiles a grader stored in a non-UTF-8 encoding byte for byte', async () => {
+      // Round-tripping the stored grader through a JS string would turn each
+      // TIS-620 byte into U+FFFD (ef bf bd), so the grader would print
+      // "efbfbd..." and every student would get Wrong Answer with no way to
+      // see why.
+      const row = await judgeOnce('htis620', 'cpp', STUDENT_OK);
+      expect({ status: row.overall_status, results: row.results })
+        .toMatchObject({ status: SUBMISSION_STATUS.ACCEPTED });
+      expect(row.score).toBe(100);
     });
 
     it('rejects a Python submission to a header problem', async () => {

@@ -168,8 +168,13 @@ type HeaderJudgeSpec = NonNullable<Awaited<ReturnType<typeof getHeaderJudgeSpec>
  * the pipeline stays a single straight-line flow over this plan.
  */
 interface PreparePlan {
-  /** Files written into the workspace, in order (name + utf-8 content). */
-  files: ReadonlyArray<{ name: string; content: string }>;
+  /**
+   * Files written into the workspace, in order. A string is the submitted
+   * source (it comes from a TEXT column); a Buffer is a stored problem file,
+   * written byte for byte — grader files live in BYTEA and may be in any
+   * encoding, so decoding them to UTF-8 would corrupt them irreversibly.
+   */
+  files: ReadonlyArray<{ name: string; content: string | Buffer }>;
   /** The submitted source's name inside the workspace. */
   sourceName: string;
   /** Artifact the prepare step produces, or null for interpreted languages. */
@@ -222,7 +227,9 @@ function headerPreparePlan(code: string, spec: HeaderJudgeSpec): PreparePlan {
   }
   return {
     files: [
-      ...spec.graderFiles.map((file) => ({ name: file.filename, content: file.content.toString('utf-8') })),
+      // Buffers, not strings: byte-exact so a grader in a non-UTF-8 encoding
+      // (e.g. a Thai course's TIS-620 main.cpp) compiles and prints as authored.
+      ...spec.graderFiles.map((file) => ({ name: file.filename, content: file.content })),
       { name: sourceName, content: code },
     ],
     sourceName,

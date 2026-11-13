@@ -111,8 +111,12 @@ export interface BoundedProcessOptions {
  * can write file content without a shell.
  */
 export interface SandboxProcessOptions extends BoundedProcessOptions {
-  /** Written to the child's stdin, which is then closed. */
-  stdin?: string;
+  /**
+   * Written to the child's stdin, which is then closed. A Buffer is written
+   * verbatim — the byte-exact path problem grader files need (a grader saved
+   * in TIS-620/CP874 must not be re-encoded on its way into the workspace).
+   */
+  stdin?: string | Buffer;
 }
 
 /**
@@ -284,7 +288,7 @@ async function runAsSandbox(
   sandbox: SandboxIdentity,
   command: string,
   args: readonly string[],
-  options?: { stdin?: string; cwd?: string }
+  options?: { stdin?: string | Buffer; cwd?: string }
 ): Promise<BoundedProcessResult> {
   return runSandboxProcess(command, args, {
     uid: sandbox.uid,
@@ -354,11 +358,15 @@ export async function createSandboxWorkspace(
  * echo of the content back on stdout, so the spawn's output cap can never
  * truncate a large source). Mode 0600 is applied by a uid-dropped `chmod`.
  * Returns the file's absolute path.
+ *
+ * A Buffer `content` lands in the workspace byte for byte: grader files are
+ * stored as BYTEA and may be in any encoding, so decoding them to a JS string
+ * first would replace every non-UTF-8 byte with U+FFFD.
  */
 export async function writeSandboxFile(
   workspaceDir: string,
   fileName: string,
-  content: string,
+  content: string | Buffer,
   options: SandboxWorkspaceOptions
 ): Promise<string> {
   const filePath = path.join(workspaceDir, fileName);
