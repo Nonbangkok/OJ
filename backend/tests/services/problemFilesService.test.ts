@@ -7,6 +7,8 @@ import {
   getHeaderJudgeSpec,
   hasGraderSource,
   appendStarterZip,
+  sendStarterZip,
+  starterZipFilename,
 } from '../../services/problemFilesService';
 import { AppError } from '../../middleware/errorHandler';
 
@@ -120,12 +122,49 @@ describe('problemFilesService', () => {
     });
   });
 
-  it('hasGraderSource matches .cpp grader files', async () => {
+  it('hasGraderSource matches .cpp grader files case-insensitively', async () => {
     query.mockResolvedValueOnce({ rows: [{ exists: true }] });
     expect(await hasGraderSource('p1')).toBe(true);
-    expect(query.mock.calls[0][0]).toContain("LIKE '%.cpp'");
+    // validateProblemFileSet and headerPreparePlan both lower-case the
+    // extension, so a grader uploaded as `main.CPP` is accepted and compiled.
+    // A case-sensitive LIKE here would make such a problem permanently
+    // unsubmittable ("not ready for submissions yet").
+    expect(query.mock.calls[0][0]).toContain("LOWER(filename) LIKE '%.cpp'");
     query.mockResolvedValueOnce({ rows: [{ exists: false }] });
     expect(await hasGraderSource('p1')).toBe(false);
+  });
+
+  describe('starter ZIP attachment name', () => {
+    // Problem ids are an unrestricted VARCHAR(50): a quote inside one would
+    // otherwise close the Content-Disposition filename and let the id dictate
+    // an arbitrary saved filename (or inject header syntax).
+    it.each([
+      ['plain-01', 'plain-01-starter.zip'],
+      ['ev"il', 'ev_il-starter.zip'],
+      ['a"; filename="pwn.exe', 'a_filename_pwn.exe-starter.zip'],
+      ['../../etc/passwd', 'etc_passwd-starter.zip'],
+      ['bad\r\nX-Evil: 1', 'bad_X-Evil_1-starter.zip'],
+      ['\u0e42\u0e08\u0e17\u0e22\u0e4c', 'problem-starter.zip'],
+    ])('sanitizes %p', (problemId, expected) => {
+      expect(starterZipFilename(problemId)).toBe(expected);
+    });
+
+    it('sendStarterZip sets the sanitized name on the response header', async () => {
+      const headers: Record<string, string> = {};
+      const res = {
+        setHeader: (name: string, value: string) => { headers[name] = value; },
+        on: jest.fn(),
+        once: jest.fn(),
+        emit: jest.fn(),
+        write: jest.fn().mockReturnValue(true),
+        end: jest.fn(),
+        destroy: jest.fn(),
+        writableEnded: false,
+      };
+      await sendStarterZip(res as never, 'ev"il', [{ filename: 'a.h', content: Buffer.from('1') }]);
+      expect(headers['Content-Disposition']).toBe('attachment; filename="ev_il-starter.zip"');
+      expect(headers['Content-Disposition']).not.toContain('ev"il');
+    });
   });
 
   it('appendStarterZip appends each file by name', () => {

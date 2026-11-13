@@ -424,8 +424,13 @@ describe('problemQueryService difficulty handling', () => {
     await expect(updateProblemPdf('p1', Buffer.from('%PDF-1.4'))).resolves.toBe('ok');
   });
   describe('problem type lock', () => {
-    const wire = (rows: (sql: string) => { rows: unknown[] }) => {
-      const clientQuery = jest.fn().mockImplementation(async (sql: string) => rows(String(sql)));
+    const wire = (rows: (sql: string) => { rows: unknown[] }, graderFiles: unknown[] = []) => {
+      const clientQuery = jest.fn().mockImplementation(async (sql: string) => {
+        const text = String(sql);
+        // The stored grader set, read back by the submission-filename invariant check.
+        if (text.includes('FROM problem_files')) return { rows: graderFiles };
+        return rows(text);
+      });
       (db.pool.connect as unknown as jest.Mock).mockResolvedValue({ query: clientQuery, release: jest.fn() });
       return clientQuery;
     };
@@ -470,6 +475,52 @@ describe('problemQueryService difficulty handling', () => {
       await updateProblem('p1', { id: 'p1', problem_type: 'standard' });
       const params = clientQuery.mock.calls.find(([sql]) => String(sql).includes('UPDATE problems'))![1] as unknown[];
       expect(params.slice(-3)).toEqual([true, 'standard', null]);
+    });
+
+    // The judge writes the grader files first and the submission LAST, so a
+    // grader file named like the submission file would be silently overwritten
+    // by the student's own code. The type lock only guards problems that
+    // already have submissions, so the rename path must re-check the invariant.
+    it('rejects a submission-filename rename that collides with a stored grader file', async () => {
+      const clientQuery = wire(
+        (sql) => {
+          if (sql.includes('SELECT problem_type')) return { rows: [{ problem_type: 'header', submission_filename: 'student.h' }] };
+          if (sql.includes('EXISTS')) return { rows: [{ used: false }] };
+          return { rows: [{ id: 'p1' }] };
+        },
+        [
+          { filename: 'main.cpp', content: Buffer.from('int main(){}') },
+          { filename: 'queue.h', content: Buffer.from('// grader queue') },
+        ],
+      );
+
+      const result = await updateProblem('p1', { id: 'p1', submission_filename: 'queue.h' });
+
+      expect(result).toEqual({ kind: 'filename_conflict', message: expect.stringContaining('queue.h') });
+      // Nothing was written: the rejection happens before the UPDATE.
+      expect(clientQuery.mock.calls.some(([sql]) => String(sql).includes('UPDATE problems'))).toBe(false);
+      expect(clientQuery.mock.calls.some(([sql]) => String(sql).includes('FROM problem_files'))).toBe(true);
+    });
+
+    it('allows a submission-filename rename that no grader file shadows', async () => {
+      wire(
+        (sql) => {
+          if (sql.includes('SELECT problem_type')) return { rows: [{ problem_type: 'header', submission_filename: 'student.h' }] };
+          if (sql.includes('EXISTS')) return { rows: [{ used: false }] };
+          return { rows: [{ id: 'p1' }] };
+        },
+        [{ filename: 'main.cpp', content: Buffer.from('int main(){}') }],
+      );
+      await expect(updateProblem('p1', { id: 'p1', submission_filename: 'queue.h' })).resolves.toEqual({ id: 'p1' });
+    });
+
+    it('does not reject a rename on a header problem that has no grader files yet', async () => {
+      wire((sql) => {
+        if (sql.includes('SELECT problem_type')) return { rows: [{ problem_type: 'header', submission_filename: 'student.h' }] };
+        if (sql.includes('EXISTS')) return { rows: [{ used: false }] };
+        return { rows: [{ id: 'p1' }] };
+      });
+      await expect(updateProblem('p1', { id: 'p1', submission_filename: 'queue.h' })).resolves.toEqual({ id: 'p1' });
     });
   });
 });

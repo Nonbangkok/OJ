@@ -91,7 +91,7 @@ export async function hasGraderSource(problemId: string): Promise<boolean> {
   const result = await db.query(
     `SELECT EXISTS (
        SELECT 1 FROM problem_files
-        WHERE problem_id = $1 AND role = 'grader' AND filename LIKE '%.cpp'
+        WHERE problem_id = $1 AND role = 'grader' AND LOWER(filename) LIKE '%.cpp'
      ) AS exists`,
     [problemId],
   );
@@ -104,10 +104,23 @@ export function appendStarterZip(archive: ZipArchive, files: readonly ProblemFil
   }
 }
 
+/**
+ * ASCII slug of a problem id, safe to interpolate into a quoted
+ * `Content-Disposition` filename. Problem ids are an unrestricted VARCHAR(50),
+ * so an id containing `"`, `;`, a path separator or a CR/LF would otherwise let
+ * whoever created it dictate the saved filename (or inject header syntax).
+ * Every character outside `[A-Za-z0-9._-]` collapses to `_`; an id that leaves
+ * nothing behind (e.g. an all-Thai id) falls back to `problem`.
+ */
+export function starterZipFilename(problemId: string): string {
+  const slug = problemId.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[._-]+/, '');
+  return `${slug.length > 0 ? slug : 'problem'}-starter.zip`;
+}
+
 /** Streams the starter files to `res` as a ZIP attachment named `<problemId>-starter.zip`. */
 export async function sendStarterZip(res: Response, problemId: string, files: readonly ProblemFileInput[]): Promise<void> {
   res.setHeader('Content-Type', 'application/zip');
-  res.setHeader('Content-Disposition', `attachment; filename="${problemId}-starter.zip"`);
+  res.setHeader('Content-Disposition', `attachment; filename="${starterZipFilename(problemId)}"`);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   const archive = new ZipArchive({ zlib: { level: 9 } });
   archive.on('error', (err: Error) => {

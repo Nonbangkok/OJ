@@ -303,6 +303,9 @@ router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
   if (updateResult === 'type_locked') {
     throw new AppError('Problem type and submission filename cannot change after submissions exist.', 409);
   }
+  if (typeof updateResult === 'object' && 'kind' in updateResult && updateResult.kind === 'filename_conflict') {
+    throw new AppError(updateResult.message, 409);
+  }
   if (updateResult === 'duplicate_id') {
     throw new AppError(`Problem ID '${newId}' already exists.`, 409);
   }

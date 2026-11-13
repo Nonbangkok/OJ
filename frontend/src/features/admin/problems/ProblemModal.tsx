@@ -33,10 +33,9 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser, c
   // Escape, focus trap and focus restore, like the shared Dialog. Escape is
   // ignored while an upload runs, matching the disabled Cancel button.
   useModalFocus(dialogRef, { open: true, onClose, closeOnEscape: !isUploading });
-  // Type and filename lock once submissions exist: known up front when the
-  // problem says so, or learned from the 409 a save just got.
-  const typeLocked = Boolean(problem?.has_submissions)
-    || (uploadProgress?.status === 'failed' && uploadProgress.message === TYPE_LOCK_MESSAGE);
+  // Type and filename lock once submissions exist. No API surfaces that up
+  // front, so it is learned from the 409 the save just got.
+  const typeLocked = uploadProgress?.status === 'failed' && uploadProgress.message === TYPE_LOCK_MESSAGE;
   const isHeader = formData.problem_type === 'header';
   const handleCollectionChange = (event) => {
     const { value } = event.target;

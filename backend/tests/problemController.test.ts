@@ -523,6 +523,24 @@ describe('Problem Controller', () => {
             expect(res.status).toBe(409);
             expect(res.body.message).toBe('Problem type and submission filename cannot change after submissions exist.');
         });
+
+        it('returns 409 when the new submission filename shadows a stored grader file', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [] }) // BEGIN
+                .mockResolvedValueOnce({ rows: [{ problem_type: 'header', submission_filename: 'student.h' }] })
+                .mockResolvedValueOnce({ rows: [{ used: false }] })
+                .mockResolvedValueOnce({ rows: [
+                    { filename: 'main.cpp', content: Buffer.from('int main(){}') },
+                    { filename: 'queue.h', content: Buffer.from('// grader') },
+                ] });
+
+            const res = await request(app)
+                .put('/admin/problems/P1')
+                .send({ id: 'P1', title: 'T', problem_type: 'header', submission_filename: 'queue.h' });
+
+            expect(res.status).toBe(409);
+            expect(res.body.message).toContain('queue.h');
+        });
     });
 
     describe('DELETE /admin/problems/:id', () => {

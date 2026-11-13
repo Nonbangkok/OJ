@@ -136,7 +136,7 @@ export const getContestProblemDetailForParticipant = async (
 
     if (contestStatus === CONTEST_STATUS.FINISHED) {
         const result = await db.query<ContestProblemDetailRow>(
-            'SELECT cp.problem_id AS id, cp.title, cp.author, cp.time_limit_ms, cp.memory_limit_mb, (cp.problem_pdf IS NOT NULL) AS has_pdf, COALESCE(p.problem_type, \'standard\') AS problem_type, p.submission_filename, EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = cp.problem_id AND f.role = \'starter\') AS has_starter_files FROM contest_problems cp LEFT JOIN problems p ON p.id = cp.problem_id WHERE cp.contest_id = $1 AND cp.problem_id = $2',
+            'SELECT cp.problem_id AS id, cp.title, cp.author, cp.time_limit_ms, cp.memory_limit_mb, (cp.problem_pdf IS NOT NULL) AS has_pdf, COALESCE(p.problem_type, \'standard\') AS problem_type, p.submission_filename, (COALESCE(p.problem_type, \'standard\') = \'header\' AND EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = cp.problem_id AND f.role = \'starter\')) AS has_starter_files FROM contest_problems cp LEFT JOIN problems p ON p.id = cp.problem_id WHERE cp.contest_id = $1 AND cp.problem_id = $2',
             [contestId, problemId],
         );
         if (!result.rows[0]) {
@@ -146,7 +146,7 @@ export const getContestProblemDetailForParticipant = async (
     }
 
     const result = await db.query<ContestProblemDetailRow>(
-        'SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) AS has_pdf, problem_type, submission_filename, EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = problems.id AND f.role = \'starter\') AS has_starter_files FROM problems WHERE id = $1 AND contest_id = $2',
+        'SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) AS has_pdf, problem_type, submission_filename, (problems.problem_type = \'header\' AND EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = problems.id AND f.role = \'starter\')) AS has_starter_files FROM problems WHERE id = $1 AND contest_id = $2',
         [problemId, contestId],
     );
     if (!result.rows[0]) {

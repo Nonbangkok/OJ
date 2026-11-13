@@ -18,6 +18,8 @@ import { ADMIN_PROBLEM_LIST_CONFIG, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CO
 import { fullyPairedCaseNumbers, pairZippedTestcaseFiles } from './testcaseZipPairing';
 import { isUniqueViolation } from '../utils/dbErrors';
 import { AppError } from '../middleware/errorHandler';
+import { getProblemFiles } from './problemFilesService';
+import { validateProblemFileSet } from '../utils/headerProblemFiles';
 
 /**
  * Run `body` inside a single transaction. BEGIN/COMMIT/ROLLBACK on a dedicated
@@ -378,7 +380,7 @@ export const getVisibleProblems = async (): Promise<Array<Pick<ProblemRow, 'id' 
 
 export const getProblemDetail = async (problemId: string): Promise<ProblemDetailDTO | null> => {
   const result = await db.query<ProblemDetailDTO>(
-    'SELECT id, title, author, categories, difficulty, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible, contest_id, problem_type, submission_filename, EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = problems.id AND f.role = \'starter\') AS has_starter_files FROM problems WHERE id = $1',
+    'SELECT id, title, author, categories, difficulty, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible, contest_id, problem_type, submission_filename, (problems.problem_type = \'header\' AND EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = problems.id AND f.role = \'starter\')) AS has_starter_files FROM problems WHERE id = $1',
     [problemId]
   );
   return result.rows[0] ?? null;
@@ -427,10 +429,16 @@ export const createProblem = async (
   }
 };
 
+/** A submission filename that would collide with a stored grader file. */
+export interface SubmissionFilenameConflict {
+  kind: 'filename_conflict';
+  message: string;
+}
+
 export const updateProblem = async (
   oldId: string,
   payload: UpdateProblemRequestBody,
-): Promise<'duplicate_id' | 'not_found' | 'type_locked' | ProblemRow> => {
+): Promise<'duplicate_id' | 'not_found' | 'type_locked' | SubmissionFilenameConflict | ProblemRow> => {
   return withTransaction(async (client) => {
     if (oldId !== payload.id) {
       const existingProblem = await client.query<Pick<ProblemRow, 'id'>>('SELECT id FROM problems WHERE id = $1', [payload.id]);
@@ -466,6 +474,21 @@ export const updateProblem = async (
         );
         if (used.rows[0]?.used) {
           return 'type_locked';
+        }
+      }
+      // With no submissions the rename is allowed, but it must not break the
+      // "no grader file is named like the submission file" invariant: the judge
+      // writes the grader files first and the submission LAST, so a grader
+      // `queue.h` would be silently overwritten by the student's own code.
+      // Re-checked here, in the same transaction that takes FOR UPDATE on the
+      // problem row, against the grader set as stored right now.
+      if (nextFilename !== null && nextFilename !== row.submission_filename) {
+        const graderFiles = await getProblemFiles(oldId, 'grader', client);
+        if (graderFiles.length > 0) {
+          const fileSetError = validateProblemFileSet('grader', graderFiles, nextFilename);
+          if (fileSetError) {
+            return { kind: 'filename_conflict', message: fileSetError };
+          }
         }
       }
     }
