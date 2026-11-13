@@ -1,5 +1,5 @@
 import { Readable } from 'stream';
-import { UPLOAD_STATUS, type ProblemType } from '../constants';
+import { UPLOAD_STATUS, type ProblemFileRole, type ProblemType } from '../constants';
 import type { ProblemFileInput } from '../utils/headerProblemFiles';
 import { ContestRow, ProblemRow, SystemSettingRow, TestcaseRow, UserRow } from './models';
 
@@ -210,10 +210,12 @@ export interface ProblemCategoryCounts {
 export interface ProblemExportTestcaseRow extends Pick<TestcaseRow, 'case_number' | 'input_data' | 'output_data'> {}
 
 export interface ProblemExportBundle {
-  problem: Pick<ProblemRow, 'id' | 'title' | 'author' | 'time_limit_ms' | 'memory_limit_mb' | 'problem_pdf' | 'categories' | 'difficulty'> & {
+  problem: Pick<ProblemRow, 'id' | 'title' | 'author' | 'time_limit_ms' | 'memory_limit_mb' | 'problem_pdf' | 'categories' | 'difficulty' | 'problem_type' | 'submission_filename'> & {
     collection_name: string | null;
   };
   testcases: ProblemExportTestcaseRow[];
+  /** Header problems only (empty for standard). */
+  files: Array<ProblemFileInput & { role: ProblemFileRole }>;
 }
 
 export type ReplaceProblemTestcasesFromZipResult =

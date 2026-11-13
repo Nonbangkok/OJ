@@ -14,7 +14,7 @@ import {
   TestcaseView,
   TestcaseViewPart,
 } from '../types/service';
-import { ADMIN_PROBLEM_LIST_CONFIG, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CONFIG, TESTCASE_VIEWER_CONFIG } from '../constants';
+import { ADMIN_PROBLEM_LIST_CONFIG, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CONFIG, TESTCASE_VIEWER_CONFIG, type ProblemFileRole } from '../constants';
 import { fullyPairedCaseNumbers, pairZippedTestcaseFiles } from './testcaseZipPairing';
 import { isUniqueViolation } from '../utils/dbErrors';
 import { AppError } from '../middleware/errorHandler';
@@ -808,7 +808,8 @@ export const replaceProblemTestcasesFromZipFile = async (
 export const getProblemExportBundle = async (problemId: string): Promise<ProblemExportBundle | null> => {
   const problemResult = await db.query<ProblemExportBundle['problem']>(
     `SELECT p.id, p.title, p.author, p.time_limit_ms, p.memory_limit_mb, p.problem_pdf,
-            p.categories, p.difficulty, col.name AS collection_name
+            p.categories, p.difficulty, p.problem_type, p.submission_filename,
+            col.name AS collection_name
      FROM problems p
      LEFT JOIN collections col ON col.id = p.collection_id
      WHERE p.id = $1`,
@@ -825,9 +826,19 @@ export const getProblemExportBundle = async (problemId: string): Promise<Problem
     [problemId]
   );
 
+  let files: ProblemExportBundle['files'] = [];
+  if (problem.problem_type === 'header') {
+    const filesResult = await db.query<{ role: ProblemFileRole; filename: string; content: Buffer }>(
+      'SELECT role, filename, content FROM problem_files WHERE problem_id = $1 ORDER BY role, filename',
+      [problemId]
+    );
+    files = filesResult.rows;
+  }
+
   return {
     problem,
     testcases: testcasesResult.rows,
+    files,
   };
 };
 

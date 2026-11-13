@@ -165,6 +165,10 @@ export interface ProblemExportConfig {
     categories: ProblemCategory[];
     difficulty: number | null;
     collection: string | null;
+    /** Present only for header problems. */
+    problem_type?: 'header';
+    /** Present only for header problems. */
+    submission_filename?: string;
 }
 
 export interface CreateProblemRequestBody {

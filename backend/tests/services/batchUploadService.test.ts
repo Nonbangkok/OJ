@@ -139,7 +139,7 @@ describe('Batch Upload Service', () => {
             // no collection.
             expect(dbQuery).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO problems'),
-                ['P1', 'Problem 1', 'Admin', 1000, 256, [], null, null]
+                ['P1', 'Problem 1', 'Admin', 1000, 256, [], null, null, 'standard', null]
             );
             expect(fsPromises.unlink).toHaveBeenCalledWith('/tmp/test.zip');
         });
@@ -174,7 +174,7 @@ describe('Batch Upload Service', () => {
             // Insert carries the metadata (categories deduped + sorted)
             expect(dbQuery).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO problems'),
-                ['P1', 'Problem 1', 'Admin', 1000, 256, ['Graph', 'Tree'], 2100, 7],
+                ['P1', 'Problem 1', 'Admin', 1000, 256, ['Graph', 'Tree'], 2100, 7, 'standard', null],
             );
         });
 
@@ -391,6 +391,152 @@ describe('Batch Upload Service', () => {
             const statements = dbQuery.mock.calls.map(([sql]) => String(sql).trim());
             expect(statements).toContain('ROLLBACK');
             expect(statements).toContain('COMMIT');
+        });
+    });
+
+    describe('header problems', () => {
+        const headerConfig = {
+            id: 'H1', title: 'Header 1', author: 'Admin', time_limit_ms: 1000, memory_limit_mb: 256,
+            problem_type: 'header',
+        };
+
+        /** Path-keyed fs mock: `dirs` maps a subdirectory of H1 to its entries. */
+        function stubHeaderFs(
+            dirs: Record<string, Record<string, Buffer | 'dir'>>,
+            config: Record<string, unknown> = headerConfig,
+        ) {
+            (fsPromises.readdir as jest.Mock).mockImplementation((p: string, opts?: { withFileTypes?: boolean }) => {
+                const parts = String(p).split('/');
+                const last = parts[parts.length - 1];
+                let entries: Array<[string, boolean]>;
+                if (last === 'H1') {
+                    entries = [['config.json', false], ...Object.keys(dirs).map((d): [string, boolean] => [d, true])];
+                } else if (dirs[last] && parts[parts.length - 2] === 'H1') {
+                    entries = Object.entries(dirs[last]).map(([n, v]): [string, boolean] => [n, v === 'dir']);
+                } else {
+                    // batch temp root
+                    entries = [['H1', true]];
+                }
+                return Promise.resolve(opts?.withFileTypes
+                    ? entries.map(([n, d]) => createMockDirent(n, d))
+                    : entries.map(([n]) => n));
+            });
+            (fsPromises.readFile as jest.Mock).mockImplementation((p: string) => {
+                const parts = String(p).split('/');
+                const name = parts.pop() as string;
+                const dir = parts.pop() as string;
+                if (name === 'config.json') return Promise.resolve(JSON.stringify(config));
+                const entry = dirs[dir]?.[name];
+                if (entry && entry !== 'dir') return Promise.resolve(entry);
+                return Promise.reject(new Error('ENOENT'));
+            });
+        }
+
+        function stubHeaderDb(insertRowCount = 1) {
+            dbQuery.mockImplementation((sql: string) => {
+                if (sql.includes('INSERT INTO problems')) return Promise.resolve({ rowCount: insertRowCount });
+                if (sql.includes('SELECT submission_filename')) {
+                    return Promise.resolve({ rows: [{ submission_filename: 'student.h' }] });
+                }
+                return Promise.resolve({});
+            });
+        }
+
+        const extract = () => (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ extract: jest.fn().mockResolvedValue(undefined) });
+
+        it('adds a header problem: stores type, default filename and grader/starter files', async () => {
+            extract();
+            stubHeaderFs({
+                grader: { 'main.cpp': Buffer.from('int main(){}'), 'g.h': Buffer.from('//g') },
+                starter: { 'student.h': Buffer.from('// start') },
+            });
+            stubHeaderDb();
+
+            const results = await processBatchUpload('/tmp/test.zip');
+
+            expect(results.errors).toEqual([]);
+            expect(results.added).toEqual(['H1']);
+            expect(dbQuery).toHaveBeenCalledWith(
+                expect.stringContaining('INSERT INTO problems'),
+                ['H1', 'Header 1', 'Admin', 1000, 256, [], null, null, 'header', 'student.h'],
+            );
+            const fileInserts = dbQuery.mock.calls.filter(([sql]) => String(sql).includes('INSERT INTO problem_files'));
+            expect(fileInserts.map(([, v]) => [v[1], v[2]]).sort()).toEqual([
+                ['grader', 'g.h'], ['grader', 'main.cpp'], ['starter', 'student.h'],
+            ]);
+            const testcaseInserts = dbQuery.mock.calls.filter(([sql]) => String(sql).includes('INSERT INTO testcases'));
+            expect(testcaseInserts).toHaveLength(0);
+        });
+
+        it('reports an error and rolls back when grader/ has no .cpp file', async () => {
+            extract();
+            stubHeaderFs({
+                grader: { 'only.h': Buffer.from('//h') },
+                starter: { 'student.h': Buffer.from('//s') },
+            });
+            stubHeaderDb();
+
+            const results = await processBatchUpload('/tmp/test.zip');
+
+            expect(results.added).toEqual([]);
+            expect(results.errors).toHaveLength(1);
+            expect(results.errors[0].directory).toBe('H1');
+            expect(results.errors[0].message).toContain('.cpp');
+            const statements = dbQuery.mock.calls.map(([sql]) => String(sql).trim());
+            expect(statements).toContain('ROLLBACK');
+            expect(statements).not.toContain('COMMIT');
+        });
+
+        it('reports a per-problem error for a nested folder inside grader/', async () => {
+            extract();
+            stubHeaderFs({
+                grader: { 'main.cpp': Buffer.from('x'), nested: 'dir' },
+            });
+            stubHeaderDb();
+
+            const results = await processBatchUpload('/tmp/test.zip');
+
+            expect(results.added).toEqual([]);
+            expect(results.errors).toHaveLength(1);
+            expect(results.errors[0].message).toContain('nested');
+            expect(results.errors[0].message).toContain('grader');
+        });
+
+        it('does not treat grader/ and starter/ as testcase directories', async () => {
+            extract();
+            stubHeaderFs({
+                grader: { 'main.cpp': Buffer.from('x') },
+                starter: {},
+            });
+            stubHeaderDb();
+
+            await processBatchUpload('/tmp/test.zip');
+
+            const readdirPaths = (fsPromises.readdir as jest.Mock).mock.calls.map(([p]) => String(p));
+            // grader/ and starter/ are each read exactly once (for files), never
+            // probed as a testcase root (input/output stat, flat pairing).
+            expect(readdirPaths.filter(p => p.endsWith('/grader'))).toHaveLength(1);
+            expect(readdirPaths.filter(p => p.endsWith('/starter'))).toHaveLength(1);
+            expect((fsPromises.stat as jest.Mock).mock.calls.map(([p]) => String(p))
+                .filter(p => p.includes('grader') || p.includes('starter'))).toEqual([]);
+        });
+
+        it('keeps SKIPPED semantics for an existing id: no type or file changes', async () => {
+            extract();
+            stubHeaderFs({
+                grader: { 'main.cpp': Buffer.from('x') },
+                starter: { 'student.h': Buffer.from('y') },
+            }, { ...headerConfig, problem_type: 'header', submission_filename: 'other.h' });
+            stubHeaderDb(0);
+
+            const results = await processBatchUpload('/tmp/test.zip');
+
+            expect(results.skipped).toEqual(['H1']);
+            const sqls = dbQuery.mock.calls.map(([sql]) => String(sql));
+            expect(sqls.some(s => s.includes('problem_files'))).toBe(false);
+            const update = sqls.find(s => s.includes('UPDATE problems'));
+            expect(update).not.toContain('problem_type');
+            expect(update).not.toContain('submission_filename');
         });
     });
 });

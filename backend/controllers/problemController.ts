@@ -689,7 +689,12 @@ router.post('/admin/problems/export', requireAuth, requireStaffOrAdmin,
         archive.append(problem.problem_pdf, { name: `${problemFolderName}/${problem.id}.pdf` });
       }
 
-      // 3. Add test cases (input/output)
+      // 3. Header problems: grader/ and starter/ files (byte-exact)
+      for (const file of bundle.files) {
+        archive.append(file.content, { name: `${problemFolderName}/${file.role}/${file.filename}` });
+      }
+
+      // 4. Add test cases (input/output)
       if (testcases.length > 0) {
         for (const testcase of testcases) {
           const caseNumberPadded = testcase.case_number.toString().padStart(2, '0'); // e.g., 01, 02

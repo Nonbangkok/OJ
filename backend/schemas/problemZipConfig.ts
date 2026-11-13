@@ -5,9 +5,11 @@ import {
   PROBLEM_DIFFICULTY_MAX,
   PROBLEM_DIFFICULTY_MIN,
   PROBLEM_DIFFICULTY_STEP,
+  PROBLEM_TYPES,
   PROBLEM_VALIDATION,
   STRING_LIMITS,
 } from '../constants';
+import { validateSubmissionFilename } from '../utils/problemFilename';
 
 /**
  * The `config.json` found at the root of each problem directory inside a
@@ -93,6 +95,23 @@ export const problemZipConfigSchema = z.object({
   categories: zipConfigCategories,
   difficulty: zipConfigDifficulty,
   collection: zipConfigCollection,
+  /** Omitted = standard. */
+  problem_type: z.enum(PROBLEM_TYPES).optional(),
+  /** Header problems only; defaults to student.h at import time. */
+  submission_filename: z.string().nullable().optional(),
+}).superRefine((config, ctx) => {
+  const isHeader = config.problem_type === 'header';
+  if (config.submission_filename === undefined || config.submission_filename === null) return;
+  if (!isHeader) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['submission_filename'],
+      message: 'submission_filename is only allowed for problem_type "header"',
+    });
+    return;
+  }
+  const error = validateSubmissionFilename(config.submission_filename);
+  if (error) ctx.addIssue({ code: 'custom', path: ['submission_filename'], message: error });
 });
 
 /** Parsed config.json with presence-preserving metadata fields. */
@@ -108,6 +127,10 @@ export interface ProblemZipConfig {
   difficulty?: number | null;
   /** undefined = field omitted; null = no collection/clear; string = collection name. */
   collection?: string | null;
+  /** undefined = standard. */
+  problem_type?: (typeof PROBLEM_TYPES)[number];
+  /** Header problems only; undefined/null = default. */
+  submission_filename?: string | null;
 }
 
 /** Flatten a ZodError from the ZIP config into one human-readable line. */
