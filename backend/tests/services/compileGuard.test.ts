@@ -1,4 +1,4 @@
-import { findForbiddenInclude } from '../../utils/compileGuard';
+import { findForbiddenAsm, findForbiddenInclude } from '../../utils/compileGuard';
 import { sanitizeCompilerStderr } from '../../services/submissionService';
 
 /**
@@ -74,6 +74,42 @@ describe('findForbiddenInclude', () => {
     expect(findForbiddenInclude('#define N 100\n#define X std::vector<int>\n#define NAME "problem"\n#include <iostream>')).toBeNull();
     // Comment between directive parts must not splice into a path.
     expect(findForbiddenInclude('#include <ios/* comment */tream>')).toBeNull();
+  });
+});
+
+describe('findForbiddenAsm', () => {
+  it('rejects inline asm keywords used to embed files', () => {
+    expect(findForbiddenAsm('asm(".incbin \\"main.cpp\\"")')).toBe('asm');
+    expect(findForbiddenAsm('__asm__ volatile("")')).toBe('__asm__');
+    expect(findForbiddenAsm('__asm volatile("")')).toBe('__asm');
+  });
+
+  it('rejects incbin and .include directives anywhere in the code', () => {
+    expect(findForbiddenAsm('const char* s = "incbin";')).toBe('incbin');
+    expect(findForbiddenAsm('x .include y')).toBe('.include');
+  });
+
+  it('does not match asm as a substring of a longer identifier', () => {
+    expect(findForbiddenAsm('int plasma = 1;')).toBeNull();
+    expect(findForbiddenAsm('int spasm;')).toBeNull();
+  });
+
+  it('ignores asm and incbin inside comments', () => {
+    expect(findForbiddenAsm('// asm\nint x;')).toBeNull();
+    expect(findForbiddenAsm('/* asm */ int x;')).toBeNull();
+    expect(findForbiddenAsm('/* incbin */ int x;')).toBeNull();
+  });
+
+  it('does not let a // inside a string literal hide following code', () => {
+    expect(findForbiddenAsm('const char* u = "http://x"; asm("nop");')).toBe('asm');
+  });
+
+  it('sees through backslash-newline continuation', () => {
+    expect(findForbiddenAsm('as\\\nm("nop");')).toBe('asm');
+  });
+
+  it('allows ordinary code', () => {
+    expect(findForbiddenAsm('#include <bits/stdc++.h>\nint main(){ return 0; }')).toBeNull();
   });
 });
 

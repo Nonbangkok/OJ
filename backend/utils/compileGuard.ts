@@ -58,3 +58,24 @@ export function findForbiddenInclude(code: string): string | null {
   }
   return null;
 }
+
+/**
+ * Best-effort guard against assembler-level file embedding. A header-problem
+ * student.h is compiled in the same translation unit as the grader's secret
+ * main.cpp, so `asm(".incbin \"main.cpp\"")` would bake the secret bytes into
+ * the binary. Matches inline-asm keywords as whole identifiers and the
+ * `incbin` / `.include` directives as substrings. Comments are stripped
+ * (string literals are preserved, so a `//` inside a string cannot hide code).
+ * Token-pasting tricks such as `incb##in` are not caught; the unprivileged
+ * compile remains the real boundary.
+ */
+export function findForbiddenAsm(code: string): string | null {
+  const logical = code.replace(/\\\r?\n/g, '');
+  const stripped = logical.replace(
+    /("(?:\\.|[^"\\\n])*")|('(?:\\.|[^'\\\n])*')|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,
+    (match, dq?: string, sq?: string) => (dq ?? sq ?? ' '),
+  );
+  const asmRe = /\b(?:__asm__|__asm|asm)\b|incbin|\.include/;
+  const match = stripped.match(asmRe);
+  return match ? match[0] : null;
+}
