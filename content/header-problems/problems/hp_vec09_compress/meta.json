@@ -1,0 +1,41 @@
+{
+  "id": "hp_vec09_compress",
+  "title": "Vector Compress — ยุบสมาชิกซ้ำที่อยู่ติดกัน",
+  "author": "OJ Header Problem Set",
+  "topic": "vector",
+  "class": "CP::vector<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 2200,
+  "collection": "Header Problems — Vector",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "void compress();",
+    "",
+    "// Pre-implemented in the header: appending is not the exercise here, and",
+    "// the grader uses it to build runs of equal values at the end.",
+    "void push_back(const T &element)",
+    "{",
+    "  ensureCapacity(mSize + 1);",
+    "  mData[mSize] = element;",
+    "  mSize++;",
+    "}"
+  ],
+  "pdf_probe": "เหลือไว้เพียงตัวแรกของแต่ละช่วงที่ซ้ำกัน",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ≤ 2,000 (วิธีที่ลบทีละตัวแล้วเลื่อนข้อมูลใหม่ทุกครั้งผ่านได้)"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ถึง 10⁶ และส่วนใหญ่เป็นสมาชิกซ้ำติดกัน (ต้องทำงานในพาสเดียว O(n))"
+    }
+  ]
+}

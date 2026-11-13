@@ -1,0 +1,32 @@
+{
+  "id": "hp_vec10_rotate",
+  "title": "Vector Rotate — หมุนเวกเตอร์โดยไม่ใช้ที่เพิ่ม",
+  "author": "OJ Header Problem Set",
+  "topic": "vector",
+  "class": "CP::vector<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 2500,
+  "collection": "Header Problems — Vector",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 32,
+  "submission_filename": "student.h",
+  "declarations": [
+    "void rotate(size_t k);"
+  ],
+  "pdf_probe": "หมุนสมาชิกทั้งเวกเตอร์ไปทางซ้าย",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ≤ 1,500 (วิธีหมุนทีละหนึ่งช่องซ้ำ k ครั้งผ่านได้ และข้อมูลเล็กพอที่จะใช้อาเรย์ชั่วคราวได้)"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ถึง 2 × 10⁶ ของ long long (16 MB) — ต้องเป็น O(n) ต่อการหมุนหนึ่งครั้ง และใช้ที่เพิ่มแบบคงที่ จึงอยู่ในขอบเขต 32 MB"
+    }
+  ]
+}

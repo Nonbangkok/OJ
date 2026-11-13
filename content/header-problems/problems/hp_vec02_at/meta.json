@@ -1,0 +1,38 @@
+{
+  "id": "hp_vec02_at",
+  "title": "Vector At — เข้าถึงแบบตรวจขอบเขต",
+  "author": "OJ Header Problem Set",
+  "topic": "vector",
+  "class": "CP::vector<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 900,
+  "collection": "Header Problems — Vector",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "T &at(size_t index);",
+    "const T &at(size_t index) const;"
+  ],
+  "pdf_probe": "ต้องโยนข้อยกเว้นเมื่อดัชนีอยู่นอกช่วง",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "n ≤ 10 และคำสั่งไม่เกิน 80 คำสั่ง"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "n ≤ 2,000 และคำสั่งไม่เกิน 600 คำสั่ง"
+    },
+    {
+      "cases": 4,
+      "percent": 40,
+      "note": "n ≤ 1,000,000 และคำสั่งไม่เกิน 400 คำสั่ง"
+    }
+  ]
+}

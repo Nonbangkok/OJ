@@ -1,0 +1,46 @@
+{
+  "id": "hp_vec03_pop_front",
+  "title": "Vector Pop Front — ลบสมาชิกตัวหน้า",
+  "author": "OJ Header Problem Set",
+  "topic": "vector",
+  "class": "CP::vector<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1000,
+  "collection": "Header Problems — Vector",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "void pop_front();",
+    "",
+    "// Pre-implemented in the header: appending is not the exercise here, and",
+    "// the grader uses it to interleave capacity growth with pop_front.",
+    "void push_back(const T &element)",
+    "{",
+    "  ensureCapacity(mSize + 1);",
+    "  mData[mSize] = element;",
+    "  mSize++;",
+    "}"
+  ],
+  "pdf_probe": "ลบสมาชิกตัวแรกของเวกเตอร์ออก",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "n ≤ 10 และคำสั่งไม่เกิน 60 คำสั่ง"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "n ≤ 2,000 และคำสั่งไม่เกิน 300 คำสั่ง"
+    },
+    {
+      "cases": 4,
+      "percent": 40,
+      "note": "n ≤ 100,000 โดยผลรวมของสมาชิกที่ต้องเลื่อนทั้งชุดทดสอบไม่เกินประมาณ 4 × 10⁷ ช่อง"
+    }
+  ]
+}
