@@ -1,0 +1,51 @@
+{
+  "id": "hp_que10_merge",
+  "title": "Queue Merge — ต่อคิวอีกคิวเข้าท้ายคิวนี้",
+  "author": "OJ Header Problem Set",
+  "topic": "queue",
+  "class": "CP::queue<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1800,
+  "collection": "Header Problems — Queue",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "// ---- the function you must write; it lives in student.h ----",
+    "void merge(queue<T> &other);",
+    "",
+    "// ---- already written for you, and they stay in this file ----",
+    "const T &front() const { return mData[mFront]; }",
+    "",
+    "const T &back() const { return mData[(mFront + mSize - 1) % mCap]; }",
+    "",
+    "void push(const T &element)",
+    "{",
+    "  ensureCapacity(mSize + 1);",
+    "  mData[(mFront + mSize) % mCap] = element;",
+    "  mSize++;",
+    "}",
+    "",
+    "void pop()",
+    "{",
+    "  mFront = (mFront + 1) % mCap;",
+    "  mSize--;",
+    "}"
+  ],
+  "pdf_probe": "ต้องจองที่เผื่อไว้ให้พอในครั้งเดียว",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "สมาชิกเริ่มต้นคิวละไม่เกิน 2,000 ตัว และคำสั่งไม่เกิน 2,500 คำสั่ง (วิธีที่ขยายอาเรย์ทีละหนึ่งช่องก็ผ่าน)"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "สมาชิกเริ่มต้นคิวละไม่เกิน 26,000 ตัว และคำสั่งไม่เกิน 30,000 คำสั่ง (ต้องจองที่ครั้งเดียวและคัดลอกแบบ O(n + m))"
+    }
+  ]
+}
