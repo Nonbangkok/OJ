@@ -101,7 +101,14 @@ const useProblemModal = (problem, onSave, uploadProgress, currentUser) => {
     const [formSource, setFormSource] = useState({ problem, username: currentUsername });
     if (formSource.problem !== problem || formSource.username !== currentUsername) {
         setFormSource({ problem, username: currentUsername });
-        setFormData(buildProblemForm(problem, currentUsername));
+        // The saved type only comes from the files endpoint, so keep it across a re-seed.
+        setFormData({
+            ...buildProblemForm(problem, currentUsername),
+            ...(problem && filesInfo ? {
+                problem_type: filesInfo.problem_type,
+                submission_filename: filesInfo.submission_filename ?? DEFAULT_SUBMISSION_FILENAME,
+            } : {}),
+        });
         setPdfFile(null);
         setZipFile(null);
     }

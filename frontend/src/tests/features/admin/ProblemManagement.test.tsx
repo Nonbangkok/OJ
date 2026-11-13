@@ -1114,5 +1114,56 @@ describe('ProblemManagement Component', () => {
                 problem_type: 'header', submission_filename: 'other.h',
             }));
         });
+
+        const savedPayload = () => (jest.mocked(adminService.updateProblem) as jest.Mock).mock.calls[0][1];
+
+        it('never sends type fields when saving a standard problem edit', async () => {
+            (jest.mocked(adminService.getProblemFiles) as jest.Mock).mockResolvedValue(
+                filesInfo({ problem_type: 'standard', submission_filename: null, files: [] }));
+            (jest.mocked(adminService.updateProblem) as jest.Mock).mockResolvedValue({});
+            const dialog = await openEdit();
+            await waitFor(() => expect(adminService.getProblemFiles).toHaveBeenCalled());
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+            await waitFor(() => expect(adminService.updateProblem).toHaveBeenCalled());
+            expect(savedPayload()).not.toHaveProperty('problem_type');
+            expect(savedPayload()).not.toHaveProperty('submission_filename');
+        });
+
+        it('never sends type fields when creating a standard problem', async () => {
+            (jest.mocked(adminService.createProblem) as jest.Mock).mockResolvedValue({ id: 'N1' });
+            renderProblemManagement();
+            await screen.findByText('Problem 1');
+            fireEvent.click(screen.getByRole('button', { name: /new problem/i }));
+            const dialog = await screen.findByRole('dialog');
+            fireEvent.change(within(dialog).getByLabelText('Problem ID'), { target: { value: 'N1' } });
+            fireEvent.change(within(dialog).getByLabelText('Title'), { target: { value: 'New' } });
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+            await waitFor(() => expect(adminService.createProblem).toHaveBeenCalled());
+            const payload = (jest.mocked(adminService.createProblem) as jest.Mock).mock.calls[0][1] ?? (jest.mocked(adminService.createProblem) as jest.Mock).mock.calls[0][0];
+            expect(payload).not.toHaveProperty('problem_type');
+            expect(payload).not.toHaveProperty('submission_filename');
+        });
+
+        it('omits type fields when the files fetch fails, leaving the saved type untouched', async () => {
+            (jest.mocked(adminService.getProblemFiles) as jest.Mock).mockRejectedValue(new Error('boom'));
+            (jest.mocked(adminService.updateProblem) as jest.Mock).mockResolvedValue({});
+            const dialog = await openEdit();
+            await waitFor(() => expect(adminService.getProblemFiles).toHaveBeenCalled());
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+            await waitFor(() => expect(adminService.updateProblem).toHaveBeenCalled());
+            expect(savedPayload()).not.toHaveProperty('problem_type');
+            expect(savedPayload()).not.toHaveProperty('submission_filename');
+        });
+
+        it('sends standard with a null filename when a header problem is switched back', async () => {
+            (jest.mocked(adminService.getProblemFiles) as jest.Mock).mockResolvedValue(filesInfo());
+            (jest.mocked(adminService.updateProblem) as jest.Mock).mockResolvedValue({});
+            const dialog = await openEdit();
+            await within(dialog).findByText('grader.cpp');
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Standard' }));
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+            await waitFor(() => expect(adminService.updateProblem).toHaveBeenCalled());
+            expect(savedPayload()).toEqual(expect.objectContaining({ problem_type: 'standard', submission_filename: null }));
+        });
     });
 });
