@@ -14,7 +14,7 @@ import {
   TestcaseView,
   TestcaseViewPart,
 } from '../types/service';
-import { ADMIN_PROBLEM_LIST_CONFIG, PROBLEM_LIST_CONFIG, TESTCASE_VIEWER_CONFIG } from '../constants';
+import { ADMIN_PROBLEM_LIST_CONFIG, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CONFIG, TESTCASE_VIEWER_CONFIG } from '../constants';
 import { fullyPairedCaseNumbers, pairZippedTestcaseFiles } from './testcaseZipPairing';
 import { isUniqueViolation } from '../utils/dbErrors';
 import { AppError } from '../middleware/errorHandler';
@@ -403,10 +403,11 @@ export const getProblemPdfWithAccess = async (
 export const createProblem = async (
   payload: CreateProblemRequestBody,
 ): Promise<'duplicate_id' | ProblemRow> => {
+  const problemType = payload.problem_type ?? 'standard';
   try {
     const result = await db.query<ProblemRow>(
-      'INSERT INTO problems (id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb) VALUES ($1, $2, $3, $4::text[], $5, $6, $7, $8) RETURNING *',
-      [payload.id, payload.title, payload.author, [...payload.categories ?? []], payload.difficulty ?? null, payload.collection_id ?? null, payload.time_limit_ms, payload.memory_limit_mb]
+      'INSERT INTO problems (id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb, problem_type, submission_filename) VALUES ($1, $2, $3, $4::text[], $5, $6, $7, $8, $9, $10) RETURNING *',
+      [payload.id, payload.title, payload.author, [...payload.categories ?? []], payload.difficulty ?? null, payload.collection_id ?? null, payload.time_limit_ms, payload.memory_limit_mb, problemType, problemType === 'header' ? (payload.submission_filename ?? DEFAULT_SUBMISSION_FILENAME) : null]
     );
     return result.rows[0];
   } catch (error) {
@@ -418,12 +419,43 @@ export const createProblem = async (
 export const updateProblem = async (
   oldId: string,
   payload: UpdateProblemRequestBody,
-): Promise<'duplicate_id' | 'not_found' | ProblemRow> => {
+): Promise<'duplicate_id' | 'not_found' | 'type_locked' | ProblemRow> => {
   return withTransaction(async (client) => {
     if (oldId !== payload.id) {
       const existingProblem = await client.query<Pick<ProblemRow, 'id'>>('SELECT id FROM problems WHERE id = $1', [payload.id]);
       if (existingProblem.rows.length > 0) {
         return 'duplicate_id';
+      }
+    }
+
+    // problem_type / submission_filename are locked once any submission exists:
+    // old submissions would otherwise be rejudged under the wrong shape.
+    // Switching to standard stores NULL (DB CHECK: filename non-null iff header).
+    const typeFieldsProvided = payload.problem_type !== undefined || payload.submission_filename !== undefined;
+    let nextType: string | null = null;
+    let nextFilename: string | null = null;
+    if (typeFieldsProvided) {
+      const current = await client.query<Pick<ProblemRow, 'problem_type' | 'submission_filename'>>(
+        'SELECT problem_type, submission_filename FROM problems WHERE id = $1 FOR UPDATE',
+        [oldId],
+      );
+      if (current.rows.length === 0) {
+        return 'not_found';
+      }
+      const row = current.rows[0];
+      nextType = payload.problem_type ?? row.problem_type;
+      nextFilename = nextType === 'header'
+        ? (payload.submission_filename ?? row.submission_filename ?? DEFAULT_SUBMISSION_FILENAME)
+        : null;
+      if (nextType !== row.problem_type || nextFilename !== row.submission_filename) {
+        const used = await client.query(
+          `SELECT (EXISTS (SELECT 1 FROM submissions WHERE problem_id = $1)
+                OR EXISTS (SELECT 1 FROM contest_submissions WHERE problem_id = $1)) AS used`,
+          [oldId],
+        );
+        if (used.rows[0]?.used) {
+          return 'type_locked';
+        }
       }
     }
 
@@ -434,8 +466,8 @@ export const updateProblem = async (
     // null = clear the rating (Unrated), number = set it.
     const difficultyProvided = payload.difficulty !== undefined;
     const result = await client.query<ProblemRow>(
-      'UPDATE problems SET id = $1, title = COALESCE($2, title), author = COALESCE($3, author), categories = CASE WHEN $8::boolean THEN $4::text[] ELSE categories END, difficulty = CASE WHEN $9::boolean THEN $5 ELSE difficulty END, collection_id = CASE WHEN $11::boolean THEN $10 ELSE collection_id END, time_limit_ms = COALESCE($6, time_limit_ms), memory_limit_mb = COALESCE($7, memory_limit_mb) WHERE id = $12 RETURNING *',
-      [payload.id, payload.title ?? null, payload.author ?? null, [...payload.categories ?? []], payload.difficulty ?? null, payload.time_limit_ms ?? null, payload.memory_limit_mb ?? null, categoriesProvided, difficultyProvided, payload.collection_id ?? null, payload.collection_id !== undefined, oldId]
+      'UPDATE problems SET id = $1, title = COALESCE($2, title), author = COALESCE($3, author), categories = CASE WHEN $8::boolean THEN $4::text[] ELSE categories END, difficulty = CASE WHEN $9::boolean THEN $5 ELSE difficulty END, collection_id = CASE WHEN $11::boolean THEN $10 ELSE collection_id END, time_limit_ms = COALESCE($6, time_limit_ms), memory_limit_mb = COALESCE($7, memory_limit_mb), problem_type = CASE WHEN $13::boolean THEN $14 ELSE problem_type END, submission_filename = CASE WHEN $13::boolean THEN $15 ELSE submission_filename END WHERE id = $12 RETURNING *',
+      [payload.id, payload.title ?? null, payload.author ?? null, [...payload.categories ?? []], payload.difficulty ?? null, payload.time_limit_ms ?? null, payload.memory_limit_mb ?? null, categoriesProvided, difficultyProvided, payload.collection_id ?? null, payload.collection_id !== undefined, oldId, typeFieldsProvided, nextType, nextFilename]
     );
 
     if (result.rows.length === 0) {

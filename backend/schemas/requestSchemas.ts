@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { seedSchema } from '../authoring/protocol';
+import { validateSubmissionFilename } from '../utils/problemFilename';
 import {
   ADMIN_USER_LIST_CONFIG,
   AUTHORING_VALIDATION,
@@ -8,6 +9,7 @@ import {
   PROBLEM_DIFFICULTY_MIN,
   PROBLEM_DIFFICULTY_STEP,
   PROBLEM_LIST_CONFIG,
+  PROBLEM_TYPES,
   PROBLEM_VALIDATION,
   STATEMENT_ASSET,
   STRING_LIMITS,
@@ -239,6 +241,25 @@ export const moveContestProblemsBodySchema = z.object({
 });
 
 // Problem schemas
+const problemTypeFields = {
+  problem_type: z.enum(PROBLEM_TYPES).optional(),
+  submission_filename: z.string().nullable().optional(),
+};
+
+/** A supplied submission filename must be a valid header name (checked for header problems). */
+const refineSubmissionFilename = (
+  value: { problem_type?: (typeof PROBLEM_TYPES)[number]; submission_filename?: string | null },
+  ctx: z.RefinementCtx,
+): void => {
+  if (value.problem_type === 'standard') return;
+  if (typeof value.submission_filename === 'string') {
+    const error = validateSubmissionFilename(value.submission_filename);
+    if (error) {
+      ctx.addIssue({ code: 'custom', path: ['submission_filename'], message: error });
+    }
+  }
+};
+
 export const createProblemSchema = z.object({
   id: nonEmptyString,
   title: z.string().trim().min(PROBLEM_VALIDATION.MIN_TITLE_LENGTH).max(STRING_LIMITS.TITLE),
@@ -248,7 +269,8 @@ export const createProblemSchema = z.object({
   collection_id: z.number().int().positive().nullable().optional(),
   time_limit_ms: z.number().int().min(PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS),
   memory_limit_mb: z.number().int().min(PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB),
-});
+  ...problemTypeFields,
+}).superRefine(refineSubmissionFilename);
 
 export const updateProblemSchema = z.object({
   id: nonEmptyString,
@@ -259,7 +281,8 @@ export const updateProblemSchema = z.object({
   collection_id: z.number().int().positive().nullable().optional(),
   time_limit_ms: z.number().int().min(PROBLEM_VALIDATION.MIN_TIME_LIMIT_MS).optional(),
   memory_limit_mb: z.number().int().min(PROBLEM_VALIDATION.MIN_MEMORY_LIMIT_MB).optional(),
-});
+  ...problemTypeFields,
+}).superRefine(refineSubmissionFilename);
 
 export const updateProblemVisibilitySchema = z.object({
   isVisible: z.boolean(),

@@ -1,32 +1,17 @@
 import path from 'path';
 import * as unzipper from 'unzipper';
 import { HEADER_PROBLEM_LIMITS, type ProblemFileRole } from '../constants';
+import { validateProblemFilename, validateSubmissionFilename } from './problemFilename';
 import { assertSafeArchive, type ArchiveEntryLike } from '../services/batchUploadService';
+
+export { validateProblemFilename, validateSubmissionFilename };
 
 export interface ProblemFileInput {
   filename: string;
   content: Buffer;
 }
 
-const FILENAME_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}$/;
 const GRADER_EXTENSIONS = new Set(['.cpp', '.h', '.hpp']);
-const SUBMISSION_EXTENSIONS = new Set(['.h', '.hpp']);
-
-export function validateProblemFilename(name: string): string | null {
-  if (!FILENAME_PATTERN.test(name)) {
-    return `Invalid file name "${name}": use 1-100 letters, digits, "_", "-" or "." with no path and no leading dot.`;
-  }
-  return null;
-}
-
-export function validateSubmissionFilename(name: string): string | null {
-  const nameError = validateProblemFilename(name);
-  if (nameError) return nameError;
-  if (!SUBMISSION_EXTENSIONS.has(path.extname(name).toLowerCase())) {
-    return `Submission file "${name}" must end in .h or .hpp.`;
-  }
-  return null;
-}
 
 export function validateProblemFileSet(
   role: ProblemFileRole,

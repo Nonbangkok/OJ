@@ -423,4 +423,53 @@ describe('problemQueryService difficulty handling', () => {
     query.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'p1' }] });
     await expect(updateProblemPdf('p1', Buffer.from('%PDF-1.4'))).resolves.toBe('ok');
   });
+  describe('problem type lock', () => {
+    const wire = (rows: (sql: string) => { rows: unknown[] }) => {
+      const clientQuery = jest.fn().mockImplementation(async (sql: string) => rows(String(sql)));
+      (db.pool.connect as unknown as jest.Mock).mockResolvedValue({ query: clientQuery, release: jest.fn() });
+      return clientQuery;
+    };
+
+    it("returns 'type_locked' when the type changes and a submission exists", async () => {
+      wire((sql) => {
+        if (sql.includes('SELECT problem_type')) return { rows: [{ problem_type: 'standard', submission_filename: null }] };
+        if (sql.includes('EXISTS')) return { rows: [{ used: true }] };
+        return { rows: [{ id: 'p1' }] };
+      });
+      await expect(updateProblem('p1', { id: 'p1', problem_type: 'header' })).resolves.toBe('type_locked');
+    });
+
+    it('checks both submissions and contest_submissions', async () => {
+      const clientQuery = wire((sql) => {
+        if (sql.includes('SELECT problem_type')) return { rows: [{ problem_type: 'header', submission_filename: 'student.h' }] };
+        if (sql.includes('EXISTS')) return { rows: [{ used: false }] };
+        return { rows: [{ id: 'p1' }] };
+      });
+      await updateProblem('p1', { id: 'p1', submission_filename: 'other.h' });
+      const existsSql = clientQuery.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.includes('EXISTS'))!;
+      expect(existsSql).toContain('FROM submissions');
+      expect(existsSql).toContain('FROM contest_submissions');
+    });
+
+    it('updates when the type is unchanged even if submissions exist', async () => {
+      const clientQuery = wire((sql) => {
+        if (sql.includes('SELECT problem_type')) return { rows: [{ problem_type: 'header', submission_filename: 'student.h' }] };
+        return { rows: [{ id: 'p1' }] };
+      });
+      await expect(updateProblem('p1', { id: 'p1', title: 'New', problem_type: 'header', submission_filename: 'student.h' }))
+        .resolves.toEqual({ id: 'p1' });
+      expect(clientQuery.mock.calls.some(([sql]) => String(sql).includes('EXISTS'))).toBe(false);
+    });
+
+    it('stores a NULL filename when switching to standard with no submissions', async () => {
+      const clientQuery = wire((sql) => {
+        if (sql.includes('SELECT problem_type')) return { rows: [{ problem_type: 'header', submission_filename: 'student.h' }] };
+        if (sql.includes('EXISTS')) return { rows: [{ used: false }] };
+        return { rows: [{ id: 'p1' }] };
+      });
+      await updateProblem('p1', { id: 'p1', problem_type: 'standard' });
+      const params = clientQuery.mock.calls.find(([sql]) => String(sql).includes('UPDATE problems'))![1] as unknown[];
+      expect(params.slice(-3)).toEqual([true, 'standard', null]);
+    });
+  });
 });

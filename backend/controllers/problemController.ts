@@ -206,8 +206,8 @@ router.get('/problems/:id/pdf', requirePublicAccess,
 router.post('/admin/problems', requireAuth, requireStaffOrAdmin,
   validateRequest({ body: createProblemSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const { id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb } = req.body as CreateProblemRequestBody;
-  const createResult = await createProblem({ id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb });
+  const { id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb, problem_type, submission_filename } = req.body as CreateProblemRequestBody;
+  const createResult = await createProblem({ id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb, problem_type, submission_filename });
   if (createResult === 'duplicate_id') {
     throw new AppError(`Problem ID '${id}' already exists.`, 409);
   }
@@ -218,7 +218,7 @@ router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
   validateRequest({ params: problemIdParamSchema, body: updateProblemSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const oldId = String(req.params.id);
-  const { id: newId, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb } = req.body as UpdateProblemRequestBody;
+  const { id: newId, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb, problem_type, submission_filename } = req.body as UpdateProblemRequestBody;
 
   const updateResult = await updateProblem(oldId, {
     id: newId,
@@ -229,7 +229,12 @@ router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
     collection_id,
     time_limit_ms,
     memory_limit_mb,
+    problem_type,
+    submission_filename,
   });
+  if (updateResult === 'type_locked') {
+    throw new AppError('Problem type and submission filename cannot change after submissions exist.', 409);
+  }
   if (updateResult === 'duplicate_id') {
     throw new AppError(`Problem ID '${newId}' already exists.`, 409);
   }

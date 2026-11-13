@@ -385,8 +385,35 @@ describe('Problem Controller', () => {
             expect(res.status).toBe(201);
             expect(db.query).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO problems'),
-                ['P4', 'Problem 4', 'Author 4', ['Dynamic Programming', 'Graph'], null, null, 1000, 256]
+                ['P4', 'Problem 4', 'Author 4', ['Dynamic Programming', 'Graph'], null, null, 1000, 256, 'standard', null]
             );
+        });
+
+        it('creates a header problem defaulting the filename to student.h', async () => {
+            const body = { id: 'H1', title: 'H', author: 'A', time_limit_ms: 1000, memory_limit_mb: 256, problem_type: 'header' };
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ ...body, submission_filename: 'student.h' }] });
+
+            const res = await request(app).post('/admin/problems').send(body);
+
+            expect(res.status).toBe(201);
+            expect((db.query as jest.Mock).mock.calls[0][1].slice(-2)).toEqual(['header', 'student.h']);
+        });
+
+        it('rejects an invalid header submission filename with 400', async () => {
+            const res = await request(app).post('/admin/problems').send({
+                id: 'H2', title: 'H', author: 'A', time_limit_ms: 1000, memory_limit_mb: 256,
+                problem_type: 'header', submission_filename: '../evil.h',
+            });
+            expect(res.status).toBe(400);
+        });
+
+        it('stores NULL filename for a standard problem even if one is sent', async () => {
+            const body = { id: 'S1', title: 'S', author: 'A', time_limit_ms: 1000, memory_limit_mb: 256, problem_type: 'standard', submission_filename: 'x.h' };
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [body] });
+
+            await request(app).post('/admin/problems').send(body);
+
+            expect((db.query as jest.Mock).mock.calls[0][1].slice(-2)).toEqual(['standard', null]);
         });
 
         it('should return 409 when the problem ID already exists', async () => {
@@ -425,7 +452,7 @@ describe('Problem Controller', () => {
             expect(res.status).toBe(201);
             expect(db.query).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO problems'),
-                ['P4b', 'Problem 4b', 'Author 4', [], null, null, 1000, 256]
+                ['P4b', 'Problem 4b', 'Author 4', [], null, null, 1000, 256, 'standard', null]
             );
         });
 
@@ -467,6 +494,22 @@ describe('Problem Controller', () => {
 
             expect(res.status).toBe(404);
             expect(res.body.message).toBe('Problem not found');
+        });
+    });
+
+    describe('PUT /admin/problems/:id type lock', () => {
+        const body = { id: 'P1', title: 'T', problem_type: 'header', submission_filename: 'student.h' };
+
+        it('returns 409 when the type changes after submissions exist', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [] }) // BEGIN
+                .mockResolvedValueOnce({ rows: [{ problem_type: 'standard', submission_filename: null }] })
+                .mockResolvedValueOnce({ rows: [{ used: true }] });
+
+            const res = await request(app).put('/admin/problems/P1').send(body);
+
+            expect(res.status).toBe(409);
+            expect(res.body.message).toBe('Problem type and submission filename cannot change after submissions exist.');
         });
     });
 

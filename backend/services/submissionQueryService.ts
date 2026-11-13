@@ -7,6 +7,7 @@ import {
 } from '../types/models';
 import { SubmissionListQuery, SubmitRequestBody } from '../types/api';
 import { AppError } from '../middleware/errorHandler';
+import { hasGraderSource } from './problemFilesService';
 import { isContestManagementRole, isContestParticipant } from './contestAccess';
 import {
     ExistsRow,
@@ -17,6 +18,21 @@ import {
     SearchViewer,
     SubmissionListRow,
 } from '../types/service';
+
+/** Header problems are C++-only and need at least one grader .cpp to be judgeable. */
+const assertHeaderSubmitAllowed = async (
+    problemType: string | undefined,
+    problemId: string,
+    language: string,
+): Promise<void> => {
+    if (problemType !== 'header') return;
+    if (language !== 'cpp') {
+        throw new AppError('This problem accepts C++ only.', 400);
+    }
+    if (!(await hasGraderSource(problemId))) {
+        throw new AppError('This problem is not ready for submissions yet.', 400);
+    }
+};
 
 export const validateAndQueueSubmission = async (
     submission: SubmitRequestBody,
@@ -75,13 +91,14 @@ export const validateAndQueueSubmission = async (
             throw new AppError('You must join the contest before submitting.', 403);
         }
 
-        const problemResult = await db.query<ExistsRow>(
-            'SELECT 1 AS exists FROM problems WHERE id = $1 AND contest_id = $2',
+        const problemResult = await db.query<ExistsRow & { problem_type?: string }>(
+            'SELECT 1 AS exists, problem_type FROM problems WHERE id = $1 AND contest_id = $2',
             [problemId, contestId],
         );
         if (problemResult.rows.length === 0) {
             throw new AppError('Problem does not belong to this contest.', 400);
         }
+        await assertHeaderSubmitAllowed(problemResult.rows[0].problem_type, problemId, language);
 
         const submissionResult = await db.query<{ id: number }>(
             `INSERT INTO contest_submissions (contest_id, user_id, problem_id, code, language, overall_status, score)
@@ -96,14 +113,15 @@ export const validateAndQueueSubmission = async (
     }
 
     const isStaffOrAdmin = isContestManagementRole({ role });
-    const problemResult = await db.query<ExistsRow>(
-        `SELECT 1 AS exists FROM problems
+    const problemResult = await db.query<ExistsRow & { problem_type?: string }>(
+        `SELECT 1 AS exists, problem_type FROM problems
          WHERE id = $1 AND contest_id IS NULL AND (is_visible = true OR $2 = true)`,
         [problemId, isStaffOrAdmin],
     );
     if (problemResult.rows.length === 0) {
         throw new AppError('Problem is not available for submission.', 400);
     }
+    await assertHeaderSubmitAllowed(problemResult.rows[0].problem_type, problemId, language);
 
     const submissionResult = await db.query<{ id: number }>(
         `INSERT INTO submissions (user_id, problem_id, code, language, overall_status, score)
