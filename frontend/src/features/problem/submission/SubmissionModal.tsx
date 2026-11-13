@@ -9,6 +9,7 @@ import editorStyles from '../../../components/styles/CodeEditor.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 import { UI_CONFIG } from '../../../config/constants';
 import { getLanguageDisplayName } from '../../../utils/constants';
+import { readOnlyCodeEditorProps } from '../../../utils/readOnlyCodeEditor';
 
 const SubmissionModal = ({ submission, onClose }) => {
   const {
@@ -132,7 +133,7 @@ const SubmissionModal = ({ submission, onClose }) => {
                   highlight={highlightCode}
                   padding={16}
                   textareaId="code"
-                  disabled={true}
+                  {...readOnlyCodeEditorProps}
                   style={{
                     fontFamily: '"Fira code", "Fira Mono", monospace',
                     fontSize: UI_CONFIG.DEFAULT_EDITOR_FONT_SIZE,
