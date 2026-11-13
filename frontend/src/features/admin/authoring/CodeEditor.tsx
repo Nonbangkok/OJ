@@ -4,6 +4,9 @@ import cpp from 'highlight.js/lib/languages/cpp';
 import 'highlight.js/styles/atom-one-dark.css';
 import Editor from 'react-simple-code-editor';
 import styles from './Authoring.module.css';
+import { readOnlyCodeEditorProps } from '../../../utils/readOnlyCodeEditor';
+
+const ignoreEdit = () => {};
 
 hljs.registerLanguage('cpp', cpp);
 
@@ -52,10 +55,13 @@ export default function CodeEditor({ label, value, disabled, onChange, minLines 
       <div className={styles.codeScroll}>
         <Editor
           value={value}
-          onValueChange={onChange}
+          // While disabled (e.g. a job is running) the code stays scrollable
+          // and selectable but cannot change: read-only, not disabled, which
+          // Gecko browsers would make unscrollable.
+          onValueChange={disabled ? ignoreEdit : onChange}
           highlight={highlight}
           padding={14}
-          disabled={disabled}
+          {...(disabled ? readOnlyCodeEditorProps : {})}
           textareaId={`editor-${label.replace(/\W+/g, '-')}`}
           style={{
             fontFamily: '"Fira code", "Fira Mono", monospace',
