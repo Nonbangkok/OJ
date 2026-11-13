@@ -102,7 +102,11 @@ const readDirFiles = (dir: string): Array<[string, Buffer]> =>
     expect([...results.added].sort()).toEqual(problemIds);
   });
 
-  describe.each(problemIds)('%s', id => {
+  // `describe.each` is evaluated when the module loads, even inside a skipped
+  // describe, and throws on an empty table. dist/ is a build artifact that is
+  // absent in a fresh checkout, so the per-problem block only exists once the
+  // content has actually been built.
+  if (problemIds.length > 0) describe.each(problemIds)('%s', id => {
     const dir = path.join(distDir, id);
     const config = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8'));
 
