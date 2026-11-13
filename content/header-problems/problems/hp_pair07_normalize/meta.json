@@ -1,0 +1,43 @@
+{
+  "id": "hp_pair07_normalize",
+  "title": "Pair Normalize — จัดให้สมาชิกตัวแรกไม่เกินตัวที่สอง",
+  "author": "OJ Header Problem Set",
+  "topic": "pair",
+  "class": "CP::pair<T1,T2>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1400,
+  "collection": "Header Problems — Pair",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "void normalize();",
+    "bool sorted() const;",
+    "",
+    "// already implemented here: normalising twice in a row. A correct",
+    "// normalize() is idempotent, so this must leave exactly the same pair",
+    "// behind as a single call.",
+    "void normalize_twice() { normalize(); normalize(); }"
+  ],
+  "pdf_probe": "เรียกซ้ำอีกครั้งต้องไม่เปลี่ยนอะไรอีก",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 2,
+      "percent": 20,
+      "note": "มีเฉพาะ CP::pair<int,int> และข้อมูลขนาดเล็ก"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "มี CP::pair<string,string> และ CP::pair<long long,long long> ด้วย"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "ข้อมูลขนาดใหญ่ มีคู่ที่เรียงอยู่แล้วและคู่ที่สมาชิกเท่ากันจำนวนมาก"
+    }
+  ]
+}

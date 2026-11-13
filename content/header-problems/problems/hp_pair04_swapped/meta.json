@@ -1,0 +1,43 @@
+{
+  "id": "hp_pair04_swapped",
+  "title": "Pair Swapped — สลับที่สมาชิกทั้งสองเป็นคู่อันดับใหม่",
+  "author": "OJ Header Problem Set",
+  "topic": "pair",
+  "class": "CP::pair<T1,T2>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1100,
+  "collection": "Header Problems — Pair",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "pair<T2, T1> swapped() const;",
+    "void become(const pair<T2, T1> &other);",
+    "",
+    "// already implemented here: sliding the components across twice has to",
+    "// land back on the original pair, so this calls your swapped() on BOTH",
+    "// pair<T1,T2> and pair<T2,T1>.",
+    "pair<T1, T2> round_trip() const { return swapped().swapped(); }"
+  ],
+  "pdf_probe": "สลับตำแหน่งของสมาชิกทั้งสองแล้วคืนเป็นคู่อันดับใหม่",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "มีเฉพาะ CP::pair<int,string> และข้อมูลขนาดเล็ก"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "มี CP::pair<string,long long> และ CP::pair<int,int> ด้วย"
+    },
+    {
+      "cases": 4,
+      "percent": 40,
+      "note": "ข้อมูลขนาดใหญ่ และมีการสลับซ้อนหลายชั้น"
+    }
+  ]
+}

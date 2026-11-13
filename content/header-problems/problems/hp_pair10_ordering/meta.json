@@ -1,0 +1,56 @@
+{
+  "id": "hp_pair10_ordering",
+  "title": "Pair Ordering — ตัวดำเนินการเปรียบเทียบครบหกตัวที่สอดคล้องกัน",
+  "author": "OJ Header Problem Set",
+  "topic": "pair",
+  "class": "CP::pair<T1,T2>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1900,
+  "collection": "Header Problems — Pair",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "bool operator==(const pair<T1, T2> &other) const;",
+    "bool operator!=(const pair<T1, T2> &other) const;",
+    "bool operator<(const pair<T1, T2> &other) const;",
+    "bool operator<=(const pair<T1, T2> &other) const;",
+    "bool operator>(const pair<T1, T2> &other) const;",
+    "bool operator>=(const pair<T1, T2> &other) const;",
+    "",
+    "const pair<T1, T2> &clamp(const pair<T1, T2> &low, const pair<T1, T2> &high) const;",
+    "",
+    "// already implemented here: -1 / 0 / +1 from your < alone. Exactly one",
+    "// of the three answers can be right for any two pairs, so a < that is",
+    "// not a strict total order makes this function lie.",
+    "int compare_sign(const pair<T1, T2> &other) const",
+    "{",
+    "  if (*this < other)",
+    "    return -1;",
+    "  if (other < *this)",
+    "    return 1;",
+    "  return 0;",
+    "}"
+  ],
+  "pdf_probe": "ตัวดำเนินการทั้งหกตัวต้องให้คำตอบที่สอดคล้องกัน",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 2,
+      "percent": 20,
+      "note": "มีเฉพาะ CP::pair<int,int> และข้อมูลขนาดเล็ก"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "มี CP::pair<string,int> และ CP::pair<long long,long long> ด้วย"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "ข้อมูลขนาดใหญ่ มีคู่ที่เท่ากันและคู่ที่ first ตรงกันจำนวนมาก"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "id": "hp_pair05_add",
+  "title": "Pair Add — บวกคู่อันดับทีละตำแหน่ง",
+  "author": "OJ Header Problem Set",
+  "topic": "pair",
+  "class": "CP::pair<T1,T2>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1200,
+  "collection": "Header Problems — Pair",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "pair<T1, T2> operator+(const pair<T1, T2> &other) const;",
+    "pair<T1, T2> doubled() const;",
+    "",
+    "// already implemented here: adding `other` twice. It adds a pair to the",
+    "// RESULT of an addition, so your operator+ has to return a usable value,",
+    "// not a reference into a temporary.",
+    "pair<T1, T2> plus_twice(const pair<T1, T2> &other) const { return *this + other + other; }"
+  ],
+  "pdf_probe": "บวกสมาชิกที่อยู่ตำแหน่งเดียวกันเข้าด้วยกัน",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 2,
+      "percent": 20,
+      "note": "มีเฉพาะ CP::pair<long long,long long> และข้อมูลขนาดเล็ก"
+    },
+    {
+      "cases": 4,
+      "percent": 40,
+      "note": "มี CP::pair<int,string> ด้วย (ตำแหน่งที่สองเป็นการต่อข้อความ)"
+    },
+    {
+      "cases": 4,
+      "percent": 40,
+      "note": "ข้อมูลขนาดใหญ่ และมี CP::pair<string,string> ที่ทั้งสองตำแหน่งเป็นข้อความ"
+    }
+  ]
+}

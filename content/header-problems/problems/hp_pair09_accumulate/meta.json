@@ -1,0 +1,49 @@
+{
+  "id": "hp_pair09_accumulate",
+  "title": "Pair Accumulate — บวกสะสมในที่และคืนการอ้างอิง",
+  "author": "OJ Header Problem Set",
+  "topic": "pair",
+  "class": "CP::pair<T1,T2>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1700,
+  "collection": "Header Problems — Pair",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "pair<T1, T2> &operator+=(const pair<T1, T2> &other);",
+    "pair<T1, T2> &absorb_twice(const pair<T1, T2> &other);",
+    "",
+    "// already implemented here: + is written on top of your +=, exactly the",
+    "// way the standard library pairs the two operators. The two therefore",
+    "// agree by construction — and a += that does not update *this leaves",
+    "// this + broken as well.",
+    "pair<T1, T2> operator+(const pair<T1, T2> &other) const",
+    "{",
+    "  pair<T1, T2> result(*this);",
+    "  result += other;",
+    "  return result;",
+    "}"
+  ],
+  "pdf_probe": "ต้องแก้ค่าในตัวเองโดยตรง ไม่ใช่สร้างคู่อันดับใหม่แล้วคัดลอกกลับ",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "ข้อมูลขนาดเล็ก สมาชิกเป็นจำนวนเต็มเป็นหลัก"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "ข้อมูลขนาดกลาง มี CP::pair<string,string> ด้วย (วิธีสร้างคู่ใหม่ทุกครั้งยังผ่าน)"
+    },
+    {
+      "cases": 4,
+      "percent": 40,
+      "note": "บวกสะสมข้อความถึง 5 × 10^4 ครั้งลงตัวสะสมเดียว ต้องต่อข้อความในที่"
+    }
+  ]
+}
