@@ -14,10 +14,12 @@ import {
   TestcaseView,
   TestcaseViewPart,
 } from '../types/service';
-import { ADMIN_PROBLEM_LIST_CONFIG, PROBLEM_LIST_CONFIG, TESTCASE_VIEWER_CONFIG } from '../constants';
+import { ADMIN_PROBLEM_LIST_CONFIG, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CONFIG, TESTCASE_VIEWER_CONFIG, type ProblemFileRole } from '../constants';
 import { fullyPairedCaseNumbers, pairZippedTestcaseFiles } from './testcaseZipPairing';
 import { isUniqueViolation } from '../utils/dbErrors';
 import { AppError } from '../middleware/errorHandler';
+import { getProblemFiles } from './problemFilesService';
+import { validateProblemFileSet } from '../utils/headerProblemFiles';
 
 /**
  * Run `body` inside a single transaction. BEGIN/COMMIT/ROLLBACK on a dedicated
@@ -378,8 +380,19 @@ export const getVisibleProblems = async (): Promise<Array<Pick<ProblemRow, 'id' 
 
 export const getProblemDetail = async (problemId: string): Promise<ProblemDetailDTO | null> => {
   const result = await db.query<ProblemDetailDTO>(
-    'SELECT id, title, author, categories, difficulty, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible, contest_id FROM problems WHERE id = $1',
+    'SELECT id, title, author, categories, difficulty, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible, contest_id, problem_type, submission_filename, (problems.problem_type = \'header\' AND EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = problems.id AND f.role = \'starter\')) AS has_starter_files FROM problems WHERE id = $1',
     [problemId]
+  );
+  return result.rows[0] ?? null;
+};
+
+/** Visibility context for the public starter-ZIP route (same rule as the PDF route). */
+export const getProblemStarterAccess = async (
+  problemId: string,
+): Promise<Pick<ProblemRow, 'problem_type' | 'is_visible' | 'contest_id'> | null> => {
+  const result = await db.query<Pick<ProblemRow, 'problem_type' | 'is_visible' | 'contest_id'>>(
+    'SELECT problem_type, is_visible, contest_id FROM problems WHERE id = $1',
+    [problemId],
   );
   return result.rows[0] ?? null;
 };
@@ -403,10 +416,11 @@ export const getProblemPdfWithAccess = async (
 export const createProblem = async (
   payload: CreateProblemRequestBody,
 ): Promise<'duplicate_id' | ProblemRow> => {
+  const problemType = payload.problem_type ?? 'standard';
   try {
     const result = await db.query<ProblemRow>(
-      'INSERT INTO problems (id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb) VALUES ($1, $2, $3, $4::text[], $5, $6, $7, $8) RETURNING *',
-      [payload.id, payload.title, payload.author, [...payload.categories ?? []], payload.difficulty ?? null, payload.collection_id ?? null, payload.time_limit_ms, payload.memory_limit_mb]
+      'INSERT INTO problems (id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb, problem_type, submission_filename) VALUES ($1, $2, $3, $4::text[], $5, $6, $7, $8, $9, $10) RETURNING *',
+      [payload.id, payload.title, payload.author, [...payload.categories ?? []], payload.difficulty ?? null, payload.collection_id ?? null, payload.time_limit_ms, payload.memory_limit_mb, problemType, problemType === 'header' ? (payload.submission_filename ?? DEFAULT_SUBMISSION_FILENAME) : null]
     );
     return result.rows[0];
   } catch (error) {
@@ -415,15 +429,67 @@ export const createProblem = async (
   }
 };
 
+/** A submission filename that would collide with a stored grader file. */
+export interface SubmissionFilenameConflict {
+  kind: 'filename_conflict';
+  message: string;
+}
+
 export const updateProblem = async (
   oldId: string,
   payload: UpdateProblemRequestBody,
-): Promise<'duplicate_id' | 'not_found' | ProblemRow> => {
+): Promise<'duplicate_id' | 'not_found' | 'type_locked' | SubmissionFilenameConflict | ProblemRow> => {
   return withTransaction(async (client) => {
     if (oldId !== payload.id) {
       const existingProblem = await client.query<Pick<ProblemRow, 'id'>>('SELECT id FROM problems WHERE id = $1', [payload.id]);
       if (existingProblem.rows.length > 0) {
         return 'duplicate_id';
+      }
+    }
+
+    // problem_type / submission_filename are locked once any submission exists:
+    // old submissions would otherwise be rejudged under the wrong shape.
+    // Switching to standard stores NULL (DB CHECK: filename non-null iff header).
+    const typeFieldsProvided = payload.problem_type !== undefined || payload.submission_filename !== undefined;
+    let nextType: string | null = null;
+    let nextFilename: string | null = null;
+    if (typeFieldsProvided) {
+      const current = await client.query<Pick<ProblemRow, 'problem_type' | 'submission_filename'>>(
+        'SELECT problem_type, submission_filename FROM problems WHERE id = $1 FOR UPDATE',
+        [oldId],
+      );
+      if (current.rows.length === 0) {
+        return 'not_found';
+      }
+      const row = current.rows[0];
+      nextType = payload.problem_type ?? row.problem_type;
+      nextFilename = nextType === 'header'
+        ? (payload.submission_filename ?? row.submission_filename ?? DEFAULT_SUBMISSION_FILENAME)
+        : null;
+      if (nextType !== row.problem_type || nextFilename !== row.submission_filename) {
+        const used = await client.query(
+          `SELECT (EXISTS (SELECT 1 FROM submissions WHERE problem_id = $1)
+                OR EXISTS (SELECT 1 FROM contest_submissions WHERE problem_id = $1)) AS used`,
+          [oldId],
+        );
+        if (used.rows[0]?.used) {
+          return 'type_locked';
+        }
+      }
+      // With no submissions the rename is allowed, but it must not break the
+      // "no grader file is named like the submission file" invariant: the judge
+      // writes the grader files first and the submission LAST, so a grader
+      // `queue.h` would be silently overwritten by the student's own code.
+      // Re-checked here, in the same transaction that takes FOR UPDATE on the
+      // problem row, against the grader set as stored right now.
+      if (nextFilename !== null && nextFilename !== row.submission_filename) {
+        const graderFiles = await getProblemFiles(oldId, 'grader', client);
+        if (graderFiles.length > 0) {
+          const fileSetError = validateProblemFileSet('grader', graderFiles, nextFilename);
+          if (fileSetError) {
+            return { kind: 'filename_conflict', message: fileSetError };
+          }
+        }
       }
     }
 
@@ -434,8 +500,8 @@ export const updateProblem = async (
     // null = clear the rating (Unrated), number = set it.
     const difficultyProvided = payload.difficulty !== undefined;
     const result = await client.query<ProblemRow>(
-      'UPDATE problems SET id = $1, title = COALESCE($2, title), author = COALESCE($3, author), categories = CASE WHEN $8::boolean THEN $4::text[] ELSE categories END, difficulty = CASE WHEN $9::boolean THEN $5 ELSE difficulty END, collection_id = CASE WHEN $11::boolean THEN $10 ELSE collection_id END, time_limit_ms = COALESCE($6, time_limit_ms), memory_limit_mb = COALESCE($7, memory_limit_mb) WHERE id = $12 RETURNING *',
-      [payload.id, payload.title ?? null, payload.author ?? null, [...payload.categories ?? []], payload.difficulty ?? null, payload.time_limit_ms ?? null, payload.memory_limit_mb ?? null, categoriesProvided, difficultyProvided, payload.collection_id ?? null, payload.collection_id !== undefined, oldId]
+      'UPDATE problems SET id = $1, title = COALESCE($2, title), author = COALESCE($3, author), categories = CASE WHEN $8::boolean THEN $4::text[] ELSE categories END, difficulty = CASE WHEN $9::boolean THEN $5 ELSE difficulty END, collection_id = CASE WHEN $11::boolean THEN $10 ELSE collection_id END, time_limit_ms = COALESCE($6, time_limit_ms), memory_limit_mb = COALESCE($7, memory_limit_mb), problem_type = CASE WHEN $13::boolean THEN $14 ELSE problem_type END, submission_filename = CASE WHEN $13::boolean THEN $15 ELSE submission_filename END WHERE id = $12 RETURNING *',
+      [payload.id, payload.title ?? null, payload.author ?? null, [...payload.categories ?? []], payload.difficulty ?? null, payload.time_limit_ms ?? null, payload.memory_limit_mb ?? null, categoriesProvided, difficultyProvided, payload.collection_id ?? null, payload.collection_id !== undefined, oldId, typeFieldsProvided, nextType, nextFilename]
     );
 
     if (result.rows.length === 0) {
@@ -765,7 +831,8 @@ export const replaceProblemTestcasesFromZipFile = async (
 export const getProblemExportBundle = async (problemId: string): Promise<ProblemExportBundle | null> => {
   const problemResult = await db.query<ProblemExportBundle['problem']>(
     `SELECT p.id, p.title, p.author, p.time_limit_ms, p.memory_limit_mb, p.problem_pdf,
-            p.categories, p.difficulty, col.name AS collection_name
+            p.categories, p.difficulty, p.problem_type, p.submission_filename,
+            col.name AS collection_name
      FROM problems p
      LEFT JOIN collections col ON col.id = p.collection_id
      WHERE p.id = $1`,
@@ -782,9 +849,19 @@ export const getProblemExportBundle = async (problemId: string): Promise<Problem
     [problemId]
   );
 
+  let files: ProblemExportBundle['files'] = [];
+  if (problem.problem_type === 'header') {
+    const filesResult = await db.query<{ role: ProblemFileRole; filename: string; content: Buffer }>(
+      'SELECT role, filename, content FROM problem_files WHERE problem_id = $1 ORDER BY role, filename',
+      [problemId]
+    );
+    files = filesResult.rows;
+  }
+
   return {
     problem,
     testcases: testcasesResult.rows,
+    files,
   };
 };
 

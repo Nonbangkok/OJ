@@ -1,0 +1,51 @@
+{
+  "id": "hp_que08_rotate",
+  "title": "Queue Rotate",
+  "author": "Nonbangkok",
+  "topic": "queue",
+  "class": "CP::queue<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1600,
+  "collection": "Header Problems — Queue",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "// ---- the function you must write; it lives in student.h ----",
+    "void rotate(size_t k);",
+    "",
+    "// ---- already written for you, and they stay in this file ----",
+    "const T &front() const { return mData[mFront]; }",
+    "",
+    "const T &back() const { return mData[(mFront + mSize - 1) % mCap]; }",
+    "",
+    "void push(const T &element)",
+    "{",
+    "  ensureCapacity(mSize + 1);",
+    "  mData[(mFront + mSize) % mCap] = element;",
+    "  mSize++;",
+    "}",
+    "",
+    "void pop()",
+    "{",
+    "  mFront = (mFront + 1) % mCap;",
+    "  mSize--;",
+    "}"
+  ],
+  "pdf_probe": "หมุนไปข้างหน้าหรือหมุนย้อนกลับก็ได้",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ≤ 2,000 และคำสั่งไม่เกิน 3,000 คำสั่ง (วิธีที่ลด k แล้วหมุนทีละตำแหน่งไปข้างหน้าก็ผ่าน)"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ≤ 50,000 และคำสั่งไม่เกิน 36,000 คำสั่ง โดยส่วนใหญ่ k ≡ −r (mod size()) ที่ r น้อย ๆ (ต้องหมุนย้อนกลับแทน)"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "id": "hp_pq06_descendants",
+  "title": "Priority Queue Descendants",
+  "author": "Nonbangkok",
+  "topic": "priority_queue",
+  "class": "CP::priority_queue<T,Comp>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 2400,
+  "collection": "Header Problems — Priority Queue",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "// for student.h\nsize_t descendants(size_t i) const;",
+    "",
+    "// already implemented here on top of your descendants(): ปุ่มนี้เป็นใบ\n// ของต้นไม้หรือไม่\nbool is_leaf(size_t i) const { return descendants(i) == 0; }",
+    "",
+    "// already implemented here, and only the grader calls it: does the array\n// still satisfy the heap property (every parent at least as important as its\n// children, measured with mLess)? You never need to call it yourself.\nbool heap_ok() const\n{\n  for (size_t c = 1; c < mSize; c++)\n    if (mLess(mData[(c - 1) / 2], mData[c]))\n      return false;\n  return true;\n}"
+  ],
+  "pdf_probe": "ลูกหลานของปุ่มหนึ่งในแต่ละชั้นเป็นช่วงดัชนีที่ติดกัน",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "สมาชิกไม่เกิน 2,000 ตัว (วิธีไล่นับทุกปุ่มใน subtree ผ่านได้)"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "สมาชิกถึง 10⁶ ตัว และถามรวมกว่า 2 × 10⁵ ครั้งต่อบล็อก โดยดัชนีอยู่ใกล้ราก (ต้องตอบใน O(log n))"
+    }
+  ]
+}

@@ -120,6 +120,32 @@ describe('adminService', () => {
             expect(result).toEqual(mockData);
         });
 
+        it('getProblemFiles lists header problem files', async () => {
+            const data = { problem_type: 'header', submission_filename: 'student.h', files: [{ role: 'grader', filename: 'g.cpp', bytes: 10 }] };
+            jest.mocked(api.get).mockResolvedValueOnce({ data });
+            const result = await adminService.getProblemFiles('H1');
+            expect(api.get).toHaveBeenCalledWith('/admin/problems/H1/files');
+            expect(result).toEqual(data);
+        });
+
+        it('replaceProblemFiles PUTs the ZIP as the filesZip multipart field', async () => {
+            jest.mocked(api.put).mockResolvedValueOnce({ data: { message: 'ok' } });
+            const zip = new File(['x'], 'grader.zip', { type: 'application/zip' });
+            await adminService.replaceProblemFiles('H1', 'grader', zip);
+            const [url, body] = jest.mocked(api.put).mock.calls[0];
+            expect(url).toBe('/admin/problems/H1/files/grader');
+            expect(body).toBeInstanceOf(FormData);
+            expect((body as FormData).get('filesZip')).toBe(zip);
+        });
+
+        it('downloadProblemFile fetches the raw bytes as a blob', async () => {
+            const blob = new Blob(['x']);
+            jest.mocked(api.get).mockResolvedValueOnce({ data: blob });
+            const result = await adminService.downloadProblemFile('H1', 'starter', 'a b.h');
+            expect(api.get).toHaveBeenCalledWith('/admin/problems/H1/files/starter/a%20b.h', { responseType: 'blob' });
+            expect(result).toBe(blob);
+        });
+
         it('updateProblemVisibility calls api.put with correct body', async () => {
             const response: ApiMessageResponse = { message: 'Updated' };
             jest.mocked(api.put).mockResolvedValueOnce({ data: response });

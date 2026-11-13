@@ -1,0 +1,41 @@
+{
+  "id": "hp_pq02_is_heap",
+  "title": "Priority Queue Is-Heap",
+  "author": "Nonbangkok",
+  "topic": "priority_queue",
+  "class": "CP::priority_queue<T,Comp>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1600,
+  "collection": "Header Problems — Priority Queue",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "// for student.h\nbool is_heap() const;",
+    "",
+    "// already implemented here, and only the grader uses them: raw_push()\n// ต่อสมาชิกท้ายอาเรย์โดยไม่เรียก fixUp และ raw_swap() สลับช่องสองช่อง\n// โดยไม่ซ่อมอะไรเลย ทั้งสองจึงทำให้อาเรย์หยุดเป็นฮีปได้\nvoid raw_push(const T &element)\n{\n  ensureCapacity(mSize + 1);\n  mData[mSize] = element;\n  mSize++;\n}",
+    "",
+    "void raw_swap(size_t i, size_t j)\n{\n  T hold = mData[i];\n  mData[i] = mData[j];\n  mData[j] = hold;\n}"
+  ],
+  "pdf_probe": "มีสมบัติของฮีปครบทุกคู่พ่อลูก",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "ไม่เกิน 30 สมาชิก และเป็น CP::priority_queue<int> เท่านั้น"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "ไม่เกิน 900 สมาชิก มีทั้ง min-heap, long long และชนิดข้อมูลที่ไม่มี operator<"
+    },
+    {
+      "cases": 4,
+      "percent": 40,
+      "note": "สมาชิกถึง 30,000 ตัว และถาม is_heap() หลายพันครั้งบนอาเรย์ที่ถูกทำให้เสีย"
+    }
+  ]
+}

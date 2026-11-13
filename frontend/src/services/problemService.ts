@@ -107,6 +107,14 @@ const problemService = {
     }
     return `${baseUrl}/problems/${problemId}/pdf`;
   },
+
+  getStarterUrl: (problemId: string, contestId: string | number | null = null): string => {
+    const baseUrl = api.defaults.baseURL ?? '';
+    if (contestId !== null) {
+      return `${baseUrl}/contests/${contestId}/problems/${problemId}/starter`;
+    }
+    return `${baseUrl}/problems/${problemId}/starter`;
+  },
 };
 
 export default problemService;

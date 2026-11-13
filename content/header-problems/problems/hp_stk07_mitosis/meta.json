@@ -1,0 +1,36 @@
+{
+  "id": "hp_stk07_mitosis",
+  "title": "Stack Mitosis",
+  "author": "Nonbangkok",
+  "topic": "stack",
+  "class": "CP::stack<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1800,
+  "collection": "Header Problems — Stack",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "// for student.h\nvoid mitosis(size_t k);",
+    "",
+    "// for student.h — you MAY need to edit these\nconst T &top() const;",
+    "void push(const T &element);",
+    "void pop();"
+  ],
+  "pdf_probe": "ทำสำเนาสมาชิก k ตัวบนสุด",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "n ≤ 10 และ q ≤ 60 (รวมกรณี k = 0, k = size และ k > size)"
+    },
+    {
+      "cases": 7,
+      "percent": 70,
+      "note": "n ≤ 30,000 และ q ≤ 90,000 โดยจำนวนสมาชิกไม่เกิน 60,000 ตัวตลอดการทำงาน"
+    }
+  ]
+}

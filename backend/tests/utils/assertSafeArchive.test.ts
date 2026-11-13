@@ -2,7 +2,7 @@ import {
   assertSafeArchive,
   MAX_ARCHIVE_ENTRIES,
   type ArchiveEntryLike,
-} from '../../services/batchUploadService';
+} from '../../utils/archiveSafety';
 
 /**
  * Unit tests for the archive safety guard (security item E): zip-slip and

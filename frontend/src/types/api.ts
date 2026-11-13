@@ -128,6 +128,15 @@ export interface AdminProblemsQuery {
 }
 export type AdminProblemDetailResponse = ProblemDetail;
 
+export type ProblemFileRole = 'grader' | 'starter';
+
+/** GET /admin/problems/:id/files */
+export interface ProblemFilesResponse {
+  problem_type: 'standard' | 'header';
+  submission_filename: string | null;
+  files: Array<{ role: ProblemFileRole; filename: string; bytes: number }>;
+}
+
 // --- Admin testcase viewer (GET /admin/problems/:id/testcases) -----------
 
 /** Metadata row of the default (list) response — never carries content. */

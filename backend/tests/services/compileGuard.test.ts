@@ -1,4 +1,4 @@
-import { findForbiddenInclude } from '../../utils/compileGuard';
+import { findForbiddenAsm, findForbiddenInclude } from '../../utils/compileGuard';
 import { sanitizeCompilerStderr } from '../../services/submissionService';
 
 /**
@@ -77,6 +77,42 @@ describe('findForbiddenInclude', () => {
   });
 });
 
+describe('findForbiddenAsm', () => {
+  it('rejects inline asm keywords used to embed files', () => {
+    expect(findForbiddenAsm('asm(".incbin \\"main.cpp\\"")')).toBe('asm');
+    expect(findForbiddenAsm('__asm__ volatile("")')).toBe('__asm__');
+    expect(findForbiddenAsm('__asm volatile("")')).toBe('__asm');
+  });
+
+  it('rejects incbin and .include directives anywhere in the code', () => {
+    expect(findForbiddenAsm('const char* s = "incbin";')).toBe('incbin');
+    expect(findForbiddenAsm('x .include y')).toBe('.include');
+  });
+
+  it('does not match asm as a substring of a longer identifier', () => {
+    expect(findForbiddenAsm('int plasma = 1;')).toBeNull();
+    expect(findForbiddenAsm('int spasm;')).toBeNull();
+  });
+
+  it('ignores asm and incbin inside comments', () => {
+    expect(findForbiddenAsm('// asm\nint x;')).toBeNull();
+    expect(findForbiddenAsm('/* asm */ int x;')).toBeNull();
+    expect(findForbiddenAsm('/* incbin */ int x;')).toBeNull();
+  });
+
+  it('does not let a // inside a string literal hide following code', () => {
+    expect(findForbiddenAsm('const char* u = "http://x"; asm("nop");')).toBe('asm');
+  });
+
+  it('sees through backslash-newline continuation', () => {
+    expect(findForbiddenAsm('as\\\nm("nop");')).toBe('asm');
+  });
+
+  it('allows ordinary code', () => {
+    expect(findForbiddenAsm('#include <bits/stdc++.h>\nint main(){ return 0; }')).toBeNull();
+  });
+});
+
 describe('sanitizeCompilerStderr', () => {
   it('replaces the internal temp source path with a neutral name', () => {
     const tempPath = '/usr/src/app/services/submissions/42_1700000000000.cpp';
@@ -90,5 +126,27 @@ describe('sanitizeCompilerStderr', () => {
   it('returns a generic message when stderr is empty/undefined', () => {
     expect(sanitizeCompilerStderr('', '/tmp/x.cpp')).toBe('Compilation failed');
     expect(sanitizeCompilerStderr(undefined, '/tmp/x.cpp')).toBe('Compilation failed');
+  });
+
+  it('strips workspace paths from diagnostics by default', () => {
+    const raw = '/tmp/oj-submissions/sub_1_2_abc/solution.cpp:3:5: error: expected \';\'';
+    const out = sanitizeCompilerStderr(raw, 'solution.cpp');
+    expect(out).not.toContain('oj-submissions');
+    expect(out).toContain('solution.cpp:3:5: error');
+  });
+
+  it('keeps the submitted file name for header problems, path-stripped to its basename', () => {
+    // A header submission is a named file (student.h) compiled with the
+    // problem's grader sources: diagnostics MUST keep pointing at the real
+    // file the student wrote, so the neutral rename is off — only server
+    // paths are stripped.
+    const raw = 'In file included from main.cpp:1:\n'
+      + 'student.h:3:5: error: expected \';\'\n'
+      + '/tmp/oj-submissions/sub_1_2_abc/student.h:4:1: error: stray token';
+    const out = sanitizeCompilerStderr(raw, 'student.h', 'cpp', { keepSourceName: true });
+    expect(out).toContain('student.h:3:5: error');
+    expect(out).toContain('student.h:4:1: error: stray token');
+    expect(out).not.toContain('solution.cpp');
+    expect(out).not.toContain('oj-submissions');
   });
 });

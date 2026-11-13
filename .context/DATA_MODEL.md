@@ -4,9 +4,9 @@
 
 ## Schema Overview
 
-The database contains **24 tables**. The 11 legacy application tables are bootstrapped by `backend/scripts/init_db.ts` (and `migrations/0001CoreSchema.ts`); `schema_migrations` and the remaining tables are managed by the non-destructive migration runner in `backend/migrations/`. There is no ORM — all schema is defined as raw SQL DDL.
+The database contains **25 tables**. The 11 legacy application tables are bootstrapped by `backend/scripts/init_db.ts` (and `migrations/0001CoreSchema.ts`); `schema_migrations` and the remaining tables are managed by the non-destructive migration runner in `backend/migrations/`. There is no ORM — all schema is defined as raw SQL DDL.
 
-Schema status for this revision (migrations 0001–0020):
+Schema status for this revision (migrations 0001–0024):
 - Migration `0002_problem_authoring_foundation` adds `author_profiles`, `problem_drafts`, `problem_draft_assets`, `problem_draft_testcases`, and `authoring_jobs`.
 - Migration `0003_authoring_job_delivery` adds durable request JSON and the partial unique active-job-per-draft index.
 - Migration `0004_authoring_job_inputs` adds immutable input snapshots for output-generation jobs.
@@ -26,6 +26,7 @@ Schema status for this revision (migrations 0001–0020):
 - Migration `0018_integrity_fixes` adds `problems.is_visible_before_contest`, the case-insensitive unique index `users_username_lower_unique` on `LOWER(username)`, converts `user_sessions.expire` to `timestamptz`, and repairs a NULL `published_at` on published drafts.
 - Migration `0019_password_change_enabled` inserts `system_settings.password_change_enabled` (default `'true'`).
 - Migration `0020_contest_visibility` adds `contests.is_visible BOOLEAN NOT NULL DEFAULT TRUE`.
+- Migration `0024_header_problems` adds `problems.problem_type` / `problems.submission_filename` (guarded CHECKs) and the `problem_files` table.
 - `schema_migrations` serializes and records applied migrations.
 - Backend typing around the schema includes:
   - DB row interfaces remain in `backend/types/models.ts`.
@@ -259,7 +260,23 @@ Programming problems. The PDF is stored as `BYTEA` directly in the database.
 | `collection_id` | `INT` | FK → `collections(id)` ON DELETE SET NULL, NULLABLE (migration 0014) |
 | `is_visible_before_contest` | `BOOLEAN` | NULLABLE; snapshot written when a problem is attached to a contest and restored on every contest exit path (migration 0018) |
 
+| `problem_type` | `TEXT` | NOT NULL, DEFAULT `'standard'`; CHECK IN (`'standard'`, `'header'`) (migration 0024) |
+| `submission_filename` | `TEXT` | NULLABLE; CHECK `(problem_type = 'header') = (submission_filename IS NOT NULL)` — header problems only, `.h`/`.hpp` (migration 0024) |
+
 Renaming a problem id cascades to the non-FK references in `user_problem_rewards`, `authoring_published_problems`, and `problem_drafts` (the service updates them explicitly).
+
+### `problem_files`
+Secret grader sources and public starter files of **header problems** (migration 0024). Files are flat (no paths), at most 20 per role and 1 MiB each (`HEADER_PROBLEM_LIMITS`).
+
+| Column | Type | Constraints |
+|---|---|---|
+| `problem_id` | `TEXT` | FK → `problems(id)` ON DELETE CASCADE ON UPDATE CASCADE |
+| `role` | `TEXT` | NOT NULL, CHECK IN (`'grader'`, `'starter'`) |
+| `filename` | `TEXT` | NOT NULL |
+| `content` | `BYTEA` | NOT NULL |
+| | | PK(`problem_id`, `role`, `filename`) |
+
+`grader` files (at least one `.cpp`) are compiled with the student's header and never served to non-staff; `starter` files are what students download. Rows are kept if a problem's type is later switched back to standard (only possible before the first submission).
 
 ### `testcases`
 Input/output pairs for judging.

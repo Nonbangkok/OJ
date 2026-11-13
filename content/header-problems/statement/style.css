@@ -1,0 +1,245 @@
+/* Print stylesheet for header-problem statements (the house template).
+ *
+ * Font stack: Thai first (Garuda/Loma ship in fonts-thai-tlwg and carry the
+ * full Thai range with proper mark positioning), DejaVu Sans behind it for
+ * Latin and symbols. If the Thai family were missing, wkhtmltopdf would
+ * silently substitute boxes — build.py extracts the text back out of the
+ * finished PDF and fails the build when the Thai phrase does not survive, so
+ * this stack is checked rather than trusted. The same applies to the math:
+ * the relation glyphs (≤ ≥ × √) come from DejaVu Sans and are proved present
+ * by harness.assert_math_survived.
+ *
+ * Everything here has to work in wkhtmltopdf 0.12.6's QtWebKit, which is why
+ * the fractions and radicals below are plain inline-blocks with borders
+ * rather than MathML or flexbox.
+ */
+
+@page {
+  size: A4;
+  margin: 18mm 16mm 18mm 16mm;
+}
+
+body {
+  font-family: "Garuda", "Loma", "DejaVu Sans", sans-serif;
+  font-size: 11.5pt;
+  line-height: 1.65;
+  color: #15181d;
+  margin: 0;
+}
+
+h1 {
+  font-size: 19pt;
+  line-height: 1.35;
+  margin: 0 0 2mm 0;
+  border-bottom: 1.6pt solid #15181d;
+  padding-bottom: 2mm;
+}
+
+h2 {
+  font-size: 14pt;
+  line-height: 1.4;
+  margin: 7mm 0 2mm 0;
+  color: #0f2f5c;
+}
+
+h3 {
+  font-size: 12pt;
+  line-height: 1.4;
+  margin: 5mm 0 1.5mm 0;
+}
+
+p {
+  margin: 0 0 2.5mm 0;
+}
+
+ul,
+ol {
+  margin: 0 0 3mm 0;
+  padding-left: 7mm;
+}
+
+li {
+  margin-bottom: 1.2mm;
+}
+
+code {
+  font-family: "DejaVu Sans Mono", monospace;
+  font-size: 10pt;
+  background: #f1f3f6;
+  padding: 0.3mm 1mm;
+  border-radius: 1mm;
+}
+
+pre {
+  font-family: "DejaVu Sans Mono", monospace;
+  font-size: 9.5pt;
+  line-height: 1.45;
+  background: #f6f7f9;
+  border: 0.4pt solid #ced4dc;
+  border-radius: 1.2mm;
+  padding: 2.5mm 3mm;
+  margin: 0 0 3mm 0;
+  white-space: pre-wrap;
+  page-break-inside: avoid;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 3mm 0;
+  font-size: 10.5pt;
+  page-break-inside: avoid;
+}
+
+th,
+td {
+  border: 0.4pt solid #aeb6c2;
+  padding: 1.6mm 2.2mm;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: #e8ecf2;
+}
+
+hr {
+  border: none;
+  border-top: 0.4pt solid #ced4dc;
+  margin: 5mm 0;
+}
+
+.meta {
+  font-size: 10pt;
+  color: #4a5362;
+  margin: 0 0 4mm 0;
+}
+
+.meta span {
+  margin-right: 5mm;
+  white-space: nowrap;
+}
+
+/* --- the template's example table ------------------------------------------
+ *
+ * Rendered by mdrender from the sample-input / sample-output fixture, never
+ * hand-written, so the table and the sample verify.py runs cannot disagree.
+ */
+
+.samples {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin: 0 0 4mm 0;
+}
+
+.samples th {
+  width: 50%;
+  text-align: center;
+  padding: 1.4mm 2mm;
+}
+
+.samples td {
+  vertical-align: top;
+  padding: 2mm;
+}
+
+.samples pre {
+  margin: 0;
+  border: none;
+  background: none;
+  padding: 0;
+  white-space: pre;
+}
+
+/* --- explicit page break ---------------------------------------------------
+ *
+ * <div style="page-break-after: always;"></div> in the statement — the
+ * reference template's own spelling — becomes this.
+ */
+
+.page-break {
+  display: block;
+  height: 0;
+  page-break-after: always;
+}
+
+/* --- math ------------------------------------------------------------------
+ *
+ * mdrender.render_math emits this markup. Keep an expression on one line: it
+ * is always short, and an unbroken run is also what makes the PDF text-layer
+ * probe meaningful.
+ */
+
+.math {
+  white-space: nowrap;
+}
+
+.math i {
+  font-family: "DejaVu Serif", "DejaVu Sans", serif;
+  font-style: italic;
+}
+
+.mrel {
+  margin: 0 0.14em;
+}
+
+.mop {
+  font-style: normal;
+  margin-right: 0.12em;
+}
+
+sub,
+sup {
+  font-size: 0.72em;
+  line-height: 0;
+  position: relative;
+}
+
+sup {
+  top: -0.42em;
+}
+
+sub {
+  bottom: -0.22em;
+}
+
+.frac {
+  display: inline-block;
+  vertical-align: -0.5em;
+  text-align: center;
+  font-size: 0.92em;
+  margin: 0 0.12em;
+}
+
+.frac .num {
+  display: block;
+  padding: 0 0.3em;
+  border-bottom: 0.5pt solid #15181d;
+}
+
+.frac .den {
+  display: block;
+  padding: 0 0.3em;
+}
+
+.sqrt .rad {
+  border-top: 0.5pt solid #15181d;
+  padding: 0 0.12em;
+}
+
+.math-block {
+  display: inline-block;
+}
+
+p.math-block {
+  display: block;
+  text-align: center;
+  margin: 3mm 0;
+}

@@ -41,9 +41,12 @@ const writeSubmissionCache = (cache: SubmissionCache): void => {
 
 const useCodeSubmission = (
   problemId: string,
-  contestId: string | null | undefined
+  contestId: string | null | undefined,
+  submissionFilename?: string | null
 ) => {
-  const [language, setLanguage] = useState<SubmissionLanguage>('cpp');
+  const [selectedLanguage, setLanguage] = useState<SubmissionLanguage>('cpp');
+  // Header problems are C++ only; the judge rejects anything else.
+  const language: SubmissionLanguage = submissionFilename ? 'cpp' : selectedLanguage;
   const [code, setCode] = useState(``);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');

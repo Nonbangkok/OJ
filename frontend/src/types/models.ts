@@ -74,6 +74,10 @@ export interface ProblemDetail extends ProblemBase {
   memory_limit_mb: number;
   has_pdf?: boolean;
   is_visible?: boolean;
+  /** 'header' problems accept a single header file (submission_filename). */
+  problem_type?: 'standard' | 'header';
+  submission_filename?: string | null;
+  has_starter_files?: boolean;
 }
 
 export interface Contest extends Record<string, unknown> {

@@ -1,0 +1,44 @@
+{
+  "id": "hp_pair03_gte",
+  "title": "Pair Greater-or-Equal",
+  "author": "Nonbangkok",
+  "topic": "pair",
+  "class": "CP::pair<T1,T2>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1000,
+  "collection": "Header Problems — Pair",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "bool operator>=(const pair<T1, T2> &other) const;",
+    "void clamp_low(const pair<T1, T2> &floor);",
+    "",
+    "// already implemented here: < is the exact negation of >=, and <= is >=",
+    "// with the operands swapped. Both therefore run on your >= alone, so a",
+    "// >= that is wrong on equal pairs makes all three disagree at once.",
+    "bool operator<(const pair<T1, T2> &other) const { return !(*this >= other); }",
+    "bool operator<=(const pair<T1, T2> &other) const { return other >= *this; }"
+  ],
+  "pdf_probe": "คู่อันดับที่เท่ากันทุกตำแหน่งต้องคืนค่าจริง",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "มีเฉพาะ CP::pair<int,int> และข้อมูลขนาดเล็ก"
+    },
+    {
+      "cases": 2,
+      "percent": 20,
+      "note": "มี CP::pair<string,string> และ CP::pair<long long,int> ด้วย"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "ข้อมูลขนาดใหญ่ และมีคู่ที่เท่ากันทุกตำแหน่งจำนวนมาก"
+    }
+  ]
+}

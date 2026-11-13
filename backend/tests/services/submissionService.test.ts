@@ -7,9 +7,16 @@ import { judge } from '../../services/judgeService';
 import { publishRealtime } from '../../services/realtimeHub';
 import { awardSolveReward } from '../../services/progressionService';
 import { enqueueTrackedJudgeTask } from '../../services/judgeQueue';
+import { getHeaderJudgeSpec } from '../../services/problemFilesService';
 import { JUDGE_CONFIG } from '../../constants';
 
 jest.mock('../../db');
+// The header-problem spec is read through its own service (own db.query
+// calls); mocking it keeps this suite's positional db.query mocks intact and
+// lets each test declare the problem type it exercises.
+jest.mock('../../services/problemFilesService', () => ({
+    getHeaderJudgeSpec: jest.fn(),
+}));
 jest.mock('../../services/realtimeHub', () => ({
     publishRealtime: jest.fn(),
 }));
@@ -32,6 +39,7 @@ jest.mock('fs', () => ({
         chmod: jest.fn(),
         chown: jest.fn(),
         mkdir: jest.fn(),
+        rm: jest.fn(),
         // mkdtemp yields a workspace directory; tests assert on its usage.
         mkdtemp: jest.fn(async (prefix: string) => `${prefix}XXXXXX`),
     }
@@ -59,11 +67,44 @@ jest.mock('child_process', () => {
 });
 jest.mock('../../services/judgeService');
 
+/**
+ * A benign spawn stub (empty output, exit 0; `mktemp` reports a workspace) —
+ * mirrors the child_process module mock's default so a describe that
+ * overrides `cp.spawn` with its own implementation can put it back and not
+ * leak compile behaviour into the next describe.
+ */
+const benignSpawn = (command: string) => {
+    const handlers: Record<string, (...a: unknown[]) => void> = {};
+    const child = {
+        pid: 1111,
+        stdin: { on: jest.fn(), end: jest.fn() },
+        stdout: { on: (_e: string, fn: (...a: unknown[]) => void) => { handlers.stdout = fn; } },
+        stderr: { on: (_e: string, fn: (...a: unknown[]) => void) => { handlers.stderr = fn; } },
+        on: (event: string, fn: (...a: unknown[]) => void) => { handlers[event] = fn; },
+        kill: jest.fn(),
+    };
+    setImmediate(() => {
+        if (command === 'mktemp') handlers.stdout?.(Buffer.from('/tmp/oj-submissions/sub_1_1_testws\n'));
+        handlers.stdout?.(Buffer.from(''));
+        handlers.stderr?.(Buffer.from(''));
+        handlers.close?.(0, null);
+    });
+    return child;
+};
+
+/** The Compilation Error output the pipeline persisted (results JSON). */
+const compilationErrorOutput = (callIndex: number): string =>
+    JSON.parse((db.query as jest.Mock).mock.calls[callIndex][1][0])[0].output;
+
 describe('Submission Service', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         // Default: a solve earns nothing new (reward already existed).
         (awardSolveReward as jest.Mock).mockResolvedValue(0);
+        // Default: an ordinary standard problem (the header tests override).
+        (getHeaderJudgeSpec as jest.Mock).mockResolvedValue({
+            problemType: 'standard', submissionFilename: null, graderFiles: [],
+        });
         console.error = jest.fn(); // Suppress expected errors in tests
         // Default to the unprivileged dev path regardless of who runs the
         // suite (CI runs it as root inside the backend image, where the real
@@ -765,6 +806,343 @@ describe('Submission Service', () => {
             expect(helperCmds).not.toContain('dd');
             expect(judge).toHaveBeenCalledTimes(1);
             expect(fs.promises.chown).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('header problems (student.h compiled with secret grader files)', () => {
+        // A header problem's submission is ONE file (student.h) compiled in the
+        // same translation unit as the problem's secret grader sources. The
+        // pipeline must therefore: reject non-C++ and inline assembly up front,
+        // write every grader file next to the submission, compile the grader
+        // .cpp sources, and then SCRUB every source from the workspace before
+        // the binary ever runs — otherwise the student's program could just
+        // fopen() the secret main.cpp it was linked against.
+        const HEADER_SPEC = {
+            problemType: 'header' as const,
+            submissionFilename: 'student.h',
+            // DB order (ORDER BY filename): main.cpp, queue.h.
+            graderFiles: [
+                { filename: 'main.cpp', content: Buffer.from('#include "queue.h"\nint main(){}\n') },
+                { filename: 'queue.h', content: Buffer.from('#include "student.h"\n') },
+            ],
+        };
+        const GOOD_HEADER = 'void push(int){}\n';
+
+        // "สวัสดี" encoded in TIS-620/CP874, the encoding a Thai course's
+        // editor still saves in. These bytes are NOT valid UTF-8, so decoding
+        // them to a JS string replaces every one with U+FFFD and re-encoding
+        // yields different bytes: the grader's literal becomes mojibake and
+        // every student gets Wrong Answer with nothing to see.
+        const TIS620_BYTES = Buffer.from([0xca, 0xc7, 0xd1, 0xca, 0xb4, 0xd5]);
+        const TIS620_GRADER = Buffer.concat([
+            Buffer.from('#include <cstdio>\n#include "queue.h"\nint main(){ std::printf("'),
+            TIS620_BYTES,
+            Buffer.from('\\n"); }\n'),
+        ]);
+        const TIS620_SPEC = {
+            problemType: 'header' as const,
+            submissionFilename: 'student.h',
+            graderFiles: [
+                { filename: 'main.cpp', content: TIS620_GRADER },
+                { filename: 'queue.h', content: Buffer.from('#include "student.h"\n') },
+            ],
+        };
+
+        const mockRow = (code: string, language: 'cpp' | 'python' = 'cpp') =>
+            ({ rows: [{ problem_id: 'H1', user_id: 7, code, language }] });
+
+        // Restore the module mock's default compile behaviour: the privileged
+        // describe below installs its own spawn stub, and a jest.fn's
+        // implementation survives clearAllMocks.
+        afterEach(() => {
+            (cp.spawn as unknown as jest.Mock).mockImplementation(benignSpawn as never);
+        });
+
+        describe('up-front rejections', () => {
+            it('rejects a non-C++ submission as a Compilation Error without compiling', async () => {
+                (getHeaderJudgeSpec as jest.Mock).mockResolvedValue(HEADER_SPEC);
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce(mockRow('print(1)', 'python'))
+                    .mockResolvedValueOnce({}) // UPDATE Compiling
+                    .mockResolvedValueOnce({}); // UPDATE Compilation Error
+
+                await processSubmission(1);
+
+                expect(db.query).toHaveBeenNthCalledWith(3,
+                    expect.stringContaining('UPDATE submissions SET overall_status = \'Compilation Error\''),
+                    [expect.any(String), 1]);
+                expect(compilationErrorOutput(2)).toBe('This problem accepts C++ only.');
+                expect(cp.spawn).not.toHaveBeenCalled();
+                expect(judge).not.toHaveBeenCalled();
+            });
+
+            it('rejects inline assembly as a Compilation Error without compiling', async () => {
+                (getHeaderJudgeSpec as jest.Mock).mockResolvedValue(HEADER_SPEC);
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce(mockRow('asm(".incbin \\"main.cpp\\"");\n'))
+                    .mockResolvedValueOnce({}) // UPDATE Compiling
+                    .mockResolvedValueOnce({}); // UPDATE Compilation Error
+
+                await processSubmission(1);
+
+                expect(db.query).toHaveBeenNthCalledWith(3,
+                    expect.stringContaining('UPDATE submissions SET overall_status = \'Compilation Error\''),
+                    [expect.any(String), 1]);
+                expect(compilationErrorOutput(2)).toBe(
+                    'Compilation rejected: inline assembly ("asm") is not allowed in this problem.');
+                expect(cp.spawn).not.toHaveBeenCalled();
+                expect(judge).not.toHaveBeenCalled();
+            });
+
+            it('still rejects a forbidden #include with the standard message', async () => {
+                (getHeaderJudgeSpec as jest.Mock).mockResolvedValue(HEADER_SPEC);
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce(mockRow('#include "/etc/passwd"\n'))
+                    .mockResolvedValueOnce({}) // UPDATE Compiling
+                    .mockResolvedValueOnce({}); // UPDATE Compilation Error
+
+                await processSubmission(1);
+
+                expect(compilationErrorOutput(2)).toContain('#include of a non-permitted path');
+                expect(cp.spawn).not.toHaveBeenCalled();
+            });
+        });
+
+        describe('privileged (production) path', () => {
+            let spawnCalls: Array<[string, string[], Record<string, unknown>]>;
+            let removeFiles: jest.SpyInstance;
+
+            beforeEach(() => {
+                spawnCalls = [];
+                (getHeaderJudgeSpec as jest.Mock).mockResolvedValue(HEADER_SPEC);
+                const sandboxProcess = jest.requireActual('../../utils/sandboxProcess');
+                jest.spyOn(sandboxProcess, 'canDropPrivileges').mockReturnValue(true);
+                removeFiles = jest.spyOn(sandboxProcess, 'removeSandboxFiles').mockResolvedValue(undefined);
+                (cp.spawn as unknown as jest.Mock).mockImplementation(
+                    (command: string, args: string[], options: Record<string, unknown>) => {
+                        spawnCalls.push([command, args, options]);
+                        return benignSpawn(command);
+                    }
+                );
+            });
+
+            const runHeaderPipeline = async (): Promise<void> => {
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce(mockRow(GOOD_HEADER))
+                    .mockResolvedValueOnce({}) // UPDATE Compiling
+                    .mockResolvedValueOnce({}) // UPDATE Running
+                    .mockResolvedValueOnce({ rowCount: 1 }); // final UPDATE (landed)
+                (judge as jest.Mock).mockResolvedValueOnce({
+                    results: [], score: 100, overallStatus: 'Accepted', maxTimeMs: 1, maxMemoryKb: 1024
+                });
+                await processSubmission(1);
+            };
+
+            it('compiles the grader .cpp sources (not the submitted header) with the header flag set', async () => {
+                await runHeaderPipeline();
+
+                const compile = spawnCalls.find(([cmd]) => cmd === JUDGE_CONFIG.PRLIMIT_PATH);
+                expect(compile).toBeDefined();
+                const compileArgs = compile![1];
+                const gpp = compileArgs.indexOf('--') + 1;
+                expect(compileArgs[gpp]).toBe('g++');
+                // Standard C++ flags are reused verbatim, plus the header flag
+                // that keeps the secret grader source OUT of diagnostics.
+                expect(compileArgs).toEqual(expect.arrayContaining([
+                    '-std=c++20',
+                    '-fsanitize=signed-integer-overflow',
+                    '-fno-sanitize-recover=signed-integer-overflow',
+                    '-fno-diagnostics-show-caret',
+                    'main.cpp',
+                    '-o',
+                    'solution.out',
+                ]));
+                // The submitted header and the grader's .h are compiled only
+                // through #include — never named on the g++ command line.
+                expect(compileArgs).not.toContain('solution.cpp');
+                expect(compileArgs).not.toContain('student.h');
+                expect(compileArgs).not.toContain('queue.h');
+                // No absolute server paths in argv.
+                expect(compileArgs.join(' ')).not.toContain('/tmp/oj-submissions');
+            });
+
+            it('writes every grader file and the submission into the workspace as the sandbox uid', async () => {
+                await runHeaderPipeline();
+
+                const written = spawnCalls.filter(([cmd]) => cmd === 'dd').map(([, args]) => args.join(' '));
+                expect(written).toHaveLength(3);
+                expect(written.some((a) => a.includes('main.cpp'))).toBe(true);
+                expect(written.some((a) => a.includes('queue.h'))).toBe(true);
+                expect(written.some((a) => a.includes('student.h'))).toBe(true);
+                expect(written.some((a) => a.includes('solution.cpp'))).toBe(false);
+                for (const [, , opts] of spawnCalls.filter(([cmd]) => cmd === 'dd')) {
+                    expect(opts.uid as number).toBeGreaterThanOrEqual(JUDGE_CONFIG.SANDBOX_UID_BASE);
+                }
+            });
+
+            it('pipes grader file bytes into the workspace verbatim (no UTF-8 round trip)', async () => {
+                (getHeaderJudgeSpec as jest.Mock).mockResolvedValue(TIS620_SPEC);
+                const writtenBytes = new Map<string, unknown>();
+                (cp.spawn as unknown as jest.Mock).mockImplementation((command: string, args: string[]) => {
+                    const child = benignSpawn(command);
+                    if (command === 'dd') {
+                        const target = String(args[0]).replace(/^of=/, '');
+                        child.stdin.end = jest.fn((payload: unknown) => {
+                            writtenBytes.set(path.basename(target), payload);
+                        });
+                    }
+                    return child;
+                });
+
+                await runHeaderPipeline();
+
+                const mainCpp = writtenBytes.get('main.cpp');
+                expect(Buffer.isBuffer(mainCpp)).toBe(true);
+                expect(mainCpp).toEqual(TIS620_GRADER);
+                expect((mainCpp as Buffer).includes(TIS620_BYTES)).toBe(true);
+                // The submitted code stays a string: it comes from a TEXT column.
+                expect(writtenBytes.get('student.h')).toBe(GOOD_HEADER);
+            });
+
+            it('scrubs every source file from the workspace BEFORE the binary runs', async () => {
+                await runHeaderPipeline();
+
+                expect(removeFiles).toHaveBeenCalledTimes(1);
+                const [workspaceDir, fileNames, options] = removeFiles.mock.calls[0];
+                expect(String(workspaceDir)).toContain('oj-submissions');
+                expect(fileNames).toEqual(['main.cpp', 'queue.h', 'student.h']);
+                expect((options as { sandbox: { uid: number } }).sandbox.uid)
+                    .toBeGreaterThanOrEqual(JUDGE_CONFIG.SANDBOX_UID_BASE);
+                // ...strictly before the judge runs the compiled binary.
+                expect(removeFiles.mock.invocationCallOrder[0])
+                    .toBeLessThan((judge as jest.Mock).mock.invocationCallOrder[0]);
+                expect(judge).toHaveBeenCalledWith('H1', { command: expect.stringContaining('.out'), args: [] }, 'cpp', expect.anything());
+            });
+
+            it('fails the submission (System Error) and never runs the binary when the scrub fails', async () => {
+                removeFiles.mockRejectedValue(new Error('rm: Permission denied'));
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce(mockRow(GOOD_HEADER))
+                    .mockResolvedValueOnce({}) // UPDATE Compiling
+                    .mockResolvedValueOnce({}) // UPDATE Running
+                    .mockResolvedValueOnce({}); // UPDATE System Error
+
+                await processSubmission(1);
+
+                expect(judge).not.toHaveBeenCalled();
+                expect(db.query).toHaveBeenNthCalledWith(4,
+                    expect.stringContaining('UPDATE submissions SET overall_status = \'System Error\''), [1]);
+            });
+
+            it('keeps the real student.h name in compile diagnostics but no server paths', async () => {
+                (cp.spawn as unknown as jest.Mock).mockImplementation(
+                    (command: string, args: string[]) => {
+                        const handlers: Record<string, (...a: unknown[]) => void> = {};
+                        const child = {
+                            pid: 1111,
+                            stdin: { on: jest.fn(), end: jest.fn() },
+                            stdout: { on: (_e: string, fn: (...a: unknown[]) => void) => { handlers.stdout = fn; } },
+                            stderr: { on: (_e: string, fn: (...a: unknown[]) => void) => { handlers.stderr = fn; } },
+                            on: (event: string, fn: (...a: unknown[]) => void) => { handlers[event] = fn; },
+                            kill: jest.fn(),
+                        };
+                        const isCompile = command === JUDGE_CONFIG.PRLIMIT_PATH;
+                        setImmediate(() => {
+                            if (command === 'mktemp') handlers.stdout?.(Buffer.from('/tmp/oj-submissions/sub_1_1_testws\n'));
+                            if (isCompile) {
+                                handlers.stderr?.(Buffer.from(
+                                    'In file included from main.cpp:1:\n'
+                                    + 'student.h:3:5: error: expected \';\' before \'}\' token\n'
+                                    + '/tmp/oj-submissions/sub_1_1_testws/student.h:4:1: error: stray token\n'
+                                ));
+                            }
+                            handlers.close?.(isCompile ? 1 : 0, null);
+                        });
+                        void args;
+                        return child;
+                    }
+                );
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce(mockRow('void push(int){ }}\n'))
+                    .mockResolvedValueOnce({}) // UPDATE Compiling
+                    .mockResolvedValueOnce({}); // UPDATE Compilation Error
+
+                await processSubmission(1);
+
+                const saved = (db.query as jest.Mock).mock.calls[2][1][0] as string;
+                // Diagnostics must still point at the file the student wrote...
+                expect(saved).toContain('student.h:3:5: error');
+                expect(saved).not.toContain('solution.cpp');
+                // ...but never disclose the workspace path.
+                expect(saved).not.toContain('oj-submissions');
+                expect(saved).toContain('student.h:4:1: error: stray token');
+                expect(judge).not.toHaveBeenCalled();
+            });
+        });
+
+        describe('dev (unprivileged) path', () => {
+            it('writes the files 0600 and removes them with fs.promises.rm before judging', async () => {
+                (getHeaderJudgeSpec as jest.Mock).mockResolvedValue(HEADER_SPEC);
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce(mockRow(GOOD_HEADER))
+                    .mockResolvedValueOnce({}) // UPDATE Compiling
+                    .mockResolvedValueOnce({}) // UPDATE Running
+                    .mockResolvedValueOnce({ rowCount: 1 }); // final UPDATE (landed)
+                (judge as jest.Mock).mockResolvedValueOnce({
+                    results: [], score: 100, overallStatus: 'Accepted', maxTimeMs: 1, maxMemoryKb: 1024
+                });
+
+                await processSubmission(1);
+
+                const writes = (fs.promises.writeFile as jest.Mock).mock.calls;
+                expect(writes).toHaveLength(3);
+                expect(writes.map(([target]: [string]) => path.basename(String(target))))
+                    .toEqual(['main.cpp', 'queue.h', 'student.h']);
+                for (const [, , opts] of writes) expect(opts.mode).toBe(0o600);
+
+                const removed = (fs.promises.rm as jest.Mock).mock.calls
+                    .map(([target]: [string]) => path.basename(String(target)));
+                expect(removed).toEqual(['main.cpp', 'queue.h', 'student.h']);
+                expect(judge).toHaveBeenCalledTimes(1);
+            });
+
+            it('writes grader bytes verbatim too (fs path stays byte-exact)', async () => {
+                (getHeaderJudgeSpec as jest.Mock).mockResolvedValue(TIS620_SPEC);
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce(mockRow(GOOD_HEADER))
+                    .mockResolvedValueOnce({}) // UPDATE Compiling
+                    .mockResolvedValueOnce({}) // UPDATE Running
+                    .mockResolvedValueOnce({ rowCount: 1 }); // final UPDATE (landed)
+                (judge as jest.Mock).mockResolvedValueOnce({
+                    results: [], score: 100, overallStatus: 'Accepted', maxTimeMs: 1, maxMemoryKb: 1024
+                });
+
+                await processSubmission(1);
+
+                const writes = (fs.promises.writeFile as jest.Mock).mock.calls;
+                const mainWrite = writes.find(([target]: [string]) => path.basename(String(target)) === 'main.cpp')!;
+                expect(Buffer.isBuffer(mainWrite[1])).toBe(true);
+                expect(mainWrite[1]).toEqual(TIS620_GRADER);
+            });
+        });
+
+        it('leaves a standard problem on the unchanged single-source path', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code: 'int main(){}', language: 'cpp' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}) // UPDATE Running
+                .mockResolvedValueOnce({ rowCount: 1 });
+            (judge as jest.Mock).mockResolvedValueOnce({
+                results: [], score: 100, overallStatus: 'Accepted', maxTimeMs: 1, maxMemoryKb: 1024
+            });
+
+            await processSubmission(1);
+
+            const [, compileArgs] = (cp.spawn as unknown as jest.Mock).mock.calls[0];
+            expect(compileArgs).toContain('solution.cpp');
+            expect(compileArgs).not.toContain('-fno-diagnostics-show-caret');
+            expect(fs.promises.rm).not.toHaveBeenCalled();
+            expect((fs.promises.writeFile as jest.Mock).mock.calls).toHaveLength(1);
         });
     });
 

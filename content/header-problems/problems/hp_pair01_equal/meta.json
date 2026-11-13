@@ -1,0 +1,42 @@
+{
+  "id": "hp_pair01_equal",
+  "title": "Pair Equal",
+  "author": "Nonbangkok",
+  "topic": "pair",
+  "class": "CP::pair<T1,T2>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 800,
+  "collection": "Header Problems — Pair",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "bool operator==(const pair<T1, T2> &other) const;",
+    "void set(const T1 &a, const T2 &b);",
+    "",
+    "// already implemented here: != is written in terms of ==, so the two can",
+    "// never disagree. Breaking == therefore breaks != as well.",
+    "bool operator!=(const pair<T1, T2> &other) const { return !(*this == other); }"
+  ],
+  "pdf_probe": "เท่ากันเมื่อสมาชิกทั้งสองตัวเท่ากัน",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "มีเฉพาะ `CP::pair<int,int>` และข้อมูลขนาดเล็ก"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "มี `CP::pair<std::string,int>` ด้วย"
+    },
+    {
+      "cases": 4,
+      "percent": 40,
+      "note": "ข้อมูลขนาดใหญ่ ($n \\leq 20{,}000$) มีคู่ที่ `first` ตรงกันแต่ `second` ต่างกันจำนวนมาก"
+    }
+  ]
+}

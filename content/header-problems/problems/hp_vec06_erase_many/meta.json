@@ -1,0 +1,32 @@
+{
+  "id": "hp_vec06_erase_many",
+  "title": "Vector Erase Many",
+  "author": "Nonbangkok",
+  "topic": "vector",
+  "class": "CP::vector<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1600,
+  "collection": "Header Problems — Vector",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "void erase_many(const std::vector<size_t> &positions);"
+  ],
+  "pdf_probe": "ลบสมาชิกทุกตำแหน่งที่อยู่ในรายการ",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ≤ 2,000 และจำนวนตำแหน่งที่ลบรวมไม่เกิน 2,000 (วิธีลบทีละตำแหน่งผ่านได้)"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ≤ 1,000,000 และลบครั้งละถึง 10⁵ ตำแหน่ง (ต้องทำงานในพาสเดียว O(n + k))"
+    }
+  ]
+}

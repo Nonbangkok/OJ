@@ -1026,4 +1026,144 @@ describe('ProblemManagement Component', () => {
             expect(document.activeElement).toBe(input);
         });
     });
+
+    describe('header problem type', () => {
+        const filesInfo = (over = {}) => ({
+            problem_type: 'header',
+            submission_filename: 'student.h',
+            files: [
+                { role: 'grader', filename: 'grader.cpp', bytes: 2048 },
+                { role: 'starter', filename: 'student.h', bytes: 100 },
+            ],
+            ...over,
+        });
+
+        beforeEach(() => {
+            (jest.mocked(adminService.getAuthors) as jest.Mock).mockResolvedValue([]);
+            (jest.mocked(adminService.getProblemDetail) as jest.Mock).mockResolvedValue({
+                id: 'P1', title: 'Problem 1', author: 'admin', time_limit_ms: 1000, memory_limit_mb: 256,
+                has_pdf: false, is_visible: true, categories: [], difficulty: null,
+            });
+        });
+
+        const openEdit = async () => {
+            renderProblemManagement();
+            const row = await screen.findByText('Problem 1').then(element => element.closest('tr'));
+            fireEvent.click(within(row).getByRole('button', { name: 'Edit' }));
+            return screen.findByRole('dialog');
+        };
+
+        it('shows the filename input defaulting to student.h when switching a new problem to Header', async () => {
+            renderProblemManagement();
+            await screen.findByText('Problem 1');
+            fireEvent.click(screen.getByRole('button', { name: /new problem|add problem|create/i }));
+            const dialog = await screen.findByRole('dialog');
+            expect(within(dialog).queryByLabelText('Submission filename')).not.toBeInTheDocument();
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Header' }));
+            expect(within(dialog).getByLabelText('Submission filename')).toHaveValue('student.h');
+            // Files can only be uploaded for a saved problem.
+            expect(within(dialog).queryByText('Grader files')).not.toBeInTheDocument();
+        });
+
+        it('lists current files and replaces a role with the uploaded ZIP, then re-lists', async () => {
+            (jest.mocked(adminService.getProblemFiles) as jest.Mock)
+                .mockResolvedValueOnce(filesInfo())
+                .mockResolvedValueOnce(filesInfo({ files: [{ role: 'grader', filename: 'new.cpp', bytes: 5 }] }));
+            (jest.mocked(adminService.replaceProblemFiles) as jest.Mock).mockResolvedValue({ message: 'ok' });
+            const dialog = await openEdit();
+
+            expect(await within(dialog).findByText('grader.cpp')).toBeInTheDocument();
+            expect(within(dialog).getByText('2.0 KB')).toBeInTheDocument();
+            expect(within(dialog).getByLabelText('Submission filename')).toHaveValue('student.h');
+
+            const zip = new File(['zip'], 'grader.zip', { type: 'application/zip' });
+            await userEvent.upload(within(dialog).getByLabelText('Replace all grader files'), zip);
+
+            await waitFor(() => expect(adminService.replaceProblemFiles).toHaveBeenCalledWith('P1', 'grader', zip));
+            expect(await within(dialog).findByText('new.cpp')).toBeInTheDocument();
+            expect(within(dialog).queryByText('grader.cpp')).not.toBeInTheDocument();
+        });
+
+        it('shows the API message inline when an upload is rejected', async () => {
+            (jest.mocked(adminService.getProblemFiles) as jest.Mock).mockResolvedValue(filesInfo());
+            (jest.mocked(adminService.replaceProblemFiles) as jest.Mock).mockRejectedValue({
+                response: { status: 400, data: { message: 'Grader files need at least one .cpp file.' } },
+            });
+            const dialog = await openEdit();
+            await within(dialog).findByText('grader.cpp');
+            await userEvent.upload(within(dialog).getByLabelText('Replace all starter files'), new File(['z'], 's.zip'));
+            expect(await within(dialog).findByText('Grader files need at least one .cpp file.')).toBeInTheDocument();
+        });
+
+        it('shows the lock message when saving a type change is refused with 409', async () => {
+            (jest.mocked(adminService.getProblemFiles) as jest.Mock).mockResolvedValue(filesInfo());
+            const message = 'Problem type and submission filename cannot change after submissions exist.';
+            (jest.mocked(adminService.updateProblem) as jest.Mock).mockRejectedValue({
+                response: { status: 409, data: { message } },
+            });
+            const dialog = await openEdit();
+            await within(dialog).findByText('grader.cpp');
+            fireEvent.change(within(dialog).getByLabelText('Submission filename'), { target: { value: 'other.h' } });
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+            expect(await within(dialog).findByText(new RegExp(message))).toBeInTheDocument();
+            await waitFor(() => expect(within(dialog).getByLabelText('Submission filename')).toBeDisabled());
+            expect(within(dialog).getByRole('button', { name: 'Standard' })).toBeDisabled();
+            expect(within(dialog).getByText('Locked after the first submission.')).toBeInTheDocument();
+            expect(adminService.updateProblem).toHaveBeenCalledWith('P1', expect.objectContaining({
+                problem_type: 'header', submission_filename: 'other.h',
+            }));
+        });
+
+        const savedPayload = () => (jest.mocked(adminService.updateProblem) as jest.Mock).mock.calls[0][1];
+
+        it('never sends type fields when saving a standard problem edit', async () => {
+            (jest.mocked(adminService.getProblemFiles) as jest.Mock).mockResolvedValue(
+                filesInfo({ problem_type: 'standard', submission_filename: null, files: [] }));
+            (jest.mocked(adminService.updateProblem) as jest.Mock).mockResolvedValue({});
+            const dialog = await openEdit();
+            await waitFor(() => expect(adminService.getProblemFiles).toHaveBeenCalled());
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+            await waitFor(() => expect(adminService.updateProblem).toHaveBeenCalled());
+            expect(savedPayload()).not.toHaveProperty('problem_type');
+            expect(savedPayload()).not.toHaveProperty('submission_filename');
+        });
+
+        it('never sends type fields when creating a standard problem', async () => {
+            (jest.mocked(adminService.createProblem) as jest.Mock).mockResolvedValue({ id: 'N1' });
+            renderProblemManagement();
+            await screen.findByText('Problem 1');
+            fireEvent.click(screen.getByRole('button', { name: /new problem/i }));
+            const dialog = await screen.findByRole('dialog');
+            fireEvent.change(within(dialog).getByLabelText('Problem ID'), { target: { value: 'N1' } });
+            fireEvent.change(within(dialog).getByLabelText('Title'), { target: { value: 'New' } });
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+            await waitFor(() => expect(adminService.createProblem).toHaveBeenCalled());
+            const payload = (jest.mocked(adminService.createProblem) as jest.Mock).mock.calls[0][1] ?? (jest.mocked(adminService.createProblem) as jest.Mock).mock.calls[0][0];
+            expect(payload).not.toHaveProperty('problem_type');
+            expect(payload).not.toHaveProperty('submission_filename');
+        });
+
+        it('omits type fields when the files fetch fails, leaving the saved type untouched', async () => {
+            (jest.mocked(adminService.getProblemFiles) as jest.Mock).mockRejectedValue(new Error('boom'));
+            (jest.mocked(adminService.updateProblem) as jest.Mock).mockResolvedValue({});
+            const dialog = await openEdit();
+            await waitFor(() => expect(adminService.getProblemFiles).toHaveBeenCalled());
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+            await waitFor(() => expect(adminService.updateProblem).toHaveBeenCalled());
+            expect(savedPayload()).not.toHaveProperty('problem_type');
+            expect(savedPayload()).not.toHaveProperty('submission_filename');
+        });
+
+        it('sends standard with a null filename when a header problem is switched back', async () => {
+            (jest.mocked(adminService.getProblemFiles) as jest.Mock).mockResolvedValue(filesInfo());
+            (jest.mocked(adminService.updateProblem) as jest.Mock).mockResolvedValue({});
+            const dialog = await openEdit();
+            await within(dialog).findByText('grader.cpp');
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Standard' }));
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+            await waitFor(() => expect(adminService.updateProblem).toHaveBeenCalled());
+            expect(savedPayload()).toEqual(expect.objectContaining({ problem_type: 'standard', submission_filename: null }));
+        });
+    });
 });

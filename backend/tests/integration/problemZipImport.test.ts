@@ -286,6 +286,89 @@ type CollectionRow = { id: number; name: string };
     expect((await fetchProblem('roundtrip-a'))?.collection_id).toBe(collections[0].id);
   });
 
+  it('round-trips a header problem byte-for-byte through export and import into an empty DB', async () => {
+    const graderMain = Buffer.from('#include "g.h"\r\nint main() { return 0; }\r\n// \u0e44\u0e17\u0e22\n');
+    const graderHeader = Buffer.from([0x23, 0x70, 0x72, 0x61, 0x67, 0x6d, 0x61, 0x00, 0xff, 0xfe, 0x0a]);
+    const starter = Buffer.from('// student file\nint solve(int x);\n\n');
+    const sourceZip = await makeZip({
+      'hdr/config.json': configJson({
+        ...baseConfig, id: 'hdr', title: 'Header Problem',
+        problem_type: 'header', submission_filename: 'solution.hpp',
+      }),
+      'hdr/testcases/input/input01.txt': '1\n',
+      'hdr/testcases/output/output01.txt': '2\n',
+      'hdr/grader/main.cpp': graderMain,
+      'hdr/grader/g.h': graderHeader,
+      'hdr/starter/solution.hpp': starter,
+    });
+    const first = await processBatchUpload(sourceZip);
+    expect(first.errors).toEqual([]);
+    expect(first.added).toEqual(['hdr']);
+
+    const exported = await exportZip(['hdr']);
+    const directory = await unzipper.Open.buffer(exported);
+    const names = directory.files.map(entry => entry.path).sort();
+    expect(names).toEqual(expect.arrayContaining([
+      'hdr/config.json', 'hdr/grader/g.h', 'hdr/grader/main.cpp', 'hdr/starter/solution.hpp',
+    ]));
+    expect(await readExportedConfigs(exported)).toMatchObject({
+      hdr: { problem_type: 'header', submission_filename: 'solution.hpp' },
+    });
+
+    await pool.query('TRUNCATE problems, testcases, collections CASCADE');
+    const exportPath = path.join(workDir, 'export-header.zip');
+    await realFs.writeFile(exportPath, exported);
+    const second = await processBatchUpload(exportPath);
+    expect(second.errors).toEqual([]);
+    expect(second.added).toEqual(['hdr']);
+
+    const row = await pool.query(
+      'SELECT problem_type, submission_filename FROM problems WHERE id = $1', ['hdr']);
+    expect(row.rows[0]).toEqual({ problem_type: 'header', submission_filename: 'solution.hpp' });
+    const files = await pool.query(
+      'SELECT role, filename, content FROM problem_files WHERE problem_id = $1 ORDER BY role, filename', ['hdr']);
+    expect(files.rows.map(r => [r.role, r.filename])).toEqual([
+      ['grader', 'g.h'], ['grader', 'main.cpp'], ['starter', 'solution.hpp'],
+    ]);
+    expect(files.rows[0].content.equals(graderHeader)).toBe(true);
+    expect(files.rows[1].content.equals(graderMain)).toBe(true);
+    expect(files.rows[2].content.equals(starter)).toBe(true);
+    const cases = await pool.query('SELECT input_data, output_data FROM testcases WHERE problem_id = $1', ['hdr']);
+    expect(cases.rows).toEqual([{ input_data: '1\n', output_data: '2\n' }]);
+  });
+
+  it('a header problem without grader .cpp is reported and leaves no problem row', async () => {
+    const zip = await makeZip({
+      'bad/config.json': configJson({ ...baseConfig, id: 'bad', problem_type: 'header' }),
+      'bad/grader/only.h': '// nope',
+    });
+    const results = await processBatchUpload(zip);
+    expect(results.added).toEqual([]);
+    expect(results.errors).toHaveLength(1);
+    expect(results.errors[0].directory).toBe('bad');
+    expect(await fetchProblem('bad')).toBeNull();
+  });
+
+  it('re-importing an existing id never changes problem_type, submission_filename or files', async () => {
+    const first = await makeZip({
+      'keep/config.json': configJson({ ...baseConfig, id: 'keep', problem_type: 'header' }),
+      'keep/grader/main.cpp': 'int main(){}',
+      'keep/starter/student.h': '// a',
+    });
+    expect((await processBatchUpload(first)).added).toEqual(['keep']);
+
+    const second = await makeZip({
+      'keep/config.json': configJson({ ...baseConfig, id: 'keep' }),
+      'keep/grader/other.cpp': 'int x;',
+    });
+    const results = await processBatchUpload(second);
+    expect(results.skipped).toEqual(['keep']);
+    const row = await pool.query('SELECT problem_type, submission_filename FROM problems WHERE id = $1', ['keep']);
+    expect(row.rows[0]).toEqual({ problem_type: 'header', submission_filename: 'student.h' });
+    const files = await pool.query('SELECT role, filename FROM problem_files WHERE problem_id = $1 ORDER BY role, filename', ['keep']);
+    expect(files.rows.map(r => [r.role, r.filename])).toEqual([['grader', 'main.cpp'], ['starter', 'student.h']]);
+  });
+
   it('reuses an existing collection instead of duplicating it', async () => {
     const existing = await pool.query(
       'INSERT INTO collections (name) VALUES ($1) RETURNING id',

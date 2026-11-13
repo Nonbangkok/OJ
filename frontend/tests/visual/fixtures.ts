@@ -80,7 +80,7 @@ const profiles = [
   },
 ];
 
-function json(body: unknown) {
+export function json(body: unknown) {
   return {
     contentType: 'application/json',
     body: JSON.stringify(body),

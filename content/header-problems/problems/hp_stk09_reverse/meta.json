@@ -1,0 +1,36 @@
+{
+  "id": "hp_stk09_reverse",
+  "title": "Stack Reverse",
+  "author": "Nonbangkok",
+  "topic": "stack",
+  "class": "CP::stack<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 2700,
+  "collection": "Header Problems — Stack",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "// for student.h\nvoid reverse();",
+    "",
+    "// for student.h — you WILL need to edit these\nconst T &top() const;",
+    "void push(const T &element);",
+    "void pop();"
+  ],
+  "pdf_probe": "กลับลำดับของสมาชิกทั้งสแตก",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ≤ 2,000 และ q ≤ 6,000 (วิธีกลับข้อมูลจริงทุกครั้งผ่านได้)"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ≤ 36,000 และ q ≤ 140,000 ซึ่งส่วนใหญ่เป็นคำสั่ง reverse (ต้องทำ reverse() ใน O(1))"
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import {
   nextSandboxIdentity,
   prlimitAvailable,
   prlimitWrap,
+  removeSandboxFiles,
   runBoundedChildProcess,
   runSandboxProcess,
   sandboxSubmissionsRoot,
@@ -191,6 +192,70 @@ describe('sandboxProcess', () => {
       });
       expect(result.exitCode).toBe(0);
       expect(result.stdout.trim()).toBe('ok');
+    });
+  });
+
+  describe('removeSandboxFiles (header problems: scrub sources before the binary runs)', () => {
+    // A header submission is compiled together with the problem's SECRET
+    // grader sources, so every source must leave the workspace before the
+    // student's binary runs. The removal is uid-dropped (root cannot unlink
+    // uid-owned files in the lockdown container) and must THROW on failure —
+    // running untrusted code next to a readable main.cpp is the leak.
+    const sandbox = { uid: JUDGE_CONFIG.SANDBOX_UID_BASE + 3, gid: JUDGE_CONFIG.SANDBOX_UID_BASE + 3 };
+    const childProcess = require('child_process') as { spawn: typeof import('child_process').spawn };
+
+    const stubSpawn = (exitCode: number, stderr = ''): jest.SpyInstance =>
+      jest.spyOn(childProcess, 'spawn').mockImplementation((() => {
+        const handlers: Record<string, (...a: unknown[]) => void> = {};
+        const child = {
+          pid: 4242,
+          stdout: { on: (_e: string, fn: (...a: unknown[]) => void) => { handlers.stdout = fn; } },
+          stderr: { on: (_e: string, fn: (...a: unknown[]) => void) => { handlers.stderr = fn; } },
+          on: (event: string, fn: (...a: unknown[]) => void) => { handlers[event] = fn; },
+          kill: jest.fn(),
+        };
+        setImmediate(() => {
+          if (stderr) handlers.stderr?.(Buffer.from(stderr));
+          handlers.close?.(exitCode, null);
+        });
+        return child;
+      }) as unknown as typeof childProcess.spawn);
+
+    it('spawns `rm -f --` on the absolute paths as the sandbox uid, without a shell', async () => {
+      const spawnSpy = stubSpawn(0);
+
+      await removeSandboxFiles('/tmp/oj-submissions/ws', ['main.cpp', 'queue.h', 'student.h'], { sandbox, context: 'sub 7' });
+
+      expect(spawnSpy).toHaveBeenCalledTimes(1);
+      const [command, args, options] = spawnSpy.mock.calls[0] as [string, string[], Record<string, unknown>];
+      expect(command).toBe('rm');
+      // `--` terminates option parsing: a filename could otherwise look like a flag.
+      expect(args).toEqual([
+        '-f', '--',
+        '/tmp/oj-submissions/ws/main.cpp',
+        '/tmp/oj-submissions/ws/queue.h',
+        '/tmp/oj-submissions/ws/student.h',
+      ]);
+      expect(options.uid).toBe(sandbox.uid);
+      expect(options.gid).toBe(sandbox.gid);
+      expect(options.shell).toBeUndefined();
+      expect((options.env as NodeJS.ProcessEnv).DATABASE_URL).toBeUndefined();
+    });
+
+    it('throws when the removal fails (a failed scrub must not run untrusted code)', async () => {
+      stubSpawn(1, 'rm: cannot remove main.cpp: Permission denied');
+
+      await expect(
+        removeSandboxFiles('/tmp/oj-submissions/ws', ['main.cpp'], { sandbox, context: 'sub 7' })
+      ).rejects.toThrow(/Permission denied/);
+    });
+
+    it('is a no-op when there is nothing to remove', async () => {
+      const spawnSpy = jest.spyOn(childProcess, 'spawn');
+
+      await removeSandboxFiles('/tmp/oj-submissions/ws', [], { sandbox });
+
+      expect(spawnSpy).not.toHaveBeenCalled();
     });
   });
 

@@ -11,6 +11,8 @@ describe('serializeProblemConfig', () => {
     difficulty: 800,
     collection_name: 'CEDT',
     problem_pdf: null,
+    problem_type: 'standard' as const,
+    submission_filename: null,
   };
 
   it('serializes canonical category names, numeric difficulty, and collection name', () => {
@@ -48,5 +50,19 @@ describe('serializeProblemConfig', () => {
     });
     expect(config).not.toHaveProperty('problem_pdf');
     expect(config).not.toHaveProperty('collection_id');
+  });
+
+  it('emits problem_type and submission_filename only for header problems', () => {
+    const header = serializeProblemConfig({
+      ...base, problem_type: 'header', submission_filename: 'student.h',
+    });
+    expect(header).toMatchObject({ problem_type: 'header', submission_filename: 'student.h' });
+
+    const standard = serializeProblemConfig({
+      ...base, problem_type: 'standard', submission_filename: null,
+    });
+    expect(standard).not.toHaveProperty('problem_type');
+    expect(standard).not.toHaveProperty('submission_filename');
+    expect(JSON.parse(JSON.stringify(serializeProblemConfig(base)))).not.toHaveProperty('problem_type');
   });
 });

@@ -1,0 +1,56 @@
+{
+  "id": "hp_que05_m2b",
+  "title": "Queue Move To Back",
+  "author": "Nonbangkok",
+  "topic": "queue",
+  "class": "CP::queue<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1200,
+  "collection": "Header Problems — Queue",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "// ---- the function you must write; it lives in student.h ----",
+    "void move_to_back(size_t i);",
+    "",
+    "// ---- already written for you, and they stay in this file ----",
+    "const T &front() const { return mData[mFront]; }",
+    "",
+    "const T &back() const { return mData[(mFront + mSize - 1) % mCap]; }",
+    "",
+    "void push(const T &element)",
+    "{",
+    "  ensureCapacity(mSize + 1);",
+    "  mData[(mFront + mSize) % mCap] = element;",
+    "  mSize++;",
+    "}",
+    "",
+    "void pop()",
+    "{",
+    "  mFront = (mFront + 1) % mCap;",
+    "  mSize--;",
+    "}"
+  ],
+  "pdf_probe": "ต้องเก็บค่าที่จะย้ายไว้ในตัวแปรชั่วคราวก่อน",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 4,
+      "percent": 40,
+      "note": "n ≤ 16 และคำสั่งไม่เกิน 90 คำสั่ง (ตรวจด้วยมือได้ มี i = 0 และ i = size() − 1)"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "n ≤ 2,000 และคำสั่งไม่เกิน 6,000 คำสั่ง (คิวอยู่ในสภาพวนรอบ และมีการย้ายซ้ำ ๆ)"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "n ≤ 20,000 และคำสั่งไม่เกิน 60,000 คำสั่ง"
+    }
+  ]
+}

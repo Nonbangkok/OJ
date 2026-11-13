@@ -3,7 +3,7 @@
  * Covers request bodies, composite response payloads, and
  * callback parameter types used inside controllers.
  */
-import { ProblemCategory, SubmissionLanguage } from '../constants';
+import { ProblemCategory, ProblemType, SubmissionLanguage } from '../constants';
 import { ContestStatus, ProblemDetailDTO, UserPublicProfileDTO } from './models';
 
 // ---------------------------------------------------------------------------
@@ -165,6 +165,10 @@ export interface ProblemExportConfig {
     categories: ProblemCategory[];
     difficulty: number | null;
     collection: string | null;
+    /** Present only for header problems. */
+    problem_type?: 'header';
+    /** Present only for header problems. */
+    submission_filename?: string;
 }
 
 export interface CreateProblemRequestBody {
@@ -177,6 +181,9 @@ export interface CreateProblemRequestBody {
     collection_id?: number | null;
     time_limit_ms: number;
     memory_limit_mb: number;
+    problem_type?: ProblemType;
+    /** Header problems only; defaults to student.h on create. Stored NULL for standard. */
+    submission_filename?: string | null;
 }
 
 export interface UpdateProblemRequestBody {
@@ -189,6 +196,8 @@ export interface UpdateProblemRequestBody {
     collection_id?: number | null;
     time_limit_ms?: number;
     memory_limit_mb?: number;
+    problem_type?: ProblemType;
+    submission_filename?: string | null;
 }
 
 export interface UpdateProblemVisibilityRequestBody {

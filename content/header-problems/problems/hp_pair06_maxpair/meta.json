@@ -1,0 +1,43 @@
+{
+  "id": "hp_pair06_maxpair",
+  "title": "Pair Larger",
+  "author": "Nonbangkok",
+  "topic": "pair",
+  "class": "CP::pair<T1,T2>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1300,
+  "collection": "Header Problems — Pair",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "const pair<T1, T2> &larger(const pair<T1, T2> &other) const;",
+    "const pair<T1, T2> &larger3(const pair<T1, T2> &b, const pair<T1, T2> &c) const;",
+    "",
+    "// already implemented here: \"did I win?\" is answered by comparing the",
+    "// ADDRESS the reference points at with my own address. It therefore only",
+    "// works if larger() hands back one of the two objects it was given.",
+    "bool dominates(const pair<T1, T2> &other) const { return &larger(other) == this; }"
+  ],
+  "pdf_probe": "ต้องคืนการอ้างอิงไปยังคู่อันดับตัวจริง",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "มีเฉพาะ CP::pair<int,int> และข้อมูลขนาดเล็ก"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "มี CP::pair<string,int> และ CP::pair<long long,long long> ด้วย"
+    },
+    {
+      "cases": 4,
+      "percent": 40,
+      "note": "ข้อมูลขนาดใหญ่ และมีคู่ที่เท่ากันจำนวนมาก (ต้องคืน *this เมื่อเท่ากัน)"
+    }
+  ]
+}

@@ -280,4 +280,55 @@ describe('submissionQueryService visibility (PROBLEM-001 / SUB-001 / SUB-002)', 
             });
         });
     });
+    describe('validateAndQueueSubmission header problems', () => {
+        const base = { problemId: 'H1', code: 'int f(){}' };
+
+        it('rejects non-C++ submissions to a header problem', async () => {
+            query
+                .mockResolvedValueOnce({ rows: [{ exists: 1 }] })
+                .mockResolvedValueOnce({ rows: [{ exists: 1, problem_type: 'header' }] });
+
+            await expect(validateAndQueueSubmission({ ...base, language: 'python' }, 5)).rejects.toMatchObject({
+                statusCode: 400,
+                message: 'This problem accepts C++ only.',
+            });
+        });
+
+        it('rejects submissions when the header problem has no grader .cpp', async () => {
+            query
+                .mockResolvedValueOnce({ rows: [{ exists: 1 }] })
+                .mockResolvedValueOnce({ rows: [{ exists: 1, problem_type: 'header' }] })
+                .mockResolvedValueOnce({ rows: [{ exists: false }] });
+
+            await expect(validateAndQueueSubmission({ ...base, language: 'cpp' }, 5)).rejects.toMatchObject({
+                statusCode: 400,
+                message: 'This problem is not ready for submissions yet.',
+            });
+        });
+
+        it('queues a C++ submission to a ready header problem', async () => {
+            query
+                .mockResolvedValueOnce({ rows: [{ exists: 1 }] })
+                .mockResolvedValueOnce({ rows: [{ exists: 1, problem_type: 'header' }] })
+                .mockResolvedValueOnce({ rows: [{ exists: true }] })
+                .mockResolvedValueOnce({ rows: [{ id: 9 }] });
+
+            await expect(validateAndQueueSubmission({ ...base, language: 'cpp' }, 5)).resolves.toEqual({
+                submissionId: 9,
+                isContestSubmission: false,
+            });
+        });
+
+        it('leaves standard problems unchanged (python still allowed)', async () => {
+            query
+                .mockResolvedValueOnce({ rows: [{ exists: 1 }] })
+                .mockResolvedValueOnce({ rows: [{ exists: 1, problem_type: 'standard' }] })
+                .mockResolvedValueOnce({ rows: [{ id: 10 }] });
+
+            await expect(validateAndQueueSubmission({ ...base, language: 'python' }, 5)).resolves.toEqual({
+                submissionId: 10,
+                isContestSubmission: false,
+            });
+        });
+    });
 });

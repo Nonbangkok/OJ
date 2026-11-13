@@ -1,0 +1,137 @@
+/* Header-problem file sets.
+
+   Two sets sit side by side in the problem modal and look almost alike, but
+   one is compiled with every submission and must never reach a student while
+   the other is exactly what students download. That distinction is the only
+   thing allowed to be loud here: each set states in plain words who sees it.
+   Everything else — the well, the rows, the replace control — stays quiet so
+   the file names are what the eye lands on.
+
+   Every selector below is at least two classes deep on purpose. Form surfaces
+   paint their descendant buttons as full-width accent action buttons
+   (`.form-container button` in Form.module.css, specificity 0,1,1), which
+   otherwise turns each file name into a blue block. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.section .role {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.section .roleHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.section .roleName {
+  color: var(--text-primary);
+  font-size: var(--font-size-card-title);
+  font-weight: 600;
+}
+
+.section .roleCount {
+  color: var(--text-muted);
+  font-size: var(--font-size-metadata);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.section .roleNote {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--text-secondary);
+  font-size: var(--font-size-metadata);
+  line-height: 1.5;
+}
+
+/* The well: one container for the whole set, rows divided by hairlines
+   rather than each file carrying its own box. */
+.section .fileList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--background-secondary);
+  overflow: hidden;
+}
+
+.section .fileItem {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.3rem 0.4rem 0.3rem 0.6rem;
+}
+
+.section .fileItem + .fileItem {
+  border-top: 1px solid var(--border-color);
+}
+
+.section .fileName {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  display: inline-block;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.4rem;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-size: var(--font-size-metadata);
+  font-weight: 400;
+  text-align: left;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.section .fileName:hover,
+.section .fileName:focus-visible {
+  color: var(--accent-primary);
+  background-color: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+}
+
+.section .fileSize {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-size: var(--font-size-metadata);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.section .empty {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: var(--font-size-metadata);
+}
+
+.section .replace {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.section .hint {
+  color: var(--text-muted);
+  font-size: var(--font-size-metadata);
+  line-height: 1.45;
+}
+
+.section .error {
+  color: var(--error-text);
+  font-size: var(--font-size-metadata);
+}

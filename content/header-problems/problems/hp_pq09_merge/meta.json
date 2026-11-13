@@ -1,0 +1,34 @@
+{
+  "id": "hp_pq09_merge",
+  "title": "Priority Queue Merge",
+  "author": "Nonbangkok",
+  "topic": "priority_queue",
+  "class": "CP::priority_queue<T,Comp>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 3100,
+  "collection": "Header Problems — Priority Queue",
+  "time_limit_ms": 1500,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "// for student.h\nvoid merge(priority_queue<T, Comp> &other);",
+    "",
+    "// already implemented here, and only the grader calls it: does the array\n// still satisfy the heap property (every parent at least as important as its\n// children, measured with mLess)? You never need to call it yourself.\nbool heap_ok() const\n{\n  for (size_t c = 1; c < mSize; c++)\n    if (mLess(mData[(c - 1) / 2], mData[c]))\n      return false;\n  return true;\n}"
+  ],
+  "pdf_probe": "สร้างฮีปจากล่างขึ้นบนด้วยการเรียก fixDown ทุกปุ่มที่มีลูก",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "รวมสมาชิกไม่เกิน 1,700,000 ตัวต่อหนึ่งชุดทดสอบ (วิธี push ทีละตัวผ่านได้)"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "รวมฮีปขนาด 262,144 ตัวซ้ำ 125-138 ครั้ง และสมาชิกมีค่าเท่ากันแทบทั้งหมด (ต้องรวมใน O(n + m))"
+    }
+  ]
+}

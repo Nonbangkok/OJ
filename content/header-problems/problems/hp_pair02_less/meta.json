@@ -1,0 +1,42 @@
+{
+  "id": "hp_pair02_less",
+  "title": "Pair Less",
+  "author": "Nonbangkok",
+  "topic": "pair",
+  "class": "CP::pair<T1,T2>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 900,
+  "collection": "Header Problems — Pair",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "bool operator<(const pair<T1, T2> &other) const;",
+    "void make_min(const pair<T1, T2> &other);",
+    "",
+    "// already implemented here: > is written as \"the other one is smaller\",",
+    "// so it reuses your < with the operands swapped.",
+    "bool operator>(const pair<T1, T2> &other) const { return other < *this; }"
+  ],
+  "pdf_probe": "เทียบสมาชิกตัวแรกก่อน ถ้าเท่ากันจึงเทียบสมาชิกตัวที่สอง",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 2,
+      "percent": 20,
+      "note": "มีเฉพาะ CP::pair<int,int> และข้อมูลขนาดเล็ก"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "มี CP::pair<string,int> และ CP::pair<int,string> ด้วย"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "ข้อมูลขนาดใหญ่ และ first ซ้ำกันเป็นส่วนมาก (ต้องตัดสินด้วย second)"
+    }
+  ]
+}

@@ -264,4 +264,61 @@ describe('Contest Controller', () => {
             expect(findSimilarContestPairs).not.toHaveBeenCalled();
         });
     });
+    describe('GET /contests/:id/problems/:problemId/starter', () => {
+        const contestRow = (over: Record<string, unknown> = {}) => ({ rows: [{ id: 1, status: 'running', is_visible: true, ...over }] });
+        const binary = (res: any, cb: (err: Error | null, body: Buffer) => void) => {
+            const chunks: Buffer[] = [];
+            res.on('data', (c: Buffer) => chunks.push(c));
+            res.on('end', () => cb(null, Buffer.concat(chunks)));
+        };
+
+        beforeEach(() => { requestUser = { id: 2, username: 'u2', role: 'user', hasAvatar: false }; });
+
+        it('404s an unknown or hidden contest', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+            const res = await request(app).get('/contests/1/problems/H1/starter');
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Contest not found.');
+        });
+
+        it('403s an inactive contest', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce(contestRow({ status: 'upcoming' }));
+            const res = await request(app).get('/contests/1/problems/H1/starter');
+            expect(res.status).toBe(403);
+            expect(res.body.message).toBe('Contest is not active.');
+        });
+
+        it('403s a non-participant', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce(contestRow()).mockResolvedValueOnce({ rows: [] });
+            const res = await request(app).get('/contests/1/problems/H1/starter');
+            expect(res.status).toBe(403);
+            expect(res.body.message).toBe('You are not a participant in this contest.');
+        });
+
+        it('404s a standard problem', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce(contestRow()).mockResolvedValueOnce({ rows: [{ 1: 1 }] })
+                .mockResolvedValueOnce({ rows: [{ problem_type: 'standard' }] });
+            const res = await request(app).get('/contests/1/problems/S1/starter');
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Starter files not found.');
+        });
+
+        it('404s a missing problem', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce(contestRow()).mockResolvedValueOnce({ rows: [{ 1: 1 }] })
+                .mockResolvedValueOnce({ rows: [] });
+            const res = await request(app).get('/contests/1/problems/NOPE/starter');
+            expect(res.status).toBe(404);
+        });
+
+        it.each(['running', 'finished'])('serves the starter ZIP in a %s contest', async (status) => {
+            (db.query as jest.Mock).mockResolvedValueOnce(contestRow({ status })).mockResolvedValueOnce({ rows: [{ 1: 1 }] })
+                .mockResolvedValueOnce({ rows: [{ problem_type: 'header' }] })
+                .mockResolvedValueOnce({ rows: [{ filename: 'student.h', content: Buffer.from('// s') }] });
+            const res = await request(app).get('/contests/1/problems/H1/starter').buffer(true).parse(binary);
+            expect(res.status).toBe(200);
+            expect(res.headers['content-type']).toContain('application/zip');
+            expect(res.headers['content-disposition']).toBe('attachment; filename="H1-starter.zip"');
+            expect((res.body as Buffer).toString('latin1')).toContain('student.h');
+        });
+    });
 });

@@ -286,6 +286,20 @@ export interface RunnableCommand {
 }
 
 /**
+ * The C++ compile flags shared by every C++ compile the judge performs
+ * (standard single-source submissions and header problems alike).
+ * UndefinedBehaviorSanitizer traps signed integer overflow, and
+ * -fno-sanitize-recover makes it fatal: the program prints the UBSan report
+ * to stderr and exits 1, which the judge classifies as a Runtime Error
+ * (without it UBSan only reports and the run continues).
+ */
+const CPP_COMPILE_FLAGS = [
+    '-std=c++20',
+    '-fsanitize=signed-integer-overflow',
+    '-fno-sanitize-recover=signed-integer-overflow',
+] as const;
+
+/**
  * Per-language "prepare" recipe: how a submission's source is turned into a
  * runnable command. Every language defines
  *  - `sourceExtension`  — file suffix for the written source,
@@ -305,13 +319,9 @@ export const LANGUAGE_PREPARE: Record<SubmissionLanguage, {
 }> = {
     cpp: {
         sourceExtension: '.cpp',
-        // UndefinedBehaviorSanitizer traps signed integer overflow, and
-        // -fno-sanitize-recover makes it fatal: the program prints the UBSan
-        // report to stderr and exits 1, which the judge classifies as a
-        // Runtime Error (without it UBSan only reports and the run continues).
         checkCommand: (sourcePath, outputPath) => ({
             command: 'g++',
-            args: ['-std=c++20', '-fsanitize=signed-integer-overflow', '-fno-sanitize-recover=signed-integer-overflow', sourcePath, '-o', outputPath],
+            args: [...CPP_COMPILE_FLAGS, sourcePath, '-o', outputPath],
         }),
         runCommand: (binaryPath) => ({ command: binaryPath, args: [] }),
         compiledArtifactPath: (outputPath) => outputPath,
@@ -328,6 +338,24 @@ export const LANGUAGE_PREPARE: Record<SubmissionLanguage, {
         compiledArtifactPath: () => null,
     },
 };
+
+/**
+ * Prepare recipe for a HEADER problem: the student submits a single header
+ * (e.g. `student.h`) and the judge compiles the problem's secret grader
+ * sources — which `#include` it — into one binary. Same flags as a standard
+ * C++ submission (header problems are C++ only) plus
+ * `-fno-diagnostics-show-caret`: without it g++ echoes the offending SOURCE
+ * LINE in diagnostics, which would quote the grader's secret code back to the
+ * submitter on any compile error. Only the grader `.cpp` names are passed on
+ * the command line; headers (the submission included) enter through #include.
+ */
+export const HEADER_CPP_PREPARE = {
+    checkCommand: (cppSources: readonly string[], outputPath: string): RunnableCommand => ({
+        command: 'g++',
+        args: [...CPP_COMPILE_FLAGS, '-fno-diagnostics-show-caret', ...cppSources, '-o', outputPath],
+    }),
+    runCommand: (binaryPath: string): RunnableCommand => LANGUAGE_PREPARE.cpp.runCommand(binaryPath),
+} as const;
 
 export const SUBMISSION_VALIDATION = {
     // Maximum source code size accepted for a submission (characters).
@@ -528,4 +556,18 @@ export const FILE_CONFIG = {
 export const ARCHIVE_LIMITS = {
     MAX_UNCOMPRESSED_BYTES: 500 * 1024 * 1024, // 500 MB total
     MAX_ENTRIES: 5000, // file count
+} as const;
+
+// --- Header problems (student submits only a header, compiled with secret grader files) ---
+export const PROBLEM_TYPES = ['standard', 'header'] as const;
+export type ProblemType = (typeof PROBLEM_TYPES)[number];
+
+export const PROBLEM_FILE_ROLES = ['grader', 'starter'] as const;
+export type ProblemFileRole = (typeof PROBLEM_FILE_ROLES)[number];
+
+export const DEFAULT_SUBMISSION_FILENAME = 'student.h';
+
+export const HEADER_PROBLEM_LIMITS = {
+    MAX_FILE_BYTES: 1024 * 1024, // 1 MiB per file
+    MAX_FILES_PER_ROLE: 20,
 } as const;

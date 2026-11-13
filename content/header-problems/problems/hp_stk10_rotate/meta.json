@@ -1,0 +1,36 @@
+{
+  "id": "hp_stk10_rotate",
+  "title": "Stack Rotate",
+  "author": "Nonbangkok",
+  "topic": "stack",
+  "class": "CP::stack<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 3100,
+  "collection": "Header Problems — Stack",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "// for student.h\nvoid rotate(size_t k);",
+    "",
+    "// for student.h — you WILL need to edit these\nconst T &top() const;",
+    "void push(const T &element);",
+    "void pop();"
+  ],
+  "pdf_probe": "หมุนสมาชิก k ตัวบนสุดไปหนึ่งตำแหน่ง",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ≤ 2,000 และ q ≤ 6,000 (วิธีหมุนข้อมูลจริงทุกครั้งผ่านได้)"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ≤ 30,000 และ q ≤ 220,000 โดยคำสั่ง rotate ที่ k เดิมมาติดกันเป็นช่วงยาว (ต้องเลื่อนงานจริงออกไป)"
+    }
+  ]
+}

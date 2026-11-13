@@ -1,0 +1,32 @@
+{
+  "id": "hp_vec05_insert",
+  "title": "Vector Insert",
+  "author": "Nonbangkok",
+  "topic": "vector",
+  "class": "CP::vector<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1300,
+  "collection": "Header Problems — Vector",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "void insert(size_t pos, const T &value);"
+  ],
+  "pdf_probe": "แทรกค่าใหม่เข้าไปก่อนตำแหน่ง",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "จำนวนสมาชิกและจำนวนการแทรกรวมในแต่ละบล็อกไม่เกิน 2,000 (วิธีที่ขยายอาเรย์ทีละช่องผ่านได้)"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "มีการแทรกที่ท้ายเวกเตอร์ติดต่อกันถึง 10⁶ ครั้ง (ต้องขยายความจุแบบเท่าตัวจึงจะทัน)"
+    }
+  ]
+}

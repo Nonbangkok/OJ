@@ -1,5 +1,6 @@
 import { Readable } from 'stream';
-import { UPLOAD_STATUS } from '../constants';
+import { UPLOAD_STATUS, type ProblemFileRole, type ProblemType } from '../constants';
+import type { ProblemFileInput } from '../utils/headerProblemFiles';
 import { ContestRow, ProblemRow, SystemSettingRow, TestcaseRow, UserRow } from './models';
 
 // ---------------------------------------------------------------------------
@@ -209,10 +210,12 @@ export interface ProblemCategoryCounts {
 export interface ProblemExportTestcaseRow extends Pick<TestcaseRow, 'case_number' | 'input_data' | 'output_data'> {}
 
 export interface ProblemExportBundle {
-  problem: Pick<ProblemRow, 'id' | 'title' | 'author' | 'time_limit_ms' | 'memory_limit_mb' | 'problem_pdf' | 'categories' | 'difficulty'> & {
+  problem: Pick<ProblemRow, 'id' | 'title' | 'author' | 'time_limit_ms' | 'memory_limit_mb' | 'problem_pdf' | 'categories' | 'difficulty' | 'problem_type' | 'submission_filename'> & {
     collection_name: string | null;
   };
   testcases: ProblemExportTestcaseRow[];
+  /** Header problems only (empty for standard). */
+  files: Array<ProblemFileInput & { role: ProblemFileRole }>;
 }
 
 export type ReplaceProblemTestcasesFromZipResult =
@@ -389,6 +392,9 @@ export interface ContestProblemDetailRow extends ContestProblemsSummaryRow {
   time_limit_ms: number;
   memory_limit_mb: number;
   has_pdf: boolean;
+  problem_type: ProblemType;
+  submission_filename: string | null;
+  has_starter_files: boolean;
 }
 
 export type ContestProblemsForParticipantResult =
@@ -410,6 +416,13 @@ export type ContestProblemPdfResult =
   | { kind: 'inactive' }
   | { kind: 'not_found_pdf' }
   | { kind: 'ok'; data: Buffer };
+
+export type ContestProblemStarterResult =
+  | { kind: 'not_found_contest' }
+  | { kind: 'not_participant' }
+  | { kind: 'inactive' }
+  | { kind: 'not_found_starter' }
+  | { kind: 'ok'; files: ProblemFileInput[] };
 
 export type MoveSingleProblemToMainResult =
   | { kind: 'not_found_contest' }

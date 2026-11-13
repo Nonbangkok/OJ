@@ -1,0 +1,46 @@
+{
+  "id": "hp_pair08_by_second",
+  "title": "Pair By Second",
+  "author": "Nonbangkok",
+  "topic": "pair",
+  "class": "CP::pair<T1,T2>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1500,
+  "collection": "Header Problems — Pair",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "bool less_by_second(const pair<T1, T2> &other) const;",
+    "bool greater_by_second(const pair<T1, T2> &other) const;",
+    "",
+    "// already implemented here: \"neither one comes first\" — the equality",
+    "// that your ordering implies. It is only right if less_by_second really",
+    "// is a strict ordering, so it is false for a pair against itself.",
+    "bool equal_by_second(const pair<T1, T2> &other) const",
+    "{",
+    "  return !less_by_second(other) && !other.less_by_second(*this);",
+    "}"
+  ],
+  "pdf_probe": "เรียงด้วยสมาชิกตัวที่สองก่อน ถ้าเท่ากันจึงใช้สมาชิกตัวแรกตัดสิน",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 2,
+      "percent": 20,
+      "note": "มีเฉพาะ CP::pair<string,int> และข้อมูลขนาดเล็ก"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "มี CP::pair<int,long long> และ CP::pair<string,string> ด้วย"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "ข้อมูลขนาดใหญ่ และ second ซ้ำกันเป็นส่วนมาก (ต้องตัดสินด้วย first)"
+    }
+  ]
+}

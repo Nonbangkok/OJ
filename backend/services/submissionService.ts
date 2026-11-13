@@ -6,23 +6,28 @@ import { judge } from './judgeService';
 import { ContestSubmissionRow, SubmissionRow } from '../types/models';
 import { CompileCommandError } from '../types/service';
 import {
+  DEFAULT_SUBMISSION_FILENAME,
+  HEADER_CPP_PREPARE,
   JUDGE_CONFIG,
   LANGUAGE_PREPARE,
+  RunnableCommand,
   SUBMISSION_QUERY_CONFIG,
   SUBMISSION_STATUS,
   SubmissionLanguage,
 } from '../constants';
-import { findForbiddenInclude } from '../utils/compileGuard';
+import { findForbiddenAsm, findForbiddenInclude } from '../utils/compileGuard';
 import { logger } from '../utils/logger';
 import { publishRealtime } from './realtimeHub';
 import { awardSolveReward } from './progressionService';
 import { enqueueTrackedJudgeTask } from './judgeQueue';
+import { getHeaderJudgeSpec } from './problemFilesService';
 import {
   canDropPrivileges,
   chmodSandboxPath,
   createSandboxWorkspace,
   nextSandboxIdentity,
   prlimitWrap,
+  removeSandboxFiles,
   removeSandboxWorkspace,
   runBoundedChildProcess,
   SandboxIdentity,
@@ -75,30 +80,166 @@ const SANITIZED_SOURCE_NAME: Record<SubmissionLanguage, string> = {
   python: 'solution.py',
 };
 
+export interface SanitizeStderrOptions {
+  /**
+   * Keep the submitted file's own name in the output instead of rewriting it
+   * to the neutral `solution.cpp`. Header problems set this: the student
+   * submits a NAMED file (`student.h`) that the grader includes, so a
+   * diagnostic has to keep pointing at it to be of any use — and the grader's
+   * file names are an accepted disclosure (their CONTENTS stay hidden:
+   * `-fno-diagnostics-show-caret` keeps g++ from echoing source lines).
+   */
+  keepSourceName?: boolean;
+}
+
 /**
  * Replace the internal temporary source path in compiler/checker output with a
  * neutral name so server filesystem paths are not disclosed to submitters.
  * Both the bare source filename and its per-submission directory form are
  * neutralized (compiles run with cwd = the submission directory, so g++
  * diagnostics can print either).
+ *
+ * Absolute workspace paths that slipped through include resolution are
+ * stripped either way (defence in depth): to the neutral name normally, to
+ * the plain basename when the real file name is kept.
  */
-export function sanitizeCompilerStderr(stderr: string | undefined, sourcePath: string, language: SubmissionLanguage = 'cpp'): string {
+export function sanitizeCompilerStderr(
+  stderr: string | undefined,
+  sourcePath: string,
+  language: SubmissionLanguage = 'cpp',
+  options: SanitizeStderrOptions = {}
+): string {
   if (!stderr) {
     return 'Compilation failed';
   }
   const neutralName = SANITIZED_SOURCE_NAME[language];
-  return sourcePath
+  const renamed = sourcePath && !options.keepSourceName
     ? stderr
         .split(sourcePath)
         .join(neutralName)
         .split(path.join(path.dirname(sourcePath), neutralName))
         .join(neutralName)
     : stderr;
+  return renamed.replace(
+    /\/[^\s:]*oj-submissions\/[^\s:]+/g,
+    (match) => (options.keepSourceName ? path.basename(match) : neutralName)
+  );
 }
 
 const FORBIDDEN_INCLUDE_MESSAGE = (target: string): string =>
   `Compilation rejected: #include of a non-permitted path ("${target}") is not allowed. ` +
   `Use standard library headers (e.g. <bits/stdc++.h>) only.`;
+
+const FORBIDDEN_ASM_MESSAGE = (target: string): string =>
+  `Compilation rejected: inline assembly ("${target}") is not allowed in this problem.`;
+
+const HEADER_CPP_ONLY_MESSAGE = 'This problem accepts C++ only.';
+
+/**
+ * Pre-compile source guard. The `#include` check protects every submission
+ * (compile-time arbitrary file read, RUNNER-001). The inline-assembly check
+ * is header-only: `asm(".incbin \"main.cpp\"")` would bake the grader's
+ * secret bytes into the binary, a vector that only exists when secret files
+ * share the translation unit. Returns the submitter-facing message, or null.
+ */
+function findSourceRejection(code: string, isHeader: boolean): string | null {
+  const forbiddenInclude = findForbiddenInclude(code);
+  if (forbiddenInclude) {
+    return FORBIDDEN_INCLUDE_MESSAGE(forbiddenInclude);
+  }
+  if (isHeader) {
+    const forbiddenAsm = findForbiddenAsm(code);
+    if (forbiddenAsm) {
+      return FORBIDDEN_ASM_MESSAGE(forbiddenAsm);
+    }
+  }
+  return null;
+}
+
+/** Name of the binary produced inside a submission's workspace. */
+const BINARY_NAME = 'solution.out';
+
+type HeaderJudgeSpec = NonNullable<Awaited<ReturnType<typeof getHeaderJudgeSpec>>>;
+
+/**
+ * Everything that differs between a standard and a header submission, decided
+ * ONCE before the workspace exists: which files go into it, how they are
+ * compiled, what is scrubbed afterwards, and what the judge runs. The rest of
+ * the pipeline stays a single straight-line flow over this plan.
+ */
+interface PreparePlan {
+  /**
+   * Files written into the workspace, in order. A string is the submitted
+   * source (it comes from a TEXT column); a Buffer is a stored problem file,
+   * written byte for byte — grader files live in BYTEA and may be in any
+   * encoding, so decoding them to UTF-8 would corrupt them irreversibly.
+   */
+  files: ReadonlyArray<{ name: string; content: string | Buffer }>;
+  /** The submitted source's name inside the workspace. */
+  sourceName: string;
+  /** Artifact the prepare step produces, or null for interpreted languages. */
+  artifactName: string | null;
+  /** Compile / syntax-check invocation, with workspace-relative paths. */
+  check: RunnableCommand;
+  /**
+   * Files removed from the workspace after a SUCCESSFUL prepare, before the
+   * binary runs: empty for standard problems, every grader source plus the
+   * submitted header for header problems.
+   */
+  scrub: readonly string[];
+  /** Keep the submitted file's real name in compile diagnostics. */
+  keepSourceName: boolean;
+  /** The judge's runnable, built from the artifact (or source) path. */
+  runCommand: (targetPath: string) => RunnableCommand;
+}
+
+/** The unchanged single-source flow: one file, one compile, nothing scrubbed. */
+function standardPreparePlan(language: SubmissionLanguage, code: string): PreparePlan {
+  const prepare = LANGUAGE_PREPARE[language];
+  const sourceName = `solution${prepare.sourceExtension}`;
+  return {
+    files: [{ name: sourceName, content: code }],
+    sourceName,
+    artifactName: prepare.compiledArtifactPath(BINARY_NAME),
+    check: prepare.checkCommand(sourceName, BINARY_NAME),
+    scrub: [],
+    keepSourceName: false,
+    runCommand: prepare.runCommand,
+  };
+}
+
+/**
+ * Header problems: the grader files and the submitted header live side by side
+ * in the workspace and compile as ONE translation unit (only the grader's
+ * `.cpp` names are passed to g++ — headers arrive through `#include`).
+ * Everything that was a source is then scrubbed, so the student's binary can
+ * never read the grader's secret main.
+ */
+function headerPreparePlan(code: string, spec: HeaderJudgeSpec): PreparePlan {
+  const sourceName = spec.submissionFilename ?? DEFAULT_SUBMISSION_FILENAME;
+  const graderNames = spec.graderFiles.map((file) => file.filename);
+  const cppSources = graderNames.filter((name) => name.toLowerCase().endsWith('.cpp')).sort();
+  if (cppSources.length === 0) {
+    // Authoring validation guarantees at least one grader .cpp; a problem that
+    // lost its grader files must fail loudly (System Error), never judge as if
+    // the submission were at fault.
+    throw new Error('header problem has no grader .cpp source to compile');
+  }
+  return {
+    files: [
+      // Buffers, not strings: byte-exact so a grader in a non-UTF-8 encoding
+      // (e.g. a Thai course's TIS-620 main.cpp) compiles and prints as authored.
+      ...spec.graderFiles.map((file) => ({ name: file.filename, content: file.content })),
+      { name: sourceName, content: code },
+    ],
+    sourceName,
+    artifactName: BINARY_NAME,
+    check: HEADER_CPP_PREPARE.checkCommand(cppSources, BINARY_NAME),
+    scrub: [...graderNames, sourceName],
+    keepSourceName: true,
+    runCommand: HEADER_CPP_PREPARE.runCommand,
+  };
+}
 
 /**
  * Publish a realtime `submission_update` after a status/score transition has
@@ -126,6 +267,20 @@ const publishSubmissionStatus = (
   });
 };
 
+/** Persist a terminal Compilation Error with its submitter-facing output. */
+async function recordCompilationError(
+  table: 'submissions' | 'contest_submissions',
+  submissionId: number,
+  userId: number | null,
+  output: string
+): Promise<void> {
+  await db.query(
+    `UPDATE ${table} SET overall_status = '${SUBMISSION_STATUS.COMPILATION_ERROR}', results = $1 WHERE id = $2`,
+    [JSON.stringify([{ status: SUBMISSION_STATUS.COMPILATION_ERROR, output }]), submissionId]
+  );
+  publishSubmissionStatus(submissionId, table, userId, SUBMISSION_STATUS.COMPILATION_ERROR, 0);
+}
+
 /**
  * Compile a submission's source and run it against the problem's testcases,
  * persisting each status transition. Shared by the standalone
@@ -140,9 +295,6 @@ async function runSubmissionPipeline(
   // Absolute path of the per-submission workspace directory; cleaned in the
   // finally block (RUNNER-003).
   let workspaceDir = '';
-  // Absolute paths of the source and (potential) binary inside the workspace.
-  let filePath = '';
-  let outputPath = '';
   // Owner of the submission — needed by the System Error handler below, so it
   // must live outside the try block alongside the file paths.
   let userId: number | null = null;
@@ -177,7 +329,34 @@ async function runSubmissionPipeline(
     );
     publishSubmissionStatus(submissionId, table, user_id, SUBMISSION_STATUS.COMPILING, 0);
 
-    const prepare = LANGUAGE_PREPARE[submissionLanguage];
+    // Header problems (`problem_type = 'header'`) are judged from the
+    // problem's SECRET grader files plus the submitted header. The spec is
+    // read once here and decides the whole prepare plan below; a standard
+    // problem (or a problem row that vanished) takes the unchanged path.
+    const headerSpec = await getHeaderJudgeSpec(problem_id);
+    const isHeader = headerSpec?.problemType === 'header';
+
+    // Header problems are C++ only: there is no way to compile a Python
+    // submission into the grader's translation unit.
+    if (isHeader && submissionLanguage !== 'cpp') {
+      await recordCompilationError(table, submissionId, user_id, HEADER_CPP_ONLY_MESSAGE);
+      return;
+    }
+
+    // Reject sources that try to read files outside the submission via
+    // #include (and, for header problems, assembler-level file embedding)
+    // BEFORE anything is written or compiled — a first line of defence
+    // against the compile-time arbitrary file-read vector (the compile also
+    // runs unprivileged, see runBoundedCompile).
+    const sourceRejection = findSourceRejection(code, isHeader);
+    if (sourceRejection) {
+      await recordCompilationError(table, submissionId, user_id, sourceRejection);
+      return;
+    }
+
+    const plan = isHeader
+      ? headerPreparePlan(code, headerSpec as HeaderJudgeSpec)
+      : standardPreparePlan(submissionLanguage, code);
     const uniqueId = `${filePrefix}_${submissionId}_${Date.now()}`;
 
     // Per-submission sandbox identity (RUNNER-006): the compile and every
@@ -214,39 +393,24 @@ async function runSubmissionPipeline(
       await fs.promises.chmod(workspaceDir, 0o711);
     }
 
-    const sourceName = `solution${prepare.sourceExtension}`;
-    const binaryName = 'solution.out';
-    filePath = path.join(workspaceDir, sourceName);
-    outputPath = path.join(workspaceDir, binaryName);
+    const sourcePath = path.join(workspaceDir, plan.sourceName);
+    const artifactPath = plan.artifactName ? path.join(workspaceDir, plan.artifactName) : null;
 
-    // Reject sources that try to read files outside the submission via #include
-    // before compiling — a first line of defence against the compile-time
-    // arbitrary file-read vector (the compile also runs unprivileged, see
-    // runBoundedCompile).
-    const forbiddenInclude = findForbiddenInclude(code);
-    if (forbiddenInclude) {
-      await db.query(
-        `UPDATE ${table} SET overall_status = '${SUBMISSION_STATUS.COMPILATION_ERROR}', results = $1 WHERE id = $2`,
-        [
-          JSON.stringify([{ status: SUBMISSION_STATUS.COMPILATION_ERROR, output: FORBIDDEN_INCLUDE_MESSAGE(forbiddenInclude) }]),
-          submissionId,
-        ]
-      );
-      publishSubmissionStatus(submissionId, table, user_id, SUBMISSION_STATUS.COMPILATION_ERROR, 0);
-      return;
-    }
-
-    // The source is owned by the submission's sandbox identity with mode
-    // 0600: readable by the sandboxed compile/run of THIS submission only —
-    // another submission's uid cannot read it even by name, and the
+    // Every planned file is owned by the submission's sandbox identity with
+    // mode 0600: readable by the sandboxed compile/run of THIS submission
+    // only — another submission's uid cannot read it even by name, and the
     // traverse-only workspace keeps it out of any directory listing.
-    // In the by-construction path the uid-dropped `dd` write makes it
+    // In the by-construction path the uid-dropped `dd` write makes each file
     // identity-owned from creation (no chown — root cannot chown in the
-    // lockdown container; see sandboxProcess.ts).
-    if (privileged) {
-      filePath = await writeSandboxFile(workspaceDir, sourceName, code, { sandbox, context: uniqueId });
-    } else {
-      await fs.promises.writeFile(filePath, code, { mode: 0o600 });
+    // lockdown container; see sandboxProcess.ts). For a header problem this
+    // is also where the grader's secret files land; they are scrubbed again
+    // the moment the compile succeeds (below).
+    for (const file of plan.files) {
+      if (privileged) {
+        await writeSandboxFile(workspaceDir, file.name, file.content, { sandbox, context: uniqueId });
+      } else {
+        await fs.promises.writeFile(path.join(workspaceDir, file.name), file.content, { mode: 0o600 });
+      }
     }
 
     // Language-agnostic "prepare" phase: compile (C++) or syntax-check
@@ -255,25 +419,18 @@ async function runSubmissionPipeline(
     // A failure maps to Compilation Error with the sanitized stderr shown to
     // the submitter. Paths are relative to the workspace so diagnostics carry
     // no server directories at all.
-    const check = prepare.checkCommand(sourceName, binaryName);
-    const compileCommand = prlimitWrap(check.command, check.args);
+    const compileCommand = prlimitWrap(plan.check.command, plan.check.args);
     const compile = await runBoundedCompile(workspaceDir, compileCommand.command, compileCommand.args, sandbox);
     if (!compile.ok) {
       logger.warn('submission compile failed', { submissionId, table, language: submissionLanguage, stderr: compile.stderr });
-      await db.query(
-        `UPDATE ${table} SET overall_status = '${SUBMISSION_STATUS.COMPILATION_ERROR}', results = $1 WHERE id = $2`,
-        [
-          JSON.stringify([{
-            status: SUBMISSION_STATUS.COMPILATION_ERROR,
-            output: sanitizeCompilerStderr(compile.stderr, sourceName, submissionLanguage)
-              // Defence-in-depth: diagnostics may still embed absolute paths
-              // from include resolution; strip any that slipped through.
-              .replace(/\/[^\s:]*oj-submissions\/[^\s:]+/g, SANITIZED_SOURCE_NAME[submissionLanguage]),
-          }]),
-          submissionId,
-        ]
+      await recordCompilationError(
+        table,
+        submissionId,
+        user_id,
+        sanitizeCompilerStderr(compile.stderr, plan.sourceName, submissionLanguage, {
+          keepSourceName: plan.keepSourceName,
+        })
       );
-      publishSubmissionStatus(submissionId, table, user_id, SUBMISSION_STATUS.COMPILATION_ERROR, 0);
       return;
     }
 
@@ -283,12 +440,30 @@ async function runSubmissionPipeline(
     );
     publishSubmissionStatus(submissionId, table, user_id, SUBMISSION_STATUS.RUNNING, 0);
 
+    // HEADER PROBLEMS — scrub before anything runs. The binary was linked
+    // against the problem's secret grader sources, which are still sitting in
+    // the workspace the program is about to run with (same uid, same
+    // directory): without this removal the student's code could simply
+    // fopen() main.cpp and print the solution it was graded against. The
+    // submitted header goes too — it is no longer needed and keeps the
+    // workspace free of ANY source. A failed scrub must never fall through to
+    // the run, so removeSandboxFiles throws and the submission becomes a
+    // System Error (see utils/sandboxProcess.ts).
+    if (plan.scrub.length > 0) {
+      if (privileged) {
+        await removeSandboxFiles(workspaceDir, plan.scrub, { sandbox, context: uniqueId });
+      } else {
+        for (const fileName of plan.scrub) {
+          await fs.promises.rm(path.join(workspaceDir, fileName), { force: true });
+        }
+      }
+    }
+
     // Compiled languages run the produced artifact; interpreted languages run
     // the source through their interpreter. The judge applies per-language
     // limit multipliers from here on. g++ wrote the binary as the sandbox
     // identity already; 0750 keeps it owner+group only (the group IS the same
     // identity — one uid per submission — so this is effectively owner-only).
-    const artifactPath = prepare.compiledArtifactPath(outputPath);
     if (artifactPath) {
       // The artifact is owned by the sandbox identity (g++ wrote it as that
       // uid, or the dev-path compile produced it as this user). Root cannot
@@ -302,7 +477,7 @@ async function runSubmissionPipeline(
     }
     const judgeResult = await judge(
       problem_id,
-      prepare.runCommand(artifactPath ?? filePath),
+      plan.runCommand(artifactPath ?? sourcePath),
       submissionLanguage,
       sandbox
     );

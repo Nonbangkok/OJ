@@ -1,0 +1,56 @@
+{
+  "id": "hp_que01_at",
+  "title": "Queue At",
+  "author": "Nonbangkok",
+  "topic": "queue",
+  "class": "CP::queue<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 800,
+  "collection": "Header Problems — Queue",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "// ---- the function you must write; it lives in student.h ----",
+    "const T &at(size_t i) const;",
+    "",
+    "// ---- already written for you, and they stay in this file ----",
+    "const T &front() const { return mData[mFront]; }",
+    "",
+    "const T &back() const { return mData[(mFront + mSize - 1) % mCap]; }",
+    "",
+    "void push(const T &element)",
+    "{",
+    "  ensureCapacity(mSize + 1);",
+    "  mData[(mFront + mSize) % mCap] = element;",
+    "  mSize++;",
+    "}",
+    "",
+    "void pop()",
+    "{",
+    "  mFront = (mFront + 1) % mCap;",
+    "  mSize--;",
+    "}"
+  ],
+  "pdf_probe": "ตำแหน่งทางกายภาพของสมาชิกลำดับที่",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 4,
+      "percent": 40,
+      "note": "n ≤ 16 และคำสั่งไม่เกิน 90 คำสั่ง (ตรวจด้วยมือได้ มีคิวว่างและคิวที่มีสมาชิกตัวเดียว)"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "n ≤ 2,000 และคำสั่งไม่เกิน 6,000 คำสั่ง (คิวอยู่ในสภาพวนรอบเกือบตลอด)"
+    },
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "n ≤ 50,000 และคำสั่งไม่เกิน 130,000 คำสั่ง (ต้องเข้าถึงสมาชิกในเวลา O(1) วิธีที่เดินทีละช่องจาก mFront จะช้าเกินไป)"
+    }
+  ]
+}

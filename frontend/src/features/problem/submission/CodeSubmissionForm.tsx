@@ -8,7 +8,7 @@ import styles from './CodeSubmissionForm.module.css';
 import { UI_CONFIG } from '../../../config/constants';
 import { SUPPORTED_LANGUAGES, getLanguageDisplayName } from '../../../utils/constants';
 
-const CodeSubmissionForm = ({ problemId, contestId }) => {
+const CodeSubmissionForm = ({ problemId, contestId, submissionFilename = null }) => {
   const {
     language,
     setLanguage,
@@ -22,30 +22,39 @@ const CodeSubmissionForm = ({ problemId, contestId }) => {
     highlightCode,
     lineCount,
     handleWrapperClick
-  } = useCodeSubmission(problemId, contestId);
+  } = useCodeSubmission(problemId, contestId, submissionFilename);
 
   return (
     <div className={styles['submission-form-container']}>
       <div className={styles.formHeader}>
         <h2>Submit Solution</h2>
-        <div className={styles.languageButtons}>
-          {SUPPORTED_LANGUAGES.map((supportedLanguage) => (
-            <button
-              key={supportedLanguage}
-              className={language === supportedLanguage ? styles.active : ''}
-              onClick={() => setLanguage(supportedLanguage)}
-              disabled={isSubmitting}
-            >
-              {getLanguageDisplayName(supportedLanguage)}
-            </button>
-          ))}
-        </div>
+        {submissionFilename ? (
+          <span className={styles.languageLabel}>{getLanguageDisplayName('cpp')}</span>
+        ) : (
+          <div className={styles.languageButtons}>
+            {SUPPORTED_LANGUAGES.map((supportedLanguage) => (
+              <button
+                key={supportedLanguage}
+                className={language === supportedLanguage ? styles.active : ''}
+                onClick={() => setLanguage(supportedLanguage)}
+                disabled={isSubmitting}
+              >
+                {getLanguageDisplayName(supportedLanguage)}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
+      {submissionFilename && (
+        <p className={styles.headerHelp}>
+          Submit only {submissionFilename} {'\u2014'} it is compiled with the grader&apos;s own main.cpp.
+        </p>
+      )}
       {error && <p className="error-message" style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
       <form onSubmit={handleSubmit}>
         <div className={formStyles['form-group']}>
-          <label htmlFor="code">Your Code:</label>
+          <label htmlFor="code">{submissionFilename ? `Your ${submissionFilename}` : 'Your Code:'}</label>
           {/* Click-to-focus is a mouse convenience; Tab reaches the textarea directly. */}
             {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
             <div className={editorStyles['editorWrapper']} ref={editorWrapperRef} onClick={handleWrapperClick}>

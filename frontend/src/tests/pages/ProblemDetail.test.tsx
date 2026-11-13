@@ -113,4 +113,36 @@ describe('ProblemDetail Page', () => {
             expect(screen.getByText(/failed to fetch problem/i)).toBeInTheDocument();
         });
     });
+
+    it('renders a Download starter files link only when has_starter_files', async () => {
+        const detail = {
+            id: '1', title: 'Header One', author: null,
+            time_limit_ms: 1000, memory_limit_mb: 256,
+            problem_type: 'header' as const, submission_filename: 'student.h', has_starter_files: true,
+        };
+        jest.mocked(problemService.getDetails).mockResolvedValueOnce(detail);
+        jest.mocked(problemService.getAllWithStats).mockResolvedValueOnce([]);
+        jest.mocked(problemService.getStarterUrl).mockReturnValue('/api/problems/1/starter');
+
+        render(<BrowserRouter><ProblemDetail /></BrowserRouter>);
+
+        const link = await screen.findByRole('link', { name: 'Download starter files' });
+        expect(link).toHaveAttribute('href', '/api/problems/1/starter');
+        expect(link).toHaveAttribute('download');
+    });
+
+    it('hides the starter link when there are no starter files', async () => {
+        const detail = {
+            id: '1', title: 'Plain', author: null,
+            time_limit_ms: 1000, memory_limit_mb: 256,
+            problem_type: 'standard' as const, submission_filename: null, has_starter_files: false,
+        };
+        jest.mocked(problemService.getDetails).mockResolvedValueOnce(detail);
+        jest.mocked(problemService.getAllWithStats).mockResolvedValueOnce([]);
+
+        render(<BrowserRouter><ProblemDetail /></BrowserRouter>);
+
+        await screen.findByRole('heading', { name: 'Plain' });
+        expect(screen.queryByRole('link', { name: 'Download starter files' })).not.toBeInTheDocument();
+    });
 });

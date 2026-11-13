@@ -111,8 +111,12 @@ export interface BoundedProcessOptions {
  * can write file content without a shell.
  */
 export interface SandboxProcessOptions extends BoundedProcessOptions {
-  /** Written to the child's stdin, which is then closed. */
-  stdin?: string;
+  /**
+   * Written to the child's stdin, which is then closed. A Buffer is written
+   * verbatim — the byte-exact path problem grader files need (a grader saved
+   * in TIS-620/CP874 must not be re-encoded on its way into the workspace).
+   */
+  stdin?: string | Buffer;
 }
 
 /**
@@ -284,7 +288,7 @@ async function runAsSandbox(
   sandbox: SandboxIdentity,
   command: string,
   args: readonly string[],
-  options?: { stdin?: string; cwd?: string }
+  options?: { stdin?: string | Buffer; cwd?: string }
 ): Promise<BoundedProcessResult> {
   return runSandboxProcess(command, args, {
     uid: sandbox.uid,
@@ -354,11 +358,15 @@ export async function createSandboxWorkspace(
  * echo of the content back on stdout, so the spawn's output cap can never
  * truncate a large source). Mode 0600 is applied by a uid-dropped `chmod`.
  * Returns the file's absolute path.
+ *
+ * A Buffer `content` lands in the workspace byte for byte: grader files are
+ * stored as BYTEA and may be in any encoding, so decoding them to a JS string
+ * first would replace every non-UTF-8 byte with U+FFFD.
  */
 export async function writeSandboxFile(
   workspaceDir: string,
   fileName: string,
-  content: string,
+  content: string | Buffer,
   options: SandboxWorkspaceOptions
 ): Promise<string> {
   const filePath = path.join(workspaceDir, fileName);
@@ -386,6 +394,33 @@ export async function chmodSandboxPath(
   const result = await runAsSandbox(options.sandbox, 'chmod', [mode, targetPath]);
   if (result.exitCode !== 0 || result.spawnError) {
     throw new Error(`failed to chmod ${targetPath} to ${mode}: ${result.stderr.trim()}`);
+  }
+}
+
+/**
+ * Remove named files from a sandbox workspace AS THEIR OWNER (the sandbox
+ * identity) — the header-problem scrub: the student's header is compiled in
+ * the same translation unit as the problem's SECRET grader sources, so every
+ * source file must leave the workspace before the produced binary runs, or
+ * the program could simply `fopen()` the main.cpp it was linked against.
+ *
+ * Unlike {@link removeSandboxWorkspace} this THROWS on failure: a scrub that
+ * did not happen must fail the submission (System Error), never let untrusted
+ * code run next to readable grader sources. `rm -f` tolerates already-missing
+ * files; `--` keeps a filename from being read as an option.
+ */
+export async function removeSandboxFiles(
+  workspaceDir: string,
+  fileNames: readonly string[],
+  options: SandboxWorkspaceOptions
+): Promise<void> {
+  if (fileNames.length === 0) return;
+  const targets = fileNames.map((fileName) => path.join(workspaceDir, fileName));
+  const result = await runAsSandbox(options.sandbox, 'rm', ['-f', '--', ...targets]);
+  if (result.exitCode !== 0 || result.spawnError) {
+    throw new Error(
+      `failed to remove sandbox files (exit=${result.exitCode} spawnError=${result.spawnError}): ${result.stderr.trim()}`
+    );
   }
 }
 

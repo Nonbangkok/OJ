@@ -415,12 +415,19 @@
 - Response 200: `application/pdf` (+ `X-Content-Type-Options: nosniff`)
 - Error 404 — รวม hidden และ contest problem สำหรับ non-staff
 
+### 48a. `GET /problems/:id/starter` (และ `GET /contests/:id/problems/:problemId/starter`)
+- Auth: `requirePublicAccess` (contest variant: `requireAuth`, participant เท่านั้น — gate เหมือน PDF)
+- Purpose: โหลด starter files ของ header problem เป็น ZIP (`<id>-starter.zip`)
+- Response 200: `application/zip`; `GET /problems/:id` และ contest problem detail คืน `problem_type`, `submission_filename`, `has_starter_files` เพิ่ม
+- Error 404 — standard problem, ไม่มี starter files, hidden/contest problem สำหรับ non-staff
+
 ### 49. `POST /admin/problems`
 - Auth: `staff|admin`
 - Purpose: สร้างโจทย์ใหม่
 - Body:
   - `id, title, author, time_limit_ms, memory_limit_mb`
   - `categories?: string[]`, `difficulty?: number`, `collection_id?: number`
+  - `problem_type?: 'standard'|'header'` (default `standard`), `submission_filename?: string` (header เท่านั้น, `.h`/`.hpp`, default `student.h`)
 - Response 201: created row
 - Error 409: id ซ้ำ
 
@@ -429,7 +436,7 @@
 - Purpose: แก้โจทย์ (รวม rename id — rename cascade ไป `user_problem_rewards`/`authoring_published_problems`/`problem_drafts`)
 - Body: shape เดียวกับ create (field `id` คือใหม่)
 - Response 200: updated row
-- Errors: 404/409
+- Errors: 404/409 — 409 ยังใช้เมื่อเปลี่ยน `problem_type`/`submission_filename` หลังมี submission แล้ว (type lock)
 
 ### 51. `DELETE /admin/problems/:id`
 - Auth: `staff|admin`
@@ -508,6 +515,14 @@
 - Body: `{ problemIds: string[] }`
 - Response 200: ZIP binary
 - Error 400: ไม่มี problemIds
+- Header problems: `config.json` มี `problem_type`/`submission_filename` และ ZIP มี `<id>/grader/*`, `<id>/starter/*` (batch upload รับรูปแบบเดียวกัน; ต้องมี grader `.cpp` อย่างน้อยหนึ่งไฟล์, id ที่มีอยู่แล้วถูก SKIPPED)
+
+### 63a. Header problem files (admin)
+- Auth: `staff|admin`
+- `GET /admin/problems/:id/files` — `{ problem_type, submission_filename, files: [{ role, filename, bytes }] }`
+- `GET /admin/problems/:id/files/:role/:filename` — โหลดไฟล์เดียว (`application/octet-stream`, `nosniff`); `role` = `grader|starter`
+- `PUT /admin/problems/:id/files/:role` — multipart `filesZip` (flat ZIP) แทนที่ทั้ง role ใน transaction
+- Errors: 400 (ไม่ใช่ header problem / ZIP ไม่ valid / nested path / ไม่มีไฟล์), 404 problem ไม่พบ
 
 ---
 

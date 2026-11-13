@@ -1,0 +1,32 @@
+{
+  "id": "hp_vec08_block_swap",
+  "title": "Vector Block Swap",
+  "author": "Nonbangkok",
+  "topic": "vector",
+  "class": "CP::vector<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 2000,
+  "collection": "Header Problems — Vector",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "void block_swap(size_t i, size_t j, size_t len);"
+  ],
+  "pdf_probe": "สลับข้อมูลสองช่วงที่ยาวเท่ากัน",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ≤ 2,000 และสลับรวมไม่เกิน 2,000 ครั้ง (วิธีที่คัดลอกทั้งเวกเตอร์ทุกครั้งผ่านได้)"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ถึง 10⁶ และสลับถึง 2 × 10⁴ ครั้งด้วย len สั้น ๆ (ต้องใช้เวลา O(len) ไม่ใช่ O(n))"
+    }
+  ]
+}

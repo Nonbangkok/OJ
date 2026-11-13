@@ -147,4 +147,20 @@ describe('Problem Service', () => {
 
         expect(url).toBe('/problems/P1/pdf');
     });
+
+    it('getStarterUrl returns global starter ZIP URL when no contestId', () => {
+        (api.defaults as AxiosDefaults).baseURL = 'http://localhost:5000/api';
+        expect(problemService.getStarterUrl('p1')).toBe('http://localhost:5000/api/problems/p1/starter');
+    });
+
+    it('getStarterUrl returns contest starter ZIP URL when contestId provided', () => {
+        (api.defaults as AxiosDefaults).baseURL = 'http://localhost:5000/api';
+        expect(problemService.getStarterUrl('p1', 5)).toBe('http://localhost:5000/api/contests/5/problems/p1/starter');
+    });
+
+    it('getStarterUrl uses empty base URL fallback when API baseURL is missing', () => {
+        (api.defaults as AxiosDefaults).baseURL = undefined;
+
+        expect(problemService.getStarterUrl('p1')).toBe('/problems/p1/starter');
+    });
 });

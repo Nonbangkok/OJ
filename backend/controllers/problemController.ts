@@ -15,6 +15,7 @@ import {
   getProblemDetail,
   getProblemExportBundle,
   getProblemPdfWithAccess,
+  getProblemStarterAccess,
   getProblemTestcases,
   getProblemsWithStatsForUser,
   getPublicProblemCategoryCounts,
@@ -27,7 +28,10 @@ import {
   updateProblemVisibility,
   updateAdminProblemsVisibility,
 } from '../services/problemQueryService';
-import { USER_ROLES } from '../constants';
+import { USER_ROLES, type ProblemFileRole } from '../constants';
+import * as db from '../db';
+import { sendStarterZip, getProblemFile, getProblemFiles, listProblemFiles, replaceProblemFiles } from '../services/problemFilesService';
+import { readFlatZip } from '../utils/headerProblemFiles';
 import {
   createCollection,
   deleteCollection,
@@ -55,6 +59,8 @@ import {
   adminProblemsBulkDeleteSchema,
   createProblemSchema,
   problemIdParamSchema,
+  problemFileParamSchema,
+  problemFileRoleParamSchema,
   problemExportSchema,
   problemTestcasesQuerySchema,
   problemsWithStatsQuerySchema,
@@ -203,11 +209,73 @@ router.get('/problems/:id/pdf', requirePublicAccess,
   res.send(problem.problem_pdf);
 }));
 
+router.get('/problems/:id/starter', requirePublicAccess,
+  validateRequest({ params: problemIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const notFound = new AppError('Starter files not found.', 404);
+
+  // Same visibility rule as /problems/:id/pdf: hidden and contest problems read
+  // as plain 404s to non-staff callers (contests have their own guarded route).
+  const problem = await getProblemStarterAccess(id);
+  if (!problem) throw notFound;
+  const isStaffOrAdmin = req.user?.role === USER_ROLES.ADMIN || req.user?.role === USER_ROLES.STAFF;
+  if ((!problem.is_visible || problem.contest_id !== null) && !isStaffOrAdmin) throw notFound;
+  if (problem.problem_type !== 'header') throw notFound;
+
+  const files = await getProblemFiles(id, 'starter');
+  if (files.length === 0) throw notFound;
+
+  await sendStarterZip(res, id, files);
+}));
+
+router.get('/admin/problems/:id/files', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: problemIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const problem = await getProblemDetail(id);
+  if (!problem) throw new AppError('Problem not found', 404);
+  const files = await listProblemFiles(id);
+  res.json({ problem_type: problem.problem_type, submission_filename: problem.submission_filename, files });
+}));
+
+router.get('/admin/problems/:id/files/:role/:filename', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: problemFileParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const content = await getProblemFile(String(req.params.id), req.params.role as ProblemFileRole, String(req.params.filename));
+  if (!content) throw new AppError('File not found.', 404);
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.send(content);
+}));
+
+router.put('/admin/problems/:id/files/:role', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: problemFileRoleParamSchema }),
+  memoryUpload.single('filesZip'),
+  asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const role = req.params.role as ProblemFileRole;
+  if (!req.file) throw new AppError('No ZIP file uploaded.', 400);
+
+  const problem = await getProblemDetail(id);
+  if (!problem) throw new AppError('Problem not found', 404);
+  if (problem.problem_type !== 'header') throw new AppError('Only header problems have files.', 400);
+
+  let files;
+  try {
+    files = await readFlatZip(req.file.buffer);
+  } catch (error) {
+    throw new AppError(getErrorMessage(error), 400);
+  }
+  await db.withTransaction((client) => replaceProblemFiles(client, id, role, files));
+  res.json({ message: 'Files updated.', files: await listProblemFiles(id) });
+}));
+
 router.post('/admin/problems', requireAuth, requireStaffOrAdmin,
   validateRequest({ body: createProblemSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-  const { id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb } = req.body as CreateProblemRequestBody;
-  const createResult = await createProblem({ id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb });
+  const { id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb, problem_type, submission_filename } = req.body as CreateProblemRequestBody;
+  const createResult = await createProblem({ id, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb, problem_type, submission_filename });
   if (createResult === 'duplicate_id') {
     throw new AppError(`Problem ID '${id}' already exists.`, 409);
   }
@@ -218,7 +286,7 @@ router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
   validateRequest({ params: problemIdParamSchema, body: updateProblemSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const oldId = String(req.params.id);
-  const { id: newId, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb } = req.body as UpdateProblemRequestBody;
+  const { id: newId, title, author, categories, difficulty, collection_id, time_limit_ms, memory_limit_mb, problem_type, submission_filename } = req.body as UpdateProblemRequestBody;
 
   const updateResult = await updateProblem(oldId, {
     id: newId,
@@ -229,7 +297,15 @@ router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
     collection_id,
     time_limit_ms,
     memory_limit_mb,
+    problem_type,
+    submission_filename,
   });
+  if (updateResult === 'type_locked') {
+    throw new AppError('Problem type and submission filename cannot change after submissions exist.', 409);
+  }
+  if (typeof updateResult === 'object' && 'kind' in updateResult && updateResult.kind === 'filename_conflict') {
+    throw new AppError(updateResult.message, 409);
+  }
   if (updateResult === 'duplicate_id') {
     throw new AppError(`Problem ID '${newId}' already exists.`, 409);
   }
@@ -616,7 +692,12 @@ router.post('/admin/problems/export', requireAuth, requireStaffOrAdmin,
         archive.append(problem.problem_pdf, { name: `${problemFolderName}/${problem.id}.pdf` });
       }
 
-      // 3. Add test cases (input/output)
+      // 3. Header problems: grader/ and starter/ files (byte-exact)
+      for (const file of bundle.files) {
+        archive.append(file.content, { name: `${problemFolderName}/${file.role}/${file.filename}` });
+      }
+
+      // 4. Add test cases (input/output)
       if (testcases.length > 0) {
         for (const testcase of testcases) {
           const caseNumberPadded = testcase.case_number.toString().padStart(2, '0'); // e.g., 01, 02

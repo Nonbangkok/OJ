@@ -460,3 +460,11 @@
   color: var(--text-secondary);
   font-size: 0.85rem;
 }
+
+.problem-info .starter-link {
+  display: block;
+  box-sizing: border-box;
+  margin-top: 0.5rem;
+  border-radius: 6px;
+  text-decoration: none;
+}

@@ -1,0 +1,51 @@
+{
+  "id": "hp_que07_erase",
+  "title": "Queue Erase",
+  "author": "Nonbangkok",
+  "topic": "queue",
+  "class": "CP::queue<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1500,
+  "collection": "Header Problems — Queue",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "// ---- the function you must write; it lives in student.h ----",
+    "void erase(size_t i);",
+    "",
+    "// ---- already written for you, and they stay in this file ----",
+    "const T &front() const { return mData[mFront]; }",
+    "",
+    "const T &back() const { return mData[(mFront + mSize - 1) % mCap]; }",
+    "",
+    "void push(const T &element)",
+    "{",
+    "  ensureCapacity(mSize + 1);",
+    "  mData[(mFront + mSize) % mCap] = element;",
+    "  mSize++;",
+    "}",
+    "",
+    "void pop()",
+    "{",
+    "  mFront = (mFront + 1) % mCap;",
+    "  mSize--;",
+    "}"
+  ],
+  "pdf_probe": "ย้ายข้อมูลเพียงฝั่งที่สั้นกว่า",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ≤ 2,000 และคำสั่งไม่เกิน 3,000 คำสั่ง (วิธีที่เลื่อนข้อมูลฝั่งท้ายทุกครั้งก็ผ่าน)"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ≤ 60,000 และคำสั่งไม่เกิน 80,000 คำสั่ง โดยส่วนใหญ่เป็นการลบใกล้หัวหรือใกล้ท้ายคิว (ต้องเลือกย้ายฝั่งที่สั้นกว่า)"
+    }
+  ]
+}
