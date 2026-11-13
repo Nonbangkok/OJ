@@ -6,7 +6,7 @@ import os from 'os';
 import { Readable } from 'stream';
 import type { PoolClient } from 'pg';
 import * as db from '../db';
-import { UPLOAD_STATUS, FILE_CONFIG, ARCHIVE_LIMITS, DEFAULT_SUBMISSION_FILENAME, type ProblemFileRole } from '../constants';
+import { UPLOAD_STATUS, FILE_CONFIG, DEFAULT_SUBMISSION_FILENAME, type ProblemFileRole } from '../constants';
 import { BatchUploadProgressData } from '../types/api';
 import {
   BatchUploadResult,
@@ -23,62 +23,20 @@ import { resolveCollectionIdByName } from './collectionQueryService';
 import { replaceProblemFiles } from './problemFilesService';
 import type { ProblemFileInput } from '../utils/headerProblemFiles';
 import { pairFlatDirTestcaseFiles, pairZippedTestcaseFiles } from './testcaseZipPairing';
+import { assertSafeArchive, MAX_ARCHIVE_ENTRIES, type ArchiveEntryLike } from '../utils/archiveSafety';
 
-const MAX_ARCHIVE_UNCOMPRESSED_BYTES = ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES;
-export const MAX_ARCHIVE_ENTRIES = ARCHIVE_LIMITS.MAX_ENTRIES;
+// Re-exported for the callers that have always imported the archive guard from
+// this service; the implementation now lives in `utils/archiveSafety`.
+export { assertSafeArchive, MAX_ARCHIVE_ENTRIES };
+export type { ArchiveEntryLike };
+
 const PDF_MAGIC = Buffer.from('%PDF');
-
-export interface ArchiveEntryLike {
-  path: string;
-  type?: string;
-  uncompressedSize?: number;
-}
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
   return 'Unknown error';
-}
-
-/**
- * Validate every entry of an opened archive *before* extraction.
- *
- * - Zip-slip: reject absolute paths and any path that escapes the target
- *   directory via `..` segments (normalised, cross-platform).
- * - Zip-bomb: reject archives with too many entries or whose total
- *   uncompressed size exceeds the cap.
- *
- * Throws an Error (which callers surface as a per-archive failure) if unsafe.
- */
-export function assertSafeArchive(entries: ArchiveEntryLike[] | undefined | null): void {
-  if (!Array.isArray(entries)) {
-    return;
-  }
-  if (entries.length > MAX_ARCHIVE_ENTRIES) {
-    throw new Error(`Archive rejected: too many entries (${entries.length} > ${MAX_ARCHIVE_ENTRIES}).`);
-  }
-
-  let totalUncompressed = 0;
-  for (const entry of entries) {
-    const entryPath = entry.path ?? '';
-
-    // Reject absolute paths (POSIX or Windows-style).
-    if (path.isAbsolute(entryPath) || /^[a-zA-Z]:[\\/]/.test(entryPath)) {
-      throw new Error(`Archive rejected: absolute entry path "${entryPath}".`);
-    }
-
-    // Normalise and ensure the entry stays within the extraction root.
-    const normalized = path.normalize(entryPath);
-    if (normalized.startsWith('..' + path.sep) || normalized === '..' || normalized.includes('..' + path.sep)) {
-      throw new Error(`Archive rejected: path traversal in entry "${entryPath}".`);
-    }
-
-    totalUncompressed += entry.uncompressedSize ?? 0;
-    if (totalUncompressed > MAX_ARCHIVE_UNCOMPRESSED_BYTES) {
-      throw new Error(`Archive rejected: uncompressed size exceeds ${MAX_ARCHIVE_UNCOMPRESSED_BYTES} bytes (decompression bomb).`);
-    }
-  }
 }
 
 /** Remove a directory tree without spawning a shell (avoids command injection). */

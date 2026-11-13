@@ -2,7 +2,7 @@ import path from 'path';
 import * as unzipper from 'unzipper';
 import { HEADER_PROBLEM_LIMITS, type ProblemFileRole } from '../constants';
 import { validateProblemFilename, validateSubmissionFilename } from './problemFilename';
-import { assertSafeArchive, type ArchiveEntryLike } from '../services/batchUploadService';
+import { assertSafeArchive, type ArchiveEntryLike } from './archiveSafety';
 
 export { validateProblemFilename, validateSubmissionFilename };
 
