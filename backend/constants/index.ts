@@ -529,3 +529,17 @@ export const ARCHIVE_LIMITS = {
     MAX_UNCOMPRESSED_BYTES: 500 * 1024 * 1024, // 500 MB total
     MAX_ENTRIES: 5000, // file count
 } as const;
+
+// --- Header problems (student submits only a header, compiled with secret grader files) ---
+export const PROBLEM_TYPES = ['standard', 'header'] as const;
+export type ProblemType = (typeof PROBLEM_TYPES)[number];
+
+export const PROBLEM_FILE_ROLES = ['grader', 'starter'] as const;
+export type ProblemFileRole = (typeof PROBLEM_FILE_ROLES)[number];
+
+export const DEFAULT_SUBMISSION_FILENAME = 'student.h';
+
+export const HEADER_PROBLEM_LIMITS = {
+    MAX_FILE_BYTES: 1024 * 1024, // 1 MiB per file
+    MAX_FILES_PER_ROLE: 20,
+} as const;

@@ -27,6 +27,7 @@ describe('user profile migration', () => {
       '0021_collection_description',
       '0022_drop_collection_description_again',
       '0023_user_submission_lock',
+      '0024_header_problems',
     ]);
   });
 

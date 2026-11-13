@@ -5,7 +5,7 @@
  * Each interface maps directly to one table row as returned by pg.
  * Use these as the generic parameter for `db.query<T>()`.
  */
-import { CONTEST_STATUS, ProblemCategory, SUBMISSION_STATUS, USER_ROLES } from '../constants';
+import { CONTEST_STATUS, ProblemCategory, ProblemFileRole, ProblemType, SUBMISSION_STATUS, USER_ROLES } from '../constants';
 
 // ---------------------------------------------------------------------------
 // Primitives / Shared
@@ -111,6 +111,17 @@ export interface ProblemRow {
     memory_limit_mb: number;
     is_visible: boolean;
     contest_id: number | null;
+    problem_type: ProblemType;
+    /** Header problems: the single file the student submits (e.g. student.h); null for standard. */
+    submission_filename: string | null;
+}
+
+/** `problem_files` table row (secret grader files / public starter files). */
+export interface ProblemFileRow {
+    problem_id: string;
+    role: ProblemFileRole;
+    filename: string;
+    content: Buffer;
 }
 
 export type ProblemWithPdf = Pick<
