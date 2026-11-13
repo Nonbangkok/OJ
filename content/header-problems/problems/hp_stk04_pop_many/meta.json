@@ -1,0 +1,38 @@
+{
+  "id": "hp_stk04_pop_many",
+  "title": "Stack Pop Many — นำออกทีละหลายตัว",
+  "author": "OJ Header Problem Set",
+  "topic": "stack",
+  "class": "CP::stack<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1200,
+  "collection": "Header Problems — Stack",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "void push(const T &element)\n{\n  ensureCapacity(mSize + 1);\n  mData[mSize] = element;\n  mSize++;\n}",
+    "",
+    "void pop()\n{\n  if (mSize > 0)\n    mSize--;\n}",
+    "",
+    "const T &top() const { return mData[mSize - 1]; }",
+    "",
+    "// for student.h\nvoid pop(size_t k);"
+  ],
+  "pdf_probe": "นำสมาชิกออกจากสแตกพร้อมกัน",
+  "has_tle_subtask": false,
+  "subtasks": [
+    {
+      "cases": 3,
+      "percent": 30,
+      "note": "n ≤ 10 และ q ≤ 60 (รวมกรณี k = 0, k = size และ k > size)"
+    },
+    {
+      "cases": 7,
+      "percent": 70,
+      "note": "n ≤ 50,000 และ q ≤ 120,000 โดย k ≤ 4 × 10⁹"
+    }
+  ]
+}
