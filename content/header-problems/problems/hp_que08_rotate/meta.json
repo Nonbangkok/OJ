@@ -1,7 +1,7 @@
 {
   "id": "hp_que08_rotate",
   "title": "Queue Rotate",
-  "author": "OJ Header Problem Set",
+  "author": "Nonbangkok",
   "topic": "queue",
   "class": "CP::queue<T>",
   "categories": [

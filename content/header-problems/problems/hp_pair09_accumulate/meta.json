@@ -1,7 +1,7 @@
 {
   "id": "hp_pair09_accumulate",
   "title": "Pair Accumulate",
-  "author": "OJ Header Problem Set",
+  "author": "Nonbangkok",
   "topic": "pair",
   "class": "CP::pair<T1,T2>",
   "categories": [

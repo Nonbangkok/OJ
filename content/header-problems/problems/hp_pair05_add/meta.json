@@ -1,7 +1,7 @@
 {
   "id": "hp_pair05_add",
   "title": "Pair Add",
-  "author": "OJ Header Problem Set",
+  "author": "Nonbangkok",
   "topic": "pair",
   "class": "CP::pair<T1,T2>",
   "categories": [

@@ -1,7 +1,7 @@
 {
   "id": "hp_que07_erase",
   "title": "Queue Erase",
-  "author": "OJ Header Problem Set",
+  "author": "Nonbangkok",
   "topic": "queue",
   "class": "CP::queue<T>",
   "categories": [

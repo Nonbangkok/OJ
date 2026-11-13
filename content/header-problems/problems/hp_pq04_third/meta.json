@@ -1,7 +1,7 @@
 {
   "id": "hp_pq04_third",
   "title": "Priority Queue Third",
-  "author": "OJ Header Problem Set",
+  "author": "Nonbangkok",
   "topic": "priority_queue",
   "class": "CP::priority_queue<T,Comp>",
   "categories": [

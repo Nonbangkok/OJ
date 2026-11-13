@@ -1,7 +1,7 @@
 {
   "id": "hp_que10_merge",
   "title": "Queue Merge",
-  "author": "OJ Header Problem Set",
+  "author": "Nonbangkok",
   "topic": "queue",
   "class": "CP::queue<T>",
   "categories": [

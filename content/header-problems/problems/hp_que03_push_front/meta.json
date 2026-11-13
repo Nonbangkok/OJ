@@ -1,7 +1,7 @@
 {
   "id": "hp_que03_push_front",
   "title": "Queue Push Front",
-  "author": "OJ Header Problem Set",
+  "author": "Nonbangkok",
   "topic": "queue",
   "class": "CP::queue<T>",
   "categories": [

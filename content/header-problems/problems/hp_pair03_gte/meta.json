@@ -1,7 +1,7 @@
 {
   "id": "hp_pair03_gte",
   "title": "Pair Greater-or-Equal",
-  "author": "OJ Header Problem Set",
+  "author": "Nonbangkok",
   "topic": "pair",
   "class": "CP::pair<T1,T2>",
   "categories": [

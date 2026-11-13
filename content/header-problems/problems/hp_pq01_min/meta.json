@@ -1,7 +1,7 @@
 {
   "id": "hp_pq01_min",
   "title": "Priority Queue Min",
-  "author": "OJ Header Problem Set",
+  "author": "Nonbangkok",
   "topic": "priority_queue",
   "class": "CP::priority_queue<T,Comp>",
   "categories": [

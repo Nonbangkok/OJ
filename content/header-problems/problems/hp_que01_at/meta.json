@@ -1,7 +1,7 @@
 {
   "id": "hp_que01_at",
   "title": "Queue At",
-  "author": "OJ Header Problem Set",
+  "author": "Nonbangkok",
   "topic": "queue",
   "class": "CP::queue<T>",
   "categories": [

@@ -1,7 +1,7 @@
 {
   "id": "hp_stk06_deep_push",
   "title": "Stack Deep Push",
-  "author": "OJ Header Problem Set",
+  "author": "Nonbangkok",
   "topic": "stack",
   "class": "CP::stack<T>",
   "categories": [
