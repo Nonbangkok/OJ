@@ -1,0 +1,36 @@
+{
+  "id": "hp_que09_reverse",
+  "title": "Queue Reverse — กลับคิวในเวลาคงที่",
+  "author": "OJ Header Problem Set",
+  "topic": "queue",
+  "class": "CP::queue<T>",
+  "categories": [
+    "Data Structures"
+  ],
+  "difficulty": 1500,
+  "collection": "Header Problems — Queue",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "submission_filename": "student.h",
+  "declarations": [
+    "void reverse();",
+    "const T &front() const;",
+    "const T &back() const;",
+    "void push(const T &element);",
+    "void pop();"
+  ],
+  "pdf_probe": "กลับลำดับของสมาชิกทั้งคิว",
+  "has_tle_subtask": true,
+  "subtasks": [
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ≤ 2,000 และ q ≤ 2,000 (วิธีที่กลับข้อมูลจริงทุกครั้งผ่านได้)"
+    },
+    {
+      "cases": 5,
+      "percent": 50,
+      "note": "n ≤ 36,000 และ q ≤ 200,000 (ต้องทำ reverse ใน O(1))"
+    }
+  ]
+}
