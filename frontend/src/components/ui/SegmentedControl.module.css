@@ -17,7 +17,18 @@
   height: 2.1rem;
 }
 
-.segmentBtn {
+/* Every rule below is scoped `.segment .segmentBtn` on purpose. Form
+   surfaces style their descendant buttons as full-width accent action
+   buttons (`.form-container button` in Form.module.css, specificity 0,1,1),
+   which otherwise repaints an inactive segment blue and inflates it past
+   this 2.1rem well. Two classes (0,2,0) win that cascade, so the control
+   keeps its own look wherever it is dropped — and the properties that rule
+   sets are reset here explicitly rather than left to chance. */
+.segment .segmentBtn {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
   padding-top: 0;
   padding-bottom: 0;
   padding-left: 0.875rem;
@@ -26,6 +37,7 @@
   border-radius: var(--radius-sm);
   background-color: transparent;
   color: var(--text-secondary);
+  font-family: inherit;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -33,22 +45,22 @@
   white-space: nowrap;
 }
 
-.segmentBtn:hover {
+.segment .segmentBtn:hover {
   color: var(--text-primary);
 }
 
-.segmentBtn.active {
+.segment .segmentBtn.active {
   background-color: var(--background-primary);
   color: var(--text-primary);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.segmentBtn:focus-visible {
+.segment .segmentBtn:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 1px;
 }
 
-.segmentBtn:disabled {
+.segment .segmentBtn:disabled {
   cursor: not-allowed;
   opacity: 0.65;
 }
