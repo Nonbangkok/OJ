@@ -325,7 +325,7 @@ async function republishSyncedProblem(client: PoolClientLike,
   if (!provenance) return false;
   const updated = await client.query(`UPDATE problems SET
     title=$2, author=$3, categories=$4::text[], difficulty=$5, problem_pdf=$6
-    WHERE id=$1 AND title=$7 AND author IS NOT DISTINCT FROM $8
+    WHERE id=$1 AND problem_type='standard' AND title=$7 AND author IS NOT DISTINCT FROM $8
       AND categories IS NOT DISTINCT FROM $9
       AND difficulty IS NOT DISTINCT FROM $10
       AND time_limit_ms=$11 AND memory_limit_mb=$12

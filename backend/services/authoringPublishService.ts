@@ -74,7 +74,7 @@ export async function publishProblemDraft(draftId: string, expectedRevision: num
       // outside the authoring workflow.
       const updated = await client.query<{ is_visible: boolean }>(`UPDATE problems SET
         title=$2,author=$3,categories=$4::text[],difficulty=$5,problem_pdf=$6,time_limit_ms=$7,memory_limit_mb=$8
-        WHERE id=$1 AND title=$9 AND author IS NOT DISTINCT FROM $10
+        WHERE id=$1 AND problem_type='standard' AND title=$9 AND author IS NOT DISTINCT FROM $10
           AND categories IS NOT DISTINCT FROM $11
           AND difficulty IS NOT DISTINCT FROM $12
           AND time_limit_ms=$13 AND memory_limit_mb=$14

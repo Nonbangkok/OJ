@@ -173,6 +173,25 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     expect((await stored(d.id)).status).toBe('ready');
   });
 
+  it('never republishes over a problem that has since become a header problem', async () => {
+    const d = await ready();
+    expect((await post(d.id)).status).toBe(201);
+    await pool.query("UPDATE problems SET problem_type='header', submission_filename='student.h' WHERE id=$1", [d.problem_id]);
+    await pool.query("INSERT INTO problem_files (problem_id, role, filename, content) VALUES ($1,'grader','main.cpp',$2)",
+      [d.problem_id, Buffer.from('int main(){}')]);
+    const saved = await updateProblemDraft(d.id, 1, { statement_html: '<h1>Correction</h1>' }, database);
+    expect(saved.kind).toBe('updated');
+    await verify(d, 2);
+
+    const response = await post(d.id, 2);
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('published_problem_mismatch');
+    expect((await rows('problems'))[0]).toEqual(expect.objectContaining({ problem_type: 'header', submission_filename: 'student.h' }));
+    expect((await pool.query('SELECT role, filename FROM problem_files WHERE problem_id=$1', [d.problem_id])).rows)
+      .toEqual([{ role: 'grader', filename: 'main.cpp' }]);
+    expect((await stored(d.id)).status).toBe('ready');
+  });
+
   it('updates changed authoring metadata when the original legacy publication is still intact', async () => {
     const d = await ready();
     expect((await post(d.id)).status).toBe(201);
