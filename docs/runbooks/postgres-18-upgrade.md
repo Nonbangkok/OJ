@@ -107,6 +107,17 @@ empty-database deploy the guard exists to stop.
   is not met. Override only if you are sure: `OJ_PG18_SKIP_DISK_CHECK=1`.
   Check by hand with `df -h . "$(docker info -f '{{.DockerRootDir}}')"` and
   `docker system df -v | grep db-data`.
+  - **Measured on production (2026-11-13):** for 4950 MiB of `base/`, the
+    `.sql` was 8.66 GB (1.75×), the `.dump` 3.07 GB (0.62×), the transient
+    dump copy inside the container another 0.62×, and the new cluster 5.9 GB
+    (1.2×, including 1 GB of WAL). The peak was about 4.3×, so the 6× rule
+    held inside the VM.
+  - **If the server is a VM on thin-provisioned storage** (e.g. Proxmox
+    LVM-thin, qcow2, a cloud disk with a quota), the **host** must also have
+    room for the guest to write those ~4–5× of new blocks. The script can only
+    see the guest's filesystem. When the host pool fills, the VM is paused or
+    gets I/O errors: everything stops at once (SSH, Tailscale, the Cloudflare
+    tunnel), which is what happened on production mid-restore.
 - **A maintenance window.** The site is down from the moment the script stops
   the stack until it restarts it; plan for a few minutes plus dump/restore
   time (roughly proportional to the database size). The script builds this
@@ -130,6 +141,15 @@ empty-database deploy the guard exists to stop.
   after you confirm that no migration is running: `ps -ef | grep '[p]g18-migrate'`
   shows nothing, and neither does `docker ps -a --filter name=pg16-migrate`.
   Then run `rm -rf backups/.pg18-migrate.lock`.
+- **Exactly one `cloudflared` connector for the tunnel.** `production.conf`
+  trusts `X-Forwarded-Proto` only from the compose `cloudflared` at
+  `172.30.250.3` and redirects every other plain-HTTP request to HTTPS. A second
+  connector running with the same `TUNNEL_TOKEN` (e.g. an old hand-started
+  `docker run` container on another network) gets about half the traffic, and
+  every one of its requests is redirected again and again: browsers show "too
+  many redirects" intermittently. List them before deploying and stop any that
+  is not the compose service `cloudflared`:
+  `docker ps --format '{{.Names}} {{.Networks}}' | grep -i cloudflared`.
 - The server's `.env` is the one production uses (the scripts read
   `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` through compose).
 - Announce the window to users.
