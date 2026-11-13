@@ -127,4 +127,26 @@ describe('sanitizeCompilerStderr', () => {
     expect(sanitizeCompilerStderr('', '/tmp/x.cpp')).toBe('Compilation failed');
     expect(sanitizeCompilerStderr(undefined, '/tmp/x.cpp')).toBe('Compilation failed');
   });
+
+  it('strips workspace paths from diagnostics by default', () => {
+    const raw = '/tmp/oj-submissions/sub_1_2_abc/solution.cpp:3:5: error: expected \';\'';
+    const out = sanitizeCompilerStderr(raw, 'solution.cpp');
+    expect(out).not.toContain('oj-submissions');
+    expect(out).toContain('solution.cpp:3:5: error');
+  });
+
+  it('keeps the submitted file name for header problems, path-stripped to its basename', () => {
+    // A header submission is a named file (student.h) compiled with the
+    // problem's grader sources: diagnostics MUST keep pointing at the real
+    // file the student wrote, so the neutral rename is off — only server
+    // paths are stripped.
+    const raw = 'In file included from main.cpp:1:\n'
+      + 'student.h:3:5: error: expected \';\'\n'
+      + '/tmp/oj-submissions/sub_1_2_abc/student.h:4:1: error: stray token';
+    const out = sanitizeCompilerStderr(raw, 'student.h', 'cpp', { keepSourceName: true });
+    expect(out).toContain('student.h:3:5: error');
+    expect(out).toContain('student.h:4:1: error: stray token');
+    expect(out).not.toContain('solution.cpp');
+    expect(out).not.toContain('oj-submissions');
+  });
 });

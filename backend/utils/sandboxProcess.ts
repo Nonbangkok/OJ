@@ -390,6 +390,33 @@ export async function chmodSandboxPath(
 }
 
 /**
+ * Remove named files from a sandbox workspace AS THEIR OWNER (the sandbox
+ * identity) — the header-problem scrub: the student's header is compiled in
+ * the same translation unit as the problem's SECRET grader sources, so every
+ * source file must leave the workspace before the produced binary runs, or
+ * the program could simply `fopen()` the main.cpp it was linked against.
+ *
+ * Unlike {@link removeSandboxWorkspace} this THROWS on failure: a scrub that
+ * did not happen must fail the submission (System Error), never let untrusted
+ * code run next to readable grader sources. `rm -f` tolerates already-missing
+ * files; `--` keeps a filename from being read as an option.
+ */
+export async function removeSandboxFiles(
+  workspaceDir: string,
+  fileNames: readonly string[],
+  options: SandboxWorkspaceOptions
+): Promise<void> {
+  if (fileNames.length === 0) return;
+  const targets = fileNames.map((fileName) => path.join(workspaceDir, fileName));
+  const result = await runAsSandbox(options.sandbox, 'rm', ['-f', '--', ...targets]);
+  if (result.exitCode !== 0 || result.spawnError) {
+    throw new Error(
+      `failed to remove sandbox files (exit=${result.exitCode} spawnError=${result.spawnError}): ${result.stderr.trim()}`
+    );
+  }
+}
+
+/**
  * Recursively remove a sandbox-owned workspace AS ITS OWNER. Root cannot do
  * this in the lockdown container (no CAP_DAC_OVERRIDE over uid-owned dirs),
  * so the pipeline's finally-block cleanup must go through here. Never throws
