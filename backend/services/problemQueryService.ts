@@ -378,8 +378,19 @@ export const getVisibleProblems = async (): Promise<Array<Pick<ProblemRow, 'id' 
 
 export const getProblemDetail = async (problemId: string): Promise<ProblemDetailDTO | null> => {
   const result = await db.query<ProblemDetailDTO>(
-    'SELECT id, title, author, categories, difficulty, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible, contest_id FROM problems WHERE id = $1',
+    'SELECT id, title, author, categories, difficulty, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) as has_pdf, is_visible, contest_id, problem_type, submission_filename, EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = problems.id AND f.role = \'starter\') AS has_starter_files FROM problems WHERE id = $1',
     [problemId]
+  );
+  return result.rows[0] ?? null;
+};
+
+/** Visibility context for the public starter-ZIP route (same rule as the PDF route). */
+export const getProblemStarterAccess = async (
+  problemId: string,
+): Promise<Pick<ProblemRow, 'problem_type' | 'is_visible' | 'contest_id'> | null> => {
+  const result = await db.query<Pick<ProblemRow, 'problem_type' | 'is_visible' | 'contest_id'>>(
+    'SELECT problem_type, is_visible, contest_id FROM problems WHERE id = $1',
+    [problemId],
   );
   return result.rows[0] ?? null;
 };

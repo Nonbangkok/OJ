@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { seedSchema } from '../authoring/protocol';
-import { validateSubmissionFilename } from '../utils/problemFilename';
+import { validateProblemFilename, validateSubmissionFilename } from '../utils/problemFilename';
 import {
   ADMIN_USER_LIST_CONFIG,
   AUTHORING_VALIDATION,
@@ -9,6 +9,7 @@ import {
   PROBLEM_DIFFICULTY_MIN,
   PROBLEM_DIFFICULTY_STEP,
   PROBLEM_LIST_CONFIG,
+  PROBLEM_FILE_ROLES,
   PROBLEM_TYPES,
   PROBLEM_VALIDATION,
   STATEMENT_ASSET,
@@ -105,6 +106,18 @@ export const idParamSchema = z.object({
 // (e.g. "aplusb"), so this stays a string schema.
 export const problemIdParamSchema = z.object({
   id: nonEmptyString.max(50),
+});
+
+export const problemFileRoleParamSchema = z.object({
+  id: nonEmptyString.max(50),
+  role: z.enum(PROBLEM_FILE_ROLES),
+});
+
+export const problemFileParamSchema = problemFileRoleParamSchema.extend({
+  filename: z.string().superRefine((name, ctx) => {
+    const error = validateProblemFilename(name);
+    if (error) ctx.addIssue({ code: 'custom', message: error });
+  }),
 });
 
 export const usernameParamSchema = z.object({

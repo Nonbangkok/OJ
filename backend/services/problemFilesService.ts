@@ -1,5 +1,7 @@
 import type { PoolClient } from 'pg';
-import type { ZipArchive } from 'archiver';
+import type { Response } from 'express';
+import { ZipArchive } from 'archiver';
+import { logger } from '../utils/logger';
 import * as db from '../db';
 import { AppError } from '../middleware/errorHandler';
 import type { ProblemFileRole, ProblemType } from '../constants';
@@ -100,4 +102,19 @@ export function appendStarterZip(archive: ZipArchive, files: readonly ProblemFil
   for (const file of files) {
     archive.append(file.content, { name: file.filename });
   }
+}
+
+/** Streams the starter files to `res` as a ZIP attachment named `<problemId>-starter.zip`. */
+export async function sendStarterZip(res: Response, problemId: string, files: readonly ProblemFileInput[]): Promise<void> {
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="${problemId}-starter.zip"`);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  const archive = new ZipArchive({ zlib: { level: 9 } });
+  archive.on('error', (err: Error) => {
+    logger.error('Starter archive error', { problemId, error: err.message });
+    res.destroy(err);
+  });
+  archive.pipe(res);
+  appendStarterZip(archive, files);
+  await archive.finalize();
 }

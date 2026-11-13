@@ -10,6 +10,7 @@ import { selectProgressResponseOrigin } from '../services/batchUploadProgress';
 import * as db from '../db';
 import { processBatchUpload } from '../services/batchUploadService';
 import * as problemQueryService from '../services/problemQueryService';
+import { readFlatZip } from '../utils/headerProblemFiles';
 
 // Mock dependencies
 jest.mock('../db');
@@ -36,7 +37,6 @@ jest.mock('../middleware/auth', () => ({
     }
 }));
 jest.mock('unzipper', () => ({}));
-jest.mock('archiver', () => ({}));
 jest.mock('../middleware/upload', () => ({
     ...jest.requireActual('../middleware/upload'),
     diskUpload: {
@@ -47,7 +47,19 @@ jest.mock('../middleware/upload', () => ({
             next();
         }
     },
-    memoryUpload: { fields: () => (req: Request, res: Response, next: NextFunction) => next() }
+    memoryUpload: {
+        fields: () => (req: Request, res: Response, next: NextFunction) => next(),
+        single: () => (req: Request, _res: Response, next: NextFunction) => {
+            if (req.headers['x-test-has-file'] === '1') {
+                req.file = { buffer: Buffer.from('zip-bytes') } as Express.Multer.File;
+            }
+            next();
+        },
+    }
+}));
+jest.mock('../utils/headerProblemFiles', () => ({
+    ...jest.requireActual('../utils/headerProblemFiles'),
+    readFlatZip: jest.fn(),
 }));
 jest.mock('../services/batchUploadService', () => ({
     processBatchUpload: jest.fn()
@@ -959,6 +971,156 @@ describe('Problem Controller', () => {
             expect(res.status).toBe(200);
             expect(res.body.updated).toBe(3);
             expect(res.body.message).toBe('3 problems hidden');
+        });
+    });
+    describe('header problem starter + admin files', () => {
+        const buildAppAsRole = (role: string | null) => {
+            const roleApp = express();
+            roleApp.use(express.json());
+            roleApp.use((req: Request, _res: Response, next: NextFunction) => {
+                if (role) req.user = { id: 2, username: 'u', role: role as 'user', hasAvatar: false };
+                next();
+            });
+            roleApp.use('/', problemRouter);
+            roleApp.use(errorHandler);
+            return roleApp;
+        };
+        const access = (over: Record<string, unknown> = {}) =>
+            ({ rows: [{ problem_type: 'header', is_visible: true, contest_id: null, ...over }] });
+        const starterRows = { rows: [{ filename: 'student.h', content: Buffer.from('// starter') }, { filename: 'helper.h', content: Buffer.from('// helper') }] };
+        const binary = (res: any, cb: (err: Error | null, body: Buffer) => void) => {
+            const chunks: Buffer[] = [];
+            res.on('data', (c: Buffer) => chunks.push(c));
+            res.on('end', () => cb(null, Buffer.concat(chunks)));
+        };
+
+        it('serves the starter ZIP for a visible header problem', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce(access()).mockResolvedValueOnce(starterRows);
+            const res = await request(buildAppAsRole(null)).get('/problems/H1/starter').buffer(true).parse(binary);
+            expect(res.status).toBe(200);
+            expect(res.headers['content-type']).toContain('application/zip');
+            expect(res.headers['content-disposition']).toBe('attachment; filename="H1-starter.zip"');
+            const raw = (res.body as Buffer).toString('latin1');
+            expect(raw).toContain('student.h');
+            expect(raw).toContain('helper.h');
+        });
+
+        it.each([['guest', null], ['user', 'user']])('404s a hidden problem for %s', async (_n, role) => {
+            (db.query as jest.Mock).mockResolvedValueOnce(access({ is_visible: false }));
+            const res = await request(buildAppAsRole(role)).get('/problems/H1/starter');
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Starter files not found.');
+            expect(db.query).toHaveBeenCalledTimes(1);
+        });
+
+        it('serves a hidden problem to staff', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce(access({ is_visible: false })).mockResolvedValueOnce(starterRows);
+            const res = await request(buildAppAsRole('staff')).get('/problems/H1/starter').buffer(true).parse(binary);
+            expect(res.status).toBe(200);
+        });
+
+        it('404s a contest problem for non-staff', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce(access({ contest_id: 5 }));
+            const res = await request(buildAppAsRole('user')).get('/problems/H1/starter');
+            expect(res.status).toBe(404);
+        });
+
+        it('404s a standard problem', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce(access({ problem_type: 'standard' }));
+            const res = await request(buildAppAsRole(null)).get('/problems/S1/starter');
+            expect(res.status).toBe(404);
+            expect(res.body.message).toBe('Starter files not found.');
+        });
+
+        it('404s a header problem without starter files', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce(access()).mockResolvedValueOnce({ rows: [] });
+            const res = await request(buildAppAsRole(null)).get('/problems/H1/starter');
+            expect(res.status).toBe(404);
+        });
+
+        it('includes header fields in the problem detail', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{
+                id: 'H1', title: 'T', is_visible: true, problem_type: 'header',
+                submission_filename: 'student.h', has_starter_files: true,
+            }] });
+            const res = await request(buildAppAsRole(null)).get('/problems/H1');
+            expect(res.status).toBe(200);
+            expect(res.body).toMatchObject({ problem_type: 'header', submission_filename: 'student.h', has_starter_files: true });
+        });
+
+        it('lists files for staff', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ id: 'H1', problem_type: 'header', submission_filename: 'student.h' }] })
+                .mockResolvedValueOnce({ rows: [{ role: 'grader', filename: 'grader.cpp', bytes: 12 }] });
+            const res = await request(buildAppAsRole('staff')).get('/admin/problems/H1/files');
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual({
+                problem_type: 'header', submission_filename: 'student.h',
+                files: [{ role: 'grader', filename: 'grader.cpp', bytes: 12 }],
+            });
+        });
+
+        it.each([
+            ['get', '/admin/problems/H1/files'],
+            ['get', '/admin/problems/H1/files/grader/grader.cpp'],
+            ['put', '/admin/problems/H1/files/grader'],
+        ])('403s non-staff on %s %s', async (method, url) => {
+            const res = await (request(buildAppAsRole('user')) as any)[method](url).set('x-test-role', 'user');
+            expect(res.status).toBe(403);
+        });
+
+        it('downloads one file as raw bytes', async () => {
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ content: Buffer.from('int x;') }] });
+            const res = await request(buildAppAsRole('staff')).get('/admin/problems/H1/files/grader/grader.cpp').buffer(true).parse(binary);
+            expect(res.status).toBe(200);
+            expect(res.headers['content-type']).toContain('application/octet-stream');
+            expect(res.headers['x-content-type-options']).toBe('nosniff');
+            expect((res.body as Buffer).toString()).toBe('int x;');
+        });
+
+        it('rejects an unknown role and an invalid filename', async () => {
+            const staff = buildAppAsRole('staff');
+            expect((await request(staff).get('/admin/problems/H1/files/secret/a.cpp')).status).toBe(400);
+            expect((await request(staff).get('/admin/problems/H1/files/grader/.hidden')).status).toBe(400);
+        });
+
+        describe('PUT /admin/problems/:id/files/:role', () => {
+            it('replaces a role from the ZIP', async () => {
+                (db.withTransaction as jest.Mock).mockImplementation(async (cb: (c: unknown) => unknown) =>
+                    cb({ query: (...a: unknown[]) => (db.query as jest.Mock)(...(a as [])) }));
+                (readFlatZip as jest.Mock).mockResolvedValue([{ filename: 'grader.cpp', content: Buffer.from('int main(){}') }]);
+                (db.query as jest.Mock).mockImplementation(async (sql: string) => {
+                    if (sql.includes('OCTET_LENGTH')) return { rows: [{ role: 'grader', filename: 'grader.cpp', bytes: 12 }] };
+                    if (sql.includes('FROM problems WHERE id')) return { rows: [{ id: 'H1', problem_type: 'header', submission_filename: 'student.h' }] };
+                    return { rows: [] };
+                });
+                const res = await request(buildAppAsRole('staff')).put('/admin/problems/H1/files/grader').set('x-test-has-file', '1');
+                expect(res.status).toBe(200);
+                expect(res.body.files).toEqual([{ role: 'grader', filename: 'grader.cpp', bytes: 12 }]);
+                expect(db.query).toHaveBeenCalledWith('DELETE FROM problem_files WHERE problem_id = $1 AND role = $2', ['H1', 'grader']);
+            });
+
+            it('400s with the validation message for a nested-path ZIP', async () => {
+                (readFlatZip as jest.Mock).mockRejectedValue(new Error('Nested path "a/b.cpp" is not allowed.'));
+                (db.query as jest.Mock).mockResolvedValue({ rows: [{ id: 'H1', problem_type: 'header', submission_filename: 'student.h' }] });
+                const res = await request(buildAppAsRole('staff')).put('/admin/problems/H1/files/grader').set('x-test-has-file', '1');
+                expect(res.status).toBe(400);
+                expect(res.body.message).toContain('a/b.cpp');
+            });
+
+            it('404s an unknown problem and 400s a standard one', async () => {
+                (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+                expect((await request(buildAppAsRole('staff')).put('/admin/problems/NOPE/files/grader').set('x-test-has-file', '1')).status).toBe(404);
+                (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ id: 'S1', problem_type: 'standard', submission_filename: null }] });
+                const res = await request(buildAppAsRole('staff')).put('/admin/problems/S1/files/grader').set('x-test-has-file', '1');
+                expect(res.status).toBe(400);
+                expect(res.body.message).toBe('Only header problems have files.');
+            });
+
+            it('400s when no ZIP is uploaded', async () => {
+                const res = await request(buildAppAsRole('staff')).put('/admin/problems/H1/files/grader');
+                expect(res.status).toBe(400);
+            });
         });
     });
 });

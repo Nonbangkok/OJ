@@ -1,6 +1,7 @@
 import * as db from '../db';
 import { ACTIVE_CONTEST_STATUSES, ProblemRow } from '../types/models';
 import { CONTEST_STATUS } from '../constants';
+import { getProblemFiles } from './problemFilesService';
 import {
     getContestById,
     isContestManagementRole,
@@ -10,6 +11,7 @@ import {
     ContestProblemDetailRow,
     ContestProblemDetailResult,
     ContestProblemPdfResult,
+    ContestProblemStarterResult,
     ContestProblemsForParticipantResult,
     ContestProblemStatsRow,
 } from '../types/service';
@@ -134,7 +136,7 @@ export const getContestProblemDetailForParticipant = async (
 
     if (contestStatus === CONTEST_STATUS.FINISHED) {
         const result = await db.query<ContestProblemDetailRow>(
-            'SELECT problem_id AS id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) AS has_pdf FROM contest_problems WHERE contest_id = $1 AND problem_id = $2',
+            'SELECT cp.problem_id AS id, cp.title, cp.author, cp.time_limit_ms, cp.memory_limit_mb, (cp.problem_pdf IS NOT NULL) AS has_pdf, COALESCE(p.problem_type, \'standard\') AS problem_type, p.submission_filename, EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = cp.problem_id AND f.role = \'starter\') AS has_starter_files FROM contest_problems cp LEFT JOIN problems p ON p.id = cp.problem_id WHERE cp.contest_id = $1 AND cp.problem_id = $2',
             [contestId, problemId],
         );
         if (!result.rows[0]) {
@@ -144,7 +146,7 @@ export const getContestProblemDetailForParticipant = async (
     }
 
     const result = await db.query<ContestProblemDetailRow>(
-        'SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) AS has_pdf FROM problems WHERE id = $1 AND contest_id = $2',
+        'SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) AS has_pdf, problem_type, submission_filename, EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = problems.id AND f.role = \'starter\') AS has_starter_files FROM problems WHERE id = $1 AND contest_id = $2',
         [problemId, contestId],
     );
     if (!result.rows[0]) {
@@ -186,4 +188,41 @@ export const getContestProblemPdfForParticipant = async (
         return { kind: 'not_found_pdf' };
     }
     return { kind: 'ok', data: pdf };
+};
+
+export const getContestProblemStarterForParticipant = async (
+    contestId: string,
+    problemId: string,
+    userId: number,
+    viewer?: { id: number; role: string },
+): Promise<ContestProblemStarterResult> => {
+    const contest = await getContestById(contestId);
+    if (!contest || (!contest.is_visible && !isContestManagementRole(viewer))) {
+        return { kind: 'not_found_contest' };
+    }
+    const contestStatus = contest.status;
+
+    if (!ACTIVE_CONTEST_STATUSES.includes(contestStatus)) {
+        return { kind: 'inactive' };
+    }
+
+    if (!(await isContestParticipant(contestId, userId))) {
+        return { kind: 'not_participant' };
+    }
+
+    const finished = contestStatus === CONTEST_STATUS.FINISHED;
+    const result = await db.query<{ problem_type: string }>(
+        finished
+            ? 'SELECT p.problem_type FROM contest_problems cp JOIN problems p ON p.id = cp.problem_id WHERE cp.contest_id = $1 AND cp.problem_id = $2'
+            : 'SELECT problem_type FROM problems WHERE id = $1 AND contest_id = $2',
+        finished ? [contestId, problemId] : [problemId, contestId],
+    );
+    if (result.rows[0]?.problem_type !== 'header') {
+        return { kind: 'not_found_starter' };
+    }
+    const files = await getProblemFiles(problemId, 'starter');
+    if (files.length === 0) {
+        return { kind: 'not_found_starter' };
+    }
+    return { kind: 'ok', files };
 };

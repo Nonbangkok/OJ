@@ -134,6 +134,9 @@ export type ProblemDetailDTO = Pick<
     'id' | 'title' | 'author' | 'categories' | 'difficulty' | 'time_limit_ms' | 'memory_limit_mb' | 'is_visible' | 'contest_id'
 > & {
     has_pdf: boolean;
+    problem_type: ProblemType;
+    submission_filename: string | null;
+    has_starter_files: boolean;
 };
 
 /** `problems` row augmented with contest status for the admin index. */

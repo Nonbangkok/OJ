@@ -194,6 +194,7 @@ describe('public access matrix (route middleware wiring)', () => {
         expect(source).toMatch(/'\/problems', requirePublicAccess/);
         expect(source).toMatch(/'\/problems\/:id',\s*\n\s*requirePublicAccess/);
         expect(source).toMatch(/'\/problems\/:id\/pdf', requirePublicAccess/);
+        expect(source).toMatch(/'\/problems\/:id\/starter', requirePublicAccess/);
         // Admin problem management stays behind staff/admin auth.
         expect(source).toMatch(/'\/admin\/problems', requireAuth, requireStaffOrAdmin/);
     });

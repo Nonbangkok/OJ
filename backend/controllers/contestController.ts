@@ -34,8 +34,11 @@ import { findSimilarContestPairs } from '../services/similarityService';
 import {
   getContestProblemDetailForParticipant,
   getContestProblemPdfForParticipant,
+  getContestProblemStarterForParticipant,
   getContestProblemsForParticipant,
 } from '../services/contestParticipantQueryService';
+
+import { sendStarterZip } from '../services/problemFilesService';
 
 const router: Router = express.Router();
 
@@ -316,6 +319,34 @@ router.get('/contests/:id/problems/:problemId/pdf', requireAuth,
 
   res.setHeader('Content-Type', 'application/pdf');
   res.send(result.data);
+}));
+
+// Starter ZIP for a header contest problem (same gates and outcomes as the PDF route)
+router.get('/contests/:id/problems/:problemId/starter', requireAuth,
+  validateRequest({ params: contestProblemParamsSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const contestId = String(req.params.id);
+  const problemId = String(req.params.problemId);
+  const userId = req.user?.id;
+  if (!userId) {
+    throw new AppError('Authentication required', 401);
+  }
+
+  const result = await getContestProblemStarterForParticipant(contestId, problemId, userId, req.user ? { id: req.user.id, role: req.user.role } : undefined);
+  if (result.kind === 'not_found_contest') {
+    throw new AppError('Contest not found.', 404);
+  }
+  if (result.kind === 'inactive') {
+    throw new AppError('Contest is not active.', 403);
+  }
+  if (result.kind === 'not_participant') {
+    throw new AppError('You are not a participant in this contest.', 403);
+  }
+  if (result.kind === 'not_found_starter') {
+    throw new AppError('Starter files not found.', 404);
+  }
+
+  await sendStarterZip(res, problemId, result.files);
 }));
 
 // Contest cheat detection: pairs of different users whose (latest) contest
