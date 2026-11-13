@@ -1,11 +1,17 @@
-/* Print stylesheet for header-problem statements.
+/* Print stylesheet for header-problem statements (the house template).
  *
  * Font stack: Thai first (Garuda/Loma ship in fonts-thai-tlwg and carry the
  * full Thai range with proper mark positioning), DejaVu Sans behind it for
  * Latin and symbols. If the Thai family were missing, wkhtmltopdf would
  * silently substitute boxes — build.py extracts the text back out of the
  * finished PDF and fails the build when the Thai phrase does not survive, so
- * this stack is checked rather than trusted.
+ * this stack is checked rather than trusted. The same applies to the math:
+ * the relation glyphs (≤ ≥ × √) come from DejaVu Sans and are proved present
+ * by harness.assert_math_survived.
+ *
+ * Everything here has to work in wkhtmltopdf 0.12.6's QtWebKit, which is why
+ * the fractions and radicals below are plain inline-blocks with borders
+ * rather than MathML or flexbox.
  */
 
 @page {
@@ -120,18 +126,28 @@ hr {
   white-space: nowrap;
 }
 
+/* --- the template's example table ------------------------------------------
+ *
+ * Rendered by mdrender from the sample-input / sample-output fixture, never
+ * hand-written, so the table and the sample verify.py runs cannot disagree.
+ */
+
 .samples {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
+  margin: 0 0 4mm 0;
 }
 
 .samples th {
   width: 50%;
+  text-align: center;
+  padding: 1.4mm 2mm;
 }
 
 .samples td {
   vertical-align: top;
+  padding: 2mm;
 }
 
 .samples pre {
@@ -139,4 +155,91 @@ hr {
   border: none;
   background: none;
   padding: 0;
+  white-space: pre;
+}
+
+/* --- explicit page break ---------------------------------------------------
+ *
+ * <div style="page-break-after: always;"></div> in the statement — the
+ * reference template's own spelling — becomes this.
+ */
+
+.page-break {
+  display: block;
+  height: 0;
+  page-break-after: always;
+}
+
+/* --- math ------------------------------------------------------------------
+ *
+ * mdrender.render_math emits this markup. Keep an expression on one line: it
+ * is always short, and an unbroken run is also what makes the PDF text-layer
+ * probe meaningful.
+ */
+
+.math {
+  white-space: nowrap;
+}
+
+.math i {
+  font-family: "DejaVu Serif", "DejaVu Sans", serif;
+  font-style: italic;
+}
+
+.mrel {
+  margin: 0 0.14em;
+}
+
+.mop {
+  font-style: normal;
+  margin-right: 0.12em;
+}
+
+sub,
+sup {
+  font-size: 0.72em;
+  line-height: 0;
+  position: relative;
+}
+
+sup {
+  top: -0.42em;
+}
+
+sub {
+  bottom: -0.22em;
+}
+
+.frac {
+  display: inline-block;
+  vertical-align: -0.5em;
+  text-align: center;
+  font-size: 0.92em;
+  margin: 0 0.12em;
+}
+
+.frac .num {
+  display: block;
+  padding: 0 0.3em;
+  border-bottom: 0.5pt solid #15181d;
+}
+
+.frac .den {
+  display: block;
+  padding: 0 0.3em;
+}
+
+.sqrt .rad {
+  border-top: 0.5pt solid #15181d;
+  padding: 0 0.12em;
+}
+
+.math-block {
+  display: inline-block;
+}
+
+p.math-block {
+  display: block;
+  text-align: center;
+  margin: 3mm 0;
 }

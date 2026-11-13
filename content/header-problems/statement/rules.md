@@ -6,7 +6,7 @@
   Edit this file to change the rules everywhere; never copy it into a problem.
 -->
 
-## ข้อบังคับ
+## ข้อบังคับ :
 
 1. ส่งไฟล์ `{{submission}}` เพียงไฟล์เดียว ระบบจะนำไปคอมไพล์รวมกับ `main.cpp`
    และ `{{ds}}` ของผู้ออกข้อสอบ ซึ่ง **ไม่ใช่** ไฟล์ชุดเดียวกับที่ให้

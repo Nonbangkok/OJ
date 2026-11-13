@@ -22,7 +22,8 @@ The contract, one check each:
 
 Plus the things a bad bundle would otherwise only reveal at import time: the
 layout and case count, config.json agreeing with meta.json, the shipped
-student template compiling, and the Thai text surviving into the PDF.
+student template compiling, and the Thai text and the rendered math surviving
+into the PDF's text layer.
 
 Exit status is 0 only if every problem passed every check.
 """
@@ -44,7 +45,7 @@ from harness import (
     Meta,
     TESTCASE_COUNT,
     assemble_statement_markdown,
-    assert_thai_survived,
+    assert_statement_survived,
     case_input_name,
     case_output_name,
     compile_header_program,
@@ -178,15 +179,25 @@ def check_grader_file_set(meta: Meta, report: Report) -> bool:
 
 
 def check_pdf(meta: Meta, report: Report) -> bool:
+    """The rendered statement, checked through its own text layer.
+
+    Two probes, both read back out of the finished PDF with pdftotext: the
+    Thai (a missing Thai font would otherwise draw silent boxes) and the math
+    (wkhtmltopdf's WebKit cannot run KaTeX, so mdrender renders the LaTeX
+    server-side — this is the evidence that it survived).
+    """
     pdf = meta.dist_dir / f"{meta.id}.pdf"
     if pdf.read_bytes()[:4] != b"%PDF":
         return report.record("statement PDF", False, "missing the %PDF magic bytes")
     try:
-        probe = assert_thai_survived(meta, pdf, meta.work_dir)
+        markdown = assemble_statement_markdown(meta)
+        thai_probe, math_probe = assert_statement_survived(meta, pdf, meta.work_dir, markdown)
     except HarnessError as error:
-        return report.record("statement PDF Thai text", False, str(error))
-    return report.record("statement PDF Thai text", True,
-                         f"\"{probe}\" found in the text extracted from {human_bytes(pdf.stat().st_size)} of PDF")
+        return report.record("statement PDF Thai and math text", False, str(error))
+    return report.record(
+        "statement PDF Thai and math text", True,
+        f"\"{thai_probe}\" and the rendered math \"{math_probe}\" found in the text "
+        f"extracted from {human_bytes(pdf.stat().st_size)} of PDF")
 
 
 def check_starter(meta: Meta, report: Report) -> bool:
@@ -236,7 +247,7 @@ def check_starter(meta: Meta, report: Report) -> bool:
                              f"        expected: {expected.strip()!r}\n"
                              f"        actual:   {actual.strip()!r}")
     return report.record("starter runs the statement's sample", True,
-                         f"{result.wall_ms:.0f} ms, output matches the ตัวอย่าง section")
+                         f"{result.wall_ms:.0f} ms, output matches the \"Examples :\" section")
 
 
 def check_reference(meta: Meta, report: Report) -> bool:

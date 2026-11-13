@@ -50,7 +50,7 @@ from harness import (
     TESTCASE_COUNT,
     WORK_DIR,
     assemble_statement_markdown,
-    assert_thai_survived,
+    assert_statement_survived,
     case_input_name,
     case_output_name,
     compile_header_program,
@@ -63,7 +63,7 @@ from harness import (
     run_program,
     write_text,
 )
-from mdrender import extract_fenced, render_markdown
+from mdrender import MathError, extract_fenced, render_markdown
 
 ZIP_NAME = "header-problems.zip"
 
@@ -82,15 +82,24 @@ REFERENCE_TIME_WARN_FRACTION = 0.5
 
 
 def statement_html(meta: Meta, markdown: str) -> str:
+    """The template's page: the title as H1, a small identification line, then
+    the statement.
+
+    The time and memory limits are NOT repeated here — they are the generated
+    `## Limits :` section of the statement itself, so the PDF states them
+    once.
+    """
     style = (STATEMENT_DIR / "style.css").read_text(encoding="utf-8")
     difficulty = "ไม่จัดระดับ" if meta.difficulty is None else str(meta.difficulty)
     meta_line = (
         f"<span>รหัสข้อ: <code>{meta.id}</code></span>"
-        f"<span>เวลา: {meta.time_limit_ms / 1000:.3f} วินาที</span>"
-        f"<span>หน่วยความจำ: {meta.memory_limit_mb} MB</span>"
         f"<span>ส่งไฟล์: <code>{meta.submission_filename}</code></span>"
         f"<span>ระดับความยาก: {difficulty}</span>"
     )
+    try:
+        body = render_markdown(markdown)
+    except MathError as error:
+        raise HarnessError(f"{meta.id}: statement math does not render: {error}") from error
     return (
         "<!DOCTYPE html>\n<html lang=\"th\">\n<head>\n"
         "<meta charset=\"utf-8\">\n"
@@ -99,7 +108,7 @@ def statement_html(meta: Meta, markdown: str) -> str:
         "</head>\n<body>\n"
         f"<h1>{meta.title}</h1>\n"
         f"<p class=\"meta\">{meta_line}</p>\n"
-        f"{render_markdown(markdown)}\n"
+        f"{body}\n"
         "</body>\n</html>\n"
     )
 
@@ -261,9 +270,10 @@ def build_problem(problem_dir: Path) -> dict:
     write_text(html_path, statement_html(meta, markdown))
     pdf_path = meta.dist_dir / f"{meta.id}.pdf"
     render_pdf(meta, html_path, pdf_path)
-    probe = assert_thai_survived(meta, pdf_path, meta.work_dir)
+    thai_probe, math_probe = assert_statement_survived(meta, pdf_path, meta.work_dir, markdown)
     print(f"    statement.pdf  {human_bytes(pdf_path.stat().st_size)}  "
-          f"(Thai check ok: \"{probe}\" found in the extracted text)")
+          f"(Thai check ok: \"{thai_probe}\"; math check ok: \"{math_probe}\" "
+          "— both found in the text extracted from the PDF)")
 
     input_dir = meta.dist_dir / "testcases" / "input"
     output_dir = meta.dist_dir / "testcases" / "output"
