@@ -81,12 +81,20 @@ jobs:
             echo "::error::No tailscale0 interface on the runner — tailscaled is in userspace mode, so a plain ssh to a tailnet address cannot route."
             exit 1
           fi
-          if tailscale ping -c 5 --timeout 5s "$DEPLOY_HOST" >/dev/null 2>&1; then
-            echo "tailnet path to the server: ok"
-          else
-            echo "::error::The runner joined the tailnet but cannot reach the deploy host over it. Check that the host is online in the Tailscale admin console and that the policy allows tag:ci to reach it."
-            exit 1
-          fi
+          # A node that joined seconds ago still has to learn the netmap and
+          # bring up a relay path, so the first ping can legitimately time out.
+          # Poll for a minute before calling it unreachable.
+          i=0
+          while [ "$i" -lt 12 ]; do
+            if tailscale ping -c 1 --timeout 5s "$DEPLOY_HOST" >/dev/null 2>&1; then
+              echo "tailnet path to the server: ok after ${i} retries"
+              exit 0
+            fi
+            i=$((i + 1))
+            sleep 5
+          done
+          echo "::error::The runner joined the tailnet but could not reach the deploy host over it within a minute. Check that the host is online in the Tailscale admin console, that it is in the SAME tailnet as the OAuth client, and that the policy allows tag:ci to reach it."
+          exit 1
 
       - name: Run scripts/cd-deploy.sh on the server
         env:
