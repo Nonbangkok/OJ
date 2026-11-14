@@ -197,7 +197,7 @@ const runScript = (sha, extra) =>
 const head = () => git('rev-parse', 'HEAD');
 const dumps = () => {
   try {
-    return readdirSync(path.join(repo, 'backups')).sort();
+    return readdirSync(path.join(repo, 'backups')).filter((name) => name.endsWith('.dump')).sort();
   } catch {
     return [];
   }
@@ -212,7 +212,12 @@ test('failed deploy exits 21 and restores the previous images and working tree',
   assertRunning(OLD_TAG);
   assert.equal(readFileSync(path.join(repo, '.last-release'), 'utf8'), `${OLD_TAG}\n${shaA}\n`);
   assert.equal(dumps().length, 1);
-  assert.match(dumps()[0], new RegExp(`^pre-deploy-${newTag}-\\d{8}T\\d{6}\\.dump$`));
+  assert.match(dumps()[0], new RegExp(`^pre-deploy-${newTag}-\\d{8}T\\d{6}\\.dump$`));  // The run log (first output line, and named by the rollback message) holds the outcome.
+  const logName = readdirSync(path.join(repo, 'backups')).find((name) => /^cd-deploy-.*\.log$/.test(name));
+  assert.ok(logName, 'run log written next to the dumps');
+  assert.match(r.out.split('\n')[0], /log file: .*cd-deploy-/);
+  assert.match(readFileSync(path.join(repo, 'backups', logName), 'utf8'), /ROLLBACK OK/);
+  assert.match(r.out, /Full log of this run on the server: .*cd-deploy-/);
 });
 
 test('rollback target images missing exits 22 and says what to do by hand', async () => {
