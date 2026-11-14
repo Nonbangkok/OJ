@@ -86,7 +86,12 @@ jobs:
           # Poll for a minute before calling it unreachable.
           i=0
           while [ "$i" -lt 12 ]; do
-            if tailscale ping -c 1 --timeout 5s "$DEPLOY_HOST" >/dev/null 2>&1; then
+            # --until-direct=false is load-bearing: by default `tailscale ping`
+            # keeps going until it gets a DIRECT connection and exits 1 when it
+            # only ever gets a relayed one, even though the pong came back fine.
+            # This host answers via DERP in ~200ms and has no direct path, so
+            # the default spelling reports failure on a working tailnet.
+            if tailscale ping --until-direct=false -c 1 --timeout 5s "$DEPLOY_HOST" >/dev/null 2>&1; then
               echo "tailnet path to the server: ok after ${i} retries"
               exit 0
             fi
