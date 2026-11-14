@@ -473,3 +473,36 @@ test('invalid CD_BACKUP_KEEP exits 1 before anything is changed', async () => {
   }
   assert.equal(head(), shaA);
 });
+
+test('the run survives its console reader going away mid-deploy and logs the verdict', async () => {
+  // A dropped SSH session without a pty closes the pipes the script writes to.
+  // The deploy command outlives the reader, fails, and the rollback must still
+  // run to completion, with the final verdict in the run log.
+  const slowFail = path.join(workDir, 'deploy-slow-fail.sh');
+  writeFileSync(
+    slowFail,
+    '#!/bin/sh\necho "stub deploy started"\ntouch "$CD_TEST_STUB_RAN"\nsleep 4\necho "stub deploy still writing after the reader closed"\nexit 1\n',
+    { mode: 0o755 },
+  );
+  const child = spawn('sh', [script, shaB], { cwd: repositoryRoot, env: baseEnv({ CD_DEPLOY_CMD: slowFail }) });
+  let consoleOut = '';
+  child.stdout.on('data', (d) => { consoleOut += d; });
+  child.stderr.on('data', (d) => { consoleOut += d; });
+  const closed = new Promise((resolve) => child.on('close', (status, signal) => resolve({ status, signal })));
+  for (let i = 0; i < 300 && !existsSync(stubRan); i += 1) await new Promise((r) => setTimeout(r, 100));
+  assert.ok(existsSync(stubRan), `deploy command never started: ${consoleOut}`);
+  child.stdout.destroy();
+  child.stderr.destroy();
+  const { status, signal } = await closed;
+  assert.equal(signal, null);
+  assert.equal(status, 21, consoleOut);
+  assert.equal(head(), shaA);
+  assertRunning(OLD_TAG);
+  const logName = readdirSync(path.join(repo, 'backups')).find((name) => /^cd-deploy-.*\.log$/.test(name));
+  assert.ok(logName, 'run log written');
+  const logged = readFileSync(path.join(repo, 'backups', logName), 'utf8');
+  assert.match(logged, /stub deploy still writing after the reader closed/);
+  assert.match(logged, /DEPLOY FAILED/);
+  assert.match(logged, /ROLLBACK OK/);
+  assert.match(logged, /Full log of this run on the server/);
+});
