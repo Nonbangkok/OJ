@@ -1,0 +1,121 @@
+name: Deploy
+
+# Fires after the CI workflow finishes on main. The job then parks on the
+# `production` environment until a reviewer approves, and only then are the
+# environment secrets released. All deploy logic lives in scripts/cd-deploy.sh
+# on the server; this workflow is: approval gate -> tailnet -> one SSH call.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Deploys queue and never cancel one another mid-rollback. GitHub keeps a single
+# pending run, so at most one waits behind the running deploy: a third approval
+# cancels the one that was waiting.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to production
+    # workflow_run fires for every CI run, including forks, pull requests and
+    # other branches. Only a green push to main in this repository may deploy.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # Only needed for .github/deploy-known-hosts (public host keys, no secrets).
+      - uses: actions/checkout@v7
+
+      - name: Join the tailnet
+        uses: tailscale/github-action@v4.1.3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Prepare SSH key and pinned host key
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -eu
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          # .github/deploy-known-hosts holds "<keytype> <base64-key>" lines
+          # (output of ssh-keyscan minus the host column). Comments are ignored.
+          keys=$(grep -Ev '^[[:space:]]*(#|$)' .github/deploy-known-hosts || true)
+          if [ -z "$keys" ]; then
+            echo "::error::.github/deploy-known-hosts has no host key. Pin the server's SSH host key there (see the CD runbook); refusing to connect without it."
+            exit 1
+          fi
+          : > "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$keys" | while IFS= read -r key; do
+            printf '%s %s\n' "$DEPLOY_HOST" "$key" >> "$HOME/.ssh/known_hosts"
+          done
+
+      - name: Run scripts/cd-deploy.sh on the server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          # The commit CI actually tested, not whatever main points at after approval.
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -u
+          case "$DEPLOY_SHA" in
+            *[!0-9a-f]* | "") echo "::error::Refusing to deploy: '$DEPLOY_SHA' is not a commit SHA"; exit 1 ;;
+          esac
+          [ "${#DEPLOY_SHA}" -eq 40 ] || { echo "::error::Refusing to deploy: SHA is not 40 hex characters"; exit 1; }
+
+          status=0
+          ssh -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o ConnectTimeout=30 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=10 \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cd /srv/docker/apps/OJ && scripts/cd-deploy.sh $DEPLOY_SHA" || status=$?
+
+          case "$status" in
+            0) echo "Deployed $DEPLOY_SHA." ;;
+            1) msg="usage error or database/internal failure; nothing was deployed" ;;
+            10) msg="a contest is running; deploy refused, nothing changed. Re-run after it ends" ;;
+            11) msg="the judge queue did not drain; deploy refused, nothing changed" ;;
+            12) msg="free disk is below the minimum; deploy refused, nothing changed" ;;
+            13) msg="the production tree has modified tracked files; deploy refused, nothing changed" ;;
+            14) msg="the SHA is not an ancestor of origin/main; deploy refused, nothing changed" ;;
+            20) msg="the pre-deploy backup failed; deploy refused, nothing changed" ;;
+            21) msg="the deploy failed and was ROLLED BACK; production runs the previous release" ;;
+            22) msg="the deploy failed and the ROLLBACK ALSO FAILED; production may be broken, fix it by hand now" ;;
+            255) msg="SSH failed or the connection dropped (network, host key mismatch, key rejected). The script ignores the hangup and keeps running, so the deploy may have finished or rolled back: read the newest backups/cd-deploy-*.log in /srv/docker/apps/OJ on the server before doing anything" ;;
+            *) msg="unexpected failure" ;;
+          esac
+          if [ "$status" -ne 0 ]; then
+            echo "::error::cd-deploy.sh exited $status: $msg"
+            echo "::error::The first line of the output above names the run log on the server (backups/cd-deploy-<sha>-<time>.log in /srv/docker/apps/OJ)."
+            exit "$status"
+          fi
+
+      # Goes through Cloudflare, which can be briefly cold. The deploy already
+      # verified the stack over loopback, so this only warns.
+      - name: Check the public URL
+        continue-on-error: true
+        run: |
+          if ! curl --fail --silent --show-error --max-time 30 --retry 3 --retry-delay 10 --retry-all-errors --output /dev/null https://nonbangkokgrader.com/; then
+            echo "::warning::https://nonbangkokgrader.com/ did not answer from the runner. The deploy itself verified the stack locally; check Cloudflare and DNS."
+            exit 1
+          fi

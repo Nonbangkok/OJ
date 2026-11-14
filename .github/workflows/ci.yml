@@ -82,7 +82,9 @@ jobs:
   docker:
     name: Docker (compose config + image build)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The CD guard/rollback suites add roughly five minutes of container work
+    # before the image build.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
 
@@ -90,8 +92,17 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Repo config tests (compose, Node and nginx versions, Postgres 18 guard, frontend caching, proxy healthcheck)
-        run: node --test tests/composeConfig.test.mjs tests/nodeVersion.test.mjs tests/nginxVersion.test.mjs tests/pg18Guard.test.mjs tests/frontendCaching.test.mjs tests/proxyHealthcheck.test.mjs
+      # The cdDeploy guard/rollback suites need Docker (throwaway Postgres
+      # containers and a throwaway compose project), which is why they belong in
+      # this job: without them CI would gate cd-deploy.sh with shellcheck and a
+      # text-shaped structural test only, and a regression in
+      # backup/snapshot/rollback would ship green.
+      - name: Repo config tests (compose, Node and nginx versions, Postgres 18 guard, frontend caching, proxy healthcheck, deploy workflow, CD deploy guards and rollback)
+        run: node --test tests/composeConfig.test.mjs tests/nodeVersion.test.mjs tests/nginxVersion.test.mjs tests/pg18Guard.test.mjs tests/frontendCaching.test.mjs tests/proxyHealthcheck.test.mjs tests/deployWorkflow.test.mjs tests/cdDeployStructure.test.mjs tests/cdDeployGuards.test.mjs tests/cdDeployRollback.test.mjs
+
+      # shellcheck ships on ubuntu-latest runners.
+      - name: Shellcheck the CD deploy script
+        run: shellcheck scripts/cd-deploy.sh
 
       - name: Build all images (local + production overlay)
         run: |
