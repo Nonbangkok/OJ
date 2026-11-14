@@ -5,3 +5,5 @@
 # column, taken over a trusted channel, e.g. on the server:
 #   awk '{print $1, $2}' /etc/ssh/ssh_host_ed25519_key.pub
 # While this file has no key line the deploy fails closed before connecting.
+
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMRxhcdS9jNHCQ9Eg8ydQFgv0K8D0x0F/VpCoj6zSfYX
