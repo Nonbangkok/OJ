@@ -186,6 +186,14 @@ OJ/
 │   ├── composeConfig.test.mjs
 │   ├── localSessionSmoke.test.mjs
 │   └── authoring/          # Disposable authoring Compose suite + runtime matrices
+│
+├── content/header-problems/  # Problem CONTENT, not app code: the 50-problem
+│   ├── run.sh                #   starter set and the harness that builds it
+│   ├── build.py / verify.py  #   statements -> PDF, generators -> testcases,
+│   ├── lib/                  #   reference run -> expected output, then the
+│   ├── statement/            #   import ZIP; verify enforces "reference is
+│   ├── problems/<id>/        #   Accepted, naive solution times out"
+│   └── Dockerfile            #   throwaway image: judge's g++ + Thai PDF renderer
 └── docs/superpowers/       # Design specs and plans (historical, per-feature)
 ```
 
@@ -362,6 +370,13 @@ Key judging properties:
 - **Verdicts are evidence-based** (JUDGE-001/002/008): exit code 124 = TLE; SIGKILL with measured memory over the limit = MLE; SIGSEGV and other signals = Runtime Error. No stderr-keyword heuristics. Runtime Error output is sanitized — server paths and wrapper telemetry (`TIME_USED:`/`MEM_USED:` tokens) never reach the submitter.
 - **Crash-safety** — the judge queue keeps an in-flight registry; the final verdict UPDATE only lands while the row is still in a non-terminal judgeable state (a stale judge from a rejudge or contest-end migration cannot overwrite a newer verdict). On boot, `sweepOrphanedSubmissions` re-enqueues `Pending` rows and marks `Compiling`/`Running` rows as System Error ("interrupted by server restart").
 - **Rejudge** (`/admin/rejudge/*`) resets and re-enqueues judgeable submissions; rows with a judge already in flight are reported as `busy` (never double-judged), and a second identical rejudge gets 409.
+- **Header problems take the same path with a different prepare plan** (migration 0024). For `problems.problem_type = 'header'` the submission is not a whole program but one header (`submission_filename`, default `student.h`): the pipeline writes the problem's secret `grader` files from `problem_files` into the workspace **byte-for-byte** (never through a UTF-8 string — a TIS-620 grader must survive), writes the submission beside them, and compiles every grader `.cpp` with the normal C++ flags plus `-fno-diagnostics-show-caret`. The standard path is unchanged; both are expressed as a `PreparePlan` rather than branches scattered through the pipeline.
+
+  Two properties carry the secrecy guarantee, and both fail closed:
+  - **Scrub before run** — after a successful compile, every grader source and the submitted header are removed from the workspace (`removeSandboxFiles`, uid-dropped `rm`) *before* `judge()` starts. It throws on failure, so a failed scrub becomes a System Error instead of running untrusted code next to the grader sources.
+  - **Diagnostics** — `sanitizeCompilerStderr` keeps the real `student.h` name (so line numbers mean something to the student) while stripping workspace paths; caret display is off so no grader source line is echoed. Grader *file names* and identifiers can still appear in diagnostics — an accepted trade-off, documented in the design.
+
+  Secrecy is "no casual source-text leak", the same level standard problems already give (a program can print its own testcase input and read it back from a Runtime Error). `findForbiddenAsm` rejects `asm`/`incbin`/`.include` to close the assembler file-embed channel; the unprivileged compile remains the real boundary.
 
 ### Database Import / Maintenance Mode
 

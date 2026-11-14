@@ -22,6 +22,7 @@ The Grader System offers a rich set of features for both users and administrator
 *   **Problem Management:**
     *   **Problem Statements (PDF):** Upload and display problem descriptions in PDF format (up to 2GB).
     *   **Test Case Management:** Store and manage test cases (input/output) for each problem in the database, with a per-problem testcase viewer in the admin panel.
+    *   **Header Problems:** A second problem type where the student implements one function instead of a whole program. The problem ships a data-structure header and a `student.h` template; the student submits only `student.h` and the judge compiles it against the problem's own secret `main.cpp`, which differs from the downloadable one so it can catch edits that break pre-existing functions. C++ only. See [Header problems](#header-problems).
     *   **Single Problem Upload (Admin):** Administrators can add new problems or update existing ones individually, including their metadata, PDF, and test cases (via ZIP upload).
     *   **Batch Problem Upload (Admin):** Efficiently upload multiple problems at once using structured ZIP files (up to 2GB).
     *   **Problem Visibility Control (Admin):** Administrators can toggle the visibility of problems to users, individually or across a whole collection at once.
@@ -534,6 +535,85 @@ Each problem directory (either at the root of a multi-problem ZIP or the content
     *   **Recommendation:** It is highly recommended to use numerically sequential and consistently named test case files (e.g., `01.in`, `02.in`, ..., `01.out`, `02.out`, ...) to ensure correct pairing and ordering during the judging process. This helps avoid unexpected behavior across different file systems and parsing logic.
 
 **Note**: The script will clear any existing test cases for a problem before inserting the new ones.
+
+## Header problems
+
+A header problem asks the student to implement one function rather than a whole
+program, in the style of a data-structures course: the problem ships a class
+header (`queue.h`, `vector.h`, …) and a `student.h` with the target function
+left empty, the student submits **only `student.h`**, and the judge compiles it
+against the problem's own `main.cpp`. That `main.cpp` is secret and deliberately
+differs from the one the student downloads — it drives a command stream and
+interleaves the new function with the pre-existing ones, so an edit that breaks
+`push` or `pop` is caught.
+
+Header problems are **C++ only**. Each one stores two file sets:
+
+| role | who sees it | what it holds |
+|---|---|---|
+| `grader` | staff only | the secret `main.cpp` (at least one `.cpp` required) and the class header |
+| `starter` | anyone who can see the problem | the files students download as a ZIP |
+
+After compiling, the judge deletes every grader source and the submitted header
+from the sandbox before the first testcase runs, so the running program cannot
+read them.
+
+### Creating one
+
+In **Admin Panel → Problems**, set *Problem type* to `Header`, set the
+submission filename (default `student.h`), save, then upload a flat ZIP for each
+role — up to 20 files, 1 MiB each. Uploading replaces that role's whole set.
+The problem type and submission filename lock once any submission exists.
+
+In a batch-upload ZIP, add `grader/` and `starter/` folders beside the problem's
+PDF and testcases, and set the two extra `config.json` keys:
+
+```json
+{
+  "id": "hp_que09_reverse",
+  "title": "Queue Reverse",
+  "problem_type": "header",
+  "submission_filename": "student.h"
+}
+```
+
+```
+hp_que09_reverse/
+├── config.json
+├── hp_que09_reverse.pdf
+├── grader/
+│   ├── main.cpp        # secret; never served to students
+│   └── queue.h
+├── starter/
+│   ├── main.cpp        # the simple one students get
+│   ├── queue.h
+│   └── student.h       # target function left empty
+└── testcases/
+    ├── input/
+    └── output/
+```
+
+Export writes the same layout back, so a header problem round-trips.
+
+### The bundled 50-problem set
+
+`content/header-problems/` holds the source and the build harness for a starter
+set of 50 header problems (pair, vector, stack, queue, priority_queue — ten
+each, easy to hard, statements in Thai). Problems are authored as plain files
+and built into the import ZIP inside a throwaway Docker image that carries the
+judge's compiler and a Thai-capable PDF renderer:
+
+```bash
+cd content/header-problems
+./run.sh build  --all     # statements -> PDF, generators -> testcases, then dist/header-problems.zip
+./run.sh verify --all     # reference solution must be Accepted; the naive one must time out
+```
+
+`verify` is the point of the harness: every problem ships a reference solution
+that has to score 100 and, where the problem promises a complexity, a correct
+but naive `slow.h` that has to exceed the time limit on the large subtask. See
+[content/header-problems/README.md](content/header-problems/README.md) for the
+per-problem file contract and how to add one.
 
 ## Contests Management
 

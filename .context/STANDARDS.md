@@ -130,6 +130,31 @@ All colors, shadows, and radii live as CSS custom properties in `frontend/src/in
    - `src/tests/styles/actionTokenContrast.test.ts` / `statusBadgeContrast.test.ts` — action and status token colors must meet AA contrast (including the `--action-*-hover` and `--status-success-hover` semantic-hover tokens — green buttons must stay green on hover).
    - `src/tests/styles/difficultyChipContrast.test.ts` / `adminNavbarLayout.test.ts` — difficulty chip bands and admin navbar layout regressions.
 
+### Shared primitives inside form containers
+
+`components/styles/Form.module.css` styles **every** descendant button of a
+`.form-container` as a full-width accent action button
+(`.form-container button:where(:not([class*='react-datepicker__']))`,
+specificity 0,1,1). That is deliberate — most form buttons want it — but a
+shared primitive dropped into a form inherits it and loses its own look. A
+single-class rule (`.segmentBtn`, 0,1,0) *loses* that cascade; a two-class rule
+(`.segment .segmentBtn`, 0,2,0) wins it.
+
+This bit twice in one day: the Problem type `SegmentedControl` rendered its
+inactive segment as a blue block overflowing its 2.1rem well, and the
+header-problem file list rendered each file name as a full-width blue button.
+
+**Rule:** a reusable `components/ui` primitive scopes its rules at least two
+classes deep and explicitly resets what that rule imposes (`width`, `padding`,
+`font-size`, `font-weight`, `background-color`, `border-radius`). Do not narrow
+the shared form rule to fix one component — other surfaces depend on it.
+
+Jsdom does not evaluate the cascade, so unit tests cannot catch this. The
+regression test belongs in Playwright, asserting computed style and geometry:
+see `frontend/tests/visual/problem-modal.spec.ts`, which checks that segments
+stay inside the control's box, that the inactive one is transparent, and that
+both use the control's own type scale.
+
 ### Responsive Breakpoints
 
 Standard `max-width` breakpoints (documented at the top of `index.css`):
@@ -144,6 +169,8 @@ New rules use 480 or 768 unless there is a concrete reason not to.
 ### Visual Regression
 
 Playwright visual baselines cover the admin authoring shell and author profiles (desktop 1280×720 + mobile 390×844, focus states, one dark variant). Changes to those DOM trees or their CSS must keep pixels stable or consciously regenerate baselines with `npm run test:visual:update` and re-verify with `npm run test:visual`.
+
+The suite also carries assertions that are *not* pixel diffs — `problem-modal.spec.ts` reads computed style and bounding boxes instead. Prefer that form for cascade bugs: it states the rule being protected, survives unrelated redesigns, and fails with a readable message rather than an image.
 
 ---
 

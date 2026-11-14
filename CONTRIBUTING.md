@@ -119,6 +119,30 @@ cp .env.production.example .env
 docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
 ```
 
+### Problem content (`content/header-problems/`)
+
+Problem content is versioned as source, not as a binary ZIP. Adding or editing
+one of the 50 header problems means editing files under
+`content/header-problems/problems/<id>/` and rebuilding:
+
+```bash
+cd content/header-problems
+./run.sh build  <id>
+./run.sh verify <id> --measure
+```
+
+`verify` is a real gate, not a lint: it compiles the problem's reference
+solution against the secret grader and requires **Accepted on all 10 cases**,
+and where the problem promises a complexity it requires the bundled naive
+solution to **exceed the time limit** on the large subtask. It also checks that
+the statement's sample actually runs, that the grader has no `student.h`, and
+that the Thai text and the rendered math survive into the PDF. Never loosen a
+check to make a problem pass — fix the problem.
+
+Everything runs in a throwaway Docker image built by `run.sh`; it carries the
+same `g++` major version as the judge so measured times mean something. The
+image and `dist/` are git-ignored build artifacts.
+
 ## Coding conventions
 
 These mirror the existing codebase — match the surrounding style.

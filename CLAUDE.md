@@ -57,6 +57,20 @@ npm run test:visual:update                 # regenerate visual baselines after a
 ./tests/run_tests.sh    # backend then frontend; exit 0 only if both pass. Requires DB running.
 ```
 
+### Problem content (`content/header-problems/`)
+
+Source and build harness for the bundled 50 header problems — content, not app code. Each problem is a directory of eight files (`meta.json`, `statement.md`, the two `main.cpp`, `student_template.h`, `solution.h`, `slow.h`, `gen.py`); everything else is generated.
+
+```bash
+cd content/header-problems
+./run.sh build  <id|--all>          # <ds>.h, PDF, testcases (outputs come from running the reference), dist/ + the import ZIP
+./run.sh verify <id|--all> --measure # the real gate, see below
+```
+
+`verify` requires the reference solution to be **Accepted on all 10 cases** and, when `meta.json` says `has_tle_subtask`, the bundled naive `slow.h` to **exceed the time limit** at exactly the promised subtask boundary — so a complexity claim in a statement is proven, not asserted. It also runs the starter against the statement's own sample, checks grader hygiene (≥1 `.cpp`, no `student.h`), and extracts the Thai text and rendered math back out of the finished PDF. Fix the problem, never the check; the harness is not meant to change when adding a problem.
+
+Everything runs in a throwaway image (`run.sh` builds it) carrying the judge's `g++` major version plus a Thai-capable PDF renderer. `dist/` is git-ignored, which is why `tests/integration/headerProblemsImport.test.ts` skips in a fresh checkout. Statements follow the house template documented in `content/header-problems/README.md`; math renders server-side to HTML+CSS with Unicode super/subscripts because KaTeX cannot run in wkhtmltopdf.
+
 ## Architecture
 
 ### Request routing
