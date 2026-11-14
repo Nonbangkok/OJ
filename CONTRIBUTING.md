@@ -41,7 +41,7 @@ script for normal development.
 
 ## Branch model
 
-Development happens directly on **`master`** (short-lived feature branches are
+Development happens directly on **`main`** (short-lived feature branches are
 merged into it after verification; there is currently no separate integration
 branch).
 
@@ -54,11 +54,11 @@ Use descriptive branch names, e.g. `feature/contest-export`, `fix/pdf-idor`,
 
 ## Development workflow
 
-1. Create a short-lived branch from `master`.
+1. Create a short-lived branch from `main`.
 2. Make focused changes that stay within one concern.
 3. Add or update tests for the code you touch (see below).
 4. Run the type-checks, linters, and tests locally until they pass.
-5. Open a PR against `master` with a clear description of the what and the why.
+5. Open a PR against `main` with a clear description of the what and the why.
 
 ### Backend (`backend/`)
 
@@ -100,8 +100,20 @@ npm run validate                           # type-check + lint:check + test:ci (
 Compose and localhost authentication smoke tests:
 
 ```bash
-node --test tests/composeConfig.test.mjs tests/nodeVersion.test.mjs tests/nginxVersion.test.mjs
+node --test tests/composeConfig.test.mjs tests/nodeVersion.test.mjs tests/nginxVersion.test.mjs tests/deployWorkflow.test.mjs
 BASE_URL=http://127.0.0.1 node --test tests/localSessionSmoke.test.mjs
+```
+
+Continuous deployment (`scripts/cd-deploy.sh`). The structure test needs
+nothing; the other two need a working Docker and take a few minutes — they
+create a throwaway Postgres container and a throwaway compose project (never
+project `oj`, no published ports) and remove both afterwards. CI runs all three
+in the `docker` job, so a regression in the guards, the backup, the snapshot or
+the rollback fails the pull request:
+
+```bash
+node --test tests/cdDeployStructure.test.mjs                               # no Docker needed
+node --test tests/cdDeployGuards.test.mjs tests/cdDeployRollback.test.mjs  # Docker, ~4 minutes
 ```
 
 Frontend visual regression (admin shell + authoring profiles, Playwright):
@@ -142,6 +154,16 @@ check to make a problem pass — fix the problem.
 Everything runs in a throwaway Docker image built by `run.sh`; it carries the
 same `g++` major version as the judge so measured times mean something. The
 image and `dist/` are git-ignored build artifacts.
+
+## After your commit lands on `main`
+
+CI runs on every push to `main`. When it is green, the **Deploy** workflow
+offers the commit for production and waits for a maintainer to approve it; it
+then deploys with a database backup and an automatic rollback if the release
+does not verify. Nothing deploys without that approval, and a deploy is refused
+while a contest is running. Do not edit tracked files on the production server
+by hand (a modified tree blocks deploys). Details:
+[docs/runbooks/continuous-deployment.md](docs/runbooks/continuous-deployment.md).
 
 ## Coding conventions
 

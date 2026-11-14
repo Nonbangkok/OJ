@@ -20,6 +20,8 @@ cd backend && npm run db:migrate                      # apply pending migrations
 >
 > Postgres 16 → 18 upgrade of an existing deployment: `deploy.sh` runs `scripts/pg18-guard.sh` and refuses to start until `scripts/pg18-migrate.sh` has migrated the data — see `docs/runbooks/postgres-18-upgrade.md`.
 
+> Production deploys go through the CD gate, not by hand: a green push to `main` triggers `.github/workflows/deploy.yml`, which waits for human approval on the `production` environment, then SSHes in and runs `scripts/cd-deploy.sh <sha>` (guards for contest / judge queue / disk / dirty tree / SHA on `origin/main`, then backup, `deploy.sh`, verify, automatic rollback). `deploy.sh` is still what runs on the server and what a hand deploy uses; CD wraps it rather than replacing it, so don't deploy around the gate without a reason. Exit codes, run logs and restore steps: `docs/runbooks/continuous-deployment.md`.
+
 > `backend/scripts/init_db.ts` is a **destructive development reset** (drops all tables). Never use it to upgrade an existing database — use migrations. Health checks: `/api/health/live` (process) and `/api/health/ready` (DB + schema readiness). Production refuses to boot without `COOKIE_SECURE=true` (startup-time env check).
 
 ### Backend (`backend/`)
