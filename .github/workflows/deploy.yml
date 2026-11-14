@@ -65,6 +65,29 @@ jobs:
             printf '%s %s\n' "$DEPLOY_HOST" "$key" >> "$HOME/.ssh/known_hosts"
           done
 
+      # A tailnet that is up but cannot carry traffic to the server looks
+      # exactly like a dead server: ssh sits there until ConnectTimeout and
+      # reports "Connection timed out", which says nothing about why. This
+      # separates the two before the deploy step runs. It prints no tailnet
+      # addresses or device names, because this repository is public.
+      - name: Check the server is reachable over the tailnet
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          set -u
+          if [ -d /sys/class/net/tailscale0 ]; then
+            echo "tailscale0 interface: present"
+          else
+            echo "::error::No tailscale0 interface on the runner — tailscaled is in userspace mode, so a plain ssh to a tailnet address cannot route."
+            exit 1
+          fi
+          if tailscale ping -c 5 --timeout 5s "$DEPLOY_HOST" >/dev/null 2>&1; then
+            echo "tailnet path to the server: ok"
+          else
+            echo "::error::The runner joined the tailnet but cannot reach the deploy host over it. Check that the host is online in the Tailscale admin console and that the policy allows tag:ci to reach it."
+            exit 1
+          fi
+
       - name: Run scripts/cd-deploy.sh on the server
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
