@@ -75,6 +75,9 @@ const env = (extra = {}) => ({
   CD_DB_CONTAINER: container,
   CD_DB_USER: 'postgres',
   CD_DB_NAME: 'postgres',
+  // The Docker root of the machine running the tests (e.g. Docker Desktop's VM
+  // path) need not be stat-able on the host, so point the check at a real dir.
+  CD_DOCKER_ROOT_DIR: workDir,
   CD_MIN_FREE_GB: '0',
   CD_QUEUE_WAIT_SECONDS: '2',
   ...extra,
@@ -172,4 +175,52 @@ test('modified tracked file exits 13; untracked files are ignored', () => {
   } finally {
     git(repo, 'checkout', '--', 'tracked.txt');
   }
+});
+
+test('contest_submissions in flight exit 11 even with ALLOW_DURING_CONTEST=1; absent table is fine', () => {
+  reset();
+  // Fixture so far has no contest_submissions table: counted as 0.
+  const without = runScript(headSha, { ALLOW_DURING_CONTEST: '1' });
+  assert.equal(without.status, 0, without.stdout + without.stderr);
+
+  sql('CREATE TABLE contest_submissions (id serial PRIMARY KEY, overall_status varchar(50) NOT NULL)');
+  try {
+    sql("INSERT INTO contest_submissions (overall_status) VALUES ('Accepted'), ('Pending')");
+    const idle = runScript(headSha, { ALLOW_DURING_CONTEST: '1' });
+    assert.equal(idle.status, 0, idle.stdout + idle.stderr);
+    for (const status of ['Compiling', 'Running']) {
+      sql('DELETE FROM contest_submissions');
+      sql(`INSERT INTO contest_submissions (overall_status) VALUES ('${status}')`);
+      const r = runScript(headSha, { ALLOW_DURING_CONTEST: '1' });
+      assert.equal(r.status, 11, r.stdout + r.stderr);
+      assert.match(r.stdout + r.stderr, /1 submission/);
+    }
+  } finally {
+    sql('DROP TABLE contest_submissions');
+  }
+});
+
+test('non-integer or empty CD_MIN_FREE_GB / CD_QUEUE_WAIT_SECONDS exit 1 naming the variable', () => {
+  reset();
+  for (const name of ['CD_MIN_FREE_GB', 'CD_QUEUE_WAIT_SECONDS']) {
+    for (const value of ['2.5', 'abc', '', '-1']) {
+      const r = runScript(headSha, { [name]: value });
+      assert.equal(r.status, 1, `${name}='${value}'\n${r.stdout}${r.stderr}`);
+      assert.match(r.stdout + r.stderr, new RegExp(`${name} must be a non-negative integer, got '${value}'`));
+    }
+  }
+});
+
+test('free disk is the minimum over the checkout and the Docker root; refusal names the short path', () => {
+  reset();
+  const r = runScript(headSha, { CD_MIN_FREE_GB: '999999', CD_DOCKER_ROOT_DIR: workDir });
+  assert.equal(r.status, 12, r.stdout + r.stderr);
+  assert.match(r.stdout + r.stderr, /GB on \S+, below the required 999999 GB/);
+});
+
+test('unreadable Docker root fails closed with exit 1', () => {
+  reset();
+  const r = runScript(headSha, { CD_DOCKER_ROOT_DIR: path.join(workDir, 'does-not-exist') });
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout + r.stderr, /could not read free disk space/);
 });

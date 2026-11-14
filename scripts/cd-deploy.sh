@@ -25,7 +25,9 @@
 #   CD_QUEUE_WAIT_SECONDS      judge-queue drain window (default 300)
 #   CD_DRY_RUN=1               run the guards, then exit 0 without deploying
 #   CD_REPO_DIR                checkout to operate on (default: this repo)
-#   CD_DB_CONTAINER            database container (default: compose service
+#   CD_DOCKER_ROOT_DIR         Docker data root to check for free disk (default:
+#                              `docker info`; unresolvable -> exit 1)
+#   CD_DB_CONTAINER           database container (default: compose service
 #                              "database" of the checkout)
 #   CD_DB_USER, CD_DB_NAME     psql credentials (default: $POSTGRES_USER /
 #                              $POSTGRES_DB from the checkout's .env)
@@ -97,13 +99,40 @@ guard_sha_on_main() {
     fi
 }
 
+# require_uint <variable name> <value>: a bad value is an operator error, so it
+# exits 1 instead of silently falling back to a default.
+require_uint() {
+    case $2 in '' | *[!0-9]*) die "$1 must be a non-negative integer, got '$2'" ;; esac
+}
+
+# note_free_gb <path>: folds the free space (whole GB) of the filesystem holding
+# <path> into SHORT_GB / SHORT_PATH. No subshell, so die really exits.
+note_free_gb() {
+    kb=$(df -Pk "$1" 2>/dev/null | awk 'NR==2 {print $4}') || kb=
+    case $kb in '' | *[!0-9]*) die "could not read free disk space for $1" ;; esac
+    gb=$((kb / 1024 / 1024))
+    if [ -z "$SHORT_GB" ] || [ "$gb" -lt "$SHORT_GB" ]; then
+        SHORT_GB=$gb
+        SHORT_PATH=$1
+    fi
+}
+
 guard_disk() {
-    min_gb=${CD_MIN_FREE_GB:-5}
-    free_kb=$(df -Pk "$REPO_DIR" | awk 'NR==2 {print $4}')
-    case $free_kb in '' | *[!0-9]*) die "could not read free disk space for $REPO_DIR" ;; esac
-    free_gb=$((free_kb / 1024 / 1024))
-    if [ "$free_gb" -lt "$min_gb" ]; then
-        refuse "$EXIT_DISK" "free disk is ${free_gb} GB, below the required ${min_gb} GB (CD_MIN_FREE_GB)"
+    min_gb=${CD_MIN_FREE_GB-5}
+    require_uint CD_MIN_FREE_GB "$min_gb"
+    docker_root=${CD_DOCKER_ROOT_DIR-}
+    if [ -z "$docker_root" ]; then
+        docker_root=$(docker info -f '{{.DockerRootDir}}' 2>/dev/null) || docker_root=
+    fi
+    [ -n "$docker_root" ] || die "could not resolve Docker's data root (docker info); set CD_DOCKER_ROOT_DIR"
+    SHORT_GB=
+    SHORT_PATH=
+    # Everything a deploy writes to: the checkout and Docker's data root (image
+    # builds). Task 3 adds the backup directory with one more call here.
+    note_free_gb "$REPO_DIR"
+    note_free_gb "$docker_root"
+    if [ "$SHORT_GB" -lt "$min_gb" ]; then
+        refuse "$EXIT_DISK" "free disk is ${SHORT_GB} GB on $SHORT_PATH, below the required ${min_gb} GB (CD_MIN_FREE_GB)"
     fi
 }
 
@@ -119,10 +148,18 @@ guard_contest() {
 }
 
 guard_judge_queue() {
-    wait_s=${CD_QUEUE_WAIT_SECONDS:-300}
+    wait_s=${CD_QUEUE_WAIT_SECONDS-300}
+    require_uint CD_QUEUE_WAIT_SECONDS "$wait_s"
     waited=0
     while :; do
         count=$(db_scalar "SELECT count(*) FROM submissions WHERE overall_status IN ($SUBMISSION_IN_FLIGHT_STATUSES)")
+        # Contest submissions share the judge queue. The table is optional, and
+        # Postgres resolves table names at parse time (a CASE would not help),
+        # so check for it first and only then query it.
+        if [ "$(db_scalar "SELECT to_regclass('public.contest_submissions') IS NOT NULL")" = t ]; then
+            contest_count=$(db_scalar "SELECT count(*) FROM contest_submissions WHERE overall_status IN ($SUBMISSION_IN_FLIGHT_STATUSES)")
+            count=$((count + contest_count))
+        fi
         [ "$count" = 0 ] && return 0
         if [ "$waited" -ge "$wait_s" ]; then
             refuse "$EXIT_QUEUE" "$count submission(s) still compiling or running after waiting ${wait_s}s; a restart would turn them into System Errors"
