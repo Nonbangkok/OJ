@@ -21,10 +21,13 @@ concurrency:
 jobs:
   deploy:
     name: Deploy to production
-    # workflow_run fires for every CI run, including forks and other branches.
+    # workflow_run fires for every CI run, including forks, pull requests and
+    # other branches. Only a green push to main in this repository may deploy.
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'main'
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -77,6 +80,9 @@ jobs:
           ssh -i "$HOME/.ssh/deploy_key" \
             -o IdentitiesOnly=yes \
             -o BatchMode=yes \
+            -o ConnectTimeout=30 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=10 \
             -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
             "$DEPLOY_USER@$DEPLOY_HOST" \
@@ -93,11 +99,12 @@ jobs:
             20) msg="the pre-deploy backup failed; deploy refused, nothing changed" ;;
             21) msg="the deploy failed and was ROLLED BACK; production runs the previous release" ;;
             22) msg="the deploy failed and the ROLLBACK ALSO FAILED; production may be broken, fix it by hand now" ;;
-            255) msg="SSH itself failed (network, host key mismatch or key rejected); the script did not run" ;;
+            255) msg="SSH failed or the connection dropped (network, host key mismatch, key rejected). The script ignores the hangup and keeps running, so the deploy may have finished or rolled back: read the newest backups/cd-deploy-*.log in /srv/docker/apps/OJ on the server before doing anything" ;;
             *) msg="unexpected failure" ;;
           esac
           if [ "$status" -ne 0 ]; then
             echo "::error::cd-deploy.sh exited $status: $msg"
+            echo "::error::The first line of the output above names the run log on the server (backups/cd-deploy-<sha>-<time>.log in /srv/docker/apps/OJ)."
             exit "$status"
           fi
 

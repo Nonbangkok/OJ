@@ -74,6 +74,11 @@
 
 set -eu
 
+# A dropped SSH session sends SIGHUP to this script; ignore it so a disconnect
+# can never interrupt the run between the deploy and its rollback. Children
+# inherit the ignore. Set before anything mutates state.
+trap '' HUP
+
 EXIT_CONTEST=10
 EXIT_QUEUE=11
 EXIT_DISK=12
@@ -385,6 +390,7 @@ rollback_failed() {
     log "The deploy of $SHA failed AND the previous release could not be restored."
     log "State: the checkout is at $(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown); the site may be down or on the failed release."
     log "The database was NOT restored. Pre-deploy backup: ${BACKUP_FILE:-none}"
+    log "Full log of this run on the server: ${LOG_FILE:-none}"
     if [ -n "$PREV_TAG" ]; then
         log "Caveat: tag '$PREV_TAG' images are only known to match $PREV_SHA if nobody checked out a different commit after building them (true for ':local' built by hand)."
         log "To restore by hand: cd $REPO_DIR && git checkout --detach $PREV_SHA && OJ_IMAGE_TAG=$PREV_TAG docker compose $COMPOSE_FILES up -d --no-build"
@@ -408,6 +414,7 @@ rollback() {
     # by construction, and readiness alone once let a broken build pass.
     verify_release 1 || rollback_failed "the previous release did not verify (readiness or migrations)"
     log "ROLLBACK OK: tag $PREV_TAG at $PREV_SHA is running again (the database was not restored)"
+    log "Full log of this run on the server: ${LOG_FILE:-none}"
     exit "$EXIT_ROLLED_BACK"
 }
 
@@ -453,6 +460,28 @@ deploy() {
     log "DEPLOY OK: $SHA is live as tag $NEW_TAG"
 }
 
+# Copies everything this run prints to backups/cd-deploy-<sha>-<ts>.log (next
+# to the dumps, git-ignored), so the outcome can be read on the server when the
+# SSH session dies and the exit code is lost. The path is the first line of
+# output. Best effort: if the log cannot be created the run goes on without it.
+start_run_log() {
+    LOG_FILE=
+    mkdir -p "$BACKUP_DIR" 2>/dev/null || return 0
+    stamp=$(date '+%Y%m%dT%H%M%S')
+    name=$(printf '%.12s' "$SHA" | tr -c '0-9a-zA-Z' '_')
+    LOG_FILE=$BACKUP_DIR/cd-deploy-$name-$stamp.log
+    fifo=$BACKUP_DIR/.cd-deploy-$$.fifo
+    if mkfifo "$fifo" 2>/dev/null && : >"$LOG_FILE" 2>/dev/null; then
+        tee -a "$LOG_FILE" <"$fifo" &
+        exec >"$fifo" 2>&1
+        rm -f "$fifo"
+        log "log file: $LOG_FILE"
+    else
+        rm -f "$fifo"
+        LOG_FILE=
+    fi
+}
+
 main() {
     [ $# -eq 1 ] || die "usage: cd-deploy.sh <commit-sha>"
     SHA=$1
@@ -470,6 +499,8 @@ main() {
     HTTPS_PORT=${HTTPS_PORT:-$(env_file_value HTTPS_PORT)}
     HTTPS_PORT=${HTTPS_PORT:-443}
     HEALTH_URL=${CD_HEALTH_URL:-https://$PUBLIC_HOST:$HTTPS_PORT/api/health/ready}
+
+    start_run_log
 
     preflight
 
