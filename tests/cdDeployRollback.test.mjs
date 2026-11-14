@@ -271,17 +271,27 @@ test('rollback restores nginx-proxy, so the proxy serves the restored release co
   const observed = path.join(workDir, 'proxy-observed');
   rmSync(observed, { force: true });
   const stub = path.join(workDir, 'deploy-proxy-fail.sh');
-  // Mirrors deploy.sh: bring the stack up, then apply the new release's proxy
-  // configuration with `nginx -s reload`. Then it fails, having recorded what
-  // the proxy serves, so the test can tell a real restore from a vacuous pass.
+  // Puts release B's proxy configuration genuinely into the RUNNING proxy, then
+  // fails, having recorded what the proxy serves -- so the test can tell a real
+  // restore from a vacuous pass.
+  //
+  // It force-recreates the proxy rather than reloading it, which is NOT what
+  // deploy.sh does, because a reload cannot load the new configuration at all:
+  // `git checkout` replaces proxy.conf with a new inode, and a single-file bind
+  // mount in a running container stays attached to the old one. On Linux (CI)
+  // `nginx -s reload` therefore silently re-reads the STALE file and the proxy
+  // keeps serving A; on Docker Desktop the path re-resolves and it ENOENTs. So
+  // reloading here would leave release B never loaded and make the assertions
+  // below meaningless. That hole on deploy.sh's own success path is a separate
+  // follow-up; what this test pins is that the ROLLBACK restores the proxy.
   writeFileSync(
     stub,
     [
       '#!/bin/sh',
       'touch "$CD_TEST_STUB_RAN"',
       `docker compose -p ${project} -f docker-compose.yml up -d --no-build`,
+      `docker compose -p ${project} -f docker-compose.yml up -d --force-recreate --no-deps nginx-proxy`,
       `p=$(docker compose -p ${project} -f docker-compose.yml ps -q nginx-proxy)`,
-      'docker exec "$p" nginx -s reload',
       'i=0',
       'while [ "$i" -lt 20 ]; do',
       '    out=$(docker exec "$p" wget -qO- http://127.0.0.1:8080/ 2>/dev/null || echo ERR)',
@@ -300,8 +310,9 @@ test('rollback restores nginx-proxy, so the proxy serves the restored release co
   assert.equal(r.status, 21, r.out);
   assert.equal(readFileSync(observed, 'utf8').trim(), 'B', 'the failed deploy really did load release B');
   assert.match(r.out, /nginx-proxy recreated onto the restored configuration/);
-  // `compose up -d --no-build` alone leaves the proxy on release B: only the
-  // rollback's explicit restore brings it back.
+  // The proxy's compose spec is identical in both releases, so the rollback's
+  // `up -d --no-build` does not recreate it: without restore_proxy the B
+  // container survives the rollback and keeps serving B.
   assert.equal(proxyServesEventually('A'), 'A');
 });
 
