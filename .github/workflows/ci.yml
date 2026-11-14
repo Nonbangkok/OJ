@@ -90,8 +90,12 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Repo config tests (compose, Node and nginx versions, Postgres 18 guard, frontend caching, proxy healthcheck)
-        run: node --test tests/composeConfig.test.mjs tests/nodeVersion.test.mjs tests/nginxVersion.test.mjs tests/pg18Guard.test.mjs tests/frontendCaching.test.mjs tests/proxyHealthcheck.test.mjs
+      - name: Repo config tests (compose, Node and nginx versions, Postgres 18 guard, frontend caching, proxy healthcheck, deploy workflow)
+        run: node --test tests/composeConfig.test.mjs tests/nodeVersion.test.mjs tests/nginxVersion.test.mjs tests/pg18Guard.test.mjs tests/frontendCaching.test.mjs tests/proxyHealthcheck.test.mjs tests/deployWorkflow.test.mjs
+
+      # shellcheck ships on ubuntu-latest runners.
+      - name: Shellcheck the CD deploy script
+        run: shellcheck scripts/cd-deploy.sh
 
       - name: Build all images (local + production overlay)
         run: |
