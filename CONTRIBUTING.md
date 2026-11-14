@@ -104,6 +104,18 @@ node --test tests/composeConfig.test.mjs tests/nodeVersion.test.mjs tests/nginxV
 BASE_URL=http://127.0.0.1 node --test tests/localSessionSmoke.test.mjs
 ```
 
+Continuous deployment (`scripts/cd-deploy.sh`). The structure test needs
+nothing; the other two need a working Docker and take a few minutes — they
+create a throwaway Postgres container and a throwaway compose project (never
+project `oj`, no published ports) and remove both afterwards. CI runs all three
+in the `docker` job, so a regression in the guards, the backup, the snapshot or
+the rollback fails the pull request:
+
+```bash
+node --test tests/cdDeployStructure.test.mjs                               # no Docker needed
+node --test tests/cdDeployGuards.test.mjs tests/cdDeployRollback.test.mjs  # Docker, ~4 minutes
+```
+
 Frontend visual regression (admin shell + authoring profiles, Playwright):
 
 ```bash
