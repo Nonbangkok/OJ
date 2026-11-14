@@ -1,9 +1,10 @@
 #!/bin/sh
 # cd-deploy.sh <commit-sha>
 #
-# Continuous-deployment entry point, run on the production server. This part
-# holds the preflight guards: every refusal happens before anything is
-# changed, so a bad request leaves the server exactly as it was.
+# Continuous-deployment entry point, run on the production server.
+#
+# Phase 1, preflight guards: every refusal happens before anything is changed,
+# so a bad request leaves the server exactly as it was.
 #
 # Guards, in order (cheapest and most local first):
 #   13  the working tree has modified TRACKED files (untracked files, such as
@@ -16,8 +17,27 @@
 #       The backend turns each of those into a System Error on boot, so the
 #       script waits for the queue to drain and aborts if it does not.
 #
+# Phase 2, deploy (after the guards pass):
+#   backup      pg_dump -Fc into backups/pre-deploy-<sha>-<ts>.dump, verified
+#               with pg_restore -l, pruned to the newest CD_BACKUP_KEEP
+#   record      .last-release (line 1 image tag, line 2 commit sha) names the
+#               release that is running, so a failed deploy can go back to it
+#   check out   git checkout --detach <sha>
+#   deploy      OJ_IMAGE_TAG=<short-sha> $CD_DEPLOY_CMD
+#   verify      loopback /api/health/ready is ready, and the newest
+#               schema_migrations row is not behind the migrations shipped in
+#               the checkout
+#   roll back   on any failure: previous working tree AND previous images,
+#               brought up without building, then re-verified. The database is
+#               never restored automatically.
+#   prune       old oj-* image tags, by name, keeping this and the previous
+#               release (and :local, which manual deploys use)
+#
 # Other exit codes: 0 ok, 1 usage error or the database could not be queried
-# (fails closed).
+# (fails closed), 20 backup failed (nothing changed), 21 deploy failed and was
+# rolled back, 22 deploy failed and the rollback ALSO failed (or there was no
+# rollback target): the site is down or on a broken release and a person must
+# act; the message says what.
 #
 # Environment:
 #   ALLOW_DURING_CONTEST=1     operator escape hatch for the contest guard
@@ -31,6 +51,17 @@
 #                              "database" of the checkout)
 #   CD_DB_USER, CD_DB_NAME     psql credentials (default: $POSTGRES_USER /
 #                              $POSTGRES_DB from the checkout's .env)
+#   CD_BACKUP_KEEP             backups to retain, at least 1 (default 3)
+#   CD_DEPLOY_CMD              deploy command, run in the checkout with
+#                              OJ_IMAGE_TAG set (default ./deploy.sh)
+#   CD_COMPOSE_FILES           compose -f arguments used for rollback (default
+#                              "-f docker-compose.yml -f docker-compose.production.yml",
+#                              the same pair deploy.sh uses)
+#   CD_IMAGE_PREFIX            image repository prefix (default oj, giving
+#                              oj-backend, oj-frontend, oj-authoring-runner)
+#   CD_HEALTH_URL              readiness URL (default: https loopback to the
+#                              nginx proxy, /api/health/ready)
+#   CD_HEALTH_WAIT_SECONDS     how long readiness may take (default 60)
 
 set -eu
 
@@ -39,12 +70,21 @@ EXIT_QUEUE=11
 EXIT_DISK=12
 EXIT_DIRTY=13
 EXIT_SHA=14
+EXIT_BACKUP=20
+EXIT_ROLLED_BACK=21
+EXIT_ROLLBACK_FAILED=22
 
 # Mirrors CONTEST_STATUS / SUBMISSION_STATUS in backend/constants/index.ts.
 CONTEST_BLOCKING_STATUSES="'running','finishing'"
 SUBMISSION_IN_FLIGHT_STATUSES="'Compiling','Running'"
 
 QUEUE_POLL_SECONDS=2
+HEALTH_POLL_SECONDS=2
+
+# deploy.sh is bound to this host (certificate, tunnel); the loopback probe
+# resolves it to 127.0.0.1 the same way deploy.sh does.
+PUBLIC_HOST=nonbangkokgrader.com
+IMAGE_SERVICES="backend frontend authoring-runner"
 
 log() {
     printf '%s cd-deploy: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*"
@@ -128,9 +168,10 @@ guard_disk() {
     SHORT_GB=
     SHORT_PATH=
     # Everything a deploy writes to: the checkout and Docker's data root (image
-    # builds). Task 3 adds the backup directory with one more call here.
+    # builds), and the backup directory when it is on another filesystem.
     note_free_gb "$REPO_DIR"
     note_free_gb "$docker_root"
+    if [ -d "$BACKUP_DIR" ]; then note_free_gb "$BACKUP_DIR"; fi
     if [ "$SHORT_GB" -lt "$min_gb" ]; then
         refuse "$EXIT_DISK" "free disk is ${SHORT_GB} GB on $SHORT_PATH, below the required ${min_gb} GB (CD_MIN_FREE_GB)"
     fi
@@ -171,6 +212,8 @@ guard_judge_queue() {
 }
 
 preflight() {
+    require_uint CD_BACKUP_KEEP "$BACKUP_KEEP"
+    [ "$BACKUP_KEEP" -ge 1 ] || die "CD_BACKUP_KEEP must be at least 1, got '$BACKUP_KEEP'"
     guard_clean_tree
     guard_sha_on_main
     guard_disk
@@ -180,10 +223,209 @@ preflight() {
     log "preflight ok for $SHA"
 }
 
+# ---------------------------------------------------------------------------
+# Phase 2: backup, deploy, verify, roll back
+# ---------------------------------------------------------------------------
+
+image_repo() {
+    printf '%s-%s' "$IMAGE_PREFIX" "$1"
+}
+
+# compose <args>: docker compose in the checkout with the production files.
+compose() {
+    # CD_COMPOSE_FILES is a list of arguments on purpose.
+    # shellcheck disable=SC2086
+    (cd "$REPO_DIR" && docker compose $COMPOSE_FILES "$@")
+}
+
+backup_database() {
+    ts=$(date '+%Y%m%dT%H%M%S')
+    BACKUP_FILE="$BACKUP_DIR/pre-deploy-$SHORT_SHA-$ts.dump"
+    log "backing up $DB_NAME to $BACKUP_FILE"
+    mkdir -p "$BACKUP_DIR" || refuse "$EXIT_BACKUP" "cannot create backup directory $BACKUP_DIR"
+    if ! docker exec "$DB_CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc >"$BACKUP_FILE"; then
+        rm -f "$BACKUP_FILE"
+        refuse "$EXIT_BACKUP" "pg_dump failed"
+    fi
+    if ! docker exec -i "$DB_CONTAINER" pg_restore -l <"$BACKUP_FILE" >/dev/null; then
+        rm -f "$BACKUP_FILE"
+        refuse "$EXIT_BACKUP" "the dump is not readable (pg_restore -l failed)"
+    fi
+    log "backup verified: $(wc -c <"$BACKUP_FILE" | tr -d ' ') bytes"
+    prune_backups
+}
+
+# Keeps the newest CD_BACKUP_KEEP dumps. Ordered by the timestamp at the end of
+# the name; the sha prefix would sort unrelated to age.
+prune_backups() {
+    for f in "$BACKUP_DIR"/pre-deploy-*.dump; do
+        [ -e "$f" ] || continue
+        printf '%s %s\n' "$(basename "$f" .dump | sed 's/.*-//')" "$f"
+    done | sort -r | tail -n +"$((BACKUP_KEEP + 1))" | while read -r _ f; do
+        rm -f "$f"
+        log "pruned old backup $f"
+    done
+}
+
+# The tag the backend container is running (empty when nothing runs).
+running_tag() {
+    cid=$(compose ps -q backend 2>/dev/null | head -n 1) || cid=
+    [ -n "$cid" ] || return 0
+    image=$(docker inspect -f '{{.Config.Image}}' "$cid" 2>/dev/null) || return 0
+    printf '%s' "${image##*:}"
+}
+
+# Sets PREV_TAG / PREV_SHA from .last-release when it still describes what is
+# running; otherwise leaves them empty (no rollback target). A manual
+# ./deploy.sh builds :local over the recorded images, which is how the file
+# goes stale, so it is checked against the running containers.
+load_rollback_target() {
+    PREV_TAG=
+    PREV_SHA=
+    if [ ! -f "$LAST_RELEASE" ]; then
+        log "WARNING: no rollback target (no $LAST_RELEASE); a failed deploy cannot be rolled back"
+        return 0
+    fi
+    tag=$(sed -n 1p "$LAST_RELEASE")
+    sha=$(sed -n 2p "$LAST_RELEASE")
+    if [ -z "$tag" ] || [ -z "$sha" ]; then
+        log "WARNING: no rollback target ($LAST_RELEASE is malformed); a failed deploy cannot be rolled back"
+        return 0
+    fi
+    running=$(running_tag)
+    if [ "$running" != "$tag" ]; then
+        log "WARNING: no rollback target ($LAST_RELEASE says '$tag' but '${running:-nothing}' is running, probably a manual deploy); a failed deploy cannot be rolled back"
+        return 0
+    fi
+    PREV_TAG=$tag
+    PREV_SHA=$sha
+    log "rollback target: tag $PREV_TAG at $PREV_SHA"
+}
+
+probe_health() {
+    curl -fsS --max-time 5 -o /dev/null --resolve "$PUBLIC_HOST:$HTTPS_PORT:127.0.0.1" "$HEALTH_URL" 2>/dev/null
+}
+
+wait_healthy() {
+    waited=0
+    until probe_health; do
+        [ "$waited" -lt "$HEALTH_WAIT" ] || return 1
+        sleep "$HEALTH_POLL_SECONDS"
+        waited=$((waited + HEALTH_POLL_SECONDS))
+    done
+}
+
+# Fails (prints why) unless the newest applied migration is at least the newest
+# one shipped in the checkout. Ahead is fine: redeploying an older commit runs
+# against a newer schema by design. Versions look like 0024_header_problems,
+# files like 0024HeaderProblems.ts; the four-digit prefix is the comparable part.
+check_migrations() {
+    shipped=$(ls "$REPO_DIR/backend/migrations" 2>/dev/null | sed -n 's/^\([0-9]\{4\}\).*\.ts$/\1/p' | sort | tail -n 1)
+    [ -n "$shipped" ] || { log "no migration files found in $REPO_DIR/backend/migrations"; return 1; }
+    applied=$(db_scalar "SELECT coalesce(max(substr(version, 1, 4)), '') FROM schema_migrations") || return 1
+    lowest=$(printf '%s\n%s\n' "$applied" "$shipped" | sort | head -n 1)
+    if [ "$applied" != "$shipped" ] && [ "$lowest" = "$applied" ]; then
+        log "newest applied migration is '${applied:-none}' but this release ships $shipped"
+        return 1
+    fi
+}
+
+# verify_release <check migrations: 1|0>
+verify_release() {
+    wait_healthy || { log "$HEALTH_URL did not become ready within ${HEALTH_WAIT}s"; return 1; }
+    [ "$1" = 1 ] && { check_migrations || return 1; }
+    return 0
+}
+
+# Prints what the operator must do and exits 22. The message is the mitigation.
+rollback_failed() {
+    reason=$1
+    log "ROLLBACK FAILED: $reason"
+    log "The deploy of $SHA failed AND the previous release could not be restored."
+    log "State: the checkout is at $(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown); the site may be down or on the failed release."
+    log "The database was NOT restored. Pre-deploy backup: ${BACKUP_FILE:-none}"
+    if [ -n "$PREV_TAG" ]; then
+        log "To restore by hand: cd $REPO_DIR && git checkout --detach $PREV_SHA && OJ_IMAGE_TAG=$PREV_TAG docker compose $COMPOSE_FILES up -d --no-build"
+    else
+        log "There was no rollback target. Fix forward, or restore a known-good commit with ./deploy.sh."
+    fi
+    exit "$EXIT_ROLLBACK_FAILED"
+}
+
+rollback() {
+    [ -n "$PREV_TAG" ] || rollback_failed "no rollback target: the previous release was not recorded"
+    log "rolling back to tag $PREV_TAG ($PREV_SHA)"
+    missing=
+    for svc in $IMAGE_SERVICES; do
+        docker image inspect "$(image_repo "$svc"):$PREV_TAG" >/dev/null 2>&1 ||
+            missing="$missing $(image_repo "$svc"):$PREV_TAG"
+    done
+    [ -z "$missing" ] || rollback_failed "rollback target is missing, image(s) not found:$missing"
+    git -C "$REPO_DIR" checkout --quiet --detach "$PREV_SHA" || rollback_failed "git checkout $PREV_SHA failed"
+    OJ_IMAGE_TAG=$PREV_TAG compose up -d --no-build --remove-orphans || rollback_failed "docker compose up with tag $PREV_TAG failed"
+    # Only readiness: the schema may legitimately be ahead of the old tree.
+    verify_release 0 || rollback_failed "the previous release did not become healthy"
+    log "ROLLBACK OK: tag $PREV_TAG at $PREV_SHA is running again (the database was not restored)"
+    exit "$EXIT_ROLLED_BACK"
+}
+
+# Deletes oj-* image tags older than the two releases kept (this and the
+# previous one) by name, plus :local which manual deploys use. Failures, such as
+# an image still in use, are not fatal. Never a blanket prune: other containers
+# share this daemon.
+prune_images() {
+    for svc in $IMAGE_SERVICES; do
+        repo=$(image_repo "$svc")
+        docker image ls --format '{{.Tag}}' "$repo" | sort -u | while read -r tag; do
+            case $tag in "$NEW_TAG" | "$PREV_TAG" | local | '<none>') continue ;; esac
+            if docker rmi "$repo:$tag" >/dev/null 2>&1; then log "pruned image $repo:$tag"; fi
+        done
+    done
+    return 0
+}
+
+deploy() {
+    SHORT_SHA=$(git -C "$REPO_DIR" rev-parse --short=12 "$SHA^{commit}") || die "cannot resolve $SHA"
+    NEW_TAG=$SHORT_SHA
+    BACKUP_FILE=
+    backup_database
+    load_rollback_target
+
+    log "checking out $SHA"
+    git -C "$REPO_DIR" checkout --quiet --detach "$SHA" || die "git checkout $SHA failed (nothing was deployed)"
+
+    log "deploying with OJ_IMAGE_TAG=$NEW_TAG: $DEPLOY_CMD"
+    if ! (cd "$REPO_DIR" && OJ_IMAGE_TAG=$NEW_TAG sh -c "$DEPLOY_CMD"); then
+        log "deploy command failed"
+        log "DEPLOY FAILED for $SHA"
+        rollback
+    fi
+    if ! verify_release 1; then
+        log "DEPLOY FAILED for $SHA (verification)"
+        rollback
+    fi
+
+    printf '%s\n%s\n' "$NEW_TAG" "$SHA" >"$LAST_RELEASE"
+    prune_images
+    log "DEPLOY OK: $SHA is live as tag $NEW_TAG"
+}
+
 main() {
     [ $# -eq 1 ] || die "usage: cd-deploy.sh <commit-sha>"
     SHA=$1
     REPO_DIR=${CD_REPO_DIR:-$(cd "$(dirname "$0")/.." && pwd)}
+    BACKUP_DIR=$REPO_DIR/backups
+    # In the checkout root; git-ignored, so it never dirties the tree.
+    LAST_RELEASE=$REPO_DIR/.last-release
+    BACKUP_KEEP=${CD_BACKUP_KEEP-3}
+    DEPLOY_CMD=${CD_DEPLOY_CMD:-./deploy.sh}
+    COMPOSE_FILES=${CD_COMPOSE_FILES:--f docker-compose.yml -f docker-compose.production.yml}
+    IMAGE_PREFIX=${CD_IMAGE_PREFIX:-oj}
+    HEALTH_WAIT=${CD_HEALTH_WAIT_SECONDS-60}
+    require_uint CD_HEALTH_WAIT_SECONDS "$HEALTH_WAIT"
+    HTTPS_PORT=${HTTPS_PORT:-$(env_file_value HTTPS_PORT)}
+    HTTPS_PORT=${HTTPS_PORT:-443}
+    HEALTH_URL=${CD_HEALTH_URL:-https://$PUBLIC_HOST:$HTTPS_PORT/api/health/ready}
 
     preflight
 
@@ -191,6 +433,8 @@ main() {
         log "dry run: guards passed, not deploying"
         exit 0
     fi
+
+    deploy
 }
 
 main "$@"
