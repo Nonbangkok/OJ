@@ -78,6 +78,18 @@ const assertRunning = (tag) => {
   assert.deepEqual(runningImages(), Object.fromEntries(services.map((s) => [s, `${prefix}-${s}:${tag}`])));
 };
 
+// The image's init server answers briefly before the real one starts: wait
+// for init to finish, then for the final server.
+const waitForPostgres = (container) => {
+  for (let i = 0; i < 90; i += 1) {
+    const logs = run('docker', ['logs', container]);
+    const ready = `${logs.stdout}${logs.stderr}`.includes('PostgreSQL init process complete');
+    if (ready && run('docker', ['exec', container, 'psql', '-U', 'postgres', '-d', 'postgres', '-c', 'select 1']).status === 0) return;
+    spawnSync('sleep', ['1']);
+  }
+  assert.fail(`postgres in ${container} never became ready`);
+};
+
 before(() => {
   const origin = path.join(workDir, 'origin.git');
   must('git', ['init', '--bare', '-b', 'main', origin]);
@@ -85,7 +97,13 @@ before(() => {
   const composeYml = services
     .map((s) => `  ${s}:\n    image: ${prefix}-${s}:\${OJ_IMAGE_TAG:-local}\n    command: ["sleep", "3600"]\n`)
     .join('');
-  writeFileSync(path.join(repo, 'docker-compose.yml'), `services:\n${composeYml}`);
+  // Optional database service (profile "db", off unless COMPOSE_PROFILES=db).
+  // DEPLOY_MARK changes with the image tag, so a deploy recreates it.
+  const databaseYml =
+    '  database:\n    image: postgres:18-alpine\n    profiles: ["db"]\n    environment:\n' +
+    '      POSTGRES_PASSWORD: x\n      DEPLOY_MARK: ${OJ_IMAGE_TAG:-local}\n' +
+    '    volumes:\n      - dbdata:/var/lib/postgresql\n';
+  writeFileSync(path.join(repo, 'docker-compose.yml'), `services:\n${composeYml}${databaseYml}volumes:\n  dbdata:\n`);
   mkdirSync(path.join(repo, 'backend/migrations'), { recursive: true });
   writeFileSync(path.join(repo, 'backend/migrations/0001Core.ts'), '// 1\n');
   git('add', '.');
@@ -115,14 +133,7 @@ before(() => {
   );
 
   must('docker', ['run', '-d', '--name', dbContainer, '-e', 'POSTGRES_PASSWORD=x', 'postgres:18-alpine']);
-  // The image's init server answers briefly before the real one starts: wait
-  // for init to finish, then for the final server.
-  for (let i = 0; i < 90; i += 1) {
-    const logs = run('docker', ['logs', dbContainer]);
-    const ready = `${logs.stdout}${logs.stderr}`.includes('PostgreSQL init process complete');
-    if (ready && run('docker', ['exec', dbContainer, 'psql', '-U', 'postgres', '-d', 'postgres', '-c', 'select 1']).status === 0) break;
-    spawnSync('sleep', ['1']);
-  }
+  waitForPostgres(dbContainer);
   sql('CREATE TABLE contests (id serial PRIMARY KEY, status varchar(20) NOT NULL)');
   sql('CREATE TABLE submissions (id serial PRIMARY KEY, overall_status varchar(50) NOT NULL)');
   sql('CREATE TABLE schema_migrations (version text PRIMARY KEY)');
@@ -130,7 +141,7 @@ before(() => {
 
 after(() => {
   if (existsSync(repo)) {
-    spawnSync('docker', ['compose', '-p', project, '-f', 'docker-compose.yml', 'down', '-v', '--remove-orphans'], {
+    spawnSync('docker', ['compose', '-p', project, '--profile', 'db', '-f', 'docker-compose.yml', 'down', '-v', '--remove-orphans'], {
       cwd: repo,
       encoding: 'utf8',
     });
@@ -215,7 +226,8 @@ test('rollback target images missing exits 22 and says what to do by hand', asyn
   assert.match(r.out, /database was NOT restored/);
 });
 
-test('no .last-release warns "no rollback target" and still deploys', async () => {
+test('nothing running warns "no rollback target" and still deploys', async () => {
+  compose(OLD_TAG, 'down', '--remove-orphans');
   rmSync(path.join(repo, '.last-release'));
   sql("INSERT INTO schema_migrations VALUES ('0002_more')");
   const r = await runScript(shaB);
@@ -225,19 +237,110 @@ test('no .last-release warns "no rollback target" and still deploys', async () =
   assert.equal(readFileSync(path.join(repo, '.last-release'), 'utf8'), `${newTag}\n${shaB}\n`);
 });
 
-test('failed deploy without a rollback target exits 22', async () => {
+test('failed deploy with nothing running exits 22 (no rollback target)', async () => {
+  compose(OLD_TAG, 'down', '--remove-orphans');
   rmSync(path.join(repo, '.last-release'));
   const r = await runScript(shaB, { CD_DEPLOY_CMD: failStub });
   assert.equal(r.status, 22, r.out);
   assert.match(r.out, /no rollback target/);
 });
 
-test('stale .last-release (running tag differs) is not a rollback target', async () => {
-  writeFileSync(path.join(repo, '.last-release'), `zzz\n${shaA}\n`);
+test('.last-release is recorded from live state, never trusted from the file', async () => {
+  writeFileSync(path.join(repo, '.last-release'), `zzz\n${shaB}\n`);
+  const r = await runScript(shaB, { CD_DEPLOY_CMD: failStub });
+  assert.equal(r.status, 21, r.out);
+  assert.match(r.out, new RegExp(`rollback target: tag ${OLD_TAG} at ${shaA}`));
+  assert.equal(head(), shaA);
+  assertRunning(OLD_TAG);
+  assert.equal(readFileSync(path.join(repo, '.last-release'), 'utf8'), `${OLD_TAG}\n${shaA}\n`);
+});
+
+test('first CD deploy over a hand-built :local release is rollbackable', async () => {
+  compose(OLD_TAG, 'down', '--remove-orphans');
+  tagAll('local');
+  compose('local', 'up', '-d', '--no-build');
+  rmSync(path.join(repo, '.last-release'));
+  const r = await runScript(shaB, { CD_DEPLOY_CMD: failStub });
+  assert.equal(r.status, 21, r.out);
+  assert.match(r.out, new RegExp(`rollback target: tag local at ${shaA}`));
+  assert.match(r.out, /ROLLBACK OK/);
+  assert.equal(head(), shaA);
+  assertRunning('local');
+});
+
+// A deploy of the commit that is already live reuses the live tag: deploy.sh
+// rebuilds the very images the rollback would restore.
+const redeploySetup = () => {
+  compose(OLD_TAG, 'down', '--remove-orphans');
+  git('checkout', '--quiet', '--detach', shaB);
+  compose(newTag, 'up', '-d', '--no-build');
+  const originalId = must('docker', ['image', 'inspect', '-f', '{{.Id}}', `${prefix}-backend:${newTag}`]);
+  const brokenDir = path.join(workDir, 'image-broken');
+  mkdirSync(brokenDir, { recursive: true });
+  writeFileSync(path.join(brokenDir, 'Dockerfile'), 'FROM postgres:18-alpine\nLABEL broken=1\n');
+  const rebuild = path.join(workDir, 'deploy-rebuild.sh');
+  const builds = services.map((svc) => `docker build -q -t ${prefix}-${svc}:$OJ_IMAGE_TAG ${brokenDir} >/dev/null`).join('\n');
+  return { originalId, rebuild, builds };
+};
+const runningImageIds = () =>
+  services.map((service) => {
+    const id = must('docker', ['compose', '-p', project, '-f', 'docker-compose.yml', 'ps', '-q', service], { cwd: repo });
+    return must('docker', ['inspect', '-f', '{{.Image}}', id]);
+  });
+
+test('redeploying the live commit that then fails restores the original images, not the rebuilt ones', async () => {
+  const { originalId, rebuild, builds } = redeploySetup();
   sql("INSERT INTO schema_migrations VALUES ('0002_more')");
-  const r = await runScript(shaB);
-  assert.equal(r.status, 0, r.out);
-  assert.match(r.out, new RegExp(`no rollback target .*'zzz' but '${OLD_TAG}' is running`));
+  writeFileSync(
+    rebuild,
+    `#!/bin/sh\n${builds}\ndocker compose -p ${project} -f docker-compose.yml up -d --no-build\nexit 1\n`,
+    { mode: 0o755 },
+  );
+  const r = await runScript(shaB, { CD_DEPLOY_CMD: rebuild });
+  assert.equal(r.status, 21, r.out);
+  assert.match(r.out, /ROLLBACK OK/);
+  assert.equal(head(), shaB);
+  assert.deepEqual(runningImageIds(), [originalId, originalId, originalId]);
+  assert.equal(must('docker', ['image', 'inspect', '-f', '{{.Id}}', `${prefix}-backend:${newTag}`]), originalId);
+});
+
+test('rollback that cannot verify exits 22, never a false ROLLBACK OK', async () => {
+  // schema_migrations stops at 0001 but the live tree (B) ships 0002: neither
+  // the failed deploy nor the restored release can pass full verification.
+  const { rebuild, builds } = redeploySetup();
+  writeFileSync(rebuild, `#!/bin/sh\n${builds}\ndocker compose -p ${project} -f docker-compose.yml up -d --no-build\n`, { mode: 0o755 });
+  const r = await runScript(shaB, { CD_DEPLOY_CMD: rebuild });
+  assert.equal(r.status, 22, r.out);
+  assert.match(r.out, /ROLLBACK FAILED/);
+  assert.doesNotMatch(r.out, /ROLLBACK OK/);
+});
+
+test('database service recreated by the deploy is re-resolved by name (no false rollback)', async () => {
+  const dbEnv = { ...process.env, COMPOSE_PROFILES: 'db', OJ_IMAGE_TAG: OLD_TAG };
+  const composeDb = (...args) =>
+    must('docker', ['compose', '-p', project, '-f', 'docker-compose.yml', ...args], { cwd: repo, env: dbEnv });
+  const idOf = () => composeDb('ps', '-q', 'database');
+  try {
+    composeDb('up', '-d', '--no-build');
+    waitForPostgres(`${project}-database-1`);
+    const sqlInDb = (statement) =>
+      must('docker', ['exec', `${project}-database-1`, 'psql', '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-c', statement]);
+    sqlInDb('CREATE TABLE contests (id serial PRIMARY KEY, status varchar(20) NOT NULL)');
+    sqlInDb('CREATE TABLE submissions (id serial PRIMARY KEY, overall_status varchar(50) NOT NULL)');
+    sqlInDb('CREATE TABLE schema_migrations (version text PRIMARY KEY)');
+    sqlInDb("INSERT INTO schema_migrations VALUES ('0001_core'), ('0002_more')");
+    const before = idOf();
+    const r = await runScript(shaB, { COMPOSE_PROFILES: 'db', CD_DB_CONTAINER: '' });
+    assert.equal(r.status, 0, r.out);
+    assert.notEqual(idOf(), before, 'the deploy must have recreated the database container');
+    assert.match(r.out, /DEPLOY OK/);
+  } finally {
+    spawnSync('docker', ['compose', '-p', project, '--profile', 'db', '-f', 'docker-compose.yml', 'down', '-v', '--remove-orphans'], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: { ...process.env, OJ_IMAGE_TAG: OLD_TAG },
+    });
+  }
 });
 
 test('successful deploy records the release, keeps the previous images, prunes older tags and backups', async () => {
@@ -322,6 +425,39 @@ test('unreadable dump exits 20, removes the file and changes nothing', async () 
   assert.deepEqual(dumps(), []);
   assert.equal(head(), shaA);
   assert.ok(!existsSync(stubRan));
+});
+
+test('pg_dump exceeding CD_BACKUP_TIMEOUT_SECONDS exits 20, removes the partial file and changes nothing', async () => {
+  // Replaces the dump with a long sleep but keeps the real in-container timeout.
+  const shimDir = path.join(workDir, 'shim-timeout');
+  mkdirSync(shimDir, { recursive: true });
+  writeFileSync(
+    path.join(shimDir, 'docker'),
+    '#!/bin/sh\ncase "$*" in *pg_dump*) exec "$REAL_DOCKER" exec "$2" "$3" "$4" sleep 30;; esac\nexec "$REAL_DOCKER" "$@"\n',
+    { mode: 0o755 },
+  );
+  const realDocker = must('sh', ['-c', 'command -v docker']);
+  const started = Date.now();
+  const r = await runScript(shaB, {
+    PATH: `${shimDir}:${process.env.PATH}`,
+    REAL_DOCKER: realDocker,
+    CD_BACKUP_TIMEOUT_SECONDS: '2',
+  });
+  assert.equal(r.status, 20, r.out);
+  assert.match(r.out, /exceeded 2s/);
+  assert.ok(Date.now() - started < 25000, 'the cap must cut the dump short');
+  assert.deepEqual(dumps(), []);
+  assert.equal(head(), shaA);
+  assert.ok(!existsSync(stubRan));
+});
+
+test('invalid CD_BACKUP_TIMEOUT_SECONDS exits 1 before anything is changed', async () => {
+  for (const value of ['', 'x', '0']) {
+    const r = await runScript(shaB, { CD_BACKUP_TIMEOUT_SECONDS: value });
+    assert.equal(r.status, 1, `'${value}'\n${r.out}`);
+    assert.match(r.out, /CD_BACKUP_TIMEOUT_SECONDS must be/);
+  }
+  assert.equal(head(), shaA);
 });
 
 test('invalid CD_BACKUP_KEEP exits 1 before anything is changed', async () => {

@@ -20,18 +20,25 @@
 # Phase 2, deploy (after the guards pass):
 #   backup      pg_dump -Fc into backups/pre-deploy-<sha>-<ts>.dump, verified
 #               with pg_restore -l, pruned to the newest CD_BACKUP_KEEP
-#   record      .last-release (line 1 image tag, line 2 commit sha) names the
-#               release that is running, so a failed deploy can go back to it
+#   record      .last-release (line 1 image tag, line 2 commit sha) is written
+#               from LIVE state: the tag the backend container runs and the
+#               checked-out HEAD. That is the rollback target, whether it was
+#               deployed by this script or by hand (tag "local").
+#   snapshot    right before the deploy command, the target's three images get
+#               a second tag, :cd-rollback. deploy.sh may rebuild the target's
+#               own tag in place (re-deploying the same commit); the snapshot
+#               is what rollback restores from.
 #   check out   git checkout --detach <sha>
 #   deploy      OJ_IMAGE_TAG=<short-sha> $CD_DEPLOY_CMD
 #   verify      loopback /api/health/ready is ready, and the newest
 #               schema_migrations row is not behind the migrations shipped in
 #               the checkout
-#   roll back   on any failure: previous working tree AND previous images,
-#               brought up without building, then re-verified. The database is
+#   roll back   on any failure: previous working tree AND previous images
+#               (from the snapshot), brought up without building, then fully
+#               re-verified (readiness and migrations). The database is
 #               never restored automatically.
 #   prune       old oj-* image tags, by name, keeping this and the previous
-#               release (and :local, which manual deploys use)
+#               release (and :local and :cd-rollback)
 #
 # Other exit codes: 0 ok, 1 usage error or the database could not be queried
 # (fails closed), 20 backup failed (nothing changed), 21 deploy failed and was
@@ -52,6 +59,8 @@
 #   CD_DB_USER, CD_DB_NAME     psql credentials (default: $POSTGRES_USER /
 #                              $POSTGRES_DB from the checkout's .env)
 #   CD_BACKUP_KEEP             backups to retain, at least 1 (default 3)
+#   CD_BACKUP_TIMEOUT_SECONDS  wall-clock cap on pg_dump, at least 1; a timeout
+#                              is a backup failure, exit 20 (default 1800)
 #   CD_DEPLOY_CMD              deploy command, run in the checkout with
 #                              OJ_IMAGE_TAG set (default ./deploy.sh)
 #   CD_COMPOSE_FILES           compose -f arguments used for rollback (default
@@ -80,6 +89,8 @@ SUBMISSION_IN_FLIGHT_STATUSES="'Compiling','Running'"
 
 QUEUE_POLL_SECONDS=2
 HEALTH_POLL_SECONDS=2
+# Second tag on the rollback target's images; see "snapshot" in the header.
+SNAPSHOT_TAG=cd-rollback
 
 # deploy.sh is bound to this host (certificate, tunnel); the loopback probe
 # resolves it to 127.0.0.1 the same way deploy.sh does.
@@ -108,10 +119,22 @@ env_file_value() {
     sed -n "s/^$1=//p" "$REPO_DIR/.env" | tail -n 1
 }
 
+# Prints the database container, by NAME (an ID goes stale when a deploy
+# recreates the service). CD_DB_CONTAINER overrides. Empty when not found.
+find_db_container() {
+    if [ -n "${CD_DB_CONTAINER:-}" ]; then
+        printf '%s' "$CD_DB_CONTAINER"
+        return 0
+    fi
+    name=$(cd "$REPO_DIR" && docker compose ps --format '{{.Name}}' database 2>/dev/null | head -n 1) || name=
+    [ -n "$name" ] || name=$(cd "$REPO_DIR" && docker compose ps -q database 2>/dev/null | head -n 1) || name=
+    printf '%s' "$name"
+}
+
 resolve_database() {
     DB_USER=${CD_DB_USER:-${POSTGRES_USER:-$(env_file_value POSTGRES_USER)}}
     DB_NAME=${CD_DB_NAME:-${POSTGRES_DB:-$(env_file_value POSTGRES_DB)}}
-    DB_CONTAINER=${CD_DB_CONTAINER:-$(cd "$REPO_DIR" && docker compose ps -q database 2>/dev/null | head -n 1)}
+    DB_CONTAINER=$(find_db_container)
     [ -n "$DB_USER" ] && [ -n "$DB_NAME" ] || die "database user/name unknown (set CD_DB_USER and CD_DB_NAME or POSTGRES_USER/POSTGRES_DB in .env)"
     [ -n "$DB_CONTAINER" ] || die "database container not found (is the compose stack up? or set CD_DB_CONTAINER)"
 }
@@ -214,6 +237,8 @@ guard_judge_queue() {
 preflight() {
     require_uint CD_BACKUP_KEEP "$BACKUP_KEEP"
     [ "$BACKUP_KEEP" -ge 1 ] || die "CD_BACKUP_KEEP must be at least 1, got '$BACKUP_KEEP'"
+    require_uint CD_BACKUP_TIMEOUT_SECONDS "$BACKUP_TIMEOUT"
+    [ "$BACKUP_TIMEOUT" -ge 1 ] || die "CD_BACKUP_TIMEOUT_SECONDS must be at least 1, got '$BACKUP_TIMEOUT'"
     guard_clean_tree
     guard_sha_on_main
     guard_disk
@@ -243,9 +268,9 @@ backup_database() {
     BACKUP_FILE="$BACKUP_DIR/pre-deploy-$SHORT_SHA-$ts.dump"
     log "backing up $DB_NAME to $BACKUP_FILE"
     mkdir -p "$BACKUP_DIR" || refuse "$EXIT_BACKUP" "cannot create backup directory $BACKUP_DIR"
-    if ! docker exec "$DB_CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc >"$BACKUP_FILE"; then
+    if ! docker exec "$DB_CONTAINER" timeout "$BACKUP_TIMEOUT" pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc >"$BACKUP_FILE"; then
         rm -f "$BACKUP_FILE"
-        refuse "$EXIT_BACKUP" "pg_dump failed"
+        refuse "$EXIT_BACKUP" "pg_dump failed or exceeded ${BACKUP_TIMEOUT}s (CD_BACKUP_TIMEOUT_SECONDS)"
     fi
     if ! docker exec -i "$DB_CONTAINER" pg_restore -l <"$BACKUP_FILE" >/dev/null; then
         rm -f "$BACKUP_FILE"
@@ -275,31 +300,44 @@ running_tag() {
     printf '%s' "${image##*:}"
 }
 
-# Sets PREV_TAG / PREV_SHA from .last-release when it still describes what is
-# running; otherwise leaves them empty (no rollback target). A manual
-# ./deploy.sh builds :local over the recorded images, which is how the file
-# goes stale, so it is checked against the running containers.
+# Records the running release in .last-release and sets PREV_TAG / PREV_SHA
+# from live state: the backend container's image tag and the checked-out HEAD.
+# Nothing running means no rollback target. A hand-built release has tag
+# "local"; that works as a target because a CD deploy tags by sha and never
+# rebuilds :local.
 load_rollback_target() {
-    PREV_TAG=
+    PREV_TAG=$(running_tag)
     PREV_SHA=
-    if [ ! -f "$LAST_RELEASE" ]; then
-        log "WARNING: no rollback target (no $LAST_RELEASE); a failed deploy cannot be rolled back"
+    if [ -z "$PREV_TAG" ]; then
+        log "WARNING: no rollback target (no running $(image_repo backend) container found); a failed deploy cannot be rolled back"
         return 0
     fi
-    tag=$(sed -n 1p "$LAST_RELEASE")
-    sha=$(sed -n 2p "$LAST_RELEASE")
-    if [ -z "$tag" ] || [ -z "$sha" ]; then
-        log "WARNING: no rollback target ($LAST_RELEASE is malformed); a failed deploy cannot be rolled back"
-        return 0
+    PREV_SHA=$(git -C "$REPO_DIR" rev-parse HEAD) || die "cannot read HEAD of $REPO_DIR"
+    printf '%s\n%s\n' "$PREV_TAG" "$PREV_SHA" >"$LAST_RELEASE"
+    log "rollback target: tag $PREV_TAG at $PREV_SHA (recorded in $LAST_RELEASE)"
+}
+
+# Gives the target's images a second tag so deploy.sh rebuilding the target's
+# own tag in place (same commit deployed again) cannot destroy them. SNAPSHOT_OK
+# is 1 only when all three were tagged by THIS run; a stale snapshot from an
+# earlier deploy is removed first and never trusted.
+snapshot_rollback_target() {
+    SNAPSHOT_OK=0
+    SNAPSHOT_MISSING=
+    for svc in $IMAGE_SERVICES; do
+        docker rmi "$(image_repo "$svc"):$SNAPSHOT_TAG" >/dev/null 2>&1 || true
+    done
+    [ -n "$PREV_TAG" ] || return 0
+    for svc in $IMAGE_SERVICES; do
+        repo=$(image_repo "$svc")
+        docker tag "$repo:$PREV_TAG" "$repo:$SNAPSHOT_TAG" >/dev/null 2>&1 ||
+            SNAPSHOT_MISSING="$SNAPSHOT_MISSING $repo:$PREV_TAG"
+    done
+    if [ -z "$SNAPSHOT_MISSING" ]; then
+        SNAPSHOT_OK=1
+    else
+        log "WARNING: cannot snapshot the rollback target, image(s) not found:$SNAPSHOT_MISSING"
     fi
-    running=$(running_tag)
-    if [ "$running" != "$tag" ]; then
-        log "WARNING: no rollback target ($LAST_RELEASE says '$tag' but '${running:-nothing}' is running, probably a manual deploy); a failed deploy cannot be rolled back"
-        return 0
-    fi
-    PREV_TAG=$tag
-    PREV_SHA=$sha
-    log "rollback target: tag $PREV_TAG at $PREV_SHA"
 }
 
 probe_health() {
@@ -320,6 +358,9 @@ wait_healthy() {
 # against a newer schema by design. Versions look like 0024_header_problems,
 # files like 0024HeaderProblems.ts; the four-digit prefix is the comparable part.
 check_migrations() {
+    # The deploy may have recreated the database service.
+    DB_CONTAINER=$(find_db_container)
+    [ -n "$DB_CONTAINER" ] || { log "database container not found after the deploy"; return 1; }
     shipped=$(ls "$REPO_DIR/backend/migrations" 2>/dev/null | sed -n 's/^\([0-9]\{4\}\).*\.ts$/\1/p' | sort | tail -n 1)
     [ -n "$shipped" ] || { log "no migration files found in $REPO_DIR/backend/migrations"; return 1; }
     applied=$(db_scalar "SELECT coalesce(max(substr(version, 1, 4)), '') FROM schema_migrations") || return 1
@@ -345,6 +386,7 @@ rollback_failed() {
     log "State: the checkout is at $(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown); the site may be down or on the failed release."
     log "The database was NOT restored. Pre-deploy backup: ${BACKUP_FILE:-none}"
     if [ -n "$PREV_TAG" ]; then
+        log "Caveat: tag '$PREV_TAG' images are only known to match $PREV_SHA if nobody checked out a different commit after building them (true for ':local' built by hand)."
         log "To restore by hand: cd $REPO_DIR && git checkout --detach $PREV_SHA && OJ_IMAGE_TAG=$PREV_TAG docker compose $COMPOSE_FILES up -d --no-build"
     else
         log "There was no rollback target. Fix forward, or restore a known-good commit with ./deploy.sh."
@@ -353,18 +395,18 @@ rollback_failed() {
 }
 
 rollback() {
-    [ -n "$PREV_TAG" ] || rollback_failed "no rollback target: the previous release was not recorded"
+    [ -n "$PREV_TAG" ] || rollback_failed "no rollback target: no running release was found before the deploy"
+    [ "$SNAPSHOT_OK" = 1 ] || rollback_failed "rollback target is missing, image(s) not found:$SNAPSHOT_MISSING"
     log "rolling back to tag $PREV_TAG ($PREV_SHA)"
-    missing=
-    for svc in $IMAGE_SERVICES; do
-        docker image inspect "$(image_repo "$svc"):$PREV_TAG" >/dev/null 2>&1 ||
-            missing="$missing $(image_repo "$svc"):$PREV_TAG"
-    done
-    [ -z "$missing" ] || rollback_failed "rollback target is missing, image(s) not found:$missing"
     git -C "$REPO_DIR" checkout --quiet --detach "$PREV_SHA" || rollback_failed "git checkout $PREV_SHA failed"
+    for svc in $IMAGE_SERVICES; do
+        repo=$(image_repo "$svc")
+        docker tag "$repo:$SNAPSHOT_TAG" "$repo:$PREV_TAG" || rollback_failed "restoring $repo:$PREV_TAG from the snapshot failed"
+    done
     OJ_IMAGE_TAG=$PREV_TAG compose up -d --no-build --remove-orphans || rollback_failed "docker compose up with tag $PREV_TAG failed"
-    # Only readiness: the schema may legitimately be ahead of the old tree.
-    verify_release 0 || rollback_failed "the previous release did not become healthy"
+    # Full verification: with the old tree back, "migrations not behind" holds
+    # by construction, and readiness alone once let a broken build pass.
+    verify_release 1 || rollback_failed "the previous release did not verify (readiness or migrations)"
     log "ROLLBACK OK: tag $PREV_TAG at $PREV_SHA is running again (the database was not restored)"
     exit "$EXIT_ROLLED_BACK"
 }
@@ -377,7 +419,7 @@ prune_images() {
     for svc in $IMAGE_SERVICES; do
         repo=$(image_repo "$svc")
         docker image ls --format '{{.Tag}}' "$repo" | sort -u | while read -r tag; do
-            case $tag in "$NEW_TAG" | "$PREV_TAG" | local | '<none>') continue ;; esac
+            case $tag in "$NEW_TAG" | "$PREV_TAG" | local | "$SNAPSHOT_TAG" | '<none>') continue ;; esac
             if docker rmi "$repo:$tag" >/dev/null 2>&1; then log "pruned image $repo:$tag"; fi
         done
     done
@@ -394,6 +436,7 @@ deploy() {
     log "checking out $SHA"
     git -C "$REPO_DIR" checkout --quiet --detach "$SHA" || die "git checkout $SHA failed (nothing was deployed)"
 
+    snapshot_rollback_target
     log "deploying with OJ_IMAGE_TAG=$NEW_TAG: $DEPLOY_CMD"
     if ! (cd "$REPO_DIR" && OJ_IMAGE_TAG=$NEW_TAG sh -c "$DEPLOY_CMD"); then
         log "deploy command failed"
@@ -418,6 +461,7 @@ main() {
     # In the checkout root; git-ignored, so it never dirties the tree.
     LAST_RELEASE=$REPO_DIR/.last-release
     BACKUP_KEEP=${CD_BACKUP_KEEP-3}
+    BACKUP_TIMEOUT=${CD_BACKUP_TIMEOUT_SECONDS-1800}
     DEPLOY_CMD=${CD_DEPLOY_CMD:-./deploy.sh}
     COMPOSE_FILES=${CD_COMPOSE_FILES:--f docker-compose.yml -f docker-compose.production.yml}
     IMAGE_PREFIX=${CD_IMAGE_PREFIX:-oj}
