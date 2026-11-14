@@ -65,8 +65,9 @@ automatic rollback. The script's header documents every environment variable.
 4. Watch the "Run scripts/cd-deploy.sh on the server" step. The first line of
    its output is the path of the run log on the server.
 
-Two approved deploys queue (one concurrency group); the second never interrupts
-the first.
+Deploys share one concurrency group and never cancel a running one. At most one
+waits behind it: GitHub keeps a single pending run, so a third approval cancels
+the second.
 
 ## A deploy failed: what now
 
@@ -78,11 +79,11 @@ anything**: production is exactly as it was.
 |---|---|---|---|
 | 0 | Deployed | New release live | Nothing |
 | 1 | Usage error, a database/internal failure (fails closed), or the run log could not be written | Unchanged | Read the message; fix the cause (database container down, an invalid `CD_*` value, disk full) and re-run |
-| 10 | A contest is running or finishing | Unchanged | Re-run after it ends. Operator override: `ALLOW_DURING_CONTEST=1` on the server (restarts the stack under people being graded; only with a good reason) |
+| 10 | A contest is running or finishing | Unchanged | Re-run after it ends. Operator override, only by running the script by hand on the server (the workflow passes no environment): `ALLOW_DURING_CONTEST=1 scripts/cd-deploy.sh <sha>`. It restarts the stack under people being graded; only with a good reason |
 | 11 | The judge queue did not drain: submissions still Compiling/Running after `CD_QUEUE_WAIT_SECONDS` (default 300) | Unchanged | Re-run in a quiet moment; a restart would turn those into System Errors |
 | 12 | Free disk below `CD_MIN_FREE_GB` (default 5) | Unchanged | Free space, re-run |
 | 13 | The production tree has modified **tracked** files | Unchanged | `git -C /srv/docker/apps/OJ status`; commit, revert or stash the edit on the server, re-run. Untracked files (`.env`, `backups/`) are fine |
-| 14 | The SHA is not an ancestor of `origin/main` | Unchanged | The commit is not on `main` (for instance it was force-pushed away); deploy one that is |
+| 14 | The SHA is not an ancestor of `origin/main` | Unchanged | The commit is not on `main` (for instance it was force-pushed away); deploy one that is. (A failed `git fetch` is not 14: it exits 1) |
 | 20 | The backup failed or could not be verified (`pg_dump` error or timeout, or `pg_restore -l` could not read it) | Unchanged | Check the database container and disk; re-run. The script never deploys without a backup |
 | 21 | The deploy failed **and was rolled back** | Previous release running again and re-verified; database not restored | Read the run log to see why it failed, fix on `main`, redeploy |
 | 22 | The deploy failed **and the rollback also failed** | **May be down or on a broken release. Needs hands now** | See "Rollback failed" below |
@@ -90,7 +91,7 @@ anything**: production is exactly as it was.
 Exit **255** is SSH itself (network, host key mismatch, key rejected, or a
 dropped connection), not the script. The script ignores `SIGHUP` and `SIGPIPE`
 and writes its log straight to a file, so **a dropped SSH session leaves it
-running to completion, rollback included.** The Actions run can show a failure
+running to completion, rollback included.** (That covers a hangup only: a `SIGKILL` or an out-of-memory kill of the script itself is not survived.) The Actions run can show a failure
 while the deploy actually succeeded or rolled back. Check the server before
 doing anything:
 
@@ -113,7 +114,7 @@ previous release is also in `.last-release`: line 1 image tag, line 2 commit):
 cd /srv/docker/apps/OJ
 git checkout --detach <previous-sha>
 OJ_IMAGE_TAG=<previous-tag> docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --no-build
-curl -fsS --resolve nonbangkokgrader.com:443:127.0.0.1 https://nonbangkokgrader.com/api/health/ready
+curl -fsS --resolve nonbangkokgrader.com:443:127.0.0.1 https://nonbangkokgrader.com/api/health/ready   # use your HTTPS_PORT from .env instead of 443 if it is set
 ```
 
 If there was no rollback target (nothing was running before), fix forward or
@@ -153,14 +154,32 @@ step on a real incident):
 
 ```bash
 cd /srv/docker/apps/OJ
-docker compose -f docker-compose.yml -f docker-compose.production.yml stop backend
-docker exec -i <database-container> pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  --clean --if-exists --single-transaction < backups/pre-deploy-<sha>-<timestamp>.dump
+P="-f docker-compose.yml -f docker-compose.production.yml"   # the production pair; plain `docker compose` would not see this stack's overlay
+# 1. Find the database container.
+docker compose $P ps --format '{{.Name}}' database
+# 2. Stop the database's clients (the backend; the one-shot migrate service
+#    only runs at deploy time). The authoring runner has no network.
+docker compose $P stop backend
+# 3. Restore. POSTGRES_USER / POSTGRES_DB are read INSIDE the container, where
+#    they are set, so nothing depends on your shell's environment.
+docker exec -i <database-container> sh -c \
+  'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --single-transaction' \
+  < backups/pre-deploy-<sha>-<timestamp>.dump
 ```
 
-Then start the previous release as above. The database container name comes
-from `docker compose ps database`; credentials are `POSTGRES_USER` /
-`POSTGRES_DB` in the checkout's `.env`.
+Any other session still connected to the database (a `psql` left open, say)
+can make `--clean` wait on a lock; find and close it rather than waiting it out.
+If `pg_restore` aborts for any reason, `--single-transaction` leaves the database
+exactly as it was, so you can fix the cause and run it again.
+
+Then start the previous release with the "Rollback failed" commands above.
+**Do not take the values from `.last-release` in this scenario:** the release
+that ran the bad migration verified, so `.last-release` has already been
+overwritten with the NEW tag and commit. Get the previous values from the
+previous deploy's run log (`ls -t backups/cd-deploy-*.log`, the "rollback
+target:" line) or from `git log`; the previous tag is the first
+twelve characters of the previous commit (or `local` if that release was built
+by hand).
 
 ## Rollback rehearsal on the production host: NOT YET DONE
 

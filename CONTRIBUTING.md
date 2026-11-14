@@ -41,7 +41,7 @@ script for normal development.
 
 ## Branch model
 
-Development happens directly on **`master`** (short-lived feature branches are
+Development happens directly on **`main`** (short-lived feature branches are
 merged into it after verification; there is currently no separate integration
 branch).
 
@@ -54,11 +54,11 @@ Use descriptive branch names, e.g. `feature/contest-export`, `fix/pdf-idor`,
 
 ## Development workflow
 
-1. Create a short-lived branch from `master`.
+1. Create a short-lived branch from `main`.
 2. Make focused changes that stay within one concern.
 3. Add or update tests for the code you touch (see below).
 4. Run the type-checks, linters, and tests locally until they pass.
-5. Open a PR against `master` with a clear description of the what and the why.
+5. Open a PR against `main` with a clear description of the what and the why.
 
 ### Backend (`backend/`)
 
