@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
 import { after, before, beforeEach, test } from 'node:test';
@@ -474,16 +474,17 @@ test('invalid CD_BACKUP_KEEP exits 1 before anything is changed', async () => {
   assert.equal(head(), shaA);
 });
 
-test('the run survives its console reader going away mid-deploy and logs the verdict', async () => {
-  // A dropped SSH session without a pty closes the pipes the script writes to.
-  // The deploy command outlives the reader, fails, and the rollback must still
-  // run to completion, with the final verdict in the run log.
+// A dropped SSH session without a pty closes the pipes the script writes to.
+// The deploy command outlives the reader and fails; the script must still run
+// to completion, and the run log must hold the final verdict.
+const runWithReaderClosedMidDeploy = async (prepare) => {
   const slowFail = path.join(workDir, 'deploy-slow-fail.sh');
   writeFileSync(
     slowFail,
     '#!/bin/sh\necho "stub deploy started"\ntouch "$CD_TEST_STUB_RAN"\nsleep 4\necho "stub deploy still writing after the reader closed"\nexit 1\n',
     { mode: 0o755 },
   );
+  if (prepare) prepare();
   const child = spawn('sh', [script, shaB], { cwd: repositoryRoot, env: baseEnv({ CD_DEPLOY_CMD: slowFail }) });
   let consoleOut = '';
   child.stdout.on('data', (d) => { consoleOut += d; });
@@ -495,14 +496,60 @@ test('the run survives its console reader going away mid-deploy and logs the ver
   child.stderr.destroy();
   const { status, signal } = await closed;
   assert.equal(signal, null);
-  assert.equal(status, 21, consoleOut);
-  assert.equal(head(), shaA);
-  assertRunning(OLD_TAG);
   const logName = readdirSync(path.join(repo, 'backups')).find((name) => /^cd-deploy-.*\.log$/.test(name));
   assert.ok(logName, 'run log written');
   const logged = readFileSync(path.join(repo, 'backups', logName), 'utf8');
   assert.match(logged, /stub deploy still writing after the reader closed/);
   assert.match(logged, /DEPLOY FAILED/);
-  assert.match(logged, /ROLLBACK OK/);
   assert.match(logged, /Full log of this run on the server/);
+  return { status, logged, consoleOut };
+};
+
+test('exit 21 survives the console reader going away mid-deploy and the log holds the verdict', async () => {
+  const { status, logged, consoleOut } = await runWithReaderClosedMidDeploy();
+  assert.equal(status, 21, consoleOut);
+  assert.equal(head(), shaA);
+  assertRunning(OLD_TAG);
+  assert.match(logged, /ROLLBACK OK/);
+});
+
+test('exit 22 survives the console reader going away mid-deploy and the log holds the verdict', async () => {
+  const { status, logged, consoleOut } = await runWithReaderClosedMidDeploy(() =>
+    run('docker', ['rmi', '-f', ...imageRefs(OLD_TAG)]),
+  );
+  assert.equal(status, 22, consoleOut);
+  assert.match(logged, /ROLLBACK FAILED/);
+  assert.match(logged, /rollback target is missing/);
+  assert.match(logged, /database was NOT restored/);
+});
+
+test('an unwritable run log fails loudly before anything is changed', { skip: process.getuid?.() === 0 }, async () => {
+  const backupDir = path.join(repo, 'backups');
+  mkdirSync(backupDir);
+  chmodSync(backupDir, 0o555);
+  try {
+    const r = await runScript(shaB);
+    assert.equal(r.status, 1, r.out);
+    assert.match(r.out, /cannot write the run log/);
+  } finally {
+    chmodSync(backupDir, 0o755);
+  }
+  assert.ok(!existsSync(stubRan), 'deploy command must not run');
+  assert.equal(head(), shaA);
+});
+
+test('a console that is already closed cannot kill a run that has no log (SIGPIPE is ignored)', async () => {
+  // backups is a file, so no run log can be created and output stays on stdout.
+  writeFileSync(path.join(repo, 'backups'), 'not a directory\n');
+  const statusFile = path.join(workDir, 'closed-console-status');
+  rmSync(statusFile, { force: true });
+  // The reader (`true`) exits at once, so every write by the script hits a closed pipe.
+  const child = spawn('sh', ['-c', '(sleep 1; sh "$0" "$1"; echo $? >"$2") 2>&1 | true', script, shaB, statusFile], {
+    cwd: repositoryRoot,
+    env: baseEnv(),
+  });
+  await new Promise((resolve) => child.on('close', resolve));
+  for (let i = 0; i < 100 && !existsSync(statusFile); i += 1) await new Promise((r) => setTimeout(r, 100));
+  assert.equal(readFileSync(statusFile, 'utf8').trim(), '20');
+  assert.ok(!existsSync(stubRan));
 });
