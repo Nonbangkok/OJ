@@ -180,6 +180,16 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml config --q
 ./deploy.sh
 ```
 
+### Continuous deployment
+
+Pushes to `main` that pass CI can be deployed by approving the **Deploy**
+workflow run in GitHub (it waits on the `production` environment's required
+reviewers). The server runs `scripts/cd-deploy.sh`, which checks that no contest
+is running, backs up the database, calls `./deploy.sh`, verifies the result and
+rolls back automatically if it fails. `deploy.sh` remains the way to deploy by
+hand. How to approve, read a failed deploy and restore a backup:
+[docs/runbooks/continuous-deployment.md](docs/runbooks/continuous-deployment.md).
+
 Upgrading an existing Postgres 16 deployment to Postgres 18 is a one-time manual
 migration: `deploy.sh` refuses to start until it is done. Follow
 [docs/runbooks/postgres-18-upgrade.md](docs/runbooks/postgres-18-upgrade.md).

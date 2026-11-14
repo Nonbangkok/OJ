@@ -143,6 +143,16 @@ Everything runs in a throwaway Docker image built by `run.sh`; it carries the
 same `g++` major version as the judge so measured times mean something. The
 image and `dist/` are git-ignored build artifacts.
 
+## After your commit lands on `main`
+
+CI runs on every push to `main`. When it is green, the **Deploy** workflow
+offers the commit for production and waits for a maintainer to approve it; it
+then deploys with a database backup and an automatic rollback if the release
+does not verify. Nothing deploys without that approval, and a deploy is refused
+while a contest is running. Do not edit tracked files on the production server
+by hand (a modified tree blocks deploys). Details:
+[docs/runbooks/continuous-deployment.md](docs/runbooks/continuous-deployment.md).
+
 ## Coding conventions
 
 These mirror the existing codebase — match the surrounding style.
