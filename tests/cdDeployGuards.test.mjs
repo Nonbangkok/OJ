@@ -34,6 +34,20 @@ const repo = path.join(workDir, 'repo');
 let headSha;
 let offMainSha;
 
+// The image's init server answers briefly before the real one starts, so a bare
+// "psql succeeded" can be a false positive: wait for init to finish, then for
+// the final server. (Both CD suites run in the same `node --test` invocation and
+// start their containers at the same time, so startup can be slow.)
+const waitForPostgres = () => {
+  for (let i = 0; i < 90; i += 1) {
+    const logs = run('docker', ['logs', container]);
+    const ready = `${logs.stdout}${logs.stderr}`.includes('PostgreSQL init process complete');
+    if (ready && run('docker', ['exec', container, 'psql', '-U', 'postgres', '-d', 'postgres', '-c', 'select 1']).status === 0) return;
+    spawnSync('sleep', ['1']);
+  }
+  assert.fail(`postgres in ${container} never became ready`);
+};
+
 before(() => {
   // git: bare origin + clone with a tracked file, main pushed, plus a commit
   // that only exists on a side branch (not an ancestor of origin/main).
@@ -54,11 +68,7 @@ before(() => {
   git(repo, 'checkout', 'main');
 
   must('docker', ['run', '-d', '--name', container, '-e', 'POSTGRES_PASSWORD=x', 'postgres:18-alpine']);
-  for (let i = 0; i < 60; i += 1) {
-    const r = run('docker', ['exec', container, 'psql', '-U', 'postgres', '-d', 'postgres', '-c', 'select 1']);
-    if (r.status === 0) break;
-    spawnSync('sleep', ['1']);
-  }
+  waitForPostgres();
   sql('CREATE TABLE contests (id serial PRIMARY KEY, status varchar(20) NOT NULL)');
   sql('CREATE TABLE submissions (id serial PRIMARY KEY, overall_status varchar(50) NOT NULL)');
 });
@@ -80,6 +90,10 @@ const env = (extra = {}) => ({
   CD_DOCKER_ROOT_DIR: workDir,
   CD_MIN_FREE_GB: '0',
   CD_QUEUE_WAIT_SECONDS: '2',
+  // A dry run now records and snapshots the rollback target, so it touches
+  // image tags: keep those under a throwaway prefix, never the real `oj-*`.
+  CD_IMAGE_PREFIX: `ojcdguard${runId}`,
+  CD_COMPOSE_FILES: '-f docker-compose.does-not-exist.yml',
   ...extra,
 });
 
@@ -93,6 +107,17 @@ test('all clear exits 0', () => {
   reset();
   const r = runScript(headSha);
   assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+test('a dry run says whether a rollback would be possible', () => {
+  reset();
+  // Nothing is running in this fixture (there is no compose project at all),
+  // which is exactly the state in which a deploy cannot be rolled back.
+  const r = runScript(headSha);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const out = r.stdout + r.stderr;
+  assert.match(out, /dry run: a deploy right now COULD NOT BE ROLLED BACK, no running release was found/);
+  assert.match(out, /dry run: the only state created is/);
 });
 
 test('running contest exits 10; ALLOW_DURING_CONTEST=1 overrides', () => {

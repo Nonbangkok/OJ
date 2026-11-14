@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
 import { after, before, beforeEach, test } from 'node:test';
@@ -65,6 +65,34 @@ const tagAll = (tag) => {
   for (const ref of imageRefs(tag)) must('docker', ['tag', `${prefix}-backend:${OLD_TAG}`, ref]);
 };
 
+// Each release's proxy configuration answers with its own release name, so what
+// the running proxy serves says which release's configuration it has LOADED
+// (unlike `nginx -T`, which re-reads the files on disk).
+const proxyConf = (release) =>
+  `server {\n    listen 8080;\n    location / {\n        return 200 "${release}\\n";\n    }\n}\n`;
+const proxyCid = () =>
+  must('docker', ['compose', '-p', project, '-f', 'docker-compose.yml', 'ps', '-q', 'nginx-proxy'], { cwd: repo });
+const proxyServes = () => {
+  let last = '';
+  // A reload hands over to new workers asynchronously.
+  for (let i = 0; i < 30; i += 1) {
+    const r = run('docker', ['exec', proxyCid(), 'wget', '-qO-', 'http://127.0.0.1:8080/']);
+    last = r.status === 0 ? r.stdout.trim() : `wget failed: ${r.stderr.trim()}`;
+    if (r.status === 0) return last;
+    spawnSync('sleep', ['0.3']);
+  }
+  return last;
+};
+const proxyServesEventually = (expected) => {
+  let last = '';
+  for (let i = 0; i < 30; i += 1) {
+    last = proxyServes();
+    if (last === expected) return last;
+    spawnSync('sleep', ['0.3']);
+  }
+  return last;
+};
+
 // Image of each running container of the throwaway project, by service.
 const runningImages = () => {
   const out = {};
@@ -97,19 +125,28 @@ before(() => {
   const composeYml = services
     .map((s) => `  ${s}:\n    image: ${prefix}-${s}:\${OJ_IMAGE_TAG:-local}\n    command: ["sleep", "3600"]\n`)
     .join('');
+  // Stands in for the real nginx-proxy: stock nginx whose configuration is
+  // bind-mounted FROM THE CHECKOUT and differs between the two releases. Its
+  // compose spec never changes, so `up -d` neither recreates nor reloads it --
+  // the hole the rollback's explicit restore of the proxy closes.
+  const proxyYml =
+    `  nginx-proxy:\n    image: nginx:1.30-alpine\n    volumes:\n` +
+    '      - ./proxy.conf:/etc/nginx/conf.d/default.conf:ro\n';
   // Optional database service (profile "db", off unless COMPOSE_PROFILES=db).
   // DEPLOY_MARK changes with the image tag, so a deploy recreates it.
   const databaseYml =
     '  database:\n    image: postgres:18-alpine\n    profiles: ["db"]\n    environment:\n' +
     '      POSTGRES_PASSWORD: x\n      DEPLOY_MARK: ${OJ_IMAGE_TAG:-local}\n' +
     '    volumes:\n      - dbdata:/var/lib/postgresql\n';
-  writeFileSync(path.join(repo, 'docker-compose.yml'), `services:\n${composeYml}${databaseYml}volumes:\n  dbdata:\n`);
+  writeFileSync(path.join(repo, 'docker-compose.yml'), `services:\n${composeYml}${proxyYml}${databaseYml}volumes:\n  dbdata:\n`);
   mkdirSync(path.join(repo, 'backend/migrations'), { recursive: true });
   writeFileSync(path.join(repo, 'backend/migrations/0001Core.ts'), '// 1\n');
+  writeFileSync(path.join(repo, 'proxy.conf'), proxyConf('A'));
   git('add', '.');
   git('commit', '-m', 'A');
   git('branch', '-M', 'main');
   writeFileSync(path.join(repo, 'backend/migrations/0002More.ts'), '// 2\n');
+  writeFileSync(path.join(repo, 'proxy.conf'), proxyConf('B'));
   writeFileSync(path.join(repo, 'release.txt'), 'B\n');
   git('add', '.');
   git('commit', '-m', 'B');
@@ -218,6 +255,54 @@ test('failed deploy exits 21 and restores the previous images and working tree',
   assert.match(r.out.split('\n')[0], /log file: .*cd-deploy-/);
   assert.match(readFileSync(path.join(repo, 'backups', logName), 'utf8'), /ROLLBACK OK/);
   assert.match(r.out, /Full log of this run on the server: .*cd-deploy-/);
+});
+
+test('rollback prunes the failed release images and keeps the previous ones', async () => {
+  const r = await runScript(shaB, { CD_DEPLOY_CMD: failStub });
+  assert.equal(r.status, 21, r.out);
+  const refs = allImageRefs();
+  // Without this, every failed deploy leaks three images on a disk the disk
+  // guard protects, until a later deploy is refused with exit 12.
+  for (const ref of [...imageRefs(newTag), ...imageRefs('old1')]) assert.ok(!refs.includes(ref), `${ref} pruned`);
+  for (const ref of [...imageRefs(OLD_TAG), ...imageRefs('cd-rollback')]) assert.ok(refs.includes(ref), `${ref} kept`);
+});
+
+test('rollback restores nginx-proxy, so the proxy serves the restored release configuration', async () => {
+  const observed = path.join(workDir, 'proxy-observed');
+  rmSync(observed, { force: true });
+  const stub = path.join(workDir, 'deploy-proxy-fail.sh');
+  // Mirrors deploy.sh: bring the stack up, then apply the new release's proxy
+  // configuration with `nginx -s reload`. Then it fails, having recorded what
+  // the proxy serves, so the test can tell a real restore from a vacuous pass.
+  writeFileSync(
+    stub,
+    [
+      '#!/bin/sh',
+      'touch "$CD_TEST_STUB_RAN"',
+      `docker compose -p ${project} -f docker-compose.yml up -d --no-build`,
+      `p=$(docker compose -p ${project} -f docker-compose.yml ps -q nginx-proxy)`,
+      'docker exec "$p" nginx -s reload',
+      'i=0',
+      'while [ "$i" -lt 20 ]; do',
+      '    out=$(docker exec "$p" wget -qO- http://127.0.0.1:8080/ 2>/dev/null || echo ERR)',
+      `    printf '%s' "$out" > ${JSON.stringify(observed)}`,
+      '    case $out in B*) break ;; esac',
+      '    sleep 1',
+      '    i=$((i + 1))',
+      'done',
+      'exit 1',
+      '',
+    ].join('\n'),
+    { mode: 0o755 },
+  );
+  assert.equal(proxyServes(), 'A', 'release A is loaded before the deploy');
+  const r = await runScript(shaB, { CD_DEPLOY_CMD: stub });
+  assert.equal(r.status, 21, r.out);
+  assert.equal(readFileSync(observed, 'utf8').trim(), 'B', 'the failed deploy really did load release B');
+  assert.match(r.out, /nginx-proxy recreated onto the restored configuration/);
+  // `compose up -d --no-build` alone leaves the proxy on release B: only the
+  // rollback's explicit restore brings it back.
+  assert.equal(proxyServesEventually('A'), 'A');
 });
 
 test('rollback target images missing exits 22 and says what to do by hand', async () => {
@@ -521,6 +606,106 @@ test('exit 22 survives the console reader going away mid-deploy and the log hold
   assert.match(logged, /ROLLBACK FAILED/);
   assert.match(logged, /rollback target is missing/);
   assert.match(logged, /database was NOT restored/);
+});
+
+test('a dry run reports that a rollback would be possible, and deploys nothing', async () => {
+  rmSync(path.join(repo, '.last-release'), { force: true });
+  const r = await runScript(shaB, { CD_DRY_RUN: '1' });
+  assert.equal(r.status, 0, r.out);
+  assert.match(r.out, new RegExp(`dry run: a failed deploy COULD be rolled back, to tag ${OLD_TAG} at ${shaA}`));
+  assert.match(r.out, /dry run: the only state created is/);
+  // The snapshot is the only way to know, so a dry run creates it (and
+  // .last-release) -- and nothing else.
+  const refs = allImageRefs();
+  for (const ref of imageRefs('cd-rollback')) assert.ok(refs.includes(ref), `${ref} created`);
+  assert.equal(readFileSync(path.join(repo, '.last-release'), 'utf8'), `${OLD_TAG}\n${shaA}\n`);
+  assert.equal(head(), shaA);
+  assertRunning(OLD_TAG);
+  assert.deepEqual(dumps(), []);
+  assert.ok(!existsSync(stubRan), 'deploy command must not run');
+});
+
+test('a dry run says plainly when a deploy could NOT be rolled back', async () => {
+  // The production host as it stands: the backend runs :local but the other
+  // two images have no such tag, so there is nothing to snapshot.
+  run('docker', ['rmi', '-f', ...imageRefs(OLD_TAG).slice(1)]);
+  const r = await runScript(shaB, { CD_DRY_RUN: '1' });
+  assert.equal(r.status, 0, r.out);
+  assert.match(r.out, /WARNING: THIS DEPLOY CANNOT BE ROLLED BACK/);
+  assert.match(r.out, new RegExp(`${prefix}-frontend:${OLD_TAG}`));
+  assert.match(r.out, new RegExp(`${prefix}-authoring-runner:${OLD_TAG}`));
+  assert.match(r.out, /dry run: a deploy right now COULD NOT BE ROLLED BACK, image\(s\) not found/);
+  assert.equal(head(), shaA);
+});
+
+test('a second cd-deploy refuses while another run holds the lock', async () => {
+  const shimDir = path.join(workDir, 'shim-flock');
+  mkdirSync(shimDir, { recursive: true });
+  // A faithful stand-in for `flock -n <fd>`: the lock belongs to the open file
+  // description that fd 9 shares with the script, so it outlives this helper
+  // exactly as the real flock(1) does. Used on every platform (this Mac has no
+  // flock at all), so the branch is covered identically everywhere.
+  writeFileSync(
+    path.join(shimDir, 'flock'),
+    '#!/usr/bin/env python3\nimport fcntl, sys\ntry:\n'
+      + '    fcntl.flock(int(sys.argv[-1]), fcntl.LOCK_EX | fcntl.LOCK_NB)\n'
+      + 'except OSError:\n    sys.exit(1)\n',
+    { mode: 0o755 },
+  );
+  mkdirSync(path.join(repo, 'backups'), { recursive: true });
+  const lock = path.join(repo, 'backups', '.cd-deploy.lock');
+  writeFileSync(lock, '');
+  const holder = spawn('python3', [
+    '-c',
+    `import fcntl, time\nf = open(${JSON.stringify(lock)}, 'w')\nfcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)\ntime.sleep(120)\n`,
+  ]);
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    const r = await runScript(shaB, { PATH: `${shimDir}:${process.env.PATH}`, CD_DEPLOY_CMD: failStub });
+    assert.equal(r.status, 1, r.out);
+    assert.match(r.out, /another cd-deploy is running on this host/);
+    assert.ok(!existsSync(stubRan), 'deploy command must not run');
+    assert.equal(head(), shaA);
+    assertRunning(OLD_TAG);
+  } finally {
+    holder.kill('SIGKILL');
+  }
+});
+
+test('the backup directory, the dumps and the run log are private to the deploy user', async () => {
+  // A pg_dump of this database holds every password hash and session.
+  const r = await runScript(shaB, { CD_DEPLOY_CMD: failStub });
+  assert.equal(r.status, 21, r.out);
+  const backupDir = path.join(repo, 'backups');
+  assert.equal(statSync(backupDir).mode & 0o777, 0o700);
+  const [dump] = dumps();
+  assert.ok(dump, 'a dump was taken');
+  assert.equal(statSync(path.join(backupDir, dump)).mode & 0o777, 0o600);
+  const logName = readdirSync(backupDir).find((name) => /^cd-deploy-.*\.log$/.test(name));
+  assert.equal(statSync(path.join(backupDir, logName)).mode & 0o777, 0o600);
+});
+
+test('a submission that starts during the backup refuses the deploy (exit 11), tree untouched', async () => {
+  const shimDir = path.join(workDir, 'shim-queue');
+  mkdirSync(shimDir, { recursive: true });
+  // Makes the judge queue busy exactly while the dump runs: the window the
+  // second guard_judge_queue call closes. The dump itself still runs.
+  writeFileSync(
+    path.join(shimDir, 'docker'),
+    '#!/bin/sh\ncase "$*" in *pg_dump*) "$REAL_DOCKER" exec '
+      + dbContainer
+      + ' psql -U postgres -d postgres -c "INSERT INTO submissions (overall_status) VALUES (\'Running\')" >/dev/null 2>&1;; esac\n'
+      + 'exec "$REAL_DOCKER" "$@"\n',
+    { mode: 0o755 },
+  );
+  const realDocker = must('sh', ['-c', 'command -v docker']);
+  const r = await runScript(shaB, { PATH: `${shimDir}:${process.env.PATH}`, REAL_DOCKER: realDocker });
+  assert.equal(r.status, 11, r.out);
+  assert.match(r.out, /1 submission\(s\) still compiling or running/);
+  assert.equal(dumps().length, 1, 'the dump was taken before the refusal');
+  assert.equal(head(), shaA, 'the checkout must not have happened');
+  assert.ok(!existsSync(stubRan), 'deploy command must not run');
+  assertRunning(OLD_TAG);
 });
 
 test('an unwritable run log fails loudly before anything is changed', { skip: process.getuid?.() === 0 }, async () => {
