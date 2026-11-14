@@ -59,6 +59,9 @@ test('local Compose config is self-contained and migration-gated', () => {
   assert.equal(config.services.backend.environment.COOKIE_DOMAIN, '');
   assert.equal(config.services.backend.environment.CORS_ORIGINS, '');
   assert.equal(config.services.frontend.build.args.REACT_APP_API_URL, '/api');
+  assert.equal(config.services.frontend.image, 'oj-frontend:local');
+  assert.equal(config.services['authoring-runner'].image, 'oj-authoring-runner:local');
+  assert.equal(config.services.backend.image, 'oj-backend:local');
   assert.match(config.services.frontend.healthcheck.test.join(' '), /127\.0\.0\.1/);
   assert.equal(config.services['nginx-proxy'].ports[0].published, '80');
 
