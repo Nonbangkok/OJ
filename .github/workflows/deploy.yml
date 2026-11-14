@@ -13,7 +13,9 @@ on:
 permissions:
   contents: read
 
-# Two approved deploys queue; one never cancels the other mid-rollback.
+# Deploys queue and never cancel one another mid-rollback. GitHub keeps a single
+# pending run, so at most one waits behind the running deploy: a third approval
+# cancels the one that was waiting.
 concurrency:
   group: deploy-production
   cancel-in-progress: false
