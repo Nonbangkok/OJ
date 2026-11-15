@@ -274,11 +274,10 @@ describe('review fixes (phase 1 final review)', () => {
     });
   });
 
-  it.each(['components/navbar/Navbar.module.css'])(
-    '%s marks the active link in text, not only with the slider', (file) => {
-      expect(decl(file, ".nav-links a[aria-current='page']", 'color')).toBe('var(--text-primary)');
-      expect(decl(file, ".nav-links a[aria-current='page']", 'font-weight')).toBe('600');
-    });
+  it('sidebar marks the current page in text, not only with a surface', () => {
+    const css = readSource('components/shell/Sidebar.module.css');
+    expect(css).toMatch(/\.item\[aria-current='page'\]\s*\{[^}]*color:\s*var\(--text-primary\)[^}]*font-weight:\s*500/);
+  });
 
   it.each([
     ['components/ui/Dialog.module.css'], ['components/ui/ActionMenu.module.css'], ['components/ui/Drawer.module.css'],
@@ -362,5 +361,13 @@ describe('page headers', () => {
     const rule = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].find(([, sel]) => sel.trim() === selector);
     expect(rule).toBeDefined();
     expect(rule?.[2]).not.toMatch(/max-width/);
+  });
+});
+
+describe('old navbars', () => {
+  it('nothing imports the removed navbars', () => {
+    const hits = listSourceFiles(['.ts', '.tsx']).filter((file) =>
+      /components\/navbar\/|layouts\/contest\/ContestNavbar|AdminNavbar/.test(readSource(file)));
+    expect(hits).toEqual([]);
   });
 });
