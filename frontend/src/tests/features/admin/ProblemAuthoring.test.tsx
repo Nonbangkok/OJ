@@ -450,6 +450,37 @@ test('a draft without a linked profile keeps its metadata inputs enabled', async
   }
 });
 
+test('Generate inputs runs the generator with the seed the author entered', async () => {
+  const withGenerator = { ...draft, generatorCpp: 'int main(){}' };
+  jest.mocked(api.get).mockImplementation(async (url) => ({
+    data: url.endsWith('/testcases') ? { revision: 3, testcases: [] } : url.endsWith('/d1') ? withGenerator : [],
+  }));
+  jest.mocked(api.post).mockResolvedValue({
+    data: { id: 'j1', draftId: 'd1', draftRevision: 3, jobType: 'generate', status: 'queued' },
+  });
+  show('/admin/authoring/d1/testcases');
+  const seed = await screen.findByLabelText('Generator seed');
+  fireEvent.change(seed, { target: { value: '987654' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Generate inputs' }));
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirm replacement' }));
+  await waitFor(() => expect(api.post).toHaveBeenCalledWith(
+    '/admin/authoring/drafts/d1/jobs/generate',
+    { expectedRevision: 3, seed: '987654' }
+  ));
+});
+
+test('the Solution checklist item links to the Solution step', async () => {
+  const noSolution = { ...draft, solutionCpp: '', verifiedRevision: null };
+  jest.mocked(api.get).mockImplementation(async (url) => ({
+    data: url.endsWith('/d1') ? noSolution : [],
+  }));
+  show('/admin/authoring/d1/verify');
+  const checklist = await screen.findByLabelText('Publish readiness');
+  fireEvent.click(within(checklist).getByRole('button', { name: 'add it' }));
+  expect(await screen.findByRole('heading', { name: 'Solution' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Testcases' })).not.toBeInTheDocument();
+});
+
 test('the Testcases checklist item shows real pairing counts, not the draft status', async () => {
   // Status reset to 'draft' (as a fresh verify start does) while the
   // testcases themselves are complete — the checklist must still tick.
