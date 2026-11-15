@@ -156,4 +156,79 @@ describe('useRejudge', () => {
 
         expect(result.current.isRejudging).toBe(false);
     });
+
+    describe('bulk problem rejudge', () => {
+        const bulk = { kind: 'problems' as const, ids: ['P1', 'P2', 'P3'], title: 'the 3 selected problems' };
+
+        const confirmBulk = async () => {
+            const { result } = renderHook(() => useRejudge());
+            act(() => {
+                result.current.handleRejudgeClick(bulk);
+            });
+            await act(async () => {
+                await result.current.handleConfirmRejudge();
+            });
+            return result;
+        };
+
+        it('rejudges every selected problem and reports the combined counts', async () => {
+            (jest.mocked(adminService.rejudgeProblem) as jest.Mock)
+                .mockResolvedValueOnce({ queued: 2, skipped: 1 })
+                .mockResolvedValueOnce({ queued: 3, skipped: 0, busy: 1 })
+                .mockResolvedValueOnce({ queued: 0, skipped: 0 });
+
+            const result = await confirmBulk();
+
+            expect(adminService.rejudgeProblem).toHaveBeenCalledTimes(3);
+            expect(adminService.rejudgeProblem).toHaveBeenNthCalledWith(1, 'P1');
+            expect(adminService.rejudgeProblem).toHaveBeenNthCalledWith(2, 'P2');
+            expect(adminService.rejudgeProblem).toHaveBeenNthCalledWith(3, 'P3');
+            expect(result.current.rejudgeFeedback).toEqual({
+                visible: true,
+                message: 'Rejudge queued for 5 submissions across 3 problems (1 skipped — no stored code) (1 already being judged — skipped).',
+                type: 'success',
+            });
+        });
+
+        it('keeps going after a failure and names the problems that failed', async () => {
+            (jest.mocked(adminService.rejudgeProblem) as jest.Mock)
+                .mockResolvedValueOnce({ queued: 2, skipped: 0 })
+                .mockRejectedValueOnce({ response: { status: 500, data: { message: 'Server exploded.' } } })
+                .mockResolvedValueOnce({ queued: 1, skipped: 0 });
+
+            const result = await confirmBulk();
+
+            expect(adminService.rejudgeProblem).toHaveBeenCalledTimes(3);
+            expect(result.current.rejudgeFeedback).toEqual({
+                visible: true,
+                message: 'Rejudge queued for 3 submissions across 2 problems. 1 of 3 problems failed: P2 (Server exploded.).',
+                type: 'error',
+            });
+        });
+
+        it('reports when every selected problem failed', async () => {
+            (jest.mocked(adminService.rejudgeProblem) as jest.Mock)
+                .mockRejectedValue({ response: { status: 500, data: { message: 'Down.' } } });
+
+            const result = await confirmBulk();
+
+            expect(result.current.rejudgeFeedback).toEqual({
+                visible: true,
+                message: '3 of 3 problems failed: P1 (Down.), P2 (Down.), P3 (Down.).',
+                type: 'error',
+            });
+        });
+
+        it('says nothing was rejudged when no selected problem had judgeable submissions', async () => {
+            (jest.mocked(adminService.rejudgeProblem) as jest.Mock).mockResolvedValue({ queued: 0, skipped: 0 });
+
+            const result = await confirmBulk();
+
+            expect(result.current.rejudgeFeedback).toEqual({
+                visible: true,
+                message: 'No judgeable submissions found for the 3 selected problems. Nothing was rejudged.',
+                type: 'info',
+            });
+        });
+    });
 });

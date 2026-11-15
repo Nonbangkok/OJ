@@ -9,10 +9,12 @@ import LoadingPage from '../../components/shared/LoadingPage';
 import type { ProblemSummary } from '../../types';
 
 /** Humanized countdown without a suffix, e.g. "1d 7h 37m". Mirrors the
- *  Home page's contest countdown so the two never drift in format. */
-const formatCountdown = (target: string): string => {
+ *  Home page's contest countdown so the two never drift in format. Returns
+ *  null once the target has passed, so each caller can say what that means
+ *  (the scheduler moves the contest on within a minute). */
+const formatCountdown = (target: string): string | null => {
   const diff = new Date(target).getTime() - Date.now();
-  if (diff <= 0) return 'Soon';
+  if (diff <= 0) return null;
 
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -81,19 +83,17 @@ const ContestDetail = () => {
   // The top-right slot carries the one timing fact that matters right now:
   // remaining time while running, starts-in while scheduled, ended time once
   // finished.
+  // `finishing` means the contest has ended and the last submissions are
+  // still being judged — there is no time remaining to count down.
+  const endCountdown = formatCountdown(contest.end_time);
+  const startCountdown = formatCountdown(contest.start_time);
   const topRightTiming =
     contest.status === 'running' ? (
-      <>
-        {formatCountdown(contest.end_time)} remaining
-      </>
+      endCountdown ? <>{endCountdown} remaining</> : 'Ending now'
     ) : contest.status === 'scheduled' ? (
-      <>
-        Starts in {formatCountdown(contest.start_time)}
-      </>
+      startCountdown ? <>Starts in {startCountdown}</> : 'Starting now'
     ) : contest.status === 'finishing' ? (
-      <>
-        {formatCountdown(contest.end_time)} remaining
-      </>
+      'Judging final submissions'
     ) : (
       <>
         Ended {formatDateTime(contest.end_time)}

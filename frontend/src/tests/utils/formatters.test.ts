@@ -32,6 +32,53 @@ describe('formatters', () => {
             const past = new Date(now.getTime() - 2 * 60 * 60 * 1000);
             expect(formatTimeAgo(past.toISOString())).toBe('2 hours ago');
         });
+
+        describe('singular units', () => {
+            const SECOND = 1000;
+            const MINUTE = 60 * SECOND;
+            const HOUR = 60 * MINUTE;
+            const DAY = 24 * HOUR;
+            const ago = (ms: number) => formatTimeAgo(new Date(Date.now() - ms).toISOString());
+
+            beforeEach(() => {
+                jest.useFakeTimers();
+                jest.setSystemTime(new Date('2026-11-15T12:00:00Z'));
+            });
+            afterEach(() => {
+                jest.useRealTimers();
+            });
+
+            it.each([
+                [1 * SECOND, '1 second ago'],
+                [1.5 * MINUTE, '1 minute ago'],
+                [1.5 * HOUR, '1 hour ago'],
+                [1.5 * DAY, '1 day ago'],
+                [45 * DAY, '1 month ago'],
+                [400 * DAY, '1 year ago'],
+            ])('%d ms ago reads "%s"', (ms, expected) => {
+                expect(ago(ms)).toBe(expected);
+            });
+
+            it.each([
+                [MINUTE, '1 minute ago'],
+                [HOUR, '1 hour ago'],
+                [DAY, '1 day ago'],
+                [30 * DAY, '1 month ago'],
+                [365 * DAY, '1 year ago'],
+            ])('exactly %d ms ago reads "%s", not the smaller unit', (ms, expected) => {
+                expect(ago(ms)).toBe(expected);
+            });
+
+            it.each([
+                [0, '0 seconds ago'],
+                [2 * SECOND, '2 seconds ago'],
+                [3 * DAY, '3 days ago'],
+                [70 * DAY, '2 months ago'],
+                [800 * DAY, '2 years ago'],
+            ])('%d ms ago keeps the plural "%s"', (ms, expected) => {
+                expect(ago(ms)).toBe(expected);
+            });
+        });
     });
 
     describe('formatDateAbsolute', () => {

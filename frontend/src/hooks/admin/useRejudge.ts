@@ -4,12 +4,12 @@ import adminService from '../../services/adminService';
 import type { RejudgeResponse } from '../../types';
 import { getErrorMessage } from '../../utils/error';
 
-/** What a "Rejudge" button points at: one problem or one contest. */
-export interface RejudgeTarget {
-  kind: 'problem' | 'contest';
-  id: string | number;
-  title: string;
-}
+/** What a "Rejudge" button points at: one problem, one contest, or a
+ *  selection of problems (rejudged one by one through the per-problem call —
+ *  there is no bulk endpoint). */
+export type RejudgeTarget =
+  | { kind: 'problem' | 'contest'; id: string | number; title: string }
+  | { kind: 'problems'; ids: Array<string | number>; title: string };
 
 export interface RejudgeFeedback {
   visible: boolean;
@@ -19,7 +19,7 @@ export interface RejudgeFeedback {
 
 const HIDDEN_FEEDBACK: RejudgeFeedback = { visible: false, message: '', type: 'info' };
 
-const buildFeedback = (target: RejudgeTarget, result: RejudgeResponse): RejudgeFeedback => {
+const buildFeedback = (target: RejudgeTarget, result: RejudgeResponse, scope = ''): RejudgeFeedback => {
   if (result.queued === 0) {
     return {
       visible: true,
@@ -35,8 +35,43 @@ const buildFeedback = (target: RejudgeTarget, result: RejudgeResponse): RejudgeF
     : '';
   return {
     visible: true,
-    message: `Rejudge queued for ${result.queued} submissions${skippedSuffix}${busySuffix}.`,
+    message: `Rejudge queued for ${result.queued} submissions${scope}${skippedSuffix}${busySuffix}.`,
     type: 'success',
+  };
+};
+
+/** Rejudges each selected problem in turn. One failure does not stop the
+ *  rest; the feedback sums what was queued and names every problem that
+ *  failed. */
+const rejudgeProblems = async (
+  target: Extract<RejudgeTarget, { kind: 'problems' }>
+): Promise<RejudgeFeedback> => {
+  const totals = { queued: 0, skipped: 0, busy: 0 };
+  const failures: string[] = [];
+  for (const id of target.ids) {
+    try {
+      const result = await adminService.rejudgeProblem(id);
+      totals.queued += result.queued;
+      totals.skipped += result.skipped;
+      totals.busy += result.busy ?? 0;
+    } catch (errorValue) {
+      failures.push(`${id} (${getErrorMessage(errorValue, 'Failed to rejudge problem.')})`);
+      console.error(`Error triggering rejudge for problem ${id}:`, errorValue);
+    }
+  }
+
+  const succeeded = target.ids.length - failures.length;
+  const scope = ` across ${succeeded} ${succeeded === 1 ? 'problem' : 'problems'}`;
+  if (failures.length === 0) {
+    return buildFeedback(target, totals, scope);
+  }
+  const failedPart = `${failures.length} of ${target.ids.length} problems failed: ${failures.join(', ')}.`;
+  return {
+    visible: true,
+    message: totals.queued > 0
+      ? `${buildFeedback(target, totals, scope).message} ${failedPart}`
+      : failedPart,
+    type: 'error',
   };
 };
 
@@ -65,14 +100,18 @@ const useRejudge = () => {
 
     setIsRejudging(true);
     try {
-      const result = rejudgeTarget.kind === 'problem'
-        ? await adminService.rejudgeProblem(rejudgeTarget.id)
-        : await adminService.rejudgeContest(rejudgeTarget.id);
-      setRejudgeFeedback(buildFeedback(rejudgeTarget, result));
+      if (rejudgeTarget.kind === 'problems') {
+        setRejudgeFeedback(await rejudgeProblems(rejudgeTarget));
+      } else {
+        const result = rejudgeTarget.kind === 'problem'
+          ? await adminService.rejudgeProblem(rejudgeTarget.id)
+          : await adminService.rejudgeContest(rejudgeTarget.id);
+        setRejudgeFeedback(buildFeedback(rejudgeTarget, result));
+      }
     } catch (errorValue) {
-      const fallback = rejudgeTarget.kind === 'problem'
-        ? 'Failed to rejudge problem.'
-        : 'Failed to rejudge contest.';
+      const fallback = rejudgeTarget.kind === 'contest'
+        ? 'Failed to rejudge contest.'
+        : 'Failed to rejudge problem.';
       setRejudgeFeedback({ visible: true, message: getErrorMessage(errorValue, fallback), type: 'error' });
       console.error('Error triggering rejudge:', errorValue);
     } finally {

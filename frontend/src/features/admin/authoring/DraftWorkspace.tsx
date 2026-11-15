@@ -49,7 +49,7 @@ export default function DraftWorkspace({ id }: { id: string }) {
     handleItemMouseEnter: handleSectionMouseEnter,
     resetSlider: resetSectionSlider,
   } = useNavSlider<HTMLElement>('vertical', { itemPadding: 3, activeSelector: 'a.active' });
-  const [confirm, setConfirm] = useState<{ action: 'generate' | 'outputs' | 'publish'; revision: number } | null>(null);
+  const [confirm, setConfirm] = useState<WorkspaceConfirm | null>(null);
   const [leaveGuard, setLeaveGuard] = useState(false);
   useEffect(() => {
     if (!model.dirty) return;
@@ -140,7 +140,7 @@ export default function DraftWorkspace({ id }: { id: string }) {
             }}>Confirm publish</Button>
           : <Button disabled={model.actionsDisabled || confirm.revision !== draft.revision} onClick={() => {
               if (confirm.revision !== draft.revision || confirm.action === 'publish') return;
-              void model.runJob(confirm.action, confirm.action === 'generate' ? { seed: '12345' } : {});
+              void model.runJob(confirm.action, confirm.action === 'generate' ? { seed: confirm.seed } : {});
               setConfirm(null);
             }}>Confirm replacement</Button>}
         <Button variant="secondary" onClick={() => setConfirm(null)}>Cancel</Button>
@@ -155,12 +155,18 @@ export default function DraftWorkspace({ id }: { id: string }) {
   </div>;
 }
 
+/** A pending confirm dialog. Generate carries the seed entered in the
+ *  Testcases panel, so the job runs with exactly what the author typed. */
+export type WorkspaceConfirm =
+  | { action: 'generate'; revision: number; seed: string }
+  | { action: 'outputs' | 'publish'; revision: number };
+
 export type WorkspaceContext = {
   model: ReturnType<typeof useAuthoringDraft>;
   draft: import('./types').Draft;
   form: import('./types').Draft;
   editorDisabled: boolean;
-  setConfirm: (confirm: { action: 'generate' | 'outputs' | 'publish'; revision: number } | null) => void;
+  setConfirm: (confirm: WorkspaceConfirm | null) => void;
   navigate: ReturnType<typeof useNavigate>;
 };
 
@@ -266,7 +272,7 @@ function TestcasesSection() {
           <label className={styles.seedRow}>Generator seed<input value={seed} disabled={model.actionsDisabled || !form.generatorCpp?.trim()} inputMode="numeric" onChange={e => setSeed(e.target.value)} /></label>
           <div className={styles.actions}>
             <Button disabled={model.actionsDisabled || !form.generatorCpp?.trim() || !seedValid}
-              onClick={() => setConfirm({ action: 'generate', revision: draft.revision })}>Generate inputs</Button>
+              onClick={() => setConfirm({ action: 'generate', revision: draft.revision, seed })}>Generate inputs</Button>
             <Button disabled={model.actionsDisabled || !form.solutionCpp.trim()} onClick={() => setConfirm({ action: 'outputs', revision: draft.revision })}>Generate outputs</Button>
           </div>
         </div>
@@ -320,7 +326,8 @@ function VerifySection() {
     <VerifyOutcome draft={draft} jobs={model.jobs} />
     <PublishChecklist draft={draft} dirty={model.dirty} canPublish={model.canPublish} disabled={model.actionsDisabled}
       onVerify={() => void model.runJob('verify')} onPublish={() => setConfirm({ action: 'publish', revision: draft.revision })}
-      onBuildPdf={() => void model.runJob('pdf')} onGoToTestcases={() => navigate('testcases', { relative: 'path' })} />
+      onBuildPdf={() => void model.runJob('pdf')} onGoToSolution={() => navigate('solution', { relative: 'path' })}
+      onGoToTestcases={() => navigate('testcases', { relative: 'path' })} />
     <PdfPreview draft={draft} />
   </section>;
 }
@@ -376,9 +383,9 @@ function AiDocsSection() {
   return <AiDocs embedded />;
 }
 
-function PublishChecklist({ draft, dirty, canPublish, disabled, onVerify, onPublish, onBuildPdf, onGoToTestcases }: {
+function PublishChecklist({ draft, dirty, canPublish, disabled, onVerify, onPublish, onBuildPdf, onGoToSolution, onGoToTestcases }: {
   draft: import('./types').Draft; dirty: boolean; canPublish: boolean; disabled: boolean;
-  onVerify: () => void; onPublish: () => void; onBuildPdf: () => void; onGoToTestcases: () => void;
+  onVerify: () => void; onPublish: () => void; onBuildPdf: () => void; onGoToSolution: () => void; onGoToTestcases: () => void;
 }) {
   // Each gate names exactly what is missing and offers the action that fixes it.
   const pdfCurrent = draft.hasLatestPdf && draft.latestPdfRevision === draft.revision;
@@ -404,7 +411,7 @@ function PublishChecklist({ draft, dirty, canPublish, disabled, onVerify, onPubl
   return <div className={styles.verifyPanel}>
     <ul className={styles.checklist} aria-label="Publish readiness">
       {item(!!draft.solutionCpp.trim(), 'Solution', 'missing',
-        <>— <button type="button" className={styles.linkButton} onClick={() => onGoToTestcases()}>add it</button></>)}
+        <>— <button type="button" className={styles.linkButton} onClick={() => onGoToSolution()}>add it</button></>)}
       {item(testcasesComplete, 'Testcases', testcaseDetail,
         <>— <button type="button" className={styles.linkButton} onClick={() => onGoToTestcases()}>{total === 0 ? 'add them' : 'open testcases'}</button></>, true)}
       {item(pdfCurrent, 'PDF', draft.hasLatestPdf ? 'outdated' : 'not built',

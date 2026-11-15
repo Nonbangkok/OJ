@@ -4,7 +4,7 @@ import styles from '../../components/styles/Form.module.css';
 const RegisterForm = ({
     formData,
     error,
-    success,
+    loading = false,
     onSubmit,
     onChange,
     registrationEnabled,
@@ -51,8 +51,7 @@ const RegisterForm = ({
                     />
                 </div>
                 {error && <p className={styles['error-message']}>{error}</p>}
-                {success && <p className={styles['success-message']}>{success}</p>}
-                <button type="submit" className={styles['form-button']}>
+                <button type="submit" className={styles['form-button']} disabled={loading}>
                     Register
                 </button>
             </form>

@@ -6,6 +6,15 @@ import type { TestCaseResult, UserRole } from '../types';
  * Extracted from duplicated code across multiple page components.
  */
 
+/** Largest unit first; a month is 30 days and a year 365, as before. */
+const TIME_AGO_UNITS: ReadonlyArray<readonly [string, number]> = [
+  ['year', 31536000],
+  ['month', 2592000],
+  ['day', 86400],
+  ['hour', 3600],
+  ['minute', 60],
+];
+
 /**
  * Converts a date string to a human-readable "X ago" format.
  * @param {string} dateString - ISO date string
@@ -17,17 +26,12 @@ export const formatTimeAgo = (dateString: string | null | undefined): string => 
   const now = new Date();
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  let interval = seconds / 31536000;
-  if (interval > 1) return `${Math.floor(interval)} years ago`;
-  interval = seconds / 2592000;
-  if (interval > 1) return `${Math.floor(interval)} months ago`;
-  interval = seconds / 86400;
-  if (interval > 1) return `${Math.floor(interval)} days ago`;
-  interval = seconds / 3600;
-  if (interval > 1) return `${Math.floor(interval)} hours ago`;
-  interval = seconds / 60;
-  if (interval > 1) return `${Math.floor(interval)} minutes ago`;
-  return `${Math.floor(seconds)} seconds ago`;
+  for (const [unit, unitSeconds] of TIME_AGO_UNITS) {
+    const count = Math.floor(seconds / unitSeconds);
+    if (count >= 1) return `${count} ${unit}${count === 1 ? '' : 's'} ago`;
+  }
+  const count = Math.max(0, seconds);
+  return `${count} second${count === 1 ? '' : 's'} ago`;
 };
 
 /**

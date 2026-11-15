@@ -1,13 +1,18 @@
 import { Link } from 'react-router-dom';
 import styles from '../../components/styles/Form.module.css';
 
-const LoginForm = ({ formData, error, onSubmit, onChange, registrationEnabled, sessionExpired = false }) => {
+const LoginForm = ({ formData, error, loading = false, onSubmit, onChange, registrationEnabled, sessionExpired = false, justRegistered = false }) => {
     return (
         <div className={styles['form-container']}>
             <h2>Login</h2>
             {sessionExpired && (
                 <p className={styles['expired-notice']} role="status">
                     Your session expired. Please log in again.
+                </p>
+            )}
+            {justRegistered && !sessionExpired && (
+                <p className={styles['expired-notice']} role="status">
+                    Registration successful! Please log in.
                 </p>
             )}
             <form onSubmit={onSubmit}>
@@ -32,7 +37,7 @@ const LoginForm = ({ formData, error, onSubmit, onChange, registrationEnabled, s
                         required
                     />
                 </div>
-                <button type="submit" className={styles['form-button']}>Login</button>
+                <button type="submit" className={styles['form-button']} disabled={loading}>Login</button>
             </form>
             {registrationEnabled && (
                 <p className={styles['form-footer-link']}>
