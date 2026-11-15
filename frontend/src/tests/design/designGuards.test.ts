@@ -326,3 +326,9 @@ describe('shell tokens', () => {
     expect(pkg.dependencies.cmdk).toBe('1.1.1');
   });
 });
+
+describe('shell layout', () => {
+  it('the main column can shrink so wide tables scroll inside it', () => {
+    expect(readSource('components/shell/AppShell.module.css')).toMatch(/\.main\s*\{[^}]*min-width:\s*0/);
+  });
+});
