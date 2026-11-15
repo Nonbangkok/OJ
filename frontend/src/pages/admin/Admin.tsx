@@ -3,6 +3,7 @@ import styles from './Admin.module.css';
 import LoadingPage from '../../components/shared/LoadingPage';
 import { USER_ROLES } from '../../utils/constants';
 import { Link } from 'react-router-dom';
+import { PageHeader } from '../../components/ui';
 
 /** One navigation tile on the admin hub. Order matters only for display. */
 interface AdminSectionLink {
@@ -62,10 +63,7 @@ const Admin = () => {
 
   return (
     <div className={styles['admin-container']}>
-      <h1>Admin Panel</h1>
-      <p className={styles['admin-subtitle']}>
-        Manage users, problems, contests, authoring, analytics, and system settings.
-      </p>
+      <PageHeader title="Manage" description="Users, problems, contests, authoring, analytics and system settings." />
       <nav className={styles['hub-grid']} aria-label="Admin sections">
         {sections.map((section) => (
           <Link key={section.to} to={section.to} className={styles['hub-card']}>

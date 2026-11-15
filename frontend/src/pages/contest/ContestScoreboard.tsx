@@ -8,6 +8,7 @@ import LoadingPage from '../../components/shared/LoadingPage';
 import { useAuth } from '../../context/AuthContext';
 import { formatDateTime } from '../../utils/formatters';
 import type { CSSProperties } from 'react';
+import { PageHeader } from '../../components/ui';
 
 /** Leading-column plan (px), fed to the CSS module through the --sb-*
  *  custom properties set on the table. The media query in the module swaps
@@ -73,12 +74,10 @@ const ContestScoreboard = () => {
       className={`${shared.page} ${problems.length > 7 ? styles.widePage : ''}`}
       style={widePageStyle}
     >
-      <div className={shared.pageHeader}>
-        <h1 className={shared.pageTitle}>Contest Scoreboard</h1>
-        {lastUpdate && contest?.status !== 'finished' && (
-          <span className={shared.pageAside}>Updated {formatUpdated(lastUpdate)}</span>
-        )}
-      </div>
+      <PageHeader
+        title="Scoreboard"
+        meta={lastUpdate && contest?.status !== 'finished' ? <span>Updated {formatUpdated(lastUpdate)}</span> : undefined}
+      />
 
       {scoreboard.length === 0 ? (
         <div className={styles.noData}>

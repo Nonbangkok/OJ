@@ -16,3 +16,5 @@ export { SegmentedControl } from './SegmentedControl';
 export type { SegmentedControlProps, SegmentedOption } from './SegmentedControl';
 export { StatusBadge } from './StatusBadge';
 export type { StatusBadgeProps } from './StatusBadge';
+export { PageHeader } from './PageHeader';
+export type { PageHeaderProps } from './PageHeader';

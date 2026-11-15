@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { within, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import api from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
@@ -72,12 +72,12 @@ beforeEach(() => {
 test('renders the reference document at the AI Docs route with a copy button', () => {
   show();
   // The document is present with its sections and endpoints.
-  expect(screen.getByRole('heading', { name: 'AI Docs', level: 1 })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'AI docs', level: 1 })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Authentication', level: 2 })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Rules summary', level: 2 })).toBeInTheDocument();
   expect(screen.getAllByText(/POST \/admin\/authoring\/drafts/).length).toBeGreaterThan(0);
   // The drafts landing link is present on the standalone page.
-  expect(screen.getByRole('link', { name: '← All drafts' })).toHaveAttribute(
+  expect(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link', { name: 'Authoring' })).toHaveAttribute(
     'href',
     '/admin/authoring'
   );

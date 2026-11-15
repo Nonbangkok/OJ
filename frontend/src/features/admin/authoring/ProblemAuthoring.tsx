@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ActionMenu, Button, Dialog, OverflowTable, StatusBadge } from '../../../components/ui';
+import { ActionMenu, Button, Dialog, OverflowTable, StatusBadge, PageHeader } from '../../../components/ui';
 import { useAuth } from '../../../context/AuthContext';
 import authoringService from '../../../services/admin/authoringService';
 import { getErrorMessage } from '../../../utils/error';
@@ -159,18 +159,21 @@ function DraftList() {
   };
   return (
     <section className={styles.authoring}>
-      <div className={styles.listHead}>
-        <h1>Problem Authoring</h1>
-        <div className={styles.actions}>
-          <Link className={styles.actionLink} to="/admin/authoring/profiles">
-            Author profiles
-          </Link>
-          <Link className={styles.actionLink} to="/admin/authoring/ai-docs">
-            AI Docs
-          </Link>
-          <Button onClick={() => { setCreateError(''); setCreating(true); }}>New draft</Button>
-        </div>
-      </div>
+      <PageHeader
+        breadcrumb={[{ label: 'Manage' }]}
+        title="Authoring"
+        actions={(
+          <>
+            <Link className={styles.actionLink} to="/admin/authoring/profiles">
+              Author profiles
+            </Link>
+            <Link className={styles.actionLink} to="/admin/authoring/ai-docs">
+              AI Docs
+            </Link>
+            <Button onClick={() => { setCreateError(''); setCreating(true); }}>New draft</Button>
+          </>
+        )}
+      />
       {error && <p role="alert">{error}</p>}
       {creating && (
         <form
@@ -401,8 +404,7 @@ function DraftList() {
 function ProfilesPage() {
   return (
     <section className={styles.authoring}>
-      <Link to="/admin/authoring" className={styles.backLink}>← All drafts</Link>
-      <h1>Author profiles</h1>
+      <PageHeader breadcrumb={[{ label: 'Authoring', to: '/admin/authoring' }]} title="Author profiles" />
       <AuthorProfiles />
     </section>
   );

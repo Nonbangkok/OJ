@@ -14,7 +14,7 @@ import type { AdminProblemsQuery } from '../../../types';
 import { ADMIN_PROBLEMS_PAGE } from '../../../config/constants';
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
-import { ActionMenu, Button, StatusBadge } from '../../../components/ui';
+import { ActionMenu, Button, StatusBadge, PageHeader } from '../../../components/ui';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useInfiniteScroll } from '../../../hooks/useInfiniteScroll';
 import { buildAdminProblemListQuery, type AdminProblemListLoaderData } from '../../../routing/problemListLoaders';
@@ -321,20 +321,23 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
   return (
     <div className={styles['management-container']}>
       {/* --- 1. Page header: creation/import only -------------------------- */}
-      <div className={styles['management-header']}>
-        <h2>Problem Management</h2>
-        <div className={styles['header-actions']}>
-          <input
-            type="file"
-            ref={batchUploadInputRef}
-            onChange={handleBatchUploadFileChange}
-            style={{ display: 'none' }}
-            accept=".zip"
-          />
-          <Button variant="secondary" onClick={handleTriggerBatchUpload}>Batch Upload</Button>
-          <Button onClick={handleCreate}>+ New Problem</Button>
-        </div>
-      </div>
+      <input
+        type="file"
+        ref={batchUploadInputRef}
+        onChange={handleBatchUploadFileChange}
+        style={{ display: 'none' }}
+        accept=".zip"
+      />
+      <PageHeader
+        breadcrumb={[{ label: 'Manage' }]}
+        title="Problems"
+        actions={(
+          <>
+            <Button variant="secondary" onClick={handleTriggerBatchUpload}>Batch Upload</Button>
+            <Button onClick={handleCreate}>+ New Problem</Button>
+          </>
+        )}
+      />
 
       {/* --- 2. Filter / scope bar ----------------------------------------- */}
       <div className={styles['filter-bar']}>

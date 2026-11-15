@@ -6,7 +6,7 @@ import XpToast from '../../components/user/XpToast';
 import { useSubmissions } from '../../hooks/useSubmissions';
 import { getStatusClass, canViewCode, formatDateTime } from '../../utils/formatters';
 import tableStyles from '../../components/styles/Table.module.css';
-import { Button, SegmentedControl } from '../../components/ui';
+import { Button, SegmentedControl, PageHeader } from '../../components/ui';
 import { USER_ROLES, getLanguageDisplayName } from '../../utils/constants';
 import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
 import type { AuthUser } from '../../types';
@@ -96,7 +96,7 @@ const SubmissionsView = ({
         <div className={styles['submissions-container']}>
             {showTitle && (
                 <div className={styles['submissions-header']}>
-                    <h1>{title}</h1>
+                    <PageHeader title={title} />
                     {!problemId && (
                         <div className={styles['filter-buttons']} role="toolbar" aria-label="Submission filters">
                             <SegmentedControl<'all' | 'mine'>
