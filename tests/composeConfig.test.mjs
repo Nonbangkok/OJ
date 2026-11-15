@@ -251,3 +251,17 @@ test('deploy.sh runs the Postgres 18 upgrade guard before it builds or starts an
   assert.notEqual(up, -1);
   assert.ok(guard < build && guard < up, 'the guard must run before build and up');
 });
+
+// production.conf is a single-file bind mount and `git checkout` replaces it
+// with a new inode, so `nginx -s reload` re-reads the stale file on Linux.
+// tests/refreshProxy.test.mjs proves the helper; this pins that deploy.sh uses it.
+test('deploy.sh applies the proxy configuration through scripts/refresh-proxy.sh, after up', () => {
+  const lines = readFileSync(path.join(repositoryRoot, 'deploy.sh'), 'utf8').split('\n');
+  const code = lines.filter((line) => !/^\s*#/.test(line));
+  const refresh = lines.findIndex((line) => /^scripts\/refresh-proxy\.sh "\$\{compose_files\[@\]\}"$/.test(line));
+  const up = lines.findIndex((line) => /^"\$\{compose\[@\]\}" up\b/.test(line));
+
+  assert.notEqual(refresh, -1, 'deploy.sh must call scripts/refresh-proxy.sh with the shared compose files');
+  assert.ok(up < refresh, 'the proxy is refreshed after the stack is up');
+  assert.equal(code.some((line) => /nginx -s reload/.test(line)), false, 'no bare reload left in deploy.sh');
+});

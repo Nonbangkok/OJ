@@ -13,9 +13,10 @@ scripts/pg18-guard.sh "${compose_files[@]}" || exit $?
 "${compose[@]}" build
 "${compose[@]}" up -d --remove-orphans
 
-proxy_id=$("${compose[@]}" ps -q nginx-proxy)
-docker exec "$proxy_id" nginx -t
-docker exec "$proxy_id" nginx -s reload
+# `up -d` leaves nginx-proxy alone (its spec does not change), and a plain
+# `nginx -s reload` cannot load a production.conf that `git checkout` replaced:
+# see scripts/refresh-proxy.sh.
+scripts/refresh-proxy.sh "${compose_files[@]}"
 
 deadline=$((SECONDS + 180))
 while (( SECONDS < deadline )); do
