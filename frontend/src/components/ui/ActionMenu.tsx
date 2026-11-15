@@ -23,6 +23,9 @@ export interface ActionMenuProps {
   items: ActionMenuItem[];
   /** Visual style of the trigger. */
   trigger?: 'ellipsis' | 'text';
+  /** Custom visible trigger content (e.g. a filter chip); `label` stays the accessible name. */
+  triggerContent?: React.ReactNode;
+  triggerClassName?: string;
 }
 
 /** Distance kept between the menu and the viewport edges (px). */
@@ -96,7 +99,7 @@ let closeOpenMenu: (() => void) | null = null;
  * table container) can never clip it, and opening it never affects table
  * layout. Placement is recomputed on resize/scroll while open.
  */
-export function ActionMenu({ label, items, trigger = 'ellipsis' }: ActionMenuProps) {
+export function ActionMenu({ label, items, trigger = 'ellipsis', triggerContent, triggerClassName }: ActionMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -196,7 +199,7 @@ export function ActionMenu({ label, items, trigger = 'ellipsis' }: ActionMenuPro
       <button
         ref={triggerRef}
         type="button"
-        className={`${styles.trigger}${trigger === 'text' ? ` ${styles.triggerText}` : ''}`}
+        className={triggerClassName ?? `${styles.trigger}${trigger === 'text' ? ` ${styles.triggerText}` : ''}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
@@ -204,7 +207,7 @@ export function ActionMenu({ label, items, trigger = 'ellipsis' }: ActionMenuPro
         title={label}
         onClick={() => setOpen((previous) => !previous)}
       >
-        {trigger === 'ellipsis' ? '⋯' : 'More'}
+        {triggerContent ?? (trigger === 'ellipsis' ? '⋯' : 'More')}
       </button>
       {open &&
         createPortal(

@@ -25,3 +25,5 @@ export { Countdown, ProgressBar, StatusDot } from './Indicators';
 export { EmptyState, InlineError, InlineNotice } from './States';
 export { DataTable } from './DataTable';
 export type { DataTableColumn, DataTableProps } from './DataTable';
+export { FilterBar } from './FilterBar';
+export type { FilterBarProps, FilterChip } from './FilterBar';
