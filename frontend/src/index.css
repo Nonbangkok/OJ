@@ -64,7 +64,7 @@
   --tint-danger-fg: #b91c1c;
   --tint-danger-border: #fecaca;
 
-  --navbar-slider-background: var(--background-tertiary);
+  --navbar-slider-background: var(--border-color);
   --migrationProblemItem-background: var(--background-tertiary);
 
   /* Activity heatmap (GitHub-style contribution grid) */
@@ -120,9 +120,9 @@
   --verdict-pending: #71717a;
 
   /* Fills (testcase strip, success buttons): may be lighter than text green. */
-  --status-success-bg: #16a34a;
-  --status-success-hover: #15803d;
-  --status-success-active: #166534;
+  --status-success-bg: #15803d;
+  --status-success-hover: #166534;
+  --status-success-active: #14532d;
   --status-error-bg: var(--status-danger);
   --status-warning-bg: var(--tint-warning-fg);
   --status-info-bg: var(--status-info);
@@ -374,6 +374,14 @@ body {
   transition:
     background-color 0.2s ease,
     color 0.2s ease;
+}
+
+/* Form controls do not inherit font-family by default; keep them on the UI font. */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
 code {

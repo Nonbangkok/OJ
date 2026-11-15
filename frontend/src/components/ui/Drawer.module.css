@@ -16,7 +16,7 @@
 
 .drawer {
   background: var(--background-secondary);
-  box-shadow: var(--surface-elevation);
+  box-shadow: var(--box-shadow-lg);
   box-sizing: border-box;
   color: var(--text-primary);
   height: 100vh;

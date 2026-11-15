@@ -31,8 +31,7 @@ describe('tokens', () => {
   it('every themed token has a dark value', () => {
     const THEME_CONSTANT = [
       '--statement-paper', '--statement-stripe-a', '--statement-stripe-b', '--statement-page-number',
-      '--statement-separator', '--statement-empty', '--statement-continued', '--action-button-foreground',
-      '--contest-action-foreground', '--text-on-primary', '--action-primary-foreground',
+      '--statement-separator', '--statement-empty', '--statement-continued',
       '--action-destructive-foreground', '--on-fill',
     ];
     const css = readSource('index.css');
@@ -226,5 +225,78 @@ describe('rule contrast', () => {
       return ratio < 4.5 ? [`${where} (${ratio.toFixed(2)})`] : [];
     });
     expect(failures).toEqual([]);
+  });
+});
+
+describe('review fixes (phase 1 final review)', () => {
+  /** Declarations of the rule whose selector list contains `selector` exactly. */
+  const decl = (file: string, selector: string, prop: string): string => {
+    const css = readSource(file).replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const [, sel, body] of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      if (sel.split(',').map((s) => s.trim()).includes(selector)) {
+        const m = body.match(new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`));
+        if (m) return m[1].trim();
+      }
+    }
+    throw new Error(`${file}: no ${prop} on ${selector}`);
+  };
+  const color = (raw: string, theme: 'light' | 'dark') => {
+    const ref = raw.match(/^var\((--[\w-]+)\)$/);
+    return ref ? resolveColor(ref[1], theme) : raw;
+  };
+
+  describe.each(THEMES)('%s theme', (theme) => {
+    it.each(['.problem-action-btn.new', '.problem-action-btn.new:hover', '.problem-action-btn.new:active'])(
+      'problem list action text is AA on %s', (sel) => {
+        const fg = color(decl('features/problem/ProblemCard.module.css', '.problem-action-btn', 'color'), theme);
+        const bg = color(decl('features/problem/ProblemCard.module.css', sel, 'background-color'), theme);
+        expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5);
+      });
+
+    it.each(['full', 'partial'])('score bar number is AA on the %s fill', (kind) => {
+      const fg = color(decl('features/problem/ProblemCard.module.css', `.score-bar.${kind} span`, 'color'), theme);
+      const bg = color(decl('features/problem/ProblemCard.module.css', `.score-bar.${kind}`, 'background-color'), theme);
+      expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('upload percentage sits on its own readable surface', () => {
+      const file = 'features/admin/shared/Management.module.css';
+      const fg = color(decl(file, '.progressPercentage', 'color'), theme);
+      const bg = color(decl(file, '.progressPercentage', 'background-color'), theme);
+      expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('settings toggle knob stands out from the checked track', () => {
+      const file = 'features/admin/settings/Settings.module.css';
+      const knob = color(decl(file, '.toggleTrack::before', 'background-color'), theme);
+      const track = color(decl(file, '.toggleSwitch input:checked + .toggleTrack', 'background-color'), theme);
+      expect(contrast(knob, track)).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  it.each(['components/navbar/Navbar.module.css', 'layouts/contest/ContestNavbar.module.css'])(
+    '%s marks the active link in text, not only with the slider', (file) => {
+      expect(decl(file, ".nav-links a[aria-current='page']", 'color')).toBe('var(--text-primary)');
+      expect(decl(file, ".nav-links a[aria-current='page']", 'font-weight')).toBe('600');
+    });
+
+  it.each([
+    ['components/ui/Dialog.module.css'], ['components/ui/ActionMenu.module.css'], ['components/ui/Drawer.module.css'],
+    ['components/navbar/NavbarUserMenu.module.css'], ['components/user/XpToast.module.css'],
+  ])('%s floats with the floating-layer shadow', (file) => {
+    const shadows = [...readSource(file).matchAll(/box-shadow\s*:\s*([^;]+);/g)].map((m) => m[1].trim());
+    expect(shadows).toContain('var(--box-shadow-lg)');
+  });
+
+  it('contest navbar does not shrink the logo svg', () => {
+    expect(readSource('layouts/contest/ContestNavbar.module.css')).not.toMatch(/\.back-btn svg\s*\{/);
+  });
+
+  it('form controls inherit the UI font', () => {
+    expect(readSource('index.css')).toMatch(/button,\s*input,\s*select,\s*textarea\s*\{[^}]*font-family:\s*inherit/);
+  });
+
+  it('accepted verdict dot uses the verdict colour', () => {
+    expect(decl('pages/user/UserProfile.module.css', '.verdict-dot-accepted', 'background-color')).toBe('var(--verdict-accepted)');
   });
 });

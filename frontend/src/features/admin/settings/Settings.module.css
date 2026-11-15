@@ -193,7 +193,7 @@
   width: 20px;
   left: 4px;
   bottom: 4px;
-  background-color: white;
+  background-color: var(--background-primary);
   border-radius: 50%;
   transition: 0.2s;
 }

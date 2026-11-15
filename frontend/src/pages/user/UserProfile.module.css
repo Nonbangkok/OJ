@@ -215,7 +215,7 @@
   background-color: var(--text-muted);
 }
 
-.verdict-dot-accepted { background-color: var(--accent-primary); }
+.verdict-dot-accepted { background-color: var(--verdict-accepted); }
 .verdict-dot-wrong { background-color: var(--verdict-wrong); }
 .verdict-dot-time { background-color: var(--verdict-time); }
 .verdict-dot-memory { background-color: var(--verdict-memory); }

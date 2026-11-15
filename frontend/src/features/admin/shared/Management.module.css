@@ -494,6 +494,10 @@
   left: 50%;
   transform: translate(-50%, -50%);
   color: var(--text-primary);
+  /* Own surface: the label sits over both the fill and the empty track. */
+  background-color: var(--background-primary);
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.8rem;
   font-weight: 600;
 }

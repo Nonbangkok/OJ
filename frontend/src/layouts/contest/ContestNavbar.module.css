@@ -36,11 +36,6 @@
   color: var(--text-secondary);
 }
 
-.back-btn svg {
-  width: 22px;
-  height: 22px;
-}
-
 /* Nav Brand (Contest Title) */
 .nav-brand {
   display: flex;
@@ -88,6 +83,12 @@
 
 .nav-links a:hover {
   color: var(--text-primary);
+}
+
+/* The current page is marked in text too, not only by the slider. */
+.nav-links a[aria-current='page'] {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .slider {
