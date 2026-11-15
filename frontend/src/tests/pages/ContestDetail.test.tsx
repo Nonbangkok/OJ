@@ -135,4 +135,54 @@ describe('ContestDetail Page', () => {
             expect(screen.getByText(/failed to load contest data/i)).toBeInTheDocument();
         });
     });
+
+    describe('top-right timing line', () => {
+        const contestWith = (overrides: Record<string, unknown>) => ({
+            id: 1, title: 'Test Contest', description: null,
+            problems: [{ id: 'P1', title: 'Problem 1', author: null }],
+            is_participant: true,
+            start_time: '2026-01-01T00:00:00Z',
+            end_time: '2026-01-02T00:00:00Z',
+            participant_count: '5',
+            ...overrides,
+        });
+        const hoursFromNow = (hours: number) => new Date(Date.now() + hours * 3600 * 1000).toISOString();
+
+        it('says final submissions are being judged while finishing, never "Soon remaining"', async () => {
+            jest.mocked(contestService.getById).mockResolvedValue(contestWith({ status: 'finishing' }) as never);
+
+            render(<BrowserRouter><ContestDetail /></BrowserRouter>);
+
+            expect(await screen.findByText('Judging final submissions')).toBeInTheDocument();
+            expect(screen.queryByText(/remaining/i)).not.toBeInTheDocument();
+            expect(screen.queryByText(/soon/i)).not.toBeInTheDocument();
+        });
+
+        it('shows the remaining time while running', async () => {
+            jest.mocked(contestService.getById).mockResolvedValue(
+                contestWith({ status: 'running', end_time: hoursFromNow(2.5) }) as never
+            );
+
+            render(<BrowserRouter><ContestDetail /></BrowserRouter>);
+
+            expect(await screen.findByText(/^2h (29|30)m remaining$/)).toBeInTheDocument();
+        });
+
+        it('says the contest is ending once a running contest is past its end time', async () => {
+            jest.mocked(contestService.getById).mockResolvedValue(contestWith({ status: 'running' }) as never);
+
+            render(<BrowserRouter><ContestDetail /></BrowserRouter>);
+
+            expect(await screen.findByText('Ending now')).toBeInTheDocument();
+            expect(screen.queryByText(/soon remaining/i)).not.toBeInTheDocument();
+        });
+
+        it('says the contest is starting once a scheduled contest is past its start time', async () => {
+            jest.mocked(contestService.getById).mockResolvedValue(contestWith({ status: 'scheduled' }) as never);
+
+            render(<BrowserRouter><ContestDetail /></BrowserRouter>);
+
+            expect(await screen.findByText('Starting now')).toBeInTheDocument();
+        });
+    });
 });
