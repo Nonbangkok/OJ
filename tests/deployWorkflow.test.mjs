@@ -112,3 +112,11 @@ test('the public URL check is warning-only', () => {
   assert.match(wf, /https:\/\/nonbangkokgrader\.com\//);
   assert.match(wf, /continue-on-error:\s*true/);
 });
+
+test('the job outlasts an uncached build plus the backup', () => {
+  // The server disk is rotational: a build with no BuildKit cache takes about
+  // an hour and the pre-deploy pg_dump up to CD_BACKUP_TIMEOUT_SECONDS (30 min).
+  // A 45-minute cap cut a healthy deploy off mid-build on 2026-11-16.
+  const minutes = Number(wf.match(/^ {4}timeout-minutes:\s*(\d+)/m)?.[1]);
+  assert.ok(minutes >= 120, `job timeout-minutes is ${minutes}, needs >= 120`);
+});

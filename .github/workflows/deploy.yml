@@ -32,7 +32,11 @@ jobs:
       github.event.workflow_run.head_repository.full_name == github.repository
     environment: production
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # The server builds on a rotational disk: a deploy with no BuildKit cache
+    # (after `docker builder prune`) takes ~1 h to build plus up to 30 min of
+    # backup. 45 min cut a healthy deploy off mid-build on 2026-11-16; the
+    # script kept running on the server, but the run showed as failed.
+    timeout-minutes: 120
     steps:
       # Only needed for .github/deploy-known-hosts (public host keys, no secrets).
       - uses: actions/checkout@v7
