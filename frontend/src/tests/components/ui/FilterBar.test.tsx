@@ -44,6 +44,17 @@ describe('FilterBar', () => {
     expect(screen.queryByRole('button', { name: 'Add filter: Category' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Filters · 1' }));
     const sheet = screen.getByRole('dialog', { name: 'Filters' });
-    expect(within(sheet).getByRole('button', { name: 'Add filter: Category' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: 'DP' })).toBeInTheDocument();
+  });
+
+  it('sets an unset filter from inline options in the phone sheet', () => {
+    setPhone(true);
+    const onChange = jest.fn();
+    render(<FilterBar filters={chips(undefined, onChange)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Filters · 0' }));
+    const sheet = screen.getByRole('dialog', { name: 'Filters' });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Hard' }));
+    expect(onChange).toHaveBeenCalledWith('hard');
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 });

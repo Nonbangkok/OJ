@@ -57,17 +57,32 @@ describe('DataTable', () => {
     expect(onChange).toHaveBeenLastCalledWith(new Set());
   });
 
-  it('activates a row with Enter but not from a button inside it', () => {
+  it('activates a row through its primary button, with one tab stop per row', () => {
     const onRowClick = jest.fn();
     renderTable({
       onRowClick,
       rowActions: () => [{ key: 'del', label: 'Delete', onClick: jest.fn(), variant: 'danger' }],
     });
     const row = screen.getByRole('row', { name: /Beta/ });
-    fireEvent.keyDown(row, { key: 'Enter' });
-    expect(onRowClick).toHaveBeenCalledWith(rows[1]);
-    fireEvent.click(within(row).getByRole('button', { name: 'Actions for b' }));
+    expect(row).not.toHaveAttribute('tabindex');
+    fireEvent.click(within(row).getByRole('button', { name: 'Beta' }));
     expect(onRowClick).toHaveBeenCalledTimes(1);
+    expect(onRowClick).toHaveBeenCalledWith(rows[1]);
+    fireEvent.click(within(row).getByRole('button', { name: 'Actions for Beta' }));
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores clicks inside an open row menu that miss every item', () => {
+    const onRowClick = jest.fn();
+    renderTable({ onRowClick, rowActions: () => [{ key: 'edit', label: 'Edit', onClick: jest.fn() }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Beta' }));
+    fireEvent.click(screen.getByRole('menu'));
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('scrolls inside a fixed height so the sticky header has something to stick to', () => {
+    renderTable({ maxHeight: '480px' });
+    expect(screen.getByRole('table').parentElement).toHaveStyle({ maxHeight: '480px' });
   });
 
   it('lists destructive row actions last', () => {
@@ -106,5 +121,17 @@ describe('DataTable', () => {
     const item = within(list).getAllByRole('listitem')[1];
     expect(item).toHaveTextContent('Beta');
     expect(item).toHaveTextContent('b · 1200');
+  });
+
+  it('keeps interactive meta cells outside the phone row link', () => {
+    setPhone(true);
+    const withLink: DataTableColumn<Row>[] = [
+      ...columns,
+      { key: 'author', header: 'Author', cell: (r) => <a href={`/users/${r.id}`}>{`by ${r.id}`}</a>, mobile: 'meta' },
+    ];
+    renderTable({ columns: withLink, rowHref: (r) => `/problems/${r.id}` });
+    const author = screen.getByRole('link', { name: 'by b' });
+    expect(author.parentElement?.closest('a')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Beta' })).toHaveAttribute('href', '/problems/b');
   });
 });

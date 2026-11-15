@@ -24,4 +24,18 @@ describe('useUrlFilters', () => {
     expect(search).toBe('?other=1');
     expect(router.state.historyAction).toBe('REPLACE');
   });
+
+  it('applies several changes in one update', () => {
+    let api = null as unknown as ReturnType<typeof useUrlFilters<'difficulty' | 'page'>>;
+    let search = '';
+    const Probe = () => {
+      api = useUrlFilters(['difficulty', 'page'] as const);
+      search = useLocation().search;
+      return null;
+    };
+    const router = createMemoryRouter([{ path: '/', element: <Probe /> }], { initialEntries: ['/?page=3'] });
+    render(<RouterProvider router={router} />);
+    act(() => api.setMany({ difficulty: 'hard', page: null }));
+    expect(search).toBe('?difficulty=hard');
+  });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useRef, type MouseEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CaretDown, CaretUp } from '@phosphor-icons/react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
@@ -32,6 +32,8 @@ export interface DataTableProps<T> {
   error?: { message: string; onRetry?: () => void };
   empty?: ReactNode;
   highlightKey?: string;
+  /** Caps the table's height so it scrolls inside its box and the header stays visible. */
+  maxHeight?: string;
 }
 
 export const PHONE_TABLE_QUERY = '(max-width: 639px)';
@@ -47,7 +49,7 @@ function SelectAll({ checked, indeterminate, onChange }: { checked: boolean; ind
 /** The standard table: left text, right mono numbers, row activation, ⋯ actions, two-line phone layout. */
 export function DataTable<T>(props: DataTableProps<T>) {
   const {
-    columns, rows, rowKey, caption, onRowClick, rowHref, rowActions, rowLabel, selection, sort, loading, error, empty, highlightKey,
+    columns, rows, rowKey, caption, onRowClick, rowHref, rowActions, rowLabel, selection, sort, loading, error, empty, highlightKey, maxHeight,
   } = props;
   const isPhone = useMediaQuery(PHONE_TABLE_QUERY);
   const navigate = useNavigate();
@@ -63,12 +65,11 @@ export function DataTable<T>(props: DataTableProps<T>) {
     if (onRowClick) onRowClick(row);
     else if (rowHref) navigate(rowHref(row));
   };
+  // A mouse convenience only: the keyboard path is the primary cell's link or button.
+  // React bubbles clicks out of portals, so a click must land inside the row itself.
   const onRowMouse = (row: T) => (event: MouseEvent) => {
-    if ((event.target as HTMLElement).closest(INTERACTIVE)) return;
-    activate(row);
-  };
-  const onRowKey = (row: T) => (event: KeyboardEvent) => {
-    if (event.key !== 'Enter' || event.target !== event.currentTarget) return;
+    const target = event.target as HTMLElement;
+    if (!event.currentTarget.contains(target) || target.closest(INTERACTIVE)) return;
     activate(row);
   };
   const toggle = (key: string) => {
@@ -86,7 +87,9 @@ export function DataTable<T>(props: DataTableProps<T>) {
   };
   const cellContent = (col: DataTableColumn<T>, row: T) => {
     const content = col.cell(row);
-    if (rowHref && col === primary) return <Link to={rowHref(row)} className={styles.primaryLink}>{content}</Link>;
+    if (col !== primary) return content;
+    if (rowHref) return <Link to={rowHref(row)} className={styles.primaryLink}>{content}</Link>;
+    if (onRowClick) return <button type="button" className={styles.primaryLink} onClick={() => onRowClick(row)}>{content}</button>;
     return content;
   };
 
@@ -105,25 +108,25 @@ export function DataTable<T>(props: DataTableProps<T>) {
               {selection && (
                 <input type="checkbox" aria-label={`Select ${labelOf(row)}`} checked={selection.selected.has(key)} onChange={() => toggle(key)} className={styles.checkbox} />
               )}
-              {(() => {
-                const text = (
-                  <>
+              <div className={styles.itemText}>
+                {(() => {
+                  // Only the primary line is the control; meta cells may hold their own links.
+                  const primaryText = (
                     <span className={styles.itemPrimary}>
-                      {columns.filter((c) => c.mobile === 'primary').map((c) => <span key={c.key}>{rowHref ? c.cell(row) : cellContent(c, row)}</span>)}
+                      {columns.filter((c) => c.mobile === 'primary').map((c) => <span key={c.key}>{c.cell(row)}</span>)}
                     </span>
-                    {metas.length > 0 && (
-                      <span className={styles.itemMeta}>
-                        {metas.map((c, i) => <span key={c.key}>{i > 0 && ' · '}{c.cell(row)}</span>)}
-                      </span>
-                    )}
-                  </>
-                );
-                // On phones the whole text block is the control: a link for rowHref, a button for onRowClick.
-                if (rowHref) return <Link to={rowHref(row)} className={styles.itemText}>{text}</Link>;
-                if (onRowClick) return <button type="button" className={styles.itemText} onClick={() => onRowClick(row)}>{text}</button>;
-                return <div className={styles.itemText}>{text}</div>;
-              })()}
-              {rowActions && <ActionMenu label={`Actions for ${key}`} items={actionsFor(row)} />}
+                  );
+                  if (rowHref) return <Link to={rowHref(row)} className={styles.itemControl}>{primaryText}</Link>;
+                  if (onRowClick) return <button type="button" className={styles.itemControl} onClick={() => onRowClick(row)}>{primaryText}</button>;
+                  return primaryText;
+                })()}
+                {metas.length > 0 && (
+                  <span className={styles.itemMeta}>
+                    {metas.map((c, i) => <span key={c.key}>{i > 0 && ' · '}{c.cell(row)}</span>)}
+                  </span>
+                )}
+              </div>
+              {rowActions && <ActionMenu label={`Actions for ${labelOf(row)}`} items={actionsFor(row)} />}
             </li>
           );
         })}
@@ -133,7 +136,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
 
   const colSpan = columns.length + (selection ? 1 : 0) + (rowActions ? 1 : 0);
   return (
-    <div className={styles.wrap}>
+    <div className={styles.wrap} style={maxHeight ? { maxHeight, overflowY: 'auto' } : undefined}>
       {error && <InlineError message={error.message} onRetry={error.onRetry} />}
       <table className={styles.table}>
         <caption className={styles.caption}>{caption}</caption>
@@ -174,9 +177,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
               <tr
                 key={key}
                 className={`${activatable ? styles.activatable : ''} ${key === highlightKey ? styles.highlight : ''}`.trim() || undefined}
-                tabIndex={activatable ? 0 : undefined}
                 onClick={activatable ? onRowMouse(row) : undefined}
-                onKeyDown={activatable ? onRowKey(row) : undefined}
               >
                 {selection && (
                   <td className={styles.selectCell}>
@@ -187,7 +188,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                   <td key={col.key} data-align={col.align ?? 'left'}>{cellContent(col, row)}</td>
                 ))}
                 {rowActions && (
-                  <td className={styles.actionsCell}><ActionMenu label={`Actions for ${key}`} items={actionsFor(row)} /></td>
+                  <td className={styles.actionsCell}><ActionMenu label={`Actions for ${labelOf(row)}`} items={actionsFor(row)} /></td>
                 )}
               </tr>
             );

@@ -41,6 +41,21 @@ function Chip({ chip }: { chip: FilterChip }) {
   );
 }
 
+/**
+ * Phone sheet: unset filters list their options inline. A menu would open
+ * under the drawer's backdrop and outside its focus trap.
+ */
+function SheetOptions({ chip }: { chip: FilterChip }) {
+  if (chip.options.some((o) => o.value === chip.value)) return <Chip chip={chip} />;
+  return (
+    <div role="group" aria-label={chip.label} className={styles.sheetOptions}>
+      {chip.options.map((o) => (
+        <button key={o.value} type="button" className={styles.chipAdd} onClick={() => chip.onChange(o.value)}>{o.label}</button>
+      ))}
+    </div>
+  );
+}
+
 /** Search + segmented control + filter chips + result count, one row (filters collapse on phones). */
 export function FilterBar({ search, segments, filters = [], resultCount, trailing }: FilterBarProps) {
   const isPhone = useMediaQuery('(max-width: 639px)');
@@ -72,7 +87,7 @@ export function FilterBar({ search, segments, filters = [], resultCount, trailin
               {filters.map((chip) => (
                 <div key={chip.key} className={styles.sheetGroup}>
                   <span className={styles.sheetLabel}>{chip.label}</span>
-                  <Chip chip={chip} />
+                  <SheetOptions chip={chip} />
                 </div>
               ))}
             </div>

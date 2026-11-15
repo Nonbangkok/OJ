@@ -33,4 +33,20 @@ describe('ConfirmDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onCancel).toHaveBeenCalled();
   });
+
+  it('clears the typed text when the dialog closes', () => {
+    const props = { tier: 'typed' as const, title: 'Delete user nattapat?', body: 'x', confirmLabel: 'Delete user', confirmText: 'nattapat', onConfirm: jest.fn(), onCancel: jest.fn() };
+    const { rerender } = render(<ConfirmDialog open {...props} />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'nattapat' } });
+    expect(screen.getByRole('button', { name: 'Delete user' })).toBeEnabled();
+    rerender(<ConfirmDialog open={false} {...props} />);
+    rerender(<ConfirmDialog open {...props} />);
+    expect(screen.getByRole('textbox')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Delete user' })).toBeDisabled();
+  });
+
+  it('never enables a typed confirm whose text is empty', () => {
+    render(<ConfirmDialog open tier="typed" title="Delete?" body="x" confirmLabel="Delete" confirmText="" onConfirm={jest.fn()} onCancel={jest.fn()} />);
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+  });
 });

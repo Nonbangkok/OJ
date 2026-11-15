@@ -7,7 +7,10 @@ import { useSearchParams } from 'react-router-dom';
  */
 export function useUrlFilters<K extends string>(keys: readonly K[]): {
   values: Record<K, string>;
+  /** One change. Two `set` calls in one handler keep only the last; use `setMany` for that. */
   set: (key: K, value: string | null) => void;
+  /** Several changes in one URL update (e.g. a filter plus a page reset). */
+  setMany: (patch: Partial<Record<K, string | null>>) => void;
   clear: () => void;
 } {
   const [params, setParams] = useSearchParams();
@@ -20,13 +23,20 @@ export function useUrlFilters<K extends string>(keys: readonly K[]): {
     [params, keyList],
   );
 
-  const set = useCallback((key: K, value: string | null) => {
+  const setMany = useCallback((patch: Partial<Record<K, string | null>>) => {
     setParams((prev) => {
       const next = new URLSearchParams(prev);
-      if (value === null || value === '') next.delete(key); else next.set(key, value);
+      for (const [key, value] of Object.entries(patch) as Array<[K, string | null | undefined]>) {
+        if (value === undefined) continue;
+        if (value === null || value === '') next.delete(key); else next.set(key, value);
+      }
       return next;
     }, { replace: true });
   }, [setParams]);
+
+  const set = useCallback((key: K, value: string | null) => {
+    setMany({ [key]: value } as Partial<Record<K, string | null>>);
+  }, [setMany]);
 
   const clear = useCallback(() => {
     setParams((prev) => {
@@ -36,7 +46,7 @@ export function useUrlFilters<K extends string>(keys: readonly K[]): {
     }, { replace: true });
   }, [setParams, keyList]);
 
-  return { values, set, clear };
+  return { values, set, setMany, clear };
 }
 
 export default useUrlFilters;

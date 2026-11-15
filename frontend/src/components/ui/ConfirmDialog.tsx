@@ -3,24 +3,32 @@ import { Button } from './Button';
 import { Dialog } from './Dialog';
 import styles from './ConfirmDialog.module.css';
 
-export interface ConfirmDialogProps {
+interface ConfirmDialogBase {
   open: boolean;
-  tier: 'plain' | 'destructive' | 'typed';
   title: string;
   body: ReactNode;
   confirmLabel: string;
-  /** For `typed`: the exact text (case-sensitive, untrimmed) the user must type. */
-  confirmText?: string;
   busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
+export type ConfirmDialogProps =
+  | (ConfirmDialogBase & { tier: 'plain' | 'destructive'; confirmText?: never })
+  /** `confirmText` is the exact text (case-sensitive, untrimmed) the user must type; empty never confirms. */
+  | (ConfirmDialogBase & { tier: 'typed'; confirmText: string });
+
 /** Confirmation in three tiers: reversible, destructive, and type-the-name for cascading deletes. */
 export function ConfirmDialog({ open, tier, title, body, confirmLabel, confirmText = '', busy = false, onConfirm, onCancel }: ConfirmDialogProps) {
   const [typed, setTyped] = useState('');
+  const [wasOpen, setWasOpen] = useState(open);
+  // Closing clears the typed text, so every open asks for a fresh deliberate act.
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (!open) setTyped('');
+  }
   const inputId = useId();
-  const ready = tier !== 'typed' || typed === confirmText;
+  const ready = tier !== 'typed' || (confirmText !== '' && typed === confirmText);
   const variant = tier === 'plain' ? 'primary' : 'destructive';
   const confirm = () => { if (ready && !busy) onConfirm(); };
 
