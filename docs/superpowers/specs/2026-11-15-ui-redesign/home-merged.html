@@ -1,0 +1,205 @@
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+
+<style>
+  .g { font-family:'IBM Plex Sans Thai', sans-serif; background:var(--bg); color:var(--fg); border-radius:10px; overflow:hidden; border:1px solid rgba(127,127,127,.25); }
+  .light { --bg:#fff; --fg:#18181b; --mut:#71717a; --faint:#a1a1aa; --line:#e4e4e7; --line2:#f4f4f5; --ok:#16a34a; --bad:#dc2626; --none:#d4d4d8; --btn:#18181b; --btnfg:#fff; --btnk:#52525b;
+           --h0:#ebedf0; --h1:#9be9a8; --h2:#40c463; --h3:#30a14e; --h4:#216e39; }
+  .dark  { --bg:#0d1117; --fg:#e6edf3; --mut:#8b949e; --faint:#6e7681; --line:#21262d; --line2:#161b22; --ok:#3fb950; --bad:#f85149; --none:#30363d; --btn:#e6edf3; --btnfg:#0d1117; --btnk:#8b949e;
+           --h0:#161b22; --h1:#0e4429; --h2:#006d32; --h3:#26a641; --h4:#39d353; }
+  .mono { font-family:'JetBrains Mono', monospace; }
+
+  .g .nav { display:flex; align-items:center; gap:22px; height:52px; padding:0 24px; border-bottom:1px solid var(--line); font-size:14px; }
+  .g .logo { display:flex; align-items:center; gap:8px; font-weight:600; }
+  .g .logo b { width:22px; height:22px; border-radius:5px; background:var(--fg); color:var(--bg); display:grid; place-items:center; font:600 12px 'JetBrains Mono', monospace; }
+  .g .nav a { color:var(--mut); }
+  .g .nav .r { margin-left:auto; display:flex; gap:10px; align-items:center; }
+  .g .search { display:flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:6px; padding:5px 8px 5px 10px; color:var(--faint); font-size:13px; width:200px; }
+  .g .k { margin-left:auto; font:11px 'JetBrains Mono', monospace; border:1px solid var(--line); border-radius:4px; padding:0 5px; color:var(--mut); }
+  .g .lv { font:12px 'JetBrains Mono', monospace; border:1px solid var(--line); border-radius:6px; padding:3px 8px; color:var(--mut); }
+  .g .lv b { color:var(--fg); font-weight:500; }
+  .g .av { width:26px; height:26px; border-radius:50%; background:var(--line); }
+
+  .g .page { max-width:1040px; margin:0 auto; padding:28px 24px 30px; display:grid; grid-template-columns: 1fr 300px; gap:36px; }
+  .g .hello { font-size:13px; color:var(--mut); margin-bottom:6px; }
+  .g h1 { font-size:22px; font-weight:600; margin:0 0 18px; }
+  .g h3 { font-size:12px; font-weight:500; color:var(--mut); text-transform:uppercase; letter-spacing:.06em; margin:0 0 10px; }
+
+  .g .resume { border:1px solid var(--line); border-radius:8px; padding:16px 18px; }
+  .g .resume .top { display:flex; align-items:center; gap:12px; }
+  .g .resume .id { font:12.5px 'JetBrains Mono', monospace; color:var(--mut); }
+  .g .resume .title { font-size:17px; font-weight:600; }
+  .g .resume .btn { margin-left:auto; background:var(--btn); color:var(--btnfg); border-radius:6px; padding:8px 14px; font-size:14px; font-weight:500; display:flex; gap:8px; align-items:center; }
+  .g .resume .btn .k { border-color:var(--btnk); color:var(--btnk); }
+  .g .cases { display:flex; gap:4px; margin:14px 0 8px; }
+  .g .cases span { width:22px; height:8px; border-radius:2px; background:var(--ok); }
+  .g .cases span.x { background:var(--bad); }
+  .g .cases span.n { background:var(--line); }
+  .g .resume .meta { font-size:13px; color:var(--mut); display:flex; gap:14px; }
+  .g .resume .meta .v { font:12px 'JetBrains Mono', monospace; color:var(--bad); }
+
+  .g .sec { margin-top:26px; }
+  .g .goal { display:grid; grid-template-columns: 22px 1fr; gap:10px; padding:12px 0; border-bottom:1px solid var(--line2); font-size:14px; }
+  .g .goal i { font-size:18px; color:var(--mut); margin-top:1px; }
+  .g .goal .go { font-size:13px; color:var(--fg); text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--line); }
+  .g .num { font:12.5px 'JetBrains Mono', monospace; color:var(--mut); }
+
+  .g .side > div { margin-bottom:26px; }
+  .g .big { font-size:15px; font-weight:500; }
+  .g .small { font-size:13px; color:var(--mut); }
+  .g .bar { height:6px; background:var(--line2); border-radius:3px; overflow:hidden; }
+  .g .bar span { display:block; height:100%; background:var(--fg); }
+  .g .coll { display:grid; grid-template-columns: 1fr auto; gap:4px 10px; align-items:center; font-size:13.5px; margin-bottom:10px; }
+  .g .coll .bar { grid-column: 1 / -1; }
+  .g .coll .bar span { background:var(--h3); }
+
+  .g .week { display:flex; gap:6px; margin-top:8px; }
+  .g .week div { flex:1; text-align:center; font-size:11px; color:var(--mut); }
+  .g .week div span { display:grid; place-items:center; height:30px; border-radius:4px; background:var(--h0); margin-bottom:4px; font:11px 'JetBrains Mono', monospace; color:transparent; }
+  .g .week div span.l1 { background:var(--h1); } .g .week div span.l2 { background:var(--h2); } .g .week div span.l3 { background:var(--h3); } .g .week div span.l4 { background:var(--h4); }
+  .g .week div span.today { background:transparent; border:1.5px dashed var(--faint); }
+  .g .week:hover div span { color:var(--fg); }
+  .g .week:hover div span.l3, .g .week:hover div span.l4 { color:#fff; }
+  .g .legend { display:flex; gap:4px; align-items:center; font-size:11px; color:var(--mut); margin-top:8px; }
+  .g .legend i { width:10px; height:10px; border-radius:2px; display:inline-block; }
+
+  /* phone */
+  .phone { width:370px; }
+  .phone .nav { padding:0 16px; gap:12px; }
+  .phone .page { display:block; padding:18px 16px 18px; }
+  .phone .resume .top { flex-wrap:wrap; }
+  .phone .resume .btn { margin-left:0; width:100%; justify-content:center; margin-top:12px; order:3; }
+  .phone .cases span { flex:1; width:auto; }
+  .phone .side { margin-top:24px; }
+  .phone .tabs { display:flex; border-top:1px solid var(--line); }
+  .phone .tabs div { flex:1; text-align:center; padding:8px 0 10px; font-size:11px; color:var(--mut); }
+  .phone .tabs div i { display:block; font-size:20px; margin-bottom:2px; }
+  .phone .tabs div.on { color:var(--fg); font-weight:500; }
+
+  .lbl { font:600 12px/1 sans-serif; letter-spacing:.08em; text-transform:uppercase; opacity:.6; margin:28px 0 10px; }
+  .row2 { display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; }
+</style>
+
+<h2>หน้าหลัก: B + แถบ Level และชุดโจทย์จาก A</h2>
+<p class="subtitle">ช่องของแต่ละวันในสัปดาห์นี้ไล่ความเข้มของสีเขียวตามจำนวนข้อที่ผ่านในวันนั้น ใช้ 4 ระดับเดียวกับตารางกิจกรรมในหน้าโปรไฟล์ เอาเมาส์ไปชี้แถบสัปดาห์จะเห็นจำนวนข้อ</p>
+
+<div class="lbl">Desktop · โหมดสว่าง</div>
+<div class="g light">
+  <div class="nav"><div class="logo"><b>G</b> Grader</div><a>Problems</a><a>Contests</a><a>Submissions</a><a>Ranking</a>
+    <div class="r"><div class="search"><i class="ph ph-magnifying-glass"></i> Search <span class="k">⌘K</span></div><span class="lv">Lv.<b>12</b> Expert</span><div class="av"></div></div></div>
+  <div class="page">
+    <div>
+      <div class="hello">Sunday, 15 Nov</div>
+      <h1>Continue where you left off</h1>
+      <div class="resume">
+        <div class="top"><div><div class="id">hp_vec04_erase</div><div class="title">vector::erase</div></div><div class="btn">Continue <span class="k">↵</span></div></div>
+        <div class="cases"><span></span><span></span><span></span><span></span><span></span><span></span><span class="x"></span><span class="n"></span><span class="n"></span><span class="n"></span></div>
+        <div class="meta"><span class="v">WRONG 6/10</span><span>3 attempts</span><span>last tried 2h ago</span></div>
+      </div>
+      <div class="sec">
+        <h3>Within reach</h3>
+        <div class="goal"><i class="ph ph-stack"></i><div><div>One more to finish <b>pair</b> <span class="num">9/10</span></div><span class="go">pair ordering →</span></div></div>
+        <div class="goal"><i class="ph ph-arrow-fat-lines-up"></i><div><div><span class="mono">160 XP</span> to Level 13</div><span class="go">vector::at gives +60 XP →</span></div></div>
+        <div class="goal"><i class="ph ph-calendar-check"></i><div><div>Solve one today to make it a 6-day run</div><span class="go">Random unsolved →</span></div></div>
+      </div>
+    </div>
+    <div class="side">
+      <div>
+        <h3>Level</h3>
+        <div class="big">Lv.12 · Expert</div>
+        <div class="bar" style="margin:8px 0 6px"><span style="width:68%"></span></div>
+        <div class="small"><span class="mono">340 / 500 XP</span> · 160 XP to Lv.13</div>
+      </div>
+      <div>
+        <h3>This week</h3>
+        <div class="week">
+          <div><span class="l1">1</span>M</div><div><span class="l3">4</span>T</div><div><span>0</span>W</div><div><span class="l2">2</span>T</div><div><span class="l4">6</span>F</div><div><span class="l1">1</span>S</div><div><span class="today"></span>S</div>
+        </div>
+        <div class="legend">less <i style="background:var(--h0)"></i><i style="background:var(--h1)"></i><i style="background:var(--h2)"></i><i style="background:var(--h3)"></i><i style="background:var(--h4)"></i> more</div>
+        <div class="small" style="margin-top:8px">14 solved this week · 5-day run</div>
+      </div>
+      <div>
+        <h3>Collections</h3>
+        <div class="coll"><span>pair</span><span class="num">9/10</span><div class="bar"><span style="width:90%"></span></div></div>
+        <div class="coll"><span>vector</span><span class="num">3/10</span><div class="bar"><span style="width:30%"></span></div></div>
+        <div class="coll"><span>stack / queue</span><span class="num">0/10</span><div class="bar"><span style="width:0%"></span></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="lbl">Desktop · โหมดมืด</div>
+<div class="g dark">
+  <div class="nav"><div class="logo"><b>G</b> Grader</div><a>Problems</a><a>Contests</a><a>Submissions</a><a>Ranking</a>
+    <div class="r"><div class="search"><i class="ph ph-magnifying-glass"></i> Search <span class="k">⌘K</span></div><span class="lv">Lv.<b>12</b> Expert</span><div class="av"></div></div></div>
+  <div class="page">
+    <div>
+      <div class="hello">Sunday, 15 Nov</div>
+      <h1>Continue where you left off</h1>
+      <div class="resume">
+        <div class="top"><div><div class="id">hp_vec04_erase</div><div class="title">vector::erase</div></div><div class="btn">Continue <span class="k">↵</span></div></div>
+        <div class="cases"><span></span><span></span><span></span><span></span><span></span><span></span><span class="x"></span><span class="n"></span><span class="n"></span><span class="n"></span></div>
+        <div class="meta"><span class="v">WRONG 6/10</span><span>3 attempts</span><span>last tried 2h ago</span></div>
+      </div>
+      <div class="sec">
+        <h3>Within reach</h3>
+        <div class="goal"><i class="ph ph-stack"></i><div><div>One more to finish <b>pair</b> <span class="num">9/10</span></div><span class="go">pair ordering →</span></div></div>
+        <div class="goal"><i class="ph ph-arrow-fat-lines-up"></i><div><div><span class="mono">160 XP</span> to Level 13</div><span class="go">vector::at gives +60 XP →</span></div></div>
+        <div class="goal"><i class="ph ph-calendar-check"></i><div><div>Solve one today to make it a 6-day run</div><span class="go">Random unsolved →</span></div></div>
+      </div>
+    </div>
+    <div class="side">
+      <div>
+        <h3>Level</h3>
+        <div class="big">Lv.12 · Expert</div>
+        <div class="bar" style="margin:8px 0 6px"><span style="width:68%"></span></div>
+        <div class="small"><span class="mono">340 / 500 XP</span> · 160 XP to Lv.13</div>
+      </div>
+      <div>
+        <h3>This week</h3>
+        <div class="week">
+          <div><span class="l1">1</span>M</div><div><span class="l3">4</span>T</div><div><span>0</span>W</div><div><span class="l2">2</span>T</div><div><span class="l4">6</span>F</div><div><span class="l1">1</span>S</div><div><span class="today"></span>S</div>
+        </div>
+        <div class="legend">less <i style="background:var(--h0)"></i><i style="background:var(--h1)"></i><i style="background:var(--h2)"></i><i style="background:var(--h3)"></i><i style="background:var(--h4)"></i> more</div>
+        <div class="small" style="margin-top:8px">14 solved this week · 5-day run</div>
+      </div>
+      <div>
+        <h3>Collections</h3>
+        <div class="coll"><span>pair</span><span class="num">9/10</span><div class="bar"><span style="width:90%"></span></div></div>
+        <div class="coll"><span>vector</span><span class="num">3/10</span><div class="bar"><span style="width:30%"></span></div></div>
+        <div class="coll"><span>stack / queue</span><span class="num">0/10</span><div class="bar"><span style="width:0%"></span></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="lbl">มือถือ · ปุ่ม Continue เต็มความกว้าง, ส่วนขวาย้ายลงล่าง</div>
+<div class="row2">
+  <div class="g light phone">
+    <div class="nav"><div class="logo"><b>G</b> Grader</div><div class="r"><span class="lv">Lv.<b>12</b></span><div class="av"></div></div></div>
+    <div class="page">
+      <div class="hello">Sunday, 15 Nov</div>
+      <h1>Continue where you left off</h1>
+      <div class="resume">
+        <div class="top"><div><div class="id">hp_vec04_erase</div><div class="title">vector::erase</div></div><div class="btn">Continue</div></div>
+        <div class="cases"><span></span><span></span><span></span><span></span><span></span><span></span><span class="x"></span><span class="n"></span><span class="n"></span><span class="n"></span></div>
+        <div class="meta"><span class="v">WRONG 6/10</span><span>3 attempts</span></div>
+      </div>
+      <div class="sec">
+        <h3>Within reach</h3>
+        <div class="goal"><i class="ph ph-stack"></i><div><div>One more to finish <b>pair</b> <span class="num">9/10</span></div><span class="go">pair ordering →</span></div></div>
+        <div class="goal"><i class="ph ph-calendar-check"></i><div><div>Solve one today to make it a 6-day run</div><span class="go">Random unsolved →</span></div></div>
+      </div>
+      <div class="side">
+        <div>
+          <h3>This week</h3>
+          <div class="week">
+            <div><span class="l1">1</span>M</div><div><span class="l3">4</span>T</div><div><span>0</span>W</div><div><span class="l2">2</span>T</div><div><span class="l4">6</span>F</div><div><span class="l1">1</span>S</div><div><span class="today"></span>S</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tabs"><div class="on"><i class="ph ph-house"></i>Home</div><div><i class="ph ph-list-checks"></i>Problems</div><div><i class="ph ph-flag-checkered"></i>Contests</div><div><i class="ph ph-paper-plane-tilt"></i>Submissions</div></div>
+  </div>
+</div>

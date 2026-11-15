@@ -1,0 +1,202 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+
+<style>
+  .mock-wrap { margin: 0 0 40px; }
+  .mock-wrap > .tag { font: 600 13px/1 Inter, sans-serif; letter-spacing: .08em; text-transform: uppercase; opacity: .6; margin-bottom: 10px; }
+  .frame { border-radius: 10px; overflow: hidden; border: 1px solid rgba(127,127,127,.25); }
+
+  /* ---------- A ---------- */
+  .mA { font-family: Inter, 'Noto Sans Thai', sans-serif; background: radial-gradient(1200px 400px at 10% -10%, #ede9fe 0%, transparent 60%), radial-gradient(900px 400px at 100% 0%, #dbeafe 0%, transparent 55%), #f8fafc; color: #0f172a; padding-bottom: 28px; }
+  .mA .nav { display:flex; align-items:center; gap:28px; padding:16px 32px; background: rgba(255,255,255,.6); backdrop-filter: blur(12px); border-bottom:1px solid rgba(255,255,255,.8); }
+  .mA .logo { font-weight:800; font-size:18px; background: linear-gradient(90deg,#6366f1,#a855f7,#ec4899); -webkit-background-clip:text; color:transparent; display:flex; gap:6px; align-items:center; }
+  .mA .logo i { color:#a855f7; -webkit-text-fill-color:#a855f7; }
+  .mA .nav a { font-size:14px; color:#475569; text-decoration:none; }
+  .mA .nav .cta { margin-left:auto; padding:9px 18px; border-radius:999px; color:#fff; font-weight:600; font-size:14px; background: linear-gradient(90deg,#6366f1,#a855f7); box-shadow: 0 8px 24px -6px rgba(139,92,246,.55); }
+  .mA .hero { text-align:center; padding:36px 32px 24px; }
+  .mA .pill { display:inline-flex; gap:6px; align-items:center; padding:5px 12px; border-radius:999px; background:#fff; border:1px solid #e9d5ff; color:#7c3aed; font-size:12px; font-weight:600; }
+  .mA h1 { font-size:34px; font-weight:800; margin:14px 0 8px; letter-spacing:-.02em; }
+  .mA h1 span { background: linear-gradient(90deg,#6366f1,#a855f7,#ec4899); -webkit-background-clip:text; color:transparent; }
+  .mA .sub { color:#64748b; font-size:15px; }
+  .mA .grid { display:grid; grid-template-columns: repeat(4,1fr); gap:16px; padding:8px 32px 0; }
+  .mA .card { background: rgba(255,255,255,.75); border:1px solid rgba(255,255,255,.9); border-radius:20px; padding:18px; box-shadow: 0 10px 30px -12px rgba(30,41,59,.18); }
+  .mA .card .ic { width:36px; height:36px; border-radius:12px; display:grid; place-items:center; color:#fff; background: linear-gradient(135deg,#818cf8,#c084fc); font-size:18px; margin-bottom:12px; }
+  .mA .card h3 { font-size:15px; margin:0 0 4px; font-weight:700; }
+  .mA .card p { font-size:13px; color:#64748b; margin:0 0 12px; }
+  .mA .chip { display:inline-block; font-size:11px; font-weight:600; padding:3px 9px; border-radius:999px; background: linear-gradient(90deg,#e0e7ff,#f3e8ff); color:#6d28d9; }
+
+  /* ---------- B ---------- */
+  .mB { font-family: 'IBM Plex Sans Thai', Inter, sans-serif; background:#fff; color:#18181b; }
+  .mB .nav { display:flex; align-items:center; gap:22px; height:48px; padding:0 24px; border-bottom:1px solid #e4e4e7; font-size:13.5px; }
+  .mB .logo { font-weight:600; display:flex; align-items:center; gap:8px; }
+  .mB .logo b { width:20px; height:20px; border-radius:5px; background:#18181b; color:#fff; display:grid; place-items:center; font:600 11px 'JetBrains Mono', monospace; }
+  .mB .nav a { color:#71717a; text-decoration:none; }
+  .mB .nav a.on { color:#18181b; font-weight:500; }
+  .mB .nav .r { margin-left:auto; display:flex; gap:14px; align-items:center; color:#71717a; }
+  .mB .kbd { font: 11px 'JetBrains Mono', monospace; border:1px solid #e4e4e7; border-radius:4px; padding:1px 5px; color:#71717a; }
+  .mB .av { width:24px; height:24px; border-radius:50%; background:#e4e4e7; }
+  .mB .head { padding:22px 24px 14px; display:flex; align-items:end; justify-content:space-between; }
+  .mB h1 { font-size:20px; font-weight:600; margin:0; }
+  .mB .meta { font-size:13px; color:#71717a; margin-top:4px; }
+  .mB .search { display:flex; gap:8px; align-items:center; border:1px solid #e4e4e7; border-radius:6px; padding:6px 10px; font-size:13px; color:#a1a1aa; width:240px; }
+  .mB table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  .mB th { text-align:left; font-weight:500; color:#71717a; font-size:12px; padding:8px 24px; border-top:1px solid #e4e4e7; border-bottom:1px solid #e4e4e7; background:#fafafa; }
+  .mB td { padding:11px 24px; border-bottom:1px solid #f4f4f5; }
+  .mB .id { font: 12px 'JetBrains Mono', monospace; color:#a1a1aa; }
+  .mB .t { font-weight:500; }
+  .mB .d { font-size:12.5px; color:#71717a; }
+  .mB .ok { color:#16a34a; } .mB .bad { color:#dc2626; } .mB .none { color:#d4d4d8; }
+  .mB .num { font: 12.5px 'JetBrains Mono', monospace; color:#52525b; }
+
+  /* ---------- C ---------- */
+  .mC { font-family: Anuphan, sans-serif; background:#fbf8f3; color:#22201c; padding-bottom:22px; }
+  .mC .nav { display:flex; align-items:center; gap:6px; padding:14px 28px; }
+  .mC .logo { font-weight:700; font-size:18px; display:flex; gap:8px; align-items:center; margin-right:18px; }
+  .mC .logo b { width:30px; height:30px; border-radius:9px; background:#2f6b4f; color:#fbf8f3; display:grid; place-items:center; font-size:17px; }
+  .mC .nav a { color:#6b645a; text-decoration:none; font-size:15px; padding:7px 12px; border-radius:8px; }
+  .mC .nav a.on { background:#efe8dc; color:#22201c; font-weight:600; }
+  .mC .nav .r { margin-left:auto; display:flex; align-items:center; gap:12px; font-size:14px; }
+  .mC .streak { display:flex; gap:6px; align-items:center; background:#fff; border:1px solid #ebe3d6; border-radius:999px; padding:5px 12px 5px 8px; font-weight:600; }
+  .mC .streak i { color:#e0782f; font-size:17px; }
+  .mC .av { width:32px; height:32px; border-radius:50%; background:#d9cfbf; display:grid; place-items:center; font-weight:700; color:#5a5246; }
+  .mC .body { display:grid; grid-template-columns: 1fr 260px; gap:22px; padding:10px 28px 0; }
+  .mC h1 { font-size:26px; font-weight:700; margin:6px 0 4px; }
+  .mC .sub { color:#6b645a; font-size:15px; margin-bottom:16px; }
+  .mC .row { display:flex; align-items:center; gap:14px; background:#fff; border:1px solid #ebe3d6; border-radius:12px; padding:13px 16px; margin-bottom:8px; }
+  .mC .st { width:26px; height:26px; border-radius:50%; display:grid; place-items:center; font-size:15px; flex:none; }
+  .mC .st.ok { background:#2f6b4f; color:#fff; } .mC .st.try { background:#fbe7d6; color:#c25a1c; } .mC .st.none { border:2px dashed #d9cfbf; }
+  .mC .t { font-weight:600; font-size:15.5px; }
+  .mC .d { color:#6b645a; font-size:14px; }
+  .mC .topic { margin-left:auto; font-size:12.5px; padding:4px 10px; border-radius:8px; background:#e7efe9; color:#2f6b4f; font-weight:600; white-space:nowrap; }
+  .mC .topic.v { background:#e8eaf5; color:#3d4a8f; }
+  .mC .lv { font-size:13px; color:#6b645a; width:44px; text-align:right; }
+  .mC .side { background:#fff; border:1px solid #ebe3d6; border-radius:14px; padding:18px; align-self:start; margin-top:46px; }
+  .mC .side h4 { margin:0 0 4px; font-size:15px; }
+  .mC .bar { height:8px; border-radius:99px; background:#efe8dc; overflow:hidden; margin:12px 0 6px; }
+  .mC .bar span { display:block; height:100%; width:62%; background:#2f6b4f; border-radius:99px; }
+  .mC .small { font-size:13px; color:#6b645a; }
+
+  /* ---------- D ---------- */
+  .mD { font-family: 'Noto Sans Thai', Inter, sans-serif; background:#0d1117; color:#e6edf3; }
+  .mD .nav { display:flex; align-items:center; gap:22px; height:50px; padding:0 24px; border-bottom:1px solid #21262d; font-size:14px; background:#010409; }
+  .mD .logo { font: 600 14px 'JetBrains Mono', monospace; color:#7ee787; }
+  .mD .nav a { color:#8b949e; text-decoration:none; }
+  .mD .nav a.on { color:#e6edf3; box-shadow: inset 0 -2px 0 #f78166; padding-bottom:14px; padding-top:16px; }
+  .mD .nav .r { margin-left:auto; display:flex; gap:12px; align-items:center; font: 12px 'JetBrains Mono', monospace; color:#8b949e; }
+  .mD .badge { border:1px solid #30363d; border-radius:6px; padding:3px 8px; }
+  .mD .badge b { color:#d2a8ff; font-weight:500; }
+  .mD .head { padding:22px 24px 12px; }
+  .mD .prompt { font: 13px 'JetBrains Mono', monospace; color:#8b949e; }
+  .mD .prompt span { color:#7ee787; }
+  .mD h1 { font-size:22px; margin:6px 0 0; font-weight:600; }
+  .mD .list { padding: 6px 24px 22px; }
+  .mD .row { display:grid; grid-template-columns: 22px 170px 1fr 120px 60px; gap:14px; align-items:center; padding:10px 12px; border:1px solid #21262d; border-radius:6px; margin-bottom:6px; background:#0d1117; font-size:14px; }
+  .mD .row:hover, .mD .row.hl { background:#161b22; border-color:#30363d; }
+  .mD .id { font: 12.5px 'JetBrains Mono', monospace; color:#79c0ff; }
+  .mD .d { color:#8b949e; font-size:13px; }
+  .mD .v { font: 12px 'JetBrains Mono', monospace; }
+  .mD .ac { color:#3fb950; } .mD .wa { color:#f85149; } .mD .na { color:#484f58; }
+  .mD .lvl { font: 12.5px 'JetBrains Mono', monospace; color:#d29922; text-align:right; }
+</style>
+
+<h2>ลองดูสี่แบบนี้ แล้วบอกความรู้สึกกับแต่ละแบบ</h2>
+<p class="subtitle">ทั้งสี่แบบเป็นหน้ารายการโจทย์หน้าเดียวกัน ใช้โจทย์จริงจาก grader ต่างกันแค่ "บรรยากาศ" ผมตั้งใจทำมาแบบหนึ่งให้ใกล้กับสิ่งที่คนมักเรียกว่า AI slop ลองเดาดูว่าแบบไหน</p>
+
+<!-- A -->
+<div class="mock-wrap">
+  <div class="tag">แบบ A</div>
+  <div class="frame mA">
+    <div class="nav">
+      <div class="logo"><i class="ph-fill ph-sparkle"></i> GraderAI</div>
+      <a>โจทย์</a><a>การแข่งขัน</a><a>อันดับ</a><a>ชุมชน</a>
+      <div class="cta">เริ่มเลย →</div>
+    </div>
+    <div class="hero">
+      <span class="pill"><i class="ph-fill ph-lightning"></i> ใหม่! โจทย์ Header Problems 50 ข้อ</span>
+      <h1>ยกระดับทักษะเขียนโค้ด <span>ไปอีกขั้น</span></h1>
+      <div class="sub">ฝึกฝน แข่งขัน และเติบโต ไปพร้อมกับชุมชนนักแก้โจทย์ที่ทรงพลังที่สุด</div>
+    </div>
+    <div class="grid">
+      <div class="card"><div class="ic"><i class="ph-bold ph-check"></i></div><h3>pair::operator&lt;</h3><p>เปรียบเทียบแบบ lexicographic</p><span class="chip">ง่าย · 900</span></div>
+      <div class="card"><div class="ic"><i class="ph-bold ph-rocket-launch"></i></div><h3>vector::erase</h3><p>ลบสมาชิกที่ตำแหน่ง pos</p><span class="chip">ปานกลาง · 1200</span></div>
+      <div class="card"><div class="ic"><i class="ph-bold ph-brain"></i></div><h3>vector::at</h3><p>เข้าถึงสมาชิกพร้อมตรวจขอบเขต</p><span class="chip">ง่าย · 1000</span></div>
+      <div class="card"><div class="ic"><i class="ph-bold ph-trophy"></i></div><h3>pair ordering</h3><p>ตัวเปรียบเทียบครบทั้ง 6 ตัว</p><span class="chip">ยาก · 1600</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- B -->
+<div class="mock-wrap">
+  <div class="tag">แบบ B</div>
+  <div class="frame mB">
+    <div class="nav">
+      <div class="logo"><b>G</b> Grader</div>
+      <a class="on">โจทย์</a><a>การแข่งขัน</a><a>ผลส่ง</a><a>อันดับ</a>
+      <div class="r"><span class="kbd">/</span> ค้นหา <div class="av"></div></div>
+    </div>
+    <div class="head">
+      <div><h1>โจทย์</h1><div class="meta">142 ข้อ · ทำผ่านแล้ว 38</div></div>
+      <div class="search"><i class="ph ph-magnifying-glass"></i> ค้นหาโจทย์หรือรหัส</div>
+    </div>
+    <table>
+      <tr><th style="width:28px"></th><th>รหัส</th><th>ชื่อโจทย์</th><th>หมวด</th><th style="text-align:right">ระดับ</th></tr>
+      <tr><td><i class="ph-bold ph-check ok"></i></td><td class="id">hp_pair02</td><td><div class="t">pair::operator&lt;</div><div class="d">เปรียบเทียบแบบ lexicographic</div></td><td class="d">Data Structures</td><td class="num" style="text-align:right">900</td></tr>
+      <tr><td><i class="ph-bold ph-x bad"></i></td><td class="id">hp_vec04</td><td><div class="t">vector::erase</div><div class="d">ลบสมาชิกที่ตำแหน่ง pos</div></td><td class="d">Data Structures</td><td class="num" style="text-align:right">1200</td></tr>
+      <tr><td><i class="ph ph-circle none"></i></td><td class="id">hp_vec02</td><td><div class="t">vector::at</div><div class="d">เข้าถึงสมาชิกพร้อมตรวจขอบเขต</div></td><td class="d">Data Structures</td><td class="num" style="text-align:right">1000</td></tr>
+      <tr><td><i class="ph ph-circle none"></i></td><td class="id">hp_pair10</td><td><div class="t">pair ordering</div><div class="d">ตัวเปรียบเทียบครบทั้ง 6 ตัว</div></td><td class="d">Data Structures</td><td class="num" style="text-align:right">1600</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- C -->
+<div class="mock-wrap">
+  <div class="tag">แบบ C</div>
+  <div class="frame mC">
+    <div class="nav">
+      <div class="logo"><b><i class="ph-bold ph-code"></i></b> Grader</div>
+      <a class="on">โจทย์</a><a>การแข่งขัน</a><a>ผลส่งของฉัน</a><a>อันดับ</a>
+      <div class="r"><span class="streak"><i class="ph-fill ph-flame"></i> 5 วัน</span><div class="av">น</div></div>
+    </div>
+    <div class="body">
+      <div>
+        <h1>โจทย์</h1>
+        <div class="sub">วันนี้ทำไปแล้ว 2 ข้อ ต่ออีกนิด</div>
+        <div class="row"><div class="st ok"><i class="ph-bold ph-check"></i></div><div><div class="t">pair::operator&lt;</div><div class="d">เปรียบเทียบแบบ lexicographic</div></div><span class="topic">pair</span><span class="lv">900</span></div>
+        <div class="row"><div class="st try"><i class="ph-bold ph-arrow-counter-clockwise"></i></div><div><div class="t">vector::erase</div><div class="d">ลองแล้ว 3 ครั้ง · ผ่าน 6/10 เคส</div></div><span class="topic v">vector</span><span class="lv">1200</span></div>
+        <div class="row"><div class="st none"></div><div><div class="t">vector::at</div><div class="d">เข้าถึงสมาชิกพร้อมตรวจขอบเขต</div></div><span class="topic v">vector</span><span class="lv">1000</span></div>
+        <div class="row"><div class="st none"></div><div><div class="t">pair ordering</div><div class="d">ตัวเปรียบเทียบครบทั้ง 6 ตัว</div></div><span class="topic">pair</span><span class="lv">1600</span></div>
+      </div>
+      <div class="side">
+        <h4>Header Problems · pair</h4>
+        <div class="small">ทำผ่าน 6 จาก 10 ข้อ</div>
+        <div class="bar"><span></span></div>
+        <div class="small">ข้อต่อไปที่แนะนำ: vector::at</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- D -->
+<div class="mock-wrap">
+  <div class="tag">แบบ D</div>
+  <div class="frame mD">
+    <div class="nav">
+      <div class="logo">~/grader</div>
+      <a class="on">โจทย์</a><a>การแข่งขัน</a><a>ผลส่ง</a><a>อันดับ</a>
+      <div class="r"><span class="badge">Lv.<b>12</b> Expert</span><span class="badge">⌘K</span></div>
+    </div>
+    <div class="head">
+      <div class="prompt"><span>$</span> ls problems --sort=level</div>
+      <h1>โจทย์ทั้งหมด</h1>
+    </div>
+    <div class="list">
+      <div class="row hl"><i class="ph-bold ph-check ac"></i><span class="id">hp_pair02_less</span><span>pair::operator&lt; <span class="d">· lexicographic</span></span><span class="v ac">ACCEPTED</span><span class="lvl">900</span></div>
+      <div class="row"><i class="ph-bold ph-x wa"></i><span class="id">hp_vec04_erase</span><span>vector::erase <span class="d">· ลบที่ตำแหน่ง pos</span></span><span class="v wa">WRONG 6/10</span><span class="lvl">1200</span></div>
+      <div class="row"><i class="ph ph-minus na"></i><span class="id">hp_vec02_at</span><span>vector::at <span class="d">· ตรวจขอบเขต</span></span><span class="v na">—</span><span class="lvl">1000</span></div>
+      <div class="row"><i class="ph ph-minus na"></i><span class="id">hp_pair10_ordering</span><span>pair ordering <span class="d">· ครบ 6 ตัว</span></span><span class="v na">—</span><span class="lvl">1600</span></div>
+    </div>
+  </div>
+</div>

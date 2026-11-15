@@ -1,0 +1,127 @@
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+
+<style>
+  .g { font-family:'IBM Plex Sans Thai', sans-serif; background:var(--bg); color:var(--fg); border-radius:10px; overflow:hidden; border:1px solid rgba(127,127,127,.25); }
+  .light { --bg:#ffffff; --bg2:#fafafa; --fg:#18181b; --mut:#71717a; --faint:#a1a1aa; --line:#e4e4e7; --line2:#f4f4f5; --hover:#f4f4f5; --ok:#16a34a; --bad:#dc2626; --warn:#b45309; --none:#d4d4d8; --id:#71717a; --logo-bg:#18181b; --logo-fg:#fff; --navbg:#fff; --chip:#f4f4f5; }
+  .dark  { --bg:#0d1117; --bg2:#010409; --fg:#e6edf3; --mut:#8b949e; --faint:#6e7681; --line:#21262d; --line2:#161b22; --hover:#161b22; --ok:#3fb950; --bad:#f85149; --warn:#d29922; --none:#30363d; --id:#79c0ff; --logo-bg:#e6edf3; --logo-fg:#0d1117; --navbg:#010409; --chip:#161b22; }
+  .mono { font-family:'JetBrains Mono', monospace; }
+
+  .g .nav { display:flex; align-items:center; gap:22px; height:52px; padding:0 24px; border-bottom:1px solid var(--line); background:var(--navbg); font-size:14px; }
+  .g .logo { display:flex; align-items:center; gap:8px; font-weight:600; }
+  .g .logo b { width:22px; height:22px; border-radius:5px; background:var(--logo-bg); color:var(--logo-fg); display:grid; place-items:center; font:600 12px 'JetBrains Mono', monospace; }
+  .g .nav a { color:var(--mut); text-decoration:none; display:flex; align-items:center; height:100%; }
+  .g .nav a.on { color:var(--fg); font-weight:500; box-shadow: inset 0 -2px 0 var(--fg); }
+  .g .nav .r { margin-left:auto; display:flex; gap:10px; align-items:center; }
+  .g .search { display:flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:6px; padding:5px 8px 5px 10px; color:var(--faint); font-size:13px; width:220px; }
+  .g .search .k { margin-left:auto; font:11px 'JetBrains Mono', monospace; border:1px solid var(--line); border-radius:4px; padding:0 5px; }
+  .g .lv { font:12px 'JetBrains Mono', monospace; border:1px solid var(--line); border-radius:6px; padding:3px 8px; color:var(--mut); }
+  .g .lv b { color:var(--fg); font-weight:500; }
+  .g .av { width:26px; height:26px; border-radius:50%; background:var(--line); display:grid; place-items:center; font-size:12px; color:var(--mut); }
+
+  .g .page { max-width: 1040px; margin: 0 auto; padding: 24px 24px 28px; }
+  .g .head { display:flex; align-items:end; justify-content:space-between; gap:16px; margin-bottom:14px; }
+  .g h1 { font-size:22px; font-weight:600; margin:0; }
+  .g .meta { color:var(--mut); font-size:13px; margin-top:4px; }
+  .g .seg { display:flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; font-size:13px; }
+  .g .seg span { padding:5px 12px; color:var(--mut); border-right:1px solid var(--line); }
+  .g .seg span:last-child { border-right:0; }
+  .g .seg span.on { background:var(--chip); color:var(--fg); font-weight:500; }
+
+  .g .row { display:grid; grid-template-columns: 22px 150px 1fr 150px 56px; gap:14px; align-items:center; padding:11px 12px; border-bottom:1px solid var(--line2); font-size:14px; }
+  .g .row.hd { font-size:12px; color:var(--mut); border-bottom:1px solid var(--line); padding-top:6px; padding-bottom:8px; }
+  .g .row:not(.hd):hover, .g .row.hl { background:var(--hover); border-radius:6px; }
+  .g .id { font:12.5px 'JetBrains Mono', monospace; color:var(--id); }
+  .g .t { font-weight:500; }
+  .g .d { color:var(--mut); font-size:13px; }
+  .g .v { font:12px 'JetBrains Mono', monospace; }
+  .g .ok { color:var(--ok); } .g .bad { color:var(--bad); } .g .none { color:var(--none); }
+  .g .num { font:12.5px 'JetBrains Mono', monospace; color:var(--mut); text-align:right; }
+
+  /* mobile */
+  .phones { display:flex; gap:28px; flex-wrap:wrap; }
+  .phone { width:360px; }
+  .phone .nav { padding:0 16px; gap:12px; }
+  .phone .page { padding:18px 16px 20px; }
+  .phone .head { flex-direction:column; align-items:stretch; }
+  .phone .row { grid-template-columns: 22px 1fr auto; gap:12px; padding:12px 4px; }
+  .phone .row .id, .phone .row .num.hide { display:none; }
+  .phone .stack { display:flex; flex-direction:column; gap:2px; }
+  .phone .sub { display:flex; gap:8px; align-items:center; }
+  .phone .tabs { display:flex; border-top:1px solid var(--line); background:var(--navbg); }
+  .phone .tabs div { flex:1; text-align:center; padding:8px 0 10px; font-size:11px; color:var(--mut); }
+  .phone .tabs div i { display:block; font-size:20px; margin-bottom:2px; }
+  .phone .tabs div.on { color:var(--fg); font-weight:500; }
+  .phone .msearch { display:flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:6px; padding:8px 10px; color:var(--faint); font-size:14px; margin-top:12px; }
+  .lbl { font:600 12px/1 sans-serif; letter-spacing:.08em; text-transform:uppercase; opacity:.6; margin:28px 0 10px; }
+</style>
+
+<h2>B เป็นฐาน, D เป็นโหมดมืดของระบบเดียวกัน</h2>
+<p class="subtitle">ตัด gradient, การ์ดลอย และไอคอนไฟออกทั้งหมด เก็บไอคอนสถานะ (ผ่าน / ไม่ผ่าน / ยังไม่ทำ) จาก B และรายละเอียดจาก D อย่าง "WRONG 6/10", ระดับ Lv. แบบตัวหนังสือเรียบๆ และปุ่มลัด ⌘K ลงในระบบเดียว ความกว้างหน้า 1040px เท่ากันทุกหน้า</p>
+
+<div class="lbl">Desktop · โหมดสว่าง</div>
+<div class="g light">
+  <div class="nav">
+    <div class="logo"><b>G</b> Grader</div>
+    <a class="on">โจทย์</a><a>การแข่งขัน</a><a>ผลส่ง</a><a>อันดับ</a>
+    <div class="r"><div class="search"><i class="ph ph-magnifying-glass"></i> ค้นหา <span class="k">⌘K</span></div><span class="lv">Lv.<b>12</b> Expert</span><div class="av">น</div></div>
+  </div>
+  <div class="page">
+    <div class="head">
+      <div><h1>โจทย์</h1><div class="meta">142 ข้อ · ผ่านแล้ว 38</div></div>
+      <div class="seg"><span class="on">ทั้งหมด</span><span>ยังไม่ผ่าน</span><span>ผ่านแล้ว</span></div>
+    </div>
+    <div class="row hd"><span></span><span>รหัส</span><span>ชื่อโจทย์</span><span>ผลล่าสุด</span><span style="text-align:right">ระดับ</span></div>
+    <div class="row"><i class="ph-bold ph-check ok"></i><span class="id">hp_pair02_less</span><span><span class="t">pair::operator&lt;</span> <span class="d">· เปรียบเทียบแบบ lexicographic</span></span><span class="v ok">ACCEPTED</span><span class="num">900</span></div>
+    <div class="row hl"><i class="ph-bold ph-x bad"></i><span class="id">hp_vec04_erase</span><span><span class="t">vector::erase</span> <span class="d">· ลบสมาชิกที่ตำแหน่ง pos</span></span><span class="v bad">WRONG 6/10</span><span class="num">1200</span></div>
+    <div class="row"><i class="ph-bold ph-timer" style="color:var(--warn)"></i><span class="id">hp_vec01_fill</span><span><span class="t">vector::fill</span> <span class="d">· กำหนดค่าทุกสมาชิก</span></span><span class="v" style="color:var(--warn)">TIME LIMIT 8/10</span><span class="num">1000</span></div>
+    <div class="row"><i class="ph ph-circle none"></i><span class="id">hp_vec02_at</span><span><span class="t">vector::at</span> <span class="d">· เข้าถึงสมาชิกพร้อมตรวจขอบเขต</span></span><span class="v none">—</span><span class="num">1000</span></div>
+    <div class="row"><i class="ph ph-circle none"></i><span class="id">hp_pair10_ordering</span><span><span class="t">pair ordering</span> <span class="d">· ตัวเปรียบเทียบครบทั้ง 6 ตัว</span></span><span class="v none">—</span><span class="num">1600</span></div>
+  </div>
+</div>
+
+<div class="lbl">Desktop · โหมดมืด</div>
+<div class="g dark">
+  <div class="nav">
+    <div class="logo"><b>G</b> Grader</div>
+    <a class="on">โจทย์</a><a>การแข่งขัน</a><a>ผลส่ง</a><a>อันดับ</a>
+    <div class="r"><div class="search"><i class="ph ph-magnifying-glass"></i> ค้นหา <span class="k">⌘K</span></div><span class="lv">Lv.<b>12</b> Expert</span><div class="av">น</div></div>
+  </div>
+  <div class="page">
+    <div class="head">
+      <div><h1>โจทย์</h1><div class="meta">142 ข้อ · ผ่านแล้ว 38</div></div>
+      <div class="seg"><span class="on">ทั้งหมด</span><span>ยังไม่ผ่าน</span><span>ผ่านแล้ว</span></div>
+    </div>
+    <div class="row hd"><span></span><span>รหัส</span><span>ชื่อโจทย์</span><span>ผลล่าสุด</span><span style="text-align:right">ระดับ</span></div>
+    <div class="row"><i class="ph-bold ph-check ok"></i><span class="id">hp_pair02_less</span><span><span class="t">pair::operator&lt;</span> <span class="d">· เปรียบเทียบแบบ lexicographic</span></span><span class="v ok">ACCEPTED</span><span class="num">900</span></div>
+    <div class="row hl"><i class="ph-bold ph-x bad"></i><span class="id">hp_vec04_erase</span><span><span class="t">vector::erase</span> <span class="d">· ลบสมาชิกที่ตำแหน่ง pos</span></span><span class="v bad">WRONG 6/10</span><span class="num">1200</span></div>
+    <div class="row"><i class="ph-bold ph-timer" style="color:var(--warn)"></i><span class="id">hp_vec01_fill</span><span><span class="t">vector::fill</span> <span class="d">· กำหนดค่าทุกสมาชิก</span></span><span class="v" style="color:var(--warn)">TIME LIMIT 8/10</span><span class="num">1000</span></div>
+    <div class="row"><i class="ph ph-circle none"></i><span class="id">hp_vec02_at</span><span><span class="t">vector::at</span> <span class="d">· เข้าถึงสมาชิกพร้อมตรวจขอบเขต</span></span><span class="v none">—</span><span class="num">1000</span></div>
+    <div class="row"><i class="ph ph-circle none"></i><span class="id">hp_pair10_ordering</span><span><span class="t">pair ordering</span> <span class="d">· ตัวเปรียบเทียบครบทั้ง 6 ตัว</span></span><span class="v none">—</span><span class="num">1600</span></div>
+  </div>
+</div>
+
+<div class="lbl">มือถือ · แถบเมนูย้ายไปล่างจอ</div>
+<div class="phones">
+  <div class="g light phone">
+    <div class="nav"><div class="logo"><b>G</b> Grader</div><div class="r"><span class="lv">Lv.<b>12</b></span><div class="av">น</div></div></div>
+    <div class="page">
+      <div class="head"><div><h1>โจทย์</h1><div class="meta">142 ข้อ · ผ่านแล้ว 38</div></div><div class="msearch"><i class="ph ph-magnifying-glass"></i> ค้นหาโจทย์</div></div>
+      <div class="row"><i class="ph-bold ph-check ok"></i><div class="stack"><span class="t">pair::operator&lt;</span><span class="sub"><span class="v ok">ACCEPTED</span></span></div><span class="num">900</span></div>
+      <div class="row"><i class="ph-bold ph-x bad"></i><div class="stack"><span class="t">vector::erase</span><span class="sub"><span class="v bad">WRONG 6/10</span></span></div><span class="num">1200</span></div>
+      <div class="row"><i class="ph ph-circle none"></i><div class="stack"><span class="t">vector::at</span><span class="d">เข้าถึงสมาชิกพร้อมตรวจขอบเขต</span></div><span class="num">1000</span></div>
+    </div>
+    <div class="tabs"><div class="on"><i class="ph ph-list-checks"></i>โจทย์</div><div><i class="ph ph-flag-checkered"></i>แข่งขัน</div><div><i class="ph ph-paper-plane-tilt"></i>ผลส่ง</div><div><i class="ph ph-ranking"></i>อันดับ</div></div>
+  </div>
+  <div class="g dark phone">
+    <div class="nav"><div class="logo"><b>G</b> Grader</div><div class="r"><span class="lv">Lv.<b>12</b></span><div class="av">น</div></div></div>
+    <div class="page">
+      <div class="head"><div><h1>โจทย์</h1><div class="meta">142 ข้อ · ผ่านแล้ว 38</div></div><div class="msearch"><i class="ph ph-magnifying-glass"></i> ค้นหาโจทย์</div></div>
+      <div class="row"><i class="ph-bold ph-check ok"></i><div class="stack"><span class="t">pair::operator&lt;</span><span class="sub"><span class="v ok">ACCEPTED</span></span></div><span class="num">900</span></div>
+      <div class="row"><i class="ph-bold ph-x bad"></i><div class="stack"><span class="t">vector::erase</span><span class="sub"><span class="v bad">WRONG 6/10</span></span></div><span class="num">1200</span></div>
+      <div class="row"><i class="ph ph-circle none"></i><div class="stack"><span class="t">vector::at</span><span class="d">เข้าถึงสมาชิกพร้อมตรวจขอบเขต</span></div><span class="num">1000</span></div>
+    </div>
+    <div class="tabs"><div class="on"><i class="ph ph-list-checks"></i>โจทย์</div><div><i class="ph ph-flag-checkered"></i>แข่งขัน</div><div><i class="ph ph-paper-plane-tilt"></i>ผลส่ง</div><div><i class="ph ph-ranking"></i>อันดับ</div></div>
+  </div>
+</div>
