@@ -12,10 +12,7 @@ export function useLiveContest(): Contest | null {
   const loggedIn = Boolean(user);
 
   useEffect(() => {
-    if (!loggedIn) {
-      setLive(null);
-      return undefined;
-    }
+    if (!loggedIn) return undefined;
     let cancelled = false;
     const load = () => {
       contestService.getAll()
@@ -38,5 +35,5 @@ export function useLiveContest(): Contest | null {
     };
   }, [loggedIn]);
 
-  return live;
+  return loggedIn ? live : null;
 }

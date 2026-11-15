@@ -2,7 +2,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  min-width: 0; /* let the username ellipsize instead of overflowing the navbar */
+  min-width: 0; /* let the username ellipsize */
 }
 
 /* Trigger identifies the user only: avatar + username + chevron. No border —
@@ -12,27 +12,18 @@
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
-  max-width: 220px; /* long usernames ellipsize instead of stretching the navbar */
+  width: 100%; /* fills the sidebar footer; long usernames ellipsize */
   background: none;
   border: none;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   padding: 0.1875rem 0.625rem 0.1875rem 0.1875rem;
   cursor: pointer;
   color: var(--text-primary);
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease,
-    transform 0.15s ease;
+  transition: background-color 0.15s ease;
 }
 
 .trigger:hover {
-  background-color: var(--background-secondary);
-  color: var(--accent-primary);
-  transform: scale(1.03);
-}
-
-.trigger:active {
-  transform: scale(0.98);
+  background-color: var(--background-tertiary);
 }
 
 .trigger:focus-visible {
@@ -79,8 +70,9 @@
 
 .menu {
   position: absolute;
-  top: calc(100% + 0.5rem);
-  right: 0;
+  /* Opens upward from the sidebar footer. */
+  bottom: calc(100% + 0.375rem);
+  left: 0;
   min-width: 220px;
   background-color: var(--surface-elevated);
   border: 1px solid var(--border-color);
@@ -185,4 +177,11 @@
     max-width: none;
     padding: 0.1875rem 0.5rem 0.1875rem 0.1875rem;
   }
+}
+
+.level {
+  margin-left: auto;
+  font-family: var(--font-family-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }

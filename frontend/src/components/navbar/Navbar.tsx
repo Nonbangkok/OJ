@@ -1,7 +1,7 @@
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
-import NavbarUserMenu from './NavbarUserMenu';
+import NavbarUserMenu from '../shell/AccountMenu';
 import styles from './Navbar.module.css';
 import GraderLogo from '../brand/GraderLogo';
 import { USER_ROLES } from '../../utils/constants';

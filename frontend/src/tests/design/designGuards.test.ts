@@ -282,7 +282,7 @@ describe('review fixes (phase 1 final review)', () => {
 
   it.each([
     ['components/ui/Dialog.module.css'], ['components/ui/ActionMenu.module.css'], ['components/ui/Drawer.module.css'],
-    ['components/navbar/NavbarUserMenu.module.css'], ['components/user/XpToast.module.css'],
+    ['components/shell/AccountMenu.module.css'], ['components/user/XpToast.module.css'],
   ])('%s floats with the floating-layer shadow', (file) => {
     const shadows = [...readSource(file).matchAll(/box-shadow\s*:\s*([^;]+);/g)].map((m) => m[1].trim());
     expect(shadows).toContain('var(--box-shadow-lg)');

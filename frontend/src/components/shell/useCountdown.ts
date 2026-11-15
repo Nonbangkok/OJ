@@ -18,27 +18,27 @@ export interface Countdown {
   done: boolean;
 }
 
-const read = (target: number | null): Countdown => {
-  if (target === null) return { remainingMs: 0, label: '', done: true };
-  const remainingMs = Math.max(0, target - Date.now());
-  return { remainingMs, label: formatRemaining(remainingMs), done: remainingMs === 0 };
-};
-
 /** Ticking countdown to `target`; stops at zero. */
 export function useCountdown(target: string | Date | null): Countdown {
   const targetMs = target === null ? null : new Date(target).getTime();
-  const [state, setState] = useState<Countdown>(() => read(targetMs));
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    setState(read(targetMs));
-    if (targetMs === null || targetMs <= Date.now()) return undefined;
+    if (targetMs === null) return undefined;
+    // Tick once immediately so a new target is never shown against a stale clock.
+    const tick = () => setNow(Date.now());
+    const first = window.setTimeout(tick, 0);
     const timer = window.setInterval(() => {
-      const next = read(targetMs);
-      setState(next);
-      if (next.done) window.clearInterval(timer);
+      tick();
+      if (Date.now() >= targetMs) window.clearInterval(timer);
     }, 1000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(timer);
+    };
   }, [targetMs]);
 
-  return state;
+  if (targetMs === null) return { remainingMs: 0, label: '', done: true };
+  const remainingMs = Math.max(0, targetMs - now);
+  return { remainingMs, label: formatRemaining(remainingMs), done: remainingMs === 0 };
 }

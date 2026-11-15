@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 
 import GraderLogo from '../../components/brand/GraderLogo';
-import NavbarUserMenu from '../../components/navbar/NavbarUserMenu';
+import NavbarUserMenu from '../../components/shell/AccountMenu';
 import { useAuth } from '../../context/AuthContext';
 import { USER_ROLES } from '../../utils/constants';
 import { useNavSlider } from '../../hooks/useNavSlider';
