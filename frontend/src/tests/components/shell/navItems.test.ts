@@ -19,8 +19,8 @@ describe('navItemsFor', () => {
     ]);
   });
 
-  it('shows guests only public pages', () => {
-    expect(navItemsFor(null, { privateMode: false }).map((i) => i.key)).toEqual(['home', 'problems']);
+  it('shows public-mode guests every public page and private-mode guests none', () => {
+    expect(navItemsFor(null, { privateMode: false }).map((i) => i.key)).toEqual(['home', 'problems', 'submissions', 'ranking', 'contests']);
     expect(navItemsFor(null, { privateMode: true })).toEqual([]);
   });
 });

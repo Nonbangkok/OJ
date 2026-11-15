@@ -24,8 +24,9 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const debounced = useDebouncedValue(query, DEBOUNCE_MS);
-  const [problems, setProblems] = useState<ProblemSuggestion[]>([]);
-  const [users, setUsers] = useState<UserSuggestion[]>([]);
+  // Results are stored with the query they answer, so a stale answer is never shown.
+  const [problemResult, setProblemResult] = useState<{ term: string; items: ProblemSuggestion[] }>({ term: '', items: [] });
+  const [userResult, setUserResult] = useState<{ term: string; items: UserSuggestion[] }>({ term: '', items: [] });
   const [contests, setContests] = useState<Contest[]>([]);
   const isStaff = user?.role === 'staff' || user?.role === 'admin';
   const term = debounced.trim();
@@ -38,14 +39,15 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
   }, [user]);
 
   useEffect(() => {
-    if (!term) return undefined;
+    // The search endpoints require a session; guests only get pages and contests.
+    if (!term || !user) return undefined;
     let cancelled = false;
-    submissionService.searchProblems(term).then((data) => { if (!cancelled) setProblems(data); }).catch(() => undefined);
+    submissionService.searchProblems(term).then((data) => { if (!cancelled) setProblemResult({ term, items: data }); }).catch(() => undefined);
     if (isStaff) {
-      submissionService.searchUsers(term).then((data) => { if (!cancelled) setUsers(data); }).catch(() => undefined);
+      submissionService.searchUsers(term).then((data) => { if (!cancelled) setUserResult({ term, items: data }); }).catch(() => undefined);
     }
     return () => { cancelled = true; };
-  }, [term, isStaff]);
+  }, [term, isStaff, user]);
 
   const go = (to: string) => {
     onClose();
@@ -54,8 +56,10 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
 
   const pages = navItemsFor(user?.role ?? null, { privateMode: isPrivateMode }).filter((item) => !query || matches(item.label, query));
   const contestHits = query ? contests.filter((c) => matches(c.title, query)).slice(0, 5) : [];
-  const problemHits = term ? problems.slice(0, 8) : [];
-  const userHits = term && isStaff ? users.slice(0, 5) : [];
+  // Compare with the live query: results for an older query are hidden at once.
+  const live = query.trim();
+  const problemHits = user && live && problemResult.term === live ? problemResult.items.slice(0, 8) : [];
+  const userHits = user && live && isStaff && userResult.term === live ? userResult.items.slice(0, 5) : [];
   const showTheme = !query || matches('Toggle theme', query);
 
   return (

@@ -5,3 +5,8 @@ export function isEditableTarget(target: EventTarget | null): boolean {
   if (target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], .cm-editor, [data-code-editor]')) return true;
   return false;
 }
+
+/** True while a modal dialog (ours or a page's) is open. */
+export function isModalOpen(): boolean {
+  return Boolean(document.querySelector('[role="dialog"][aria-modal="true"], dialog[open]'));
+}

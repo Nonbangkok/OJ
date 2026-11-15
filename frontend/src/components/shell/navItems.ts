@@ -35,7 +35,8 @@ const MANAGE: Array<NavItem & { adminOnly?: boolean }> = [
 /** Navigation destinations the current viewer may open. Permissions mirror the routes' guards. */
 export function navItemsFor(role: UserRole | null, opts: { privateMode: boolean }): NavItem[] {
   if (!role) {
-    return opts.privateMode ? [] : PRACTICE.filter((item) => item.key === 'home' || item.key === 'problems');
+    // Public mode: every public page (the old navbar showed these to guests too).
+    return opts.privateMode ? [] : [...PRACTICE, ...CONTESTS];
   }
   const manage = role === 'admin'
     ? MANAGE

@@ -88,6 +88,35 @@ describe('CommandPalette', () => {
     expect(router.state.location.pathname).toBe('/profile/nattapat');
   });
 
+  it('does not call the login-only search endpoints for guests', async () => {
+    jest.mocked(useAuth).mockReturnValue({ user: null } as ReturnType<typeof useAuth>);
+    renderApp();
+    fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true });
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'rev' } });
+    await act(async () => { jest.advanceTimersByTime(200); });
+    expect(submissionService.searchProblems).not.toHaveBeenCalled();
+    expect(submissionService.searchUsers).not.toHaveBeenCalled();
+  });
+
+  it('drops results from an older query as soon as the query changes', async () => {
+    renderApp();
+    fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true });
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'vec' } });
+    await act(async () => { jest.advanceTimersByTime(200); });
+    expect(await screen.findByRole('option', { name: /vector::erase/ })).toBeInTheDocument();
+    jest.mocked(submissionService.searchProblems).mockReturnValue(new Promise(() => undefined));
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'zzz' } });
+    await act(async () => { jest.advanceTimersByTime(200); });
+    expect(screen.queryByRole('option', { name: /vector::erase/ })).toBeNull();
+  });
+
+  it('does not open over another open dialog', () => {
+    render(<div role="dialog" aria-modal="true" aria-label="Edit contest"><input aria-label="Title" /></div>);
+    renderApp();
+    fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true });
+    expect(screen.queryByRole('dialog', { name: 'Search' })).toBeNull();
+  });
+
   it('toggles the theme', () => {
     renderApp();
     fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true });

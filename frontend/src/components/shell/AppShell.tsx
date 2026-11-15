@@ -8,7 +8,7 @@ import { MOBILE_QUERY, useMediaQuery } from '../../hooks/useMediaQuery';
 import Sidebar from './Sidebar';
 import MobileTabBar from './MobileTabBar';
 import { navItemsFor } from './navItems';
-import { isEditableTarget } from './keyboard';
+import { isEditableTarget, isModalOpen } from './keyboard';
 import { useCommandPalette } from './CommandPaletteContext';
 import styles from './AppShell.module.css';
 
@@ -67,7 +67,7 @@ export default function AppShell({ children, onOpenSearch: onOpenSearchProp }: A
     if (isMobile) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== '[' || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (isEditableTarget(event.target)) return;
+      if (isEditableTarget(event.target) || isModalOpen()) return;
       event.preventDefault();
       toggle();
     };

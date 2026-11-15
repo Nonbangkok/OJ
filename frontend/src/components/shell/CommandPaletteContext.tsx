@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import CommandPalette from './CommandPalette';
-import { isEditableTarget } from './keyboard';
+import { isEditableTarget, isModalOpen } from './keyboard';
 
 interface CommandPaletteValue {
   open: () => void;
@@ -21,6 +21,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // Never stack the palette on top of another modal (two focus traps).
+      if (isModalOpen()) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setIsOpen(true);

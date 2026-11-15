@@ -70,6 +70,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     void checkLoggedIn();
   }, [checkLoggedIn]);
 
+  // Roles are revalidated server-side on every request; re-read /me when the
+  // tab comes back so the navigation follows a role change without a reload.
+  useEffect(() => {
+    const onReturn = () => {
+      if (document.visibilityState === 'hidden') return;
+      void checkLoggedIn();
+    };
+    window.addEventListener('focus', onReturn);
+    document.addEventListener('visibilitychange', onReturn);
+    return () => {
+      window.removeEventListener('focus', onReturn);
+      document.removeEventListener('visibilitychange', onReturn);
+    };
+  }, [checkLoggedIn]);
+
   const login = useCallback((userData: AuthUser) => {
     // A fresh session exists again, so re-arm the session-expiry redirect
     // (AUTH-008): without this the second expiry in the same tab would not
@@ -85,6 +100,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } catch (error) {
       console.error('Logout failed', error);
     } finally {
+      // A guest's later 401s are normal, not a "session expired" redirect.
+      window.sessionStorage.removeItem('oj:had-session');
       setUser(null);
     }
   }, []);
