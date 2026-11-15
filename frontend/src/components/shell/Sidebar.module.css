@@ -164,3 +164,12 @@
   background: var(--background-primary);
   color: var(--text-primary);
 }
+
+/* Keyboard focus is always visible (phase 2a review). */
+.item:focus-visible,
+.search:focus-visible,
+.iconButton:focus-visible,
+.brandLink:focus-visible {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}

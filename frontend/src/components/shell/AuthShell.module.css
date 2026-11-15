@@ -23,3 +23,9 @@
   width: 100%;
   max-width: 360px;
 }
+
+/* Keyboard focus is always visible (phase 2a review). */
+.brand:focus-visible {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}

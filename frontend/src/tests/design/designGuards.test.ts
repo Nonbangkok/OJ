@@ -371,3 +371,18 @@ describe('old navbars', () => {
     expect(hits).toEqual([]);
   });
 });
+
+describe('shell focus', () => {
+  it.each([
+    ['components/shell/Sidebar.module.css', ['.item', '.search', '.iconButton', '.brandLink']],
+    ['components/shell/AppShell.module.css', ['.iconButton', '.brand']],
+    ['components/shell/MobileTabBar.module.css', ['.tab', '.sheetItem']],
+    ['components/shell/ContestShell.module.css', ['.leave', '.title', '.problem', '.link', '.back', '.tab']],
+    ['components/shell/AuthShell.module.css', ['.brand']],
+  ])('%s gives every control a visible keyboard focus ring', (file, selectors) => {
+    const css = readSource(file);
+    for (const sel of selectors) {
+      expect(css).toMatch(new RegExp(`\\${sel}:focus-visible[^{]*\\{[^}]*outline:\\s*2px solid var\\(--action-focus-ring\\)`));
+    }
+  });
+});

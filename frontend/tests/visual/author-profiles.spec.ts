@@ -9,7 +9,7 @@ import {
 test('author profiles stay readable across viewports and themes', async ({ page }, testInfo) => {
   await mockAdminApi(page);
   await page.goto('/admin/authoring');
-  await expect(page.getByRole('heading', { name: 'Problem Authoring' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Authoring', level: 1 })).toBeVisible();
   await page.getByRole('link', { name: 'Author profiles', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Author profiles', level: 1 })).toBeVisible();
   await expect(
@@ -60,7 +60,7 @@ test('author profiles stay readable across viewports and themes', async ({ page 
   await expect(page).toHaveScreenshot('author-profiles-focus.png', { animations: 'disabled' });
 
   if (testInfo.project.name === 'desktop') {
-    // The theme toggle moved into the navbar user menu with the navbar redesign.
+    // The theme toggle lives in the account menu at the bottom of the sidebar.
     await page.getByRole('button', { name: 'Open user menu' }).click();
     await page.getByRole('menuitem', { name: 'Dark Mode' }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
