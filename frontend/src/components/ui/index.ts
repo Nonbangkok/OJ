@@ -35,3 +35,4 @@ export { FileDrop } from './FileDrop';
 export type { FileDropProps } from './FileDrop';
 export { SettingsRow } from './SettingsRow';
 export type { SettingsRowProps } from './SettingsRow';
+export { ToastProvider, useToast } from './Toast';

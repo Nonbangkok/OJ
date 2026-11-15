@@ -134,7 +134,8 @@
   text-decoration: none;
 }
 
-button.itemText {
+/* Buttons and links used as the row control on phones. */
+.itemText:is(button, a) {
   cursor: pointer;
 }
 

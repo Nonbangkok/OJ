@@ -7,6 +7,7 @@
     "node": "26.x"
   },
   "dependencies": {
+    "@base-ui/react": "1.9.0",
     "@oj/statement-renderer": "file:../shared/statement-renderer",
     "@phosphor-icons/react": "^2.1.10",
     "@testing-library/dom": "^10.4.2",
