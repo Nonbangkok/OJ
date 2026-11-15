@@ -78,7 +78,8 @@ function contrastRatio(foreground: string, background: string): number {
 }
 
 const light = themeTokens(':root');
-const dark = themeTokens("[data-theme='dark']");
+// The dark block only overrides what changes; everything else cascades from :root.
+const dark = { ...light, ...themeTokens("[data-theme='dark']") };
 
 describe('action theme contrast', () => {
   it('keeps light primary button text at AA contrast', () => {
@@ -103,7 +104,7 @@ describe('action theme contrast', () => {
   });
 
   it('keeps white control text at AA contrast on the dark danger background', () => {
-    expect(contrastRatio('#ffffff', resolveToken(dark, 'status-danger'))).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio('#ffffff', resolveToken(dark, 'action-destructive-background'))).toBeGreaterThanOrEqual(4.5);
   });
 
   it('keeps informational feedback text readable on its feedback surface', () => {

@@ -148,7 +148,9 @@ describe('logo', () => {
 
 describe('decoration', () => {
   it('no emoji in source', () => {
-    const emoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}\u{2705}\u{274C}\u{FE0F}]/u;
+    // U+FE0F (emoji presentation selector) is matched on its own: inside a
+    // character class it would combine with the previous code point.
+    const emoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}\u{2705}\u{274C}]|\u{FE0F}/u;
     const hits = listSourceFiles(['.ts', '.tsx', '.css']).filter((file) => emoji.test(readSource(file)));
     expect(hits).toEqual([]);
   });

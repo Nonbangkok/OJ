@@ -87,7 +87,7 @@ function contrastRatio(foreground: Rgb, background: Rgb): number {
 describe('StatusBadge tone contrast', () => {
   it.each([
     ['light', themeTokens(':root')],
-    ['dark', themeTokens("[data-theme='dark']")],
+    ['dark', { ...themeTokens(':root'), ...themeTokens("[data-theme='dark']") }],
   ])('keeps every %s tone at AA contrast on its rendered background', (_theme, tokens) => {
     for (const tone of ['neutral', 'info', 'success', 'warning', 'danger']) {
       const rule = toneRule(tone);
