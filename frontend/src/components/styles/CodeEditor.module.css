@@ -5,7 +5,7 @@
   background-color: var(--editor-bg); /* Same as hljs background */
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+  font-family: var(--font-family-mono);
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;

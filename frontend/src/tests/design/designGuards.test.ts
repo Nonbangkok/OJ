@@ -49,7 +49,7 @@ describe('tokens', () => {
     expect(missing).toEqual([]);
   });
 
-  it('no Bootstrap palette in source', () => {
+  it('no Bootstrap palette in source (Bootstrap guard)', () => {
     const banned = [
       '#007bff', '#0056b3', '#0069d9', '#0d6efd', '#0b5ed7', '#3d8bfd', '#6ea8fe', '#005fcc', '#17a2b8',
       '#138496', '#28a745', '#218838', '#6c757d', '#545b62', '#495057', '#212529', '#f8f9fa', '#e9ecef',
@@ -59,6 +59,52 @@ describe('tokens', () => {
       const text = readSource(file).toLowerCase();
       return banned.filter((hex) => new RegExp(`${hex}(?![0-9a-f])`).test(text)).map((hex) => `${file}: ${hex}`);
     });
+    expect(hits).toEqual([]);
+  });
+});
+
+describe('fonts', () => {
+  const css = readSource('index.css');
+  const tokens = parseTokenBlock(css, ':root');
+
+  it('imports IBM Plex Sans Thai 400/500/600 and JetBrains Mono 400/500 in one Google Fonts URL', () => {
+    const imports = css.match(/@import url\('https:\/\/fonts\.googleapis\.com[^']+'\)/g) ?? [];
+    expect(imports).toHaveLength(1);
+    expect(imports[0]).toContain('family=IBM+Plex+Sans+Thai:wght@400;500;600');
+    expect(imports[0]).toContain('family=JetBrains+Mono:wght@400;500');
+    expect(css).not.toMatch(/Inter|Inconsolata/);
+  });
+
+  it('sans stack falls back to Thai-capable system fonts', () => {
+    const stack = tokens['--font-family-sans-serif'];
+    expect(stack.startsWith("'IBM Plex Sans Thai'")).toBe(true);
+    const generic = stack.lastIndexOf('sans-serif');
+    expect(stack.indexOf("'Noto Sans Thai'")).toBeGreaterThan(-1);
+    expect(stack.indexOf("'Noto Sans Thai'")).toBeLessThan(generic);
+    expect(stack.indexOf('Tahoma')).toBeGreaterThan(-1);
+    expect(stack.indexOf('Tahoma')).toBeLessThan(generic);
+  });
+
+  it('defines one mono stack', () => {
+    const stack = tokens['--font-family-mono'];
+    expect(stack.startsWith("'JetBrains Mono'")).toBe(true);
+    expect(stack.trim().endsWith('monospace')).toBe(true);
+  });
+
+  it('every CSS font-family goes through a token', () => {
+    const hits = listSourceFiles(['.css']).flatMap((file) =>
+      [...readSource(file).matchAll(/font-family\s*:\s*([^;]+);/g)]
+        .map((m) => m[1].trim())
+        .filter((value) => value !== 'inherit' && !value.startsWith('var(--font-family-'))
+        .map((value) => `${file}: ${value}`),
+    );
+    expect(hits).toEqual([]);
+  });
+
+  it('no legacy font names in source', () => {
+    const hits = listSourceFiles(['.ts', '.tsx', '.css']).filter((file) =>
+      /Fira|Inconsolata|source-code-pro/.test(readSource(file)),
+    );
     expect(hits).toEqual([]);
   });
 });

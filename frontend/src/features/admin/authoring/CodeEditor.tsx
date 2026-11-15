@@ -64,7 +64,7 @@ export default function CodeEditor({ label, value, disabled, onChange, minLines 
           {...(disabled ? readOnlyCodeEditorProps : {})}
           textareaId={`editor-${label.replace(/\W+/g, '-')}`}
           style={{
-            fontFamily: '"Fira code", "Fira Mono", monospace',
+            fontFamily: 'var(--font-family-mono)',
             fontSize: 13,
             lineHeight: '1.55',
           }}

@@ -1,6 +1,5 @@
 /* Import Google Font */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Inconsolata:wght@200..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /*
  * Responsive breakpoint scale (max-width queries):
@@ -126,7 +125,8 @@
   --status-warning-bg: var(--tint-warning-fg);
   --status-info-bg: var(--status-info);
 
-  --font-family-sans-serif: 'Inter', sans-serif;
+  --font-family-sans-serif: 'IBM Plex Sans Thai', 'Noto Sans Thai', 'Leelawadee UI', Tahoma, system-ui, sans-serif;
+  --font-family-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --box-shadow: none;
 
   --radius-sm: 4px;
@@ -375,7 +375,7 @@ body {
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-family: var(--font-family-mono);
 }
 
 /* General container class */
