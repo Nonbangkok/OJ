@@ -87,7 +87,34 @@ describe('Register Page', () => {
         await waitFor(() => {
             expect(authService.register).toHaveBeenCalledWith('newuser', 'pass123');
         });
-        expect(mockNavigate).toHaveBeenCalledWith('/login');
+        // The success message travels with the redirect so the login page can
+        // show it — setting it here would unmount before it is ever seen.
+        expect(mockNavigate).toHaveBeenCalledWith('/login', { state: { registered: true } });
+    });
+
+    it('disables the submit button while registration is pending', async () => {
+        let resolveRegister: (value: unknown) => void = () => {};
+        jest.mocked(authService.register).mockImplementationOnce(
+            () => new Promise((resolve) => { resolveRegister = resolve; }) as never
+        );
+
+        render(
+            <BrowserRouter>
+                <Register />
+            </BrowserRouter>
+        );
+
+        fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'newuser' } });
+        fireEvent.change(screen.getByLabelText(/^password/i), { target: { value: 'pass123' } });
+        const button = screen.getByRole('button', { name: /register/i });
+        fireEvent.click(button);
+
+        await waitFor(() => expect(button).toBeDisabled());
+        fireEvent.click(button);
+        expect(authService.register).toHaveBeenCalledTimes(1);
+
+        resolveRegister({ message: 'Registered', user: { id: 1, username: 'newuser' } });
+        await waitFor(() => expect(button).toBeEnabled());
     });
 
     it('displays error on failed registration from service', async () => {

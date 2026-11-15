@@ -12,6 +12,10 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Register redirects here with `{ registered: true }` state after a
+  // successful sign-up.
+  const justRegistered = (location.state as { registered?: boolean } | null)?.registered === true;
+
   // The session-expiry interceptor in services/api.ts redirects here with
   // ?expired=1&returnTo=<original path> when a mid-session 401 happens.
   const { isSessionExpired, returnTo } = useMemo(() => {
@@ -27,7 +31,7 @@ const Login = () => {
     };
   }, [location.search]);
 
-  const { formData, error, setError, handleChange, setLoading } = useAuthForms();
+  const { formData, error, setError, handleChange, loading, setLoading } = useAuthForms();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -48,10 +52,12 @@ const Login = () => {
     <LoginForm
       formData={formData}
       error={error}
+      loading={loading}
       onSubmit={handleSubmit}
       onChange={handleChange}
       registrationEnabled={registrationEnabled}
       sessionExpired={isSessionExpired}
+      justRegistered={justRegistered}
     />
   );
 };

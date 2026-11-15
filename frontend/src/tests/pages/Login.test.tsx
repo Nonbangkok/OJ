@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import Login from '../../pages/auth/Login';
 import authService from '../../services/authService';
 
@@ -75,5 +75,48 @@ describe('Login Page', () => {
         await waitFor(() => {
             expect(screen.getByText(/invalid credentials/i)).toBeInTheDocument();
         });
+    });
+
+    it('shows the registration success notice after a redirect from Register', () => {
+        render(
+            <MemoryRouter initialEntries={[{ pathname: '/login', state: { registered: true } }]}>
+                <Login />
+            </MemoryRouter>
+        );
+        expect(screen.getByRole('status')).toHaveTextContent('Registration successful! Please log in.');
+    });
+
+    it('shows no registration notice on a plain visit', () => {
+        render(
+            <BrowserRouter>
+                <Login />
+            </BrowserRouter>
+        );
+        expect(screen.queryByText(/registration successful/i)).not.toBeInTheDocument();
+    });
+
+    it('disables the submit button while login is pending', async () => {
+        let resolveLogin: (value: unknown) => void = () => {};
+        jest.mocked(authService.login).mockImplementationOnce(
+            () => new Promise((resolve) => { resolveLogin = resolve; }) as never
+        );
+
+        render(
+            <BrowserRouter>
+                <Login />
+            </BrowserRouter>
+        );
+
+        fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'testuser' } });
+        fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
+        const button = screen.getByRole('button', { name: /login/i });
+        fireEvent.click(button);
+
+        await waitFor(() => expect(button).toBeDisabled());
+        fireEvent.click(button);
+        expect(authService.login).toHaveBeenCalledTimes(1);
+
+        resolveLogin({ message: 'Logged in', user: { id: 1, username: 'testuser', role: 'user', hasAvatar: false } });
+        await waitFor(() => expect(button).toBeEnabled());
     });
 });

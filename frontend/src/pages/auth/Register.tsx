@@ -9,22 +9,22 @@ const Register = () => {
   const { registrationEnabled, isLoading: isLoadingSettings } = useSettings();
 
   const {
-    formData, error, setError, success, setSuccess,
-    handleChange, validate, setLoading
+    formData, error, setError,
+    handleChange, validate, loading, setLoading
   } = useAuthForms();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setSuccess('');
 
     if (!validate()) return;
 
     try {
       setLoading(true);
       await authService.register(formData.username, formData.password);
-      setSuccess('Registration successful! Please log in.');
-      navigate('/login');
+      // This page unmounts on navigate, so the success notice is shown by the
+      // login page, signalled through the navigation state.
+      navigate('/login', { state: { registered: true } });
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Username or email might already be in use.');
     } finally {
@@ -36,7 +36,7 @@ const Register = () => {
     <RegisterForm
       formData={formData}
       error={error}
-      success={success}
+      loading={loading}
       onSubmit={handleSubmit}
       onChange={handleChange}
       registrationEnabled={registrationEnabled}
