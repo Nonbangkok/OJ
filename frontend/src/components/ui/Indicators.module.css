@@ -1,0 +1,45 @@
+.countdown {
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.track {
+  display: block;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--background-tertiary);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  background: var(--text-primary);
+}
+
+.fillPass {
+  background: var(--status-success-bg);
+}
+
+.dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.dotMark {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.dot[data-tone='pass'] .dotMark { background: var(--status-success); }
+.dot[data-tone='warn'] .dotMark { background: var(--status-warning); }
+.dot[data-tone='fail'] .dotMark { background: var(--status-danger); }
