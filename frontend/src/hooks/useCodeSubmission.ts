@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import hljs from 'highlight.js/lib/core';
 import cpp from 'highlight.js/lib/languages/cpp';
 import python from 'highlight.js/lib/languages/python';
-import 'highlight.js/styles/atom-one-dark.css';
 import submissionService from '../services/submissionService';
 import { APP_CONSTANTS } from '../utils/constants';
 import type { SubmissionLanguage } from '../utils/constants';

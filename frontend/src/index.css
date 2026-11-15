@@ -167,6 +167,17 @@
   --editor-gutter-muted: #a1a1aa;
   --editor-focus: #18181b;
 
+  /* Syntax highlighting (styles/codeHighlight.css). The one place hue is
+     allowed; never used outside code. All ≥4.5:1 on --editor-bg. */
+  --code-text: #18181b;
+  --code-comment: #6b7280;
+  --code-keyword: #9d174d;
+  --code-string: #166534;
+  --code-number: #9a3412;
+  --code-title: #1d4ed8;
+  --code-type: #7c2d12;
+  --code-meta: #52525b;
+
   /* Statement-editor chrome — follows the theme. */
   --editor-chrome-bg: var(--background-secondary);
   --editor-chrome-text: var(--text-primary);
@@ -341,6 +352,15 @@
   --editor-gutter-text: #6e7681;
   --editor-gutter-muted: #6e7681;
   --editor-focus: #e6edf3;
+
+  --code-text: #e6edf3;
+  --code-comment: #8b949e;
+  --code-keyword: #ff7b72;
+  --code-string: #a5d6ff;
+  --code-number: #79c0ff;
+  --code-title: #d2a8ff;
+  --code-type: #ffa657;
+  --code-meta: #8b949e;
 
   /* Medals brightened for dark backgrounds. */
   --medal-gold: #ffcc4d;

@@ -2,7 +2,6 @@ import Editor from 'react-simple-code-editor';
 import { ClipboardText } from '@phosphor-icons/react';
 import useSubmissionModal from '../../../hooks/useSubmissionModal';
 import { Dialog } from '../../../components/ui/Dialog';
-import 'highlight.js/styles/atom-one-dark.css';
 
 import styles from './SubmissionModal.module.css';
 import editorStyles from '../../../components/styles/CodeEditor.module.css';

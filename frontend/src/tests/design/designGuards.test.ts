@@ -108,3 +108,33 @@ describe('fonts', () => {
     expect(hits).toEqual([]);
   });
 });
+
+describe('code colours', () => {
+  const CODE_TOKENS = [
+    '--code-text', '--code-comment', '--code-keyword', '--code-string',
+    '--code-number', '--code-title', '--code-type', '--code-meta',
+  ];
+
+  describe.each(THEMES)('%s theme', (theme) => {
+    it.each(CODE_TOKENS)('%s on --editor-bg ≥ 4.5', (token) => {
+      expect(contrast(resolveColor(token, theme), resolveColor('--editor-bg', theme))).toBeGreaterThanOrEqual(4.5);
+    });
+  });
+
+  it('no highlight.js stock theme imports', () => {
+    const hits = listSourceFiles(['.ts', '.tsx']).filter((file) => readSource(file).includes('highlight.js/styles/'));
+    expect(hits).toEqual([]);
+  });
+
+  it('codeHighlight.css colours hljs tokens only through --code-* variables', () => {
+    const css = readSource('styles/codeHighlight.css');
+    expect(css).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    for (const cls of ['comment', 'keyword', 'string', 'number', 'title', 'type', 'meta', 'built_in', 'literal']) {
+      expect(css).toMatch(new RegExp(`\\.hljs-${cls}\\b[^{]*\\{[^}]*var\\(--code-`));
+    }
+  });
+
+  it('the app entry loads codeHighlight.css', () => {
+    expect(readSource('index.tsx')).toContain("import './styles/codeHighlight.css';");
+  });
+});
