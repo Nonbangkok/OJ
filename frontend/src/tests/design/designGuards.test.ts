@@ -300,3 +300,29 @@ describe('review fixes (phase 1 final review)', () => {
     expect(decl('pages/user/UserProfile.module.css', '.verdict-dot-accepted', 'background-color')).toBe('var(--verdict-accepted)');
   });
 });
+
+describe('shell tokens', () => {
+  const css = readSource('index.css');
+  const root = parseTokenBlock(css, ':root');
+
+  it('defines the layout tokens', () => {
+    expect(root['--sidebar-width']).toBe('220px');
+    expect(root['--content-max-width']).toBe('1040px');
+    expect(root['--page-gutter']).toBe('28px');
+    expect(root['--tabbar-height']).toBe('56px');
+    expect(root['--topbar-height']).toBe('52px');
+  });
+
+  it('narrows the page gutter on phones', () => {
+    expect(css).toMatch(/@media \(max-width: 767px\)\s*\{\s*:root\s*\{[^}]*--page-gutter:\s*16px/);
+  });
+
+  it('the page container uses the shared width and gutter', () => {
+    expect(css).toMatch(/\.container\s*\{[^}]*max-width:\s*var\(--content-max-width\)[^}]*padding:\s*24px var\(--page-gutter\)/);
+  });
+
+  it('pins cmdk exactly', () => {
+    const pkg = JSON.parse(readSource('../package.json'));
+    expect(pkg.dependencies.cmdk).toBe('1.1.1');
+  });
+});

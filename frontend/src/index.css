@@ -28,6 +28,13 @@
   --font-size-card-title: 1rem;
   --font-size-metadata: 0.875rem;
 
+  /* App shell layout (UI redesign phase 2a). */
+  --sidebar-width: 220px;
+  --content-max-width: 1040px;
+  --page-gutter: 28px;
+  --tabbar-height: 56px;
+  --topbar-height: 52px;
+
   /* ── Base palette (UI redesign 2026-11, docs/superpowers/specs/2026-11-15-ui-redesign-design.md §5).
      Neutral zinc surfaces, near-black primary, colour only for meaning:
      green = pass, red = fail/destructive, amber = time limit/stale. ── */
@@ -390,9 +397,15 @@ code {
 
 /* General container class */
 .container {
-  max-width: 1200px;
+  max-width: var(--content-max-width);
   margin: 0 auto;
-  padding: 20px;
+  padding: 24px var(--page-gutter);
+}
+
+@media (max-width: 767px) {
+  :root {
+    --page-gutter: 16px;
+  }
 }
 
 .admin-main {
