@@ -3,9 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import NavbarUserMenu from './NavbarUserMenu';
 import styles from './Navbar.module.css';
-import { useTheme } from '../../context/ThemeContext';
-import logo from '../../assets/logo512.png';
-import darkmodeLogo from '../../assets/logo512_darkmode.png';
+import GraderLogo from '../brand/GraderLogo';
 import { USER_ROLES } from '../../utils/constants';
 import { useNavSlider } from '../../hooks/useNavSlider';
 
@@ -14,8 +12,6 @@ const Navbar = () => {
   const { registrationEnabled, isPrivateMode } = useSettings();
   const navigate = useNavigate();
   const location = useLocation();
-  const { theme } = useTheme(); // Get current theme
-  const currentLogo = theme === 'dark' ? darkmodeLogo : logo; // Choose logo based on theme
   const {
     navRef,
     sliderStyle,
@@ -36,7 +32,7 @@ const Navbar = () => {
     <nav className={styles.navbar}>
       <div className={styles['navbar-container']}>
         <NavLink to="/" className={styles['nav-brand']}>
-          <img src={currentLogo} alt="Grader Logo" className={styles['nav-logo']} />
+          <GraderLogo size={40} title="" className={styles['nav-logo']} />
           <span className={styles['nav-brand-name']}>Grader</span>
         </NavLink>
         <ul ref={navRef} className={styles['nav-links']} onMouseLeave={resetSlider}>

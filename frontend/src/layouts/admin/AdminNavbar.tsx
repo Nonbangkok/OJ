@@ -1,22 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 
-import logo from '../../assets/logo512.png';
-import darkmodeLogo from '../../assets/logo512_darkmode.png';
+import GraderLogo from '../../components/brand/GraderLogo';
 import NavbarUserMenu from '../../components/navbar/NavbarUserMenu';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
 import { USER_ROLES } from '../../utils/constants';
 import { useNavSlider } from '../../hooks/useNavSlider';
 import styles from './AdminNavbar.module.css';
 
 const AdminNavbar = () => {
   const { user } = useAuth();
-  const { theme } = useTheme();
   const location = useLocation();
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const currentLogo = theme === 'dark' ? darkmodeLogo : logo;
   const {
     navRef,
     sliderStyle,
@@ -53,7 +49,7 @@ const AdminNavbar = () => {
       <div className={styles['navbar-container']}>
         <div className={styles['nav-left']}>
           <NavLink to="/" className={styles['back-btn']} aria-label="Home">
-            <img src={currentLogo} alt="" className={styles['nav-logo']} />
+            <GraderLogo size={36} title="" className={styles['nav-logo']} />
           </NavLink>
           <NavLink to="/admin" end className={styles['nav-brand']} onClick={closeMenu}>
             {user?.role === USER_ROLES.ADMIN ? 'Admin Panel' : 'Staff Panel'}

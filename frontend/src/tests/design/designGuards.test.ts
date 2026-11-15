@@ -138,3 +138,10 @@ describe('code colours', () => {
     expect(readSource('index.tsx')).toContain("import './styles/codeHighlight.css';");
   });
 });
+
+describe('logo', () => {
+  it('no source file imports the PNG logos', () => {
+    const hits = listSourceFiles(['.ts', '.tsx']).filter((file) => readSource(file).includes('assets/logo512'));
+    expect(hits).toEqual([]);
+  });
+});
