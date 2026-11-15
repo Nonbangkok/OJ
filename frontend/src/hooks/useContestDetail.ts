@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useContestShellReload } from '../components/shell/ContestShell';
 import contestService from '../services/contestService';
 import { POLLING_INTERVALS } from '../config/constants';
 import { fetchContestOutcome } from './contestStatusFetch';
@@ -72,11 +73,14 @@ const useContestDetail = () => {
     return () => clearInterval(intervalId);
   }, [fetchContestData]);
 
+  const reloadShell = useContestShellReload();
+
   const handleJoinContest = async () => {
     setJoining(true);
     try {
       await contestService.join(contestId);
       await fetchContestData();
+      reloadShell();
     } catch (err) {
       console.error('Error joining contest:', err);
       alert(err.response?.data?.message || 'Failed to join contest');

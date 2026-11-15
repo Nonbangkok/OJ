@@ -10,6 +10,8 @@
 }
 
 .sidebar {
+  display: flex;
+  flex-direction: column;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -253,4 +255,9 @@
 .tab:focus-visible {
   outline: 2px solid var(--action-focus-ring);
   outline-offset: 2px;
+}
+
+.footer {
+  margin-top: auto;
+  padding-top: 8px;
 }

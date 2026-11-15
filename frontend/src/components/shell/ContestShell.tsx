@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Circle, ListChecks, PaperPlaneTilt, Ranking, Timer, X } from '@phosphor-icons/react';
 import contestService from '../../services/contestService';
@@ -6,9 +6,16 @@ import { subscribeSubmissions } from '../../services/realtimeService';
 import { MOBILE_QUERY, useMediaQuery } from '../../hooks/useMediaQuery';
 import type { Contest, ProblemSummary } from '../../types';
 import { useCountdown } from './useCountdown';
+import AccountMenu from './AccountMenu';
 import styles from './ContestShell.module.css';
 
 const POLL_MS = 30_000;
+const IN_PROGRESS = new Set(['Pending', 'Compiling', 'Running']);
+
+const ContestShellReloadContext = createContext<() => void>(() => undefined);
+
+/** Pages inside a contest call this after changing contest state (e.g. joining) so the sidebar refreshes. */
+export const useContestShellReload = (): (() => void) => useContext(ContestShellReloadContext);
 
 /** 0 → A … 25 → Z, 26 → AA. */
 export function problemLetter(index: number): string {
@@ -57,6 +64,8 @@ export default function ContestShell() {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [contest, setContest] = useState<Contest | null>(null);
   const [problems, setProblems] = useState<ProblemSummary[]>([]);
+  const [version, setVersion] = useState(0);
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,7 +80,8 @@ export default function ContestShell() {
     loadProblems();
     let poll: number | undefined;
     const unsubscribe = subscribeSubmissions(
-      (update) => { if (update.table === 'contest_submissions') loadProblems(); },
+      // Only final verdicts change a score; skip Pending/Compiling/Running pings.
+      (update) => { if (update.table === 'contest_submissions' && !IN_PROGRESS.has(update.overall_status)) loadProblems(); },
       { onStreamDown: () => { poll = window.setInterval(loadProblems, POLL_MS); } },
     );
     return () => {
@@ -79,7 +89,17 @@ export default function ContestShell() {
       unsubscribe();
       if (poll !== undefined) window.clearInterval(poll);
     };
-  }, [contestId]);
+  }, [contestId, version]);
+
+  // Reload at the next transition (start or end) so the sidebar never sits on 00:00:00.
+  const transition = contest?.status === 'scheduled' ? contest.start_time : contest?.status === 'running' ? contest.end_time : null;
+  useEffect(() => {
+    if (!transition) return undefined;
+    const delay = new Date(transition).getTime() - Date.now() + 1000;
+    if (delay <= 0) return undefined;
+    const timer = window.setTimeout(reload, delay);
+    return () => window.clearTimeout(timer);
+  }, [transition, reload]);
 
   const finished = contest?.status === 'finished';
   const showProblems = Boolean(contest) && !finished;
@@ -87,23 +107,26 @@ export default function ContestShell() {
 
   if (isMobile) {
     return (
+      <ContestShellReloadContext.Provider value={reload}>
       <div className={styles.mobile}>
         <header className={styles.topbar}>
           <Link to="/contests" className={styles.back} aria-label="Back to contests"><ArrowLeft size={18} aria-hidden="true" /></Link>
           <span className={styles.topTitle}>{contest?.title}</span>
           {contest && <ContestClock contest={contest} compact />}
         </header>
-        <main className={styles.mobileMain}><Outlet /></main>
+        <main className={styles.main}><div className="container"><Outlet /></div></main>
         <nav aria-label="Contest" className={styles.tabbar}>
-          <NavLink to={`/contests/${contestId}/problems`} className={styles.tab}><ListChecks size={20} aria-hidden="true" />Problems</NavLink>
-          <NavLink to={`/contests/${contestId}/submissions`} className={styles.tab}><PaperPlaneTilt size={20} aria-hidden="true" />Mine</NavLink>
+          {!finished && <NavLink to={`/contests/${contestId}/problems`} className={styles.tab}><ListChecks size={20} aria-hidden="true" />Problems</NavLink>}
+          {showMine && <NavLink to={`/contests/${contestId}/submissions`} className={styles.tab}><PaperPlaneTilt size={20} aria-hidden="true" />Mine</NavLink>}
           <NavLink to={`/contests/${contestId}/scoreboard`} className={styles.tab}><Ranking size={20} aria-hidden="true" />Scoreboard</NavLink>
         </nav>
       </div>
+      </ContestShellReloadContext.Provider>
     );
   }
 
   return (
+    <ContestShellReloadContext.Provider value={reload}>
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
         <nav aria-label="Contest" className={styles.nav}>
@@ -122,6 +145,11 @@ export default function ContestShell() {
             </div>
           )}
           <div className={styles.links}>
+            {!finished && (
+              <NavLink to={`/contests/${contestId}/problems`} end className={styles.link}>
+                <ListChecks size={17} aria-hidden="true" />Problems
+              </NavLink>
+            )}
             {showMine && (
               <NavLink to={`/contests/${contestId}/submissions`} className={styles.link}>
                 <PaperPlaneTilt size={17} aria-hidden="true" />My submissions
@@ -132,8 +160,10 @@ export default function ContestShell() {
             </NavLink>
           </div>
         </nav>
+        <div className={styles.footer}><AccountMenu /></div>
       </aside>
       <main className={styles.main}><div className="container"><Outlet /></div></main>
     </div>
+    </ContestShellReloadContext.Provider>
   );
 }
