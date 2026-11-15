@@ -126,9 +126,9 @@
 }
 
 .logout-btn:hover {
-  background-color: var(--status-danger);
-  border-color: var(--status-danger);
-  color: var(--action-button-foreground);
+  background-color: var(--button-danger-bg);
+  border-color: var(--button-danger-bg);
+  color: var(--on-fill);
 }
 
 /* --- Responsive navbar --------------------------------------------------- */

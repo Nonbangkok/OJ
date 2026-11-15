@@ -44,7 +44,9 @@
 
   --accent-primary: #18181b;
   --accent-primary-hover: #3f3f46;
-  --text-on-primary: #ffffff;
+  --text-on-primary: var(--action-primary-foreground);
+  /* Text on fixed semantic fills (danger buttons): white in both themes. */
+  --on-fill: #ffffff;
   /* Grey crescent of the Grader logo (GraderLogo.tsx). */
   --logo-accent: #a6a6a6;
 
@@ -103,7 +105,7 @@
 
   --status-success: #15803d;
   --status-danger: #dc2626;
-  --error-text: var(--status-danger);
+  --error-text: var(--tint-danger-fg);
   --status-warning: #b45309;
   --status-info: #52525b;
 
@@ -163,8 +165,8 @@
   --editor-border: #e4e4e7;
   --editor-border-strong: #d4d4d8;
   --editor-text: #18181b;
-  --editor-gutter-text: #a1a1aa;
-  --editor-gutter-muted: #a1a1aa;
+  --editor-gutter-text: #71717a;
+  --editor-gutter-muted: #71717a;
   --editor-focus: #18181b;
 
   /* Syntax highlighting (styles/codeHighlight.css). The one place hue is
@@ -222,7 +224,7 @@
   --action-neutral-button-bg: var(--action-primary-background);
   --action-neutral-button-hover: var(--action-primary-hover-background);
   --action-disabled-bg: var(--text-faint);
-  --action-button-foreground: #ffffff;
+  --action-button-foreground: var(--action-primary-foreground);
 
   /* Contest-status badges — shared by Management badges, the contest-status
      badge on the problems table, and ContestCard's joined status. */
@@ -236,7 +238,7 @@
   --contest-badge-finishing-fg: var(--tint-warning-fg);
   --contest-badge-finishing-border: var(--tint-warning-border);
   --contest-badge-finished-bg: var(--tint-neutral-bg);
-  --contest-badge-finished-fg: var(--text-muted);
+  --contest-badge-finished-fg: var(--tint-neutral-fg);
   --contest-badge-finished-border: var(--tint-neutral-border);
 
   /* Batch-upload feedback boxes. */
@@ -329,8 +331,8 @@
   --editor-border: #30363d;
   --editor-border-strong: #484f58;
   --editor-text: #e6edf3;
-  --editor-gutter-text: #6e7681;
-  --editor-gutter-muted: #6e7681;
+  --editor-gutter-text: #8b949e;
+  --editor-gutter-muted: #8b949e;
   --editor-focus: #e6edf3;
 
   --code-text: #e6edf3;

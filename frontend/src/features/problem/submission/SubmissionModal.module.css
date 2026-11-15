@@ -159,7 +159,7 @@
 
 .copy-button:hover {
   background-color: var(--accent-primary);
-  color: white;
+  color: var(--action-primary-foreground);
   border-color: var(--accent-primary);
 }
 

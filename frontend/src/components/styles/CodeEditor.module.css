@@ -14,7 +14,7 @@
   max-height: 65vh;
   min-height: 50vh;
   overflow: hidden; /* Children will handle their own scrolling */
-  color: white;
+  color: var(--editor-text);
 }
 
 .editorWrapper:focus-within {
@@ -57,7 +57,7 @@
   font-size: 1rem !important;
   line-height: 1.5 !important;
   outline: none !important;
-  caret-color: white !important;
+  caret-color: var(--editor-text) !important;
   background: none !important;
   overflow-y: auto !important; /* The internal textarea is the one that scrolls */
 }

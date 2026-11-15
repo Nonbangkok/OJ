@@ -33,7 +33,7 @@ describe('tokens', () => {
       '--statement-paper', '--statement-stripe-a', '--statement-stripe-b', '--statement-page-number',
       '--statement-separator', '--statement-empty', '--statement-continued', '--action-button-foreground',
       '--contest-action-foreground', '--text-on-primary', '--action-primary-foreground',
-      '--action-destructive-foreground',
+      '--action-destructive-foreground', '--on-fill',
     ];
     const css = readSource('index.css');
     const light = parseTokenBlock(css, ':root');
@@ -174,5 +174,57 @@ describe('primitives', () => {
     for (const [tone, tint] of [['neutral', 'neutral'], ['info', 'neutral'], ['success', 'success'], ['warning', 'warning'], ['danger', 'danger']]) {
       expect(css).toMatch(new RegExp(`\\.${tone}\\s*\\{[^}]*background:\\s*var\\(--tint-${tint}-bg\\)[^}]*color:\\s*var\\(--tint-${tint}-fg\\)`));
     }
+  });
+});
+
+describe('theme-safe text', () => {
+  it('no literal white text except on the fixed difficulty bands', () => {
+    // Surfaces such as --accent-primary and --editor-bg flip between light and
+    // dark, so text on them must use a token (--action-primary-foreground,
+    // --editor-text). Difficulty chips sit on constant band colours and keep white.
+    const hits = listSourceFiles(['.css']).flatMap((file) =>
+      [...readSource(file).matchAll(/([^{}]+)\{([^}]*)\}/g)]
+        .filter(([, selector, body]) =>
+          !/difficulty(-chip-|-preview-|Chip)/.test(selector) &&
+          /(^|[^-])(color|caret-color)\s*:\s*(white|#fff\b|#ffffff)/.test(body))
+        .map(([, selector]) => `${file}: ${selector.trim().split('\n').pop()}`),
+    );
+    expect(hits).toEqual([]);
+  });
+});
+
+describe('rule contrast', () => {
+  // Every CSS rule that sets both a text colour and a solid background must stay
+  // readable in both themes. Values are resolved through the theme tokens.
+  const valueOf = (raw: string, theme: 'light' | 'dark'): string | null => {
+    const v = raw.replace(/!important/, '').trim();
+    const ref = v.match(/^var\((--[\w-]+)\)$/);
+    if (ref) {
+      try { return resolveColor(ref[1], theme); } catch { return null; }
+    }
+    if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(v)) return v;
+    if (/^(white)$/i.test(v)) return '#ffffff';
+    return null;
+  };
+
+  const rules = listSourceFiles(['.css']).flatMap((file) =>
+    [...readSource(file).replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^}]*)\}/g)].flatMap(([, selector, body]) => {
+      const color = body.match(/(?:^|;)\s*color\s*:\s*([^;]+)/)?.[1];
+      const bg = body.match(/(?:^|;)\s*background(?:-color)?\s*:\s*([^;]+)/)?.[1];
+      // Disabled controls are exempt from contrast (WCAG 1.4.3 inactive UI).
+      if (/:disabled|\[disabled\]/.test(selector)) return [];
+      return color && bg ? [{ where: `${file}: ${selector.trim().split('\n').pop()}`, color, bg }] : [];
+    }),
+  );
+
+  it.each(THEMES)('text on its own background is ≥ 4.5:1 in %s', (theme) => {
+    const failures = rules.flatMap(({ where, color, bg }) => {
+      const fg = valueOf(color, theme);
+      const back = valueOf(bg, theme);
+      if (!fg || !back) return [];
+      const ratio = contrast(fg, back);
+      return ratio < 4.5 ? [`${where} (${ratio.toFixed(2)})`] : [];
+    });
+    expect(failures).toEqual([]);
   });
 });

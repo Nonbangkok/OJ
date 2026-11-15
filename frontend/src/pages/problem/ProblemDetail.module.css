@@ -34,7 +34,7 @@
 
 .status-badge.running {
   background: var(--background-tertiary);
-  color: var(--status-success-bg);
+  color: var(--status-success);
   border: 1px solid var(--border-color);
 }
 
@@ -78,7 +78,7 @@
 
 .view-scoreboard {
   background: var(--accent-primary);
-  color: white;
+  color: var(--action-primary-foreground);
 }
 
 .view-scoreboard:hover {

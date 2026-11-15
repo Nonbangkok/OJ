@@ -822,8 +822,8 @@
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  color: var(--text-primary);
-  background: var(--status-warning);
+  color: var(--tint-warning-fg);
+  background: var(--tint-warning-bg);
 }
 .editorStatus {
   margin: 0;
