@@ -1,6 +1,6 @@
 /* Shared contest-page chrome. Contest pages deliberately have no shell
    layout below the navbar — consistency comes from these shared classes
-   (page width comes from the `.container` main in ContestLayout). */
+   (page width comes from the `.container` inside ContestShell). */
 
 .page {
   padding-top: 0.75rem;

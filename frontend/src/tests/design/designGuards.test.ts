@@ -274,7 +274,7 @@ describe('review fixes (phase 1 final review)', () => {
     });
   });
 
-  it.each(['components/navbar/Navbar.module.css', 'layouts/contest/ContestNavbar.module.css'])(
+  it.each(['components/navbar/Navbar.module.css'])(
     '%s marks the active link in text, not only with the slider', (file) => {
       expect(decl(file, ".nav-links a[aria-current='page']", 'color')).toBe('var(--text-primary)');
       expect(decl(file, ".nav-links a[aria-current='page']", 'font-weight')).toBe('600');
@@ -288,8 +288,10 @@ describe('review fixes (phase 1 final review)', () => {
     expect(shadows).toContain('var(--box-shadow-lg)');
   });
 
-  it('contest navbar does not shrink the logo svg', () => {
-    expect(readSource('layouts/contest/ContestNavbar.module.css')).not.toMatch(/\.back-btn svg\s*\{/);
+  it('contest sidebar marks the current page in text', () => {
+    const css = readSource('components/shell/ContestShell.module.css');
+    expect(css).toMatch(/\.link\[aria-current='page'\]\s*\{[^}]*color:\s*var\(--text-primary\)/);
+    expect(css).toMatch(/\.problem\[aria-current='page'\]\s*\{[^}]*color:\s*var\(--text-primary\)/);
   });
 
   it('form controls inherit the UI font', () => {

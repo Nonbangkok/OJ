@@ -14,7 +14,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Components
 import Navbar from './components/navbar/Navbar';
-import ContestLayout from './layouts/contest/ContestLayout';
+import ContestShell from './components/shell/ContestShell';
 import AdminLayout from './layouts/admin/AdminLayout';
 
 // Pages
@@ -143,7 +143,7 @@ export const appRoutes = createRoutesFromElements(
       <Route path="analysis" element={<AnalysisPage />} />
     </Route>
 
-    <Route path="/contests/:contestId" element={<PrivateRoute><ContestLayout /></PrivateRoute>}>
+    <Route path="/contests/:contestId" element={<PrivateRoute><ContestShell /></PrivateRoute>}>
       <Route index element={<ContestDetail />} />
       <Route path="problems" element={<ContestProblems />} />
       <Route path="problems/:problemId" element={<ProblemDetail />} />
