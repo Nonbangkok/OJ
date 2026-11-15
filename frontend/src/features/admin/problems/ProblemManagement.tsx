@@ -456,7 +456,7 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
                 ))}
               </select>
             </label>
-            <Button size="compact" variant="secondary" onClick={() => handleRejudgeClick({ kind: 'problem', id: String(selectedProblemIds[0]), title: `the ${selectedCount} selected problems` })} disabled={loading}>
+            <Button size="compact" variant="secondary" onClick={() => handleRejudgeClick({ kind: 'problems', ids: selectedProblemIds, title: `the ${selectedCount} selected problems` })} disabled={loading}>
               Rejudge
             </Button>
             <Button size="compact" variant="destructive" onClick={() => setDeleteSelectionConfirm(true)} disabled={loading}>
@@ -743,7 +743,7 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
         onConfirm={handleConfirmRejudge}
         title="Confirm Rejudge"
         message={rejudgeTarget
-          ? `Rejudge re-runs every submission for problem "${rejudgeTarget.title}" against the current testcases and limits. Scores may change.`
+          ? `Rejudge re-runs every submission for ${rejudgeTarget.kind === 'problems' ? rejudgeTarget.title : `problem "${rejudgeTarget.title}"`} against the current testcases and limits. Scores may change.`
           : ''}
         confirmText="Rejudge"
         confirmStyle="default"

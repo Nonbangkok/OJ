@@ -426,6 +426,27 @@ describe('ProblemManagement Component', () => {
         expect(await screen.findByText(/rejudge queued for 4 submissions \(1 skipped — no stored code\)/i)).toBeInTheDocument();
     });
 
+    it('bulk Rejudge rejudges every selected problem, not just the first', async () => {
+        (jest.mocked(adminService.rejudgeProblem) as jest.Mock)
+            .mockResolvedValueOnce({ queued: 4, skipped: 0 })
+            .mockResolvedValueOnce({ queued: 2, skipped: 0 });
+        renderProblemManagement();
+
+        await waitFor(() => screen.getByText('Problem 2'));
+        const checkboxes = screen.getAllByRole('checkbox');
+        fireEvent.click(checkboxes[1]);
+        fireEvent.click(checkboxes[2]);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Rejudge' }));
+        expect(screen.getByText(/re-runs every submission for the 2 selected problems/i)).toBeInTheDocument();
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /rejudge/i }));
+
+        await waitFor(() => expect(adminService.rejudgeProblem).toHaveBeenCalledTimes(2));
+        expect(adminService.rejudgeProblem).toHaveBeenCalledWith('P1');
+        expect(adminService.rejudgeProblem).toHaveBeenCalledWith('P2');
+        expect(await screen.findByText(/rejudge queued for 6 submissions across 2 problems/i)).toBeInTheDocument();
+    });
+
     it('shows an error message when rejudge fails', async () => {
         (jest.mocked(adminService.rejudgeProblem) as jest.Mock).mockRejectedValueOnce({
             response: { status: 500, data: { message: 'Rejudge failed on the server.' } },
