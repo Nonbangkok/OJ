@@ -1,0 +1,64 @@
+/**
+ * Design guards for the UI redesign (docs/superpowers/specs/2026-11-15-ui-redesign-design.md).
+ * They read source files and fail when the neutral visual system regresses.
+ */
+import { contrast, isColor, listSourceFiles, parseTokenBlock, readSource, resolveColor, resolveRaw } from './tokenUtils';
+
+const THEMES = ['light', 'dark'] as const;
+
+describe('tokens', () => {
+  const pairs: Array<[string, string, number]> = [
+    ['--text-primary', '--background-primary', 4.5],
+    ['--text-primary', '--background-secondary', 4.5],
+    ['--text-muted', '--background-primary', 4.5],
+    ['--text-muted', '--background-secondary', 4.5],
+    ['--action-primary-foreground', '--action-primary-background', 4.5],
+    ['--action-destructive-foreground', '--action-destructive-background', 4.5],
+    ['--verdict-accepted', '--background-primary', 4.5],
+    ['--verdict-wrong', '--background-primary', 4.5],
+    ['--verdict-time', '--background-primary', 4.5],
+    ['--status-success', '--background-primary', 4.5],
+    ['--status-danger', '--background-primary', 4.5],
+    ['--action-focus-ring', '--background-primary', 3],
+  ];
+
+  describe.each(THEMES)('%s theme', (theme) => {
+    it.each(pairs)('%s on %s ≥ %s', (fg, bg, min) => {
+      expect(contrast(resolveColor(fg, theme), resolveColor(bg, theme))).toBeGreaterThanOrEqual(min);
+    });
+  });
+
+  it('every themed token has a dark value', () => {
+    const THEME_CONSTANT = [
+      '--statement-paper', '--statement-stripe-a', '--statement-stripe-b', '--statement-page-number',
+      '--statement-separator', '--statement-empty', '--statement-continued', '--action-button-foreground',
+      '--contest-action-foreground', '--text-on-primary', '--action-primary-foreground',
+      '--action-destructive-foreground',
+    ];
+    const css = readSource('index.css');
+    const light = parseTokenBlock(css, ':root');
+    const dark = parseTokenBlock(css, "[data-theme='dark']");
+    const overridden = (name: string, seen: string[] = []): boolean => {
+      if (name in dark) return true;
+      const ref = light[name]?.match(/^var\((--[\w-]+)\)$/);
+      return !!ref && !seen.includes(ref[1]) && overridden(ref[1], [...seen, name]);
+    };
+    const missing = Object.keys(light).filter(
+      (name) => !THEME_CONSTANT.includes(name) && isColor(resolveRaw(name, 'light')) && !overridden(name),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it('no Bootstrap palette in source', () => {
+    const banned = [
+      '#007bff', '#0056b3', '#0069d9', '#0d6efd', '#0b5ed7', '#3d8bfd', '#6ea8fe', '#005fcc', '#17a2b8',
+      '#138496', '#28a745', '#218838', '#6c757d', '#545b62', '#495057', '#212529', '#f8f9fa', '#e9ecef',
+      '#dee2e6',
+    ];
+    const hits = listSourceFiles(['.css', '.ts', '.tsx']).flatMap((file) => {
+      const text = readSource(file).toLowerCase();
+      return banned.filter((hex) => new RegExp(`${hex}(?![0-9a-f])`).test(text)).map((hex) => `${file}: ${hex}`);
+    });
+    expect(hits).toEqual([]);
+  });
+});

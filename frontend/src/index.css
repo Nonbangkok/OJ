@@ -29,21 +29,42 @@
   --font-size-card-title: 1rem;
   --font-size-metadata: 0.875rem;
 
+  /* ── Base palette (UI redesign 2026-11, docs/superpowers/specs/2026-11-15-ui-redesign-design.md §5).
+     Neutral zinc surfaces, near-black primary, colour only for meaning:
+     green = pass, red = fail/destructive, amber = time limit/stale. ── */
   --background-primary: #ffffff;
-  --background-secondary: #f8f9fa;
-  --background-tertiary: #e9ecef;
-  --navbar-slider-background: #e9ecef;
-  --migrationProblemItem-background: #e3f2fd;
+  --background-secondary: #fafafa;
+  --background-tertiary: #f4f4f5;
+  --border-color: #e4e4e7;
+  --border-strong: #d4d4d8;
 
-  --text-primary: #212529;
-  --text-secondary: #495057;
-  --text-muted: #6c757d;
+  --text-primary: #18181b;
+  --text-secondary: #3f3f46;
+  --text-muted: #71717a;
+  --text-faint: #a1a1aa;
 
-  --border-color: #dee2e6;
-
-  --accent-primary: #007bff;
-  --accent-primary-hover: #0056b3;
+  --accent-primary: #18181b;
+  --accent-primary-hover: #3f3f46;
   --text-on-primary: #ffffff;
+  /* Grey crescent of the Grader logo (GraderLogo.tsx). */
+  --logo-accent: #a6a6a6;
+
+  /* Tint triplets (background / text / border) every status family maps to. */
+  --tint-neutral-bg: #f4f4f5;
+  --tint-neutral-fg: #3f3f46;
+  --tint-neutral-border: #e4e4e7;
+  --tint-success-bg: #f0fdf4;
+  --tint-success-fg: #15803d;
+  --tint-success-border: #bbf7d0;
+  --tint-warning-bg: #fffbeb;
+  --tint-warning-fg: #b45309;
+  --tint-warning-border: #fde68a;
+  --tint-danger-bg: #fef2f2;
+  --tint-danger-fg: #dc2626;
+  --tint-danger-border: #fecaca;
+
+  --navbar-slider-background: var(--background-tertiary);
+  --migrationProblemItem-background: var(--background-tertiary);
 
   /* Activity heatmap (GitHub-style contribution grid) */
   --heatmap-empty: #ebedf0;
@@ -61,61 +82,58 @@
   --difficulty-band-5: #8250df;
 
   --action-primary-foreground: #ffffff;
-  --action-primary-background: #0069d9;
-  --action-primary-hover-background: var(--accent-primary-hover);
+  --action-primary-background: #18181b;
+  --action-primary-hover-background: #3f3f46;
   --action-secondary-foreground: var(--text-primary);
-  --action-secondary-background: var(--surface-elevated);
-  --action-secondary-hover-background: var(--background-secondary);
+  --action-secondary-background: var(--background-primary);
+  --action-secondary-hover-background: var(--background-tertiary);
   --action-neutral-foreground: var(--text-primary);
   --action-neutral-background: var(--background-tertiary);
   --action-neutral-hover-background: var(--border-color);
   --action-destructive-foreground: #ffffff;
   --action-destructive-background: var(--button-danger-bg);
   --action-destructive-hover-background: var(--button-danger-hover);
-  --action-focus-ring: #005fcc;
-  --surface-elevated: #ffffff;
-  --surface-elevation: var(--box-shadow);
+  --action-focus-ring: #18181b;
+  --surface-elevated: var(--background-primary);
+  /* No resting shadows: surfaces are separated by 1px borders. Only floating
+     layers (menus, dialogs) use --box-shadow-lg. */
+  --surface-elevation: none;
 
-  --button-danger-bg: #dc3545;
-  /* Red color for danger buttons */
-  --button-danger-hover: #c82333;
-  /* Darker red on hover */
+  --button-danger-bg: #dc2626;
+  --button-danger-hover: #b91c1c;
 
-  --status-success: #28a745;
-  --status-danger: #dc3545;
+  --status-success: #15803d;
+  --status-danger: #dc2626;
   --error-text: var(--status-danger);
-  --status-warning: #ffc107;
-  --status-info: #17a2b8;
+  --status-warning: #b45309;
+  --status-info: #52525b;
 
-  /* Verdict colors shared by the global .status-* classes and the
-     SubmissionModal detail values */
-  --verdict-accepted: #48bb78;
-  --verdict-wrong: #f56565;
-  --verdict-time: #f6ad55;
-  --verdict-compilation: #a0aec0;
-  --verdict-runtime: #ed8936;
-  --verdict-memory: #ed64a6;
-  --verdict-pending: #718096;
+  /* Verdict colours shared by the global .status-* classes and the
+     SubmissionModal detail values. Text colours, all ≥4.5:1. */
+  --verdict-accepted: #15803d;
+  --verdict-wrong: #dc2626;
+  --verdict-time: #b45309;
+  --verdict-compilation: #71717a;
+  --verdict-runtime: #9a3412;
+  --verdict-memory: #c2410c;
+  --verdict-pending: #71717a;
 
-  --status-success-bg: #48bb78;
-  /* Green-action hovers: success buttons stay in the green family instead
-     of flipping to the blue accent. Hover is a brighter green, active
-     (pressed) a darker one. Derived from --status-success-bg
-     (hsl(140 41% 47%)): hover hsl(140 45% 58%), active hsl(140 46% 50%). */
-  --status-success-hover: #64c484;
-  --status-success-active: #45ba6c;
-  --status-error-bg: #dc3545;
-  --status-warning-bg: #ffc107;
-  --status-info-bg: #17a2b8;
+  /* Fills (testcase strip, success buttons): may be lighter than text green. */
+  --status-success-bg: #16a34a;
+  --status-success-hover: #15803d;
+  --status-success-active: #166534;
+  --status-error-bg: var(--status-danger);
+  --status-warning-bg: var(--tint-warning-fg);
+  --status-info-bg: var(--status-info);
 
   --font-family-sans-serif: 'Inter', sans-serif;
-  --box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  --box-shadow: none;
 
   --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --shadow-hover: 0 4px 10px rgba(0, 0, 0, 0.1);
-  --box-shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.15), 0 3px 6px rgba(0, 0, 0, 0.1);
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --shadow-hover: none;
+  --box-shadow-lg: 0 12px 32px -10px rgba(0, 0, 0, 0.25);
 
   /* Semantic aliases — legacy names kept working; map onto the tokens above */
   --card-bg: var(--surface-elevated);
@@ -131,36 +149,35 @@
   --input-bg: var(--background-primary);
   --border-color-light: var(--border-color);
   --error-color: var(--status-danger);
-  --error-bg: rgba(220, 53, 69, 0.1);
+  --error-bg: var(--tint-danger-bg);
   --text-error: var(--error-text);
-  --text-success: #198754;
-  --text-warning: #b8860b;
-  --warning-color: #f57c00;
-  --background-error: rgba(220, 53, 69, 0.1);
-  --background-success: rgba(40, 167, 69, 0.1);
+  --text-success: var(--tint-success-fg);
+  --text-warning: var(--tint-warning-fg);
+  --warning-color: var(--tint-warning-fg);
+  --background-error: var(--tint-danger-bg);
+  --background-success: var(--tint-success-bg);
 
-  /* Code-editor palette — deliberately dark in both themes, mirroring the
-     highlight.js theme used for syntax coloring. */
-  --editor-bg: #282c34;
-  --editor-surface: #21252b;
-  --editor-border: #181b20;
-  --editor-border-strong: #3a3f4b;
-  --editor-text: #abb2bf;
-  --editor-gutter-text: #565c66;
-  --editor-gutter-muted: #636d83;
-  --editor-focus: #61afef;
+  /* Code editor palette — follows the theme. */
+  --editor-bg: #fafafa;
+  --editor-surface: #f4f4f5;
+  --editor-border: #e4e4e7;
+  --editor-border-strong: #d4d4d8;
+  --editor-text: #18181b;
+  --editor-gutter-text: #a1a1aa;
+  --editor-gutter-muted: #a1a1aa;
+  --editor-focus: #18181b;
 
-  /* Statement-editor chrome — dark toolbar by design, constant per theme. */
-  --editor-chrome-bg: #202428;
-  --editor-chrome-text: #f7f7f7;
-  --editor-chrome-muted: #c9cdd1;
-  --editor-chrome-button-bg: #3a4048;
-  --editor-chrome-button-border: #4a525c;
+  /* Statement-editor chrome — follows the theme. */
+  --editor-chrome-bg: var(--background-secondary);
+  --editor-chrome-text: var(--text-primary);
+  --editor-chrome-muted: var(--text-muted);
+  --editor-chrome-button-bg: var(--background-tertiary);
+  --editor-chrome-button-border: var(--border-color);
 
   /* Statement paper preview — pages stay white like printed paper in both
      themes; the desk around the pages follows the theme. */
   --statement-paper: #ffffff;
-  --statement-desk: #e9edf1;
+  --statement-desk: #f4f4f5;
   --statement-stripe-a: #f4f6f8;
   --statement-stripe-b: #eef1f4;
   --statement-page-number: #55606b;
@@ -169,96 +186,110 @@
   --statement-continued: #8a949e;
 
   /* Success tint for the verify checklist. */
-  --success-tint-bg: rgba(25, 135, 84, 0.08);
-  --success-tint-border: rgba(25, 135, 84, 0.35);
+  --success-tint-bg: var(--tint-success-bg);
+  --success-tint-border: var(--tint-success-border);
 
   /* Warning tint (modal notices). */
-  --warning-tint-bg: #fff3cd;
-  --warning-tint-text: #856404;
+  --warning-tint-bg: var(--tint-warning-bg);
+  --warning-tint-text: var(--tint-warning-fg);
 
   /* Danger tint (failure banners). */
-  --danger-tint-bg: rgba(220, 53, 69, 0.08);
+  --danger-tint-bg: var(--tint-danger-bg);
 
-  /* Scoreboard medal accents. */
+  /* Scoreboard medal accents (removed with the Ranking redesign, phase 3). */
   --medal-gold: #d4a017;
   --medal-silver: #9aa5b1;
   --medal-bronze: #b0703c;
 
-  /* Management-page action buttons (legacy composes: btn family). */
-  --action-create-bg: #28a745;
-  --action-create-hover: #218838;
-  --action-edit-bg: #17a2b8;
-  --action-edit-hover: #138496;
-  --action-problems-bg: #007bff;
-  --action-problems-hover: #0069d9;
-  --action-neutral-button-bg: #6c757d;
-  --action-neutral-button-hover: #545b62;
-  --action-disabled-bg: #adb5bd;
+  /* Management-page action buttons: neutral, never colour-coded. */
+  --action-create-bg: var(--action-primary-background);
+  --action-create-hover: var(--action-primary-hover-background);
+  --action-edit-bg: var(--action-primary-background);
+  --action-edit-hover: var(--action-primary-hover-background);
+  --action-problems-bg: var(--action-primary-background);
+  --action-problems-hover: var(--action-primary-hover-background);
+  --action-neutral-button-bg: var(--action-primary-background);
+  --action-neutral-button-hover: var(--action-primary-hover-background);
+  --action-disabled-bg: var(--text-faint);
   --action-button-foreground: #ffffff;
 
   /* Contest-status badges — shared by Management badges, the contest-status
      badge on the problems table, and ContestCard's joined status. */
-  --contest-badge-scheduled-bg: #e3f2fd;
-  --contest-badge-scheduled-fg: #1976d2;
-  --contest-badge-scheduled-border: #bbdefb;
-  --contest-badge-running-bg: #e8f5e8;
-  --contest-badge-running-fg: #2e7d32;
-  --contest-badge-running-border: #c8e6c9;
-  --contest-badge-finishing-bg: #fff3e0;
-  --contest-badge-finishing-fg: #f57c00;
-  --contest-badge-finishing-border: #ffcc02;
-  --contest-badge-finished-bg: #f3e5f5;
-  --contest-badge-finished-fg: #7b1fa2;
-  --contest-badge-finished-border: #ce93d8;
+  --contest-badge-scheduled-bg: var(--tint-neutral-bg);
+  --contest-badge-scheduled-fg: var(--tint-neutral-fg);
+  --contest-badge-scheduled-border: var(--tint-neutral-border);
+  --contest-badge-running-bg: var(--tint-success-bg);
+  --contest-badge-running-fg: var(--tint-success-fg);
+  --contest-badge-running-border: var(--tint-success-border);
+  --contest-badge-finishing-bg: var(--tint-warning-bg);
+  --contest-badge-finishing-fg: var(--tint-warning-fg);
+  --contest-badge-finishing-border: var(--tint-warning-border);
+  --contest-badge-finished-bg: var(--tint-neutral-bg);
+  --contest-badge-finished-fg: var(--text-muted);
+  --contest-badge-finished-border: var(--tint-neutral-border);
 
   /* Batch-upload feedback boxes. */
-  --feedback-info-bg: #e7f3fe;
-  --feedback-info-border: #2196f3;
-  --feedback-info-fg: #155a8a;
-  --feedback-success-bg: #e8f5e9;
-  --feedback-success-border: #4caf50;
-  --feedback-success-fg: #2e7d32;
-  --feedback-error-bg: #ffebee;
-  --feedback-error-border: #f44336;
-  --feedback-error-fg: #c62828;
+  --feedback-info-bg: var(--tint-neutral-bg);
+  --feedback-info-border: var(--tint-neutral-border);
+  --feedback-info-fg: var(--tint-neutral-fg);
+  --feedback-success-bg: var(--tint-success-bg);
+  --feedback-success-border: var(--tint-success-border);
+  --feedback-success-fg: var(--tint-success-fg);
+  --feedback-error-bg: var(--tint-danger-bg);
+  --feedback-error-border: var(--tint-danger-border);
+  --feedback-error-fg: var(--tint-danger-fg);
 
-  /* ContestCard action buttons (gradient pairs). */
-  --contest-action-join-from: #4caf50;
-  --contest-action-join-to: #45a049;
-  --contest-action-join-hover-from: #45a049;
-  --contest-action-join-hover-to: #3d8b40;
-  --contest-action-enter-from: #2196f3;
-  --contest-action-enter-to: #1976d2;
-  --contest-action-enter-hover-from: #1976d2;
-  --contest-action-enter-hover-to: #1565c0;
-  --contest-action-scoreboard-from: #ff9800;
-  --contest-action-scoreboard-to: #f57c00;
-  --contest-action-scoreboard-hover-from: #f57c00;
-  --contest-action-scoreboard-hover-to: #ef6c00;
-  --contest-action-login-from: #9c27b0;
-  --contest-action-login-to: #7b1fa2;
-  --contest-action-login-hover-from: #7b1fa2;
-  --contest-action-login-hover-to: #6a1b9a;
-  --contest-action-foreground: #ffffff;
+  /* ContestCard action buttons: flat (from = to) until the gradients are
+     removed from ContestCard.module.css in phase 1 task 5. */
+  --contest-action-join-from: var(--action-primary-background);
+  --contest-action-join-to: var(--action-primary-background);
+  --contest-action-join-hover-from: var(--action-primary-hover-background);
+  --contest-action-join-hover-to: var(--action-primary-hover-background);
+  --contest-action-enter-from: var(--action-primary-background);
+  --contest-action-enter-to: var(--action-primary-background);
+  --contest-action-enter-hover-from: var(--action-primary-hover-background);
+  --contest-action-enter-hover-to: var(--action-primary-hover-background);
+  --contest-action-scoreboard-from: var(--action-primary-background);
+  --contest-action-scoreboard-to: var(--action-primary-background);
+  --contest-action-scoreboard-hover-from: var(--action-primary-hover-background);
+  --contest-action-scoreboard-hover-to: var(--action-primary-hover-background);
+  --contest-action-login-from: var(--action-primary-background);
+  --contest-action-login-to: var(--action-primary-background);
+  --contest-action-login-hover-from: var(--action-primary-hover-background);
+  --contest-action-login-hover-to: var(--action-primary-hover-background);
+  --contest-action-foreground: var(--action-primary-foreground);
 }
 
 [data-theme='dark'] {
   color-scheme: dark;
-  --background-primary: #121212;
-  --background-secondary: #1e1e1e;
-  --background-tertiary: #2a2a2a;
-  --navbar-slider-background: #424242;
-  --migrationProblemItem-background: #4d4c4c;
+  /* GitHub-dark tones. */
+  --background-primary: #0d1117;
+  --background-secondary: #161b22;
+  --background-tertiary: #21262d;
+  --border-color: #30363d;
+  --border-strong: #484f58;
 
-  --text-primary: #e0e0e0;
-  --text-secondary: #a0a0a0;
-  --text-muted: #a0a0a0;
+  --text-primary: #e6edf3;
+  --text-secondary: #c9d1d9;
+  --text-muted: #8b949e;
+  --text-faint: #6e7681;
 
-  --border-color: #424242;
+  --accent-primary: #e6edf3;
+  --accent-primary-hover: #c9d1d9;
+  --logo-accent: #a6a6a6;
 
-  --accent-primary: #0d6efd;
-  --accent-primary-hover: #3d8bfd;
-  --text-on-primary: #ffffff;
+  --tint-neutral-bg: #21262d;
+  --tint-neutral-fg: #c9d1d9;
+  --tint-neutral-border: #30363d;
+  --tint-success-bg: #0f2a19;
+  --tint-success-fg: #3fb950;
+  --tint-success-border: #1f6f37;
+  --tint-warning-bg: #2b2111;
+  --tint-warning-fg: #d29922;
+  --tint-warning-border: #6e5313;
+  --tint-danger-bg: #2d1214;
+  --tint-danger-fg: #f85149;
+  --tint-danger-border: #6e2b2b;
 
   /* Activity heatmap — brighter greens for dark surfaces */
   --heatmap-empty: #30363d;
@@ -275,71 +306,49 @@
   --difficulty-band-4: #da3633;
   --difficulty-band-5: #8957e5;
 
-  --action-primary-foreground: #ffffff;
-  --action-primary-background: #0b5ed7;
-  --action-primary-hover-background: var(--accent-primary-hover);
-  --action-secondary-foreground: var(--text-primary);
-  --action-secondary-background: var(--surface-elevated);
-  --action-secondary-hover-background: var(--background-tertiary);
-  --action-neutral-foreground: var(--text-primary);
-  --action-neutral-background: var(--background-tertiary);
-  --action-neutral-hover-background: var(--navbar-slider-background);
-  --action-destructive-foreground: #ffffff;
-  --action-destructive-background: var(--button-danger-bg);
-  --action-destructive-hover-background: var(--button-danger-hover);
-  --action-focus-ring: #6ea8fe;
-  --surface-elevated: #1e1e1e;
-  --surface-elevation: var(--box-shadow);
+  --action-primary-foreground: #0d1117;
+  --action-primary-background: #e6edf3;
+  --action-primary-hover-background: #c9d1d9;
+  --action-focus-ring: #e6edf3;
 
-  --button-danger-bg: #dc3545;
-  /* Ensure consistent danger color in dark mode */
-  --button-danger-hover: #ef455a;
-  /* Slightly brighter for dark mode hover */
+  --button-danger-bg: #da3633;
+  --button-danger-hover: #b62324;
 
-  --status-success: #198754;
-  --status-danger: #dc3545;
-  --error-text: #ff6b7a;
-  --status-warning: #ffc107;
-  --status-info: #0dcaf0;
+  --status-success: #3fb950;
+  --status-danger: #f85149;
+  --status-warning: #d29922;
+  --status-info: #8b949e;
 
-  --box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --verdict-accepted: #3fb950;
+  --verdict-wrong: #f85149;
+  --verdict-time: #d29922;
+  --verdict-compilation: #8b949e;
+  --verdict-runtime: #f0883e;
+  --verdict-memory: #db6d28;
+  --verdict-pending: #8b949e;
 
-  --status-success-bg: #198754;
-  /* Dark-mode green hover/active: brightened versions of the darker-theme
-     success green (hover hsl(160 55% 42%), active hsl(160 52% 46%)). */
-  --status-success-hover: #1fa663;
-  --status-success-active: #1b9457;
-  --status-warning-bg: #d39e00;
-  --shadow-hover: 0 4px 10px rgba(0, 0, 0, 0.4);
+  --status-success-bg: #238636;
+  --status-success-hover: #2ea043;
+  --status-success-active: #1a7f37;
 
-  /* Dark-mode overrides for the semantic aliases */
-  --card-bg: var(--surface-elevated);
-  --background-hover: var(--background-tertiary);
-  --background-darker: var(--background-tertiary);
-  --background-light: var(--background-tertiary);
-  --input-bg: var(--background-secondary);
-  --text-success: #2fbf71;
-  --text-warning: #f6c344;
-  --warning-color: #ffa040;
+  --box-shadow-lg: 0 12px 32px -10px rgba(0, 0, 0, 0.6);
 
-  /* Warning tint readable on dark surfaces. */
-  --warning-tint-bg: rgba(255, 193, 7, 0.12);
-  --warning-tint-text: #ffd57e;
-
-  /* Danger tint readable on dark surfaces. */
-  --danger-tint-bg: rgba(220, 53, 69, 0.14);
+  --editor-bg: #0d1117;
+  --editor-surface: #161b22;
+  --editor-border: #30363d;
+  --editor-border-strong: #484f58;
+  --editor-text: #e6edf3;
+  --editor-gutter-text: #6e7681;
+  --editor-gutter-muted: #6e7681;
+  --editor-focus: #e6edf3;
 
   /* Medals brightened for dark backgrounds. */
   --medal-gold: #ffcc4d;
   --medal-silver: #c6cdd5;
   --medal-bronze: #d2926b;
-  --error-bg: rgba(255, 107, 122, 0.12);
-  --background-error: rgba(255, 107, 122, 0.12);
-  --background-success: rgba(46, 204, 113, 0.12);
 
-  /* Dark-mode overrides: the desk around statement pages darkens; the paper
-     itself and the editor palettes intentionally stay constant. */
-  --statement-desk: #1a1d21;
+  /* The desk around statement pages darkens; the paper itself stays white. */
+  --statement-desk: #010409;
 }
 
 /* Global styles reset and base */
