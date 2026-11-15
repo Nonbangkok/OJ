@@ -114,7 +114,13 @@ the rollback fails the pull request:
 ```bash
 node --test tests/cdDeployStructure.test.mjs                               # no Docker needed
 node --test tests/cdDeployGuards.test.mjs tests/cdDeployRollback.test.mjs  # Docker, ~4 minutes
+node --test tests/refreshProxy.test.mjs                                    # Docker, ~15 seconds
 ```
+
+`tests/refreshProxy.test.mjs` covers `scripts/refresh-proxy.sh`, which
+`deploy.sh` uses to apply a changed `nginx-proxy/production.conf`: it swaps the
+file the way `git checkout` does (a new inode at the same path) and checks the
+proxy then serves the new configuration.
 
 Frontend visual regression (admin shell + authoring profiles, Playwright):
 
