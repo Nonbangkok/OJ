@@ -1,0 +1,170 @@
+.wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  color: var(--text-primary);
+}
+
+.caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--background-tertiary);
+  vertical-align: middle;
+}
+
+.table [data-align='right'] {
+  text-align: right;
+}
+
+.table td[data-align='right'] {
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+}
+
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.activatable {
+  cursor: pointer;
+}
+
+.activatable:hover td,
+.highlight td {
+  background: var(--background-secondary);
+}
+
+.highlight td:first-child {
+  box-shadow: inset 2px 0 0 var(--text-primary);
+}
+
+.selectCell,
+.actionsCell {
+  width: 32px;
+}
+
+.checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--text-primary);
+  cursor: pointer;
+}
+
+.primaryLink {
+  color: var(--text-primary);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.primaryLink:hover {
+  text-decoration: underline;
+}
+
+.skeleton {
+  display: block;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--background-tertiary);
+}
+
+.emptyCell {
+  padding: 0;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--background-tertiary);
+}
+
+.itemText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+
+button.itemText {
+  cursor: pointer;
+}
+
+.itemPrimary {
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.itemMeta {
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.skeletonItem {
+  height: 44px;
+  border-bottom: 1px solid var(--background-tertiary);
+  background: var(--background-secondary);
+}
+
+.emptyItem {
+  list-style: none;
+}
+
+/* Keyboard focus is always visible. */
+.activatable:focus-visible,
+.itemText:focus-visible,
+.sortButton:focus-visible,
+.primaryLink:focus-visible {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
