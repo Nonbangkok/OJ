@@ -158,3 +158,19 @@ describe('decoration', () => {
     expect(hits).toEqual([]);
   });
 });
+
+describe('primitives', () => {
+  it('Button has no resting shadow and uses the 6px radius', () => {
+    const css = readSource('components/ui/Button.module.css');
+    expect(css).not.toMatch(/box-shadow\s*:\s*var\(--(surface-elevation|box-shadow)\)/);
+    expect(css).toMatch(/\.button\s*\{[^}]*border-radius:\s*var\(--radius-md\)/);
+    expect(css).toMatch(/\.button:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--action-focus-ring\)/);
+  });
+
+  it('StatusBadge tones use the shared tint triplets', () => {
+    const css = readSource('components/ui/StatusBadge.module.css');
+    for (const [tone, tint] of [['neutral', 'neutral'], ['info', 'neutral'], ['success', 'success'], ['warning', 'warning'], ['danger', 'danger']]) {
+      expect(css).toMatch(new RegExp(`\\.${tone}\\s*\\{[^}]*background:\\s*var\\(--tint-${tint}-bg\\)[^}]*color:\\s*var\\(--tint-${tint}-fg\\)`));
+    }
+  });
+});
