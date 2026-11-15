@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { Warning } from '@phosphor-icons/react';
 import { useAuth } from '../../context/AuthContext';
 import styles from './Contests.module.css';
 import { useContests } from '../../hooks/useContests';
@@ -32,7 +33,7 @@ const Contests = () => {
 
             {error && (
                 <div className={styles.error}>
-                    ⚠️ {error}
+                    <Warning size={16} aria-hidden="true" /> {error}
                 </div>
             )}
 

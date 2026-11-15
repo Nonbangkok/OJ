@@ -317,13 +317,6 @@
   margin-top: 2rem;
 }
 
-.no-problems-icon {
-  font-size: 4rem;
-  margin-bottom: 1.5rem;
-  filter: grayscale(1);
-  opacity: 0.6;
-}
-
 .no-problems-title {
   font-size: 1.5rem;
   font-weight: 600;

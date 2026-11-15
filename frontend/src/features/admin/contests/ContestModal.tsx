@@ -1,4 +1,5 @@
 import { useId, useRef } from 'react';
+import { Timer, Warning } from '@phosphor-icons/react';
 import useContestModal from '../../../hooks/admin/useContestModal';
 import { useModalFocus } from '../../../components/ui/useModalFocus';
 import formStyles from '../../../components/styles/Form.module.css';
@@ -38,7 +39,7 @@ const ContestModal = ({ contest, onClose, onSuccess }) => {
         <form onSubmit={handleSubmit}>
           {error && (
             <div className={formStyles['error-message']}>
-              ⚠️ {error}
+              <Warning size={16} aria-hidden="true" /> {error}
             </div>
           )}
 
@@ -119,7 +120,7 @@ const ContestModal = ({ contest, onClose, onSuccess }) => {
           {/* Duration Display */}
           {getDurationText() && (
             <div className={modalStyles['contest-duration-display']}>
-              ⏱️ {getDurationText()}
+              <Timer size={16} aria-hidden="true" /> {getDurationText()}
             </div>
           )}
 

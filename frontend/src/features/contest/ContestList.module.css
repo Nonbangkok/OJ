@@ -4,11 +4,6 @@
   color: var(--text-secondary);
 }
 
-.noContestsIcon {
-  font-size: 4rem;
-  margin-bottom: 20px;
-}
-
 .noContests h3 {
   color: var(--text-primary);
   margin-bottom: 10px;

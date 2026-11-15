@@ -133,33 +133,24 @@
 }
 
 .enterBtn {
-  background: linear-gradient(135deg, var(--contest-action-enter-from), var(--contest-action-enter-to));
-  color: var(--contest-action-foreground);
+  background: var(--action-primary-background);
+  color: var(--action-primary-foreground);
 }
 
 .enterBtn:hover {
-  background: linear-gradient(135deg, var(--contest-action-enter-hover-from), var(--contest-action-enter-hover-to));
-  transform: translateY(-2px);
+  background: var(--action-primary-hover-background);
 }
 
-.scoreboardBtn {
-  background: linear-gradient(135deg, var(--contest-action-scoreboard-from), var(--contest-action-scoreboard-to));
-  color: var(--contest-action-foreground);
-}
-
-.scoreboardBtn:hover {
-  background: linear-gradient(135deg, var(--contest-action-scoreboard-hover-from), var(--contest-action-scoreboard-hover-to));
-  transform: translateY(-2px);
-}
-
+.scoreboardBtn,
 .loginBtn {
-  background: linear-gradient(135deg, var(--contest-action-login-from), var(--contest-action-login-to));
-  color: var(--contest-action-foreground);
+  background: var(--action-secondary-background);
+  border: 1px solid var(--border-color);
+  color: var(--action-secondary-foreground);
 }
 
+.scoreboardBtn:hover,
 .loginBtn:hover {
-  background: linear-gradient(135deg, var(--contest-action-login-hover-from), var(--contest-action-login-hover-to));
-  transform: translateY(-2px);
+  background: var(--action-secondary-hover-background);
 }
 
 .joinedStatus {

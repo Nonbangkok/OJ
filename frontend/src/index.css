@@ -249,26 +249,6 @@
   --feedback-error-bg: var(--tint-danger-bg);
   --feedback-error-border: var(--tint-danger-border);
   --feedback-error-fg: var(--tint-danger-fg);
-
-  /* ContestCard action buttons: flat (from = to) until the gradients are
-     removed from ContestCard.module.css in phase 1 task 5. */
-  --contest-action-join-from: var(--action-primary-background);
-  --contest-action-join-to: var(--action-primary-background);
-  --contest-action-join-hover-from: var(--action-primary-hover-background);
-  --contest-action-join-hover-to: var(--action-primary-hover-background);
-  --contest-action-enter-from: var(--action-primary-background);
-  --contest-action-enter-to: var(--action-primary-background);
-  --contest-action-enter-hover-from: var(--action-primary-hover-background);
-  --contest-action-enter-hover-to: var(--action-primary-hover-background);
-  --contest-action-scoreboard-from: var(--action-primary-background);
-  --contest-action-scoreboard-to: var(--action-primary-background);
-  --contest-action-scoreboard-hover-from: var(--action-primary-hover-background);
-  --contest-action-scoreboard-hover-to: var(--action-primary-hover-background);
-  --contest-action-login-from: var(--action-primary-background);
-  --contest-action-login-to: var(--action-primary-background);
-  --contest-action-login-hover-from: var(--action-primary-hover-background);
-  --contest-action-login-hover-to: var(--action-primary-hover-background);
-  --contest-action-foreground: var(--action-primary-foreground);
 }
 
 [data-theme='dark'] {

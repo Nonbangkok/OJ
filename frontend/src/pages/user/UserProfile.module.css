@@ -280,7 +280,7 @@
   content: '';
   position: absolute;
   inset: 6px 2px 0 2px;
-  background: linear-gradient(180deg, var(--accent-primary), var(--accent-primary-hover));
+  background: var(--text-primary);
   border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%;
   transform: rotate(45deg);
 }
@@ -292,7 +292,7 @@
   top: 0;
   width: 12px;
   height: 16px;
-  background: linear-gradient(180deg, var(--accent-primary), var(--accent-primary-hover));
+  background: var(--text-primary);
   border-radius: 50% 50% 50% 50% / 65% 65% 35% 35%;
   transform: translateX(-50%) rotate(20deg);
 }

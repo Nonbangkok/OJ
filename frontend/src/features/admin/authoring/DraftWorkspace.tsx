@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import { Check, Circle } from '@phosphor-icons/react';
 import { Link, NavLink, Outlet, useNavigate, useOutletContext } from 'react-router-dom';
 import { Button, Dialog, StatusBadge } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
@@ -402,7 +403,7 @@ function PublishChecklist({ draft, dirty, canPublish, disabled, onVerify, onPubl
       : `${total - withOutput} of ${total} ${total - withOutput === 1 ? 'case' : 'cases'} missing expected outputs`;
   const item = (done: boolean, label: string, detail: string, action?: React.ReactNode, detailWhenDone = false) =>
     <li className={done ? styles.checkDone : styles.checkTodo} key={label}>
-      <span className={styles.checkMark} aria-hidden>{done ? '✓' : '○'}</span>
+      <span className={styles.checkMark} aria-hidden>{done ? <Check size={14} weight="bold" /> : <Circle size={14} />}</span>
       <span className={styles.checkBody}>
         <span className={styles.checkLabel}>{label}</span>
         <span className={styles.checkDetail}>{done && !detailWhenDone ? 'Done' : detail} {!done && action}</span>

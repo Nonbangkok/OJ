@@ -145,3 +145,16 @@ describe('logo', () => {
     expect(hits).toEqual([]);
   });
 });
+
+describe('decoration', () => {
+  it('no emoji in source', () => {
+    const emoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}\u{2705}\u{274C}\u{FE0F}]/u;
+    const hits = listSourceFiles(['.ts', '.tsx', '.css']).filter((file) => emoji.test(readSource(file)));
+    expect(hits).toEqual([]);
+  });
+
+  it('no gradients in source', () => {
+    const hits = listSourceFiles(['.ts', '.tsx', '.css']).filter((file) => readSource(file).includes('gradient('));
+    expect(hits).toEqual([]);
+  });
+});
