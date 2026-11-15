@@ -9,6 +9,7 @@ import Sidebar from './Sidebar';
 import MobileTabBar from './MobileTabBar';
 import { navItemsFor } from './navItems';
 import { isEditableTarget } from './keyboard';
+import { useCommandPalette } from './CommandPaletteContext';
 import styles from './AppShell.module.css';
 
 const STORAGE_KEY = 'oj.sidebar.collapsed';
@@ -37,7 +38,9 @@ export interface AppShellProps {
   onOpenSearch?: () => void;
 }
 
-export default function AppShell({ children, onOpenSearch = () => undefined }: AppShellProps) {
+export default function AppShell({ children, onOpenSearch: onOpenSearchProp }: AppShellProps) {
+  const palette = useCommandPalette();
+  const onOpenSearch = onOpenSearchProp ?? palette.open;
   const { pathname } = useLocation();
   const { user } = useAuth();
   const { isPrivateMode } = useSettings();
