@@ -5,32 +5,59 @@ button in GitHub. This runbook is for the person approving and the person
 debugging a failed run. Design background:
 [docs/superpowers/specs/2026-11-14-continuous-deployment-design.md](../superpowers/specs/2026-11-14-continuous-deployment-design.md).
 
-> **Rollback rehearsal on the production host: NOT YET DONE.** See
-> [the rehearsal section](#rollback-rehearsal-on-the-production-host-not-yet-done).
-> Until it is filled in, the rollback path has only run in the local test
-> suite, never on the machine it protects.
+> **Status.** Live since 2026-11-15 (first CD deploy: `801739d`). The rollback
+> path was rehearsed **on the production host** the same day and passed: see
+> [the rehearsal](#rollback-rehearsal-on-the-production-host-2026-11-15-passed).
+> A deploy takes about 11 minutes, about 9 of them the pre-deploy `pg_dump`
+> (~3 GB at the time).
 
-## Before the first deploy (operator prerequisites)
+## One-time setup
 
-All of these are still outstanding. Do them before expecting a deploy to work.
+All of this was done on 2026-11-15. Redo it when the server is rebuilt, a
+credential is rotated, or the tailnet changes. Each step names the failure it
+prevents, because every one of them was hit at least once on the first deploy.
 
-1. **Pin the server's SSH host key.** `.github/deploy-known-hosts` is committed
-   with comments only, so **every deploy fails closed (before connecting) until
-   a key line is added.** On the production server, over a channel you trust:
+1. **Pin the server's SSH host key.** `.github/deploy-known-hosts` holds
+   `<keytype> <base64>` lines (no host column); with no key line **every deploy
+   fails closed before connecting.** The safest source is a machine that has
+   already connected to the server, since its key was verified then:
 
    ```bash
-   awk '{print $1, $2}' /etc/ssh/ssh_host_ed25519_key.pub
+   ssh-keygen -F <server-tailnet-ip>      # take the ssh-ed25519 line, drop the host column
    ```
 
-   Paste the output (`ssh-ed25519 AAAA...`, one line per key, no host column)
-   below the comments in `.github/deploy-known-hosts`, and merge it to `main`.
-2. **Expect the first CI run of `shellcheck scripts/cd-deploy.sh` to be its first
-   real run.** shellcheck cannot be run on the development machine, so the first
-   push after this lands may fail that CI step on findings. The known causes were
-   removed by reading (no `ls` parsing, per-line `disable=` with a reason where a
-   finding is a false positive), but anything left will show up there. Fix those
-   first; a red CI run never reaches the deploy workflow.
-3. **Bring the server's checkout to the merge commit by hand, once.** The
+   or, on the server itself: `awk '{print $1, $2}' /etc/ssh/ssh_host_ed25519_key.pub`.
+   (That command only works **on the server**; `/etc/ssh/ssh_host_*` on a Mac is
+   the Mac's own key, or absent.)
+2. **Create the Tailscale OAuth client in the tailnet that actually contains the
+   server.** An account can belong to more than one tailnet, and a client made in
+   the wrong one joins fine and then cannot see the server at all: the run says
+   `ssh: connect to host *** port 22: Connection timed out`, and the reachability
+   step fails in milliseconds. Before creating anything, open **Machines** and
+   check `oj-server` is listed there (on the server, `tailscale status --json |
+   jq -r .CurrentTailnet.Name` prints the tailnet it is in). A `hosts` entry in
+   the policy file proves nothing: it is an alias anyone can type. In **that**
+   tailnet:
+   - add `"tagOwners": { "tag:ci": ["autogroup:admin"] }` to the policy file and
+     **Save** (the Tags field of the next step does not appear until the tag
+     exists);
+   - generate the OAuth client (Settings → Keys, or Trust credentials), tick
+     **Auth Keys → Write** only (the **Tags** field appears only after that
+     tick), and choose `tag:ci`;
+   - set `TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET` in the `production`
+     environment. A wrong pair fails at "Join the tailnet" with
+     `oauth2: cannot fetch token: 401 Unauthorized` / `API token invalid`.
+3. **Upload the deploy key from its file; never paste it.** A pasted key fails
+   with `Load key ".../deploy_key": error in libcrypto` followed by
+   `Permission denied (publickey)`. From the machine that holds it:
+
+   ```bash
+   gh secret set DEPLOY_SSH_KEY --env production --repo Nonbangkok/OJ < ~/.ssh/oj-deploy
+   ```
+
+   Its public half must be in the deploy user's `~/.ssh/authorized_keys` on the
+   server; compare fingerprints with `ssh-keygen -lf` on both ends.
+4. **Bring the server's checkout to the merge commit by hand, once.** The
    workflow runs `scripts/cd-deploy.sh` *from the checkout as it stands* — the
    last deployed release, which predates this branch and has no such file, so the
    first approved deploy would exit 127. On the server, with no contest running:
@@ -48,14 +75,14 @@ All of these are still outstanding. Do them before expecting a deploy to work.
    effect on the deploy *after* the one that ships it** — the deploy that ships
    it runs the previous version of the script. Treat a change to it like a change
    to the deploy mechanism, not to the app.
-4. **Make sure all three images carry the `:local` tag, then prove the first
+5. **Make sure all three images carry the `:local` tag, then prove the first
    deploy is rollbackable.** The rollback target is the tag the *backend*
-   container runs, today `local`; the snapshot needs **all three** of
-   `oj-backend:local`, `oj-frontend:local` and `oj-authoring-runner:local`. On
-   this box the frontend and authoring-runner images were built with no tag at
-   all (`oj-frontend:latest`), so before step 3 `oj-frontend:local` does not
-   exist — and a first deploy that failed **could not be rolled back** (exit 22).
-   Step 3's `./deploy.sh` normally creates all three (compose names them
+   container runs (`local` after a hand deploy); the snapshot needs **all three**
+   of `oj-backend:local`, `oj-frontend:local` and `oj-authoring-runner:local`. On
+   this box the frontend and authoring-runner images were once built with no tag
+   at all (`oj-frontend:latest`), so `oj-frontend:local` did not exist — and a
+   first deploy that failed **could not have been rolled back** (exit 22).
+   Step 4's `./deploy.sh` normally creates all three (compose names them
    `oj-<service>:${OJ_IMAGE_TAG:-local}`); check, and tag whatever is missing:
 
    ```bash
@@ -76,10 +103,18 @@ All of these are still outstanding. Do them before expecting a deploy to work.
    it; the only state it creates is the `:cd-rollback` image tags and
    `.last-release`.
 
-The GitHub side must also exist: the `production` environment with required
-reviewers, the `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `DEPLOY_HOST`,
-`DEPLOY_USER` and `DEPLOY_SSH_KEY` secrets, and the Tailscale `tag:ci`. The
-workflow references them by those names.
+The GitHub side: the `production` environment with required reviewers, and the
+`TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `DEPLOY_HOST` (the server's tailnet
+address), `DEPLOY_USER` and `DEPLOY_SSH_KEY` environment secrets. The workflow
+references them by those names.
+
+Two things that look like suspects and are not, on this host: **ufw** does not
+govern tailnet traffic (tailscaled runs with netfilter mode on and accepts
+`tailscale0` traffic before ufw's chains), so do not add ufw rules for tailnet
+SSH; and the server has **no direct path** from outside its LAN, so every peer
+reaches it through a DERP relay. That is normal and works; it is why the
+reachability check uses `tailscale ping --until-direct=false` (plain `tailscale
+ping` exits 1 on a relay-only path even when the pong comes back).
 
 ## How a deploy happens
 
@@ -90,10 +125,13 @@ workflow references them by those names.
    `push` to `main` in this repository (a fork's pull request cannot reach the
    approval prompt).
 3. After approval the job joins the tailnet, writes the deploy key, pins the
-   host key from `.github/deploy-known-hosts`, and runs one command over SSH:
-   `scripts/cd-deploy.sh <sha>` in `/srv/docker/apps/OJ` on the server. `<sha>`
-   is the commit CI tested (`workflow_run.head_sha`), not whatever `main` points
-   at after you approve.
+   host key from `.github/deploy-known-hosts`, and checks the server answers
+   over the tailnet (polling up to a minute). If it does not, a **Diagnose the
+   tailnet path** step prints the netmap facts and the verbatim ping result —
+   aggregates and scrubbed text only, since the repository is public. Then it
+   runs one command over SSH: `scripts/cd-deploy.sh <sha>` in
+   `/srv/docker/apps/OJ` on the server. `<sha>` is the commit CI tested
+   (`workflow_run.head_sha`), not whatever `main` points at after you approve.
 4. A last `curl` of the public URL only warns; it cannot fail the job.
 
 `scripts/cd-deploy.sh` runs, in order: take the host lock, guards, record and
@@ -102,6 +140,13 @@ verify, roll back on failure, prune old images.
 `deploy.sh` is still what actually builds and starts the stack, and what you run
 for a hand deploy; `cd-deploy.sh` wraps it with guards, a database backup and an
 automatic rollback. The script's header documents every environment variable.
+
+When a release changes `nginx-proxy/production.conf`, `deploy.sh` **recreates**
+the `nginx-proxy` container (a second or two in which connections drop) instead
+of reloading it, through `scripts/refresh-proxy.sh`: the file is a single-file
+bind mount, `git checkout` gives a changed file a new inode, and a reload would
+re-read the stale one. When the file is unchanged it still does the graceful
+`nginx -s reload`, which also picks up renewed certificates.
 
 The workflow passes **no** environment, so every `CD_*` variable keeps its
 default; in particular **production leaves `CD_DOCKER_ROOT_DIR` unset** so the
@@ -147,6 +192,16 @@ live state, and the `:cd-rollback` snapshot tags.)
 | 20 | The backup failed or could not be verified (`pg_dump` error or timeout, or `pg_restore -l` could not read it) | Unchanged | Check the database container and disk; re-run. The script never deploys without a backup |
 | 21 | The deploy failed **and was rolled back** | Previous release running again and re-verified; database not restored | Read the run log to see why it failed, fix on `main`, redeploy |
 | 22 | The deploy failed **and the rollback also failed** | **May be down or on a broken release. Needs hands now** | See "Rollback failed" below |
+
+A run that fails **before** the deploy step never reached the server, and
+production is untouched. The ones seen on the first deploy:
+
+| Failing step and message | Cause | Fix |
+|---|---|---|
+| Join the tailnet: `oauth2: cannot fetch token: 401 Unauthorized`, `API token invalid` | The OAuth client ID/secret pair is wrong, or is not an OAuth client | One-time setup step 2: regenerate it, set both secrets |
+| Reachability check fails in milliseconds; or the deploy step says `connect to host *** port 22: Connection timed out` | The OAuth client belongs to a tailnet the server is not in | One-time setup step 2: create it in the tailnet whose **Machines** list shows `oj-server` |
+| Reachability check fails after a minute; Diagnose shows `target_online` false or no pong | The server is offline in the tailnet, or the path is genuinely down | Check `oj-server` in the Tailscale console; `tailscale status` on the server |
+| Deploy step: `Load key ".../deploy_key": error in libcrypto`, `Permission denied (publickey)` | `DEPLOY_SSH_KEY` holds a mangled copy of the key | One-time setup step 3: upload it from the file |
 
 Exit **255** is SSH itself (network, host key mismatch, key rejected, or a
 dropped connection), not the script. The script ignores `SIGHUP` and `SIGPIPE`
@@ -206,7 +261,7 @@ restored automatically**; the log names the pre-deploy backup.
   says `THIS DEPLOY CANNOT BE ROLLED BACK` and names the missing images**; the
   deploy still goes ahead (fixing forward may be the only way out), but a failure
   will end at exit 22. `CD_DRY_RUN=1` reports that without deploying — see
-  prerequisite 3. A rollback restores the image tags from the snapshot, then the
+  one-time setup step 5. A rollback restores the image tags from the snapshot, then the
   tree, brings the stack up without building, recreates `nginx-proxy` so it stops
   serving the failed release's configuration, re-verifies readiness
   (`/api/health/ready`) and migrations, and finally prunes the failed release's
@@ -261,19 +316,87 @@ would not match the dump you are restoring. (If you need them another way: the
 tag is the first twelve characters of the previous commit, or `local` if that
 release was built by hand.)
 
-## Rollback rehearsal on the production host: NOT YET DONE
+## Rollback rehearsal on the production host (2026-11-15): passed
 
-> **PLACEHOLDER. THIS REHEARSAL HAS NOT BEEN RUN.**
->
-> The plan: on the production host, clone the checkout to a temp directory,
-> start a throwaway compose project with image tag `aaa`, run `cd-deploy.sh`
-> for a tag whose deploy command fails, and confirm the previous images and
-> tree return. The real transcript goes **below this line**.
->
-> Until it is pasted here, **the rollback path has not been exercised on the
-> machine it protects.** The local test suite has exercised it; that is not
-> the same thing. Do not treat rollback as proven.
+The real `scripts/cd-deploy.sh`, run on `oj-server` itself by its own
+`/bin/sh` (dash), against a throwaway environment that could not touch the live
+site:
+
+- a fresh clone of the repository from GitHub in `/tmp` (not the live checkout);
+- a compose project `ojreh<random>` with no published ports and no shared
+  volumes, three services standing in for backend / frontend / authoring-runner,
+  and a stock nginx standing in for `nginx-proxy`;
+- its own Postgres container for the guards, the backup and the migration check;
+- image tags under that project's own prefix, two visibly different image sets
+  (release A from `postgres:18-alpine`, release B from `nginx:1.30-alpine`),
+  removed afterwards by untagging only.
+
+Release A (`16e144e`, tag `aaa`) was running. The script was asked to deploy
+release B (`801739d`) with a deploy command that **really brought release B
+up** and then exited 1. The script had to notice and restore everything by
+itself.
+
+What it proved: exit **21**; the working tree back on release A; all three
+services back on release A's images (compose had to *recreate* them, so release
+B really had been running); `nginx-proxy` recreated; release B's tags pruned and
+A's kept with the `:cd-rollback` snapshot. On the same host Docker and compose
+versions, and under the same shell, as a real deploy. Afterwards the host held
+no trace of it, and the live stack was untouched (same containers, same uptime,
+`/api/health/ready` still `ready`).
 
 ```text
-(transcript of the production-host rehearsal goes here)
+== host: oj-server  /bin/sh -> /usr/bin/dash  Docker Compose version 2.40.3+ds1-0ubuntu1~24.04.1
+== project: ojreh0ada4c12   workdir: /tmp/cdreh.rMM3Yy
+== release A = 16e144e6925ce3ef338f3f2f46f96b30e17cf2ac (tag aaa); release B = 801739dd6c311d3e1d22ee7764bd587c3a6e62c5 (tag 801739dd6c31)
+== image A = 101873345701   image B = 583b7f2fce1c
+== BEFORE: HEAD 16e144e6925c  backend=101873345701 frontend=101873345701 authoring-runner=101873345701
+== running scripts/cd-deploy.sh 801739dd6c311d3e1d22ee7764bd587c3a6e62c5 (deploy command fails on purpose)
+------------------------------------------------------------------------
+2026-11-15T10:11:59 cd-deploy: log file: /tmp/cdreh.rMM3Yy/repo/backups/cd-deploy-801739dd6c31-20261115T101159.log
+2026-11-15T10:12:00 cd-deploy: preflight ok for 801739dd6c311d3e1d22ee7764bd587c3a6e62c5
+2026-11-15T10:12:00 cd-deploy: rollback target: tag aaa at 16e144e6925ce3ef338f3f2f46f96b30e17cf2ac (recorded in /tmp/cdreh.rMM3Yy/repo/.last-release)
+2026-11-15T10:12:01 cd-deploy: backing up postgres to /tmp/cdreh.rMM3Yy/repo/backups/pre-deploy-801739dd6c31-20261115T101201.dump
+2026-11-15T10:12:01 cd-deploy: backup verified: 5789 bytes
+2026-11-15T10:12:01 cd-deploy: checking out 801739dd6c311d3e1d22ee7764bd587c3a6e62c5
+2026-11-15T10:12:01 cd-deploy: deploying with OJ_IMAGE_TAG=801739dd6c31: ./rehearsal-stub-deploy.sh
+rehearsal stub: release B is up on tag 801739dd6c31; failing on purpose
+2026-11-15T10:12:28 cd-deploy: deploy command failed
+2026-11-15T10:12:28 cd-deploy: DEPLOY FAILED for 801739dd6c311d3e1d22ee7764bd587c3a6e62c5
+2026-11-15T10:12:28 cd-deploy: rolling back to tag aaa (16e144e6925ce3ef338f3f2f46f96b30e17cf2ac)
+ Container ojreh0ada4c12-nginx-proxy-1  Running
+ Container ojreh0ada4c12-backend-1  Recreate
+ Container ojreh0ada4c12-authoring-runner-1  Recreate
+ Container ojreh0ada4c12-frontend-1  Recreate
+ Container ojreh0ada4c12-backend-1  Recreated
+ Container ojreh0ada4c12-authoring-runner-1  Recreated
+ Container ojreh0ada4c12-frontend-1  Recreated
+ Container ojreh0ada4c12-authoring-runner-1  Starting
+ Container ojreh0ada4c12-frontend-1  Starting
+ Container ojreh0ada4c12-backend-1  Starting
+ Container ojreh0ada4c12-backend-1  Started
+ Container ojreh0ada4c12-authoring-runner-1  Started
+ Container ojreh0ada4c12-frontend-1  Started
+ Container ojreh0ada4c12-nginx-proxy-1  Recreate
+ Container ojreh0ada4c12-nginx-proxy-1  Recreated
+ Container ojreh0ada4c12-nginx-proxy-1  Starting
+ Container ojreh0ada4c12-nginx-proxy-1  Started
+2026-11-15T10:12:57 cd-deploy: nginx-proxy recreated onto the restored configuration
+2026-11-15T10:12:57 cd-deploy: pruned image ojreh0ada4c12-backend:801739dd6c31
+2026-11-15T10:12:57 cd-deploy: pruned image ojreh0ada4c12-frontend:801739dd6c31
+2026-11-15T10:12:57 cd-deploy: pruned image ojreh0ada4c12-authoring-runner:801739dd6c31
+2026-11-15T10:12:57 cd-deploy: ROLLBACK OK: tag aaa at 16e144e6925ce3ef338f3f2f46f96b30e17cf2ac is running again (the database was not restored)
+2026-11-15T10:12:57 cd-deploy: Full log of this run on the server: /tmp/cdreh.rMM3Yy/repo/backups/cd-deploy-801739dd6c31-20261115T101159.log
+------------------------------------------------------------------------
+== exit code: 21 (21 = deploy failed and was rolled back)
+== AFTER:  HEAD 16e144e6925c  backend=101873345701 frontend=101873345701 authoring-runner=101873345701
+== proxy container: 2e1e72491ca2 -> ad6be383b02d
+== .last-release: aaa 16e144e6925ce3ef338f3f2f46f96b30e17cf2ac
+== image tags left: ojreh0ada4c12-authoring-runner:aaa ojreh0ada4c12-authoring-runner:cd-rollback ojreh0ada4c12-backend:aaa ojreh0ada4c12-backend:cd-rollback ojreh0ada4c12-frontend:aaa ojreh0ada4c12-frontend:cd-rollback
+== REHEARSAL PASSED
+== cleanup: removed project ojreh0ada4c12, its db container, its image tags and /tmp/cdreh.rMM3Yy
 ```
+
+What it did **not** cover, by design: restoring a database dump (never automatic;
+see above), and the real `deploy.sh` (bound to the live domain, certificate and
+tunnel). The same rollback logic runs on every pull request in CI's `docker` job,
+whose Ubuntu runner also uses dash as `/bin/sh`.
