@@ -18,3 +18,6 @@ export { StatusBadge } from './StatusBadge';
 export type { StatusBadgeProps } from './StatusBadge';
 export { PageHeader } from './PageHeader';
 export type { PageHeaderProps } from './PageHeader';
+export { ScoreCell, StatusMark, TestcaseStrip, VerdictText } from './Verdict';
+export { passedCount, verdictLabel, verdictTone } from './verdictStatus';
+export type { VerdictTone } from './verdictStatus';

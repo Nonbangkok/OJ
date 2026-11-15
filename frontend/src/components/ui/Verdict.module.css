@@ -1,0 +1,55 @@
+.verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.pass { color: var(--verdict-accepted); }
+.fail { color: var(--verdict-wrong); }
+.limit { color: var(--verdict-time); }
+.pending { color: var(--verdict-pending); }
+.none { color: var(--text-muted); }
+
+.strip {
+  display: inline-flex;
+  gap: 2px;
+  vertical-align: middle;
+}
+
+.segment {
+  display: block;
+  border-radius: 1.5px;
+}
+
+.sm .segment { width: 9px; height: 6px; }
+.lg .segment { width: 22px; height: 8px; border-radius: 2px; }
+
+.bar {
+  display: inline-flex;
+  overflow: hidden;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+.bar.sm { width: 110px; height: 6px; }
+.bar.lg { width: 240px; height: 8px; }
+
+.fill { display: block; }
+
+.fill-pass { background: var(--status-success-bg); }
+.fill-fail { background: var(--status-danger); }
+.fill-limit { background: var(--status-warning); }
+.fill-pending,
+.fill-none { background: var(--border-color); }
+
+.score {
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.score.pass { color: var(--verdict-accepted); }
