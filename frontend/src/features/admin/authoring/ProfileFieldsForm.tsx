@@ -1,4 +1,5 @@
 import { Button } from '../../../components/ui';
+import UserLinkPicker, { type LinkedUser } from './UserLinkPicker';
 import styles from './AuthorProfiles.module.css';
 
 export interface Fields {
@@ -26,12 +27,18 @@ interface ProfileFieldsFormProps {
   setY: (value: number) => void;
   chooseImage: (file: File) => void;
   requestRemoval: () => void;
+  /** B8: the linked account (picked by username) and a server error about it. */
+  linked: LinkedUser | null;
+  onLink: (next: LinkedUser | null) => void;
+  currentProfileId?: string;
+  linkError?: string;
 }
 
 /** Author-details fields + profile image crop UI (extracted from AuthorProfiles). */
 export default function ProfileFieldsForm({
   saving, gated, fields, update, image, imageLoading, existingImage,
   canvas, zoom, x, y, setZoom, setX, setY, chooseImage, requestRemoval,
+  linked, onLink, currentProfileId, linkError,
 }: ProfileFieldsFormProps) {
   return (
             <fieldset disabled={saving || gated} className={`${styles.root} ${styles.dialogFields}`}>
@@ -79,21 +86,7 @@ export default function ProfileFieldsForm({
                 </label>
                 <small id="profile-country-help">Three letters, for example THA or USA.</small>
               </div>
-              <div>
-                <label>
-                  User account ID (optional)
-                  <input
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    aria-describedby="profile-user-help"
-                    value={fields.userId}
-                    onChange={(e) => update('userId', e.target.value)}
-                  />
-                </label>
-                <small id="profile-user-help">
-                  Leave blank for an author without a linked account.
-                </small>
-              </div>
+              <UserLinkPicker value={linked} onChange={onLink} currentProfileId={currentProfileId} error={linkError} disabled={saving || gated} />
             </div>
             <label>
               Profile image

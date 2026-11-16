@@ -72,12 +72,14 @@ beforeEach(() => {
 test('renders the reference document at the AI Docs route with a copy button', () => {
   show();
   // The document is present with its sections and endpoints.
-  expect(screen.getByRole('heading', { name: 'AI docs', level: 1 })).toBeInTheDocument();
+  // It lives under the Authoring hub: one H1 ("Authoring") and the AI docs sub-tab selected.
+  expect(screen.getByRole('heading', { name: 'Authoring', level: 1 })).toBeInTheDocument();
+  expect(within(screen.getByRole('navigation', { name: 'Authoring sections' })).getByRole('link', { name: 'AI docs' })).toHaveAttribute('aria-current', 'page');
   expect(screen.getByRole('heading', { name: 'Authentication', level: 2 })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Rules summary', level: 2 })).toBeInTheDocument();
   expect(screen.getAllByText(/POST \/admin\/authoring\/drafts/).length).toBeGreaterThan(0);
-  // The drafts landing link is present on the standalone page.
-  expect(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link', { name: 'Authoring' })).toHaveAttribute(
+  // The Drafts sub-tab leads back to the drafts list.
+  expect(within(screen.getByRole('navigation', { name: 'Authoring sections' })).getByRole('link', { name: 'Drafts' })).toHaveAttribute(
     'href',
     '/admin/authoring'
   );
@@ -94,7 +96,7 @@ test('plain users cannot open AI Docs', () => {
 
 test('the drafts list links to AI Docs', async () => {
   show('/admin/authoring');
-  const link = await screen.findByRole('link', { name: /^AI Docs$/ });
+  const link = within(await screen.findByRole('navigation', { name: 'Authoring sections' })).getByRole('link', { name: 'AI docs' });
   expect(link).toHaveAttribute('href', '/admin/authoring/ai-docs');
 });
 

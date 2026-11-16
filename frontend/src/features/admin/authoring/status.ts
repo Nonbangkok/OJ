@@ -18,6 +18,8 @@ export const draftStatus = (status: Draft['status']) =>
 const JOB_TYPES: Record<string, string> = {
   compile_solution: 'Compile solution',
   compile_generator: 'Compile generator',
+  run_generator: 'Generate inputs',
+  // Older label key; the backend stores run_generator.
   generate_inputs: 'Generate inputs',
   generate_outputs: 'Generate outputs',
   build_pdf: 'Build PDF',
@@ -33,6 +35,9 @@ const JOB_STATUSES: Record<string, { label: string; tone: StatusTone }> = {
   running: { label: 'Running', tone: 'info' },
   succeeded: { label: 'Succeeded', tone: 'success' },
   failed: { label: 'Failed', tone: 'danger' },
+  timed_out: { label: 'Timed out', tone: 'danger' },
+  cancelled: { label: 'Cancelled', tone: 'neutral' },
+  stale: { label: 'Stale', tone: 'neutral' },
 };
 
 export const jobStatus = (status: string) => JOB_STATUSES[status] ?? { label: status, tone: 'neutral' as const };

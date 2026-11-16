@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActionMenu, Button, Dialog } from '../../../components/ui';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Button, ConfirmDialog, DataTable, Drawer, InlineError, type DataTableColumn } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
 import { getErrorMessage } from '../../../utils/error';
 import { Profile, ProfileUpdateConfirmation } from './types';
@@ -7,7 +7,8 @@ import { profileCropToPng } from './profileImage';
 import { useProfileImageCrop } from './useProfileImageCrop';
 import ProfileSyncGateDialog, { PendingSync } from './ProfileSyncGateDialog';
 import ProfileFieldsForm, { Fields } from './ProfileFieldsForm';
-import ConfirmationModal from '../shared/ConfirmationModal';
+import ProfileSyncRuns from './ProfileSyncRuns';
+import type { LinkedUser } from './UserLinkPicker';
 import styles from './AuthorProfiles.module.css';
 
 const emptyFields: Fields = {
@@ -25,7 +26,18 @@ const isConfirmation = (
 ): result is ProfileUpdateConfirmation =>
   (result as ProfileUpdateConfirmation).confirmationRequired === true;
 
-export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }) {
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const errorCode = (error: unknown) => (error as { response?: { data?: { code?: string } } })?.response?.data?.code;
+
+/**
+ * Author profiles (§7.9): a table, edits in a right Drawer, an account picked
+ * by username (B8), and the recent profile syncs. `wrap` lets the page put
+ * the "New author profile" primary in the Authoring hub header.
+ */
+export default function AuthorProfiles({ onChanged, wrap }: {
+  onChanged?: () => void;
+  wrap?: (actions: ReactNode, body: ReactNode) => ReactNode;
+}) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState('');
@@ -36,6 +48,8 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
   const [notice, setNotice] = useState('');
   const [pendingSync, setPendingSync] = useState<PendingSync | null>(null);
   const [deleting, setDeleting] = useState<Profile | null>(null);
+  const [linked, setLinked] = useState<LinkedUser | null>(null);
+  const [linkError, setLinkError] = useState('');
   const listRequest = useRef(0);
   const {
     image, imageLoading, removeImage, zoom, x, y, canvas,
@@ -67,7 +81,9 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
     setError('');
     setNotice('');
     setPendingSync(null);
+    setLinkError('');
     resetImage();
+    setLinked(profile === 'new' || profile.userId === null ? null : { id: profile.userId, username: profile.linkedUsername ?? `User #${profile.userId}` });
     setFields(
       profile === 'new'
         ? emptyFields
@@ -137,12 +153,20 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
         applySavedProfile(result);
       }
     } catch (failure) {
-      setError(profileErrorMessage(failure));
+      if (errorCode(failure) === 'author_profile_user_conflict') setLinkError(profileErrorMessage(failure));
+      else setError(profileErrorMessage(failure));
     } finally {
       setSaving(false);
     }
   }
-  function applySavedProfile(data: Profile) {
+  function applySavedProfile(saved: Profile) {
+    // Saves answer without the list-only facts; keep the count and show the picked account.
+    const previous = profiles.find((profile) => profile.id === saved.id);
+    const data: Profile = {
+      ...saved,
+      draftCount: saved.draftCount ?? previous?.draftCount ?? 0,
+      linkedUsername: saved.linkedUsername ?? (saved.userId === null ? null : linked?.username ?? previous?.linkedUsername ?? null),
+    };
     setProfiles((current) =>
       current.some((profile) => profile.id === data.id)
         ? current.map((profile) => (profile.id === data.id ? data : profile))
@@ -155,6 +179,11 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
   }
   function update(key: keyof Fields, value: string) {
     setFields((current) => ({ ...current, [key]: value }));
+  }
+  function link(next: LinkedUser | null) {
+    setLinked(next);
+    setLinkError('');
+    update('userId', next ? String(next.id) : '');
   }
   async function confirmDeleteProfile() {
     if (!deleting) return;
@@ -175,113 +204,64 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
   }
   const existingImage = editing && editing !== 'new' && editing.hasProfileImage && !removeImage;
 
-  return (
-    <section className={styles.root} aria-label="Author profiles">
-      <div className={styles.heading}>
-        <Button disabled={saving || imageLoading} onClick={() => edit('new')}>
-          New author profile
-        </Button>
-      </div>
-      {loading && <p role="status">Loading author profiles…</p>}
-      {listError && (
-        <div role="alert">
-          {listError}{' '}
-          <Button variant="secondary" onClick={() => void load()}>
-            Retry profiles
-          </Button>
-        </div>
-      )}
-      {notice && <p role="status">{notice}</p>}
-      {/* Delete failures surface outside the edit dialog (the confirmation
-          modal is closed by then), so page-level errors render here. */}
+  const closeEditor = () => {
+    if (!saving && !imageLoading && !pendingSync) {
+      setEditing(null);
+      setPendingSync(null);
+      resetImage();
+    }
+  };
+  const busy = saving || imageLoading;
+
+  const columns: DataTableColumn<Profile>[] = [
+    {
+      key: 'aka', header: 'Author', mobile: 'primary',
+      cell: (profile) => (
+        <span className={styles.akaCell}>
+          {profile.hasProfileImage
+            ? <img className={styles.avatarImage} src={`/api${authoringService.profileImageUrl(profile.id)}`} alt="" />
+            : <span className={styles.avatar} aria-hidden="true">{Array.from(profile.akaName.trim())[0] || '?'}</span>}
+          {profile.akaName}
+        </span>
+      ),
+    },
+    { key: 'real', header: 'Real name', mobile: 'meta', cell: (profile) => <span className={styles.hint}>{profile.realName}</span> },
+    { key: 'language', header: 'Language', mobile: 'hidden', cell: (profile) => profile.defaultLanguage },
+    { key: 'country', header: 'Country', mobile: 'hidden', cell: (profile) => <span className={styles.mono}>{profile.countryCode}</span> },
+    {
+      key: 'user', header: 'Linked user', mobile: 'hidden',
+      cell: (profile) => (profile.userId === null ? <span className={styles.hint}>—</span> : (profile.linkedUsername ?? `User #${profile.userId}`)),
+    },
+    { key: 'drafts', header: 'Drafts', align: 'right', mobile: 'meta', cell: (profile) => <span className={styles.mono}>{profile.draftCount ?? 0}</span> },
+  ];
+
+  const actions = <Button disabled={busy} onClick={() => edit('new')}>New author profile</Button>;
+  const body = (
+    <section className={styles.page} aria-label="Author profiles">
+      {listError && <InlineError message={listError} />}
+      {listError && <Button variant="secondary" onClick={() => void load()}>Retry profiles</Button>}
+      {notice && <p role="status" className={styles.hint}>{notice}</p>}
+      {/* Delete failures surface here (the confirm is closed by then). */}
       {error && !editing && <p role="alert">{error}</p>}
-      {!loading && !listError && profiles.length === 0 && (
-        <p>No author profiles yet. Create a profile with or without an OJ user account.</p>
-      )}
-      {profiles.length > 0 && (
-        <ul className={styles.profiles}>
-          {profiles.map((profile) => (
-            <li key={profile.id}>
-              {profile.hasProfileImage ? (
-                <img
-                  className={styles.avatarImage}
-                  src={`/api${authoringService.profileImageUrl(profile.id)}`}
-                  alt=""
-                />
-              ) : (
-                <span className={styles.avatar} aria-hidden="true">
-                  {Array.from(profile.akaName.trim())[0] || '?'}
-                </span>
-              )}
-              <div className={styles.identity} data-profile-identity>
-                <strong>{profile.akaName}</strong>
-                <span className={styles.hint}>
-                  {profile.realName} · {profile.defaultLanguage} · {profile.countryCode}
-                </span>
-                <span className={styles.hint}>
-                  {profile.hasProfileImage ? 'Profile image saved' : 'Fallback avatar'} ·{' '}
-                  {profile.userId === null ? 'No linked user' : `User #${profile.userId}`}
-                </span>
-              </div>
-              <ActionMenu
-                label={`Row actions for ${profile.akaName}`}
-                items={[
-                  {
-                    key: 'edit',
-                    label: 'Edit',
-                    disabled: saving || imageLoading,
-                    onClick: () => edit(profile),
-                  },
-                  {
-                    key: 'delete',
-                    label: 'Delete',
-                    variant: 'danger',
-                    disabled: saving || imageLoading,
-                    onClick: () => setDeleting(profile),
-                  },
-                ]}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-      {editing && (
-        <form id="author-profile-form" onSubmit={save}>
-          <Dialog
-            open
-            title={editing === 'new' ? 'New author profile' : `Edit profile: ${editing.akaName}`}
-            onClose={() => {
-              if (!saving && !imageLoading && !pendingSync) {
-                setEditing(null);
-                setPendingSync(null);
-                resetImage();
-              }
-            }}
-            footer={
-              <>
-                <Button
-                  form="author-profile-form"
-                  type="submit"
-                  disabled={imageLoading}
-                  loading={saving}
-                  loadingLabel="Saving profile…"
-                >
-                  {editing === 'new' ? 'Create profile' : 'Save profile'}
-                </Button>
-                <Button
-                  variant="secondary"
-                  disabled={saving || imageLoading}
-                  onClick={() => {
-                    setEditing(null);
-                    setPendingSync(null);
-                    resetImage();
-                  }}
-                >
-                  Cancel
-                </Button>
-              </>
-            }
-          >
+      <DataTable<Profile>
+        caption="Author profiles"
+        columns={columns}
+        rows={profiles}
+        rowKey={(profile) => profile.id}
+        rowLabel={(profile) => profile.akaName}
+        onRowClick={(profile) => { if (!busy) edit(profile); }}
+        rowActions={(profile) => [
+          { key: 'edit', label: 'Edit', disabled: busy, onClick: () => edit(profile) },
+          { key: 'delete', label: 'Delete', variant: 'danger' as const, disabled: busy, onClick: () => setDeleting(profile) },
+        ]}
+        loading={loading && !listError}
+        empty={<p className={styles.hint}>No author profiles yet. Create one with or without an OJ account.</p>}
+      />
+      <ProfileSyncRuns onError={(err) => setError(profileErrorMessage(err))} />
+      <Drawer open={editing !== null} title={editing === 'new' ? 'New author profile' : `Edit ${editing?.akaName ?? ''}`} onClose={closeEditor}>
+        {editing !== null && (
+          <form id="author-profile-form" onSubmit={save}>
+            {editing !== 'new' && <p className={styles.drawerMeta}>{`Used by ${plural(editing.draftCount ?? 0, 'draft')}`}</p>}
             {error && <p role="alert">{error}</p>}
             <ProfileFieldsForm
               saving={saving}
@@ -300,10 +280,22 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
               setY={setY}
               chooseImage={(file) => void chooseImage(file)}
               requestRemoval={requestRemoval}
+              linked={linked}
+              onLink={link}
+              currentProfileId={editing === 'new' ? undefined : editing.id}
+              linkError={linkError}
             />
-        </Dialog>
-        </form>
-      )}
+            <div className={styles.drawerFoot}>
+              <Button variant="secondary" type="button" disabled={busy} onClick={() => { setEditing(null); setPendingSync(null); resetImage(); }}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={imageLoading} loading={saving} loadingLabel="Saving profile…">
+                {editing === 'new' ? 'Create profile' : 'Save profile'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Drawer>
       {editing && editing !== 'new' && pendingSync && (
         <ProfileSyncGateDialog
           pendingSync={pendingSync}
@@ -312,19 +304,17 @@ export default function AuthorProfiles({ onChanged }: { onChanged?: () => void }
           onKeepEditing={() => setPendingSync(null)}
         />
       )}
-      <ConfirmationModal
-        isOpen={!!deleting}
-        onClose={() => setDeleting(null)}
-        onConfirm={confirmDeleteProfile}
-        title={`Delete author profile "${deleting?.akaName}"?`}
-        message={
-          deleting
-            ? `${deleting.realName}${deleting.userId === null ? '' : ` (AKA user #${deleting.userId})`}. This action cannot be undone.`
-            : ''
-        }
-        confirmText="Delete Author Profile"
-        confirmStyle="danger"
+      <ConfirmDialog
+        open={deleting !== null}
+        tier="destructive"
+        title={`Delete ${deleting?.akaName ?? ''}?`}
+        body={deleting ? `${deleting.realName} · used by ${plural(deleting.draftCount ?? 0, 'draft')}. This can't be undone.` : ''}
+        confirmLabel="Delete profile"
+        onConfirm={() => { void confirmDeleteProfile(); }}
+        onCancel={() => setDeleting(null)}
       />
     </section>
   );
+
+  return <>{wrap ? wrap(actions, body) : <>{<div className={styles.toolbar}>{actions}</div>}{body}</>}</>;
 }

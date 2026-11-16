@@ -21,6 +21,19 @@ export interface Draft extends DraftFields {
   updatedAt: string; publishedAt: string | null;
   testcaseStats: DraftTestcaseStats;
 }
+/** B7: GET /admin/authoring/drafts row. */
+export interface DraftSummary {
+  id: string; problemId: string; title: string; authorProfileId: string | null; authorAkaName: string;
+  status: Draft['status']; revision: number; verifiedRevision: number | null;
+  createdBy: number | null; createdAt: string; updatedAt: string; publishedAt: string | null;
+  readiness: {
+    hasStatement: boolean; hasSolution: boolean; hasGenerator: boolean;
+    testcases: DraftTestcaseStats;
+    latestPdfRevision: number | null;
+    latestJobs: Partial<Record<string, { status: string; revision: number }>>;
+    activeJob: boolean;
+  };
+}
 export interface Profile {
   id: string;
   userId: number | null;
@@ -31,6 +44,14 @@ export interface Profile {
   hasProfileImage: boolean;
   createdAt: string;
   updatedAt: string;
+  /** B8 (list only): drafts using the profile and the linked account's username. */
+  draftCount?: number;
+  linkedUsername?: string | null;
+}
+/** B8: GET /admin/author-profiles/user-candidates */
+export interface UserCandidate {
+  id: number; username: string; role: 'user' | 'staff' | 'admin';
+  linkedProfile: { id: string; akaName: string } | null;
 }
 export interface Asset { id: string; filename: string; sizeBytes: number }
 /** Gate response when an author-relevant profile edit would cascade to drafts. */
