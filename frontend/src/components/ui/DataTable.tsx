@@ -104,7 +104,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
           const key = rowKey(row);
           const metas = columns.filter((c) => c.mobile === 'meta');
           return (
-            <li key={key} className={`${styles.item} ${key === highlightKey ? styles.highlight : ''}`.trim()}>
+            <li key={key} data-row-key={key} className={`${styles.item} ${key === highlightKey ? styles.highlight : ''}`.trim()}>
               {selection && (
                 <input type="checkbox" aria-label={`Select ${labelOf(row)}`} checked={selection.selected.has(key)} onChange={() => toggle(key)} className={styles.checkbox} />
               )}
@@ -176,6 +176,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
             return (
               <tr
                 key={key}
+                // Lets list pages remember which row was on screen (useRestoreScroll).
+                data-row-key={key}
                 className={`${activatable ? styles.activatable : ''} ${key === highlightKey ? styles.highlight : ''}`.trim() || undefined}
                 onClick={activatable ? onRowMouse(row) : undefined}
               >
