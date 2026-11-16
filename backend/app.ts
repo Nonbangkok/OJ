@@ -20,6 +20,7 @@ import healthRoutes from './controllers/healthController';
 import authoringDraftRoutes from './controllers/authoringDraftController';
 import authorProfileRoutes from './controllers/authorProfileController';
 import userProfileRoutes from './controllers/userProfileController';
+import homeRoutes from './controllers/homeController';
 import analyticsRoutes from './controllers/analyticsController';
 import { createAuthoringJobRouter } from './controllers/authoringJobController';
 import authoringTestcaseRoutes from './controllers/authoringTestcaseController';
@@ -124,6 +125,7 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
   app.use('/users/:username/profile', requirePublicAccess);
   app.use('/users/:username/avatar', requirePublicAccess);
   app.use('/', userProfileRoutes);
+  app.use('/', homeRoutes);
   app.use('/', analyticsRoutes);
 
   app.get('/', (_req: Request, res: Response) => {

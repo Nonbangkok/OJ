@@ -6,7 +6,6 @@ import { memoryUpload } from '../middleware/upload';
 import { processContestSubmission, processSubmission } from '../services/submissionService';
 import { USER_ROLES } from '../constants';
 import {
-  getGlobalScoreboard,
   getSubmissionDetail,
   getSubmissions,
   searchProblems,
@@ -22,6 +21,7 @@ import {
 } from '../types/api';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validation';
+import { getGlobalRanking, type RankingWindow } from '../services/rankingService';
 import { submitLimiter } from '../middleware/rateLimit';
 import { enqueueTrackedJudgeTask } from '../services/judgeQueue';
 import {
@@ -29,6 +29,7 @@ import {
   searchQuerySchema,
   submissionDetailQuerySchema,
   submissionsQuerySchema,
+  scoreboardQuerySchema,
   submitSchema,
 } from '../schemas/requestSchemas';
 import { ContestSubmissionDetailRow, SubmissionDetailRow } from '../types/models';
@@ -179,12 +180,14 @@ router.get(
 
 router.get(
   '/scoreboard',
-  // Public read-only in PUBLIC mode (sanitized DTO: username, avatar flag,
-  // score, solved count); PRIVATE mode still requires authentication.
+  // Global XP ranking (B3). Public read-only in PUBLIC mode (username,
+  // avatar flag, XP, solved, level); PRIVATE mode still requires authentication.
   requirePublicAccess,
-  asyncHandler(async (_req: Request, res: Response) => {
-    const scoreboard = await getGlobalScoreboard();
-    res.json(scoreboard);
+  validateRequest({ query: scoreboardQuerySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    // validateRequest writes the Zod defaults back into req.query.
+    const { window, page } = req.query as unknown as { window: RankingWindow; page: number };
+    res.json(await getGlobalRanking({ window, page, viewerId: req.user?.id ?? null }));
   }),
 );
 

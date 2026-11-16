@@ -77,8 +77,9 @@ describe('getUserProgression', () => {
             levelProgress: { current: 370, required: 700, remaining: 330, percentage: 53 },
             globalRank: 3,
         });
-        // Dense rank over per-user sums, best total first.
-        expect(String(mockedQuery.mock.calls[1][0])).toContain('DENSE_RANK() OVER (ORDER BY total_xp DESC)');
+        // Competition rank over per-user sums, shared with the global ranking (B3).
+        expect(String(mockedQuery.mock.calls[1][0])).toContain('RANK() OVER (ORDER BY xp DESC)');
+        expect(String(mockedQuery.mock.calls[1][0])).not.toContain('DENSE_RANK');
     });
 
     it('gives no rank and level 1 to a user with no rewards', async () => {

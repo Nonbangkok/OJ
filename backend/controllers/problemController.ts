@@ -18,6 +18,9 @@ import {
   getProblemStarterAccess,
   getProblemTestcases,
   getProblemsWithStatsForUser,
+  getProblemViewerContext,
+  getProblemStatusCounts,
+  type ProblemStatusFilter,
   getPublicProblemCategoryCounts,
   getPublicProblemFilterOptions,
   getVisibleProblems,
@@ -64,6 +67,7 @@ import {
   problemExportSchema,
   problemTestcasesQuerySchema,
   problemsWithStatsQuerySchema,
+  problemStatusCountsQuerySchema,
   progressIdParamSchema,
   updateProblemSchema,
   updateProblemVisibilitySchema,
@@ -105,12 +109,17 @@ router.get('/problems-with-stats', requirePublicAccess,
   // PRIVATE mode is still enforced by requirePublicAccess above.
   const userId = req.user?.id ?? null;
   // validateRequest writes Zod defaults/coercions back into req.query.
-  const { difficultyMin, difficultyMax, sort, order, search, category, author, collection, limit, cursor } = req.query as unknown as {
+  const { difficultyMin, difficultyMax, sort, order, search, category, author, collection, limit, cursor, status } = req.query as unknown as {
     difficultyMin?: number; difficultyMax?: number; sort?: 'difficulty'; order?: 'asc' | 'desc';
     search?: string; category?: string; author?: string; collection?: number | 'none';
-    limit?: number; cursor?: string;
+    limit?: number; cursor?: string; status?: ProblemStatusFilter;
   };
+  // A status bucket is the viewer's own progress; guests have none.
+  if (status !== undefined && userId === null) {
+    throw new AppError('Sign in to filter by status.', 400);
+  }
   const page = await getProblemsWithStatsForUser(userId, {
+    ...(status !== undefined ? { status } : {}),
     ...(difficultyMin !== undefined ? { difficultyMin } : {}),
     ...(difficultyMax !== undefined ? { difficultyMax } : {}),
     ...(sort !== undefined ? { sort } : {}),
@@ -124,6 +133,25 @@ router.get('/problems-with-stats', requirePublicAccess,
   });
   res.json(page);
 }));
+
+// Per-status counts for the problem list's segmented control, following the
+// same filters as /problems-with-stats. Guests count everything as unsolved.
+router.get('/problem-status-counts', requirePublicAccess,
+  validateRequest({ query: problemStatusCountsQuerySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { difficultyMin, difficultyMax, search, category, author, collection } = req.query as unknown as {
+      difficultyMin?: number; difficultyMax?: number; search?: string; category?: string;
+      author?: string; collection?: number | 'none';
+    };
+    res.json(await getProblemStatusCounts(req.user?.id ?? null, {
+      ...(difficultyMin !== undefined ? { difficultyMin } : {}),
+      ...(difficultyMax !== undefined ? { difficultyMax } : {}),
+      ...(search !== undefined && search !== '' ? { search } : {}),
+      ...(category !== undefined ? { category } : {}),
+      ...(author !== undefined ? { author } : {}),
+      ...(collection !== undefined ? { collection } : {}),
+    }));
+  }));
 
 // Global category tab counts for the problem list (visible, standalone
 // problems only) — one cheap aggregate, independent of the paginated list
@@ -163,8 +191,9 @@ router.get('/problems/:id',
     throw new AppError('Problem not found', 404);
   }
 
+  const viewer = await getProblemViewerContext(id, req.user?.id ?? null);
   const { is_visible, contest_id, ...problemData } = problemDetail;
-  res.json(isStaffOrAdmin ? problemDetail : problemData);
+  res.json({ ...(isStaffOrAdmin ? problemDetail : problemData), ...viewer });
 }));
 
 // Admin details - guaranteed to return everything

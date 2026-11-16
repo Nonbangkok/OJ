@@ -1,3 +1,4 @@
+import type { UserProgression } from '../services/progressionService';
 import { Readable } from 'stream';
 import { UPLOAD_STATUS, type ProblemFileRole, type ProblemType } from '../constants';
 import type { ProblemFileInput } from '../utils/headerProblemFiles';
@@ -156,6 +157,10 @@ export interface SubmissionListRow {
   score: number;
   language: string;
   submitted_at: Date;
+  /** Per-case statuses for the testcase strip; empty for a compile log or pending. */
+  case_statuses: string[];
+  max_time_ms: number | null;
+  max_memory_kb: number | null;
 }
 
 export interface SearchUserRow {
@@ -163,12 +168,28 @@ export interface SearchUserRow {
   username: string;
 }
 
-export interface GlobalScoreboardRow {
+/** One ranked user in GET /scoreboard (B3). Level and tier come from all-time XP. */
+export interface RankingRow {
+  rank: number;
   username: string;
-  has_avatar: boolean;
-  total_score: string;
-  problems_solved: string;
-  last_score_improvement_time: Date | null;
+  hasAvatar: boolean;
+  /** XP in the requested window. */
+  xp: number;
+  /** First solves (reward rows) in the window. */
+  solved: number;
+  level: number;
+  tier: string;
+}
+
+/** GET /scoreboard?window=all|week&page=N */
+export interface GlobalRanking {
+  rows: RankingRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  window: 'all' | 'week';
+  /** The viewer's own row regardless of page; null for guests or no XP in the window. */
+  viewer: RankingRow | null;
 }
 
 export interface ProblemStatsRow {
@@ -183,6 +204,56 @@ export interface ProblemStatsRow {
   latest_submission_status: string | null;
   best_submission_status: string | null;
   best_submission_results: unknown;
+}
+
+/** A problem the Home page links to, with the XP a first solve would award. */
+export interface HomeProblemRef {
+  id: string;
+  title: string;
+  difficulty: number | null;
+  xp: number;
+}
+
+/** The most recently tried, still unsolved problem. */
+export interface HomeContinue extends HomeProblemRef {
+  bestScore: number;
+  attempts: number;
+  lastTriedAt: string;
+  latestStatus: string;
+  /** Per-case statuses of the best submission (empty for a compile log or pending). */
+  caseStatuses: string[];
+}
+
+/** B1: the viewer's progress through one collection (visible standalone problems only). */
+export interface CollectionProgress {
+  id: number;
+  name: string;
+  solved: number;
+  total: number;
+  /** The easiest unsolved problem in the collection, null when complete. */
+  next: HomeProblemRef | null;
+}
+
+/** GET /me/home */
+export interface HomeSummary {
+  progression: UserProgression;
+  currentStreak: number;
+  solvedToday: boolean;
+  /** 7 days, oldest first; the last entry is today (profile timezone). */
+  week: { day: string; solved: number }[];
+  continue: HomeContinue | null;
+  /** Up to 3 easiest unsolved problems, only when there is nothing to continue. */
+  startWith: HomeProblemRef[];
+  collections: CollectionProgress[];
+  levelUp: { remaining: number; problem: HomeProblemRef } | null;
+}
+
+/** Per-status problem counts for the viewer (GET /problem-status-counts); buckets partition `all`. */
+export interface ProblemStatusCounts {
+  all: number;
+  unsolved: number;
+  attempted: number;
+  solved: number;
 }
 
 /** One page of the user-facing problem list (GET /problems-with-stats). */

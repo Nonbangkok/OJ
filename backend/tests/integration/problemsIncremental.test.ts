@@ -8,6 +8,7 @@ import problemRoutes from '../../controllers/problemController';
 import { errorHandler } from '../../middleware/errorHandler';
 import { runMigrationsFromPool } from '../../scripts/migrate';
 import {
+  getProblemStatusCounts,
   getProblemsWithStatsForUser,
   getPublicProblemCategoryCounts,
   getPublicProblemFilterOptions,
@@ -356,6 +357,74 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
         uncategorized: 1,
         total: 3,
       });
+    });
+  });
+
+  describe('status filter and counts', () => {
+    const seed = async () => {
+      await pool.query("INSERT INTO users (id, username, password_hash, role) VALUES (1, 'u1', 'x', 'user') ON CONFLICT DO NOTHING");
+      for (const id of ['a', 'b', 'c', 'd']) await insertProblem(id, { difficulty: 1000 });
+      await insertSubmission(1, 'a', 100);
+      await insertSubmission(1, 'b', 40, 'Wrong Answer');
+      await insertSubmission(1, 'c', 100);
+      await insertSubmission(1, 'c', 30, 'Wrong Answer');
+    };
+
+    it('solved returns problems whose best score is 100', async () => {
+      await seed();
+      expect((await walkAll(1, { status: 'solved' })).ids).toEqual(['a', 'c']);
+    });
+
+    it('attempted returns submitted but unsolved', async () => {
+      await seed();
+      expect((await walkAll(1, { status: 'attempted' })).ids).toEqual(['b']);
+    });
+
+    it('unsolved returns problems with no submission', async () => {
+      await seed();
+      expect((await walkAll(1, { status: 'unsolved' })).ids).toEqual(['d']);
+    });
+
+    it('status composes with keyset paging', async () => {
+      await seed();
+      for (let i = 0; i < 24; i++) await insertProblem(`u${String(i).padStart(2, '0')}`);
+      const first = await getProblemsWithStatsForUser(1, { status: 'unsolved', limit: 20 });
+      expect(first.problems).toHaveLength(20);
+      expect(first.hasMore).toBe(true);
+      const second = await getProblemsWithStatsForUser(1, { status: 'unsolved', limit: 20, cursor: first.nextCursor! });
+      expect(second.problems).toHaveLength(5);
+      expect(second.hasMore).toBe(false);
+      const ids = [...first.problems, ...second.problems].map(p => p.id);
+      expect(new Set(ids).size).toBe(25);
+      expect(ids).not.toContain('a');
+    });
+
+    it('counts partition all and follow the other filters', async () => {
+      await seed();
+      await insertProblem('e', { difficulty: 2000 });
+      const res = await request(app).get('/problem-status-counts?difficultyMax=1500').set('x-test-role', 'user');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ all: 4, unsolved: 1, attempted: 1, solved: 2 });
+      const all = await getProblemStatusCounts(1, {});
+      expect(all).toEqual({ all: 5, unsolved: 2, attempted: 1, solved: 2 });
+      expect(all.all).toBe(all.unsolved + all.attempted + all.solved);
+    });
+
+    it('hidden and contest problems are never counted', async () => {
+      await seed();
+      await insertContestProblem();
+      await insertProblem('hidden', { visible: false });
+      await insertProblem('contest', { contest: true });
+      await insertSubmission(1, 'hidden', 100);
+      expect(await getProblemStatusCounts(1, {})).toEqual({ all: 4, unsolved: 1, attempted: 1, solved: 2 });
+      expect((await walkAll(1, { status: 'solved' })).ids).toEqual(['a', 'c']);
+    });
+
+    it('a guest gets all counted as unsolved', async () => {
+      await seed();
+      const res = await request(app).get('/problem-status-counts');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ all: 4, unsolved: 4, attempted: 0, solved: 0 });
     });
   });
 });

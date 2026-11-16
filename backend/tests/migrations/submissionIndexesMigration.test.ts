@@ -28,6 +28,7 @@ describe('submission indexes migration', () => {
       '0022_drop_collection_description_again',
       '0023_user_submission_lock',
       '0024_header_problems',
+      '0025_submissions_user_problem_index',
     ]);
   });
 

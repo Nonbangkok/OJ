@@ -1,4 +1,5 @@
 import { query } from '../db';
+import { getUserGlobalRank } from './rankingSql';
 import {
     LEVEL_TIERS,
     XP_PER_LEVEL_BASE,
@@ -182,22 +183,9 @@ export const getUserProgression = async (userId: number): Promise<UserProgressio
     `, [userId]);
     const totalXp = Number(totals.rows[0]?.total_xp ?? 0);
 
-    // Dense rank: users with equal XP share a rank, the next distinct total
-    // gets the next consecutive rank. Only users holding at least one reward
-    // are ranked. The filter MUST sit strictly outside the ranked subquery —
-    // pushing it into the CTE would make DENSE_RANK() evaluate over the
-    // single filtered row (always rank 1).
-    const rankRes = await query<{ rank: number }>(`
-      SELECT rank FROM (
-        SELECT user_id, CAST(DENSE_RANK() OVER (ORDER BY total_xp DESC) AS INT) AS rank
-        FROM (
-          SELECT user_id, SUM(xp_awarded) AS total_xp
-          FROM user_problem_rewards
-          GROUP BY user_id
-        ) xp_totals
-      ) ranked
-      WHERE user_id = $1
-    `, [userId]);
+    // Competition rank (1, 2, 2, 4), shared with the global ranking page (B3)
+    // so the profile and /scoreboard always agree.
+    const globalRank = await getUserGlobalRank(userId);
 
     const progress = getLevelProgress(totalXp);
     return {
@@ -210,7 +198,7 @@ export const getUserProgression = async (userId: number): Promise<UserProgressio
             remaining: progress.remaining,
             percentage: progress.percentage,
         },
-        globalRank: rankRes.rows[0]?.rank ?? null,
+        globalRank,
     };
 };
 

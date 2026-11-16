@@ -11,10 +11,10 @@ const readSource = (relativePath: string): string =>
   readFileSync(join(__dirname, '..', ...relativePath.split('/')), 'utf8');
 
 describe('scoreboard avatar exposure', () => {
-  it('global scoreboard selects has_avatar', () => {
-    const source = readSource('services/submissionQueryService.ts');
+  it('global ranking selects has_avatar and exposes hasAvatar', () => {
+    const source = readSource('services/rankingService.ts');
     expect(source).toContain('(u.avatar_png IS NOT NULL) AS has_avatar');
-    expect(readSource('types/service.ts')).toContain('has_avatar: boolean;');
+    expect(readSource('types/service.ts')).toContain('hasAvatar: boolean;');
   });
 
   it('contest scoreboard selects has_avatar in both branches', () => {

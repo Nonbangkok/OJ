@@ -15,6 +15,7 @@ import {
   STATEMENT_ASSET,
   STRING_LIMITS,
   SUBMISSION_QUERY_CONFIG,
+  SUBMISSION_STATUS,
   SUBMISSION_VALIDATION,
   SUPPORTED_LANGUAGES,
   USER_ROLES,
@@ -348,7 +349,25 @@ const problemCategoryFilter = z.string()
     .max(PROBLEM_CATEGORIES.length + 1)
     .refine(categories => new Set(categories).size === categories.length, 'categories must be unique'))
   .transform(categories => categories.join(','));
+const problemListFilterShape = {
+  difficultyMin: difficultyBound.optional(),
+  difficultyMax: difficultyBound.optional(),
+  search: z.string().trim().max(STRING_LIMITS.TITLE).optional(),
+  category: problemCategoryFilter.optional(),
+  author: z.string().trim().min(1).max(STRING_LIMITS.AUTHOR).optional(),
+  collection: z.union([z.literal('none'), z.coerce.number().int().positive()]).optional(),
+};
+const difficultyRangeOrdered = ({ difficultyMin, difficultyMax }: { difficultyMin?: number; difficultyMax?: number }) =>
+  difficultyMin === undefined || difficultyMax === undefined || difficultyMin <= difficultyMax;
+
+/** GET /problem-status-counts: the list filters only (no paging, sort or status). */
+export const problemStatusCountsQuerySchema = z.object(problemListFilterShape).strict().refine(
+  difficultyRangeOrdered,
+  { message: 'difficultyMin must not exceed difficultyMax' },
+);
+
 export const problemsWithStatsQuerySchema = z.object({
+  status: z.enum(['solved', 'attempted', 'unsolved']).optional(),
   difficultyMin: difficultyBound.optional(),
   difficultyMax: difficultyBound.optional(),
   sort: z.enum(['difficulty']).optional(),
@@ -543,9 +562,16 @@ export const submissionsQuerySchema = z.object({
   contestId: optionalTrimmedString,
   filterProblemId: optionalTrimmedString,
   filterUserId: optionalTrimmedString,
+  verdict: z.enum(Object.values(SUBMISSION_STATUS) as [string, ...string[]]).optional(),
   // SUB-004: page-based access past the hard 200-row cap. Page 1 (default)
   // is the previous behavior; the cap per page stays at LIST_LIMIT.
   page: z.coerce.number().int().min(1).max(SUBMISSION_QUERY_PAGE_MAX).default(1),
+}).strict();
+
+/** GET /scoreboard: the global XP ranking window and page (B3). */
+export const scoreboardQuerySchema = z.object({
+  window: z.enum(['all', 'week']).default('all'),
+  page: z.coerce.number().int().min(1).max(10000).default(1),
 }).strict();
 
 export const searchQuerySchema = z.object({
