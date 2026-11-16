@@ -106,6 +106,15 @@ describe('ContestEditPage', () => {
     expect(await screen.findByText('Created, but it is still visible to students.')).toBeInTheDocument();
   });
 
+  it('a failed problem load says so instead of showing an empty contest', async () => {
+    jest.mocked(adminService.getContestProblemsAdmin).mockRejectedValue({ response: { status: 500, data: { message: 'boom' } } });
+    renderAt('/admin/contests/7/problems');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load the contest problems.');
+    expect(screen.queryByText(/No problems yet/)).toBeNull();
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Problems' })).toBeInTheDocument();
+  });
+
   it('an unknown contest says so', async () => {
     renderAt('/admin/contests/99');
     expect(await screen.findByText('Contest not found')).toBeInTheDocument();

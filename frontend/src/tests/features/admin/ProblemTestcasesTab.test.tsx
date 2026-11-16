@@ -109,6 +109,18 @@ describe('ProblemTestcasesTab', () => {
     expect(adminService.uploadFiles).not.toHaveBeenCalled();
   });
 
+  it('a rejudge that fails after a good replace keeps the success and says only the rejudge failed', async () => {
+    jest.mocked(adminService.rejudgeProblem).mockRejectedValue({ response: { status: 500, data: { message: 'Judge queue unavailable' } } });
+    render(<ProblemTestcasesTab problemId="P1" submissionCount={214} canRejudge />);
+    await screen.findByText('10 testcases · 2.4 MB');
+    jest.mocked(adminService.getProblemTestcases).mockResolvedValue({ testcases: cases(12), total: 12 });
+    drop();
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Replace and rejudge' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Replaced with 12 testcases.');
+    expect(screen.getByRole('alert')).toHaveTextContent("The rejudge didn't start: Judge queue unavailable");
+    expect(screen.getByRole('alert')).not.toHaveTextContent(/Replacing the testcases failed/);
+  });
+
   it('a failed processing job shows its message and skips the rejudge', async () => {
     jest.mocked(adminService.getUploadProgress).mockResolvedValue({ status: 'failed', message: 'Case 3 has no output file.' });
     render(<ProblemTestcasesTab problemId="P1" submissionCount={214} canRejudge />);

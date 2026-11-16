@@ -66,4 +66,15 @@ describe('BatchCreateDrawer', () => {
     expect(onDone).not.toHaveBeenCalled();
     expect(screen.getByText('kite-41-oak')).toBeInTheDocument();
   });
+
+  it('allows up to the server cap of 100 accounts, not more', () => {
+    render(<BatchCreateDrawer open onClose={jest.fn()} onDone={jest.fn()} />);
+    const drawer = screen.getByRole('dialog', { name: 'Create users' });
+    fireEvent.change(within(drawer).getByLabelText('Username prefix'), { target: { value: 'm42_' } });
+    fireEvent.change(within(drawer).getByLabelText('How many'), { target: { value: '101' } });
+    expect(within(drawer).getByRole('button', { name: 'Create users' })).toBeDisabled();
+    expect(drawer).toHaveTextContent('1–100');
+    fireEvent.change(within(drawer).getByLabelText('How many'), { target: { value: '100' } });
+    expect(within(drawer).getByRole('button', { name: 'Create 100 users' })).toBeEnabled();
+  });
 });

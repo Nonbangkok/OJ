@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { useTheme } from '../../../context/ThemeContext';
 
 export interface ChartColorSet {
@@ -59,15 +59,25 @@ const VERDICT_KEYS: Record<string, DailyVerdictKey> = {
 /** The colour bucket for a verdict name; everything else is "other". */
 export const verdictKeyOf = (verdict: string): DailyVerdictKey => VERDICT_KEYS[verdict] ?? 'other';
 
+/** The active theme as the DOM has it: changes only once ThemeProvider has applied data-theme. */
+const subscribeTheme = (onChange: () => void) => {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  return () => observer.disconnect();
+};
+const appliedTheme = () => document.documentElement.getAttribute('data-theme') ?? '';
+
 /**
  * SVG presentation attributes can't take var(), so the verdict tokens are
- * resolved to their computed values for the active theme (falling back to
- * the fixed palette where a token is missing, e.g. in tests).
+ * resolved to their computed values (falling back to the fixed palette where
+ * a token is missing, e.g. in tests). They are re-read when the data-theme
+ * attribute changes — not when the theme state does, which happens a render
+ * earlier, before the new token values apply.
  */
 export const useVerdictColors = (): Record<DailyVerdictKey, string> => {
-  const { theme } = useTheme();
+  const theme = useSyncExternalStore(subscribeTheme, appliedTheme, () => '');
   return useMemo(() => {
-    void theme; // the theme switch changes which token values apply
+    void theme; // re-read whenever the applied theme changes
     const computed = typeof window !== 'undefined' ? window.getComputedStyle(document.documentElement) : null;
     const out = {} as Record<DailyVerdictKey, string>;
     for (const series of DAILY_VERDICT_SERIES) {

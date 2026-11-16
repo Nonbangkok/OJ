@@ -104,19 +104,28 @@ export default function ProblemTestcasesTab({ problemId, submissionCount, canRej
     setPending(null);
     setError('');
     setProgress('Uploading…');
+    let next: TestcaseMetadataResponse[];
     try {
       await uploadTestcasesZip(problemId, file, setProgress);
-      const next = await reload();
-      if (rejudgeAfter) {
-        setProgress('Starting the rejudge…');
-        await adminService.rejudgeProblem(problemId);
-      }
-      setDone(`Replaced with ${plural(next.length, 'testcase')}.${rejudgeAfter ? ` Rejudging ${plural(submissionCount, 'submission')}.` : ''}`);
+      next = await reload();
     } catch (err) {
       setError(getErrorMessage(err, 'Replacing the testcases failed.'));
-    } finally {
       setProgress('');
+      return;
     }
+    // The replace has landed; a rejudge failure is reported on its own, not as a failed replace.
+    let rejudged = false;
+    if (rejudgeAfter) {
+      setProgress('Starting the rejudge…');
+      try {
+        await adminService.rejudgeProblem(problemId);
+        rejudged = true;
+      } catch (err) {
+        setError(`The rejudge didn't start: ${getErrorMessage(err, 'unknown error')}. Run it from the problem's row menu.`);
+      }
+    }
+    setDone(`Replaced with ${plural(next.length, 'testcase')}.${rejudged ? ` Rejudging ${plural(submissionCount, 'submission')}.` : ''}`);
+    setProgress('');
   };
 
   const confirmTitle = (() => {

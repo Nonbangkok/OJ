@@ -3,10 +3,11 @@ import { Copy, DownloadSimple } from '@phosphor-icons/react';
 import { Button, ConfirmDialog, Drawer, Field, InlineError, InlineNotice } from '../../../components/ui';
 import adminService from '../../../services/adminService';
 import { downloadCsv } from '../../../utils/downloadCsv';
+import { ADMIN_USERS } from '../../../config/constants';
 import type { BatchCreatedUser } from '../../../types';
 import styles from './Users.module.css';
 
-const MAX_BATCH = 200;
+const MAX_BATCH = ADMIN_USERS.BATCH_MAX_COUNT;
 
 /** Create many student accounts at once; the passwords are shown exactly once (§7.8). */
 export default function BatchCreateDrawer({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {

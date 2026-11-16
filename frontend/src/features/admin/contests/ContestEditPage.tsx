@@ -38,6 +38,7 @@ function ContestEditor() {
   const [missing, setMissing] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [problems, setProblems] = useState<ProblemBase[] | null>(null);
+  const [problemsFailed, setProblemsFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,7 +53,7 @@ function ContestEditor() {
       .catch((err) => { if (!cancelled) setLoadError(getErrorMessage(err, 'Failed to load the contest.')); });
     adminService.getContestProblemsAdmin(id)
       .then((list) => { if (!cancelled) setProblems(list); })
-      .catch(() => { if (!cancelled) setProblems([]); });
+      .catch(() => { if (!cancelled) setProblemsFailed(true); });
     return () => { cancelled = true; };
   }, [id]);
 
@@ -71,7 +72,12 @@ function ContestEditor() {
 
   const tab: ContestTab = TABS.includes(tabParam as ContestTab) ? tabParam as ContestTab : 'settings';
   const participants = Number(contest.participant_count ?? 0);
-  const problemCount = problems?.length ?? Number(contest.problem_count ?? 0);
+  // Unknown when the load failed: no count rather than a wrong one.
+  const problemCount = problems?.length ?? (problemsFailed ? undefined : Number(contest.problem_count ?? 0));
+  const retryProblems = () => {
+    setProblemsFailed(false);
+    adminService.getContestProblemsAdmin(id).then(setProblems, () => setProblemsFailed(true));
+  };
   const labels: Record<ContestTab, { text: string; count?: number }> = {
     settings: { text: 'Settings' },
     problems: { text: 'Problems', count: problemCount },
@@ -112,7 +118,10 @@ function ContestEditor() {
         {tab === 'settings' && (
           <ContestSettingsTab contest={contest} onSaved={(next) => setContest((prev) => (prev ? { ...prev, ...next } : prev))} />
         )}
-        {tab === 'problems' && (problems === null
+        {tab === 'problems' && problemsFailed && problems === null && (
+          <InlineError message="Could not load the contest problems." onRetry={retryProblems} />
+        )}
+        {tab === 'problems' && !problemsFailed && (problems === null
           ? <p className={styles.muted} aria-live="polite">Loading problems…</p>
           : <ContestProblemsTab contestId={contest.id} status={contest.status} problems={problems} onProblemsChange={setProblems} />)}
         {tab === 'participants' && <ContestParticipantsTab contestId={contest.id} />}

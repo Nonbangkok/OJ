@@ -11,10 +11,12 @@ const ROLES: Array<{ value: UserRole; label: string }> = [
 ];
 
 /** Edit one account (§7.8 Drawer): username, role, submission lock, password reset. */
-export default function UserEditDrawer({ user, onClose, onSaved, onResetPassword }: {
+export default function UserEditDrawer({ user, onClose, onSaved, onChanged, onResetPassword }: {
   user: AdminUser;
   onClose: () => void;
   onSaved: () => void;
+  /** Part of the edit landed (the list should refresh) but the drawer stays open. */
+  onChanged?: () => void;
   onResetPassword: (user: AdminUser) => void;
 }) {
   const [username, setUsername] = useState(user.username);
@@ -22,16 +24,32 @@ export default function UserEditDrawer({ user, onClose, onSaved, onResetPassword
   const [locked, setLocked] = useState(Boolean(user.submissions_locked));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // What the server holds after each step, so a retry only sends what hasn't landed yet.
+  const [saved, setSaved] = useState({ username: user.username, role: user.role, locked: Boolean(user.submissions_locked) });
+
+  const messageOf = (err: unknown, fallback: string) =>
+    (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? fallback;
 
   const save = async () => {
     setBusy(true);
     setError(null);
+    const name = username.trim();
+    let accountSaved = false;
     try {
-      await adminService.updateUser(user.id, { username: username.trim(), role });
-      if (locked !== Boolean(user.submissions_locked)) await adminService.setUserSubmissionLock(user.id, locked);
+      if (name !== saved.username || role !== saved.role) {
+        await adminService.updateUser(user.id, { username: name, role });
+        accountSaved = true;
+        setSaved((prev) => ({ ...prev, username: name, role }));
+      }
+      if (locked !== saved.locked) await adminService.setUserSubmissionLock(user.id, locked);
       onSaved();
     } catch (err) {
-      setError((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? "Couldn't save the changes.");
+      if (accountSaved) {
+        setError(`Username and role saved. The submission lock didn't change: ${messageOf(err, 'unknown error')}`);
+        onChanged?.();
+      } else {
+        setError(messageOf(err, "Couldn't save the changes."));
+      }
     } finally {
       setBusy(false);
     }
