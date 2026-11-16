@@ -285,6 +285,6 @@ describe('UserManagement Component', () => {
         fireEvent.click(within(adminRow).getByRole('button', { name: /row actions for Nonbangkok/i }));
         expect(
             screen.getByRole('menuitem', { name: 'Reset password' }),
-        ).toBeDisabled();
+        ).toHaveAttribute('aria-disabled', 'true');
     });
 });
