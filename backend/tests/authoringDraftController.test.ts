@@ -184,6 +184,22 @@ describe('Problem Authoring draft controller', () => {
     });
   });
 
+  it('list rows carry readiness (B7) in camel case', async () => {
+    (authoringDraftService.listProblemDrafts as jest.Mock).mockResolvedValueOnce([{
+      ...draftRow({ published_at: null }),
+      readiness: {
+        has_statement: true, has_solution: true, has_generator: false, testcase_total: 3, testcase_with_output: 2,
+        latest_pdf_revision: 1, latest_jobs: { verify_all: { status: 'failed', revision: 1 } }, active_job: false,
+      },
+    }]);
+    const response = await request(createTestApp('admin')).get('/admin/authoring/drafts');
+    expect(response.body[0].publishedAt).toBeNull();
+    expect(response.body[0].readiness).toEqual({
+      hasStatement: true, hasSolution: true, hasGenerator: false, testcases: { total: 3, withOutput: 2 },
+      latestPdfRevision: 1, latestJobs: { verify_all: { status: 'failed', revision: 1 } }, activeJob: false,
+    });
+  });
+
   it('passes scope=mine through with the logged-in username for AKA matching', async () => {
     (authoringDraftService.listProblemDrafts as jest.Mock).mockResolvedValueOnce([]);
 

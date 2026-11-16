@@ -34,6 +34,19 @@ export type CreateProblemDraftInput = Pick<
   | 'template_version'
 >>;
 
+/** B7: what the draft list needs to show readiness without loading each draft. */
+export interface ProblemDraftReadiness {
+  has_statement: boolean;
+  has_solution: boolean;
+  has_generator: boolean;
+  testcase_total: number;
+  testcase_with_output: number;
+  latest_pdf_revision: number | null;
+  /** Newest job per job_type, any revision. */
+  latest_jobs: Record<string, { status: string; revision: number }>;
+  active_job: boolean;
+}
+
 export type ProblemDraftListRow = Pick<
   ProblemDraftRow,
   | 'id'
@@ -47,7 +60,8 @@ export type ProblemDraftListRow = Pick<
   | 'created_by'
   | 'created_at'
   | 'updated_at'
->;
+  | 'published_at'
+> & { readiness: ProblemDraftReadiness };
 
 type EditableProblemDraftFields = Pick<
   ProblemDraftRow,
@@ -193,13 +207,44 @@ export const listProblemDrafts = async (
     `;
   }
 
+  // One query: testcase counts and the newest job per type come from
+  // aggregates joined onto the drafts (never per-row lookups, never BYTEA).
   const result = await database.query<ProblemDraftListRow>(`
     SELECT
-      id, problem_id, title, author_profile_id, author_aka_name, status, revision,
-      verified_revision, created_by, created_at, updated_at
+      problem_drafts.id, problem_drafts.problem_id, problem_drafts.title, problem_drafts.author_profile_id,
+      problem_drafts.author_aka_name, problem_drafts.status, problem_drafts.revision,
+      problem_drafts.verified_revision, problem_drafts.created_by, problem_drafts.created_at,
+      problem_drafts.updated_at, problem_drafts.published_at,
+      jsonb_build_object(
+        'has_statement', problem_drafts.statement_html <> '',
+        'has_solution', problem_drafts.solution_cpp <> '',
+        'has_generator', COALESCE(problem_drafts.generator_cpp, '') <> '',
+        'testcase_total', COALESCE(tc.total, 0),
+        'testcase_with_output', COALESCE(tc.with_output, 0),
+        'latest_pdf_revision', problem_drafts.latest_pdf_revision,
+        'latest_jobs', COALESCE(lj.jobs, '{}'::jsonb),
+        'active_job', COALESCE(aj.active, false)
+      ) AS readiness
     FROM problem_drafts
+    LEFT JOIN (
+      SELECT draft_id, COUNT(*)::int AS total, COUNT(output_data)::int AS with_output
+      FROM problem_draft_testcases GROUP BY draft_id
+    ) tc ON tc.draft_id = problem_drafts.id
+    LEFT JOIN (
+      SELECT draft_id, jsonb_object_agg(job_type, jsonb_build_object('status', status, 'revision', draft_revision)) AS jobs
+      FROM (
+        SELECT DISTINCT ON (draft_id, job_type) draft_id, job_type, status, draft_revision
+        FROM authoring_jobs
+        ORDER BY draft_id, job_type, created_at DESC
+      ) latest
+      GROUP BY draft_id
+    ) lj ON lj.draft_id = problem_drafts.id
+    LEFT JOIN (
+      SELECT draft_id, true AS active FROM authoring_jobs
+      WHERE status IN ('queued', 'compiling', 'running') GROUP BY draft_id
+    ) aj ON aj.draft_id = problem_drafts.id
     ${mineFilter}
-    ORDER BY updated_at DESC, id ASC
+    ORDER BY problem_drafts.updated_at DESC, problem_drafts.id ASC
   `, params);
   return result.rows;
 };
