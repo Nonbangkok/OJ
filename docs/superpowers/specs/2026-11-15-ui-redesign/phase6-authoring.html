@@ -1,0 +1,536 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Phase 6 · Authoring</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<style>
+body { margin:0; padding:32px; background:#e9e9ec; font-family:'IBM Plex Sans Thai', sans-serif; color:#18181b; }
+h2 { font-size:18px; margin:40px 0 6px; } h2:first-of-type { margin-top:0; }
+.note { max-width:880px; font-size:14px; line-height:1.65; color:#3f3f46; margin:0 0 16px; }
+.note b { color:#18181b; }
+.row { display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; }
+.cap { font-size:12.5px; color:#52525b; margin:0 0 8px; }
+
+/* Theme tokens: the same names and values as frontend/src/index.css */
+.app { --bg:#fff; --fg:#18181b; --fg2:#3f3f46; --mut:#71717a; --faint:#a1a1aa; --line:#e4e4e7; --line2:#f4f4f5; --side:#fafafa; --hover:#f4f4f5;
+  --ok:#15803d; --bad:#dc2626; --warn:#b45309; --pend:#71717a; --none:#e4e4e7; --btn:#18181b; --btnfg:#fff; --accent:#18181b; --logo-accent:#a1a1aa;
+  --h0:#ebedf0; --h1:#9be9a8; --h2:#40c463; --h3:#30a14e; --h4:#216e39;
+  font-family:'IBM Plex Sans Thai', sans-serif; background:var(--bg); color:var(--fg); font-size:14px; border-radius:10px; overflow:hidden; border:1px solid rgba(127,127,127,.25); }
+.app.dark { --bg:#0d1117; --fg:#e6edf3; --fg2:#c9d1d9; --mut:#8b949e; --faint:#6e7681; --line:#30363d; --line2:#21262d; --side:#010409; --hover:#161b22;
+  --ok:#3fb950; --bad:#f85149; --warn:#d29922; --pend:#8b949e; --none:#30363d; --btn:#e6edf3; --btnfg:#0d1117; --accent:#e6edf3; --logo-accent:#6e7681;
+  --h0:#30363d; --h1:#0e4429; --h2:#006d32; --h3:#26a641; --h4:#39d353; }
+.mono { font-family:'JetBrains Mono', monospace; }
+.mut { color:var(--mut); } .faint { color:var(--faint); } .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); } .pend { color:var(--pend); }
+
+/* desktop shell */
+.desk { flex:none; width:1280px; display:grid; grid-template-columns:220px 1fr; }
+.side { background:var(--side); border-right:1px solid var(--line); padding:12px 10px; display:flex; flex-direction:column; gap:2px; min-height:100%; box-sizing:border-box; }
+.brand { display:flex; align-items:center; gap:9px; font-weight:600; padding:4px 8px 14px; }
+.brand .col { margin-left:auto; color:var(--faint); font-size:16px; }
+.searchrow { display:flex; align-items:center; gap:8px; border:1px solid var(--line); background:var(--bg); border-radius:6px; padding:5px 8px 5px 10px; color:var(--faint); font-size:13px; margin:0 2px 6px; }
+.searchrow .k { margin-left:auto; font:11px 'JetBrains Mono', monospace; }
+.side a { display:flex; gap:10px; align-items:center; padding:7px 10px; border-radius:6px; color:var(--mut); }
+.side a i { font-size:17px; }
+.side a.on { background:var(--bg); color:var(--fg); font-weight:500; box-shadow:0 0 0 1px var(--line); }
+.grp { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); padding:14px 10px 6px; }
+.me { margin-top:auto; display:flex; gap:8px; align-items:center; padding:8px; font-size:13px; font-weight:500; }
+.me .lv { font:11.5px 'JetBrains Mono', monospace; color:var(--faint); font-weight:400; }
+.av { width:24px; height:24px; border-radius:50%; background:var(--line2); color:var(--mut); display:grid; place-items:center; font-size:11px; font-weight:500; flex:none; }
+.av.xl { width:64px; height:64px; font-size:22px; font-weight:600; }
+.wrap { max-width:1040px; padding:32px 28px 48px; box-sizing:border-box; }
+
+/* profile */
+.phd { display:flex; align-items:center; gap:20px; }
+.phd .id { flex:1; display:flex; flex-direction:column; gap:6px; }
+.phd .nm { display:flex; align-items:baseline; gap:10px; }
+.phd h1 { font-size:22px; font-weight:600; margin:0; }
+.lvl { display:flex; align-items:center; gap:12px; font-size:13px; flex-wrap:wrap; }
+.lvl b { font-weight:500; font-size:14px; }
+.bar { height:6px; border-radius:3px; background:var(--line2); overflow:hidden; }
+.bar > i { display:block; height:100%; background:var(--fg); border-radius:3px; }
+.rank { text-align:right; } .rank .v { font:500 22px 'JetBrains Mono', monospace; }
+.stats { display:grid; grid-template-columns:repeat(5, 1fr); border:1px solid var(--line); border-radius:8px; margin-top:24px; }
+.stats div { padding:12px 16px; border-right:1px solid var(--line); } .stats div:last-child { border-right:0; }
+.stats span { display:block; font-size:13px; color:var(--mut); } .stats b { font:500 18px 'JetBrains Mono', monospace; }
+.sec { margin-top:28px; }
+.sech { display:flex; align-items:baseline; gap:8px; margin-bottom:10px; } .sech b { font-weight:500; flex:1; } .sech span { font-size:13px; color:var(--mut); }
+.heat { display:grid; grid-auto-flow:column; grid-template-rows:repeat(7, 13px); gap:3px; justify-content:end; overflow:hidden; }
+.heat i { width:13px; height:13px; border-radius:3px; background:var(--h0); }
+.heat i.l1 { background:var(--h1); } .heat i.l2 { background:var(--h2); } .heat i.l3 { background:var(--h3); } .heat i.l4 { background:var(--h4); }
+.legend { display:flex; gap:4px; align-items:center; justify-content:flex-end; font-size:11px; color:var(--faint); margin-top:8px; }
+.legend i { width:10px; height:10px; border-radius:2px; display:inline-block; }
+.cols { display:grid; grid-template-columns:1fr 1fr; gap:32px; }
+.list > div { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line2); font-size:14px; }
+.list .t { flex:1; } .list .x { font:12px 'JetBrains Mono', monospace; } .list .w { font-size:13px; color:var(--mut); min-width:72px; text-align:right; }
+.hbar { display:grid; grid-template-columns:130px 1fr 52px; gap:10px; align-items:center; font-size:13px; padding:5px 0; }
+.hbar .n { font:12px 'JetBrains Mono', monospace; color:var(--fg2); text-align:right; }
+.hbar .bar > i.ok { background:var(--ok); } .hbar .bar > i.bad { background:var(--bad); } .hbar .bar > i.warn { background:var(--warn); } .hbar .bar > i.pend { background:var(--pend); } .hbar .bar > i.ink { background:var(--fg2); }
+
+/* radar */
+.radar-card { display:grid; grid-template-columns:400px 1fr; gap:32px; align-items:center; }
+.radar svg { display:block; width:100%; height:auto; overflow:visible; }
+.radar .ring { fill:none; stroke:var(--line); stroke-width:1; }
+.radar .spoke { stroke:var(--line); stroke-width:1; }
+.radar .area { fill:var(--accent); fill-opacity:.12; stroke:var(--accent); stroke-width:1.75; stroke-linejoin:round; }
+.radar .dot { fill:var(--accent); stroke:var(--bg); stroke-width:1.5; }
+.radar .lab { fill:var(--fg2); font:12px 'IBM Plex Sans Thai', sans-serif; }
+.radar .pct { fill:var(--mut); font:10.5px 'JetBrains Mono', monospace; }
+.radar .tick { fill:var(--faint); font:9.5px 'JetBrains Mono', monospace; }
+.radar .hot .dot { r:4.5; } .radar .hot .lab { fill:var(--fg); font-weight:500; }
+.catlist { font-size:13px; }
+.catlist > div { display:grid; grid-template-columns:1fr 64px 48px; gap:8px; padding:6px 0; border-bottom:1px solid var(--line2); align-items:center; }
+.catlist .n { font:12px 'JetBrains Mono', monospace; color:var(--fg2); text-align:right; }
+.catlist .p { font:12px 'JetBrains Mono', monospace; color:var(--mut); text-align:right; }
+.catlist > div.hot { background:var(--hover); box-shadow:inset 2px 0 0 var(--fg); padding-left:8px; }
+.tip { position:absolute; pointer-events:none; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 9px; font-size:12px; box-shadow:0 4px 14px rgba(0,0,0,.12); white-space:nowrap; }
+.tip b { font-weight:500; display:block; } .tip span { font:11.5px 'JetBrains Mono', monospace; color:var(--mut); }
+.ach > div { display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid var(--line2); }
+.ach .tx { flex:1; } .ach .tx b { font-weight:500; display:block; } .ach .tx span { font-size:13px; color:var(--mut); }
+.ach .prog { display:flex; align-items:center; gap:10px; } .ach .prog .bar { width:140px; }
+.ach .prog span { font:12px "JetBrains Mono", monospace; color:var(--fg2); white-space:nowrap; width:64px; text-align:right; }
+
+/* phone */
+.phone { flex:none; width:390px; height:844px; position:relative; display:flex; flex-direction:column; }
+.phone.tall { height:1720px; }
+.topbar { height:52px; flex:none; display:flex; align-items:center; gap:9px; padding:0 16px; border-bottom:1px solid var(--line); font-weight:600; font-size:15px; }
+.topbar .s { margin-left:auto; font-size:19px; color:var(--fg2); }
+.pmain { flex:1; overflow:hidden; padding:20px 16px 120px; box-sizing:border-box; }
+.tabs { position:absolute; left:0; right:0; bottom:0; height:56px; display:grid; grid-template-columns:repeat(5, 1fr); border-top:1px solid var(--line); background:var(--bg); }
+.tabs a { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:11px; color:var(--mut); }
+.tabs a i { font-size:19px; } .tabs a.on { color:var(--fg); font-weight:500; }
+.pin { position:absolute; left:0; right:0; bottom:56px; height:54px; display:flex; align-items:center; gap:10px; padding:0 16px; background:var(--hover); border-top:1px solid var(--line); box-shadow:inset 2px 0 0 var(--fg); }
+.p-h1 { font-size:22px; font-weight:600; margin:0; } .p-meta { font-size:13px; color:var(--mut); margin:2px 0 14px; }
+.ptb { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.seg { display:flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; font-size:13px; }
+.seg span { padding:6px 11px; color:var(--mut); border-right:1px solid var(--line); } .seg span:last-child { border-right:0; }
+.seg span.on { background:var(--line2); color:var(--fg); font-weight:500; }
+.btn2 { border:1px solid var(--line); background:var(--bg); border-radius:6px; padding:6px 11px; font-size:13.5px; color:var(--fg); display:inline-flex; gap:6px; align-items:center; margin-left:auto; }
+.item { padding:11px 0; border-bottom:1px solid var(--line2); }
+.item .l1 { display:flex; align-items:center; gap:8px; } .item .l1 b { flex:1; font-weight:500; }
+.item .l1 i { font-size:14px; }
+.item .l2 { display:flex; align-items:center; gap:8px; padding-left:22px; margin-top:4px; font:500 12px 'JetBrains Mono', monospace; }
+.item .l2 .id { margin-left:auto; color:var(--faint); font-weight:400; font-size:11.5px; }
+.strip { display:inline-flex; gap:2px; } .strip i { width:9px; height:6px; border-radius:1.5px; background:var(--ok); }
+.strip i.x { background:var(--bad); } .strip i.t { background:var(--warn); } .strip i.n { background:var(--none); }
+.rk { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line2); }
+.rk .r { width:22px; text-align:right; font:12.5px 'JetBrains Mono', monospace; color:var(--mut); }
+.rk .t { flex:1; } .rk .t b { display:block; font-weight:500; } .rk .t span { font-size:12.5px; color:var(--mut); }
+.rk .x { font:12.5px 'JetBrains Mono', monospace; }
+.rk.top .r, .rk.top .x { color:var(--fg); font-weight:500; } .rk.top .t b { font-weight:600; }
+.pstats { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:8px; margin:16px 0 0; }
+.pstats div { padding:10px 14px; border-bottom:1px solid var(--line); } .pstats div:nth-child(odd) { border-right:1px solid var(--line); }
+.pstats div:nth-last-child(-n+2) { border-bottom:0; }
+.pstats span { display:block; font-size:12.5px; color:var(--mut); } .pstats b { font:500 17px 'JetBrains Mono', monospace; }
+.phone .heat { grid-template-rows:repeat(7, 12px); } .phone .heat i { width:12px; height:12px; border-radius:2.5px; }
+.phone .radar-card { grid-template-columns:1fr; gap:8px; }
+</style>
+<style>
+.desk.short { min-height:720px; }
+.tag { display:inline-block; font:500 11px 'JetBrains Mono', monospace; letter-spacing:.04em; padding:2px 6px; border-radius:4px; border:1px solid var(--line); color:var(--mut); vertical-align:middle; }
+.tag.warn { color:var(--warn); border-color:currentColor; }
+.btn { display:inline-flex; align-items:center; gap:6px; background:var(--btn); color:var(--btnfg); border-radius:6px; padding:7px 14px; font-size:13.5px; font-weight:500; white-space:nowrap; }
+.btn.sec { background:var(--bg); color:var(--fg); border:1px solid var(--line); }
+.btn.red { background:var(--bad); color:#fff; }
+.btn.dis { opacity:.45; }
+.icon { display:inline-grid; place-items:center; width:32px; height:32px; border:1px solid var(--line); border-radius:6px; color:var(--fg2); }
+.h1 { font-size:24px; font-weight:600; margin:0; } .meta { font-size:13px; color:var(--mut); margin:4px 0 0; }
+.crumb { font-size:13px; color:var(--mut); margin:0 0 6px; }
+.hdr { display:flex; align-items:flex-end; gap:10px; margin-bottom:18px; } .hdr .grow { flex:1; }
+.fbar { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+.search { display:flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:6px; padding:6px 10px; width:240px; color:var(--faint); font-size:13px; }
+.chip { border:1px dashed var(--line); border-radius:6px; padding:5px 10px; font-size:13px; color:var(--mut); display:inline-flex; gap:6px; align-items:center; }
+.chip.on { border-style:solid; color:var(--fg); background:var(--line2); }
+.count { margin-left:auto; font-size:13px; color:var(--mut); }
+.tbl { width:100%; border-collapse:collapse; font-size:14px; }
+.tbl th { text-align:left; font-weight:400; font-size:12.5px; color:var(--mut); padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+.tbl td { padding:10px; border-bottom:1px solid var(--line2); white-space:nowrap; }
+.tbl .r { text-align:right; } .tbl .m { font:12.5px 'JetBrains Mono', monospace; }
+.tbl tr.sel td { background:var(--hover); }
+.cb { width:14px; height:14px; border:1.5px solid var(--faint); border-radius:3px; display:inline-block; vertical-align:middle; }
+.cb.on { background:var(--fg); border-color:var(--fg); }
+.dot { display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--fg2); }
+.dot i { width:7px; height:7px; border-radius:50%; background:var(--faint); display:inline-block; }
+.dot.ok i { background:var(--ok); } .dot.bad i { background:var(--bad); } .dot.warn i { background:var(--warn); }
+.bulk { display:flex; align-items:center; gap:14px; padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:var(--hover); margin-bottom:10px; font-size:13.5px; }
+.bulk b { font-weight:500; } .bulk a { color:var(--fg); } .bulk .x { margin-left:auto; color:var(--mut); }
+.tabs2 { display:flex; gap:22px; border-bottom:1px solid var(--line); font-size:14px; margin-bottom:20px; }
+.tabs2 span { padding:8px 0; color:var(--mut); } .tabs2 span.on { color:var(--fg); font-weight:500; border-bottom:2px solid var(--fg); }
+.notice { border:1px solid var(--line); background:var(--hover); border-radius:8px; padding:12px 14px; font-size:13.5px; display:flex; gap:10px; align-items:flex-start; }
+.notice i { font-size:17px; color:var(--mut); margin-top:1px; }
+.notice.warn { border-color:color-mix(in srgb, var(--warn) 40%, var(--line)); }
+.drop { border:1.5px dashed var(--line); border-radius:8px; padding:18px; display:flex; gap:12px; align-items:center; font-size:13.5px; color:var(--fg2); }
+.drop i { font-size:22px; color:var(--mut); }
+.field { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; font-size:13px; }
+.field label { font-weight:500; color:var(--fg2); }
+.field .in { border:1px solid var(--line); border-radius:6px; padding:8px 10px; font-size:14px; color:var(--fg); background:var(--bg); }
+.field .hint { font-size:12.5px; color:var(--mut); }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+.seg2 { display:inline-flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; font-size:13px; }
+.seg2 span { padding:6px 11px; color:var(--mut); border-right:1px solid var(--line); } .seg2 span:last-child { border-right:0; }
+.seg2 span.on { background:var(--line2); color:var(--fg); font-weight:500; }
+.sw { width:34px; height:20px; border-radius:10px; background:var(--line); position:relative; display:inline-block; flex:none; }
+.sw::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.2); }
+.sw.on { background:var(--ok); } .sw.on::after { left:16px; }
+/* drawer & dialog overlays */
+.over { position:relative; }
+.scrim { position:absolute; inset:0; background:rgba(0,0,0,.28); }
+.drawer { position:absolute; top:0; right:0; bottom:0; width:420px; background:var(--bg); border-left:1px solid var(--line); box-shadow:-8px 0 24px rgba(0,0,0,.12); padding:20px 22px; box-sizing:border-box; display:flex; flex-direction:column; }
+.drawer h3, .dialog h3 { margin:0 0 4px; font-size:17px; font-weight:600; }
+.drawer .foot { margin-top:auto; display:flex; align-items:center; gap:8px; justify-content:flex-end; padding-top:14px; border-top:1px solid var(--line); }
+.dialog { position:absolute; left:50%; top:110px; transform:translateX(-50%); width:460px; background:var(--bg); border:1px solid var(--line); border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,.18); padding:20px 22px; }
+.dialog .foot { display:flex; align-items:center; gap:8px; justify-content:flex-end; margin-top:16px; }
+.pw { font:12.5px 'JetBrains Mono', monospace; }
+.pw div { display:grid; grid-template-columns:1fr 1fr; padding:6px 0; border-bottom:1px solid var(--line2); }
+/* reorder list */
+.olist > div { display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; background:var(--bg); font-size:14px; }
+.olist .L { font:500 13px 'JetBrains Mono', monospace; width:16px; color:var(--mut); }
+.olist .h { color:var(--faint); font-size:16px; cursor:grab; }
+.olist .id { font:12px 'JetBrains Mono', monospace; color:var(--mut); }
+.olist .x { margin-left:auto; color:var(--mut); }
+.olist > div.drag { box-shadow:0 6px 18px rgba(0,0,0,.14); transform:translateX(6px); border-color:var(--fg2); }
+/* analysis */
+.kpis { display:grid; grid-template-columns:repeat(5, 1fr); border:1px solid var(--line); border-radius:8px; }
+.kpis div { padding:12px 16px; border-right:1px solid var(--line); } .kpis div:last-child { border-right:0; }
+.kpis span { display:block; font-size:13px; color:var(--mut); } .kpis b { font:500 20px 'JetBrains Mono', monospace; display:block; margin:2px 0; }
+.kpis em { font-style:normal; font:12px 'JetBrains Mono', monospace; color:var(--mut); }
+.chart { display:flex; align-items:flex-end; gap:5px; height:150px; padding:10px 0 0; border-bottom:1px solid var(--line); }
+.chart div { flex:1; display:flex; flex-direction:column-reverse; }
+.chart i { display:block; } .chart i.a { background:var(--ok); } .chart i.w { background:var(--bad); } .chart i.t { background:var(--warn); } .chart i.c { background:var(--faint); }
+.legend2 { display:flex; gap:14px; font-size:12px; color:var(--mut); margin-top:8px; }
+.legend2 i { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+/* settings */
+.srow { display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; padding:14px 0; border-bottom:1px solid var(--line2); }
+.srow b { font-weight:500; font-size:14px; display:block; } .srow span { font-size:13px; color:var(--mut); }
+.sgroup { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); margin:22px 0 2px; }
+.saved { font-size:12.5px; color:var(--ok); display:inline-flex; gap:5px; align-items:center; }
+.danger { border:1px solid color-mix(in srgb, var(--bad) 35%, var(--line)); border-radius:8px; padding:4px 16px; margin-top:22px; }
+.danger .sgroup { color:var(--bad); }
+</style>
+<style>
+/* phase 6 · authoring */
+.rd { display:inline-flex; gap:3px; vertical-align:middle; }
+.rd i { width:9px; height:9px; border-radius:2px; background:var(--none); display:inline-block; }
+.rd i.y { background:var(--ok); } .rd i.s { background:var(--warn); } .rd i.f { background:var(--bad); }
+.rdkey { display:flex; gap:14px; font-size:12px; color:var(--mut); margin:10px 0 0; }
+.rdkey i { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+.subtabs { display:flex; gap:22px; font-size:14px; margin:-6px 0 18px; border-bottom:1px solid var(--line); }
+.subtabs span { padding:8px 0; color:var(--mut); } .subtabs span.on { color:var(--fg); font-weight:500; border-bottom:2px solid var(--fg); }
+.steps { display:flex; align-items:center; gap:20px; border-bottom:1px solid var(--line); font-size:14px; margin-bottom:22px; }
+.steps span { padding:9px 0; color:var(--mut); display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.steps span.on { color:var(--fg); font-weight:500; border-bottom:2px solid var(--fg); }
+.steps span i { font-size:14px; } .steps .gl-ok { color:var(--ok); } .steps .gl-todo { color:var(--faint); } .steps .gl-stale { color:var(--warn); } .steps .gl-bad { color:var(--bad); }
+.steps .right { margin-left:auto; display:flex; gap:16px; }
+.steps .right span { color:var(--mut); }
+.save { font:12.5px 'JetBrains Mono', monospace; color:var(--mut); }
+.save.unsaved { color:var(--warn); }
+.pill { display:inline-flex; align-items:center; gap:7px; border:1px solid var(--line); border-radius:999px; padding:4px 10px 4px 8px; font-size:12.5px; color:var(--fg2); }
+.pill .spin { width:10px; height:10px; border-radius:50%; border:2px solid var(--line); border-top-color:var(--fg2); }
+.chips { display:flex; flex-wrap:wrap; gap:6px; }
+.chips span { border:1px solid var(--line); border-radius:999px; padding:4px 10px; font-size:12.5px; color:var(--mut); }
+.chips span.on { border-color:var(--fg); color:var(--fg); background:var(--line2); }
+.unit { display:flex; align-items:center; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+.unit .in { border:0 !important; flex:1; font-family:'JetBrains Mono', monospace; }
+.unit em { font-style:normal; font-size:12.5px; color:var(--mut); padding:0 10px; border-left:1px solid var(--line); align-self:stretch; display:flex; align-items:center; background:var(--line2); }
+.ferr { font-size:12.5px; color:var(--bad); }
+.card { border:1px solid var(--line); border-radius:8px; }
+.card .ch { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--line); font-size:13.5px; }
+.card .ch b { font-weight:500; flex:1; }
+.card .cb2 { padding:16px 18px; }
+.stmt { font-size:14px; line-height:1.7; color:var(--fg2); } .stmt h4 { margin:14px 0 4px; font-size:14px; color:var(--fg); } .stmt h4:first-child { margin-top:0; }
+.stmt code, .mono2 { font:12.5px 'JetBrains Mono', monospace; background:var(--line2); padding:1px 5px; border-radius:4px; }
+.pdfrow { display:flex; align-items:center; gap:12px; padding:11px 14px; border:1px solid var(--line); border-radius:8px; font-size:13.5px; }
+.pdfrow b { font-weight:500; } .pdfrow .grow { flex:1; }
+.lnk { color:var(--fg); text-decoration:underline; text-underline-offset:2px; font-size:13px; }
+.code { font:12.5px/1.7 'JetBrains Mono', monospace; background:var(--side); border:1px solid var(--line); border-radius:8px; overflow:hidden; display:grid; grid-template-columns:40px 1fr; }
+.code .ln { color:var(--faint); text-align:right; padding:10px 8px; border-right:1px solid var(--line); user-select:none; }
+.code pre { margin:0; padding:10px 12px; color:var(--fg2); white-space:pre; overflow:hidden; }
+.code .k { color:var(--fg); font-weight:500; } .code .c { color:var(--faint); } .code .s { color:var(--ok); }
+.split2 { display:grid; grid-template-columns:1fr 300px; gap:16px; align-items:start; }
+.res > div { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--line2); font-size:13px; } .res > div span:first-child { color:var(--mut); width:88px; flex:none; }
+.rl > div { display:grid; grid-template-columns:22px 1fr auto; gap:12px; align-items:center; padding:12px 4px; border-bottom:1px solid var(--line2); font-size:14px; }
+.rl i.g { font-size:17px; } .rl b { font-weight:500; display:block; } .rl span.d { font-size:13px; color:var(--mut); }
+.rl .fix { font-size:13px; }
+.pubfoot { display:flex; align-items:center; gap:10px; margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+.pubfoot .why { font-size:13px; color:var(--mut); margin-left:auto; }
+/* focus shell (full-screen editor) */
+.focus { width:1280px; height:720px; display:flex; flex-direction:column; }
+.fbarx { height:52px; flex:none; display:flex; align-items:center; gap:12px; padding:0 16px; border-bottom:1px solid var(--line); font-size:13.5px; }
+.fbarx b { font-weight:600; }
+.fsplit { flex:1; display:grid; grid-template-columns:1fr 6px 1fr; min-height:0; }
+.fsplit .gut { background:var(--line2); border-left:1px solid var(--line); border-right:1px solid var(--line); }
+.fsrc { font:12.5px/1.75 'JetBrains Mono', monospace; display:grid; grid-template-columns:44px 1fr; overflow:hidden; }
+.fsrc .ln { color:var(--faint); text-align:right; padding:14px 10px; background:var(--side); border-right:1px solid var(--line); }
+.fsrc pre { margin:0; padding:14px 16px; color:var(--fg2); white-space:pre-wrap; }
+.fprev { padding:22px 28px; overflow:hidden; background:var(--side); }
+.fprev .paper { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:22px 26px; }
+.kbd { font:11px 'JetBrains Mono', monospace; border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:1px 5px; color:var(--mut); }
+.tl > div { display:grid; grid-template-columns:140px 1fr 110px 90px; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--line2); font-size:13.5px; }
+.tl .m { font:12.5px 'JetBrains Mono', monospace; color:var(--mut); }
+.log { font:12px/1.65 'JetBrains Mono', monospace; background:var(--side); border:1px solid var(--line); border-radius:6px; padding:10px 12px; color:var(--fg2); white-space:pre; overflow:hidden; }
+.bigscreen { border:1px dashed var(--line); border-radius:8px; padding:16px; font-size:13.5px; color:var(--fg2); display:flex; gap:10px; align-items:flex-start; margin-top:12px; }
+.bigscreen i { font-size:18px; color:var(--mut); }
+.res-ok { color:var(--ok); }
+.pgrid { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; }
+</style>
+
+<h2>Phase 6 · Authoring (HTML mockup ให้อนุมัติก่อนเริ่มทำ)</h2>
+<p class="note">ทำตาม §7.9 ของ spec · ภาษาบนหน้าจอยังเป็นอังกฤษ · ใช้ส่วนประกอบเดิมจาก phase 2–5 ทั้งหมด (PageHeader, DataTable, Drawer, FileDrop, ConfirmDialog, StatusDot)
+สิ่งที่เปลี่ยนหลัก ๆ: <b>เอาแถบนำทางซ้ายของ draft ออก</b> (sidebar หลักอยู่ตลอด) แล้วใช้ <b>แท็บขั้นตอน</b> ใต้หัวเรื่องแทน ·
+หัวเรื่องมี <b>สถานะการบันทึก</b> เป็นตัว mono ("Saved · rev 14") และ <b>ปุ่มหลักปุ่มเดียวที่เปลี่ยนตามสถานะ</b> (Verify ตอนยังไม่ verify · Publish ตอนพร้อม · ไม่มีปุ่มระหว่างมีงานรัน) ·
+backend ใหม่สองอย่าง: <b>B7</b> ส่งความพร้อม 5 ข้อมาในรายการ draft · <b>B8</b> นับ draft ที่ใช้แต่ละ author profile และค้นหา username เพื่อผูกบัญชี</p>
+
+<h2>1 · Authoring · รายการ draft <span class="mono">/admin/authoring</span></h2>
+<p class="note">แท็บย่อยใต้หัวเรื่อง: <b>Drafts · Author profiles · AI docs</b> (แทนลิงก์สองปุ่มเดิม) · ช่อง <b>Ready</b> เป็นสี่เหลี่ยมเล็ก 5 ช่องเรียง
+Statement · Solution · Testcases · PDF · Verified (เขียว = ผ่าน · เหลือง = ล้าสมัย เช่น PDF เก่ากว่า revision · เทา = ยังไม่มี) ข้อมูลมาจาก <b>B7</b> ·
+สถานะใช้ dot + คำ ไม่ใช้ badge สี · Published บอก revision ที่ live อยู่ · กดทั้งแถวเพื่อเปิด draft · ⋯ มี Open, Start new revision (เฉพาะที่ publish แล้ว), Delete</p>
+<div class="row"><div id="drafts" class="app desk short"></div></div>
+
+<h2>2 · Author profiles + แก้ไขใน Drawer</h2>
+<p class="note">เปลี่ยนจากการ์ดเป็นตาราง: รูป + AKA · ชื่อจริง · ภาษา · ประเทศ · บัญชีที่ผูก · <b>จำนวน draft ที่ใช้</b> (<b>B8</b>) · ⋯ ·
+แก้ไขใน Drawer ขวา (ตัด/ซูมรูปอยู่ใน Drawer) · <b>ผูกบัญชีด้วยการค้นหา username</b> แทนการพิมพ์เลข user id (<b>B8</b>) ·
+ถ้าแก้ชื่อ/ภาษา/ประเทศของ profile ที่มี draft ใช้อยู่ ปุ่ม Save จะถามก่อนว่าจะ sync draft ที่ผูกไว้กี่อัน (dialog เดิม "Update linked problems?") · ประวัติ sync ย้ายมาอยู่หน้านี้</p>
+<div class="row"><div id="profiles" class="app desk short over"></div></div>
+
+<h2>3 · Draft workspace · Metadata <span class="mono">/admin/authoring/:id</span></h2>
+<p class="note">หัวเรื่อง: breadcrumb · ชื่อโจทย์ + สถานะ · บรรทัด meta = problem id และ <b>สถานะการบันทึก</b> (Saved · rev 14 / Saving… / Unsaved) · ปุ่มหลัก <b>Verify</b> ·
+แท็บขั้นตอนมีเครื่องหมายบอกสถานะ: <span class="ok">✓ เสร็จ</span> · <span class="faint">○ ยังไม่ทำ</span> · <span class="warn">◐ ล้าสมัย</span> · <span class="bad">✕ ล้มเหลว</span> คำนวณจากข้อมูลที่โหลดอยู่แล้ว ·
+History กับ AI docs เป็นลิงก์ชิดขวา ไม่ใช่ขั้นตอน · ฟอร์มสองคอลัมน์ ช่องตัวเลขมีหน่วย error อยู่ใต้ช่อง หมวดหมู่เป็นชิปกดเลือก</p>
+<div class="row"><div id="ws-meta" class="app desk short"></div></div>
+
+<h2>4 · Statement</h2>
+<p class="note">แสดงโจทย์ที่ render แล้วแบบอ่านอย่างเดียว + ปุ่ม <b>Edit statement</b> (เปิดตัวแก้เต็มจอ) · PDF เป็นแถวเดียว บอก revision และถ้าเก่ากว่า draft จะขึ้นสีเหลือง พร้อม Rebuild / Open ·
+รูปประกอบเป็น FileDrop + ตาราง (คัดลอก path ไปใส่ในโจทย์ได้)</p>
+<div class="row"><div id="ws-stmt" class="app desk short"></div></div>
+
+<h2>5 · ตัวแก้โจทย์เต็มจอ (FocusShell)</h2>
+<p class="note">ไม่มี sidebar · ด้านบน: ← กลับ workspace · ชื่อ · <b>สถานะการบันทึกเห็นตลอด</b> · ถ้าโจทย์ publish แล้วจะมีป้ายแยก "Published · live unchanged" (แก้ได้ แต่โจทย์ที่ live ยังไม่เปลี่ยนจนกว่าจะ publish ใหม่) ·
+Preview / PDF สลับได้ · preview ขยายพอดีความกว้างเป็นค่าเริ่มต้น · ตัวแก้มีเลขบรรทัดและสีไวยากรณ์ (ตัวเดียวกับหน้าส่งโค้ด) · มือถือแยกเป็นแท็บ Source / Preview</p>
+<div class="row"><div id="editor" class="app focus"></div></div>
+
+<h2>6 · Solution (Generator หน้าตาเดียวกัน) · ระหว่างมีงานรัน</h2>
+<p class="note">ตัวแก้โค้ด + แผงผลการ compile ล่าสุด <b>ที่ revision นี้</b> · ตัวอย่างนี้คือ <b>ระหว่างงานรัน</b>: หัวเรื่องมี pill "Compile solution · running" และ<b>ไม่มีปุ่มหลัก</b> ตัวแก้เป็นอ่านอย่างเดียวชั่วคราว ·
+"Generate inputs" อยู่ที่แท็บ Generator · ตัวแก้เปลี่ยนสีตาม theme</p>
+<div class="row"><div id="ws-sol" class="app desk short"></div></div>
+
+<h2>7 · Testcases</h2>
+<p class="note">บรรทัดสรุป (จำนวน · ขนาดรวม · ขาด output กี่ไฟล์) · แถว Generate (seed + Generate inputs / Generate outputs) · ตารางกะทัดรัด ช่อง Source บอกว่ามาจาก upload หรือ generate ที่ rev ไหน ·
+⋯ ต่อแถว: Inspect · Replace · Delete · วางไฟล์คู่ทีละเคสได้ หรือ <b>Replace all from ZIP</b> (ถามยืนยันพร้อมจำนวนเก่า/ใหม่) · มือถือดูได้อย่างเดียว</p>
+<div class="row"><div id="ws-tests" class="app desk short"></div></div>
+
+<h2>8 · Verify &amp; publish — สว่าง / มืด</h2>
+<p class="note"><b>ReadinessList</b> หนึ่งแถวต่อเงื่อนไข: Metadata · Statement · Solution compiles at rev N · Testcases · PDF current · Verified rev N พร้อมสถานะและลิงก์แก้ไปยังแท็บที่เกี่ยว ·
+แท็บนี้ไม่มีปุ่มหลักบนหัวเรื่อง ปุ่มอยู่ท้ายรายการแทน: Verify (รอง) · <b>Publish (หลัก)</b> ถ้ายัง publish ไม่ได้ ปุ่มจาง และ<b>บอกเหตุผลข้างปุ่ม</b> · ถ้า verify ล้มเหลวจะแสดงเคสที่พังและคำอธิบายจาก error code เดิม</p>
+<div class="row"><div id="ws-verify" class="app desk short"></div></div>
+<div class="row" style="margin-top:28px"><div id="ws-verify-dark" class="app desk short dark"></div></div>
+
+<h2>9 · History</h2>
+<p class="note">ตาราง timeline ของงาน build (งาน · สถานะ · revision · เวลา) กดแถวแล้ว log เปิดใน Drawer · แก้ชื่องานที่เคยโชว์ไม่ตรง (<span class="mono">run_generator</span> → "Generate inputs") และสถานะที่ยังไม่มีชื่อ (Timed out / Cancelled / Stale) ·
+ประวัติ sync ของ author profile ย้ายไปหน้า Author profiles</p>
+<div class="row"><div id="ws-history" class="app desk short over"></div></div>
+
+<h2>10 · มือถือ (390px)</h2>
+<p class="note">รายการและหน้าดูทุกหน้าใช้ได้ · แก้ได้แค่ <b>Metadata</b> · ตัวแก้โค้ด/โจทย์และการอัปโหลดจะขึ้น "Best edited on a larger screen" · แท็บขั้นตอนเลื่อนแนวนอนได้</p>
+<div class="row">
+  <div><p class="cap">Drafts</p><div id="ph-drafts" class="app phone"></div></div>
+  <div><p class="cap">Metadata</p><div id="ph-meta" class="app phone"></div></div>
+  <div><p class="cap">Solution</p><div id="ph-sol" class="app phone"></div></div>
+</div>
+
+<script>
+const LOGO = `<svg width="22" height="22" viewBox="0 0 512 512" aria-hidden="true"><defs>
+<mask id="LID-a"><circle cx="368.2" cy="148.2" r="123.1" fill="#fff"/><circle cx="351.7" cy="272.8" r="92.4" fill="#000"/></mask>
+<mask id="LID-b"><circle cx="145.4" cy="314.9" r="130.9" fill="#fff"/><circle cx="213.8" cy="405.4" r="98.3" fill="#000"/></mask>
+<mask id="LID-c"><circle cx="400.4" cy="365.9" r="101.1" fill="#fff"/><circle cx="466.6" cy="392.5" r="66.6" fill="#000"/></mask></defs>
+<circle cx="368.2" cy="148.2" r="123.1" fill="currentColor" mask="url(#LID-a)"/><circle cx="145.4" cy="314.9" r="130.9" fill="currentColor" mask="url(#LID-b)"/>
+<circle cx="400.4" cy="365.9" r="101.1" fill="var(--logo-accent)" mask="url(#LID-c)"/></svg>`;
+let logoN = 0; const logo = () => LOGO.replaceAll('LID', 'lg' + (logoN++));
+
+const side = (active) => `<nav class="side"><div class="brand">${logo()}Grader<i class="ph ph-sidebar-simple col"></i></div>
+<div class="searchrow"><i class="ph ph-magnifying-glass"></i>Search<span class="k">⌘K</span></div>
+${[['house', 'Home'], ['list-checks', 'Problems'], ['paper-plane-tilt', 'Submissions'], ['ranking', 'Ranking']].map(([i, l]) => `<a><i class="ph ph-${i}"></i>${l}</a>`).join('')}
+<div class="grp">Contests</div><a><i class="ph ph-calendar-blank"></i>All contests</a>
+<div class="grp">Manage</div>
+${[['users', 'Users'], ['file-code', 'Problems'], ['trophy', 'Contests'], ['pen-nib', 'Authoring'], ['chart-bar', 'Analysis'], ['gear-six', 'Settings']].map(([i, l]) => `<a class="${l === active ? 'on' : ''}"><i class="ph ph-${i}"></i>${l}</a>`).join('')}
+<div class="me"><span class="av">K</span>kru.somchai<span class="lv">staff</span></div></nav>`;
+const hdr = (crumb, title, meta, actions) => `${crumb ? `<p class="crumb">${crumb}</p>` : ''}<div class="hdr"><div class="grow"><h1 class="h1">${title}</h1>${meta ? `<p class="meta">${meta}</p>` : ''}</div>${actions}</div>`;
+const drawer = (inner) => `<div class="scrim"></div><div class="drawer">${inner}</div>`;
+const topBar = () => `<div class="topbar">${logo()}Grader<i class="ph ph-magnifying-glass s"></i></div>`;
+const tabs = (on) => `<nav class="tabs">${[['house', 'Home'], ['list-checks', 'Problems'], ['calendar-blank', 'Contests'], ['paper-plane-tilt', 'Submissions'], ['dots-three', 'More']].map(([i, l]) => `<a class="${l === on ? 'on' : ''}"><i class="ph ph-${i}"></i>${l}</a>`).join('')}</nav>`;
+
+/* ---------- phase 6 · authoring ---------- */
+const subtabs = (on) => `<div class="subtabs">${['Drafts', 'Author profiles', 'AI docs'].map((t) => `<span class="${t === on ? 'on' : ''}">${t}</span>`).join('')}</div>`;
+const rd = (s) => `<span class="rd" title="Statement · Solution · Testcases · PDF · Verified">${s.split('').map((c) => `<i class="${c === 'y' ? 'y' : c === 's' ? 's' : c === 'f' ? 'f' : ''}"></i>`).join('')}</span>`;
+
+/* 1 · drafts list */
+const DRAFTS = [
+  ['hp_graph_bfs', 'Shortest hops', 'Ada', 'yyysn', 'warn', 'Generated', '14 min ago'],
+  ['interval_cover', 'Interval cover', 'kru.somchai', 'yyyyy', 'ok', 'Ready', '1 h ago'],
+  ['prime_sieve', 'Prime sieve', 'Ada', 'yyyyy', 'ok', 'Published · rev 9', 'Yesterday'],
+  ['two_pointer_sum', 'Two pointer sum', 'Mint', 'yynnn', '', 'Draft', '2 days ago'],
+  ['knapsack_small', 'Small knapsack', 'kru.somchai', 'yyyfn', 'bad', 'Verify failed', '3 days ago'],
+  ['bracket_depth', 'Bracket depth', 'Ada', 'ynnnn', '', 'Draft', 'Nov 2'],
+  ['grid_paths', 'Grid paths', 'Mint', 'yyyyy', 'ok', 'Published · rev 4', 'Oct 28'],
+];
+const draftTable = () => `<table class="tbl"><tr><th>Problem ID</th><th>Title</th><th>Author</th><th>Ready</th><th>Status</th><th>Updated</th><th></th></tr>
+${DRAFTS.map(([id, t, a, r, tone, s, u]) => `<tr><td class="m">${id}</td><td style="font-weight:500">${t}</td><td class="mut">${a}</td><td>${rd(r)}</td><td><span class="dot ${tone}"><i></i>${s}</span></td><td class="mut">${u}</td><td class="mut"><i class="ph ph-dots-three"></i></td></tr>`).join('')}</table>
+<div class="rdkey"><span>Ready = Statement · Solution · Testcases · PDF · Verified</span><span><i style="background:var(--ok)"></i>done</span><span><i style="background:var(--warn)"></i>out of date</span><span><i style="background:var(--bad)"></i>failed</span><span><i style="background:var(--none)"></i>not yet</span></div>`;
+document.getElementById('drafts').innerHTML = side('Authoring') + `<main class="wrap">${hdr('Manage', 'Authoring', '23 drafts · 9 published', '<span class="btn"><i class="ph ph-plus"></i>New draft</span>')}
+${subtabs('Drafts')}
+<div class="fbar"><span class="search"><i class="ph ph-magnifying-glass"></i>Search by ID or title</span><span class="seg2"><span class="on">All drafts</span><span>Mine</span></span><span class="chip"><i class="ph ph-plus"></i>Author</span><span class="chip"><i class="ph ph-plus"></i>Status</span><span class="count">23 drafts</span></div>
+${draftTable()}</main>`;
+
+/* 2 · author profiles */
+const PROFILES = [
+  ['A', 'Ada', 'Ada Lovelace', 'English', 'GBR', 'ada.l', 12],
+  ['K', 'kru.somchai', 'Somchai Jaidee', 'Thai', 'THA', 'kru.somchai', 8],
+  ['M', 'Mint', 'Mintra Saelim', 'Thai', 'THA', '—', 3],
+  ['T', 'TOI Committee', '—', 'Thai', 'THA', '—', 0],
+];
+const profTable = () => `<table class="tbl"><tr><th>Author</th><th>Real name</th><th>Language</th><th>Country</th><th>Linked user</th><th class="r">Drafts</th><th></th></tr>
+${PROFILES.map(([a, aka, real, lang, c, u, n]) => `<tr><td><span style="display:inline-flex;gap:9px;align-items:center;font-weight:500"><span class="av">${a}</span>${aka}</span></td><td class="mut">${real}</td><td>${lang}</td><td class="m">${c}</td><td>${u === '—' ? '<span class="faint">—</span>' : u}</td><td class="r m">${n}</td><td class="mut"><i class="ph ph-dots-three"></i></td></tr>`).join('')}</table>`;
+document.getElementById('profiles').innerHTML = side('Authoring') + `<main class="wrap">${hdr('Manage', 'Authoring', '', '<span class="btn"><i class="ph ph-plus"></i>New author profile</span>')}
+${subtabs('Author profiles')}${profTable()}
+<p class="sech" style="margin-top:22px"><b>Recent profile syncs</b></p>
+<table class="tbl"><tr><th>Profile</th><th>Status</th><th>Progress</th><th>Started</th></tr>
+<tr><td>Ada</td><td><span class="dot ok"><i></i>Done</span></td><td class="m">12/12 synced</td><td class="mut">Yesterday</td></tr></table></main>`
++ drawer(`<h3>Edit Mint</h3><p class="meta" style="margin-bottom:16px">Used by 3 drafts</p>
+<div style="display:flex;gap:14px;align-items:center;margin-bottom:16px"><span class="av xl">M</span><div style="font-size:13px"><span class="btn sec" style="padding:5px 10px">Upload image</span><p class="mut" style="margin:6px 0 0">PNG or JPEG · cropped to a square</p></div></div>
+<div class="grid2"><div class="field"><label>AKA</label><div class="in">Mint</div></div><div class="field"><label>Real name</label><div class="in">Mintra Saelim</div></div>
+<div class="field"><label>Language</label><div class="in">Thai</div></div><div class="field"><label>Country</label><div class="in mono">THA</div></div></div>
+<div class="field"><label>Linked user</label><div class="in" style="display:flex;gap:8px;align-items:center"><i class="ph ph-magnifying-glass faint"></i>mint<span style="margin-left:auto" class="faint">↵</span></div>
+<div class="card" style="margin-top:4px"><div class="ch" style="border:0;padding:8px 12px"><span class="av">M</span><b>mintra</b><span class="mut" style="font-size:12.5px">Student · joined Mar 4</span></div><div class="ch" style="border:0;border-top:1px solid var(--line2);padding:8px 12px"><span class="av">M</span><b>mint_k</b><span class="mut" style="font-size:12.5px">Student · already linked to "Mint K"</span></div></div>
+<span class="hint">Optional. One profile per account.</span></div>
+<div class="foot"><span class="btn sec">Cancel</span><span class="btn">Save</span></div>`);
+
+/* workspace header + step tabs */
+const STEPS = [['Metadata', 'ok'], ['Statement', 'ok'], ['Solution', 'ok'], ['Generator', 'ok'], ['Testcases', 'ok'], ['Verify & publish', 'todo']];
+const GL = { ok: 'ph-bold ph-check-circle gl-ok', todo: 'ph ph-circle gl-todo', stale: 'ph-bold ph-circle-half gl-stale', bad: 'ph-bold ph-x-circle gl-bad' };
+const wsHead = ({ on, steps = STEPS, save = 'Saved · rev 14', saveCls = '', action = '<span class="btn"><i class="ph ph-seal-check"></i>Verify</span>', status = ['warn', 'Generated'], title = 'Shortest hops' }) =>
+  `${hdr('Manage › Authoring', `${title} <span class="dot ${status[0]}" style="font-size:13px;font-weight:400;margin-left:6px"><i></i>${status[1]}</span>`,
+    `<span class="mono">hp_graph_bfs</span> · <span class="save ${saveCls}">${save}</span>`, action)}
+<div class="steps">${steps.map(([s, g]) => `<span class="${s === on ? 'on' : ''}"><i class="${GL[g]}"></i>${s}</span>`).join('')}<div class="right"><span><i class="ph ph-clock-counter-clockwise"></i> History</span><span><i class="ph ph-book-open-text"></i> AI docs</span></div></div>`;
+
+/* 3 · metadata */
+document.getElementById('ws-meta').innerHTML = side('Authoring') + `<main class="wrap">${wsHead({ on: 'Metadata', save: 'Unsaved', saveCls: 'unsaved' })}
+<div class="grid2" style="max-width:820px">
+<div class="field"><label>Problem ID</label><div class="in mono">hp_graph_bfs</div><span class="hint">Locked after the first publish.</span></div>
+<div class="field"><label>Title</label><div class="in">Shortest hops</div></div>
+<div class="field"><label>Author</label><div class="in" style="display:flex;justify-content:space-between">Ada<i class="ph ph-caret-down faint"></i></div></div>
+<div class="field"><label>Difficulty</label><div class="in" style="display:flex;justify-content:space-between">1600<i class="ph ph-caret-down faint"></i></div><span class="hint">800–3500 · a first solve gives +57 XP</span></div>
+<div class="field"><label>Time limit</label><div class="unit"><div class="in">1000</div><em>ms</em></div></div>
+<div class="field"><label>Memory limit</label><div class="unit" style="border-color:var(--bad)"><div class="in">0</div><em>MB</em></div><span class="ferr">At least 1 MB.</span></div>
+</div>
+<div class="field" style="max-width:820px"><label>Categories</label><div class="chips">${['Graph', 'Greedy', 'Dynamic Programming', 'Math', 'Data Structures', 'String', 'Binary Search', 'Tree', 'Implementation'].map((c) => `<span class="${['Graph', 'Tree'].includes(c) ? 'on' : ''}">${c}</span>`).join('')}</div></div></main>`;
+
+/* 4 · statement */
+document.getElementById('ws-stmt').innerHTML = side('Authoring') + `<main class="wrap">${wsHead({ on: 'Statement', steps: STEPS.map(([s, g]) => [s, s === 'Statement' ? 'stale' : g]) })}
+<div class="card"><div class="ch"><b>Statement</b><span class="btn sec" style="padding:5px 11px"><i class="ph ph-pencil-simple"></i>Edit statement</span></div>
+<div class="cb2 stmt"><h4>Shortest hops</h4>Given an undirected graph with <code>N</code> cities and <code>M</code> roads, find the fewest roads needed to travel from city 1 to city <code>N</code>.
+<h4>Input</h4>The first line holds <code>N M</code> (2 ≤ N ≤ 10⁵, 1 ≤ M ≤ 2·10⁵). Each of the next M lines holds two cities joined by a road.
+<h4>Output</h4>One integer, or <code>-1</code> if city N can't be reached.</div></div>
+<div class="pdfrow" style="margin-top:12px"><i class="ph ph-file-pdf" style="font-size:18px;color:var(--warn)"></i><div class="grow"><b>PDF</b> <span class="mono mut" style="font-size:12.5px">rev 12</span> <span class="warn" style="font-size:13px">· older than the draft (rev 14)</span></div><span class="btn sec" style="padding:5px 11px">Rebuild</span><span class="lnk">Open</span></div>
+<p class="sech" style="margin-top:22px"><b>Images</b><span>JPEG, PNG or WebP · 10 MB each</span></p>
+<div class="drop"><i class="ph ph-upload-simple"></i><div><b style="font-weight:500">Drop images here</b><div class="mut" style="font-size:12.5px">or choose files</div></div></div>
+<table class="tbl" style="margin-top:8px"><tr><th>File</th><th>Use in the statement</th><th class="r">Size</th><th></th></tr>
+<tr><td>graph.png</td><td class="m mut">{{ASSET_BASE}}/graph.png <i class="ph ph-copy"></i></td><td class="r m">84 kB</td><td class="mut"><i class="ph ph-dots-three"></i></td></tr></table></main>`;
+
+/* 5 · full-screen editor */
+document.getElementById('editor').innerHTML = `<div class="fbarx"><span class="mut"><i class="ph ph-arrow-left"></i> Workspace</span><b>Shortest hops</b><span class="save">Saving…</span>
+<span class="tag">Published · live unchanged</span><span style="margin-left:auto" class="seg2"><span class="on">Preview</span><span>PDF</span></span><span class="seg2"><span>−</span><span class="mono">Fit</span><span>+</span></span><span class="mut" style="font-size:12.5px"><span class="kbd">⌘S</span> save</span></div>
+<div class="fsplit"><div class="fsrc"><div class="ln">${Array.from({ length: 16 }, (_, i) => i + 1).join('<br>')}</div><pre>&lt;h2&gt;Shortest hops&lt;/h2&gt;
+&lt;p&gt;Given an undirected graph with \\(N\\) cities and
+\\(M\\) roads, find the fewest roads needed to travel
+from city 1 to city \\(N\\).&lt;/p&gt;
+
+&lt;h3&gt;Input&lt;/h3&gt;
+&lt;p&gt;The first line holds \\(N\\ M\\)
+(\\(2 \\le N \\le 10^5\\), \\(1 \\le M \\le 2 \\cdot 10^5\\)).&lt;/p&gt;
+
+&lt;h3&gt;Output&lt;/h3&gt;
+&lt;p&gt;One integer, or &lt;code&gt;-1&lt;/code&gt; if city N
+can't be reached.&lt;/p&gt;
+
+&lt;img src="{{ASSET_BASE}}/graph.png"&gt;</pre></div><div class="gut"></div>
+<div class="fprev"><div class="paper stmt"><h4>Shortest hops</h4>Given an undirected graph with <i>N</i> cities and <i>M</i> roads, find the fewest roads needed to travel from city 1 to city <i>N</i>.
+<h4>Input</h4>The first line holds <i>N M</i> (2 ≤ <i>N</i> ≤ 10⁵, 1 ≤ <i>M</i> ≤ 2·10⁵).<h4>Output</h4>One integer, or <code>-1</code> if city N can't be reached.
+<div style="margin-top:14px;height:120px;border:1px dashed var(--line);border-radius:6px;display:grid;place-items:center;color:var(--faint);font-size:12.5px">graph.png</div></div></div></div>`;
+
+/* 6 · solution while a job runs */
+const CODE = `<span class="k">#include</span> &lt;bits/stdc++.h&gt;
+<span class="k">using namespace</span> std;
+
+<span class="k">int</span> main() {
+  <span class="k">int</span> n, m; cin &gt;&gt; n &gt;&gt; m;
+  vector&lt;vector&lt;<span class="k">int</span>&gt;&gt; g(n + 1);
+  <span class="k">for</span> (<span class="k">int</span> i = 0; i &lt; m; i++) {
+    <span class="k">int</span> a, b; cin &gt;&gt; a &gt;&gt; b;
+    g[a].push_back(b); g[b].push_back(a);
+  }
+  vector&lt;<span class="k">int</span>&gt; d(n + 1, -1); d[1] = 0;
+  queue&lt;<span class="k">int</span>&gt; q; q.push(1);
+  <span class="c">// BFS from city 1</span>
+  <span class="k">while</span> (!q.empty()) { ... }
+  cout &lt;&lt; d[n] &lt;&lt; <span class="s">"\\n"</span>;
+}`;
+document.getElementById('ws-sol').innerHTML = side('Authoring') + `<main class="wrap">${wsHead({ on: 'Solution', steps: STEPS.map(([s, g]) => [s, s === 'Solution' ? 'stale' : g]), action: '<span class="pill"><span class="spin"></span>Compile solution · running</span>' })}
+<div class="split2"><div><p class="sech" style="margin:0 0 8px"><b class="mono" style="font-weight:500">solution.cpp</b><span>Read-only while the job runs</span></p><div class="code"><div class="ln">${Array.from({ length: 16 }, (_, i) => i + 1).join('<br>')}</div><pre>${CODE}</pre></div></div>
+<div class="card"><div class="ch"><b>Last compile</b><span class="dot ok" style="font-size:12.5px"><i></i>OK</span></div><div class="cb2 res" style="padding:6px 14px 10px">
+<div><span>Revision</span><span class="mono">13</span></div><div><span>Compiler</span><span class="mono">g++ · C++20</span></div><div><span>Time</span><span class="mono">1.8 s</span></div><div><span>Warnings</span><span class="mono">0</span></div>
+<p class="mut" style="font-size:12.5px;margin:10px 0 0">Compiled at rev 13 — the code changed since, so this run is stale until the new compile finishes.</p></div></div></div></main>`;
+
+/* 7 · testcases */
+const TC = [[1, '1.in', '12 B', '4 B', 'generated · rev 13'], [2, '2.in', '1.2 kB', '6 B', 'generated · rev 13'], [3, '3.in', '480 kB', '7 B', 'generated · rev 13'], [4, 'big_line.in', '2.4 MB', '—', 'uploaded']];
+document.getElementById('ws-tests').innerHTML = side('Authoring') + `<main class="wrap">${wsHead({ on: 'Testcases', steps: STEPS.map(([s, g]) => [s, s === 'Testcases' ? 'bad' : g]) })}
+<p style="font-size:14px;margin:0 0 14px"><span class="mono">24 testcases · 3.1 MB</span> · <span class="bad">1 missing output</span></p>
+<div class="card" style="margin-bottom:14px"><div class="ch" style="border:0"><b>Generate</b><span class="mut" style="font-size:13px">Seed</span><span class="in mono" style="border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:13px">12345</span><span class="btn sec" style="padding:5px 11px">Generate inputs</span><span class="btn sec" style="padding:5px 11px">Generate outputs</span></div></div>
+<table class="tbl"><tr><th>#</th><th>Input</th><th class="r">Input size</th><th class="r">Output size</th><th>Source</th><th></th></tr>
+${TC.map(([n, f, i, o, s]) => `<tr><td class="m">${n}</td><td class="m">${f}</td><td class="r m">${i}</td><td class="r m ${o === '—' ? 'bad' : ''}">${o === '—' ? 'missing' : o}</td><td class="mut">${s}</td><td class="mut"><i class="ph ph-dots-three"></i></td></tr>`).join('')}
+<tr><td colspan="6" class="mut" style="font-size:13px">… 20 more</td></tr></table>
+<div class="drop" style="margin-top:12px"><i class="ph ph-upload-simple"></i><div style="flex:1"><b style="font-weight:500">Add a testcase</b><div class="mut" style="font-size:12.5px">Drop an input file, and its output if you have it</div></div><span class="btn sec">Replace all from ZIP…</span></div></main>`;
+
+/* 8 · verify & publish */
+const verifyMain = () => `<main class="wrap">${wsHead({ on: 'Verify & publish', action: '', steps: STEPS.map(([s, g]) => [s, s === 'Verify & publish' ? 'stale' : g]) })}
+<div class="rl" style="max-width:820px">
+<div><i class="ph-bold ph-check-circle g ok"></i><div><b>Metadata</b><span class="d">Title, limits and author are set.</span></div><span></span></div>
+<div><i class="ph-bold ph-check-circle g ok"></i><div><b>Statement</b><span class="d">Rendered without errors.</span></div><span></span></div>
+<div><i class="ph-bold ph-check-circle g ok"></i><div><b>Solution compiles at rev 14</b><span class="d">g++ · 1.7 s</span></div><span></span></div>
+<div><i class="ph-bold ph-check-circle g ok"></i><div><b>Testcases</b><span class="d">24 cases, all with outputs · 3.1 MB</span></div><span></span></div>
+<div><i class="ph-bold ph-circle-half g warn"></i><div><b>PDF current</b><span class="d">The PDF is from rev 12.</span></div><span class="lnk fix">Rebuild PDF</span></div>
+<div><i class="ph ph-circle g faint"></i><div><b>Verified at rev 14</b><span class="d">Last verified at rev 12.</span></div><span class="lnk fix">Run Verify</span></div>
+</div>
+<div class="pubfoot" style="max-width:820px"><span class="btn sec"><i class="ph ph-seal-check"></i>Verify</span><span class="btn dis"><i class="ph ph-rocket-launch"></i>Publish</span><span class="why">Rebuild the PDF and verify rev 14 before publishing.</span></div></main>`;
+document.getElementById('ws-verify').innerHTML = side('Authoring') + verifyMain();
+document.getElementById('ws-verify-dark').innerHTML = side('Authoring') + verifyMain();
+
+/* 9 · history */
+const JOBS = [['Verify All', 'bad', 'Failed · case 7 wrong answer', '12', '2 h ago'], ['Build PDF', 'ok', 'Succeeded', '12', '2 h ago'], ['Generate outputs', 'ok', 'Succeeded', '12', '2 h ago'], ['Generate inputs', 'ok', 'Succeeded', '11', 'Yesterday'], ['Compile solution', 'warn', 'Timed out', '10', 'Yesterday']];
+document.getElementById('ws-history').innerHTML = side('Authoring') + `<main class="wrap">${hdr('Manage › Authoring › Shortest hops', 'History', '<span class="mono">hp_graph_bfs</span> · build jobs, newest first', '')}
+<div class="tl"><div style="color:var(--mut);font-size:12.5px"><span>Job</span><span>Result</span><span>Revision</span><span>When</span></div>
+${JOBS.map(([j, tone, r, rev, w]) => `<div><span style="font-weight:500">${j}</span><span class="dot ${tone}"><i></i>${r}</span><span class="m">rev ${rev}</span><span class="mut">${w}</span></div>`).join('')}</div></main>`
++ drawer(`<h3>Verify All · rev 12</h3><p class="meta" style="margin-bottom:14px"><span class="dot bad"><i></i>Failed</span> · 2 h ago · 14.2 s</p>
+<div class="notice warn" style="margin-bottom:12px"><i class="ph ph-warning"></i><div><b style="font-weight:500">Case 7 — wrong answer</b><div class="mut" style="font-size:13px">The solution's output differs from the stored output. Regenerate outputs or fix the solution.</div></div></div>
+<p class="sech"><b>Checks</b></p><div class="res" style="font-size:13px"><div><span>Solution</span><span class="ok">passed</span></div><div><span>Generator</span><span class="ok">passed</span></div><div><span>Execution</span><span class="bad">failed at case 7</span></div><div><span>PDF</span><span class="ok">passed</span></div></div>
+<p class="sech" style="margin-top:14px"><b>Log</b></p><div class="log">[verify] compile solution … ok (1.7 s)
+[verify] run case 1..6 … ok
+[verify] case 7: expected "4"
+                 got      "5"
+[verify] stop: wrong answer</div>
+<div class="foot"><span class="btn sec">Close</span></div>`);
+
+/* 10 · phone */
+document.getElementById('ph-drafts').innerHTML = topBar() + `<div class="pmain"><h1 class="p-h1">Authoring</h1><p class="p-meta">23 drafts · 9 published</p>
+<div class="tabs2" style="gap:16px;margin-bottom:12px"><span class="on">Drafts</span><span>Profiles</span><span>AI docs</span></div>
+${DRAFTS.slice(0, 6).map(([id, t, a, r, tone, s, u]) => `<div class="item"><div class="l1"><b>${t}</b>${rd(r)}</div><div class="l2" style="padding-left:0;font-family:inherit;font-weight:400;color:var(--mut)"><span class="dot ${tone}" style="font-size:12px"><i></i>${s}</span> · ${u}<span class="id mono">${id}</span></div></div>`).join('')}</div>` + tabs('More');
+document.getElementById('ph-meta').innerHTML = topBar() + `<div class="pmain"><p class="crumb">Authoring</p><h1 class="p-h1" style="font-size:19px">Shortest hops</h1><p class="p-meta"><span class="dot warn"><i></i>Generated</span> · <span class="save">Saved · rev 14</span></p>
+<div class="steps" style="gap:16px;overflow:hidden">${STEPS.slice(0, 4).map(([s, g]) => `<span class="${s === 'Metadata' ? 'on' : ''}"><i class="${GL[g]}"></i>${s}</span>`).join('')}</div>
+<div class="field"><label>Title</label><div class="in">Shortest hops</div></div>
+<div class="grid2"><div class="field"><label>Time limit</label><div class="unit"><div class="in">1000</div><em>ms</em></div></div><div class="field"><label>Memory</label><div class="unit"><div class="in">256</div><em>MB</em></div></div></div>
+<div class="field"><label>Difficulty</label><div class="in">1600</div></div>
+<div class="field"><label>Categories</label><div class="chips"><span class="on">Graph</span><span class="on">Tree</span><span>Greedy</span><span>Math</span><span>+ 13</span></div></div></div>` + tabs('More');
+document.getElementById('ph-sol').innerHTML = topBar() + `<div class="pmain"><p class="crumb">Authoring</p><h1 class="p-h1" style="font-size:19px">Shortest hops</h1><p class="p-meta"><span class="dot warn"><i></i>Generated</span> · <span class="save">Saved · rev 14</span></p>
+<div class="steps" style="gap:16px;overflow:hidden">${STEPS.slice(1, 5).map(([s, g]) => `<span class="${s === 'Solution' ? 'on' : ''}"><i class="${GL[g]}"></i>${s}</span>`).join('')}</div>
+<div class="code" style="grid-template-columns:30px 1fr"><div class="ln">${Array.from({ length: 9 }, (_, i) => i + 1).join('<br>')}</div><pre>${CODE.split('\n').slice(0, 9).join('\n')}</pre></div>
+<div class="bigscreen"><i class="ph ph-desktop"></i><div><b style="font-weight:500">Best edited on a larger screen</b><div class="mut" style="font-size:12.5px">You can read the code and the last compile here.</div></div></div>
+<div class="res" style="font-size:13px;margin-top:10px"><div><span>Last compile</span><span class="ok">OK · rev 13</span></div></div></div>` + tabs('More');
+</script>
