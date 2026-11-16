@@ -7,6 +7,8 @@ import { UI_TIMEOUTS } from '../../config/constants';
 const useAdminSettings = () => {
     const [isRegistrationEnabled, setIsRegistrationEnabled] = useState(true);
     const [isLoadingRegistration, setIsLoadingRegistration] = useState(true);
+    // Each control stays disabled until its real value has loaded: toggling a placeholder default would send the wrong value.
+    const [loaded, setLoaded] = useState({ registration: false, passwordChange: false, accessMode: false });
     const [registrationError, setRegistrationError] = useState('');
     const [registrationSuccess, setRegistrationSuccess] = useState('');
 
@@ -35,6 +37,7 @@ const useAdminSettings = () => {
             try {
                 const data = await adminService.getRegistrationSettings();
                 setIsRegistrationEnabled(data.enabled);
+                setLoaded(previous => ({ ...previous, registration: true }));
             } catch (err) {
                 setRegistrationError('Failed to fetch registration settings.');
             } finally {
@@ -47,6 +50,7 @@ const useAdminSettings = () => {
             try {
                 const data = await adminService.getSiteAccessMode();
                 setSiteAccessMode(data.accessMode);
+                setLoaded(previous => ({ ...previous, accessMode: true }));
             } catch (err) {
                 setAccessModeError('Failed to fetch site access mode.');
             }
@@ -57,6 +61,7 @@ const useAdminSettings = () => {
             try {
                 const data = await adminService.getPasswordChangeSettings();
                 setIsPasswordChangeEnabled(data.enabled);
+                setLoaded(previous => ({ ...previous, passwordChange: true }));
             } catch (err) {
                 setPasswordChangeError('Failed to fetch password change settings.');
             }
@@ -220,6 +225,7 @@ const useAdminSettings = () => {
     return {
         isRegistrationEnabled,
         isLoadingRegistration,
+        loaded,
         registrationError,
         registrationSuccess,
         isPasswordChangeEnabled,

@@ -91,11 +91,23 @@ describe('AccountMenu', () => {
         expect(screen.queryByText(/· Level /)).not.toBeInTheDocument();
     });
 
-    it('shows Settings only for staff and admins', () => {
+    it('shows Settings only for admins (every settings call is admin-only)', () => {
         const regular = renderMenu();
         fireEvent.click(screen.getByRole('button', { name: /open user menu/i }));
         expect(screen.queryByRole('menuitem', { name: /settings/i })).not.toBeInTheDocument();
         regular.unmount();
+
+        jest.mocked(useAuth).mockReturnValue({
+            user: { id: 3, username: 'tester', role: 'staff', hasAvatar: false },
+            isLoading: false,
+            login: jest.fn(),
+            logout: mockLogout,
+            refreshUser: jest.fn(),
+        });
+        const staff = renderMenu();
+        fireEvent.click(screen.getByRole('button', { name: /open user menu/i }));
+        expect(screen.queryByRole('menuitem', { name: /settings/i })).not.toBeInTheDocument();
+        staff.unmount();
 
         jest.mocked(useAuth).mockReturnValue({
             user: { id: 3, username: 'tester', role: 'admin', hasAvatar: false },

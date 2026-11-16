@@ -124,7 +124,7 @@ const AccountMenu = ({ compact = false }: { compact?: boolean }) => {
             Change Password
           </button>
           )}
-          {(user.role === 'admin' || user.role === 'staff') && (
+          {user.role === 'admin' && (
             <Link to="/admin/settings" role="menuitem" className={styles['menu-item']} onClick={close}>
               <Gear size={16} aria-hidden="true" />
               Settings
