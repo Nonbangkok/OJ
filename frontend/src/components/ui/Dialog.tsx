@@ -1,9 +1,7 @@
-import { useId, useRef } from 'react';
+import { Dialog as BaseDialog } from '@base-ui/react/dialog';
 import type React from 'react';
-import { createPortal } from 'react-dom';
 import { Button } from './Button';
 import styles from './Dialog.module.css';
-import { useModalFocus } from './useModalFocus';
 
 export interface DialogProps {
   open: boolean;
@@ -21,6 +19,11 @@ export interface DialogProps {
   size?: 'default' | 'fullscreen';
 }
 
+/**
+ * Modal dialog on Base UI: focus trap, Escape and outside-press dismissal,
+ * scroll lock and focus return come from Base UI; this component keeps the
+ * app's props and look.
+ */
 export function Dialog({
   open,
   title,
@@ -33,60 +36,47 @@ export function Dialog({
   wide = false,
   size = 'default',
 }: DialogProps) {
-  const titleId = useId();
-  const descriptionId = useId();
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useModalFocus(dialogRef, { open, onClose, closeOnEscape, initialFocusRef });
+  const popupClass = [
+    styles.dialog,
+    wide ? styles.dialogWide : '',
+    size === 'fullscreen' ? styles.dialogFullscreen : '',
+  ].filter(Boolean).join(' ');
 
-  if (!open) {
-    return null;
-  }
-
-  return createPortal(
-    // Backdrop click-to-dismiss is a mouse convenience; Escape and the focus
-    // trap give keyboard users the same control, so the overlay stays
-    // non-focusable by design.
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
-    <div
-      className={styles.backdrop}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
+  return (
+    <BaseDialog.Root
+      open={open}
+      onOpenChange={(next, details) => {
+        if (next) return;
+        if (details.reason === 'escape-key' && !closeOnEscape) {
+          details.cancel();
+          return;
         }
+        onClose();
       }}
     >
-      <div
-        ref={dialogRef}
-        className={`${styles.dialog}${wide ? ` ${styles.dialogWide}` : ''}${size === 'fullscreen' ? ` ${styles.dialogFullscreen}` : ''}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={description ? descriptionId : undefined}
-        tabIndex={-1}
-      >
-        <div className={styles.header}>
-          <h2 id={titleId} className={styles.title}>
-            {title}
-          </h2>
-          <Button
-            className={styles.closeButton}
-            variant="neutral"
-            size="compact"
-            aria-label="Close dialog"
-            onClick={onClose}
+      <BaseDialog.Portal>
+        <BaseDialog.Backdrop className={styles.backdrop} />
+        <BaseDialog.Viewport className={styles.viewport}>
+          <BaseDialog.Popup
+            className={popupClass}
+            aria-modal="true"
+            initialFocus={initialFocusRef ?? true}
           >
-            <span aria-hidden="true">×</span>
-          </Button>
-        </div>
-        {description && (
-          <p id={descriptionId} className={styles.description}>
-            {description}
-          </p>
-        )}
-        {children && <div className={styles.body}>{children}</div>}
-        {footer && <div className={styles.footer}>{footer}</div>}
-      </div>
-    </div>,
-    document.body
+            <div className={styles.header}>
+              <BaseDialog.Title className={styles.title}>{title}</BaseDialog.Title>
+              <BaseDialog.Close
+                render={<Button className={styles.closeButton} variant="neutral" size="compact" />}
+                aria-label="Close dialog"
+              >
+                <span aria-hidden="true">×</span>
+              </BaseDialog.Close>
+            </div>
+            {description && <BaseDialog.Description className={styles.description}>{description}</BaseDialog.Description>}
+            {children && <div className={styles.body}>{children}</div>}
+            {footer && <div className={styles.footer}>{footer}</div>}
+          </BaseDialog.Popup>
+        </BaseDialog.Viewport>
+      </BaseDialog.Portal>
+    </BaseDialog.Root>
   );
 }

@@ -13,6 +13,22 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     globalThis.ResizeObserver = ResizeObserverStub;
 }
 
+// jsdom has no PointerEvent; Base UI menus construct one when a menu item is
+// activated from the keyboard. A MouseEvent subclass carries the same fields
+// the code reads.
+if (typeof globalThis.PointerEvent === 'undefined') {
+    class PointerEventStub extends MouseEvent {
+        pointerId: number;
+        pointerType: string;
+        constructor(type: string, init: PointerEventInit = {}) {
+            super(type, init);
+            this.pointerId = init.pointerId ?? 0;
+            this.pointerType = init.pointerType ?? '';
+        }
+    }
+    globalThis.PointerEvent = PointerEventStub as unknown as typeof PointerEvent;
+}
+
 // Mock useTheme hook globally to apply to all tests
 jest.mock('./context/ThemeContext', () => ({
     useTheme: () => ({ theme: 'light' })

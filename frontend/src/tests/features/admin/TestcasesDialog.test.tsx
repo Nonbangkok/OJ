@@ -28,7 +28,7 @@ describe('TestcasesDialog', () => {
         render(<TestcasesDialog problem={{ id: 'aplusb' }} onClose={jest.fn()} />);
 
         expect(await screen.findByText('Testcases: aplusb')).toBeInTheDocument();
-        expect(screen.getByText('2 testcases')).toBeInTheDocument();
+        expect(await screen.findByText('2 testcases')).toBeInTheDocument();
         expect(adminService.getProblemTestcases).toHaveBeenCalledWith('aplusb');
     });
 

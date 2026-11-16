@@ -11,6 +11,7 @@ import {
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ToastProvider } from './components/ui';
 
 // Shells
 import AppShell from './components/shell/AppShell';
@@ -163,7 +164,9 @@ const App = () => {
       <ThemeProvider>
         <AuthProvider>
           <SettingsProvider>
-            <RouterProvider router={router} />
+            <ToastProvider>
+              <RouterProvider router={router} />
+            </ToastProvider>
           </SettingsProvider>
         </AuthProvider>
       </ThemeProvider>

@@ -386,3 +386,10 @@ describe('shell focus', () => {
     }
   });
 });
+
+describe('libraries', () => {
+  it('pins Base UI exactly', () => {
+    const pkg = JSON.parse(readSource('../package.json'));
+    expect(pkg.dependencies['@base-ui/react']).toBe('1.9.0');
+  });
+});

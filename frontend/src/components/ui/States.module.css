@@ -1,0 +1,70 @@
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.emptyText {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+
+.emptyAction {
+  margin-top: 14px;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--tint-danger-border);
+  border-radius: var(--radius-lg);
+  background: var(--tint-danger-bg);
+  color: var(--tint-danger-fg);
+  font-size: 13.5px;
+}
+
+.errorIcon { flex: none; }
+
+.errorText {
+  flex: 1;
+  min-width: 0;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--tint-neutral-border);
+  border-radius: var(--radius-lg);
+  background: var(--tint-neutral-bg);
+  color: var(--tint-neutral-fg);
+  font-size: 13.5px;
+}
+
+.notice[data-tone='warning'] { border-color: var(--tint-warning-border); background: var(--tint-warning-bg); color: var(--tint-warning-fg); }
+.notice[data-tone='danger'] { border-color: var(--tint-danger-border); background: var(--tint-danger-bg); color: var(--tint-danger-fg); }
+.notice[data-tone='success'] { border-color: var(--tint-success-border); background: var(--tint-success-bg); color: var(--tint-success-fg); }
+
+.noticeIcon {
+  flex: none;
+  margin-top: 2px;
+}
+
+.noticeTitle {
+  margin: 0 0 2px;
+  font-weight: 500;
+}
+
+.noticeBody {
+  color: inherit;
+}

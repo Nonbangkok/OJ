@@ -248,10 +248,11 @@ test('read-only changes also disable an open confirmation and replacement form',
   await screen.findByText('sample.in');
   fireEvent.click(screen.getByRole('button', { name: 'Replace files for sample.in' }));
   selectFile('Replacement input (optional)', new File(['new'], 'sample.in'));
-  fireEvent.click(screen.getByRole('button', { name: 'Delete sample.in' }));
+  // Behind an open modal the page (and the earlier dialog) is hidden from the accessibility tree.
+  fireEvent.click(screen.getByRole('button', { name: 'Delete sample.in', hidden: true }));
   rerender(<TestcaseFiles {...props} disabled />);
   expect(screen.getByRole('button', { name: 'Confirm deletion' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: 'Save replacement files' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Save replacement files', hidden: true })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Confirm deletion' }));
   expect(remove).not.toHaveBeenCalled();
 });
@@ -267,7 +268,8 @@ test('failed inspection retains the previous preview including empty output', as
   expect(screen.getByLabelText('Output preview')).toHaveTextContent('(Empty output)');
   const error = new Error('Network failure');
   get.mockRejectedValueOnce(error);
-  fireEvent.click(screen.getByRole('button', { name: 'Inspect sample.in' }));
+  // The page behind the open preview dialog is hidden from the accessibility tree.
+  fireEvent.click(screen.getByRole('button', { name: 'Inspect sample.in', hidden: true }));
   await waitFor(() => expect(onError).toHaveBeenCalledWith(error));
   expect(screen.getByText('current input')).toBeInTheDocument();
 });

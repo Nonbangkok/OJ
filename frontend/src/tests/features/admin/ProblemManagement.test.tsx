@@ -328,13 +328,13 @@ describe('ProblemManagement Component', () => {
         const search = screen.getByLabelText('Search problems');
         fireEvent.change(search, { target: { value: 'P1' } });
         fireEvent.click(screen.getByRole('button', { name: /more global actions/i }));
-        expect(screen.getByRole('menuitem', { name: /hide all problems/i })).toBeDisabled();
+        expect(screen.getByRole('menuitem', { name: /hide all problems/i })).toHaveAttribute('aria-disabled', 'true');
 
         await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(
             expect.objectContaining({ search: 'P1', limit: 25 }),
         ), { timeout: 1500 });
         expect(screen.getByLabelText('Search problems')).toBe(search);
-        expect(screen.getByRole('menuitem', { name: /hide all problems/i })).toBeDisabled();
+        expect(screen.getByRole('menuitem', { name: /hide all problems/i })).toHaveAttribute('aria-disabled', 'true');
 
         await act(async () => { resolveSearch(makePage([mockProblems[0]], { bulkEligibleCount: 1 })); });
         await waitFor(() => expect(screen.getByRole('menuitem', { name: /hide all problems/i })).toBeEnabled());

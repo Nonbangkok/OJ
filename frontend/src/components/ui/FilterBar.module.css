@@ -1,0 +1,109 @@
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 260px;
+  min-width: 200px;
+  padding: 0 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+  color: var(--text-muted);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13.5px;
+}
+
+.search:focus-within {
+  border-color: var(--border-strong);
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 1px;
+}
+
+.chipAdd,
+.chipSet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chipAdd {
+  border: 1px dashed var(--border-strong);
+  color: var(--text-muted);
+}
+
+.chipSet {
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.chipSet b {
+  font-weight: 500;
+}
+
+.chipAdd:focus-visible,
+.chipSet:focus-visible {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+.trailing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.count {
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sheetGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sheetOptions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.sheetLabel {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}

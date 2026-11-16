@@ -55,14 +55,14 @@
   font-size: 0.7rem;
 }
 
-/* Portaled dropdown: rendered into document.body above the navbar (z-100)
-   and sticky headers, but below modal dialogs (z-1000). Same surface tokens
-   as the app's popovers. position: fixed + left/top are set inline from the
-   trigger's getBoundingClientRect(); the width is intrinsic to the menu, so
-   it never depends on the table column width. */
+/* Base UI positions this layer (position: fixed, inline left/top) and flips
+   or shifts it to stay on screen. It sits above modal dialogs (z-1000) so a
+   menu opened from inside a dialog is never covered by its backdrop. */
+.positioner {
+  z-index: 1100;
+}
+
 .menu {
-  position: fixed;
-  z-index: 200;
   min-width: 11rem;
   max-width: 20rem;
   display: flex;
@@ -72,6 +72,7 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   box-shadow: var(--box-shadow-lg);
+  outline: none;
 }
 
 .item {
@@ -87,8 +88,7 @@
   cursor: pointer;
 }
 
-.item:hover:not(:disabled),
-.item:focus-visible {
+.item[data-highlighted] {
   background-color: var(--background-tertiary);
 }
 
@@ -97,7 +97,7 @@
   outline-offset: -2px;
 }
 
-.item:disabled {
+.item[data-disabled] {
   color: var(--text-muted);
   cursor: not-allowed;
 }
@@ -106,7 +106,6 @@
   color: var(--status-danger);
 }
 
-.itemDanger:hover:not(:disabled),
-.itemDanger:focus-visible {
+.itemDanger[data-highlighted] {
   background-color: var(--danger-tint-bg);
 }

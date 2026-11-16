@@ -130,7 +130,7 @@ describe('ContestManagement Component', () => {
         const c2Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 2'));
         fireEvent.click(within(c2Row).getByRole('button', { name: /row actions for Contest 2/i }));
         const deleteItem = screen.getByRole('menuitem', { name: 'Delete' });
-        expect(deleteItem).toBeDisabled();
+        expect(deleteItem).toHaveAttribute('aria-disabled', 'true');
     });
 
     it('handles contest deletion for non-running contests', async () => {
@@ -157,7 +157,7 @@ describe('ContestManagement Component', () => {
         const c3Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 3'));
         fireEvent.click(within(c3Row).getByRole('button', { name: /row actions for Contest 3/i }));
         const rejudgeItem = screen.getByRole('menuitem', { name: 'Rejudge' });
-        expect(rejudgeItem).toBeDisabled();
+        expect(rejudgeItem).toHaveAttribute('aria-disabled', 'true');
         expect(rejudgeItem).toHaveAttribute('title', 'Finished contest — its scoreboard is frozen. Rejudge its problems individually instead.');
     });
 
