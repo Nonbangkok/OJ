@@ -1,0 +1,141 @@
+/* Statement tab (§7.9): rendered statement, PDF row, images. */
+.tab {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 880px;
+}
+
+.card {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 13.5px;
+}
+
+.cardHead b {
+  flex: 1;
+  font-weight: 500;
+}
+
+.cardBody {
+  padding: 4px;
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.pdfRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 13.5px;
+}
+
+.pdfRow b {
+  font-weight: 500;
+}
+
+.pdfIcon {
+  color: var(--text-muted);
+}
+
+.pdfIconStale,
+.stale {
+  color: var(--verdict-time);
+}
+
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.link {
+  color: var(--text-primary);
+  font-size: 13px;
+  text-underline-offset: 2px;
+}
+
+.mono {
+  font-family: var(--font-family-mono);
+}
+
+.muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sectionHead h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.table th {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 400;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.table td {
+  position: relative;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.num {
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.action {
+  width: 1%;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}

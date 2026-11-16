@@ -89,13 +89,13 @@ test('staff can open authoring like admins; plain users are rejected', async () 
   expect(api.get).not.toHaveBeenCalled();
 });
 
-test('the metadata category checkboxes toggle multiple categories and default to none', async () => {
+test('the metadata category chips toggle multiple categories and default to none', async () => {
   show('/admin/authoring/d1');
-  const graph = await screen.findByRole('checkbox', { name: 'Graph' });
-  const math = screen.getByRole('checkbox', { name: 'Math' });
-  // An uncategorized draft starts with every checkbox clear.
-  expect(graph).not.toBeChecked();
-  expect(math).not.toBeChecked();
+  const graph = await screen.findByRole('button', { name: 'Graph' });
+  const math = screen.getByRole('button', { name: 'Math' });
+  // An uncategorized draft starts with every chip off.
+  expect(graph).toHaveAttribute('aria-pressed', 'false');
+  expect(math).toHaveAttribute('aria-pressed', 'false');
   jest.mocked(api.patch).mockResolvedValue({ data: { ...draft, revision: 4 } });
   fireEvent.click(graph);
   fireEvent.click(math);
@@ -133,7 +133,8 @@ test('tabs preserve edits and disable job actions until explicit Save succeeds',
   expect(screen.getByText('Unsaved')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('link', { name: /^Statement,/ }));
   fireEvent.click(screen.getByRole('link', { name: /^Verify & publish,/ }));
-  expect(screen.getByRole('button', { name: 'Build PDF' })).toBeDisabled();
+  // Build PDF appears in the checklist and the PDF row; both wait for the save.
+  for (const button of screen.getAllByRole('button', { name: 'Build PDF' })) expect(button).toBeDisabled();
   fireEvent.click(screen.getByRole('link', { name: /^Solution,/ }));
   expect(screen.getByRole('button', { name: 'Compile solution' })).toBeDisabled();
   jest
@@ -162,7 +163,7 @@ test('a revision of a published task keeps its legacy Problem ID locked but leav
 test('Statement tab opens the dedicated editor instead of embedding a narrow source textarea', async () => {
   show('/admin/authoring/d1');
   fireEvent.click(await screen.findByRole('link', { name: /^Statement,/ }));
-  expect(screen.getByRole('link', { name: 'Open full-screen editor' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: 'Edit statement' })).toHaveAttribute(
     'href',
     '/admin/authoring/d1/editor'
   );
@@ -175,7 +176,7 @@ test('opening the dedicated editor keeps unsaved workspace fields recoverable vi
 
   // Auto-save captures unsaved edits; opening the editor no longer needs a blocking confirm.
   expect(window.sessionStorage.getItem('oj-authoring-draft:d1')).toContain('Unsaved title');
-  fireEvent.click(screen.getByRole('link', { name: 'Open full-screen editor' }));
+  fireEvent.click(screen.getByRole('link', { name: 'Edit statement' }));
   expect(screen.queryByLabelText('Statement source')).not.toBeInTheDocument();
 });
 test('unsaved statement source survives an editor route unmount such as browser Back and Forward', async () => {

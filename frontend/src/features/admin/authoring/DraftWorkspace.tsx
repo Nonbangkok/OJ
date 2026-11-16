@@ -13,7 +13,7 @@ import { Profile } from './types';
 import { draftStatus, jobLabel, jobStatus, verifyFailureExplanation } from './status';
 import JobHistory from './JobHistory';
 import MetadataFields from './MetadataFields';
-import StatementTab, { PdfPreview } from './StatementTab';
+import StatementTab, { PdfRow } from './StatementTab';
 import TestcaseFiles from './TestcaseFiles';
 import CodeEditor from './CodeEditor';
 import AiDocs from './AiDocs';
@@ -314,7 +314,7 @@ function VerifySection() {
       onVerify={() => void model.runJob('verify')} onPublish={() => setConfirm({ action: 'publish', revision: draft.revision })}
       onBuildPdf={() => void model.runJob('pdf')} onGoToSolution={() => navigate('solution', { relative: 'path' })}
       onGoToTestcases={() => navigate('testcases', { relative: 'path' })} />
-    <PdfPreview draft={draft} />
+    <PdfRow draft={draft} disabled={model.actionsDisabled} onBuild={() => void model.runJob('pdf')} />
   </section>;
 }
 
