@@ -737,6 +737,7 @@
   height: 100dvh;
   overflow: hidden;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   text-align: left;
   color: var(--text-primary);
@@ -1015,12 +1016,6 @@
   }
 }
 @media (max-width: 800px) {
-  .editorShell {
-    height: auto;
-    min-height: 100dvh;
-    overflow: auto;
-    grid-template-rows: auto auto auto auto;
-  }
   /* Narrow screens: stack left/center/right into rows; the state label
      spans the middle row, centered. */
   .editorHeader {
@@ -1033,14 +1028,14 @@
   }
   .editorHeaderRight {
     justify-content: flex-end;
+    flex-wrap: wrap;
   }
-  .editorWorkspace {
-    min-height: 100dvh;
-  }
-  .editorResizeHandle {
-    width: auto;
-    height: 8px;
-    cursor: row-resize;
+}
+/* Phones edit with Source / Preview tabs: no keyboard hint, no preview chip. */
+@media (max-width: 767px) {
+  .editorSaveHint,
+  .previewStatusChip {
+    display: none;
   }
 }
 

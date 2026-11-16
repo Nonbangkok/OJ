@@ -148,6 +148,11 @@
 }
 
 .itemPrimary {
+  /* Several primary cells (a title and its readiness squares) sit on one wrapping line. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.5rem;
   font-weight: 500;
   color: var(--text-primary);
   overflow-wrap: anywhere;

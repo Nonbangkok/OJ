@@ -276,3 +276,36 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
 }
+
+/* §7.9: a compact testcase table. On narrow screens it scrolls sideways
+   instead of squeezing every column to a letter wide. */
+.tableWrap table {
+  min-width: 36rem;
+}
+.tableWrap.tableWrap th,
+.tableWrap.tableWrap td {
+  padding: 0.45rem 0.65rem;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+.tableWrap.tableWrap thead th {
+  background: transparent;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text-muted);
+}
+.tableWrap.tableWrap tbody th[scope='row'] {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.tableWrap .actions {
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+}
+.tableWrap.tableWrap button {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8125rem;
+}

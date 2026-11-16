@@ -39,7 +39,7 @@ function JobDetail({ job }: { job: Job }) {
       </InlineNotice>
     </div>}
     {report && <>
-      <section aria-label="Checks">
+      <section className={styles.drawerSection} aria-label="Checks">
         <h3>Checks</h3>
         <ul className={styles.checks}>{Object.entries(report.checks).map(([key, status]) => <li key={key}><b>{key}</b> {status}</li>)}</ul>
         <p className={styles.muted}>{report.caseCount} cases · {report.totalTestcaseBytes} testcase bytes · memory limit {report.memoryLimitMb} MiB. Peak memory is unavailable; this is not a proof of algorithm correctness.</p>
@@ -50,7 +50,7 @@ function JobDetail({ job }: { job: Job }) {
         <tbody>{report.cases.map((c) => <tr key={c.caseId}><td>{c.caseNumber}</td><td className={styles.num}>{c.durationMs}</td></tr>)}</tbody>
       </table>
     </>}
-    <section aria-label="Log">
+    <section className={styles.drawerSection} aria-label="Log">
       <h3>Log</h3>
       <pre className={styles.log}>{job.log || 'No log output.'}</pre>
     </section>

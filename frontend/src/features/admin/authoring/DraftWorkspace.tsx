@@ -369,7 +369,7 @@ function VerifyFailure({ jobs }: { jobs: import('./types').Job[] }) {
   if (!verify || (verify.status !== 'failed' && verify.status !== 'timed_out')) return null;
   const { title, detail } = verifyFailureExplanation(verify);
   const failedCase = verify.resultSummary?.failedCase;
-  return <div role="alert">
+  return <div role="alert" className={verifyStyles.plainAlert}>
     <InlineNotice tone={verify.status === 'timed_out' ? 'warning' : 'danger'} title={`${title}.`}>
       {detail}
       {failedCase && <> Failing testcase: <code>{`#${failedCase.caseNumber}`}</code>
