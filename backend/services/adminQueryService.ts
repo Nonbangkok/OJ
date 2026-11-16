@@ -40,6 +40,7 @@ export interface AdminUsersPage {
 export interface AdminUsersFilters {
   search?: string;
   role?: string;
+  locked?: 'locked' | 'unlocked';
 }
 
 /**
@@ -67,11 +68,40 @@ export const getAdminUsers = async (
     filterValues.push(selectedRole);
     conditions.push(`role = $${filterValues.length}`);
   }
+  if (filters.locked === 'locked') conditions.push('submissions_locked = TRUE');
+  if (filters.locked === 'unlocked') conditions.push('submissions_locked = FALSE');
   const whereClause = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : '';
 
   const [rowsResult, countResult] = await Promise.all([
     db.query<AdminUserListRow>(
-      `SELECT id, username, role, created_at, submissions_locked FROM users${whereClause} ORDER BY id LIMIT $${filterValues.length + 1} OFFSET $${filterValues.length + 2}`,
+      // B5: per-user facts come from grouped aggregates joined once, not per-row subqueries.
+      `WITH page AS (
+         SELECT id, username, role, created_at, submissions_locked, last_login_at
+         FROM users${whereClause}
+         ORDER BY id
+         LIMIT $${filterValues.length + 1} OFFSET $${filterValues.length + 2}
+       ),
+       subs AS (
+         SELECT user_id, COUNT(*)::int AS n, MAX(submitted_at) AS last_at
+         FROM (SELECT user_id, submitted_at FROM submissions WHERE user_id IN (SELECT id FROM page)
+               UNION ALL
+               SELECT user_id, submitted_at FROM contest_submissions WHERE user_id IN (SELECT id FROM page)) s
+         GROUP BY user_id
+       ),
+       rewards AS (
+         SELECT user_id, COUNT(*)::int AS solved, COALESCE(SUM(xp_awarded), 0)::int AS xp
+         FROM user_problem_rewards WHERE user_id IN (SELECT id FROM page)
+         GROUP BY user_id
+       )
+       SELECT page.id, page.username, page.role, page.created_at, page.submissions_locked,
+              GREATEST(page.last_login_at, subs.last_at) AS last_active_at,
+              COALESCE(rewards.solved, 0) AS solved_count,
+              COALESCE(rewards.xp, 0) AS xp,
+              COALESCE(subs.n, 0) AS submission_count
+       FROM page
+       LEFT JOIN subs ON subs.user_id = page.id
+       LEFT JOIN rewards ON rewards.user_id = page.id
+       ORDER BY page.id`,
       [...filterValues, safeLimit, offset],
     ),
     db.query<{ total: string }>(`SELECT COUNT(*) AS total FROM users${whereClause}`, filterValues),
@@ -378,3 +408,27 @@ export const updateRegistrationEnabled = async (enabled: boolean): Promise<void>
     [enabled.toString()]
   );
 };
+
+export interface BulkRoleResult {
+  updated: number[];
+  skipped: Array<{ id: number; reason: 'protected' | 'self' | 'not_found' }>;
+}
+
+/** B5: set one role on many accounts; never the protected admin or the acting user. */
+export const setAdminUsersRole = async (ids: number[], role: string, actorId: number): Promise<BulkRoleResult> =>
+  db.withTransaction(async (client) => {
+    const found = await client.query<{ id: number; username: string }>('SELECT id, username FROM users WHERE id = ANY($1::int[])', [ids]);
+    const byId = new Map(found.rows.map((row) => [row.id, row.username]));
+    const skipped: BulkRoleResult['skipped'] = [];
+    const editable: number[] = [];
+    for (const id of ids) {
+      if (!byId.has(id)) skipped.push({ id, reason: 'not_found' });
+      else if (byId.get(id) === PROTECTED_ADMIN_USERNAME) skipped.push({ id, reason: 'protected' });
+      else if (id === actorId) skipped.push({ id, reason: 'self' });
+      else editable.push(id);
+    }
+    if (editable.length > 0) {
+      await client.query('UPDATE users SET role = $1 WHERE id = ANY($2::int[])', [role, editable]);
+    }
+    return { updated: editable, skipped };
+  });

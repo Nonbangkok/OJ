@@ -230,6 +230,8 @@ describe('Auth Controller', () => {
             (db.query as jest.Mock).mockResolvedValueOnce({
                 rows: [{ id: 1, username: 'testuser', password_hash: hashedPassword, role: 'user' }]
             });
+            // last_login_at stamp (B5)
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [], rowCount: 1 });
             // 25000 XP -> level 16 -> Expert.
             (db.query as jest.Mock).mockResolvedValueOnce({
                 rows: [{ total_xp: '25000' }]
@@ -248,6 +250,7 @@ describe('Auth Controller', () => {
             (db.query as jest.Mock).mockResolvedValueOnce({
                 rows: [{ id: 1, username: 'testuser', password_hash: hashedPassword, role: 'user' }]
             });
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [], rowCount: 1 }); // last_login_at stamp
             (db.query as jest.Mock).mockRejectedValueOnce(new Error('rewards table gone'));
 
             const res = await request(app)
@@ -257,6 +260,22 @@ describe('Auth Controller', () => {
             expect(res.status).toBe(200);
             expect(res.body.user.username).toBe('testuser');
             expect(res.body.user.tier).toBeUndefined();
+        });
+
+        it('still logs the user in when stamping last_login_at fails', async () => {
+            const hashedPassword = await bcrypt.hash('password123', 10);
+            (db.query as jest.Mock).mockResolvedValueOnce({
+                rows: [{ id: 1, username: 'testuser', password_hash: hashedPassword, role: 'user' }]
+            });
+            (db.query as jest.Mock).mockRejectedValueOnce(new Error('column missing'));
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ total_xp: '0' }] });
+
+            const res = await request(app)
+                .post('/login')
+                .send({ username: 'testuser', password: 'password123' });
+
+            expect(res.status).toBe(200);
+            expect(res.body.user.username).toBe('testuser');
         });
 
         it('should return 401 with a neutral message for wrong password', async () => {

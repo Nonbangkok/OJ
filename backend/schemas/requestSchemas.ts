@@ -183,6 +183,13 @@ export const adminUsersQuerySchema = z.object({
     .default(ADMIN_USER_LIST_CONFIG.DEFAULT_LIMIT),
   search: z.string().trim().max(STRING_LIMITS.USERNAME).optional(),
   role: z.enum(['all', USER_ROLES.USER, USER_ROLES.STAFF, USER_ROLES.ADMIN]).default('all'),
+  locked: z.enum(['locked', 'unlocked']).optional(),
+}).strict();
+
+export const adminUsersRoleBodySchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1).max(500)
+    .refine((ids) => new Set(ids).size === ids.length, 'User ids must be unique'),
+  role: z.enum([USER_ROLES.USER, USER_ROLES.STAFF, USER_ROLES.ADMIN]),
 }).strict();
 
 /**

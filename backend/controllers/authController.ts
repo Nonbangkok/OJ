@@ -204,6 +204,12 @@ router.post(
     // fixation: any pre-login session id is discarded and a fresh cookie is issued.
     await regenerateSession(req);
 
+    // Users list "Last active" (B5). Bookkeeping only: never blocks a login.
+    try {
+      await db.query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]);
+    } catch (err) {
+      logger.warn('could not stamp last_login_at', { err, userId: user.id });
+    }
     req.session.userId = user.id;
     req.session.username = user.username;
     req.session.role = user.role;
