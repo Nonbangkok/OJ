@@ -73,7 +73,8 @@ const PublicProblemsRoute = () => {
 
 const AdminProblemsRoute = () => {
   const initialPageSpan = useLoaderData() as AdminProblemListLoaderData;
-  return <ProblemManagement initialPageSpan={initialPageSpan} />;
+  const { user } = useAuth();
+  return <ProblemManagement initialPageSpan={initialPageSpan} currentUser={user} />;
 };
 
 // The root route owns React Router's native, history-entry-keyed restoration.

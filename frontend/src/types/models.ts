@@ -269,6 +269,13 @@ export interface AdminProblem extends ProblemBase {
   is_visible: boolean;
   contest_id: number | null;
   contest_status: ContestStatus | null;
+  /** B6 facts (GET /admin/problems). */
+  problem_type?: 'standard' | 'header';
+  time_limit_ms?: number;
+  memory_limit_mb?: number;
+  testcase_count?: number;
+  submission_count?: number;
+  type_locked?: boolean;
 }
 
 export interface UploadProgress {
