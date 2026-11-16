@@ -42,13 +42,16 @@ export const MENU_TRIGGER_GAP = 4;
 export function ActionMenu({ label, items, trigger = 'ellipsis', triggerContent, triggerClassName }: ActionMenuProps) {
   return (
     <Menu.Root modal={false}>
-      <Menu.Trigger
-        className={triggerClassName ?? `${styles.trigger}${trigger === 'text' ? ` ${styles.triggerText}` : ''}`}
-        aria-label={label}
-        title={label}
-      >
-        {triggerContent ?? (trigger === 'ellipsis' ? '⋯' : 'More')}
-      </Menu.Trigger>
+      {/* The wrapper keeps the trigger's box (inline-block) as callers' layouts expect. */}
+      <div className={styles.root}>
+        <Menu.Trigger
+          className={triggerClassName ?? `${styles.trigger}${trigger === 'text' ? ` ${styles.triggerText}` : ''}`}
+          aria-label={label}
+          title={label}
+        >
+          {triggerContent ?? (trigger === 'ellipsis' ? '⋯' : 'More')}
+        </Menu.Trigger>
+      </div>
       <Menu.Portal>
         <Menu.Positioner
           className={styles.positioner}
