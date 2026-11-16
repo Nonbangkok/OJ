@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import hljs from 'highlight.js/lib/core';
 import cpp from 'highlight.js/lib/languages/cpp';
+import xml from 'highlight.js/lib/languages/xml';
 import Editor from 'react-simple-code-editor';
 import styles from './Authoring.module.css';
 import { readOnlyCodeEditorProps } from '../../../utils/readOnlyCodeEditor';
@@ -8,24 +9,35 @@ import { readOnlyCodeEditorProps } from '../../../utils/readOnlyCodeEditor';
 const ignoreEdit = () => {};
 
 hljs.registerLanguage('cpp', cpp);
+// Statements are HTML (with a little Markdown); highlight.js calls HTML "xml".
+hljs.registerLanguage('xml', xml);
 
-const highlight = (code: string) => {
+export type CodeLanguage = 'cpp' | 'html';
+const HLJS_LANGUAGE: Record<CodeLanguage, string> = { cpp: 'cpp', html: 'xml' };
+
+const escapeHtml = (code: string) => code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const highlighter = (language: CodeLanguage) => (code: string) => {
   try {
-    return hljs.highlight(code, { language: 'cpp' }).value;
+    return hljs.highlight(code, { language: HLJS_LANGUAGE[language] }).value;
   } catch {
-    return code;
+    return escapeHtml(code);
   }
 };
+const HIGHLIGHT: Record<CodeLanguage, (code: string) => string> = { cpp: highlighter('cpp'), html: highlighter('html') };
 
-/** Read/write C++ source with line numbers and syntax highlighting,
- *  shared by the solution and generator editors. Same scroll model as the
+/** Read/write source with line numbers and syntax highlighting, shared by
+ *  the solution and generator editors (C++) and the statement editor (HTML). Same scroll model as the
  *  submission page's editor: the wrapper never scrolls — the internal
  *  textarea is the single scroller, with its position synced onto the
  *  gutter and the highlighted <pre>. */
-export default function CodeEditor({ label, value, disabled, onChange, minLines = 14 }: {
+export default function CodeEditor({ label, value, disabled, onChange, minLines = 14, language = 'cpp', fill = false }: {
   label: string; value: string; disabled: boolean;
   onChange: (value: string) => void; minLines?: number;
+  language?: CodeLanguage;
+  /** Fill the parent's height (the full-screen statement editor) instead of capping at 30rem. */
+  fill?: boolean;
 }) {
+  const textareaId = `editor-${label.replace(/\W+/g, '-')}`;
   const wrapperRef = useRef<HTMLDivElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
   const lineCount = Math.max(value.split('\n').length, minLines);
@@ -45,8 +57,8 @@ export default function CodeEditor({ label, value, disabled, onChange, minLines 
     return () => textarea.removeEventListener('scroll', syncScroll);
   }, []);
 
-  return <div className={styles.codeEditor}>
-    <div className={styles.codeLabel}>{label}</div>
+  return <div className={fill ? `${styles.codeEditor} ${styles.codeEditorFill}` : styles.codeEditor}>
+    <label className={styles.codeLabel} htmlFor={textareaId}>{label}</label>
     <div className={styles.codeWrap} ref={wrapperRef}>
       <div className={styles.lineNumbers} ref={gutterRef} aria-hidden="true">
         {Array.from({ length: lineCount }, (_, index) => <div key={index + 1}>{index + 1}</div>)}
@@ -58,10 +70,10 @@ export default function CodeEditor({ label, value, disabled, onChange, minLines 
           // and selectable but cannot change: read-only, not disabled, which
           // Gecko browsers would make unscrollable.
           onValueChange={disabled ? ignoreEdit : onChange}
-          highlight={highlight}
+          highlight={HIGHLIGHT[language]}
           padding={14}
           {...(disabled ? readOnlyCodeEditorProps : {})}
-          textareaId={`editor-${label.replace(/\W+/g, '-')}`}
+          textareaId={textareaId}
           style={{
             fontFamily: 'var(--font-family-mono)',
             fontSize: 13,

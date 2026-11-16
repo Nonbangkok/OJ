@@ -194,7 +194,7 @@ test('unsaved statement source survives an editor route unmount such as browser 
       '# Recovered work'
     )
   );
-  expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+  expect(screen.getByText('Unsaved')).toBeInTheDocument();
 });
 test('editing recovered source preserves its old base revision across another route unmount', async () => {
   let serverDraft = draft;
@@ -215,7 +215,7 @@ test('editing recovered source preserves its old base revision across another ro
 
   serverDraft = { ...draft, revision: 4, statementHtml: '# Server revision 4' };
   const second = show('/admin/authoring/d1/editor');
-  await waitFor(() => expect(screen.getByText(/server state changed/i)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText('Server state changed. Your unsaved source is retained.')).toBeInTheDocument());
   fireEvent.change(screen.getByLabelText('Statement source'), {
     target: { value: '# Revision 3 work continued' },
   });
@@ -227,7 +227,7 @@ test('editing recovered source preserves its old base revision across another ro
       '# Revision 3 work continued'
     )
   );
-  expect(screen.getByText(/server state changed/i)).toBeInTheDocument();
+  expect(screen.getByText('Server state changed. Your unsaved source is retained.')).toBeInTheDocument();
 });
 test('a new edit after clean auto-sync uses the refreshed server revision as its recovery base', async () => {
   let serverDraft = draft;
@@ -304,18 +304,20 @@ test('published statements can begin a new revision in the full-screen editor', 
       statementHtml: '<p>Corrected</p>',
     })
   , { timeout: 4000 });
-  expect(await screen.findByText('Editing — live problem unchanged')).toBeInTheDocument();
+  expect(await screen.findByText('Published · live unchanged')).toBeInTheDocument();
+  expect(await screen.findByText('Saved · rev 4')).toBeInTheDocument();
 });
 test('full-screen editor exposes a draggable pane divider and persistent preview zoom controls', async () => {
   jest.mocked(api.post).mockResolvedValue({ data: { html: '<p>Preview</p>' } });
   show('/admin/authoring/d1/editor');
   expect(await screen.findByLabelText('Resize source and preview panes')).toBeInTheDocument();
-  expect(screen.getByText('100%')).toBeInTheDocument();
+  const fit = screen.getByRole('button', { name: 'Fit to width' });
+  expect(fit).toHaveTextContent('Fit');
   fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
-  expect(screen.getByText('110%')).toBeInTheDocument();
+  expect(fit).toHaveTextContent('110%');
   expect(screen.getByRole('button', { name: 'Zoom out' })).toBeEnabled();
-  fireEvent.click(screen.getByRole('button', { name: 'Reset preview zoom' }));
-  expect(screen.getByText('100%')).toBeInTheDocument();
+  fireEvent.click(fit);
+  expect(fit).toHaveTextContent('Fit');
 });
 test('Publish requires explicit confirmation and explains hidden visibility', async () => {
   jest.mocked(api.get).mockImplementation(async (url) => ({
