@@ -1,0 +1,130 @@
+/* Contests (§7.8): list, create drawer. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.title {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.mono {
+  font-family: var(--font-family-mono);
+}
+
+.note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.drawerForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.fieldLike {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.groupLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.fieldError {
+  margin: 0;
+  font-size: 13px;
+  color: var(--verdict-wrong);
+}
+
+.switchHelp {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.drawerFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.switchRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.toggleSwitch {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 50px;
+  height: 28px;
+}
+
+.toggleSwitch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleTrack {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  background-color: var(--action-disabled-bg);
+  border-radius: 34px;
+  transition: 0.2s;
+}
+
+.toggleTrack::before {
+  position: absolute;
+  content: '';
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: var(--background-primary);
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+.toggleSwitch input:checked + .toggleTrack {
+  background-color: var(--accent-primary);
+}
+
+.toggleSwitch input:focus-visible + .toggleTrack {
+  outline: 3px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+.toggleSwitch input:checked + .toggleTrack::before {
+  transform: translateX(22px);
+}
