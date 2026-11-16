@@ -1,13 +1,12 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Home from '../../pages/home/Home';
 import contestService from '../../services/contestService';
-import problemService from '../../services/problemService';
-import userService from '../../services/userService';
+import homeService from '../../services/homeService';
+import type { HomeSummary } from '../../types';
 
 jest.mock('../../services/contestService');
-jest.mock('../../services/problemService');
-jest.mock('../../services/userService');
+jest.mock('../../services/homeService');
 
 const mockUser = { id: 1, username: 'testuser', role: 'user' as const, hasAvatar: false };
 
@@ -43,12 +42,6 @@ const mockProfile = {
   },
 };
 
-const baseProblem = {
-  id: 'two-sum',
-  title: 'Two Sum',
-  author: null,
-  difficulty: 800,
-};
 
 const renderHome = () =>
   render(
@@ -57,246 +50,100 @@ const renderHome = () =>
     </BrowserRouter>
   );
 
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useNavigate: () => mockNavigate,
+}));
+
+const accepted = { status: 'Accepted' };
+const summary = (over: Partial<HomeSummary> = {}): HomeSummary => ({
+  progression: mockProfile.progression,
+  currentStreak: 5,
+  solvedToday: false,
+  week: ['2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15', '2026-11-16']
+    .map((day, i) => ({ day, solved: [1, 4, 0, 2, 6, 1, 0][i] })),
+  continue: {
+    id: 'hp_vec04_erase', title: 'vector::erase', difficulty: 1200, xp: 60,
+    bestScore: 60, attempts: 3, lastTriedAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
+    latestStatus: 'Wrong Answer',
+    caseStatuses: [...Array(6).fill('Accepted'), 'Wrong Answer', 'Skipped', 'Skipped', 'Skipped'],
+  },
+  startWith: [],
+  collections: [{ id: 2, name: 'pair', solved: 9, total: 10, next: { id: 'pair_ord', title: 'pair ordering', difficulty: 900, xp: 30 } }],
+  levelUp: null,
+  ...over,
+});
+
 describe('Home Page (logged in)', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
     mockAuthUser = mockUser;
-    jest.mocked(userService.getProfile).mockResolvedValue(mockProfile as never);
-    jest.mocked(problemService.getAllWithStats).mockResolvedValue([] as never);
-    jest.mocked(contestService.getAll).mockResolvedValue([] as never);
+    mockNavigate.mockReset();
+    jest.mocked(homeService.getHome).mockResolvedValue(summary());
+    jest.mocked(contestService.getAll).mockResolvedValue([]);
   });
 
-  it('renders the hero with the username and progression tier', async () => {
+  it('shows the continue block with strip and verdict', async () => {
     renderHome();
-
-    expect(screen.getByText('Welcome back, testuser')).toBeInTheDocument();
-    expect(screen.getByText('Ready for another challenge?')).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(screen.getByText('Specialist · Level 12')).toBeInTheDocument();
-    });
+    expect(screen.getByRole('heading', { name: 'Continue where you left off' })).toBeInTheDocument();
+    const block = await screen.findByRole('region', { name: 'Continue' });
+    expect(within(block).getByRole('link', { name: 'vector::erase' })).toHaveAttribute('href', '/problems/hp_vec04_erase');
+    expect(within(block).getByText('hp_vec04_erase')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '6 of 10 test cases passed' })).toBeInTheDocument();
+    expect(screen.getByText('WRONG 6/10')).toBeInTheDocument();
+    expect(screen.getByText(/3 attempts/)).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: /XP to Lv\.13/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^pair\s*9\/10$/ })).toHaveAttribute('href', '/problems?collection=2');
   });
 
-  it('renders the compact progress summary strip, not stat cards', async () => {
+  it('falls back to Start with when nothing is in progress', async () => {
+    jest.mocked(homeService.getHome).mockResolvedValue(summary({
+      continue: null,
+      startWith: [{ id: 'easy', title: 'Easy one', difficulty: 800, xp: 20 }, { id: 'b', title: 'Bee', difficulty: 900, xp: 24 }],
+    }));
     renderHome();
-
-    await waitFor(() => {
-      expect(screen.getByText('12 solved')).toBeInTheDocument();
-    });
-    expect(screen.getByText('7 day streak')).toBeInTheDocument();
-    expect(screen.getByText('Level 12 · 2,840 XP')).toBeInTheDocument();
-    // The old three-card labels are gone.
-    expect(screen.queryByText('Problems Solved')).not.toBeInTheDocument();
-    expect(screen.queryByText('Current Streak')).not.toBeInTheDocument();
-    expect(screen.queryByText('Experience')).not.toBeInTheDocument();
+    const start = await screen.findByRole('region', { name: 'Start with' });
+    expect(within(start).getByRole('link', { name: /Easy one/ })).toHaveAttribute('href', '/problems/easy');
   });
 
-  it('shows the most recently attempted-but-unsolved problem in Continue where you left off', async () => {
-    jest.mocked(problemService.getAllWithStats).mockResolvedValue([
-      { ...baseProblem, best_score: 100, submission_count: '3', latest_submission_at: '2026-09-01T00:00:00Z' },
-      {
-        ...baseProblem,
-        id: 'boring-factorials',
-        title: 'Boring Factorials',
-        difficulty: 1200,
-        best_score: 40,
-        submission_count: '2',
-        latest_submission_at: '2026-09-20T10:00:00Z',
-      },
-      {
-        ...baseProblem,
-        id: 'ancient-message',
-        title: 'Ancient Message',
-        difficulty: 2000,
-        best_score: 0,
-        submission_count: '5',
-        latest_submission_at: '2026-09-10T10:00:00Z',
-      },
-    ] as never);
-
+  it('Enter opens the continue problem but not from an input', async () => {
     renderHome();
-
-    await waitFor(() => {
-      expect(screen.getByText('Continue where you left off')).toBeInTheDocument();
-    });
-    expect(screen.getByText('Boring Factorials')).toBeInTheDocument();
-    expect(screen.getByText('boring-factorials')).toBeInTheDocument();
-    expect(screen.getByText('2 attempts')).toBeInTheDocument();
-    expect(screen.getByText(/Last tried/)).toBeInTheDocument();
-    expect(screen.getByText('Continue →')).toBeInTheDocument();
-    // The hero primary CTA is Continue Solving when a problem is unfinished;
-    // Random Problem is a lower-priority ghost action.
-    expect(screen.getByRole('button', { name: 'Continue Solving' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Random Problem/ })).toBeInTheDocument();
-    // The older unsolved problem is not the featured one.
-    expect(screen.queryByText('Ancient Message')).not.toBeInTheDocument();
+    await screen.findByRole('region', { name: 'Continue' });
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(mockNavigate).not.toHaveBeenCalled();
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+    expect(mockNavigate).toHaveBeenCalledWith('/problems/hp_vec04_erase');
+    input.remove();
   });
 
-  it('suggests an unsolved problem under "Try something new" when fully caught up on attempts', async () => {
-    jest.mocked(problemService.getAllWithStats).mockResolvedValue([
-      { ...baseProblem, best_score: 100, submission_count: '3', latest_submission_at: '2026-09-01T00:00:00Z' },
-      { ...baseProblem, id: 'fresh-one', title: 'A Fresh Challenge', best_score: null, submission_count: null, latest_submission_at: null },
-    ] as never);
-
+  it('marks today in the week strip and totals the week', async () => {
     renderHome();
-
-    await waitFor(() => {
-      expect(screen.getByText('Try something new')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('Continue where you left off')).not.toBeInTheDocument();
-    expect(screen.getByText('A Fresh Challenge')).toBeInTheDocument();
-    expect(screen.getByText('Solve Problem →')).toBeInTheDocument();
-    // The hero primary CTA is Browse Problems when nothing is unfinished.
-    expect(screen.getByRole('button', { name: 'Browse Problems' })).toBeInTheDocument();
+    expect(await screen.findByText('14 solved this week · 5-day run')).toBeInTheDocument();
+    expect(screen.getAllByTestId('week-day')[6]).toHaveAttribute('data-today', 'true');
   });
 
-  it('shows a light caught-up line when every problem is already solved', async () => {
-    jest.mocked(problemService.getAllWithStats).mockResolvedValue([
-      { ...baseProblem, best_score: 100, submission_count: '3', latest_submission_at: '2026-09-01T00:00:00Z' },
-    ] as never);
-
-    renderHome();
-
-    await waitFor(() => {
-      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
-    });
-    expect(screen.queryByText('Try something new')).not.toBeInTheDocument();
-  });
-
-  it('renders the running contest with a countdown and open action', async () => {
-    const end = new Date(Date.now() + 90 * 60 * 1000).toISOString();
+  it('renders the running contest, and no contest panel when there is none', async () => {
     jest.mocked(contestService.getAll).mockResolvedValue([
-      {
-        id: 3,
-        title: 'Monthly Contest',
-        description: null,
-        start_time: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-        end_time: end,
-        status: 'running' as const,
-      },
-    ] as never);
-
+      { id: 9, title: 'Weekly #42', status: 'running', start_time: new Date(Date.now() - 3600e3).toISOString(), end_time: new Date(Date.now() + 3600e3).toISOString() } as never,
+    ]);
+    const { unmount } = renderHome();
+    expect(await screen.findByRole('link', { name: 'Weekly #42' })).toHaveAttribute('href', '/contests/9');
+    expect(screen.getByText(/^ENDS IN/)).toBeInTheDocument();
+    unmount();
+    jest.mocked(contestService.getAll).mockResolvedValue([]);
     renderHome();
-
-    await waitFor(() => {
-      expect(screen.getByText('Monthly Contest')).toBeInTheDocument();
-    });
-    expect(screen.getByText(/Ends in 1h/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Open Contest/ })).toBeInTheDocument();
+    await screen.findByRole('region', { name: 'Continue' });
+    expect(screen.queryByRole('heading', { name: 'Contest' })).toBeNull();
   });
 
-  it('prefers a running contest over a scheduled one', async () => {
-    jest.mocked(contestService.getAll).mockResolvedValue([
-      {
-        id: 4,
-        title: 'Future Contest',
-        description: null,
-        start_time: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-        end_time: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'scheduled' as const,
-      },
-      {
-        id: 5,
-        title: 'Live Contest',
-        description: null,
-        start_time: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-        end_time: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
-        status: 'running' as const,
-      },
-    ] as never);
-
+  it('shows an inline error with retry when the summary fails', async () => {
+    jest.mocked(homeService.getHome).mockRejectedValueOnce(new Error('boom'));
     renderHome();
-
-    await waitFor(() => {
-      expect(screen.getByText('Live Contest')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('Future Contest')).not.toBeInTheDocument();
-  });
-
-  it('shows the nearest scheduled contest when nothing is running', async () => {
-    jest.mocked(contestService.getAll).mockResolvedValue([
-      {
-        id: 6,
-        title: 'Far Contest',
-        description: null,
-        start_time: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-        end_time: new Date(Date.now() + 11 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'scheduled' as const,
-      },
-      {
-        id: 7,
-        title: 'Near Contest',
-        description: null,
-        start_time: new Date(Date.now() + 26 * 60 * 60 * 1000).toISOString(),
-        end_time: new Date(Date.now() + 30 * 60 * 60 * 1000).toISOString(),
-        status: 'scheduled' as const,
-      },
-    ] as never);
-
-    renderHome();
-
-    await waitFor(() => {
-      expect(screen.getByText('Near Contest')).toBeInTheDocument();
-    });
-    expect(screen.getByText(/Starts in 1d/)).toBeInTheDocument();
-    expect(screen.queryByText('Far Contest')).not.toBeInTheDocument();
-  });
-
-  it('omits the contest card entirely when no running or scheduled contest exists', async () => {
-    jest.mocked(contestService.getAll).mockResolvedValue([
-      {
-        id: 8,
-        title: 'Old Contest',
-        description: null,
-        start_time: '2026-01-01T00:00:00Z',
-        end_time: '2026-01-02T00:00:00Z',
-        status: 'finished' as const,
-      },
-    ] as never);
-
-    renderHome();
-
-    await waitFor(() => {
-      expect(screen.getByText('Welcome back, testuser')).toBeInTheDocument();
-    });
-    expect(screen.queryByRole('button', { name: /Open Contest/ })).not.toBeInTheDocument();
-    expect(screen.queryByText('Old Contest')).not.toBeInTheDocument();
-  });
-
-  it('renders the quote card with a shuffle control that changes the quote', async () => {
-    renderHome();
-
-    const shuffleButton = await screen.findByRole('button', { name: /another quote/i });
-    expect(shuffleButton).toBeInTheDocument();
-
-    const initialText = screen.getByTestId('home-quote').textContent;
-    expect(initialText).toBeTruthy();
-
-    jest.useFakeTimers();
-    fireEvent.click(shuffleButton);
-    act(() => {
-      jest.advanceTimersByTime(300);
-    });
-    jest.useRealTimers();
-
-    const nextText = screen.getByTestId('home-quote').textContent;
-    expect(nextText).toBeTruthy();
-    expect(nextText).not.toBe(initialText);
-  });
-
-  it('hides the stat cards when the profile fails to load', async () => {
-    jest.mocked(userService.getProfile).mockRejectedValue(new Error('fail') as never);
-
-    renderHome();
-
-    await waitFor(() => {
-      expect(screen.getByText('Welcome back, testuser')).toBeInTheDocument();
-    });
-    await waitFor(() => {
-      expect(screen.queryByText('12 solved')).not.toBeInTheDocument();
-    });
-    expect(screen.getByRole('button', { name: 'Browse Problems' })).toBeInTheDocument();
-    expect(screen.queryByText('Start Solving')).not.toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load your progress.");
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('region', { name: 'Continue' })).toBeInTheDocument();
   });
 });
 
@@ -318,7 +165,7 @@ describe('Home Page (logged out)', () => {
     // Dashboard content is for logged-in users only.
     expect(screen.queryByText(/day streak/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /another quote/i })).not.toBeInTheDocument();
-    expect(userService.getProfile).not.toHaveBeenCalled();
+    expect(homeService.getHome).not.toHaveBeenCalled();
   });
 
   it('PRIVATE mode shows the private landing without a Browse Problems CTA', () => {
