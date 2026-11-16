@@ -111,4 +111,16 @@ type Row = { username: string; rank: number; total_score: number; detailed_score
     expect(summary(list)).toEqual([['u1', 1, 100], ['u2', 2, 40]]);
     expect(list[0].detailed_scores.a).toEqual({ score: 100 });
   });
+
+  it('live problem titles go only to participants and staff (§7.7: titles stay participant-only while running)', async () => {
+    await pool.query("INSERT INTO users (id, username, password_hash, role) VALUES (5, 'outsider', 'x', 'user')");
+    const titles = async (viewer?: { id: number; role: string }) =>
+      (await getContestScoreboard('1', viewer))!.problems.map((p) => [p.problem_id, p.title]);
+    expect(await titles({ id: 5, role: 'user' })).toEqual([['a', ''], ['b', '']]);
+    expect(await titles(undefined)).toEqual([['a', ''], ['b', '']]);
+    expect(await titles({ id: 1, role: 'user' })).toEqual([['a', 'A'], ['b', 'B']]);
+    expect(await titles(staff)).toEqual([['a', 'A'], ['b', 'B']]);
+    await pool.query("UPDATE contests SET status = 'finishing' WHERE id = 1");
+    expect(await titles({ id: 5, role: 'user' })).toEqual([['a', ''], ['b', '']]);
+  });
 });

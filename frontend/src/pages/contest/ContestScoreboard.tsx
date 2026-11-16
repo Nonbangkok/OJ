@@ -84,9 +84,12 @@ const ContestScoreboard = () => {
                 const id = String(problem.problem_id ?? problem.id);
                 return (
                   <th scope="col" key={id} className={styles.cellHead}>
-                    <Link to={`/contests/${contestId}/problems/${id}`} aria-label={`${problemLetter(i)}: ${problem.title}`} title={problem.title}>
-                      {problemLetter(i)}
-                    </Link>
+                    {/* Titles are participant/staff-only while a contest runs; without one the letter stays plain. */}
+                    {problem.title ? (
+                      <Link to={`/contests/${contestId}/problems/${id}`} aria-label={`${problemLetter(i)}: ${problem.title}`} title={problem.title}>
+                        {problemLetter(i)}
+                      </Link>
+                    ) : problemLetter(i)}
                   </th>
                 );
               })}

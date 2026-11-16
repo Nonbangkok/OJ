@@ -119,4 +119,12 @@ describe('ContestScoreboard page', () => {
     expect(screen.getByText('No one joined this contest.')).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
   });
+
+  it('without titles (not joined) the columns are plain letters, not links', () => {
+    mockHook({ problems: [{ problem_id: 'p1', title: '' }, { problem_id: 'p2', title: '' }] });
+    renderPage();
+    const table = screen.getByRole('table', { name: 'Scoreboard' });
+    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Rank', 'Participant', 'Total', 'A', 'B']);
+    expect(within(table).queryByRole('link', { name: /^A/ })).toBeNull();
+  });
 });

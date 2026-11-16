@@ -24,7 +24,7 @@ const contest = (over: Partial<Contest> = {}): Contest => ({
 
 const Page = () => {
   const { contest: current } = useContest();
-  return <p>{`page ${current?.title ?? ''}`}</p>;
+  return <p>{`page ${current?.title ?? ''} ${current?.status ?? ''}`.trim()}</p>;
 };
 
 const renderAt = (path = '/contests/3') =>
@@ -51,7 +51,7 @@ describe('ContestLayout', () => {
     renderAt();
     expect(await screen.findByRole('navigation', { name: 'Contest' })).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
-    expect(screen.getByText('page Midterm Practice')).toBeInTheDocument();
+    expect(screen.getByText(/^page Midterm Practice/)).toBeInTheDocument();
   });
 
   it('participant + finishing → ContestShell', async () => {
@@ -63,7 +63,7 @@ describe('ContestLayout', () => {
   it('non-participant + running → AppShell', async () => {
     jest.mocked(contestService.getById).mockResolvedValue(contest({ is_participant: false }));
     renderAt();
-    expect(await screen.findByText('page Midterm Practice')).toBeInTheDocument();
+    expect(await screen.findByText(/^page Midterm Practice/)).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Contest' })).toBeNull();
   });
@@ -74,7 +74,7 @@ describe('ContestLayout', () => {
   ])('%s → AppShell for everyone, participants included', async (_label, over) => {
     jest.mocked(contestService.getById).mockResolvedValue(contest(over));
     renderAt();
-    expect(await screen.findByText('page Midterm Practice')).toBeInTheDocument();
+    expect(await screen.findByText(/^page Midterm Practice/)).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Contest' })).toBeNull();
   });
@@ -89,7 +89,7 @@ describe('ContestLayout', () => {
   it('contest fetched once for shell + page', async () => {
     jest.mocked(contestService.getById).mockResolvedValue(contest());
     renderAt('/contests/3/scoreboard');
-    await screen.findByText('page Midterm Practice');
+    await screen.findByText(/^page Midterm Practice/);
     expect(contestService.getById).toHaveBeenCalledTimes(1);
   });
 
@@ -101,6 +101,39 @@ describe('ContestLayout', () => {
     const before = jest.mocked(contestService.getById).mock.calls.length;
     await act(async () => { jest.advanceTimersByTime(3500); });
     expect(jest.mocked(contestService.getById).mock.calls.length).toBeGreaterThan(before);
+    jest.useRealTimers();
+  });
+
+  it('keeps asking after the end until the contest is finished, so an open tab reaches the recap', async () => {
+    jest.useFakeTimers();
+    const ended = new Date(Date.now() - 1000).toISOString();
+    jest.mocked(contestService.getById)
+      .mockResolvedValueOnce(contest({ end_time: ended }))
+      .mockResolvedValueOnce(contest({ status: 'finishing', end_time: ended }))
+      .mockResolvedValue(contest({ status: 'finished', end_time: ended }));
+    renderAt('/contests/3');
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.getByRole('navigation', { name: 'Contest' })).toBeInTheDocument();
+    await act(async () => { jest.advanceTimersByTime(6000); });
+    await act(async () => { jest.advanceTimersByTime(6000); });
+    expect(screen.getByText('page Midterm Practice finished')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
+    const calls = jest.mocked(contestService.getById).mock.calls.length;
+    await act(async () => { jest.advanceTimersByTime(30_000); });
+    expect(jest.mocked(contestService.getById).mock.calls.length).toBe(calls);
+    jest.useRealTimers();
+  });
+
+  it('keeps asking after the start time while the server still says scheduled', async () => {
+    jest.useFakeTimers();
+    const started = new Date(Date.now() - 1000).toISOString();
+    jest.mocked(contestService.getById)
+      .mockResolvedValueOnce(contest({ status: 'scheduled', start_time: started }))
+      .mockResolvedValue(contest({ status: 'running', start_time: started }));
+    renderAt('/contests/3');
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    await act(async () => { jest.advanceTimersByTime(6000); });
+    expect(await screen.findByRole('navigation', { name: 'Contest' })).toBeInTheDocument();
     jest.useRealTimers();
   });
 });

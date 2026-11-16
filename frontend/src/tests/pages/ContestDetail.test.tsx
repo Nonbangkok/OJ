@@ -4,8 +4,14 @@ import ContestDetail from '../../pages/contest/ContestDetail';
 import { ContestContext } from '../../features/contest/ContestContext';
 import contestService from '../../services/contestService';
 import type { Contest } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 
 jest.mock('../../services/contestService');
+jest.mock('../../context/AuthContext', () => ({ useAuth: jest.fn(() => ({ user: { id: 1, username: 'n', role: 'user' } })) }));
+
+beforeEach(() => {
+  jest.mocked(useAuth).mockReturnValue({ user: { id: 1, username: 'n', role: 'user' } } as ReturnType<typeof useAuth>);
+});
 
 const HOUR = 3_600_000;
 const contest = (over: Partial<Contest> = {}): Contest => ({
@@ -117,6 +123,12 @@ describe('ContestDetail: running, not joined', () => {
 describe('ContestDetail: participant while running', () => {
   it('goes straight to the problem table', async () => {
     renderAt(contest({ status: 'running', is_participant: true, start_time: new Date(Date.now() - HOUR).toISOString() }));
+    expect(await screen.findByText('problem table')).toBeInTheDocument();
+  });
+
+  it('staff who have not joined go to the problem table, not the join gate', async () => {
+    jest.mocked(useAuth).mockReturnValue({ user: { id: 9, username: 'staffer', role: 'staff' } } as ReturnType<typeof useAuth>);
+    renderAt(contest({ status: 'running', is_participant: false, start_time: new Date(Date.now() - HOUR).toISOString() }));
     expect(await screen.findByText('problem table')).toBeInTheDocument();
   });
 });
