@@ -39,6 +39,7 @@
 
 .pair {
   display: grid;
+  align-items: start;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
 }

@@ -195,7 +195,7 @@ function ProblemEditor() {
             {savedAt !== null && <span className={styles.saved} role="status">Saved</span>}
             <Link
               to={`/problems/${encodeURIComponent(detail.id)}`}
-              className={['oj-button', buttonStyles.button, buttonStyles.secondary].join(' ')}
+              className={['oj-button', buttonStyles.button, buttonStyles.secondary, styles.linkButton].join(' ')}
             >
               View as student
             </Link>

@@ -340,6 +340,7 @@ describe('page headers', () => {
     'pages/contest/Contests.tsx', 'pages/contest/ContestProblems.tsx', 'pages/contest/ContestScoreboard.tsx',
     'features/admin/users/UserManagement.tsx', 'features/admin/problems/ProblemManagement.tsx',
     'features/admin/contests/ContestManagement.tsx', 'features/admin/analysis/AnalysisPage.tsx',
+    'features/admin/problems/ProblemEditPage.tsx', 'features/admin/contests/ContestEditPage.tsx',
     'features/admin/settings/Settings.tsx', 'features/admin/authoring/ProblemAuthoring.tsx', 'features/admin/authoring/AiDocs.tsx',
     'pages/submission/SubmissionDetailPage.tsx', 'pages/problem/ProblemDetail.tsx',
     'features/contest/ContestLobby.tsx', 'features/contest/ContestJoinGate.tsx', 'features/contest/ContestRecap.tsx',

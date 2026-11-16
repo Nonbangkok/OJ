@@ -51,6 +51,14 @@ export const DAILY_VERDICT_SERIES = [
 
 export type DailyVerdictKey = typeof DAILY_VERDICT_SERIES[number]['key'];
 
+const VERDICT_KEYS: Record<string, DailyVerdictKey> = {
+  Accepted: 'accepted', 'Wrong Answer': 'wrong', 'Time Limit Exceeded': 'time', 'Memory Limit Exceeded': 'memory',
+  'Runtime Error': 'runtime', 'Compilation Error': 'compilation',
+};
+
+/** The colour bucket for a verdict name; everything else is "other". */
+export const verdictKeyOf = (verdict: string): DailyVerdictKey => VERDICT_KEYS[verdict] ?? 'other';
+
 /**
  * SVG presentation attributes can't take var(), so the verdict tokens are
  * resolved to their computed values for the active theme (falling back to

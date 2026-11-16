@@ -1,8 +1,7 @@
 .container {
-  background-color: var(--background-secondary);
-  padding: 1.5rem 2rem;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .container h2 {

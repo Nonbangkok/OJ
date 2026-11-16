@@ -64,6 +64,7 @@
 
 .grid {
   display: grid;
+  align-items: start;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 12px 16px;
 }
@@ -142,4 +143,12 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+}
+
+/* A router link wearing the secondary button: no underline, button metrics. */
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  font-size: 14px;
 }

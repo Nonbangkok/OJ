@@ -145,7 +145,7 @@ export default function ProblemTestcasesTab({ problemId, submissionCount, canRej
                       <th scope="col" className={styles.num}>Input</th>
                       <th scope="col" className={styles.num}>Output</th>
                       <th scope="col" className={styles.num}>Total</th>
-                      <th scope="col"><span className="visually-hidden">View</span></th>
+                      <th scope="col"><span className={styles.srOnly}>View</span></th>
                     </tr>
                   </thead>
                   <tbody>

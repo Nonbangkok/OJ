@@ -129,3 +129,10 @@ describe('verdict series', () => {
     ]);
   });
 });
+
+describe('verdictKeyOf', () => {
+  it('buckets verdict names, unknown ones as other', async () => {
+    const { verdictKeyOf } = await import('../../../features/admin/analysis/analysisCharts');
+    expect(['Accepted', 'Time Limit Exceeded', 'System Error', 'Skipped'].map(verdictKeyOf)).toEqual(['accepted', 'time', 'other', 'other']);
+  });
+});

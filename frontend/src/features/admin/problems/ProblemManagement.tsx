@@ -520,7 +520,7 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
 
       {/* --- 4. Table: minimal row actions -------------------------------- */}
       <div className={`${tableStyles['table-container']} ${styles.tableWrap}`}>
-        <table className={tableStyles.table}>
+        <table className={`${tableStyles.table} ${styles['problems-table']}`}>
           <thead>
             <tr>
               <th className={styles['col-checkbox']}>
@@ -541,7 +541,7 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
               <th className={styles['col-left']}>Limits</th>
               <th className={styles['col-left']}>Collection</th>
               <th className={styles['col-left']}>Visibility</th>
-              <th className={styles['col-center']}><span className="visually-hidden">Actions</span></th>
+              <th className={styles['col-center']}><span className={styles['sr-only']}>Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -588,7 +588,7 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
                 <td className={styles['col-left']}>
                   <Link to={`/problems/${encodeURIComponent(problem.id)}`} className={styles['problem-id']}>{problem.id}</Link>
                 </td>
-                <td className={styles['col-left']}>
+                <td className={`${styles['col-left']} ${styles['cell-wrap']}`}>
                   <span className={styles['problem-title']}>{problem.title}</span>
                   {problem.problem_type === 'header' && <StatusBadge>HEADER</StatusBadge>}
                 </td>
@@ -597,7 +597,7 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
                 <td className={`${styles['col-left']} ${styles.mono}`}>
                   {problem.time_limit_ms ? `${problem.time_limit_ms} ms · ${problem.memory_limit_mb} MB` : '—'}
                 </td>
-                <td className={styles['col-left']}>
+                <td className={`${styles['col-left']} ${styles['cell-wrap']}`}>
                   {problem.collection_id !== null
                     ? <span title={problem.collection_name ?? undefined}>{problem.collection_name}</span>
                     : null}

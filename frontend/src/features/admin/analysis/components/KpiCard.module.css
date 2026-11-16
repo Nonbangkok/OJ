@@ -20,7 +20,7 @@
 }
 
 .delta {
-  font-family: var(--font-family-mono);
-  font-size: 0.8rem;
+  font-size: 12px;
+  white-space: nowrap;
   color: var(--text-muted);
 }

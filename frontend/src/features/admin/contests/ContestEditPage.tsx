@@ -84,7 +84,7 @@ function ContestEditor() {
         title={<>{contest.title} <StatusBadge soft>{STATUS_TAG[contest.status] ?? contest.status.toUpperCase()}</StatusBadge></>}
         meta={`${windowLabel(contest.start_time, contest.end_time)} · ${participants} registered`}
         actions={(
-          <Link to={`/contests/${contest.id}`} className={['oj-button', buttonStyles.button, buttonStyles.secondary].join(' ')}>
+          <Link to={`/contests/${contest.id}`} className={['oj-button', buttonStyles.button, buttonStyles.secondary, styles.linkButton].join(' ')}>
             Open contest page
           </Link>
         )}

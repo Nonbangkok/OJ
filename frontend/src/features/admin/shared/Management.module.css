@@ -542,6 +542,14 @@
   margin-top: 1.5rem;
 }
 
+/* A flex child: without this the wide table widens the page instead of scrolling inside.
+   doubled-class so it outranks the shared .table-container's overflow-x: hidden. */
+.tableWrap.tableWrap {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 /* Filter bar: one quiet row of scope controls, a breath below the header. */
 /* Segmented scope toggle (e.g. All drafts | My drafts) — same visual
    language as the submissions scope control. */
@@ -944,4 +952,46 @@
   justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
+}
+
+/* Phase 5 Problems list: left-aligned, quiet headers, cells that don't wrap (key-pages §4). */
+.problems-table.problems-table th,
+.problems-table.problems-table td {
+  position: relative; /* keeps the sr-only header text inside the scroll box */
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.problems-table.problems-table th {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-muted);
+}
+
+.problems-table.problems-table .col-right {
+  text-align: right;
+}
+
+.problems-table.problems-table .cell-wrap {
+  min-width: 7rem;
+  white-space: normal;
+}
+
+.problems-table.problems-table .col-center {
+  text-align: center;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

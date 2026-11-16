@@ -16,7 +16,7 @@ import { Button } from '../../../components/ui';
 import { downloadCsv } from '../../../utils/downloadCsv';
 import ChartCard from './components/ChartCard';
 import KpiCard from './components/KpiCard';
-import { DAILY_VERDICT_SERIES, useChartColors, useVerdictColors, VERDICT_COLORS } from './analysisCharts';
+import { DAILY_VERDICT_SERIES, useChartColors, useVerdictColors, verdictKeyOf } from './analysisCharts';
 import styles from './OverviewTab.module.css';
 
 const deltaPercent = (current: number, previous: number): number | null => {
@@ -110,7 +110,7 @@ const OverviewTab = ({ days, rangeKey }: OverviewTabProps) => {
             <Tooltip />
             <Bar dataKey="count" name="Submissions">
               {data.verdictBreakdown.map((entry) => (
-                <Cell key={entry.verdict} fill={VERDICT_COLORS[entry.verdict] ?? colors.series[2]} />
+                <Cell key={entry.verdict} fill={verdictColors[verdictKeyOf(entry.verdict)]} />
               ))}
             </Bar>
           </BarChart>
