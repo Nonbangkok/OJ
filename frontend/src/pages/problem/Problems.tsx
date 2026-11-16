@@ -59,8 +59,11 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
   const selectedCategories = useMemo(() => categoryParam.split(',').filter(Boolean), [categoryParam]);
   const [search, setSearch] = useState(() => searchParams.get('search') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('search') || '');
-  const difficultyMin = searchParams.get('difficultyMin') || '';
-  const difficultyMax = searchParams.get('difficultyMax') || '';
+  // Bounds snap to multiples of 100 (what the API accepts), so an old …1599 link shows and queries the 1200–1500 band.
+  const roundBound = (raw: string | null, round: (n: number) => number) =>
+    raw && Number.isFinite(Number(raw)) ? String(round(Number(raw) / 100) * 100) : '';
+  const difficultyMin = roundBound(searchParams.get('difficultyMin'), Math.ceil);
+  const difficultyMax = roundBound(searchParams.get('difficultyMax'), Math.floor);
   const difficultySort = searchParams.get('sort') ?? DIFFICULTY_SORT_ASC;
   const urlAuthor = searchParams.get('author') || '';
   const collection = searchParams.get('collection') || '';

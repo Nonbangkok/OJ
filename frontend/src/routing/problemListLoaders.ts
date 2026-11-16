@@ -88,8 +88,9 @@ export const buildPublicProblemListQuery = ({
     ...(category ? { category } : {}),
     ...(trimmedAuthor ? { author: trimmedAuthor } : {}),
     ...(collection ? { collection: collection === 'none' ? 'none' : Number(collection) } : {}),
-    ...(difficultyMin !== '' ? { difficultyMin: Number(difficultyMin) } : {}),
-    ...(difficultyMax !== '' ? { difficultyMax: Number(difficultyMax) } : {}),
+    // The API takes multiples of 100 only; round inward so an old link (…1599) still works.
+    ...(difficultyMin !== '' && Number.isFinite(Number(difficultyMin)) ? { difficultyMin: Math.ceil(Number(difficultyMin) / 100) * 100 } : {}),
+    ...(difficultyMax !== '' && Number.isFinite(Number(difficultyMax)) ? { difficultyMax: Math.floor(Number(difficultyMax) / 100) * 100 } : {}),
     ...(sort === 'difficulty-asc' || sort === 'difficulty-desc'
       ? { sort: 'difficulty', order: sort === 'difficulty-asc' ? 'asc' : 'desc' }
       : {}),

@@ -170,13 +170,15 @@ describe('Problems Page', () => {
             expect(screen.getByRole('button', { name: /^Solved/ })).toHaveAttribute('aria-pressed', 'true');
         });
 
-        it('segment counts come from status-counts with the same filters', async () => {
+        it('segment counts come from status-counts with the same filters (an old ...1599 link is read as 1500)', async () => {
+            // Ratings are multiples of 100 and the API only accepts such bounds; an old band URL must not fail.
             window.history.replaceState({}, '', '/problems?collection=7&difficultyMin=1200&difficultyMax=1599');
             renderProblems();
             await screen.findByText('Knapsack');
             await waitFor(() => expect(problemService.getStatusCounts).toHaveBeenCalledWith(
-                { collection: 7, difficultyMin: 1200, difficultyMax: 1599 },
+                { collection: 7, difficultyMin: 1200, difficultyMax: 1500 },
             ));
+            expect(problemService.getProblemsPage).toHaveBeenCalledWith(expect.objectContaining({ difficultyMin: 1200, difficultyMax: 1500 }));
             expect(problemService.getStatusCounts).toHaveBeenCalledWith({});
             expect(await screen.findByRole('button', { name: 'Unsolved 2' })).toBeInTheDocument();
             expect(screen.getByText('4 problems · 1 solved')).toBeInTheDocument();
@@ -195,10 +197,11 @@ describe('Problems Page', () => {
         it('difficulty chip sets the min/max range', async () => {
             renderProblems();
             await screen.findByText('Knapsack');
-            await chooseChip('Difficulty', '1200–1599');
+            await chooseChip('Difficulty', '1200–1500');
             await waitFor(() => expect(window.location.search).toContain('difficultyMin=1200'));
-            expect(window.location.search).toContain('difficultyMax=1599');
-            expect(await screen.findByRole('button', { name: 'Remove filter Difficulty: 1200–1599' })).toBeInTheDocument();
+            // Bounds are multiples of 100 — what the API accepts (ratings step by 100, so this is the whole band).
+            expect(window.location.search).toContain('difficultyMax=1500');
+            expect(await screen.findByRole('button', { name: 'Remove filter Difficulty: 1200–1500' })).toBeInTheDocument();
         });
 
         it('category and collection chips set their params', async () => {
@@ -412,9 +415,9 @@ describe('Problems Page', () => {
             );
             await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
             expect(screen.getByLabelText('Search problems')).toHaveValue('knapsack');
-            expect(screen.getByRole('button', { name: 'Remove filter Difficulty: 1200–1599' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Remove filter Difficulty: 1200–1500' })).toBeInTheDocument();
             expect(problemService.getProblemsPage).toHaveBeenCalledWith(expect.objectContaining({
-                search: 'knapsack', category: 'Greedy', difficultyMin: 1200, difficultyMax: 1599,
+                search: 'knapsack', category: 'Greedy', difficultyMin: 1200, difficultyMax: 1500,
                 sort: 'difficulty', order: 'desc', author: 'Alice', collection: 7, limit: 20,
             }));
             fireEvent.click(screen.getByRole('link', { name: /^Knapsack/ }));
@@ -463,7 +466,7 @@ describe('Problems Page', () => {
             );
             await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
             await chooseChip('Collection', 'Practice');
-            await chooseChip('Difficulty', '1200–1599');
+            await chooseChip('Difficulty', '1200–1500');
             await chooseChip('Category', 'Greedy');
             // Sorting is the Difficulty header now (ascending → descending).
             fireEvent.click(within(screen.getByRole('columnheader', { name: /Difficulty/ })).getByRole('button'));
@@ -473,7 +476,7 @@ describe('Problems Page', () => {
                 expect(params.get('keep')).toBe('yes');
                 expect(params.get('collection')).toBe('7');
                 expect(params.get('difficultyMin')).toBe('1200');
-                expect(params.get('difficultyMax')).toBe('1599');
+                expect(params.get('difficultyMax')).toBe('1500');
                 expect(params.get('sort')).toBe('difficulty-desc');
                 expect(params.get('category')).toBe('Greedy');
                 expect(params.get('search')).toBe('knapsack');
