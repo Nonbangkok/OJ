@@ -36,7 +36,7 @@ export function readinessRows(draft: Draft, jobs: Job[], states: Record<'stateme
   const newest = (type: string) => jobs.filter((j) => j.jobType === type).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
   const metadataDone = Boolean(draft.problemId.trim() && draft.title.trim());
   const size = testcaseBytes === null ? '' : ` · ${formatDecimalSize(testcaseBytes)}`;
-  const { total, withOutput } = draft.testcaseStats;
+  const { total, withOutput } = draft.testcaseStats ?? { total: 0, withOutput: 0 };
 
   const lastCompile = newest('compile_solution');
   const solutionDetail: Record<ReadinessState, string> = {

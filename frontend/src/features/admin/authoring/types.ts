@@ -19,7 +19,8 @@ export interface Draft extends DraftFields {
   status: 'draft' | 'generated' | 'ready' | 'published';
   hasLatestPdf: boolean; latestPdfRevision: number | null; hasAuthorProfileImage: boolean;
   updatedAt: string; publishedAt: string | null;
-  testcaseStats: DraftTestcaseStats;
+  /** Only the detail read (GET) sends it; save, new-revision and profile refresh leave it out. */
+  testcaseStats?: DraftTestcaseStats;
 }
 /** B7: GET /admin/authoring/drafts row. */
 export interface DraftSummary {

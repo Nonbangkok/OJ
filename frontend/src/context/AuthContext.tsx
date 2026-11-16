@@ -45,7 +45,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const checkLoggedIn = useCallback(async () => {
+  // Keep the same object when nothing changed, so pages keyed on `user` do not refetch on every focus.
+  const applyUser = useCallback((next: AuthUser | null) => {
+    setUser(previous => (previous && next && JSON.stringify(previous) === JSON.stringify(next) ? previous : next));
+  }, []);
+
+  /** `background` re-checks (tab focus) keep the user on a failed request: a network blip or a 502 is not a logout. */
+  const checkLoggedIn = useCallback(async (background = false) => {
     try {
       const data = await authService.checkLogin();
       if (data.isAuthenticated) {
@@ -54,16 +60,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         // the expired-login flow) from a guest hitting an auth-required
         // endpoint (a normal guest state, never an expiry).
         window.sessionStorage.setItem('oj:had-session', '1');
-        setUser(data.user);
+        applyUser(data.user);
       } else {
-        setUser(null);
+        applyUser(null);
       }
     } catch {
-      setUser(null);
+      if (!background) applyUser(null);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [applyUser]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- bootstrap /me fetch; checkLoggedIn only sets state after its await resolves
@@ -75,7 +81,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   useEffect(() => {
     const onReturn = () => {
       if (document.visibilityState === 'hidden') return;
-      void checkLoggedIn();
+      void checkLoggedIn(true);
     };
     window.addEventListener('focus', onReturn);
     document.addEventListener('visibilitychange', onReturn);

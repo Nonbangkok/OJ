@@ -209,7 +209,9 @@ export default function useAuthoringDraft(id: string, options: AuthoringDraftOpt
     saveInFlightRef.current = true;
     setOperationBusy(true); setError(''); setSaveState('saving');
     try {
-      const result = await authoringService.saveDraft(id, { expectedRevision: currentDraft.revision, ...changes });
+      const saved = await authoringService.saveDraft(id, { expectedRevision: currentDraft.revision, ...changes });
+      // A save does not touch testcases; keep the stats the detail read gave when the response leaves them out.
+      const result = { ...saved, testcaseStats: saved.testcaseStats ?? currentDraft.testcaseStats };
       const latestForm = formRef.current ?? submittedForm;
       const mergedForm = { ...result };
       for (const key of editableFields) {
