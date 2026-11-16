@@ -62,7 +62,7 @@ describe('Problem Migration Service', () => {
             await moveProblemsToContest(1, ['P1']);
 
             expect(mockClient.query).toHaveBeenCalledWith(
-                expect.stringContaining('is_visible_before_contest = is_visible'),
+                expect.stringContaining('is_visible_before_contest = p.is_visible'),
                 [1, ['P1']],
             );
         });

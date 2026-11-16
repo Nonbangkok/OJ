@@ -20,6 +20,7 @@ import {
   ProblemIdentityRow,
   ProblemMoveResult,
 } from '../types/service';
+import { contestProblemOrderSql } from './contestProblemOrder';
 
 /**
  * Problem Migration Service
@@ -78,7 +79,13 @@ export const moveProblemsToContest = async (contestId: number, problemIds: strin
     // before, instead of force-publishing hidden problems (bulk move-back)
     // or leaving them invisible forever (single move-back, contest delete).
     const updateResult = await client.query<ProblemIdentityRow>(
-      'UPDATE problems SET contest_id = $1, is_visible = FALSE, is_visible_before_contest = is_visible WHERE id = ANY($2) RETURNING id, title',
+      `UPDATE problems p
+       SET contest_id = $1, is_visible = FALSE, is_visible_before_contest = p.is_visible,
+           contest_position = base.last + o.ord
+       FROM unnest($2::text[]) WITH ORDINALITY AS o(id, ord),
+            (SELECT COALESCE(MAX(contest_position), 0) AS last FROM problems WHERE contest_id = $1) base
+       WHERE p.id = o.id
+       RETURNING p.id, p.title`,
       [contestId, problemIds]
     );
 
@@ -127,6 +134,7 @@ export const moveProblemsBackToMain = async (contestId: number, problemIds: stri
     let queryText = `
       UPDATE problems
       SET contest_id = NULL,
+          contest_position = NULL,
           is_visible = COALESCE(is_visible_before_contest, TRUE),
           is_visible_before_contest = NULL
       WHERE contest_id = $1`;
@@ -209,8 +217,8 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
 
     // First, save the problems snapshot for this contest
     await client.query(`
-      INSERT INTO contest_problems (contest_id, problem_id, title, author, time_limit_ms, memory_limit_mb)
-      SELECT $1, id, title, author, time_limit_ms, memory_limit_mb
+      INSERT INTO contest_problems (contest_id, problem_id, title, author, time_limit_ms, memory_limit_mb, position)
+      SELECT $1, id, title, author, time_limit_ms, memory_limit_mb, contest_position
       FROM problems
       WHERE contest_id = $1
       ON CONFLICT (contest_id, problem_id) DO NOTHING
@@ -370,7 +378,7 @@ export const getProblemsInContest = async (contestId: number): Promise<ContestPr
         SELECT problem_id as id, title, author
         FROM contest_problems 
         WHERE contest_id = $1
-        ORDER BY problem_id
+        ORDER BY ${contestProblemOrderSql('contest_problems', 'position')}
       `, [contestId]);
       return result.rows;
     } else {
@@ -379,7 +387,7 @@ export const getProblemsInContest = async (contestId: number): Promise<ContestPr
         SELECT id, title, author
         FROM problems 
         WHERE contest_id = $1
-        ORDER BY id
+        ORDER BY ${contestProblemOrderSql('problems', 'contest_position')}
       `, [contestId]);
       return result.rows;
     }

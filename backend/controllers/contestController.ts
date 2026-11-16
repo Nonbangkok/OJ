@@ -17,6 +17,7 @@ import {
   numericContestIdParamSchema,
   contestProblemParamsSchema,
   moveContestProblemsBodySchema,
+  contestProblemOrderBodySchema,
   updateContestVisibilitySchema,
 } from '../schemas/requestSchemas';
 import {
@@ -39,6 +40,7 @@ import {
 } from '../services/contestParticipantQueryService';
 
 import { sendStarterZip } from '../services/problemFilesService';
+import { reorderContestProblems } from '../services/contestProblemOrder';
 
 const router: Router = express.Router();
 
@@ -215,6 +217,24 @@ router.post('/admin/contests/:id/problems', requireAuth, requireStaffOrAdmin,
     throw new AppError('Action must be move_to_contest or move_to_main', 400);
   }
   res.json(result);
+}));
+
+// Reorder a scheduled/running contest's problems (B4): the body lists every problem once.
+router.put('/admin/contests/:id/problem-order', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: contestIdParamSchema, body: contestProblemOrderBodySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const { problemIds } = req.body as { problemIds: string[] };
+  const result = await reorderContestProblems(String(req.params.id), problemIds);
+  if (result.kind === 'not_found') {
+    throw new AppError('Contest not found', 404);
+  }
+  if (result.kind === 'invalid_status') {
+    throw new AppError('Problems can only be reordered before the contest ends', 409);
+  }
+  if (result.kind === 'mismatch') {
+    throw new AppError("The order must list each of the contest's problems exactly once", 400);
+  }
+  res.status(204).end();
 }));
 
 // Move problem back to main system

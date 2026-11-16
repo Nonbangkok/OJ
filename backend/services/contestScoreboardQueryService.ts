@@ -3,6 +3,7 @@ import { ContestRow, ContestScoreboardDetailRow } from '../types/models';
 import { CONTEST_STATUS } from '../constants';
 import { ContestScoreboardResponse, ContestScoreboardRow } from '../types/service';
 import { isContestManagementRole } from './contestAccess';
+import { contestProblemOrderSql } from './contestProblemOrder';
 
 /**
  * Scoreboard computation, split out of contestQueryService.
@@ -44,7 +45,7 @@ export const getContestScoreboard = async (
                 `SELECT problem_id, title
                  FROM contest_problems
                  WHERE contest_id = $1
-                 ORDER BY problem_id`,
+                 ORDER BY ${contestProblemOrderSql('contest_problems', 'position')}`,
                 [id],
             ),
         ]);
@@ -101,7 +102,7 @@ export const getContestScoreboard = async (
                 `SELECT id AS problem_id, title
                  FROM problems
                  WHERE contest_id = $1
-                 ORDER BY id`,
+                 ORDER BY ${contestProblemOrderSql('problems', 'contest_position')}`,
                 [id],
             ),
         ]);
@@ -130,7 +131,7 @@ export const getContestScoreboard = async (
             `SELECT id AS problem_id, title
              FROM problems
              WHERE contest_id = $1
-             ORDER BY id`,
+             ORDER BY ${contestProblemOrderSql('problems', 'contest_position')}`,
             [id],
         ),
     ]);

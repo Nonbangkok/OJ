@@ -162,6 +162,7 @@ describe('migration command', () => {
       '0023_user_submission_lock',
       '0024_header_problems',
       '0025_submissions_user_problem_index',
+      '0026_contest_problem_position',
     ]);
     expect(calls).toContainEqual({
       text: expect.stringContaining('CREATE TABLE author_profiles'),
