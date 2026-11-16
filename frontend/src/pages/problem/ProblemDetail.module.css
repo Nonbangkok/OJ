@@ -24,6 +24,7 @@
 .mono {
   font-family: var(--font-family-mono);
   font-size: 12.5px;
+  overflow-wrap: anywhere;
 }
 
 .author {

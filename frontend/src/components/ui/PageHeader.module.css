@@ -49,6 +49,7 @@
   font-weight: 600;
   line-height: 1.25;
   color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
 .description {
