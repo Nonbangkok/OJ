@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { EmptyState, InlineError, PageHeader, StatusBadge } from '../../../components/ui';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { EmptyState, InlineError, InlineNotice, PageHeader, StatusBadge } from '../../../components/ui';
 import buttonStyles from '../../../components/ui/Button.module.css';
 import adminService from '../../../services/adminService';
 import { getErrorMessage } from '../../../utils/error';
@@ -31,12 +31,14 @@ export default function ContestEditPage() {
 function ContestEditor() {
   const { contestId = '', tab: tabParam } = useParams();
   const navigate = useNavigate();
+  const handedOver = (useLocation().state as { notice?: string } | null)?.notice;
   const id = Number(contestId);
   const base = `/admin/contests/${contestId}`;
   const [contest, setContest] = useState<Contest | null>(null);
   const [missing, setMissing] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [problems, setProblems] = useState<ProblemBase[] | null>(null);
+  const [problemsFailed, setProblemsFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,7 +53,7 @@ function ContestEditor() {
       .catch((err) => { if (!cancelled) setLoadError(getErrorMessage(err, 'Failed to load the contest.')); });
     adminService.getContestProblemsAdmin(id)
       .then((list) => { if (!cancelled) setProblems(list); })
-      .catch(() => { if (!cancelled) setProblems([]); });
+      .catch(() => { if (!cancelled) setProblemsFailed(true); });
     return () => { cancelled = true; };
   }, [id]);
 
@@ -70,7 +72,12 @@ function ContestEditor() {
 
   const tab: ContestTab = TABS.includes(tabParam as ContestTab) ? tabParam as ContestTab : 'settings';
   const participants = Number(contest.participant_count ?? 0);
-  const problemCount = problems?.length ?? Number(contest.problem_count ?? 0);
+  // Unknown when the load failed: no count rather than a wrong one.
+  const problemCount = problems?.length ?? (problemsFailed ? undefined : Number(contest.problem_count ?? 0));
+  const retryProblems = () => {
+    setProblemsFailed(false);
+    adminService.getContestProblemsAdmin(id).then(setProblems, () => setProblemsFailed(true));
+  };
   const labels: Record<ContestTab, { text: string; count?: number }> = {
     settings: { text: 'Settings' },
     problems: { text: 'Problems', count: problemCount },
@@ -84,7 +91,7 @@ function ContestEditor() {
         title={<>{contest.title} <StatusBadge soft>{STATUS_TAG[contest.status] ?? contest.status.toUpperCase()}</StatusBadge></>}
         meta={`${windowLabel(contest.start_time, contest.end_time)} · ${participants} registered`}
         actions={(
-          <Link to={`/contests/${contest.id}`} className={['oj-button', buttonStyles.button, buttonStyles.secondary].join(' ')}>
+          <Link to={`/contests/${contest.id}`} className={['oj-button', buttonStyles.button, buttonStyles.secondary, styles.linkButton].join(' ')}>
             Open contest page
           </Link>
         )}
@@ -106,11 +113,15 @@ function ContestEditor() {
           </div>
         )}
       />
+      {handedOver && <InlineNotice tone="warning" title={handedOver} />}
       <div role="tabpanel" aria-label={labels[tab].text}>
         {tab === 'settings' && (
           <ContestSettingsTab contest={contest} onSaved={(next) => setContest((prev) => (prev ? { ...prev, ...next } : prev))} />
         )}
-        {tab === 'problems' && (problems === null
+        {tab === 'problems' && problemsFailed && problems === null && (
+          <InlineError message="Could not load the contest problems." onRetry={retryProblems} />
+        )}
+        {tab === 'problems' && !problemsFailed && (problems === null
           ? <p className={styles.muted} aria-live="polite">Loading problems…</p>
           : <ContestProblemsTab contestId={contest.id} status={contest.status} problems={problems} onProblemsChange={setProblems} />)}
         {tab === 'participants' && <ContestParticipantsTab contestId={contest.id} />}

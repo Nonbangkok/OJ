@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Copy, DownloadSimple } from '@phosphor-icons/react';
-import { Button, Drawer, Field, InlineError, InlineNotice } from '../../../components/ui';
+import { Button, ConfirmDialog, Drawer, Field, InlineError, InlineNotice } from '../../../components/ui';
 import adminService from '../../../services/adminService';
 import { downloadCsv } from '../../../utils/downloadCsv';
+import { ADMIN_USERS } from '../../../config/constants';
 import type { BatchCreatedUser } from '../../../types';
 import styles from './Users.module.css';
 
-const MAX_BATCH = 200;
+const MAX_BATCH = ADMIN_USERS.BATCH_MAX_COUNT;
 
 /** Create many student accounts at once; the passwords are shown exactly once (§7.8). */
 export default function BatchCreateDrawer({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
@@ -15,6 +16,9 @@ export default function BatchCreateDrawer({ open, onClose, onDone }: { open: boo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<BatchCreatedUser[] | null>(null);
+  // The passwords exist only here: closing before they were copied or downloaded asks first.
+  const [kept, setKept] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
   const n = Number(count);
   const valid = prefix.trim().length > 0 && Number.isInteger(n) && n >= 1 && n <= MAX_BATCH;
 
@@ -24,6 +28,7 @@ export default function BatchCreateDrawer({ open, onClose, onDone }: { open: boo
     try {
       const result = await adminService.createBatchUsers({ prefix: prefix.trim(), count: n });
       setCreated(result.users);
+      setKept(false);
     } catch (err) {
       setError((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? "Couldn't create the users.");
     } finally {
@@ -32,6 +37,7 @@ export default function BatchCreateDrawer({ open, onClose, onDone }: { open: boo
   };
 
   const finish = () => {
+    setConfirmClose(false);
     setCreated(null);
     setPrefix('');
     setCount('');
@@ -40,22 +46,32 @@ export default function BatchCreateDrawer({ open, onClose, onDone }: { open: boo
 
   if (created) {
     const rows = [['username', 'password'], ...created.map((u) => [u.username, u.password])];
+    const requestClose = () => { if (kept) finish(); else setConfirmClose(true); };
     return (
-      <Drawer open={open} title={`Created ${created.length} users`} onClose={finish}>
+      <Drawer open={open} title={`Created ${created.length} users`} onClose={requestClose}>
         <InlineNotice tone="warning" title="Save these passwords now.">They won&apos;t be shown again — you can only reset them later.</InlineNotice>
         <table className={styles.passwords}>
           <thead><tr><th scope="col">Username</th><th scope="col">Password</th></tr></thead>
           <tbody>{created.map((u) => <tr key={u.username}><td>{u.username}</td><td>{u.password}</td></tr>)}</tbody>
         </table>
         <div className={styles.footer}>
-          <Button variant="secondary" onClick={() => { void navigator.clipboard?.writeText(rows.map((r) => r.join('\t')).join('\n')); }}>
+          <Button variant="secondary" onClick={() => { setKept(true); void navigator.clipboard?.writeText(rows.map((r) => r.join('\t')).join('\n')); }}>
             <Copy size={14} aria-hidden="true" />Copy
           </Button>
-          <Button variant="secondary" onClick={() => downloadCsv('new-users.csv', rows)}>
+          <Button variant="secondary" onClick={() => { setKept(true); downloadCsv('new-users.csv', rows); }}>
             <DownloadSimple size={14} aria-hidden="true" />Download CSV
           </Button>
-          <Button onClick={finish}>Done</Button>
+          <Button onClick={requestClose}>Done</Button>
         </div>
+        <ConfirmDialog
+          open={confirmClose}
+          tier="destructive"
+          title="Close without saving the passwords?"
+          body="They won't be shown again. You'd have to reset each account's password by hand."
+          confirmLabel="Close anyway"
+          onConfirm={finish}
+          onCancel={() => setConfirmClose(false)}
+        />
       </Drawer>
     );
   }

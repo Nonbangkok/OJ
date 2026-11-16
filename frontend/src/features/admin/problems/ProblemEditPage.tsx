@@ -160,7 +160,11 @@ function ProblemEditor() {
         if (Object.keys(fieldErrors).length === 0) setSaveError(message);
         if (tab !== 'general') goTab('general');
       } else {
-        if (status === 409 && message === TYPE_LOCK_MESSAGE) setLockedBy409(true);
+        if (status === 409 && message === TYPE_LOCK_MESSAGE) {
+          // The type can no longer change: put the locked fields back so the other edits can still be saved.
+          setLockedBy409(true);
+          setForm((prev) => (prev ? { ...prev, problem_type: saved.problem_type, submission_filename: saved.submission_filename } : prev));
+        }
         setSaveError(message);
       }
     } finally {
@@ -195,7 +199,7 @@ function ProblemEditor() {
             {savedAt !== null && <span className={styles.saved} role="status">Saved</span>}
             <Link
               to={`/problems/${encodeURIComponent(detail.id)}`}
-              className={['oj-button', buttonStyles.button, buttonStyles.secondary].join(' ')}
+              className={['oj-button', buttonStyles.button, buttonStyles.secondary, styles.linkButton].join(' ')}
             >
               View as student
             </Link>

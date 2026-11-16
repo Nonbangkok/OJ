@@ -1,6 +1,12 @@
-const cell = (value: string): string => (/[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+/** Spreadsheets run a cell starting with one of these as a formula (CSV injection, OWASP). */
+const FORMULA_START = /^[=+\-@\t\r]/;
 
-/** RFC 4180-style CSV: quotes cells holding a comma, quote or newline. */
+const cell = (raw: string): string => {
+  const value = FORMULA_START.test(raw) ? `'${raw}` : raw;
+  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+};
+
+/** RFC 4180-style CSV: quotes cells holding a comma, quote or newline; formula-like cells are prefixed with '. */
 export function toCsv(rows: string[][]): string {
   return rows.map((row) => row.map(cell).join(',')).join('\n');
 }

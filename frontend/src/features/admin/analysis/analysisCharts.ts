@@ -1,3 +1,4 @@
+import { useMemo, useSyncExternalStore } from 'react';
 import { useTheme } from '../../../context/ThemeContext';
 
 export interface ChartColorSet {
@@ -35,4 +36,53 @@ export const VERDICT_COLORS: Record<string, string> = {
 export const useChartColors = (): ChartColorSet => {
   const { theme } = useTheme();
   return theme === 'dark' ? DARK : LIGHT;
+};
+
+/** The daily bars' stack, bottom up: one series per verdict bucket and its colour token. */
+export const DAILY_VERDICT_SERIES = [
+  { key: 'accepted', label: 'Accepted', token: '--verdict-accepted', fallback: VERDICT_COLORS.Accepted },
+  { key: 'wrong', label: 'Wrong Answer', token: '--verdict-wrong', fallback: VERDICT_COLORS['Wrong Answer'] },
+  { key: 'time', label: 'Time Limit', token: '--verdict-time', fallback: VERDICT_COLORS['Time Limit Exceeded'] },
+  { key: 'memory', label: 'Memory Limit', token: '--verdict-memory', fallback: VERDICT_COLORS['Memory Limit Exceeded'] },
+  { key: 'runtime', label: 'Runtime Error', token: '--verdict-runtime', fallback: VERDICT_COLORS['Runtime Error'] },
+  { key: 'compilation', label: 'Compilation Error', token: '--verdict-compilation', fallback: VERDICT_COLORS['Compilation Error'] },
+  { key: 'other', label: 'Other', token: '--verdict-pending', fallback: VERDICT_COLORS['System Error'] },
+] as const;
+
+export type DailyVerdictKey = typeof DAILY_VERDICT_SERIES[number]['key'];
+
+const VERDICT_KEYS: Record<string, DailyVerdictKey> = {
+  Accepted: 'accepted', 'Wrong Answer': 'wrong', 'Time Limit Exceeded': 'time', 'Memory Limit Exceeded': 'memory',
+  'Runtime Error': 'runtime', 'Compilation Error': 'compilation',
+};
+
+/** The colour bucket for a verdict name; everything else is "other". */
+export const verdictKeyOf = (verdict: string): DailyVerdictKey => VERDICT_KEYS[verdict] ?? 'other';
+
+/** The active theme as the DOM has it: changes only once ThemeProvider has applied data-theme. */
+const subscribeTheme = (onChange: () => void) => {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  return () => observer.disconnect();
+};
+const appliedTheme = () => document.documentElement.getAttribute('data-theme') ?? '';
+
+/**
+ * SVG presentation attributes can't take var(), so the verdict tokens are
+ * resolved to their computed values (falling back to the fixed palette where
+ * a token is missing, e.g. in tests). They are re-read when the data-theme
+ * attribute changes — not when the theme state does, which happens a render
+ * earlier, before the new token values apply.
+ */
+export const useVerdictColors = (): Record<DailyVerdictKey, string> => {
+  const theme = useSyncExternalStore(subscribeTheme, appliedTheme, () => '');
+  return useMemo(() => {
+    void theme; // re-read whenever the applied theme changes
+    const computed = typeof window !== 'undefined' ? window.getComputedStyle(document.documentElement) : null;
+    const out = {} as Record<DailyVerdictKey, string>;
+    for (const series of DAILY_VERDICT_SERIES) {
+      out[series.key] = computed?.getPropertyValue(series.token).trim() || series.fallback;
+    }
+    return out;
+  }, [theme]);
 };

@@ -13,7 +13,11 @@ export interface OverviewAnalytics {
     newUsers: OverviewKpi;
     activeProblems: OverviewKpi;
   };
-  dailySeries: Array<{ day: string; total: number; accepted: number }>;
+  /** Per day: the total and its split by verdict ("other" = system errors, skipped, still judging). */
+  dailySeries: Array<{
+    day: string; total: number; accepted: number; wrong: number; time: number;
+    memory: number; runtime: number; compilation: number; other: number;
+  }>;
   verdictBreakdown: Array<{ verdict: string; count: number }>;
   topProblems: Array<{ problemId: string; title: string; submissions: number; accepted: number }>;
   topSubmitters: Array<{ userId: number; username: string; submissions: number; solved: number }>;

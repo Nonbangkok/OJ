@@ -9,8 +9,8 @@ import styles from './Contests.module.css';
 interface CreateContestDrawerProps {
   open: boolean;
   onClose: () => void;
-  /** Called with the new contest's id once it exists (and is hidden, if asked). */
-  onCreated: (id: number) => void;
+  /** Called once the contest exists; `notice` says what still needs doing (e.g. hiding it failed). */
+  onCreated: (id: number, notice?: string) => void;
 }
 
 export default function CreateContestDrawer({ open, onClose, onCreated }: CreateContestDrawerProps) {
@@ -37,8 +37,16 @@ export default function CreateContestDrawer({ open, onClose, onCreated }: Create
       // POST /admin/contests answers with the contest row itself.
       const id = (created as { id?: number }).id ?? created.contest?.id;
       if (id === undefined) throw new Error('The contest was created but the server did not return its id.');
-      if (!form.visible) await adminService.updateContestVisibility(id, false);
-      onCreated(id);
+      // The contest exists now: never offer to create it again. A failed hide becomes a notice on its page.
+      let notice: string | undefined;
+      if (!form.visible) {
+        try {
+          await adminService.updateContestVisibility(id, false);
+        } catch {
+          notice = 'Created, but it is still visible to students — hiding it failed. Turn off "Visible to students" in Settings.';
+        }
+      }
+      onCreated(id, notice);
     } catch (err) {
       setErrors({ form: getErrorMessage(err, 'Failed to create the contest.') });
     } finally {

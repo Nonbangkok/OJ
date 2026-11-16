@@ -192,7 +192,7 @@ export default function UserManagement() {
       )}
 
       {editing && (
-        <UserEditDrawer user={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh(); }} onResetPassword={(u) => setResetting(u)} />
+        <UserEditDrawer user={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh(); }} onChanged={refresh} onResetPassword={(u) => setResetting(u)} />
       )}
       <ResetPasswordModal user={resetting} onClose={() => setResetting(null)} />
       <BatchCreateDrawer open={batchOpen} onClose={() => setBatchOpen(false)} onDone={() => { setBatchOpen(false); refresh(); }} />

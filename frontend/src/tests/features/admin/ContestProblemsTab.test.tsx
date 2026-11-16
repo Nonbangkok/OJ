@@ -54,13 +54,29 @@ describe('ContestProblemsTab', () => {
     expect(adminService.reorderProblems).not.toHaveBeenCalled();
   });
 
-  it('a refused reorder puts the old order back and says why', async () => {
+  it('a refused reorder shows the server\'s order again and says why', async () => {
     jest.mocked(adminService.reorderProblems).mockRejectedValue({ response: { status: 409, data: { message: 'Problems can only be reordered before the contest ends' } } });
     render(<Harness />);
     fireEvent.dragStart(rows()[2]);
     fireEvent.drop(rows()[0]);
     expect(await screen.findByRole('alert')).toHaveTextContent('Problems can only be reordered before the contest ends');
-    expect(order()[0]).toMatch(/^A\s*Interval merge/);
+    await waitFor(() => expect(order()[0]).toMatch(/^A\s*Interval merge/));
+    expect(adminService.getContestProblemsAdmin).toHaveBeenCalledWith(7);
+  });
+
+  it('one reorder at a time: a second move waits until the first is saved', async () => {
+    let settle: (value?: unknown) => void = () => {};
+    jest.mocked(adminService.reorderProblems).mockReturnValueOnce(new Promise((resolve) => { settle = resolve; }) as never);
+    render(<Harness />);
+    fireEvent.dragStart(rows()[2]);
+    fireEvent.drop(rows()[0]);
+    expect(within(rows()[0]).queryByRole('button', { name: /^Drag/ })).toBeDisabled();
+    fireEvent.dragStart(rows()[2]);
+    fireEvent.drop(rows()[0]);
+    expect(adminService.reorderProblems).toHaveBeenCalledTimes(1);
+    settle();
+    await waitFor(() => expect(within(rows()[0]).getByRole('button', { name: /^Drag/ })).toBeEnabled());
+    expect(order().map((t) => t?.match(/P\d/)?.[0])).toEqual(['P3', 'P1', 'P2']);
   });
 
   it('Move up / Move down in each row menu reorder for keyboard users', async () => {

@@ -192,3 +192,11 @@
   font-size: 13px;
   color: var(--verdict-accepted);
 }
+
+/* A router link wearing the secondary button: no underline, button metrics. */
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  font-size: 14px;
+}

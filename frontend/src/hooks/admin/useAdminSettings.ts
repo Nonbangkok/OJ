@@ -26,6 +26,8 @@ const useAdminSettings = () => {
     const [isExporting, setIsExporting] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const [databaseError, setDatabaseError] = useState('');
+    // Export runs from the Data row, so its failure is shown there (databaseError lives in the replace dialog).
+    const [exportError, setExportError] = useState('');
     const [databaseSuccess, setDatabaseSuccess] = useState('');
 
     useEffect(() => {
@@ -113,7 +115,7 @@ const useAdminSettings = () => {
 
     const handleExportDatabase = async () => {
         setIsExporting(true);
-        setDatabaseError('');
+        setExportError('');
         setDatabaseSuccess('');
         try {
             const response = await adminService.exportDatabase();
@@ -132,7 +134,7 @@ const useAdminSettings = () => {
             setTimeout(() => setDatabaseSuccess(''), UI_TIMEOUTS.SUCCESS_MESSAGE_SHORT);
         } catch (err) {
             console.error('Export error:', err);
-            setDatabaseError('Failed to export database.');
+            setExportError('Failed to export database.');
         } finally {
             setIsExporting(false);
         }
@@ -228,6 +230,7 @@ const useAdminSettings = () => {
         isExporting,
         isImporting,
         databaseError,
+        exportError,
         databaseSuccess,
         handleRegistrationToggle,
         siteAccessMode,

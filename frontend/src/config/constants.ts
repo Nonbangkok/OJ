@@ -67,3 +67,8 @@ export const ADMIN_PROBLEMS_PAGE = {
   PAGE_SIZE: 25,
   SEARCH_DEBOUNCE_MS: 300,
 } as const;
+
+/** Admin batch user creation; mirrors USER_VALIDATION.BATCH_MAX_COUNT on the backend. */
+export const ADMIN_USERS = {
+  BATCH_MAX_COUNT: 100,
+} as const;

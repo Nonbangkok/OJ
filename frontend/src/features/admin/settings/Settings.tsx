@@ -71,6 +71,7 @@ const Settings = () => {
           help="A full dump to keep or move to another server."
           control={<Button variant="secondary" onClick={s.handleExportDatabase} loading={s.isExporting} loadingLabel="Exporting…"><DownloadSimple size={14} aria-hidden="true" />Export</Button>}
         />
+        {s.exportError && <InlineError message={s.exportError} />}
       </section>
 
       <section aria-labelledby="settings-danger" className={styles.danger}>

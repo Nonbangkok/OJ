@@ -5,28 +5,23 @@ interface KpiCardProps {
   value: number | string;
   /** Delta vs. the previous window as a percentage; null hides the delta. */
   deltaPercent: number | null;
+  /** The window it compares against, e.g. "30d"; detail views without a window omit it. */
+  comparison?: string;
 }
 
-const formatDelta = (delta: number): string => `${delta > 0 ? '+' : ''}${Math.round(delta)}%`;
-
-const KpiCard = ({ label, value, deltaPercent }: KpiCardProps) => {
-  const deltaClass = deltaPercent === null
-    ? ''
-    : deltaPercent >= 0
-      ? styles['delta-up']
-      : styles['delta-down'];
-
-  return (
-    <div className={styles.card}>
-      <span className={styles.label}>{label}</span>
-      <span className={styles.value}>{value}</span>
-      {deltaPercent !== null && (
-        <span className={`${styles.delta} ${deltaClass}`.trim()}>
-          {formatDelta(deltaPercent)}
-        </span>
-      )}
-    </div>
-  );
+/** "▲ 12% vs prev. 30d" — neutral on purpose: more submissions isn't good or bad by itself. */
+const formatDelta = (delta: number, comparison?: string): string => {
+  const rounded = Math.round(Math.abs(delta));
+  const arrow = rounded === 0 ? '' : delta > 0 ? '▲ ' : '▼ ';
+  return comparison ? `${arrow}${rounded}% vs prev. ${comparison}` : `${arrow}${rounded}%`;
 };
+
+const KpiCard = ({ label, value, deltaPercent, comparison }: KpiCardProps) => (
+  <div className={styles.card}>
+    <span className={styles.label}>{label}</span>
+    <span className={styles.value}>{value}</span>
+    {deltaPercent !== null && <span className={styles.delta}>{formatDelta(deltaPercent, comparison)}</span>}
+  </div>
+);
 
 export default KpiCard;

@@ -1,8 +1,7 @@
 .container {
-  background-color: var(--background-secondary);
-  padding: 1.5rem 2rem;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .container h2 {
@@ -14,12 +13,15 @@
 .tabs {
   display: flex;
   gap: 0.5rem;
-  margin-bottom: 1.5rem;
+  overflow-x: auto;
   border-bottom: 1px solid var(--border-color);
 }
 
 .tab,
 .tab-active {
+  display: inline-block;
+  white-space: nowrap;
+  text-decoration: none;
   padding: 0.5rem 1rem;
   background: none;
   border: none;

@@ -387,3 +387,126 @@ export async function mockContestApi(page: Page, state: ContestState): Promise<v
     problem_type: 'standard', submission_filename: null, has_starter_files: false,
   })));
 }
+
+// --- Phase 5 Manage pages ---------------------------------------------------
+
+const manageUsers = [
+  { id: 1, username: 'Nonbangkok', role: 'admin', created_at: '2025-06-01T03:00:00Z', submissions_locked: false, last_active_at: '2026-09-16T01:40:00Z', solved_count: 212, xp: 9820, submission_count: 1404 },
+  { id: 2, username: 'kru.somchai', role: 'staff', created_at: '2025-08-12T03:00:00Z', submissions_locked: false, last_active_at: '2026-09-15T11:05:00Z', solved_count: 87, xp: 3410, submission_count: 402 },
+  { id: 3, username: 'nattapat', role: 'user', created_at: '2026-05-20T03:00:00Z', submissions_locked: false, last_active_at: '2026-09-16T01:58:00Z', solved_count: 41, xp: 1290, submission_count: 233 },
+  { id: 4, username: 'ploy.s', role: 'user', created_at: '2026-05-20T03:00:00Z', submissions_locked: true, last_active_at: '2026-09-09T08:30:00Z', solved_count: 18, xp: 470, submission_count: 96 },
+  { id: 5, username: 'tonkla', role: 'user', created_at: '2026-06-02T03:00:00Z', submissions_locked: false, last_active_at: null, solved_count: 0, xp: 0, submission_count: 0 },
+  { id: 6, username: 'm42_07', role: 'user', created_at: '2026-09-01T03:00:00Z', submissions_locked: false, last_active_at: '2026-09-14T02:10:00Z', solved_count: 6, xp: 150, submission_count: 31 },
+];
+
+const manageProblems = [
+  { id: 'interval', title: 'Interval merge', author: 'Ada', categories: ['Sorting'], difficulty: 1400, collection_id: 2, collection_name: 'Sorting basics', is_visible: true, contest_id: null, contest_status: null, problem_type: 'standard', time_limit_ms: 1000, memory_limit_mb: 256, testcase_count: 10, testcase_bytes: 2_400_000, submission_count: 214, type_locked: true },
+  { id: 'hp_vec04_erase', title: 'Vector erase', author: 'Ada', categories: ['Implementation'], difficulty: 1200, collection_id: null, collection_name: null, is_visible: true, contest_id: null, contest_status: null, problem_type: 'header', time_limit_ms: 1000, memory_limit_mb: 256, testcase_count: 10, testcase_bytes: 51_200, submission_count: 38, type_locked: true },
+  { id: 'twosum', title: 'Two sums', author: 'kru.somchai', categories: ['Two Pointers'], difficulty: 1100, collection_id: 2, collection_name: 'Sorting basics', is_visible: false, contest_id: null, contest_status: null, problem_type: 'standard', time_limit_ms: 2000, memory_limit_mb: 128, testcase_count: 12, testcase_bytes: 880_000, submission_count: 0, type_locked: false },
+  { id: 'graphwalk', title: 'Graph walk', author: 'Ada', categories: ['Graphs'], difficulty: 1800, collection_id: null, collection_name: null, is_visible: false, contest_id: 7, contest_status: 'scheduled', problem_type: 'standard', time_limit_ms: 1500, memory_limit_mb: 256, testcase_count: 15, testcase_bytes: 4_100_000, submission_count: 0, type_locked: false },
+];
+
+const manageContests = [
+  { id: 8, title: 'Mid-term practice', description: null, status: 'running', start_time: '2026-09-16T01:00:00Z', end_time: '2026-09-16T03:12:08Z', participant_count: '41', problem_count: 6, is_visible: true },
+  { id: 7, title: 'Weekly 12', description: 'Round twelve: sorting and graphs.', status: 'scheduled', start_time: '2026-09-20T12:00:00Z', end_time: '2026-09-20T14:00:00Z', participant_count: '2', problem_count: 3, is_visible: true },
+  { id: 5, title: 'Summer camp final', description: null, status: 'finished', start_time: '2026-08-02T03:00:00Z', end_time: '2026-08-02T06:30:00Z', participant_count: '64', problem_count: 8, is_visible: false },
+];
+
+const contestSevenProblems = [
+  { id: 'graphwalk', title: 'Graph walk', author: 'Ada' },
+  { id: 'interval2', title: 'Interval cover', author: 'Ada' },
+  { id: 'primes', title: 'Prime sieve', author: 'kru.somchai' },
+];
+
+const overviewDay = (day: string, accepted: number, wrong: number, time: number, runtime: number, compilation: number, other = 0) => {
+  const total = accepted + wrong + time + runtime + compilation + other;
+  return { day, total, accepted, wrong, time, memory: 0, runtime, compilation, other };
+};
+
+const overviewAnalytics = {
+  kpis: {
+    submissions: { current: 1842, previous: 1640 },
+    uniqueSubmitters: { current: 96, previous: 101 },
+    accepted: { current: 812, previous: 690 },
+    newUsers: { current: 14, previous: 9 },
+    activeProblems: { current: 58, previous: 58 },
+  },
+  dailySeries: Array.from({ length: 14 }, (_, i) => overviewDay(
+    `2026-09-${String(3 + i).padStart(2, '0')}`, 30 + ((i * 7) % 25), 18 + ((i * 5) % 14), 4 + (i % 5), 2 + (i % 3), 1 + (i % 2), i % 4 === 0 ? 1 : 0,
+  )),
+  verdictBreakdown: [
+    { verdict: 'Accepted', count: 812 }, { verdict: 'Wrong Answer', count: 640 }, { verdict: 'Time Limit Exceeded', count: 201 },
+    { verdict: 'Runtime Error', count: 112 }, { verdict: 'Compilation Error', count: 66 }, { verdict: 'Memory Limit Exceeded', count: 11 },
+  ],
+  topProblems: [
+    { problemId: 'interval', title: 'Interval merge', submissions: 214, accepted: 88 },
+    { problemId: 'twosum', title: 'Two sums', submissions: 160, accepted: 101 },
+    { problemId: 'hp_vec04_erase', title: 'Vector erase', submissions: 38, accepted: 20 },
+  ],
+  topSubmitters: [
+    { userId: 3, username: 'nattapat', submissions: 233, solved: 41 },
+    { userId: 4, username: 'ploy.s', submissions: 96, solved: 18 },
+    { userId: 6, username: 'm42_07', submissions: 31, solved: 6 },
+  ],
+  contestStats: [
+    { contestId: 8, title: 'Mid-term practice', status: 'running', submissions: 402, participants: 41, avgScore: 212.4 },
+    { contestId: 5, title: 'Summer camp final', status: 'finished', submissions: 1290, participants: 64, avgScore: 388.1 },
+  ],
+};
+
+/** Admin session plus every Manage endpoint the phase 5 baselines touch. */
+export async function mockManageApi(page: Page): Promise<void> {
+  await page.clock.setFixedTime(fixedTime);
+  await page.route('**/api/**', (route) =>
+    route.fulfill({ status: 404, ...json({ message: `Unhandled visual fixture: ${route.request().url()}` }) })
+  );
+  await page.route('**/api/me', (route) =>
+    route.fulfill(json({ isAuthenticated: true, user: { id: 1, username: 'Nonbangkok', role: 'admin' } })));
+  await page.route('**/api/site-config', (route) =>
+    route.fulfill(json({ accessMode: 'public', allowRegistration: true, passwordChangeEnabled: true })));
+
+  // Users
+  await page.route(/\/api\/admin\/users(\?|$)/, (route) =>
+    route.fulfill(json({ users: manageUsers, total: manageUsers.length, page: 1, limit: 50 })));
+  await page.route('**/api/admin/users/batch', (route) => route.fulfill(json({
+    message: 'Created 3 users',
+    users: [{ username: 'm43_01', password: 'kite-41-oak' }, { username: 'm43_02', password: 'moss-88-tin' }, { username: 'm43_03', password: 'reef-07-ash' }],
+  })));
+
+  // Problems
+  await page.route(/\/api\/admin\/problems(\?|$)/, (route) => route.fulfill(json({
+    problems: manageProblems, nextCursor: null, hasMore: false, authors: [{ name: 'Ada' }, { name: 'kru.somchai' }],
+    hasUnauthoredProblems: false, bulkEligibleCount: 3,
+  })));
+  await page.route('**/api/admin/collections', (route) =>
+    route.fulfill(json([{ id: 2, name: 'Sorting basics', problem_count: 2, status: 'partially_visible' }])));
+  await page.route('**/api/admin/authors', (route) =>
+    route.fulfill(json([{ id: 1, username: 'Ada' }, { id: 2, username: 'kru.somchai' }])));
+  await page.route('**/api/admin/problems/interval', (route) => route.fulfill(json({
+    id: 'interval', title: 'Interval merge', author: 'Ada', categories: ['Sorting'], difficulty: 1400,
+    time_limit_ms: 1000, memory_limit_mb: 256, has_pdf: true, is_visible: true, contest_id: null,
+    problem_type: 'standard', submission_filename: null, has_starter_files: false,
+    collection_id: 2, testcase_count: 10, testcase_bytes: 2_400_000, submission_count: 214, type_locked: true,
+  })));
+  await page.route(/\/api\/admin\/problems\/interval\/testcases(\?|$)/, (route) => route.fulfill(json({
+    testcases: Array.from({ length: 10 }, (_, i) => ({ case_number: i + 1, input_bytes: 90_000 + i * 6_000, output_bytes: 60_000 + i * 5_000 })),
+    total: 10,
+  })));
+
+  // Contests
+  await page.route('**/api/admin/contests', (route) => route.fulfill(json(manageContests)));
+  await page.route('**/api/admin/contests/7/admin-problems', (route) => route.fulfill(json(contestSevenProblems)));
+  await page.route('**/api/admin/contests/available-problems', (route) =>
+    route.fulfill(json([{ id: 'twosum', title: 'Two sums', author: 'kru.somchai' }, { id: 'knapsack', title: 'Knapsack', author: 'Ada' }])));
+  await page.route('**/api/admin/contests/7/problem-order', (route) => route.fulfill({ status: 204, body: '' }));
+
+  // Analysis
+  await page.route(/\/api\/analytics\/overview/, (route) => route.fulfill(json(overviewAnalytics)));
+
+  // Settings
+  await page.route('**/api/admin/settings/registration', (route) => route.fulfill(json({ enabled: true })));
+  await page.route('**/api/admin/settings/password-change', (route) => route.fulfill(json({ enabled: false })));
+  await page.route('**/api/admin/settings/site-access', (route) => route.fulfill(json({ accessMode: 'public' })));
+  // Empty, so the sidebar's live-contest entry never races the screenshot.
+  await page.route('**/api/contests', (route) => route.fulfill(json([])));
+}

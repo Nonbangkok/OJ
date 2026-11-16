@@ -31,6 +31,8 @@ export default function ContestProblemsTab({ contestId, status, problems, onProb
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const [removing, setRemoving] = useState<ProblemBase | null>(null);
   const [busy, setBusy] = useState(false);
+  // One reorder at a time, so a failure can never revert over a later move that succeeded.
+  const [ordering, setOrdering] = useState(false);
   const [available, setAvailable] = useState<ProblemBase[]>([]);
   const [query, setQuery] = useState('');
   const listboxId = useId();
@@ -45,16 +47,24 @@ export default function ContestProblemsTab({ contestId, status, problems, onProb
   }, [editable]);
 
   const reorder = async (from: number, to: number) => {
-    if (from === to || from < 0 || to < 0 || from >= problems.length || to >= problems.length) return;
+    if (ordering || from === to || from < 0 || to < 0 || from >= problems.length || to >= problems.length) return;
     const before = problems;
     const next = move(problems, from, to);
     setError('');
+    setOrdering(true);
     onProblemsChange(next);
     try {
       await adminService.reorderProblems(contestId, next.map((x) => x.id));
     } catch (err) {
-      onProblemsChange(before);
       setError(getErrorMessage(err, 'Failed to save the new order.'));
+      // Show what the server actually holds; fall back to the order before this move.
+      try {
+        onProblemsChange(await adminService.getContestProblemsAdmin(contestId));
+      } catch {
+        onProblemsChange(before);
+      }
+    } finally {
+      setOrdering(false);
     }
   };
 
@@ -122,7 +132,7 @@ export default function ContestProblemsTab({ contestId, status, problems, onProb
             <li
               key={problem.id}
               className={[styles.problemRow, overIndex === index && dragIndex !== null && dragIndex !== index ? styles.dropTarget : ''].filter(Boolean).join(' ')}
-              draggable={editable}
+              draggable={editable && !ordering}
               onDragStart={editable ? (e) => {
                 setDragIndex(index);
                 e.dataTransfer?.setData('text/plain', problem.id);
@@ -138,7 +148,7 @@ export default function ContestProblemsTab({ contestId, status, problems, onProb
               onDragEnd={editable ? endDrag : undefined}
             >
               {editable && (
-                <button type="button" className={styles.handle} aria-label={`Drag ${problem.id} to reorder`} title="Drag to reorder">
+                <button type="button" className={styles.handle} aria-label={`Drag ${problem.id} to reorder`} title="Drag to reorder" disabled={ordering}>
                   <DotsSixVertical size={16} aria-hidden="true" />
                 </button>
               )}
@@ -150,8 +160,8 @@ export default function ContestProblemsTab({ contestId, status, problems, onProb
                   <ActionMenu
                     label={`More actions for ${problem.id}`}
                     items={[
-                      { key: 'up', label: 'Move up', disabled: index === 0, onClick: () => { void reorder(index, index - 1); } },
-                      { key: 'down', label: 'Move down', disabled: index === problems.length - 1, onClick: () => { void reorder(index, index + 1); } },
+                      { key: 'up', label: 'Move up', disabled: ordering || index === 0, onClick: () => { void reorder(index, index - 1); } },
+                      { key: 'down', label: 'Move down', disabled: ordering || index === problems.length - 1, onClick: () => { void reorder(index, index + 1); } },
                     ]}
                   />
                   <button type="button" className={styles.remove} aria-label={`Remove ${problem.id}`} onClick={() => setRemoving(problem)}>

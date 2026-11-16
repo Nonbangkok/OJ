@@ -42,9 +42,10 @@ describe('analyticsQueryService.getOverviewAnalytics', () => {
         expect(result.kpis.accepted).toEqual({ current: 60, previous: 40 });
         expect(result.kpis.newUsers).toEqual({ current: 5, previous: 3 });
         expect(result.kpis.activeProblems).toEqual({ current: 2, previous: 1 });
+        // Rows without the per-verdict columns count everything not accepted as "other".
         expect(result.dailySeries).toEqual([
-            { day: '2026-09-18', total: 12, accepted: 7 },
-            { day: '2026-09-19', total: 10, accepted: 6 },
+            { day: '2026-09-18', total: 12, accepted: 7, wrong: 0, time: 0, memory: 0, runtime: 0, compilation: 0, other: 5 },
+            { day: '2026-09-19', total: 10, accepted: 6, wrong: 0, time: 0, memory: 0, runtime: 0, compilation: 0, other: 4 },
         ]);
         expect(result.verdictBreakdown).toEqual([
             { verdict: 'Accepted', count: 60 },
@@ -89,6 +90,22 @@ describe('analyticsQueryService.getOverviewAnalytics', () => {
         const [contestStatsSql, contestStatsParams] = mockQuery.mock.calls[7];
         expect(String(contestStatsSql)).toContain("cs.submitted_at >= NOW() - ($1 || ' days')::interval");
         expect(contestStatsParams).toEqual([30]);
+    });
+
+    it('splits each day by verdict so the chart can stack them', async () => {
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{}] } as never)
+            .mockResolvedValueOnce({ rows: [{}] } as never)
+            .mockResolvedValueOnce({ rows: [{}] } as never)
+            .mockResolvedValueOnce({ rows: [{ day: '2026-09-18', total: '20', accepted: '7', wrong: '5', time: '3', memory: '1', runtime: '2', compilation: '1' }] } as never)
+            .mockResolvedValue({ rows: [] } as never);
+        const result = await getOverviewAnalytics(30);
+        expect(result.dailySeries).toEqual([
+            { day: '2026-09-18', total: 20, accepted: 7, wrong: 5, time: 3, memory: 1, runtime: 2, compilation: 1, other: 1 },
+        ]);
+        const dailySql = String(mockQuery.mock.calls[3][0]);
+        expect(dailySql).toContain("overall_status = 'Wrong Answer'");
+        expect(dailySql).toContain("overall_status = 'Compilation Error'");
     });
 
     it('buckets the daily series in the site timezone (ANALYSIS-002)', async () => {
