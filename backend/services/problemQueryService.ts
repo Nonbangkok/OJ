@@ -772,6 +772,8 @@ const ADMIN_PROBLEM_FACTS_SQL = `
     LEFT JOIN subs ON subs.problem_id = page.id`;
 
 export interface AdminProblemFacts {
+  /** The editor's collection select; the shared detail query does not carry it. */
+  collection_id: number | null;
   testcase_count: number;
   testcase_bytes: number;
   submission_count: number;
@@ -781,12 +783,12 @@ export interface AdminProblemFacts {
 /** B6 facts for the problem editor header and testcases tab. */
 export const getAdminProblemFacts = async (id: string): Promise<AdminProblemFacts | null> => {
   const result = await db.query<AdminProblemFacts>(
-    `WITH page AS (SELECT id FROM problems WHERE id = $1)
+    `WITH page AS (SELECT id, collection_id FROM problems WHERE id = $1)
      ${ADMIN_PROBLEM_FACTS_SQL}`,
     [id],
   );
   const row = result.rows[0];
-  return row ? { testcase_count: row.testcase_count, testcase_bytes: Number(row.testcase_bytes), submission_count: row.submission_count, type_locked: row.type_locked } : null;
+  return row ? { collection_id: row.collection_id, testcase_count: row.testcase_count, testcase_bytes: Number(row.testcase_bytes), submission_count: row.submission_count, type_locked: row.type_locked } : null;
 };
 
 export const getAdminProblemsPage = async (

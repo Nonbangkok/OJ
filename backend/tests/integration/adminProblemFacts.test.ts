@@ -56,6 +56,15 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     expect([list.a.type_locked, list.b.type_locked, list.c.type_locked, list.d.type_locked]).toEqual([true, false, true, false]);
   });
 
+  it('admin detail carries the collection id the editor needs', async () => {
+    await pool.query("INSERT INTO collections (id, name) VALUES (7, 'Sorting')");
+    await pool.query("UPDATE problems SET collection_id = 7 WHERE id = 'a'");
+    const res = await request(app).get('/admin/problems/a').expect(200);
+    expect(res.body.collection_id).toBe(7);
+    const none = await request(app).get('/admin/problems/b').expect(200);
+    expect(none.body.collection_id).toBeNull();
+  });
+
   it('detail carries testcase_count, testcase_bytes, submission_count and type_locked', async () => {
     const res = await request(app).get('/admin/problems/a').expect(200);
     expect(res.body).toMatchObject({ id: 'a', testcase_count: 2, testcase_bytes: 3 + 1 + 5 + 2, submission_count: 2, type_locked: true });
