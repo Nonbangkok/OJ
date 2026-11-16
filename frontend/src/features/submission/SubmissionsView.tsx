@@ -93,9 +93,6 @@ const SubmissionsView = ({
     const detailHref = (s: SubmissionSummary) => (contestId
         ? `/contests/${contestId}/submissions/${s.id}`
         : `/submissions/${s.id}`);
-    const problemHref = (s: SubmissionSummary) => (contestId
-        ? `/contests/${contestId}/problems/${s.problem_id}`
-        : `/problems/${s.problem_id}`);
 
     const columns: DataTableColumn<SubmissionSummary>[] = [
         {
@@ -112,7 +109,8 @@ const SubmissionsView = ({
             cell: (s) => (
                 <span className={styles.problem}>
                     <span className={styles.mono}>{s.problem_id}</span>
-                    <Link to={problemHref(s)} className={styles.problemTitle}>{s.problem_title ?? s.problem_id}</Link>
+                    {/* Plain text: the row link (to the submission) wraps this cell; the detail page links to the problem. */}
+                    <span className={styles.problemTitle}>{s.problem_title ?? s.problem_id}</span>
                 </span>
             ),
         },

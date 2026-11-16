@@ -40,6 +40,12 @@ describe('Submissions page', () => {
         expect(within(first).getByText('12.3 MB')).toBeInTheDocument();
     });
 
+    it('never nests a link inside the row link (the problem title is plain text)', async () => {
+        const { container } = renderAt();
+        await screen.findByRole('link', { name: '#48213' });
+        expect(container.querySelector('a a')).toBeNull();
+    });
+
     it('Mine is the default when logged in', async () => {
         renderAt();
         await waitFor(() => expect(submissionService.getAll).toHaveBeenCalledWith(expect.objectContaining({ filter: 'mine' })));

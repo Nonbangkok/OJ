@@ -200,6 +200,7 @@
 }
 
 .breakdown-bar-fill {
+  display: block;
   height: 100%;
   border-radius: 3px;
   background-color: var(--accent-primary);
@@ -218,15 +219,6 @@
 
 .error-message {
   color: var(--error-text);
-}
-
-.achievement-progress-old {
-  display: block;
-  margin-top: 0.5rem;
-  height: 6px;
-  border-radius: 3px;
-  background-color: var(--background-tertiary);
-  overflow: hidden;
 }
 
 /* --- XP progression (identity card) --------------------------------------- */
@@ -350,34 +342,6 @@
   white-space: nowrap;
 }
 
-.two-col {
-    grid-template-columns: 1fr;
-  }
-
-  
-  .profile-header {
-    flex-direction: column;
-    text-align: center;
-    padding: 1.5rem 1.25rem;
-  }
-
-  .profile-title {
-    align-items: center;
-  }
-
-  .progression {
-    margin-left: 0;
-    align-items: center;
-    width: 100%;
-  }
-
-  .recent-solved-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-  }
-
-  .recent-solved-date {
-    display: none;
-  }
 
 /* Phase 3 profile (§7.6): stat row, level line, rank, columns, achievements. */
 .stat-row {
@@ -538,7 +502,46 @@
     border-bottom: 1px solid var(--border-color);
   }
 
+  /* Phones: progress drops under the name instead of squeezing it. */
+  .achievement-row {
+    flex-wrap: wrap;
+  }
+
+  .achievement-text {
+    flex-basis: calc(100% - 28px);
+  }
+
+  .achievement-progress,
+  .achievement-unlocked {
+    margin-left: 28px;
+  }
+
   .achievement-progress {
-    grid-template-columns: 80px auto;
+    grid-template-columns: 120px auto;
+  }
+
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+
+  /* Phones: avatar beside the name; level line and rank wrap below, left-aligned. */
+  .profile-header {
+    flex-wrap: wrap;
+    padding: 1.25rem;
+  }
+
+  .progression,
+  .rank {
+    margin-left: 0;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .recent-solved-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .recent-solved-date {
+    display: none;
   }
 }

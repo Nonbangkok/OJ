@@ -12,6 +12,15 @@
   gap: 4px 14px;
 }
 
+.meta a {
+  color: var(--text-secondary);
+}
+
+.meta a:focus-visible {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
 .action,
 .copy,
 .toggle {

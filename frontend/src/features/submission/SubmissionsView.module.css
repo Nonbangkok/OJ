@@ -67,3 +67,9 @@
   justify-content: center;
   padding: 8px 0 16px;
 }
+
+/* Times, sizes and "x minutes ago" stay on one line. */
+.page td[data-align='right'],
+.page td .muted {
+  white-space: nowrap;
+}

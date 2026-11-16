@@ -93,4 +93,14 @@
   .pinned {
     bottom: var(--tabbar-height);
   }
+
+  /* Phones: one line — rank, avatar, name, XP. Tier and solved are in the list rows. */
+  .pinned .tier,
+  .pinnedStat:not(:last-child) {
+    display: none;
+  }
+
+  .pinnedStat:last-child {
+    margin-left: auto;
+  }
 }
