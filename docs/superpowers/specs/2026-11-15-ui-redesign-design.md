@@ -168,7 +168,12 @@ Shared rules for every Manage page:
 - **Edit-surface rule:** 1–3 fields or a confirmation → Dialog; create/edit with context and fewer than ~8 fields → right Drawer; multi-part objects TAs revisit → full page with its own URL and tabs.
 - **Confirm tiers:** reversible → plain confirm; destructive → red button naming the object and counts; cascading/irreversible → type the object's name. Button labels are verbs ("Delete user"), not "Confirm".
 
-Pages (mockup for Problems: `key-pages.html` §4):
+Pages (mockups: Problems list `key-pages.html` §4; everything else `phase5-manage.html`):
+- **Mockup decisions (phase 5 gate):**
+  - **Users:** the primary action is "Create users" (batch, Drawer); single "Add user" sits in the header `⋯`. The edit Drawer holds role, lock submissions and Reset password.
+  - **Problem page:** header actions are "View as student" and Save. General shows the difficulty → XP hint, and visibility as a dot + Hide/Show button.
+  - **Contest page:** "Open contest page" in the header. The Problems tab is a draggable ordered list with letters and a remove ✕.
+  - **Settings:** shows a "✓ Saved" indicator in the header.
 - **`/admin`:** removed as a hub; redirects to Problems (staff) or the last-used Manage page.
 - **Users:** filters (search, role segmented, locked); columns username (→ profile), role, status, solved, joined, last active (§9 B5), `⋯`; bulk lock/unlock/role/export; batch create in a Drawer whose result view offers Download CSV + Copy and warns passwords won't be shown again; edit in a Drawer; delete is type-to-confirm and states how many submissions go with it.
 - **Problems:** header actions Import ZIP, `⋯` (Manage collections), New problem. Filters as chips + "12 of 146". Columns id, title, type tag (header only), difficulty, tests (§9 B6), TL/ML, collection (blank if none), visibility dot (or "In contest"), `⋯` (Edit, Testcases, Rejudge, Show/Hide, Copy link, Delete). Scope actions ("Show all N matching") carry the count. **Edit is a full page `/admin/problems/:id`** with tabs General / Statement / Testcases / Grader files (header only) / Danger zone; "type locked · N submissions" shown up front (§9 B6). Testcases tab: summary line, table, drop zone; replacing the whole set confirms with old vs new counts and offers a rejudge. Create = small dialog (id, title) that lands on the page.
@@ -199,6 +204,8 @@ Pages (mockup for Problems: `key-pages.html` §4):
 ## 8. Figma
 
 The file "Grader Design" (`https://www.figma.com/design/1LcruSmMzO1hBruNrGWate/Grader-Design`) is empty today. After phase 2, push the real tokens (light + dark variables) and the shared components from code into it as a library. The owner's Figma plan is Starter tier, so Code Connect (Organization/Enterprise only) is not used; component names in Figma match the React component names instead. Pages not yet mocked in HTML — Profile, contest lobby/finished recap, Users/Contests editors, Analysis, Settings, the authoring workspace — are designed in Figma from that library. **This is a gate (owner decision):** before each of phases 3–6 starts, Claude puts that phase's un-mocked pages in Figma and the owner approves them; implementation of those pages waits for the approval. Pages already settled in the HTML mockups do not need a Figma pass. HTML mockups remain acceptable for quick explorations.
+
+Phase 5 status (2026-11-16): the gate uses an HTML mockup, `phase5-manage.html`, awaiting approval.
 
 Phase 4 status (2026-11-16): per the owner's earlier decision, the gate uses an HTML mockup, `phase4-contests.html`, awaiting approval.
 

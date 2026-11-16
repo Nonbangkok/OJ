@@ -1,0 +1,401 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Phase 5 · Manage</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<style>
+body { margin:0; padding:32px; background:#e9e9ec; font-family:'IBM Plex Sans Thai', sans-serif; color:#18181b; }
+h2 { font-size:18px; margin:40px 0 6px; } h2:first-of-type { margin-top:0; }
+.note { max-width:880px; font-size:14px; line-height:1.65; color:#3f3f46; margin:0 0 16px; }
+.note b { color:#18181b; }
+.row { display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; }
+.cap { font-size:12.5px; color:#52525b; margin:0 0 8px; }
+
+/* Theme tokens: the same names and values as frontend/src/index.css */
+.app { --bg:#fff; --fg:#18181b; --fg2:#3f3f46; --mut:#71717a; --faint:#a1a1aa; --line:#e4e4e7; --line2:#f4f4f5; --side:#fafafa; --hover:#f4f4f5;
+  --ok:#15803d; --bad:#dc2626; --warn:#b45309; --pend:#71717a; --none:#e4e4e7; --btn:#18181b; --btnfg:#fff; --accent:#18181b; --logo-accent:#a1a1aa;
+  --h0:#ebedf0; --h1:#9be9a8; --h2:#40c463; --h3:#30a14e; --h4:#216e39;
+  font-family:'IBM Plex Sans Thai', sans-serif; background:var(--bg); color:var(--fg); font-size:14px; border-radius:10px; overflow:hidden; border:1px solid rgba(127,127,127,.25); }
+.app.dark { --bg:#0d1117; --fg:#e6edf3; --fg2:#c9d1d9; --mut:#8b949e; --faint:#6e7681; --line:#30363d; --line2:#21262d; --side:#010409; --hover:#161b22;
+  --ok:#3fb950; --bad:#f85149; --warn:#d29922; --pend:#8b949e; --none:#30363d; --btn:#e6edf3; --btnfg:#0d1117; --accent:#e6edf3; --logo-accent:#6e7681;
+  --h0:#30363d; --h1:#0e4429; --h2:#006d32; --h3:#26a641; --h4:#39d353; }
+.mono { font-family:'JetBrains Mono', monospace; }
+.mut { color:var(--mut); } .faint { color:var(--faint); } .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); } .pend { color:var(--pend); }
+
+/* desktop shell */
+.desk { flex:none; width:1280px; display:grid; grid-template-columns:220px 1fr; }
+.side { background:var(--side); border-right:1px solid var(--line); padding:12px 10px; display:flex; flex-direction:column; gap:2px; min-height:100%; box-sizing:border-box; }
+.brand { display:flex; align-items:center; gap:9px; font-weight:600; padding:4px 8px 14px; }
+.brand .col { margin-left:auto; color:var(--faint); font-size:16px; }
+.searchrow { display:flex; align-items:center; gap:8px; border:1px solid var(--line); background:var(--bg); border-radius:6px; padding:5px 8px 5px 10px; color:var(--faint); font-size:13px; margin:0 2px 6px; }
+.searchrow .k { margin-left:auto; font:11px 'JetBrains Mono', monospace; }
+.side a { display:flex; gap:10px; align-items:center; padding:7px 10px; border-radius:6px; color:var(--mut); }
+.side a i { font-size:17px; }
+.side a.on { background:var(--bg); color:var(--fg); font-weight:500; box-shadow:0 0 0 1px var(--line); }
+.grp { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); padding:14px 10px 6px; }
+.me { margin-top:auto; display:flex; gap:8px; align-items:center; padding:8px; font-size:13px; font-weight:500; }
+.me .lv { font:11.5px 'JetBrains Mono', monospace; color:var(--faint); font-weight:400; }
+.av { width:24px; height:24px; border-radius:50%; background:var(--line2); color:var(--mut); display:grid; place-items:center; font-size:11px; font-weight:500; flex:none; }
+.av.xl { width:64px; height:64px; font-size:22px; font-weight:600; }
+.wrap { max-width:1040px; padding:32px 28px 48px; box-sizing:border-box; }
+
+/* profile */
+.phd { display:flex; align-items:center; gap:20px; }
+.phd .id { flex:1; display:flex; flex-direction:column; gap:6px; }
+.phd .nm { display:flex; align-items:baseline; gap:10px; }
+.phd h1 { font-size:22px; font-weight:600; margin:0; }
+.lvl { display:flex; align-items:center; gap:12px; font-size:13px; flex-wrap:wrap; }
+.lvl b { font-weight:500; font-size:14px; }
+.bar { height:6px; border-radius:3px; background:var(--line2); overflow:hidden; }
+.bar > i { display:block; height:100%; background:var(--fg); border-radius:3px; }
+.rank { text-align:right; } .rank .v { font:500 22px 'JetBrains Mono', monospace; }
+.stats { display:grid; grid-template-columns:repeat(5, 1fr); border:1px solid var(--line); border-radius:8px; margin-top:24px; }
+.stats div { padding:12px 16px; border-right:1px solid var(--line); } .stats div:last-child { border-right:0; }
+.stats span { display:block; font-size:13px; color:var(--mut); } .stats b { font:500 18px 'JetBrains Mono', monospace; }
+.sec { margin-top:28px; }
+.sech { display:flex; align-items:baseline; gap:8px; margin-bottom:10px; } .sech b { font-weight:500; flex:1; } .sech span { font-size:13px; color:var(--mut); }
+.heat { display:grid; grid-auto-flow:column; grid-template-rows:repeat(7, 13px); gap:3px; justify-content:end; overflow:hidden; }
+.heat i { width:13px; height:13px; border-radius:3px; background:var(--h0); }
+.heat i.l1 { background:var(--h1); } .heat i.l2 { background:var(--h2); } .heat i.l3 { background:var(--h3); } .heat i.l4 { background:var(--h4); }
+.legend { display:flex; gap:4px; align-items:center; justify-content:flex-end; font-size:11px; color:var(--faint); margin-top:8px; }
+.legend i { width:10px; height:10px; border-radius:2px; display:inline-block; }
+.cols { display:grid; grid-template-columns:1fr 1fr; gap:32px; }
+.list > div { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line2); font-size:14px; }
+.list .t { flex:1; } .list .x { font:12px 'JetBrains Mono', monospace; } .list .w { font-size:13px; color:var(--mut); min-width:72px; text-align:right; }
+.hbar { display:grid; grid-template-columns:130px 1fr 52px; gap:10px; align-items:center; font-size:13px; padding:5px 0; }
+.hbar .n { font:12px 'JetBrains Mono', monospace; color:var(--fg2); text-align:right; }
+.hbar .bar > i.ok { background:var(--ok); } .hbar .bar > i.bad { background:var(--bad); } .hbar .bar > i.warn { background:var(--warn); } .hbar .bar > i.pend { background:var(--pend); } .hbar .bar > i.ink { background:var(--fg2); }
+
+/* radar */
+.radar-card { display:grid; grid-template-columns:400px 1fr; gap:32px; align-items:center; }
+.radar svg { display:block; width:100%; height:auto; overflow:visible; }
+.radar .ring { fill:none; stroke:var(--line); stroke-width:1; }
+.radar .spoke { stroke:var(--line); stroke-width:1; }
+.radar .area { fill:var(--accent); fill-opacity:.12; stroke:var(--accent); stroke-width:1.75; stroke-linejoin:round; }
+.radar .dot { fill:var(--accent); stroke:var(--bg); stroke-width:1.5; }
+.radar .lab { fill:var(--fg2); font:12px 'IBM Plex Sans Thai', sans-serif; }
+.radar .pct { fill:var(--mut); font:10.5px 'JetBrains Mono', monospace; }
+.radar .tick { fill:var(--faint); font:9.5px 'JetBrains Mono', monospace; }
+.radar .hot .dot { r:4.5; } .radar .hot .lab { fill:var(--fg); font-weight:500; }
+.catlist { font-size:13px; }
+.catlist > div { display:grid; grid-template-columns:1fr 64px 48px; gap:8px; padding:6px 0; border-bottom:1px solid var(--line2); align-items:center; }
+.catlist .n { font:12px 'JetBrains Mono', monospace; color:var(--fg2); text-align:right; }
+.catlist .p { font:12px 'JetBrains Mono', monospace; color:var(--mut); text-align:right; }
+.catlist > div.hot { background:var(--hover); box-shadow:inset 2px 0 0 var(--fg); padding-left:8px; }
+.tip { position:absolute; pointer-events:none; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 9px; font-size:12px; box-shadow:0 4px 14px rgba(0,0,0,.12); white-space:nowrap; }
+.tip b { font-weight:500; display:block; } .tip span { font:11.5px 'JetBrains Mono', monospace; color:var(--mut); }
+.ach > div { display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid var(--line2); }
+.ach .tx { flex:1; } .ach .tx b { font-weight:500; display:block; } .ach .tx span { font-size:13px; color:var(--mut); }
+.ach .prog { display:flex; align-items:center; gap:10px; } .ach .prog .bar { width:140px; }
+.ach .prog span { font:12px "JetBrains Mono", monospace; color:var(--fg2); white-space:nowrap; width:64px; text-align:right; }
+
+/* phone */
+.phone { flex:none; width:390px; height:844px; position:relative; display:flex; flex-direction:column; }
+.phone.tall { height:1720px; }
+.topbar { height:52px; flex:none; display:flex; align-items:center; gap:9px; padding:0 16px; border-bottom:1px solid var(--line); font-weight:600; font-size:15px; }
+.topbar .s { margin-left:auto; font-size:19px; color:var(--fg2); }
+.pmain { flex:1; overflow:hidden; padding:20px 16px 120px; box-sizing:border-box; }
+.tabs { position:absolute; left:0; right:0; bottom:0; height:56px; display:grid; grid-template-columns:repeat(5, 1fr); border-top:1px solid var(--line); background:var(--bg); }
+.tabs a { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:11px; color:var(--mut); }
+.tabs a i { font-size:19px; } .tabs a.on { color:var(--fg); font-weight:500; }
+.pin { position:absolute; left:0; right:0; bottom:56px; height:54px; display:flex; align-items:center; gap:10px; padding:0 16px; background:var(--hover); border-top:1px solid var(--line); box-shadow:inset 2px 0 0 var(--fg); }
+.p-h1 { font-size:22px; font-weight:600; margin:0; } .p-meta { font-size:13px; color:var(--mut); margin:2px 0 14px; }
+.ptb { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.seg { display:flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; font-size:13px; }
+.seg span { padding:6px 11px; color:var(--mut); border-right:1px solid var(--line); } .seg span:last-child { border-right:0; }
+.seg span.on { background:var(--line2); color:var(--fg); font-weight:500; }
+.btn2 { border:1px solid var(--line); background:var(--bg); border-radius:6px; padding:6px 11px; font-size:13.5px; color:var(--fg); display:inline-flex; gap:6px; align-items:center; margin-left:auto; }
+.item { padding:11px 0; border-bottom:1px solid var(--line2); }
+.item .l1 { display:flex; align-items:center; gap:8px; } .item .l1 b { flex:1; font-weight:500; }
+.item .l1 i { font-size:14px; }
+.item .l2 { display:flex; align-items:center; gap:8px; padding-left:22px; margin-top:4px; font:500 12px 'JetBrains Mono', monospace; }
+.item .l2 .id { margin-left:auto; color:var(--faint); font-weight:400; font-size:11.5px; }
+.strip { display:inline-flex; gap:2px; } .strip i { width:9px; height:6px; border-radius:1.5px; background:var(--ok); }
+.strip i.x { background:var(--bad); } .strip i.t { background:var(--warn); } .strip i.n { background:var(--none); }
+.rk { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line2); }
+.rk .r { width:22px; text-align:right; font:12.5px 'JetBrains Mono', monospace; color:var(--mut); }
+.rk .t { flex:1; } .rk .t b { display:block; font-weight:500; } .rk .t span { font-size:12.5px; color:var(--mut); }
+.rk .x { font:12.5px 'JetBrains Mono', monospace; }
+.rk.top .r, .rk.top .x { color:var(--fg); font-weight:500; } .rk.top .t b { font-weight:600; }
+.pstats { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:8px; margin:16px 0 0; }
+.pstats div { padding:10px 14px; border-bottom:1px solid var(--line); } .pstats div:nth-child(odd) { border-right:1px solid var(--line); }
+.pstats div:nth-last-child(-n+2) { border-bottom:0; }
+.pstats span { display:block; font-size:12.5px; color:var(--mut); } .pstats b { font:500 17px 'JetBrains Mono', monospace; }
+.phone .heat { grid-template-rows:repeat(7, 12px); } .phone .heat i { width:12px; height:12px; border-radius:2.5px; }
+.phone .radar-card { grid-template-columns:1fr; gap:8px; }
+</style>
+<style>
+.desk.short { min-height:720px; }
+.tag { display:inline-block; font:500 11px 'JetBrains Mono', monospace; letter-spacing:.04em; padding:2px 6px; border-radius:4px; border:1px solid var(--line); color:var(--mut); vertical-align:middle; }
+.tag.warn { color:var(--warn); border-color:currentColor; }
+.btn { display:inline-flex; align-items:center; gap:6px; background:var(--btn); color:var(--btnfg); border-radius:6px; padding:7px 14px; font-size:13.5px; font-weight:500; white-space:nowrap; }
+.btn.sec { background:var(--bg); color:var(--fg); border:1px solid var(--line); }
+.btn.red { background:var(--bad); color:#fff; }
+.btn.dis { opacity:.45; }
+.icon { display:inline-grid; place-items:center; width:32px; height:32px; border:1px solid var(--line); border-radius:6px; color:var(--fg2); }
+.h1 { font-size:24px; font-weight:600; margin:0; } .meta { font-size:13px; color:var(--mut); margin:4px 0 0; }
+.crumb { font-size:13px; color:var(--mut); margin:0 0 6px; }
+.hdr { display:flex; align-items:flex-end; gap:10px; margin-bottom:18px; } .hdr .grow { flex:1; }
+.fbar { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+.search { display:flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:6px; padding:6px 10px; width:240px; color:var(--faint); font-size:13px; }
+.chip { border:1px dashed var(--line); border-radius:6px; padding:5px 10px; font-size:13px; color:var(--mut); display:inline-flex; gap:6px; align-items:center; }
+.chip.on { border-style:solid; color:var(--fg); background:var(--line2); }
+.count { margin-left:auto; font-size:13px; color:var(--mut); }
+.tbl { width:100%; border-collapse:collapse; font-size:14px; }
+.tbl th { text-align:left; font-weight:400; font-size:12.5px; color:var(--mut); padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+.tbl td { padding:10px; border-bottom:1px solid var(--line2); white-space:nowrap; }
+.tbl .r { text-align:right; } .tbl .m { font:12.5px 'JetBrains Mono', monospace; }
+.tbl tr.sel td { background:var(--hover); }
+.cb { width:14px; height:14px; border:1.5px solid var(--faint); border-radius:3px; display:inline-block; vertical-align:middle; }
+.cb.on { background:var(--fg); border-color:var(--fg); }
+.dot { display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--fg2); }
+.dot i { width:7px; height:7px; border-radius:50%; background:var(--faint); display:inline-block; }
+.dot.ok i { background:var(--ok); } .dot.bad i { background:var(--bad); } .dot.warn i { background:var(--warn); }
+.bulk { display:flex; align-items:center; gap:14px; padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:var(--hover); margin-bottom:10px; font-size:13.5px; }
+.bulk b { font-weight:500; } .bulk a { color:var(--fg); } .bulk .x { margin-left:auto; color:var(--mut); }
+.tabs2 { display:flex; gap:22px; border-bottom:1px solid var(--line); font-size:14px; margin-bottom:20px; }
+.tabs2 span { padding:8px 0; color:var(--mut); } .tabs2 span.on { color:var(--fg); font-weight:500; border-bottom:2px solid var(--fg); }
+.notice { border:1px solid var(--line); background:var(--hover); border-radius:8px; padding:12px 14px; font-size:13.5px; display:flex; gap:10px; align-items:flex-start; }
+.notice i { font-size:17px; color:var(--mut); margin-top:1px; }
+.notice.warn { border-color:color-mix(in srgb, var(--warn) 40%, var(--line)); }
+.drop { border:1.5px dashed var(--line); border-radius:8px; padding:18px; display:flex; gap:12px; align-items:center; font-size:13.5px; color:var(--fg2); }
+.drop i { font-size:22px; color:var(--mut); }
+.field { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; font-size:13px; }
+.field label { font-weight:500; color:var(--fg2); }
+.field .in { border:1px solid var(--line); border-radius:6px; padding:8px 10px; font-size:14px; color:var(--fg); background:var(--bg); }
+.field .hint { font-size:12.5px; color:var(--mut); }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+.seg2 { display:inline-flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; font-size:13px; }
+.seg2 span { padding:6px 11px; color:var(--mut); border-right:1px solid var(--line); } .seg2 span:last-child { border-right:0; }
+.seg2 span.on { background:var(--line2); color:var(--fg); font-weight:500; }
+.sw { width:34px; height:20px; border-radius:10px; background:var(--line); position:relative; display:inline-block; flex:none; }
+.sw::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.2); }
+.sw.on { background:var(--ok); } .sw.on::after { left:16px; }
+/* drawer & dialog overlays */
+.over { position:relative; }
+.scrim { position:absolute; inset:0; background:rgba(0,0,0,.28); }
+.drawer { position:absolute; top:0; right:0; bottom:0; width:420px; background:var(--bg); border-left:1px solid var(--line); box-shadow:-8px 0 24px rgba(0,0,0,.12); padding:20px 22px; box-sizing:border-box; display:flex; flex-direction:column; }
+.drawer h3, .dialog h3 { margin:0 0 4px; font-size:17px; font-weight:600; }
+.drawer .foot { margin-top:auto; display:flex; align-items:center; gap:8px; justify-content:flex-end; padding-top:14px; border-top:1px solid var(--line); }
+.dialog { position:absolute; left:50%; top:110px; transform:translateX(-50%); width:460px; background:var(--bg); border:1px solid var(--line); border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,.18); padding:20px 22px; }
+.dialog .foot { display:flex; align-items:center; gap:8px; justify-content:flex-end; margin-top:16px; }
+.pw { font:12.5px 'JetBrains Mono', monospace; }
+.pw div { display:grid; grid-template-columns:1fr 1fr; padding:6px 0; border-bottom:1px solid var(--line2); }
+/* reorder list */
+.olist > div { display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; background:var(--bg); font-size:14px; }
+.olist .L { font:500 13px 'JetBrains Mono', monospace; width:16px; color:var(--mut); }
+.olist .h { color:var(--faint); font-size:16px; cursor:grab; }
+.olist .id { font:12px 'JetBrains Mono', monospace; color:var(--mut); }
+.olist .x { margin-left:auto; color:var(--mut); }
+.olist > div.drag { box-shadow:0 6px 18px rgba(0,0,0,.14); transform:translateX(6px); border-color:var(--fg2); }
+/* analysis */
+.kpis { display:grid; grid-template-columns:repeat(5, 1fr); border:1px solid var(--line); border-radius:8px; }
+.kpis div { padding:12px 16px; border-right:1px solid var(--line); } .kpis div:last-child { border-right:0; }
+.kpis span { display:block; font-size:13px; color:var(--mut); } .kpis b { font:500 20px 'JetBrains Mono', monospace; display:block; margin:2px 0; }
+.kpis em { font-style:normal; font:12px 'JetBrains Mono', monospace; color:var(--mut); }
+.chart { display:flex; align-items:flex-end; gap:5px; height:150px; padding:10px 0 0; border-bottom:1px solid var(--line); }
+.chart div { flex:1; display:flex; flex-direction:column-reverse; }
+.chart i { display:block; } .chart i.a { background:var(--ok); } .chart i.w { background:var(--bad); } .chart i.t { background:var(--warn); } .chart i.c { background:var(--faint); }
+.legend2 { display:flex; gap:14px; font-size:12px; color:var(--mut); margin-top:8px; }
+.legend2 i { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+/* settings */
+.srow { display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; padding:14px 0; border-bottom:1px solid var(--line2); }
+.srow b { font-weight:500; font-size:14px; display:block; } .srow span { font-size:13px; color:var(--mut); }
+.sgroup { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); margin:22px 0 2px; }
+.saved { font-size:12.5px; color:var(--ok); display:inline-flex; gap:5px; align-items:center; }
+.danger { border:1px solid color-mix(in srgb, var(--bad) 35%, var(--line)); border-radius:8px; padding:4px 16px; margin-top:22px; }
+.danger .sgroup { color:var(--bad); }
+</style>
+
+<h2>Phase 5 · Manage (HTML mockup ให้อนุมัติก่อนเริ่มทำ)</h2>
+<p class="note">หน้า Manage ตาม §7.8 ที่ยังไม่เคยมี mockup ส่วนหน้า list ของ Problems มีแล้วใน <span class="mono">key-pages.html</span> §4 จึงใช้ของเดิม
+กติการ่วมทุกหน้า: หัวเรื่องมีปุ่มหลักสีดำได้ปุ่มเดียว · ตารางกดทั้งแถวเพื่อแก้ · เมนู <b>⋯</b> ท้ายแถว (คำสั่งลบอยู่ล่างสุด สีแดง) · แถบ bulk โผล่เฉพาะตอนเลือกแถว · สถานะเป็นจุด + ข้อความ กดสลับไม่ได้
+แก้ 1–3 ช่อง = Dialog · สร้าง/แก้ไม่เกิน ~8 ช่อง = Drawer ขวา · ของที่มีหลายส่วน = หน้าเต็มมี URL และแท็บ</p>
+
+<h2>1 · Users</h2>
+<p class="note">ตัวกรอง: ค้นหา · role (All / Students / Staff / Admins) · Locked · คอลัมน์ last active กับ solved มาจาก backend ใหม่ (<b>B5</b>)
+เลือกแถวแล้วแถบ bulk ขึ้นเหนือตาราง: Lock · Unlock · Change role · Export CSV (ลบผ่าน ⋯ เพราะต้องยืนยัน)
+ปุ่มหลัก <b>Create users</b> เปิด drawer สร้างทีละหลายคน ส่วน Add user ทีละคนอยู่ใน ⋯ ของหัวเรื่อง</p>
+<div class="row"><div id="users" class="app desk short"></div></div>
+
+<h2>2 · Users · แก้ไข (Drawer) / สร้างหลายคนเสร็จ / ลบ</h2>
+<p class="note"><b>แก้ไข:</b> username, role, ล็อกการส่ง, ปุ่ม Reset password · <b>สร้างหลายคนเสร็จ:</b> ตาราง username/password พร้อม Download CSV + Copy และเตือนว่ารหัสจะไม่แสดงอีก ·
+<b>ลบ:</b> ต้องพิมพ์ username ให้ตรง และบอกว่า submission กี่รายการจะหายไปด้วย ปุ่มเขียนว่า "Delete user" ไม่ใช่ "Confirm"</p>
+<div class="row"><div id="user-edit" class="app desk short over"></div></div>
+<div class="row" style="margin-top:28px"><div id="user-batch" class="app desk short over"></div></div>
+<div class="row" style="margin-top:28px"><div id="user-delete" class="app desk short over"></div></div>
+
+<h2>3 · Problem · หน้าแก้ไขเต็มหน้า <span class="mono">/admin/problems/:id</span></h2>
+<p class="note">แท็บ <b>General / Statement / Testcases / Grader files</b> (เฉพาะโจทย์ header) <b>/ Danger zone</b> · ถ้ามี submission แล้วจะขึ้น "type locked · N submissions" ไว้ด้านบนเลย (<b>B6</b>)
+แท็บ Testcases: บรรทัดสรุป ตาราง และที่วางไฟล์ ถ้าแทนชุดทั้งหมดจะถามยืนยันพร้อมจำนวนเก่า/ใหม่ และเสนอให้ rejudge ·
+สร้างโจทย์ใหม่ = dialog เล็กกรอก id กับ title แล้วพามาหน้านี้</p>
+<div class="row"><div id="problem-general" class="app desk short"></div></div>
+<div class="row" style="margin-top:28px"><div id="problem-tests" class="app desk short over"></div></div>
+
+<h2>4 · Contests</h2>
+<p class="note">ตัวกรองสถานะ (All / Scheduled / Running / Finished) · สถานะเป็นจุด + เวลาที่เหลือถ้ากำลังแข่ง · คลิกแถวไปหน้าแก้ไข
+<b>หน้าแก้ไข</b> <span class="mono">/admin/contests/:id</span> แท็บ Settings / <b>Problems</b> (ลากจัดลำดับ = A, B, C… ที่นักเรียนเห็น, เพิ่มโจทย์ด้วยช่องค้นหา) / Participants (ดูอย่างเดียว) ·
+<b>สร้าง</b> ใน drawer: ชื่อ คำอธิบาย วันเวลาเริ่ม ระยะเวลา (ปุ่มลัด) การมองเห็น และบอกชัดว่าเวลาเป็น Asia/Bangkok</p>
+<div class="row"><div id="contests" class="app desk short"></div></div>
+<div class="row" style="margin-top:28px"><div id="contest-problems" class="app desk short"></div></div>
+<div class="row" style="margin-top:28px"><div id="contest-create" class="app desk short over"></div></div>
+
+<h2>5 · Analysis (Overview)</h2>
+<p class="note">ช่วงเวลาอยู่ที่หัวเรื่อง · แท็บเป็น URL จริง (<span class="mono">/admin/analysis/overview</span>, …) · KPI 5 ช่องพร้อม ▲/▼ สีกลางๆ "vs prev. 30d" · เลิกใช้ pie ของ verdict
+กราฟใช้สีจาก verdict token เดียวกับทั้งเว็บ · ตารางมาตรฐานพร้อม Export CSV</p>
+<div class="row"><div id="analysis" class="app desk short"></div></div>
+
+<h2>6 · Settings — สว่าง / มืด</h2>
+<p class="note">สองกลุ่ม <b>Access</b> (การมองเห็นเว็บ, เปิดสมัคร, เปลี่ยนรหัส) และ <b>Data</b> (Export, Danger zone → Replace database…) · ข้อความอธิบายอยู่ซ้าย ตัวควบคุมอยู่ขวา (มือถือก็เหมือนกัน)
+เปลี่ยนเป็น Private จะถามยืนยันก่อน และเตือนถ้ามี contest กำลังแข่งอยู่ · บันทึกแล้วขึ้น ✓ Saved</p>
+<div class="row"><div id="settings" class="app desk short"></div></div>
+<div class="row" style="margin-top:28px"><div id="settings-dark" class="app desk short dark"></div></div>
+
+<h2>7 · มือถือ (390px)</h2>
+<p class="note">ตารางกลายเป็นรายการสองบรรทัด · Settings คงรูปแบบซ้าย/ขวา · หน้าแก้ไข contest ลากจัดลำดับได้ด้วยนิ้ว</p>
+<div class="row">
+  <div><p class="cap">Users</p><div id="ph-users" class="app phone"></div></div>
+  <div><p class="cap">Contest · Problems</p><div id="ph-cprob" class="app phone"></div></div>
+  <div><p class="cap">Settings</p><div id="ph-settings" class="app phone"></div></div>
+</div>
+
+<script>
+const LOGO = `<svg width="22" height="22" viewBox="0 0 512 512" aria-hidden="true"><defs>
+<mask id="LID-a"><circle cx="368.2" cy="148.2" r="123.1" fill="#fff"/><circle cx="351.7" cy="272.8" r="92.4" fill="#000"/></mask>
+<mask id="LID-b"><circle cx="145.4" cy="314.9" r="130.9" fill="#fff"/><circle cx="213.8" cy="405.4" r="98.3" fill="#000"/></mask>
+<mask id="LID-c"><circle cx="400.4" cy="365.9" r="101.1" fill="#fff"/><circle cx="466.6" cy="392.5" r="66.6" fill="#000"/></mask></defs>
+<circle cx="368.2" cy="148.2" r="123.1" fill="currentColor" mask="url(#LID-a)"/><circle cx="145.4" cy="314.9" r="130.9" fill="currentColor" mask="url(#LID-b)"/>
+<circle cx="400.4" cy="365.9" r="101.1" fill="var(--logo-accent)" mask="url(#LID-c)"/></svg>`;
+let logoN = 0; const logo = () => LOGO.replaceAll('LID', 'lg' + (logoN++));
+
+const side = (active) => `<nav class="side"><div class="brand">${logo()}Grader<i class="ph ph-sidebar-simple col"></i></div>
+<div class="searchrow"><i class="ph ph-magnifying-glass"></i>Search<span class="k">⌘K</span></div>
+${[['house', 'Home'], ['list-checks', 'Problems'], ['paper-plane-tilt', 'Submissions'], ['ranking', 'Ranking']].map(([i, l]) => `<a><i class="ph ph-${i}"></i>${l}</a>`).join('')}
+<div class="grp">Contests</div><a><i class="ph ph-calendar-blank"></i>All contests</a>
+<div class="grp">Manage</div>
+${[['users', 'Users'], ['file-code', 'Problems'], ['trophy', 'Contests'], ['pen-nib', 'Authoring'], ['chart-bar', 'Analysis'], ['gear-six', 'Settings']].map(([i, l]) => `<a class="${l === active ? 'on' : ''}"><i class="ph ph-${i}"></i>${l}</a>`).join('')}
+<div class="me"><span class="av">K</span>kru.somchai<span class="lv">staff</span></div></nav>`;
+const hdr = (crumb, title, meta, actions) => `${crumb ? `<p class="crumb">${crumb}</p>` : ''}<div class="hdr"><div class="grow"><h1 class="h1">${title}</h1>${meta ? `<p class="meta">${meta}</p>` : ''}</div>${actions}</div>`;
+
+/* 1 · users */
+const USERS = [
+  ['nattapat', 'student', 'Active', 96, 'Mar 4, 2025', '14 min ago'], ['ploy.s', 'student', 'Active', 214, 'Feb 11, 2025', '1 h ago'],
+  ['tonkla', 'student', 'Locked', 180, 'Feb 11, 2025', '3 days ago'], ['kru.somchai', 'staff', 'Active', 12, 'Jan 2, 2025', 'now'],
+  ['mintra', 'student', 'Active', 160, 'Mar 4, 2025', 'Yesterday'], ['phum_k', 'student', 'Active', 141, 'Mar 4, 2025', '2 h ago'],
+  ['admin', 'admin', 'Active', 0, 'Dec 1, 2024', '5 days ago'], ['jirat', 'student', 'Active', 120, 'Mar 9, 2025', '12 days ago'],
+];
+const userTable = (selected = []) => `<table class="tbl"><tr><th><span class="cb"></span></th><th>Username</th><th>Role</th><th>Status</th><th class="r">Solved</th><th>Joined</th><th>Last active</th><th></th></tr>
+${USERS.map(([u, r, s, n, j, l]) => `<tr class="${selected.includes(u) ? 'sel' : ''}"><td><span class="cb ${selected.includes(u) ? 'on' : ''}"></span></td><td style="font-weight:500">${u}</td><td>${r === 'student' ? '<span class="mut">Student</span>' : r === 'staff' ? 'Staff' : 'Admin'}</td><td><span class="dot ${s === 'Locked' ? 'warn' : 'ok'}"><i></i>${s}</span></td><td class="r m">${n}</td><td class="mut">${j}</td><td class="mut">${l}</td><td class="mut"><i class="ph ph-dots-three"></i></td></tr>`).join('')}</table>`;
+const usersMain = (selected) => `<main class="wrap">${hdr('Manage', 'Users', '412 accounts · 3 staff · 1 admin', '<span class="icon"><i class="ph ph-dots-three"></i></span><span class="btn"><i class="ph ph-users-three"></i>Create users</span>')}
+<div class="fbar"><span class="search"><i class="ph ph-magnifying-glass"></i>Search username</span><span class="seg2"><span class="on">All</span><span>Students</span><span>Staff</span><span>Admins</span></span><span class="chip"><i class="ph ph-plus"></i>Locked</span><span class="count">412 users</span></div>
+${selected.length ? `<div class="bulk"><b>${selected.length} selected</b><a>Lock</a><a>Unlock</a><a>Change role</a><a>Export CSV</a><span class="x"><i class="ph ph-x"></i> Clear</span></div>` : ''}
+${userTable(selected)}</main>`;
+document.getElementById('users').innerHTML = side('Users') + usersMain(['tonkla', 'mintra']);
+
+/* 2 · user drawers / dialog */
+const drawer = (inner) => `<div class="scrim"></div><div class="drawer">${inner}</div>`;
+document.getElementById('user-edit').innerHTML = side('Users') + usersMain([]) + drawer(`<h3>Edit tonkla</h3><p class="meta" style="margin-bottom:18px">Joined Feb 11, 2025 · 180 solved · 642 submissions</p>
+<div class="field"><label>Username</label><div class="in">tonkla</div></div>
+<div class="field"><label>Role</label><span class="seg2"><span class="on">Student</span><span>Staff</span><span>Admin</span></span></div>
+<div class="srow" style="border-top:1px solid var(--line2)"><div><b>Lock submissions</b><span>Tonkla can still log in and read problems, but cannot submit.</span></div><span class="sw on"></span></div>
+<div class="srow"><div><b>Password</b><span>Set a new one and share it with the student.</span></div><span class="btn sec">Reset password</span></div>
+<div class="foot"><span class="btn sec">Cancel</span><span class="btn">Save changes</span></div>`);
+document.getElementById('user-batch').innerHTML = side('Users') + usersMain([]) + drawer(`<h3>Created 6 users</h3><p class="meta" style="margin-bottom:14px">Class M.4/2 · role Student</p>
+<div class="notice warn"><i class="ph ph-warning"></i><span><b style="font-weight:500">Save these passwords now.</b> They won't be shown again — you can only reset them later.</span></div>
+<div class="pw" style="margin-top:14px"><div class="mut" style="font-family:'IBM Plex Sans Thai';font-size:12.5px"><span>Username</span><span>Password</span></div>
+${[['m42_01', 'kite-41-oak'], ['m42_02', 'moss-88-tin'], ['m42_03', 'reef-17-ash'], ['m42_04', 'dune-63-elm'], ['m42_05', 'gale-29-ivy'], ['m42_06', 'lark-54-bay']].map(([u, p]) => `<div><span>${u}</span><span>${p}</span></div>`).join('')}</div>
+<div class="foot"><span class="btn sec"><i class="ph ph-copy"></i>Copy</span><span class="btn sec"><i class="ph ph-download-simple"></i>Download CSV</span><span class="btn">Done</span></div>`);
+document.getElementById('user-delete').innerHTML = side('Users') + usersMain([]) + `<div class="scrim"></div><div class="dialog"><h3>Delete tonkla?</h3>
+<p style="font-size:14px;color:var(--fg2);margin:6px 0 14px">This deletes the account and its <b style="font-weight:500">642 submissions</b> and <b style="font-weight:500">180 solves</b> (XP and ranking). It cannot be undone.</p>
+<div class="field"><label>Type <span class="mono">tonkla</span> to confirm</label><div class="in">tonkl</div></div>
+<div class="foot"><span class="btn sec">Cancel</span><span class="btn red dis">Delete user</span></div></div>`;
+
+/* 3 · problem edit page */
+const ptabs = (on) => `<div class="tabs2">${['General', 'Statement', 'Testcases', 'Danger zone'].map((t) => `<span class="${t === on ? 'on' : ''}">${t}${t === 'Testcases' ? ' <span class="mono mut" style="font-size:12px">10</span>' : ''}</span>`).join('')}</div>`;
+const phdr = hdr('Manage › Problems › interval_merge', 'Interval merge <span class="tag">STANDARD</span>', '<span class="mono">interval_merge</span> · Visible · in collection <u>Sorting</u>',
+  '<span class="btn sec"><i class="ph ph-arrow-square-out"></i>View as student</span><span class="btn">Save</span>');
+const lockLine = `<div class="notice" style="margin-bottom:18px"><i class="ph ph-lock-simple"></i><span><b style="font-weight:500">Type locked · 214 submissions.</b> The problem type and submission filename can't change once anyone has submitted.</span></div>`;
+document.getElementById('problem-general').innerHTML = side('Problems') + `<main class="wrap">${phdr}${ptabs('General')}${lockLine}
+<div class="grid2"><div class="field"><label>Title</label><div class="in">Interval merge</div></div><div class="field"><label>Author</label><div class="in">Ada</div></div>
+<div class="field"><label>Time limit</label><div class="in"><span class="mono">1000</span> <span class="mut">ms</span></div></div><div class="field"><label>Memory limit</label><div class="in"><span class="mono">256</span> <span class="mut">MB</span></div></div>
+<div class="field"><label>Difficulty</label><div class="in"><span class="mono">1400</span></div><span class="hint">800–3500 · sets the XP for a first solve (+48 XP)</span></div><div class="field"><label>Collection</label><div class="in">Sorting <i class="ph ph-caret-down" style="float:right;color:var(--mut)"></i></div></div></div>
+<div class="field"><label>Categories</label><div style="display:flex;gap:6px"><span class="chip on">Sorting <i class="ph ph-x"></i></span><span class="chip on">Greedy <i class="ph ph-x"></i></span><span class="chip"><i class="ph ph-plus"></i>Add</span></div></div>
+<div class="srow" style="border-top:1px solid var(--line2)"><div><b>Visible to students</b><span>Hidden problems stay reachable by staff through their URL.</span></div><span class="dot ok"><i></i>Visible <span class="btn sec" style="margin-left:10px;padding:4px 10px">Hide</span></span></div>
+</main>`;
+document.getElementById('problem-tests').innerHTML = side('Problems') + `<main class="wrap">${phdr}${ptabs('Testcases')}
+<p style="font-size:14px;margin:0 0 12px"><b style="font-weight:500">10 testcases</b> <span class="mut">· 2.4 MB · last replaced Nov 12 by kru.somchai</span></p>
+<table class="tbl"><tr><th>#</th><th>Input</th><th>Output</th><th class="r">Size</th><th></th></tr>
+${[1, 2, 3, 4, 5].map((n) => `<tr><td class="m">${n}</td><td class="m mut">${n}.in · ${[3, 12, 48, 96, 410][n - 1]} lines</td><td class="m mut">${n}.out</td><td class="r m">${['1.2 KB', '4.8 KB', '22 KB', '91 KB', '402 KB'][n - 1]}</td><td class="mut"><i class="ph ph-eye"></i></td></tr>`).join('')}
+<tr><td colspan="5" class="mut" style="font-size:13px">… 5 more</td></tr></table>
+<div class="drop" style="margin-top:14px"><i class="ph ph-upload-simple"></i><span><b style="font-weight:500">Replace all testcases</b> — drop a ZIP of <span class="mono">N.in</span> / <span class="mono">N.out</span> pairs</span></div>
+</main><div class="scrim"></div><div class="dialog"><h3>Replace 10 testcases with 12?</h3>
+<p style="font-size:14px;color:var(--fg2);margin:6px 0 12px">The old set is deleted. <b style="font-weight:500">214 earlier submissions</b> were judged against it.</p>
+<div class="srow" style="border-top:1px solid var(--line2)"><div><b>Rejudge after replacing</b><span>Queues all 214 submissions; scores and XP update as they finish.</span></div><span class="sw on"></span></div>
+<div class="foot"><span class="btn sec">Cancel</span><span class="btn">Replace and rejudge</span></div></div>`;
+
+/* 4 · contests */
+const CONTESTS = [['Mid-term practice', 'ok', 'Running · 1:12:08 left', 'Nov 16 13:00', '3 h', 86, 5, 'Visible'], ['Weekly round #19', '', 'Scheduled', 'Nov 20 19:00', '2 h', 12, 6, 'Visible'],
+  ['Graph camp selection', '', 'Scheduled', 'Nov 28 09:00', '5 h', 0, 8, 'Hidden'], ['Weekly round #18', '', 'Finished', 'Nov 13 19:00', '2 h', 74, 6, 'Visible'], ['Sorting sprint', '', 'Finished', 'Nov 6 19:00', '1 h 30', 58, 4, 'Visible']];
+document.getElementById('contests').innerHTML = side('Contests') + `<main class="wrap">${hdr('Manage', 'Contests', 'Times are Asia/Bangkok (UTC+7)', '<span class="btn"><i class="ph ph-plus"></i>New contest</span>')}
+<div class="fbar"><span class="seg2"><span class="on">All</span><span>Scheduled</span><span>Running</span><span>Finished</span></span><span class="count">17 contests</span></div>
+<table class="tbl"><tr><th>Title</th><th>Status</th><th>Starts</th><th class="r">Duration</th><th class="r">Participants</th><th class="r">Problems</th><th>Visibility</th><th></th></tr>
+${CONTESTS.map(([t, c, s, st, d, p, n, v]) => `<tr><td style="font-weight:500">${t}</td><td><span class="dot ${c}"><i></i>${s}</span></td><td class="m">${st}</td><td class="r m">${d}</td><td class="r m">${p}</td><td class="r m">${n}</td><td><span class="dot ${v === 'Hidden' ? 'warn' : ''}"><i></i>${v}</span></td><td class="mut"><i class="ph ph-dots-three"></i></td></tr>`).join('')}</table></main>`;
+const ctabs = (on) => `<div class="tabs2">${['Settings', 'Problems', 'Participants'].map((t) => `<span class="${t === on ? 'on' : ''}">${t}${t === 'Problems' ? ' <span class="mono mut" style="font-size:12px">6</span>' : t === 'Participants' ? ' <span class="mono mut" style="font-size:12px">12</span>' : ''}</span>`).join('')}</div>`;
+const CP = [['A', 'Pair ordering', 'pair_ord'], ['B', 'Stack min', 'stack_min'], ['C', 'Two sum (sorted)', 'two_sum_sorted'], ['D', 'Rolling string hash', 'roll_hash'], ['E', 'Range minimum', 'range_min'], ['F', 'Matrix exponent', 'matrix_exp']];
+document.getElementById('contest-problems').innerHTML = side('Contests') + `<main class="wrap">${hdr('Manage › Contests', 'Weekly round #19 <span class="tag">SCHEDULED</span>', 'Nov 20 19:00 – 21:00 · 12 registered', '<span class="btn sec"><i class="ph ph-arrow-square-out"></i>Open contest page</span>')}
+${ctabs('Problems')}
+<div class="fbar"><span class="search" style="width:340px"><i class="ph ph-magnifying-glass"></i>Add a problem by id or title…</span><span class="count">Drag to set the order students see (A, B, C…)</span></div>
+<div class="olist">${CP.map(([L, t, id], i) => `<div class="${i === 2 ? 'drag' : ''}"><i class="ph ph-dots-six-vertical h"></i><span class="L">${L}</span><span>${t}</span><span class="id">${id}</span><span class="x"><i class="ph ph-x"></i></span></div>`).join('')}</div>
+<p class="meta">Removing a problem returns it to the practice set. Problems can't be added or removed after the contest ends.</p></main>`;
+document.getElementById('contest-create').innerHTML = side('Contests') + `<main class="wrap">${hdr('Manage', 'Contests', 'Times are Asia/Bangkok (UTC+7)', '<span class="btn"><i class="ph ph-plus"></i>New contest</span>')}</main>` + drawer(`<h3>New contest</h3><p class="meta" style="margin-bottom:16px">You add problems after creating it.</p>
+<div class="field"><label>Title</label><div class="in">Weekly round #20</div></div>
+<div class="field"><label>Description <span class="mut" style="font-weight:400">· optional</span></label><div class="in" style="height:54px;color:var(--mut)">Rules, allowed languages…</div></div>
+<div class="grid2"><div class="field"><label>Start date</label><div class="in mono">2026-11-27</div></div><div class="field"><label>Start time</label><div class="in mono">19:00</div></div></div>
+<div class="field"><label>Duration</label><span class="seg2"><span>1 h</span><span class="on">2 h</span><span>3 h</span><span>5 h</span><span>Custom</span></span><span class="hint">Ends Thu 27 Nov, 21:00</span></div>
+<div class="srow" style="border-top:1px solid var(--line2)"><div><b>Visible to students</b><span>Hidden contests don't appear anywhere for students.</span></div><span class="sw"></span></div>
+<div class="notice" style="margin-top:12px"><i class="ph ph-clock"></i><span>Times are Asia/Bangkok (UTC+7).</span></div>
+<div class="foot"><span class="btn sec">Cancel</span><span class="btn">Create contest</span></div>`);
+
+/* 5 · analysis */
+let s5 = 3; const r5 = () => { s5 = (s5 * 9301 + 49297) % 233280; return s5 / 233280; };
+document.getElementById('analysis').innerHTML = side('Analysis') + `<main class="wrap">${hdr('Manage', 'Analysis', '', '<span class="seg2"><span>7d</span><span class="on">30d</span><span>90d</span><span>All</span></span><span class="btn sec"><i class="ph ph-download-simple"></i>Export CSV</span>')}
+<div class="tabs2">${['Overview', 'Users', 'Problems', 'Contests', 'Submissions'].map((t, i) => `<span class="${i === 0 ? 'on' : ''}">${t}</span>`).join('')}</div>
+<div class="kpis">${[['Submissions', '8,412', '▲ 12%'], ['Unique submitters', '318', '▲ 4%'], ['Accepted', '2,960', '▲ 9%'], ['New users', '41', '▼ 18%'], ['Active problems', '126', '▲ 2%']].map(([l, v, d]) => `<div><span>${l}</span><b>${v}</b><em>${d} vs prev. 30d</em></div>`).join('')}</div>
+<div class="sec"><div class="sech"><b>Submissions per day</b><span>by verdict</span></div><div class="chart">${Array.from({ length: 30 }, (_, i) => { const t = 120 + 160 * r5() + (i % 7 < 5 ? 80 : 0); const a = t * (0.3 + 0.1 * r5()), w = t * 0.4, tl = t * 0.15; return `<div><i class="a" style="height:${a / 3.4}px"></i><i class="w" style="height:${w / 3.4}px"></i><i class="t" style="height:${tl / 3.4}px"></i><i class="c" style="height:${(t - a - w - tl) / 3.4}px"></i></div>`; }).join('')}</div>
+<div class="legend2"><span><i style="background:var(--ok)"></i>Accepted</span><span><i style="background:var(--bad)"></i>Wrong / runtime</span><span><i style="background:var(--warn)"></i>Time / memory</span><span><i style="background:var(--faint)"></i>Compile / other</span></div></div>
+<div class="sec cols"><div><div class="sech"><b>Hardest problems</b><span>lowest accept rate, ≥ 20 tries</span></div><table class="tbl"><tr><th>Problem</th><th class="r">Tries</th><th class="r">Accepted</th></tr>${[['Matrix exponent', 214, '6%'], ['Range minimum', 188, '11%'], ['Rolling string hash', 301, '14%']].map(([p, t, a]) => `<tr><td>${p}</td><td class="r m">${t}</td><td class="r m">${a}</td></tr>`).join('')}</table></div>
+<div><div class="sech"><b>Most active</b><span>submissions</span></div><table class="tbl"><tr><th>User</th><th class="r">Submissions</th><th class="r">Solved</th></tr>${[['ploy.s', 412, 38], ['tonkla', 366, 29], ['nattapat', 301, 31]].map(([u, s, n]) => `<tr><td>${u}</td><td class="r m">${s}</td><td class="r m">${n}</td></tr>`).join('')}</table></div></div></main>`;
+
+/* 6 · settings */
+const settingsMain = `<main class="wrap" style="max-width:820px">${hdr('Manage', 'Settings', '', '<span class="saved"><i class="ph-bold ph-check"></i>Saved</span>')}
+<div class="sgroup">Access</div>
+<div class="srow"><div><b>Site visibility</b><span>Private: only signed-in users see anything. Public: guests can browse problems and scoreboards.</span></div><span class="seg2"><span class="on">Public</span><span>Private</span></span></div>
+<div class="srow"><div><b>Registration</b><span>Let people create their own accounts.</span></div><span class="sw on"></span></div>
+<div class="srow"><div><b>Password changes</b><span>Let students and staff change their own password. Admins always can.</span></div><span class="sw"></span></div>
+<div class="sgroup">Data</div>
+<div class="srow"><div><b>Export database</b><span>A full dump to keep or move to another server.</span></div><span class="btn sec"><i class="ph ph-download-simple"></i>Export</span></div>
+<div class="danger"><div class="sgroup">Danger zone</div><div class="srow" style="border-bottom:0"><div><b>Replace database</b><span>Overwrites every user, problem and submission with an uploaded dump. The site is offline while it runs.</span></div><span class="btn sec" style="color:var(--bad)">Replace database…</span></div></div></main>`;
+document.getElementById('settings').innerHTML = side('Settings') + settingsMain;
+document.getElementById('settings-dark').innerHTML = side('Settings') + settingsMain;
+
+/* 7 · phones */
+const topBar = () => `<div class="topbar">${logo()}Grader<i class="ph ph-magnifying-glass s"></i></div>`;
+const tabs = (on) => `<nav class="tabs">${[['house', 'Home'], ['list-checks', 'Problems'], ['calendar-blank', 'Contests'], ['paper-plane-tilt', 'Submissions'], ['dots-three', 'More']].map(([i, l]) => `<a class="${l === on ? 'on' : ''}"><i class="ph ph-${i}"></i>${l}</a>`).join('')}</nav>`;
+document.getElementById('ph-users').innerHTML = topBar() + `<div class="pmain"><h1 class="p-h1">Users</h1><p class="p-meta">412 accounts</p>
+<div class="ptb"><div class="seg"><span class="on">All</span><span>Students</span><span>Staff</span></div><span class="btn2"><i class="ph ph-funnel"></i>Filters</span></div>
+${USERS.slice(0, 6).map(([u, r, s, n, j, l]) => `<div class="item"><div class="l1" style="gap:10px"><b>${u}</b><span class="dot ${s === 'Locked' ? 'warn' : 'ok'}" style="font-size:12px"><i></i>${s}</span><i class="ph ph-dots-three mut"></i></div><div class="l2" style="padding-left:0;font-family:inherit;font-weight:400;color:var(--mut)">${r === 'student' ? 'Student' : r[0].toUpperCase() + r.slice(1)} · <span class="mono">${n}</span> solved · ${l}</div></div>`).join('')}
+<div style="position:absolute;right:16px;bottom:72px"><span class="btn"><i class="ph ph-users-three"></i>Create users</span></div></div>` + tabs('More');
+document.getElementById('ph-cprob').innerHTML = topBar() + `<div class="pmain"><p class="crumb">Manage › Contests</p><h1 class="p-h1" style="font-size:19px">Weekly round #19</h1><p class="p-meta">Scheduled · Nov 20 19:00</p>
+<div class="tabs2" style="gap:16px">${['Settings', 'Problems', 'Participants'].map((t) => `<span class="${t === 'Problems' ? 'on' : ''}">${t}</span>`).join('')}</div>
+<span class="search" style="width:auto;margin-bottom:10px"><i class="ph ph-magnifying-glass"></i>Add a problem…</span>
+<div class="olist">${CP.map(([L, t], i) => `<div class="${i === 1 ? 'drag' : ''}"><i class="ph ph-dots-six-vertical h"></i><span class="L">${L}</span><span>${t}</span><span class="x"><i class="ph ph-x"></i></span></div>`).join('')}</div></div>` + tabs('More');
+document.getElementById('ph-settings').innerHTML = topBar() + `<div class="pmain"><h1 class="p-h1">Settings</h1><p class="p-meta"><span class="saved"><i class="ph-bold ph-check"></i>Saved</span></p>
+<div class="sgroup" style="margin-top:6px">Access</div>
+<div class="srow"><div><b>Site visibility</b><span>Guests can browse when Public.</span></div><span class="seg2"><span class="on">Public</span><span>Private</span></span></div>
+<div class="srow"><div><b>Registration</b><span>Let people create accounts.</span></div><span class="sw on"></span></div>
+<div class="srow"><div><b>Password changes</b><span>Admins always can.</span></div><span class="sw"></span></div>
+<div class="sgroup">Data</div>
+<div class="srow"><div><b>Export database</b><span>A full dump.</span></div><span class="btn sec">Export</span></div>
+<div class="danger"><div class="srow" style="border-bottom:0"><div><b style="color:var(--bad)">Replace database…</b><span>Overwrites everything.</span></div><i class="ph ph-caret-right mut"></i></div></div></div>` + tabs('More');
+</script>
