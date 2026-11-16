@@ -8,6 +8,7 @@ import type {
   ProfileSyncRun,
   ProfileUpdateConfirmation,
   TestcaseMetadata,
+  UserCandidate,
 } from '../../features/admin/authoring/types';
 
 const draftsBase = '/admin/authoring/drafts';
@@ -184,6 +185,11 @@ const authoringService = {
   },
 
   // Author profiles
+  /** B8: accounts a profile can be linked to (staff), prefix matches first. */
+  searchUserCandidates: async (q: string): Promise<UserCandidate[]> => {
+    const response = await api.get<UserCandidate[]>('/admin/author-profiles/user-candidates', { params: { q } });
+    return response.data;
+  },
   listProfiles: async (): Promise<Profile[]> => {
     const response = await api.get<Profile[]>(profilesBase);
     return response.data;

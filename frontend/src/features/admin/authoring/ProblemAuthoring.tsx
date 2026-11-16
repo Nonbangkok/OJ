@@ -10,9 +10,7 @@ import AiDocs from './AiDocs';
 
 function ProfilesPage() {
   return (
-    <AuthoringHub tab="profiles">
-      <AuthorProfiles />
-    </AuthoringHub>
+    <AuthorProfiles wrap={(actions, body) => <AuthoringHub tab="profiles" actions={actions}>{body}</AuthoringHub>} />
   );
 }
 
