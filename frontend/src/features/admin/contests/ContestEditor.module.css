@@ -1,0 +1,194 @@
+/* Contest editor (§7.8): Settings, Problems, Participants. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tab,
+.tabActive {
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--text-primary);
+}
+
+.tabActive {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.tab:focus-visible,
+.tabActive:focus-visible,
+.handle:focus-visible,
+.remove:focus-visible,
+.option:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.count {
+  margin-left: 6px;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 880px;
+}
+
+.muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.mono {
+  font-family: var(--font-family-mono);
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.problemList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.problemRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--background-primary);
+}
+
+.problemRow:last-child {
+  border-bottom: none;
+}
+
+.dropTarget {
+  box-shadow: inset 0 2px 0 var(--accent-primary);
+}
+
+.handle,
+.remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm, 4px);
+  background: none;
+  color: var(--text-muted);
+}
+
+.handle {
+  cursor: grab;
+}
+
+.remove {
+  cursor: pointer;
+}
+
+.remove:hover {
+  color: var(--verdict-wrong);
+}
+
+.letter {
+  width: 24px;
+  font-family: var(--font-family-mono);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.problemTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.problemId {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.rowTools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.picker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.options {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+}
+
+.option:hover {
+  background: var(--background-secondary);
+}
+
+.saved {
+  font-size: 13px;
+  color: var(--verdict-accepted);
+}

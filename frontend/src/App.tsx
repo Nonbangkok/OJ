@@ -53,8 +53,8 @@ import ProblemManagement from './features/admin/problems/ProblemManagement';
 import ContestManagement from './features/admin/contests/ContestManagement';
 import Settings from './features/admin/settings/Settings';
 import AnalysisPage from './features/admin/analysis/AnalysisPage';
-import ManagePlaceholder from './features/admin/ManagePlaceholder';
 import ProblemEditPage from './features/admin/problems/ProblemEditPage';
+import ContestEditPage from './features/admin/contests/ContestEditPage';
 import ProblemAuthoring from './features/admin/authoring/ProblemAuthoring';
 import {
   DraftMetadata,
@@ -154,7 +154,7 @@ export const appRoutes = createRoutesFromElements(
       </Route>
       <Route path="authoring/:draftId/editor" element={<ProblemAuthoring editorMode />} />
       <Route path="contests" element={<ContestManagement />} />
-      <Route path="contests/:contestId/:tab?" element={<ManagePlaceholder backTo="/admin/contests" backLabel="Back to Contests" />} />
+      <Route path="contests/:contestId/:tab?" element={<ContestEditPage />} />
       <Route path="settings" element={<Settings />} />
       <Route path="analysis" element={<AnalysisPage />} />
       <Route path="analysis/:tab" element={<AnalysisPage />} />
