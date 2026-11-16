@@ -90,7 +90,7 @@ describe('author profile persistence', () => {
     await expect(listAuthorProfiles()).resolves.toEqual(summaries);
     const sql = (db.query as jest.Mock).mock.calls[0][0] as string;
     expect(sql).toContain('profile_image_png IS NOT NULL AS has_profile_image');
-    expect(sql).toContain('ORDER BY aka_name ASC, id ASC');
+    expect(sql).toContain('ORDER BY ap.aka_name ASC, ap.id ASC');
     expect(sql).not.toContain('SELECT *');
   });
 

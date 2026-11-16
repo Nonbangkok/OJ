@@ -423,6 +423,11 @@ export const problemDraftIdParamSchema = z.object({
 
 export const authorProfileIdParamSchema = problemDraftIdParamSchema;
 
+/** B8: GET /admin/author-profiles/user-candidates */
+export const authorProfileUserCandidatesQuerySchema = z.object({
+  q: z.string().trim().min(1).max(50),
+});
+
 export const compileAuthoringJobSchema = z.object({
   expectedRevision: z.number().int().positive().max(AUTHORING_VALIDATION.MAX_INT),
   target: z.enum(['solution', 'generator']).default('solution'),

@@ -63,6 +63,16 @@ const toDraftSummaryResponse = (draft: ProblemDraftListRow) => ({
   createdBy: draft.created_by,
   createdAt: draft.created_at,
   updatedAt: draft.updated_at,
+  publishedAt: draft.published_at ?? null,
+  readiness: draft.readiness ? {
+    hasStatement: draft.readiness.has_statement,
+    hasSolution: draft.readiness.has_solution,
+    hasGenerator: draft.readiness.has_generator,
+    testcases: { total: draft.readiness.testcase_total, withOutput: draft.readiness.testcase_with_output },
+    latestPdfRevision: draft.readiness.latest_pdf_revision,
+    latestJobs: draft.readiness.latest_jobs,
+    activeJob: draft.readiness.active_job,
+  } : undefined,
 });
 
 const toDraftDetailResponse = (draft: ProblemDraftRow) => ({
