@@ -7,6 +7,7 @@ import type {
   ProblemDetailResponse,
   ProblemsWithStatsPageResponse,
   ProblemsWithStatsResponse,
+  ProblemStatusCounts,
 } from '../types';
 
 /** Difficulty filtering/sorting for the problems list (server-side). */
@@ -26,6 +27,8 @@ export interface ProblemListDifficultyQuery {
  * opaque next-page token.
  */
 export interface ProblemListQuery extends ProblemListDifficultyQuery {
+  /** The viewer's progress bucket; never sent for guests. */
+  status?: 'solved' | 'attempted' | 'unsolved';
   search?: string;
   category?: string;
   author?: string;
@@ -72,6 +75,14 @@ const problemService = {
       cursor = page.nextCursor;
     }
     return all;
+  },
+
+  /** Per-status counts for the segmented control, following the list filters. */
+  getStatusCounts: async (
+    query: Omit<ProblemListQuery, 'limit' | 'cursor' | 'sort' | 'order' | 'status'> = {},
+  ): Promise<ProblemStatusCounts> => {
+    const response = await api.get<ProblemStatusCounts>('/problem-status-counts', { params: query });
+    return response.data;
   },
 
   /** Global category tab counts (visible standalone problems only). */

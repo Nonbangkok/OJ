@@ -16,7 +16,6 @@ const STORAGE_KEY = 'oj.sidebar.collapsed';
 
 /** Pages that still have their own left rail start with the global sidebar collapsed (spec §10 interim rule). */
 export function defaultCollapsed(pathname: string): boolean {
-  if (/^\/problems\/[^/]+\/?$/.test(pathname)) return true;
   return /^\/admin\/authoring\/(?!profiles\/?$|ai-docs\/?$)[^/]+(\/(?!editor\/?$)[^/]+)?\/?$/.test(pathname);
 }
 

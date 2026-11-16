@@ -46,6 +46,18 @@ export const PROBLEMS_PAGE = {
 } as const;
 
 /**
+ * Difficulty chip choices on the Problems page. A band's value is
+ * "<min>-<max>" and maps onto the difficultyMin/difficultyMax URL params.
+ */
+export const DIFFICULTY_BANDS: readonly { value: string; label: string; min: number; max: number }[] = [
+  { value: '800-1199', label: '800–1199', min: 800, max: 1199 },
+  { value: '1200-1599', label: '1200–1599', min: 1200, max: 1599 },
+  { value: '1600-1999', label: '1600–1999', min: 1600, max: 1999 },
+  { value: '2000-2399', label: '2000–2399', min: 2000, max: 2399 },
+  { value: '2400-3500', label: '2400+', min: 2400, max: 3500 },
+];
+
+/**
  * Admin problem management incremental loading. PAGE_SIZE is the
  * server-side batch ("Show More" fetches exactly this many problems) and
  * matches ADMIN_PROBLEM_LIST_CONFIG.DEFAULT_LIMIT on the backend;

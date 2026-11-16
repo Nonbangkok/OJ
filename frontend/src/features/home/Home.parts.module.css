@@ -1,0 +1,245 @@
+.section,
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sectionLabel {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.mono {
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.monoRight {
+  margin-left: auto;
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.kbd {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* Continue */
+.continue {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+}
+
+.continueHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.continueTitle {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.problemTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.problemTitle:hover {
+  text-decoration: underline;
+}
+
+.continueButton {
+  flex: none;
+}
+
+.startList,
+.goals,
+.collections {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.startRow,
+.collectionRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.startRow {
+  border-bottom: 1px solid var(--background-tertiary);
+}
+
+.startRow .problemTitle {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.startRow:hover .problemTitle,
+.collectionRow:hover .collectionName {
+  text-decoration: underline;
+}
+
+/* Within reach */
+.goal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--background-tertiary);
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.goalText {
+  min-width: 0;
+}
+
+.goalLink {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.goalLink:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+/* Collections */
+.collections {
+  gap: 8px;
+}
+
+.collectionRow {
+  padding: 0 0 4px;
+  font-size: 13.5px;
+}
+
+.collectionName {
+  min-width: 0;
+}
+
+/* Week strip */
+.week {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.weekDays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.weekDay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.weekCell,
+.weekCellSmall {
+  display: block;
+  border-radius: 4px;
+  background: var(--heatmap-empty);
+}
+
+.weekCell {
+  width: 100%;
+  aspect-ratio: 1;
+  max-width: 32px;
+}
+
+.weekCellSmall {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.weekCell[data-level='1'], .weekCellSmall[data-level='1'] { background: var(--heatmap-level-1); }
+.weekCell[data-level='2'], .weekCellSmall[data-level='2'] { background: var(--heatmap-level-2); }
+.weekCell[data-level='3'], .weekCellSmall[data-level='3'] { background: var(--heatmap-level-3); }
+.weekCell[data-level='4'], .weekCellSmall[data-level='4'] { background: var(--heatmap-level-4); }
+
+.weekCell[data-today='true'] {
+  outline: 1.5px dashed var(--text-muted);
+  outline-offset: 2px;
+}
+
+.weekLetter {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.weekLegend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.goalLink:focus-visible,
+.startRow:focus-visible,
+.collectionRow:focus-visible,
+.problemTitle:focus-visible {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .continueHead {
+    flex-direction: column;
+  }
+
+  .continueButton {
+    width: 100%;
+  }
+}

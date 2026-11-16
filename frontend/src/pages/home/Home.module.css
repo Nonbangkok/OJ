@@ -1,6 +1,5 @@
-/* Editorial Home — whitespace and type carry the hierarchy; borders only
-   appear on actual objects (the problem card). The hero, progress strip and
-   quote are intentionally unboxed. */
+/* Logged-in Home (§7.1): date line + heading, then the continue/goals column
+   and the level / week / collections / contest column. */
 
 .home-container {
   display: flex;
@@ -10,34 +9,11 @@
   padding: 0 0 2.5rem;
 }
 
-/* ---------- Hero (open, no card) ---------- */
-
-.hero {
-  display: flex;
-  align-items: flex-end;
-  gap: 1.5rem 1.75rem;
-  flex-wrap: wrap;
-  padding: 1.5rem 0 0;
-}
-
-.hero-text {
-  /* Grows to push the action group to the right edge of the container. */
-  flex: 1;
-  min-width: 0;
-}
-
 .hero-title {
   margin: 0;
   font-size: var(--font-size-page-title);
   color: var(--text-primary);
   letter-spacing: -0.02em;
-}
-
-.hero-tier {
-  margin: 0.375rem 0 0;
-  font-size: var(--font-size-metadata);
-  font-weight: 600;
-  color: var(--accent-primary);
 }
 
 .hero-subtitle {
@@ -56,190 +32,6 @@
   padding-bottom: 0.25rem;
 }
 
-/* Ghost action — a low-priority text affordance used next to the one
-   strong primary CTA (hero) and on the contest row. Composes the shared
-   quiet-action style: neutral at rest, accent tint on hover, never a thin
-   blue hyperlink. */
-.ghost-action {
-  composes: quietAction from '../../components/styles/QuietAction.module.css';
-  /* No rest-state blue next to the primary CTA. */
-}
-
-/* ---------- Progress summary strip ---------- */
-
-.summary-strip {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.375rem 0.75rem;
-  margin: 0;
-  font-size: var(--font-size-card-title);
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.summary-streak {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.summary-streak svg {
-  color: var(--accent-primary);
-}
-
-.summary-separator {
-  color: var(--text-muted);
-}
-
-/* ---------- Section rules & titles ---------- */
-
-.rule {
-  border: none;
-  border-top: 1px solid var(--border-color);
-  margin: 0.25rem 0 0;
-  width: 100%;
-}
-
-.section-title {
-  margin: 0 0 0.75rem;
-  font-size: var(--font-size-card-title);
-  color: var(--text-muted);
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: 0.01em;
-}
-
-/* ---------- Problem card (an object: boxed) ---------- */
-
-.problem-section,
-.contest-section {
-  display: flex;
-  flex-direction: column;
-}
-
-.problem-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1.25rem;
-  background-color: var(--surface-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 1rem 1.25rem;
-  min-width: 0;
-}
-
-.problem-main {
-  min-width: 0;
-}
-
-.problem-title {
-  margin: 0;
-  font-size: var(--font-size-section-title);
-  font-weight: 600;
-  color: var(--text-primary);
-  overflow-wrap: anywhere;
-}
-
-.problem-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.375rem 0.75rem;
-  margin: 0.375rem 0 0;
-  font-size: var(--font-size-metadata);
-  color: var(--text-secondary);
-}
-
-.problem-id {
-  font-family: var(--font-family-mono);
-  color: var(--text-muted);
-}
-
-/* Difficulty chips — same recipe as the Problems page. */
-[class*='difficulty-chip-'] {
-  display: inline-block;
-  padding: 0.08rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: #ffffff;
-  line-height: 1.5;
-}
-
-.difficulty-chip-1 { background-color: var(--difficulty-band-1); }
-.difficulty-chip-2 { background-color: var(--difficulty-band-2); }
-.difficulty-chip-3 { background-color: var(--difficulty-band-3); }
-.difficulty-chip-4 { background-color: var(--difficulty-band-4); }
-.difficulty-chip-5 { background-color: var(--difficulty-band-5); }
-
-/* ---------- Caught-up line (all problems solved) ---------- */
-
-.caught-up {
-  margin: 0;
-  font-size: var(--font-size-card-title);
-  color: var(--text-secondary);
-}
-
-.caught-up-hint {
-  color: var(--text-muted);
-}
-
-/* ---------- Contest row (lighter than the problem card) ---------- */
-
-/* Contest row — the ghost action follows the info instead of being pushed
-   to the far edge, keeping the section one compact cluster. */
-/* One baseline: status badge, countdown, and the quiet Open Contest action
-   share a row under the contest title (flex + center, no manual margins). */
-.contest-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  padding: 0.125rem 0.25rem;
-  min-width: 0;
-}
-
-.contest-row .ghost-action {
-  flex-shrink: 0;
-}
-
-/* ---------- Quote (pure typography, no box) ---------- */
-
-/* Quote — the shuffle control sits right after the line, so the pair reads
-   as one compact element rather than spanning the page. */
-.quote-section {
-  display: flex;
-  align-items: baseline;
-  gap: 1rem;
-  flex-wrap: wrap;
-  padding: 0.75rem 0.25rem;
-}
-
-.quote-text {
-  margin: 0;
-  font-style: italic;
-  font-size: var(--font-size-card-title);
-  color: var(--text-secondary);
-  transition: opacity 0.3s ease-in-out;
-  min-width: 0;
-}
-
-.fading {
-  opacity: 0;
-}
-
-/* Quote shuffle — the quietest action on the page: shared quiet-action
-   base with the muted modifier, so at rest it sits below the contest
-   ghost action while the quote line itself stays dominant. */
-.quote-shuffle {
-  composes: quietAction muted from '../../components/styles/QuietAction.module.css';
-}
-
-/* ---------- Logged-out ---------- */
-
 .logged-out {
   display: flex;
   flex-direction: column;
@@ -251,38 +43,79 @@
   margin: 4rem auto;
 }
 
-/* ---------- Responsive ---------- */
-
-@media (max-width: 640px) {
-  .hero {
+.hero-actions {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .hero-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .hero-actions > button {
+.hero-actions > button {
     width: 100%;
   }
 
-  .problem-card {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 
-  /* The contest meta row keeps its baseline alignment on narrow screens;
-     items simply wrap to the next line when out of room. */
-  .contest-row {
-    flex-direction: row;
-    align-items: center;
-  }
+.dateLine {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
 
-  .quote-section {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
+.title {
+  margin: 0;
+  font-size: var(--font-size-page-title);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 32px;
+  align-items: start;
+}
+
+.main,
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 0;
+}
+
+.level {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mono {
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.contestTitle {
+  font-weight: 500;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.contestTitle:hover {
+  text-decoration: underline;
+}
+
+.contestTitle:focus-visible {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

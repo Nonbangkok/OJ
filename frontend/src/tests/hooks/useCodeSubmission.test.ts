@@ -136,10 +136,11 @@ describe('useCodeSubmission', () => {
         expect(result.current.code).toBe('');
     });
 
-    it('handles successful submission, saves to cache and navigates', async () => {
-        (jest.mocked(submissionService.submit) as jest.Mock).mockResolvedValueOnce({ success: true });
+    it('handles successful submission, saves to cache and reports the new id', async () => {
+        (jest.mocked(submissionService.submit) as jest.Mock).mockResolvedValueOnce({ message: 'ok', submissionId: 41, isContestSubmission: false });
+        const onSubmitted = jest.fn();
 
-        const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined));
+        const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined, null, onSubmitted));
 
         act(() => {
             result.current.setCode('print("hello")');
@@ -160,7 +161,10 @@ describe('useCodeSubmission', () => {
 
         const cache = JSON.parse(localStorage.getItem('oj-submission-cache'));
         expect(cache[`${mockProblemId}:cpp`].code).toBe('print("hello")');
-        expect(mockNavigate).toHaveBeenCalledWith('/submissions');
+        // The page shows the result in place; no navigation away.
+        expect(onSubmitted).toHaveBeenCalledWith(41);
+        expect(mockNavigate).not.toHaveBeenCalled();
+        expect(result.current.isSubmitting).toBe(false);
     });
 
     it('submits with the selected language and caches under its own key', async () => {

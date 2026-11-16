@@ -22,6 +22,8 @@ export interface ProblemListSpan<T> {
 }
 
 export interface PublicProblemListFilters {
+  /** The viewer's progress bucket; '' for none. Never set for guests. */
+  status?: string;
   search: string;
   category: string;
   author: string;
@@ -70,12 +72,18 @@ const walkProblemPages = async <T, Q extends { limit?: number; cursor?: string |
   return { problems, nextCursor: hasMore ? cursor : null, hasMore };
 };
 
+const PROBLEM_STATUSES = ['solved', 'attempted', 'unsolved'] as const;
+type ProblemStatus = typeof PROBLEM_STATUSES[number];
+const isProblemStatus = (value: string | undefined): value is ProblemStatus =>
+  (PROBLEM_STATUSES as readonly string[]).includes(value ?? '');
+
 export const buildPublicProblemListQuery = ({
-  search, category, author, collection, difficultyMin, difficultyMax, sort,
+  status, search, category, author, collection, difficultyMin, difficultyMax, sort,
 }: PublicProblemListFilters): ProblemListQuery => {
   const trimmedSearch = search.trim();
   const trimmedAuthor = author.trim();
   return {
+    ...(isProblemStatus(status) ? { status } : {}),
     ...(trimmedSearch ? { search: trimmedSearch } : {}),
     ...(category ? { category } : {}),
     ...(trimmedAuthor ? { author: trimmedAuthor } : {}),
@@ -100,7 +108,10 @@ export const buildAdminProblemListQuery = ({ search, collection, visibility, aut
 
 export const publicProblemListQueryFromUrl = (url: URL): ProblemListQuery => {
   const params = url.searchParams;
+  // A guest's ?status= makes the server answer 400; the loader then returns
+  // null and the page fetches its own (status-free) first page.
   return buildPublicProblemListQuery({
+    status: params.get('status') || '',
     search: params.get('search') || '',
     category: params.get('category') || '',
     author: params.get('author') || '',

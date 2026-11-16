@@ -1,43 +1,39 @@
-import { useState, useEffect, useRef, useCallback, type MouseEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import problemService from '../services/problemService';
 import contestService from '../services/contestService';
 import { getErrorStatus, toApiLikeError } from '../utils/error';
-import type { Contest, ProblemDetail, ProblemSummary, SliderStyle } from '../types';
+import type { Contest, ProblemDetail } from '../types';
 
+/**
+ * The problem page's data: the problem (with the viewer's best result,
+ * attempt count and collection from the detail endpoint) and, on contest
+ * routes, the contest.
+ */
 export const useProblemDetail = () => {
   const { contestId, problemId } = useParams();
-  const [problem, setProblem] = useState<(ProblemDetail & Partial<ProblemSummary>) | null>(null);
+  const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeView, setActiveView] = useState('statement');
   const [contest, setContest] = useState<Contest | null>(null);
-  const navRef = useRef<HTMLElement | null>(null);
-  const [sliderStyle, setSliderStyle] = useState<SliderStyle>({ opacity: 0 });
 
   useEffect(() => {
     const fetchProblem = async () => {
       try {
-        let problemData;
         if (contestId && problemId) {
-          problemData = await problemService.getContestProblemDetails(contestId, problemId);
-          const contestRes = await contestService.getById(contestId);
+          const [problemData, contestRes] = await Promise.all([
+            problemService.getContestProblemDetails(contestId, problemId),
+            contestService.getById(contestId),
+          ]);
+          setProblem(problemData);
           setContest(contestRes);
         } else if (problemId) {
-          const details = await problemService.getDetails(problemId);
-          const allStats = await problemService.getAllWithStats();
-          const currentStats = allStats.find((p) => String(p.id) === problemId);
-          problemData = { ...details, ...currentStats };
-        }
-        if (problemData) {
-          setProblem(problemData);
+          setProblem(await problemService.getDetails(problemId));
         }
       } catch (err) {
         const apiError = toApiLikeError(err);
-        // Hidden problems now come back as 404 (same shape as nonexistent),
-        // so there is no dedicated hidden-problem state for regular users —
-        // only staff ever see a hidden problem's detail, with is_visible
-        // riding along in the 200 body.
+        // Hidden problems come back as 404 (same shape as nonexistent);
+        // only staff ever see a hidden problem's detail.
         if (getErrorStatus(err) === 404) {
           setError(`Problem ${problemId} not found.`);
         } else {
@@ -59,49 +55,5 @@ export const useProblemDetail = () => {
     }
   }, [problemId, contestId]);
 
-  // Memoized: ProblemDetail's measure effect lists resetSlider in its deps, so
-  // a fresh identity here would re-arm the timer after every reset-driven
-  // render — resetting the slider back to the active tab every 150ms even
-  // while an item is being hovered.
-  const handleMouseEnter = useCallback((e: MouseEvent<HTMLButtonElement>) => {
-    const btn = e.currentTarget;
-    setSliderStyle({
-      height: btn.offsetHeight + 5,
-      top: btn.offsetTop + 22,
-      opacity: 1,
-    });
-  }, []);
-
-  const resetSlider = useCallback((styles?: { active: string }) => {
-    try {
-      const activeClass = styles?.active ?? 'active';
-      const activeBtn = navRef.current?.querySelector<HTMLElement>(`.${activeClass}`);
-      if (activeBtn) {
-        setSliderStyle({
-          height: activeBtn.offsetHeight + 5,
-          top: activeBtn.offsetTop + 22,
-          opacity: 1,
-        });
-      } else {
-        setSliderStyle((prev) => ({ ...prev, opacity: 0 }));
-      }
-    } catch {
-      setSliderStyle({ opacity: 0 });
-    }
-  }, []);
-
-  return {
-    problemId,
-    contestId,
-    problem,
-    contest,
-    loading,
-    error,
-    activeView,
-    setActiveView,
-    navRef,
-    sliderStyle,
-    handleMouseEnter,
-    resetSlider,
-  };
+  return { problemId, contestId, problem, contest, loading, error };
 };

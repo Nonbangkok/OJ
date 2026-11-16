@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import hljs from 'highlight.js/lib/core';
 import cpp from 'highlight.js/lib/languages/cpp';
 import python from 'highlight.js/lib/languages/python';
@@ -38,10 +37,21 @@ const writeSubmissionCache = (cache: SubmissionCache): void => {
   }
 };
 
+/** Reads a dropped file as text (FileReader works in every browser and jsdom). */
+const readFileText = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+
 const useCodeSubmission = (
   problemId: string,
   contestId: string | null | undefined,
-  submissionFilename?: string | null
+  submissionFilename?: string | null,
+  /** Called with the new submission's id once the judge has queued it. */
+  onSubmitted?: (submissionId: number) => void,
 ) => {
   const [selectedLanguage, setLanguage] = useState<SubmissionLanguage>('cpp');
   // Header problems are C++ only; the judge rejects anything else.
@@ -49,7 +59,6 @@ const useCodeSubmission = (
   const [code, setCode] = useState(``);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const navigate = useNavigate();
 
   const editorWrapperRef = useRef<HTMLDivElement | null>(null);
   const lineNumbersRef = useRef<HTMLDivElement | null>(null);
@@ -110,8 +119,9 @@ const useCodeSubmission = (
     };
   }, []); // Run only once to attach the listener
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: Pick<FormEvent, 'preventDefault'>) => {
+    e?.preventDefault();
+    if (isSubmitting) return;
     setIsSubmitting(true);
     setError('');
 
@@ -127,7 +137,7 @@ const useCodeSubmission = (
         submitData.contestId = contestId;
       }
 
-      await submissionService.submit(submitData);
+      const response = await submissionService.submit(submitData);
 
       const submissionCache = readSubmissionCache();
       submissionCache[cacheKey] = {
@@ -136,12 +146,9 @@ const useCodeSubmission = (
       };
       writeSubmissionCache(submissionCache);
 
-      // Navigate to appropriate submissions page
-      if (contestId) {
-        navigate(`/contests/${contestId}/submissions`);
-      } else {
-        navigate('/submissions');
-      }
+      // The result is shown in place (live) by the caller.
+      setIsSubmitting(false);
+      onSubmitted?.(response.submissionId);
     } catch (err) {
       const errorMsg = err.response?.data?.message || 'An unexpected error occurred.';
       setError(errorMsg);
@@ -165,6 +172,15 @@ const useCodeSubmission = (
     editorWrapperRef.current?.querySelector('textarea')?.focus();
   };
 
+  /** Loads a dropped/picked file into the editor; a .py file switches a standard problem to Python. */
+  const loadFile = async (file: File) => {
+    const text = await readFileText(file);
+    if (!submissionFilename) {
+      setLanguage(file.name.toLowerCase().endsWith('.py') ? 'python' : 'cpp');
+    }
+    setCode(text);
+  };
+
   return {
     language,
     setLanguage,
@@ -178,6 +194,7 @@ const useCodeSubmission = (
     highlightCode,
     lineCount,
     handleWrapperClick,
+    loadFile,
   };
 };
 

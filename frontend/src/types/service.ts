@@ -35,6 +35,8 @@ export interface SubmissionQueryParams {
   contestId?: string | number;
   filterProblemId?: string;
   filterUserId?: string;
+  /** Exact overall status, e.g. 'Accepted'. */
+  verdict?: string;
 }
 
 export interface CreateUserRequest {
