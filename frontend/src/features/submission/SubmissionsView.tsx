@@ -10,7 +10,6 @@ import {
     PageHeader,
     ScoreCell,
     SegmentedControl,
-    TestcaseStrip,
     VerdictText,
     type DataTableColumn,
 } from '../../components/ui';
@@ -103,11 +102,11 @@ const SubmissionsView = ({
         },
         { key: 'when', header: 'When', mobile: 'meta', cell: (s) => <span className={styles.muted}>{formatTimeAgo(s.submitted_at)}</span> },
         ...(problemId ? [] : [{
-            key: 'user', header: 'User', mobile: 'hidden' as const,
+            key: 'user', header: 'User', mobile: 'hidden' as const, width: '14%',
             cell: (s: SubmissionSummary) => <Link to={`/profile/${s.username}`} className={styles.user}>{s.username}</Link>,
         }]),
         {
-            key: 'problem', header: 'Problem', mobile: 'primary',
+            key: 'problem', header: 'Problem', mobile: 'primary', width: '30%',
             cell: (s) => (
                 <span className={styles.problem}>
                     <span className={styles.mono}>{s.problem_id}</span>
@@ -121,12 +120,8 @@ const SubmissionsView = ({
             cell: (s) => {
                 // A compile log or system message is stored as one result entry, not a testcase.
                 const results = NO_CASES.has(s.overall_status) ? [] : (s.case_statuses ?? []).map((status) => ({ status }));
-                return (
-                    <span className={styles.verdict}>
-                        <VerdictText status={s.overall_status} results={results} />
-                        {results.length > 0 && <TestcaseStrip results={results} />}
-                    </span>
-                );
+                // The verdict reads "Wrong 1/5" on its own; the per-case strip lives on the detail page.
+                return <VerdictText status={s.overall_status} results={results} />;
             },
         },
         { key: 'score', header: 'Score', align: 'right', mobile: 'hidden', cell: (s) => <ScoreCell score={s.score} attempted /> },

@@ -68,6 +68,8 @@ export default function UserEditDrawer({ user, onClose, onSaved, onChanged, onRe
         <span className={styles.fieldLabel}>Role</span>
         <SegmentedControl aria-label="Role" options={ROLES} value={role} onChange={(value) => setRole(value as UserRole)} />
       </div>
+      {/* The footer draws the closing rule, so the last row drops its own (one line, not two). */}
+      <div className={styles.rows}>
       {role === 'user' && (
         <SettingsRow
           label="Lock submissions"
@@ -80,6 +82,7 @@ export default function UserEditDrawer({ user, onClose, onSaved, onChanged, onRe
         help="Set a new one and share it with the user."
         control={<Button variant="secondary" onClick={() => onResetPassword(user)}>Reset password</Button>}
       />
+      </div>
       <div className={styles.footer}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button onClick={save} disabled={busy || username.trim().length === 0} loading={busy} loadingLabel="Saving…">Save changes</Button>

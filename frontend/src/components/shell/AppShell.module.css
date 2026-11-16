@@ -1,31 +1,52 @@
 .shell {
   display: grid;
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-current, var(--sidebar-width)) minmax(0, 1fr);
   min-height: 100vh;
   background: var(--background-primary);
 }
 
-.shell.collapsed {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto 1fr;
+.sidebarSlot {
+  position: relative;
+  min-width: 0;
+}
+
+/* The draggable right edge of the sidebar: a wide hit area, a thin line on hover. */
+.resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  z-index: 45;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+
+.resizer:hover::after,
+.resizer:focus-visible::after,
+.resizing::after {
+  background: var(--accent-primary);
+}
+
+.resizer:focus-visible {
+  outline: none;
 }
 
 .main {
   min-width: 0;
 }
 
-.strip {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 44px;
-  padding: 0 12px;
-  background: var(--background-primary);
-  border-bottom: 1px solid var(--border-color);
-}
 
 .brand {
   display: flex;

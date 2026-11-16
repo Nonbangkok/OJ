@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
-import { Countdown, InlineError, ProgressBar } from '../../components/ui';
+import { InlineError, ProgressBar } from '../../components/ui';
 import { isEditableTarget, isModalOpen } from '../../components/shell/keyboard';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -11,23 +11,14 @@ import CollectionsPanel from '../../features/home/CollectionsPanel';
 import ContinueBlock from '../../features/home/ContinueBlock';
 import WeekStrip from '../../features/home/WeekStrip';
 import WithinReach from '../../features/home/WithinReach';
+import RecentSubmissions from '../../features/home/RecentSubmissions';
+import WeeklyLeaders from '../../features/home/WeeklyLeaders';
+import ContestsPanel from '../../features/home/ContestsPanel';
 import parts from '../../features/home/Home.parts.module.css';
 import contestService from '../../services/contestService';
 import homeService from '../../services/homeService';
 import type { Contest, HomeSummary } from '../../types';
 import styles from './Home.module.css';
-
-const pickContest = (contests: Contest[]): Contest | null => {
-  // Prefer a running contest (soonest end), else the nearest scheduled by start.
-  const running = contests
-    .filter((contest) => contest.status === 'running')
-    .sort((a, b) => new Date(a.end_time).getTime() - new Date(b.end_time).getTime());
-  if (running.length > 0) return running[0];
-  const scheduled = contests
-    .filter((contest) => contest.status === 'scheduled')
-    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-  return scheduled[0] ?? null;
-};
 
 const DATE_LINE = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
 
@@ -46,7 +37,7 @@ const Home = () => {
 
   const [summary, setSummary] = useState<HomeSummary | null>(null);
   const [failed, setFailed] = useState(false);
-  const [contest, setContest] = useState<Contest | null>(null);
+  const [contests, setContests] = useState<Contest[]>([]);
 
   const loadSummary = useCallback(() => {
     setFailed(false);
@@ -62,8 +53,8 @@ const Home = () => {
       .then((data) => { if (!cancelled) setSummary(data); })
       .catch(() => { if (!cancelled) setFailed(true); });
     contestService.getAll()
-      .then((data) => { if (!cancelled) setContest(pickContest(data)); })
-      .catch(() => { if (!cancelled) setContest(null); });
+      .then((data) => { if (!cancelled) setContests(data); })
+      .catch(() => { if (!cancelled) setContests([]); });
     return () => { cancelled = true; };
   }, [user]);
 
@@ -103,6 +94,8 @@ const Home = () => {
               onContinue={(id) => navigate(`/problems/${id}`)}
             />
             <WithinReach summary={summary} />
+            <RecentSubmissions />
+            <WeeklyLeaders username={user.username} />
           </div>
 
           <aside className={styles.aside}>
@@ -129,13 +122,7 @@ const Home = () => {
 
             <CollectionsPanel collections={summary.collections} />
 
-            {contest && (
-              <section className={parts.panel} aria-labelledby="home-contest">
-                <h2 id="home-contest" className={parts.sectionLabel}>Contest</h2>
-                <Link to={`/contests/${contest.id}`} className={styles.contestTitle}>{contest.title}</Link>
-                <Countdown contest={contest} />
-              </section>
-            )}
+            <ContestsPanel contests={contests} />
           </aside>
         </div>
       )}

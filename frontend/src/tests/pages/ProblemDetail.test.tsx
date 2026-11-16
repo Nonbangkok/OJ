@@ -87,26 +87,20 @@ describe('ProblemDetail page', () => {
         expect(screen.getByRole('link', { name: 'open PDF' })).toHaveAttribute('href', '/api/problems/1/pdf');
     });
 
-    it('submitting shows the live result inline and keeps the submission id in the URL', async () => {
+    it('submitting opens the new submission\'s own page, which follows the verdict live', async () => {
         jest.mocked(submissionService.submit).mockResolvedValue({ message: 'ok', submissionId: 77, isContestSubmission: false } as never);
-        jest.mocked(submissionService.getById).mockResolvedValue(accepted as never);
         renderPage('?tab=submit');
         const editor = await screen.findByLabelText(/Your code/i);
         fireEvent.change(editor, { target: { value: 'int main(){}' } });
         fireEvent.click(screen.getByRole('button', { name: /^Submit/ }));
-        const result = await screen.findByRole('region', { name: 'Result' });
-        expect(within(result).getAllByText('ACCEPTED').length).toBeGreaterThan(0);
-        expect(window.location.search).toContain('submission=77');
-        expect(screen.getByRole('link', { name: 'View submitted code' })).toHaveAttribute('href', '/submissions/77');
+        await waitFor(() => expect(window.location.pathname).toBe('/submissions/77'));
         expect(submissionService.submit).toHaveBeenCalledWith({ problemId: '1', language: 'cpp', code: 'int main(){}' });
+        expect(screen.queryByRole('region', { name: 'Result' })).toBeNull();
     });
 
-    it('reloading with ?submission= shows that result', async () => {
-        jest.mocked(submissionService.getById).mockResolvedValue(accepted as never);
+    it('an old link with ?submission= opens that submission\'s page', async () => {
         renderPage('?tab=submit&submission=77');
-        const result = await screen.findByRole('region', { name: 'Result' });
-        expect(within(result).getAllByText('ACCEPTED').length).toBeGreaterThan(0);
-        expect(submissionService.getById).toHaveBeenCalledWith(77, null);
+        await waitFor(() => expect(window.location.pathname).toBe('/submissions/77'));
     });
 
     it('Cmd+Enter submits', async () => {

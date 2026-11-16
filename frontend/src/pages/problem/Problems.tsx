@@ -32,6 +32,7 @@ import type { PublicProblemListLoaderData } from '../../routing/problemListLoade
 import { buildPublicProblemListQuery } from '../../routing/problemListLoaders';
 
 import LoadingPage from '../../components/shared/LoadingPage';
+import { ProblemCategoryReveal } from '../../features/problem/ProblemMetadata';
 
 const UNCATEGORIZED = 'Uncategorized';
 const DIFFICULTY_SORT_ASC = 'difficulty-asc';
@@ -71,7 +72,6 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
   const [filterOptions, setFilterOptions] = useState<ProblemFilterOptionsResponse | null>(null);
   const [statusCounts, setStatusCounts] = useState<ProblemStatusCounts | null>(null);
   const [totals, setTotals] = useState<ProblemStatusCounts | null>(null);
-  const [showCategories, setShowCategories] = useState(false);
 
   const urlSearch = searchParams.get('search') || '';
   // Same-route navigation keeps this component mounted. Mirror an externally
@@ -245,11 +245,6 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
   const segmentLabel = (key: StatusSegment, label: string) =>
     statusCounts ? `${label} ${key === 'all' ? statusCounts.all : statusCounts[key]}` : label;
 
-  const visibleCategories = (problem: ProblemSummary): string[] => {
-    const categories = problem.categories ?? [];
-    return showCategories ? [...categories] : categories.filter(c => selectedCategories.includes(c));
-  };
-
   const columns: DataTableColumn<ProblemSummary>[] = [
     {
       key: 'mark',
@@ -263,20 +258,24 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
       key: 'title',
       header: 'Title',
       mobile: 'primary',
-      cell: (p) => {
-        const categories = visibleCategories(p);
-        return categories.length === 0 ? p.title : (
-          <span className={styles.titleCell}>
-            {p.title}
-            <span className={styles.categories}>{categories.join(' · ')}</span>
-          </span>
-        );
-      },
+      cell: (p) => p.title,
+    },
+    {
+      // Each row reveals its own categories (filtered ones show by default); outside the title link.
+      key: 'categories',
+      header: <span className={styles.srOnly}>Categories</span>,
+      mobile: 'hidden',
+      cell: (p) => (
+        <span className={styles.categoryCell}>
+          <ProblemCategoryReveal categories={p.categories ?? []} highlightCategories={selectedCategories} />
+        </span>
+      ),
     },
     {
       key: 'difficulty',
       header: 'Difficulty',
       align: 'right',
+      sortable: true,
       cell: (p) => (p.difficulty ?? '—'),
       mobile: 'hidden',
     },
@@ -337,28 +336,6 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
           />
         )}
         filters={filters}
-        trailing={(
-          <>
-            <button
-              type="button"
-              className={styles.toggle}
-              aria-pressed={showCategories}
-              onClick={() => setShowCategories(on => !on)}
-            >
-              Show categories
-            </button>
-            <select
-              aria-label="Sort problems"
-              className={styles.sortSelect}
-              value={difficultySort}
-              onChange={event => updateUrl({ sort: event.target.value }, ['sort'])}
-            >
-              <option value="">Sort: Default</option>
-              <option value={DIFFICULTY_SORT_ASC}>Difficulty ↑</option>
-              <option value={DIFFICULTY_SORT_DESC}>Difficulty ↓</option>
-            </select>
-          </>
-        )}
       />
 
       <DataTable<ProblemSummary>
@@ -368,6 +345,12 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
         rowKey={(p) => p.id}
         rowLabel={(p) => p.title}
         rowHref={(p) => `/problems/${p.id}`}
+        // Sorting lives in the Difficulty header (one control, and the filter bar stays on one line).
+        sort={{
+          key: 'difficulty',
+          direction: difficultySort === DIFFICULTY_SORT_DESC ? 'desc' : 'asc',
+          onChange: () => updateUrl({ sort: difficultySort === DIFFICULTY_SORT_DESC ? DIFFICULTY_SORT_ASC : DIFFICULTY_SORT_DESC }, ['sort']),
+        }}
         loading={loading}
         error={error ? { message: error } : undefined}
         empty={(

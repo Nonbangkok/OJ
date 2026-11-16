@@ -243,3 +243,130 @@
     width: 100%;
   }
 }
+
+/* Recent submissions · Top this week · Contests (home, lower half) */
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.headLink {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.headLink:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+.empty {
+  margin: 0;
+  padding: 10px 0;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--background-tertiary);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  border-bottom: 1px solid var(--background-tertiary);
+  font-size: 14px;
+}
+
+.row[data-gap='true'] {
+  border-top: 1px dashed var(--border-color);
+}
+
+.rowYou .rowTitle {
+  font-weight: 600;
+}
+
+.rowMain {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.rowMain:hover .rowTitle {
+  text-decoration: underline;
+}
+
+.rowTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.rowWhen {
+  flex: 0 0 auto;
+  min-width: 92px;
+  text-align: right;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.rank {
+  flex: 0 0 24px;
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.rows .rowTitle:is(a) {
+  flex: 1;
+}
+
+.xp {
+  margin-left: auto;
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  color: var(--status-success);
+}
+
+.contestList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contestItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.contestName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.contestName:hover {
+  text-decoration: underline;
+}

@@ -110,7 +110,7 @@ describe('Problems Page', () => {
             order: 'asc',
             limit: 20,
         });
-        expect(screen.getByLabelText('Sort problems')).toHaveValue('difficulty-asc');
+        expect(screen.getByRole('columnheader', { name: /Difficulty/ })).toHaveAttribute('aria-sort', 'ascending');
     });
 
     it('displays error if the first fetch fails', async () => {
@@ -218,13 +218,17 @@ describe('Problems Page', () => {
             expect(problemService.getProblemsPage).toHaveBeenCalledWith(expect.objectContaining({ category: 'Greedy,Dynamic Programming' }));
         });
 
-        it('categories stay hidden until Show categories', async () => {
+        it('each row reveals its own categories', async () => {
             renderProblems();
             await screen.findByText('Knapsack');
-            expect(screen.queryByText('Dynamic Programming · Data Structures')).toBeNull();
-            fireEvent.click(screen.getByRole('button', { name: 'Show categories' }));
-            expect(screen.getByText('Dynamic Programming · Data Structures')).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Show categories' })).toHaveAttribute('aria-pressed', 'true');
+            const row = screen.getByRole('link', { name: 'Knapsack' }).closest('tr') as HTMLElement;
+            expect(within(row).queryByText('Dynamic Programming')).toBeNull();
+            fireEvent.click(within(row).getByRole('button', { name: 'Show categories' }));
+            expect(within(row).getByText('Dynamic Programming')).toBeInTheDocument();
+            expect(within(row).getByRole('button', { name: 'Hide categories' })).toHaveAttribute('aria-expanded', 'true');
+            // Only that row opened; there is no page-wide toggle any more.
+            expect(screen.getAllByRole('button', { name: 'Show categories' }).length).toBeGreaterThan(0);
+            expect(screen.queryByRole('button', { name: 'Show categories', pressed: true })).toBeNull();
         });
 
         it('rows link to the problem and show the best strip and score', async () => {
@@ -357,7 +361,7 @@ describe('Problems Page', () => {
             expect(screen.getByRole('button', { name: 'Remove filter Difficulty: 1200–2200' })).toBeInTheDocument();
             expect(screen.getByRole('button', { name: 'Remove filter Author: Alice' })).toBeInTheDocument();
             expect(await screen.findByRole('button', { name: 'Remove filter Collection: Practice' })).toBeInTheDocument();
-            expect(screen.getByLabelText('Sort problems')).toHaveValue('difficulty-desc');
+            expect(screen.getByRole('columnheader', { name: /Difficulty/ })).toHaveAttribute('aria-sort', 'descending');
             expect(mock).toHaveBeenLastCalledWith({
                 search: 'updated', category: 'Greedy', difficultyMin: 1200, difficultyMax: 2200,
                 sort: 'difficulty', order: 'desc', author: 'Alice', collection: 7, limit: 20,
@@ -453,7 +457,8 @@ describe('Problems Page', () => {
             await chooseChip('Collection', 'Practice');
             await chooseChip('Difficulty', '1200–1599');
             await chooseChip('Category', 'Greedy');
-            fireEvent.change(screen.getByLabelText('Sort problems'), { target: { value: 'difficulty-desc' } });
+            // Sorting is the Difficulty header now (ascending → descending).
+            fireEvent.click(within(screen.getByRole('columnheader', { name: /Difficulty/ })).getByRole('button'));
             fireEvent.change(screen.getByLabelText('Search problems'), { target: { value: 'knapsack' } });
             await waitFor(() => {
                 const params = new URLSearchParams(screen.getByTestId('location').textContent || '');

@@ -111,3 +111,31 @@
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
 }
+
+/* The workspace's `.authoring input` rule (border, offset, padding) must not reach these fields. */
+.metadata .input.input {
+  margin: 0;
+  padding: 8px 10px;
+}
+
+.metadata .unit .input.input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.metadata .unit .input.input::-webkit-inner-spin-button,
+.metadata .unit .input.input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.unit:focus-within {
+  border-color: var(--border-strong);
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 1px;
+}
