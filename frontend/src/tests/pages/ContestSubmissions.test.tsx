@@ -90,7 +90,7 @@ describe('ContestSubmissions Page', () => {
 
         await waitFor(() => {
             expect(screen.getByText('Problem 1')).toBeInTheDocument();
-            expect(screen.getByText('Accepted')).toBeInTheDocument();
+            expect(screen.getByText('ACCEPTED')).toBeInTheDocument();
         });
     });
 });
