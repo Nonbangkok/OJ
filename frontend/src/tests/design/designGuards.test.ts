@@ -308,7 +308,7 @@ describe('shell tokens', () => {
 
   it('defines the layout tokens', () => {
     expect(root['--sidebar-width']).toBe('220px');
-    expect(root['--content-max-width']).toBe('1040px');
+    expect(root['--content-max-width']).toBe('1360px');
     expect(root['--page-gutter']).toBe('28px');
     expect(root['--tabbar-height']).toBe('56px');
     expect(root['--topbar-height']).toBe('52px');
