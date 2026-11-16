@@ -129,11 +129,12 @@ test('the metadata difficulty dropdown saves a rating and clears back to Unrated
 test('tabs preserve edits and disable job actions until explicit Save succeeds', async () => {
   show('/admin/authoring/d1');
   fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Edited title' } });
-  expect(screen.getByText(/saving/i)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('link', { name: 'Statement' }));
-  fireEvent.click(screen.getByRole('link', { name: 'Verify & Publish' }));
+  // A pending autosave reads "Unsaved" until the save starts (§7.9 save state).
+  expect(screen.getByText('Unsaved')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('link', { name: /^Statement,/ }));
+  fireEvent.click(screen.getByRole('link', { name: /^Verify & publish,/ }));
   expect(screen.getByRole('button', { name: 'Build PDF' })).toBeDisabled();
-  fireEvent.click(screen.getByRole('link', { name: 'Solution' }));
+  fireEvent.click(screen.getByRole('link', { name: /^Solution,/ }));
   expect(screen.getByRole('button', { name: 'Compile solution' })).toBeDisabled();
   jest
     .mocked(api.patch)
@@ -160,7 +161,7 @@ test('a revision of a published task keeps its legacy Problem ID locked but leav
 });
 test('Statement tab opens the dedicated editor instead of embedding a narrow source textarea', async () => {
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Statement' }));
+  fireEvent.click(await screen.findByRole('link', { name: /^Statement,/ }));
   expect(screen.getByRole('link', { name: 'Open full-screen editor' })).toHaveAttribute(
     'href',
     '/admin/authoring/d1/editor'
@@ -170,7 +171,7 @@ test('Statement tab opens the dedicated editor instead of embedding a narrow sou
 test('opening the dedicated editor keeps unsaved workspace fields recoverable via session storage', async () => {
   show('/admin/authoring/d1');
   fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Unsaved title' } });
-  fireEvent.click(screen.getByRole('link', { name: 'Statement' }));
+  fireEvent.click(screen.getByRole('link', { name: /^Statement,/ }));
 
   // Auto-save captures unsaved edits; opening the editor no longer needs a blocking confirm.
   expect(window.sessionStorage.getItem('oj-authoring-draft:d1')).toContain('Unsaved title');
@@ -320,13 +321,13 @@ test('Publish requires explicit confirmation and explains hidden visibility', as
     data: url.endsWith('/d1') ? { ...draft, hasLatestPdf: true, latestPdfRevision: 3 } : [],
   }));
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
+  fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Publish problem' }));
   expect(api.post).not.toHaveBeenCalled();
   expect(screen.getByText(/created as hidden/i)).toBeInTheDocument();
   jest.mocked(api.post).mockResolvedValue({ data: { status: 'published' } });
   fireEvent.click(screen.getByRole('button', { name: 'Confirm publish' }));
-  expect(await screen.findByText(/published — read-only/i)).toBeInTheDocument();
+  expect(await screen.findByText('Published · read-only')).toBeInTheDocument();
 });
 
 test('a changed linked profile syncs into the draft exactly once without disabling the form', async () => {
@@ -446,7 +447,7 @@ test('the Testcases checklist item shows real pairing counts, not the draft stat
     data: url.endsWith('/d1') ? reset : [],
   }));
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
+  fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
   const checklist = screen.getByLabelText('Publish readiness');
   expect(within(checklist).getByText('Testcases')).toBeInTheDocument();
   expect(within(checklist).getByText(/2 cases, all paired/)).toBeInTheDocument();
@@ -459,7 +460,7 @@ test('the Testcases checklist item names the missing pairs', async () => {
     data: url.endsWith('/d1') ? partial : [],
   }));
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
+  fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
   expect(screen.getByText(/2 of 5 cases missing expected outputs/)).toBeInTheDocument();
   expect(screen.queryByText('not generated')).not.toBeInTheDocument();
 });
@@ -470,7 +471,7 @@ test('the Testcases checklist item reports an empty testcase set', async () => {
     data: url.endsWith('/d1') ? empty : [],
   }));
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
+  fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
   expect(screen.getByText(/no testcases yet/)).toBeInTheDocument();
 });
 
@@ -486,7 +487,7 @@ test('a failed verification shows a plain-language explanation with the failing 
       : [],
   }));
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
+  fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
   expect(screen.getByText(/Solution output does not match the expected output/i)).toBeInTheDocument();
   expect(screen.getByText(/#4/)).toBeInTheDocument();
   expect(screen.getByText(/cannot be published until verification passes/i)).toBeInTheDocument();
@@ -505,7 +506,7 @@ test('a timed-out verification uses the warning tone', async () => {
       : [],
   }));
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
+  fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
   expect(screen.getByRole('alert').className).toMatch(/verifyOutcomeTimedOut/);
 });
 
@@ -521,7 +522,7 @@ test('a succeeded verification shows the passing summary', async () => {
       : [],
   }));
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
+  fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
   expect(screen.getByText(/All checks passed at revision 3/i)).toBeInTheDocument();
   expect(screen.getByText(/7 testcases executed/i)).toBeInTheDocument();
   // The success banner carries the green tone.

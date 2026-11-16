@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { Check, Circle } from '@phosphor-icons/react';
-import { Link, NavLink, Outlet, useNavigate, useOutletContext } from 'react-router-dom';
-import { Button, Dialog, StatusBadge } from '../../../components/ui';
+import { Link, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
+import { Button, ConfirmDialog, Dialog, StatusBadge } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
-import { useNavSlider } from '../../../hooks/useNavSlider';
+import { getErrorMessage } from '../../../utils/error';
+import WorkspaceHeader from './WorkspaceHeader';
+import StepTabs, { type StepPath } from './StepTabs';
+import { readinessFromWorkspace, readinessOf, type ReadinessState } from './readiness';
+import workspaceStyles from './Workspace.module.css';
 import useAuthoringDraft from './useAuthoringDraft';
 import { Profile } from './types';
 import { draftStatus, jobLabel, jobStatus, verifyFailureExplanation } from './status';
@@ -16,41 +20,18 @@ import AiDocs from './AiDocs';
 import { GENERATOR_TEMPLATE } from './generatorTemplate';
 import styles from './Authoring.module.css';
 
-const saveStateText: Record<string, string> = {
-  saved: 'Saved',
-  dirty: 'Saving…',
-  saving: 'Saving…',
-  error: 'Save failed — will retry after you edit again',
+const worse = (a: ReadinessState, b: ReadinessState): ReadinessState => {
+  const rank: Record<ReadinessState, number> = { done: 0, todo: 1, stale: 2, failed: 3 };
+  return rank[a] >= rank[b] ? a : b;
 };
-
-// Each workspace section is a real URL (…/metadata, …/statement, …), so browser
-// Back/Forward and shared links land on the exact section. The AI Docs entry
-// closes the nav: a reference page, not a draft section, but it lives here so
-// it is one click away while authoring.
-const sections = [
-  { path: 'metadata', label: 'Metadata' },
-  { path: 'statement', label: 'Statement' },
-  { path: 'solution', label: 'Solution' },
-  { path: 'generator', label: 'Generator' },
-  { path: 'testcases', label: 'Testcases' },
-  { path: 'verify', label: 'Verify & Publish' },
-  { path: 'jobs', label: 'History & Logs' },
-  { path: 'ai-docs', label: 'AI Docs' },
-] as const;
 
 export default function DraftWorkspace({ id }: { id: string }) {
   const model = useAuthoringDraft(id);
   const { draft, form, onError } = model;
   const navigate = useNavigate();
-  // The left nav's gray pill tracks the hovered section and settles on the
-  // active route; NavLink's automatic `active` class is the anchor selector.
-  const {
-    navRef: sectionNavRef,
-    sliderStyle: sectionSliderStyle,
-    handleItemMouseEnter: handleSectionMouseEnter,
-    resetSlider: resetSectionSlider,
-  } = useNavSlider<HTMLElement>('vertical', { itemPadding: 3, activeSelector: 'a.active' });
+  const { pathname } = useLocation();
   const [confirm, setConfirm] = useState<WorkspaceConfirm | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [leaveGuard, setLeaveGuard] = useState(false);
   useEffect(() => {
     if (!model.dirty) return;
@@ -71,56 +52,51 @@ export default function DraftWorkspace({ id }: { id: string }) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  // The most recent finished job's outcome stays pinned in the left nav until
-  // another job starts, so compile/generate/PDF results are visible from any tab.
-  const latestResult = useMemo(() => {
-    const terminal = model.jobs.find(job => job.status === 'succeeded' || job.status === 'failed' || job.status === 'timed_out');
-    if (!terminal) return null;
-    return { name: jobLabel(terminal.jobType), ...jobStatus(terminal.status) };
-  }, [model.jobs]);
+  const steps = useMemo(() => {
+    if (!draft) return null;
+    const r = readinessOf(readinessFromWorkspace(draft, model.jobs));
+    return {
+      metadata: 'done', statement: worse(r.statement, r.pdf), solution: r.solution, generator: r.generator,
+      testcases: r.testcases, verify: r.verified,
+    } as Record<StepPath, ReadinessState>;
+  }, [draft, model.jobs]);
 
   if (!draft || !form) return <section className={styles.authoring}><Link to="/admin/authoring">All drafts</Link>
     {model.error ? <p role="alert">{model.error}</p> : <p role="status">Loading draft…</p>}</section>;
   const editorDisabled = model.busy || !!model.activeJob || draft.status === 'published';
-  const status = draftStatus(draft.status);
 
   // Context passed to each section route below.
   const workspace = { model, draft, form, editorDisabled, setConfirm, navigate };
+  const base = `/admin/authoring/${encodeURIComponent(id)}`;
+  const onVerifyTab = pathname.endsWith('/verify');
 
-  return <div className={styles.workspaceShell}>
-    <aside className={styles.leftNav}>
-      <div className={styles.navInfo}>
-        <Link to="/admin/authoring" className={styles.backLink}>← All drafts</Link>
-        <h2>{draft.title}</h2>
-        <p className={styles.navProblemId}>{draft.problemId}</p>
-        <div className={styles.navMeta}>
-          <StatusBadge tone={status.tone} title={status.hint}>{status.label}</StatusBadge>
-        </div>
-        <strong className={styles.saveState} role="status">
-          {draft.status === 'published' ? 'Published — read-only'
-            : model.conflict ? 'Server state changed'
-              : saveStateText[model.saveState] ?? ''}
-        </strong>
-        {model.activeJob && <p role="status" className={styles.navJob}>
-          <StatusBadge tone="info" soft>Running</StatusBadge>
-          <span className={styles.navJobName}>{jobLabel(model.activeJob.jobType)}</span>
-        </p>}
-        {!model.activeJob && latestResult && <p role="status" className={styles.navJob}>
-          <StatusBadge tone={latestResult.tone} soft>{latestResult.label}</StatusBadge>
-          <span className={styles.navJobName}>{latestResult.name}</span>
-        </p>}
-      </div>
-      <nav ref={sectionNavRef} className={styles.sectionNav} aria-label="Draft sections"
-        onMouseLeave={resetSectionSlider}>
-        <div className={styles.sectionSlider} style={sectionSliderStyle} aria-hidden="true" />
-        {sections.map(section => <NavLink key={section.path} to={section.path} relative="path"
-          className={({ isActive }) => isActive ? `${styles.navBtn} ${styles.navBtnActive}` : styles.navBtn}
-          onMouseEnter={handleSectionMouseEnter}>
-          {section.label}
-        </NavLink>)}
-      </nav>
-    </aside>
-    <div className={styles.workspaceMain}>
+  const startRevision = async () => {
+    model.setOperationBusy(true);
+    try { await authoringService.startNewRevision(draft.id); await model.refresh(); }
+    catch (err) { onError(err); }
+    finally { model.setOperationBusy(false); }
+  };
+  const removeDraft = async () => {
+    try { await authoringService.deleteDraft(draft.id); setDeleting(false); navigate('/admin/authoring'); }
+    catch (err) { setDeleting(false); onError(new Error(getErrorMessage(err, 'Could not delete the authoring draft'))); }
+  };
+
+  return <div className={workspaceStyles.workspace}>
+    <WorkspaceHeader
+      draft={draft}
+      saveState={model.saveState}
+      conflict={model.conflict}
+      activeJob={model.activeJob}
+      canPublish={model.canPublish}
+      actionsDisabled={model.actionsDisabled}
+      onVerifyTab={onVerifyTab}
+      onVerify={() => { void model.runJob('verify'); }}
+      onPublish={() => setConfirm({ action: 'publish', revision: draft.revision })}
+      onStartRevision={() => { void startRevision(); }}
+      onDelete={() => setDeleting(true)}
+    />
+    {steps && <StepTabs base={base} states={steps} />}
+    <div className={workspaceStyles.workspace}>
       {model.error && <p role="alert">{model.error}</p>}
       {model.recovered && <p role="status">Recovered unsaved edits from this browser tab.</p>}
       {model.conflict && <div role="alert" className={styles.conflictBanner}><p>Server state changed. Your unsaved text is retained.</p>
@@ -146,6 +122,15 @@ export default function DraftWorkspace({ id }: { id: string }) {
             }}>Confirm replacement</Button>}
         <Button variant="secondary" onClick={() => setConfirm(null)}>Cancel</Button>
       </>} /> }
+    <ConfirmDialog
+      open={deleting}
+      tier="destructive"
+      title={`Delete ${draft.problemId}?`}
+      body="This permanently deletes this authoring draft and its draft-only artifacts. A problem it already published stays live."
+      confirmLabel="Delete draft"
+      onConfirm={() => { void removeDraft(); }}
+      onCancel={() => setDeleting(false)}
+    />
     <Dialog open={leaveGuard} title="Discard local changes?"
       description="Your unsaved edits will be lost and the latest server revision will load."
       onClose={() => setLeaveGuard(false)}

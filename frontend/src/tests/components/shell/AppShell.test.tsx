@@ -65,12 +65,10 @@ describe('AppShell', () => {
     expect(localStorage.getItem('oj.sidebar.collapsed')).toBeNull();
   });
 
-  it('starts collapsed in the authoring workspace but not the editor or the draft list', () => {
-    const { unmount } = renderAt('/admin/authoring/d1/statement');
-    expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
-    unmount();
-    renderAt('/admin/authoring');
+  it('does not auto-collapse in the authoring workspace (its left rail is gone, §10 interim rule retired)', () => {
+    renderAt('/admin/authoring/d1/statement');
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
+    expect(localStorage.getItem('oj.sidebar.collapsed')).toBeNull();
   });
 
   it('uses a bottom tab bar on phones', () => {

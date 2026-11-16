@@ -14,11 +14,6 @@ import styles from './AppShell.module.css';
 
 const STORAGE_KEY = 'oj.sidebar.collapsed';
 
-/** Pages that still have their own left rail start with the global sidebar collapsed (spec §10 interim rule). */
-export function defaultCollapsed(pathname: string): boolean {
-  return /^\/admin\/authoring\/(?!profiles\/?$|ai-docs\/?$)[^/]+(\/(?!editor\/?$)[^/]+)?\/?$/.test(pathname);
-}
-
 const readPreference = (): boolean | null => {
   try {
     const value = localStorage.getItem(STORAGE_KEY);
@@ -45,21 +40,14 @@ export default function AppShell({ children, onOpenSearch: onOpenSearchProp }: A
   const { isPrivateMode } = useSettings();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [preference, setPreference] = useState<boolean | null>(readPreference);
-  // A toggle on a rail page applies to that page only; it is not the global preference.
-  const [railOverride, setRailOverride] = useState<{ path: string; collapsed: boolean } | null>(null);
 
-  const onRailPage = defaultCollapsed(pathname);
-  const collapsed = onRailPage
-    ? (railOverride?.path === pathname ? railOverride.collapsed : true)
-    : preference ?? false;
+  // The §10 interim rule (collapse on pages with their own left rail) is retired:
+  // phase 6 removed the last rail, the authoring workspace's.
+  const collapsed = preference ?? false;
 
   const toggle = () => {
-    if (onRailPage) {
-      setRailOverride({ path: pathname, collapsed: !collapsed });
-    } else {
-      setPreference(!collapsed);
-      writePreference(!collapsed);
-    }
+    setPreference(!collapsed);
+    writePreference(!collapsed);
   };
 
   useEffect(() => {
