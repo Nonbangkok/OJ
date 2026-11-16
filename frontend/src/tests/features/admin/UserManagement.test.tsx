@@ -1,290 +1,120 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import UserManagement from '../../../features/admin/users/UserManagement';
 import adminService from '../../../services/adminService';
 import { useAuth } from '../../../context/AuthContext';
-import { BrowserRouter } from 'react-router-dom';
-import { APP_CONSTANTS } from '../../../utils/constants';
+import { downloadCsv } from '../../../utils/downloadCsv';
 
-// Mock services and context
 jest.mock('../../../services/adminService');
 jest.mock('../../../context/AuthContext');
+jest.mock('../../../utils/downloadCsv', () => ({ downloadCsv: jest.fn() }));
 
-// Mock ThemeContext to prevent useTheme errors from LoadingPage
-jest.mock('../../../context/ThemeContext', () => ({
-    useTheme: jest.fn(() => ({ theme: 'light' })),
-}));
-
-// Mock LoadingPage to control the loading text
-jest.mock('../../../components/shared/LoadingPage', () => () => <div>Loading Users...</div>);
-
-const mockUsers = [
-    { id: 1, username: 'Nonbangkok', role: 'admin' as const },
-    { id: 2, username: 'user1', role: 'user' as const },
-    { id: 3, username: 'staff1', role: 'staff' as const },
+const user = (id: number, username: string, over: Record<string, unknown> = {}) => ({
+  id, username, role: 'user', created_at: '2025-03-04T00:00:00Z', submissions_locked: false,
+  last_active_at: new Date(Date.now() - 14 * 60_000).toISOString(), solved_count: 96, xp: 1940, submission_count: 642, ...over,
+});
+const rows = [
+  user(1, 'Nonbangkok', { role: 'admin' }), user(2, 'nattapat'), user(3, 'tonkla', { submissions_locked: true, solved_count: 180 }),
+  user(4, 'kru.somchai', { role: 'staff' }),
 ];
 
-const mockCurrentUser = { id: 1, username: 'Nonbangkok', role: 'admin' as const };
+const renderPage = (path = '/admin/users') => render(<MemoryRouter initialEntries={[path]}><UserManagement /></MemoryRouter>);
+const rowFor = (name: string) => screen.getByRole('button', { name }).closest('tr') as HTMLElement;
 
-const renderUserManagement = () => {
-    return render(
-        <BrowserRouter>
-            <UserManagement />
-        </BrowserRouter>
-    );
-};
-
-describe('UserManagement Component', () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
-        (jest.mocked(useAuth) as jest.Mock).mockReturnValue({ user: mockCurrentUser, isLoading: false, login: jest.fn(), logout: jest.fn() });
-        (jest.mocked(adminService.getUsers) as jest.Mock).mockResolvedValue({
-            users: mockUsers,
-            total: mockUsers.length,
-            page: 1,
-            limit: 100,
-        });
+describe('Users page', () => {
+  beforeEach(() => {
+    jest.mocked(useAuth).mockReturnValue({ user: { id: 9, username: 'boss', role: 'admin' }, isLoading: false } as ReturnType<typeof useAuth>);
+    jest.mocked(adminService.getUsers).mockImplementation(async (q) => {
+      if (q?.limit === 1) return { users: [], total: q.role === 'staff' ? 3 : q.role === 'admin' ? 1 : 412, page: 1, limit: 1 };
+      return { users: rows as never, total: rows.length, page: 1, limit: 50 };
     });
+    jest.mocked(adminService.setUsersSubmissionLock).mockResolvedValue({} as never);
+    jest.mocked(adminService.setUsersRole).mockResolvedValue({ updated: [3], skipped: [{ id: 1, reason: 'protected' }] });
+  });
 
-    it('keeps the search toolbar mounted while the initial users request loads', () => {
-        (jest.mocked(adminService.getUsers) as jest.Mock).mockReturnValue(new Promise(() => { }));
-        renderUserManagement();
-        expect(screen.getByRole('searchbox', { name: /search users/i })).toBeInTheDocument();
-        expect(screen.getByRole('status')).toHaveTextContent(/loading users/i);
-    });
+  it('header: counts, Create users, and Add user under the page menu', async () => {
+    renderPage();
+    expect(await screen.findByText('412 accounts · 3 staff · 1 admin')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create users' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'More user actions' }), { delay: 20 } as never);
+    expect(await screen.findByRole('menuitem', { name: 'Add user' })).toBeInTheDocument();
+  });
 
-    it('groups filters and bulk actions into separate toolbar rows above the table', async () => {
-        renderUserManagement();
-        await screen.findByText('user1');
+  it('columns: username link, role, status dot, solved, joined, last active', async () => {
+    renderPage();
+    await screen.findByRole('button', { name: 'tonkla' });
+    const row = rowFor('tonkla');
+    expect(within(row).getByText('Locked')).toBeInTheDocument();
+    expect(within(row).getByText('180')).toBeInTheDocument();
+    expect(within(rowFor('nattapat')).getByText('14 minutes ago')).toBeInTheDocument();
+  });
 
-        const search = screen.getByRole('searchbox', { name: /search users/i });
-        const role = screen.getByRole('combobox', { name: /filter users by role/i });
-        const selectionCount = screen.getByText(/selected on this page/i);
-        const lock = screen.getByRole('button', { name: /^lock selected$/i });
-        const unlock = screen.getByRole('button', { name: /^unlock selected$/i });
-        const table = screen.getByRole('table');
-        const toolbar = screen.getByTestId('users-toolbar');
-        const filterRow = search.parentElement;
-        const actionRow = selectionCount.parentElement;
+  it('the row menu links to the profile', async () => {
+    renderPage();
+    await screen.findByRole('button', { name: 'nattapat' });
+    await userEvent.click(within(rowFor('nattapat')).getByRole('button', { name: /Actions for nattapat/ }), { delay: 20 } as never);
+    expect(await screen.findByRole('menuitem', { name: 'View profile' })).toBeInTheDocument();
+  });
 
-        expect(filterRow).toContainElement(role);
-        expect(actionRow).toContainElement(lock);
-        expect(actionRow).toContainElement(unlock);
-        expect(filterRow).not.toBe(actionRow);
-        expect(filterRow?.parentElement).toBe(toolbar);
-        expect(actionRow?.parentElement).toBe(toolbar);
-        expect(toolbar.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    });
+  it('role and locked filters reach the server and clear the selection', async () => {
+    renderPage();
+    await screen.findByRole('button', { name: 'tonkla' });
+    fireEvent.click(within(rowFor('tonkla')).getByRole('checkbox'));
+    expect(screen.getByRole('region', { name: 'Bulk actions' })).toHaveTextContent('1 selected');
+    fireEvent.click(screen.getByRole('button', { name: 'Staff' }));
+    await waitFor(() => expect(adminService.getUsers).toHaveBeenLastCalledWith(expect.objectContaining({ role: 'staff' })));
+    expect(screen.queryByRole('region', { name: 'Bulk actions' })).toBeNull();
+  });
 
-    it('renders user list and headers correctly', async () => {
-        renderUserManagement();
+  it('bulk Lock, Change role (with skipped report) and Export CSV act on the selection', async () => {
+    renderPage();
+    await screen.findByRole('button', { name: 'tonkla' });
+    fireEvent.click(within(rowFor('tonkla')).getByRole('checkbox'));
+    fireEvent.click(within(rowFor('nattapat')).getByRole('checkbox'));
+    const bar = screen.getByRole('region', { name: 'Bulk actions' });
+    fireEvent.click(within(bar).getByRole('button', { name: 'Lock' }));
+    await waitFor(() => expect(adminService.setUsersSubmissionLock).toHaveBeenCalledWith(expect.arrayContaining([2, 3]), true));
 
-        await waitFor(() => {
-            expect(screen.getByRole('heading', { level: 1, name: 'Users' })).toBeInTheDocument();
-            expect(screen.getByText('user1')).toBeInTheDocument();
-            expect(screen.getByText('staff1')).toBeInTheDocument();
-        });
-    });
+    await userEvent.click(within(screen.getByRole('region', { name: 'Bulk actions' })).getByRole('button', { name: 'More bulk actions' }), { delay: 20 } as never);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Export CSV' }), { delay: 20 } as never);
+    expect(downloadCsv).toHaveBeenCalledWith('users.csv', expect.arrayContaining([['username', 'role', 'status', 'solved', 'joined'], expect.arrayContaining(['tonkla'])]));
 
-    it('searches users across the database instead of only the currently loaded page', async () => {
-        const remoteMatch = { id: 119, username: 'user-1-19', role: 'user' as const };
-        (jest.mocked(adminService.getUsers) as jest.Mock)
-            .mockResolvedValueOnce({ users: mockUsers, total: 123, page: 1, limit: 100 })
-            .mockResolvedValueOnce({
-                users: [{ id: 120, username: 'last-page-user', role: 'user' as const }],
-                total: 123,
-                page: 2,
-                limit: 100,
-            })
-            .mockResolvedValueOnce({ users: [remoteMatch], total: 1, page: 1, limit: 100 });
+    fireEvent.click(within(screen.getByRole('region', { name: 'Bulk actions' })).getByRole('button', { name: 'Change role' }));
+    const dialog = await screen.findByRole('dialog', { name: /Change role/ });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Staff' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Change role' }));
+    await waitFor(() => expect(adminService.setUsersRole).toHaveBeenCalledWith(expect.arrayContaining([2, 3]), 'staff'));
+    expect(await screen.findByText(/1 user skipped/)).toBeInTheDocument();
+  });
 
-        renderUserManagement();
-        await screen.findByText('user1');
-        fireEvent.click(screen.getByRole('button', { name: /next/i }));
-        expect(await screen.findByText('last-page-user')).toBeInTheDocument();
+  it('edit drawer saves username and role; protected admin has no edit or delete', async () => {
+    jest.mocked(adminService.updateUser).mockResolvedValue({} as never);
+    renderPage();
+    await screen.findByRole('button', { name: 'nattapat' });
+    fireEvent.click(screen.getByRole('button', { name: 'nattapat' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Edit nattapat' });
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Staff' }));
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(adminService.updateUser).toHaveBeenCalledWith(2, { username: 'nattapat', role: 'staff' }));
 
-        const search = await screen.findByRole('searchbox', { name: /search users/i });
-        search.focus();
-        fireEvent.change(search, { target: { value: '1-19' } });
+    await userEvent.click(within(rowFor('Nonbangkok')).getByRole('button', { name: /Actions for Nonbangkok/ }), { delay: 20 } as never);
+    expect(screen.queryByRole('menuitem', { name: 'Delete user' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Edit' })).toBeNull();
+  });
 
-        expect(await screen.findByText('user-1-19')).toBeInTheDocument();
-        expect(search).toHaveFocus();
-        expect(adminService.getUsers).toHaveBeenLastCalledWith({
-            page: 1,
-            limit: 100,
-            search: '1-19',
-            role: 'all',
-        });
-    });
-
-    it('hides actions for protected users (self and system admin)', async () => {
-        renderUserManagement();
-
-        await waitFor(() => {
-            const rows = screen.getAllByRole('row');
-
-            // Row 1: Nonbangkok (System Admin/Self) — every action disabled.
-            const adminRow = rows.find(r => r.textContent.includes('Nonbangkok'));
-            const adminEdit = within(adminRow).getByRole('button', { name: /^edit$/i });
-            expect(adminEdit).toBeDisabled();
-
-            // Row 2: user1 (Regular user) — Edit enabled, Delete reachable
-            // through the overflow menu.
-            const userRow = rows.find(r => r.textContent.includes('user1'));
-            const userEdit = within(userRow).getByRole('button', { name: /^edit$/i });
-            expect(userEdit).toBeEnabled();
-        });
-    });
-
-    it('allows admins to lock a regular user and refreshes the row after confirmation', async () => {
-        (jest.mocked(adminService.setUserSubmissionLock) as jest.Mock).mockResolvedValue({
-            id: 2, username: 'user1', role: 'user', submissions_locked: true,
-        });
-        (jest.mocked(adminService.getUsers) as jest.Mock)
-            .mockResolvedValueOnce({ users: mockUsers, total: mockUsers.length, page: 1, limit: 100 })
-            .mockResolvedValueOnce({
-                users: [mockUsers[0], { ...mockUsers[1], submissions_locked: true }, mockUsers[2]],
-                total: mockUsers.length, page: 1, limit: 100,
-            });
-        renderUserManagement();
-        await screen.findByText('user1');
-        const userRow = screen.getAllByRole('row').find(r => r.textContent.includes('user1'));
-        fireEvent.click(within(userRow).getByRole('button', { name: /row actions for user1/i }));
-        fireEvent.click(screen.getByRole('menuitem', { name: /lock submissions/i }));
-        expect(screen.getByText(/prevent this user from submitting and joining contests/i)).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: /^lock$/i }));
-        await waitFor(() => expect(adminService.setUserSubmissionLock).toHaveBeenCalledWith(2, true));
-        expect(await screen.findByText(/submissions locked/i)).toBeInTheDocument();
-    });
-
-    it('selects displayed rows, confirms one bulk request, and reports skipped accounts', async () => {
-        (jest.mocked(adminService.setUsersSubmissionLock) as jest.Mock).mockResolvedValue({
-            updatedIds: [2], skippedIds: [1, 3],
-        });
-        renderUserManagement();
-        await screen.findByText('user1');
-        fireEvent.click(screen.getByRole('checkbox', { name: /select displayed users/i }));
-        expect(screen.getByRole('checkbox', { name: /select user1/i })).toBeChecked();
-        expect(screen.getByRole('checkbox', { name: /select staff1/i })).toBeChecked();
-        fireEvent.click(screen.getByRole('button', { name: /^lock selected$/i }));
-        expect(screen.getByText(/lock 3 selected users/i)).toBeInTheDocument();
-        expect(adminService.setUsersSubmissionLock).not.toHaveBeenCalled();
-        fireEvent.click(screen.getByRole('button', { name: /^lock$/i }));
-        await waitFor(() => expect(adminService.setUsersSubmissionLock).toHaveBeenCalledWith([1, 2, 3], true));
-        expect(adminService.setUsersSubmissionLock).toHaveBeenCalledTimes(1);
-        expect(await screen.findByRole('status')).toHaveTextContent(/updated 1 user.*skipped 2.*1, 3/i);
-        expect(screen.getByRole('checkbox', { name: /select user1/i })).not.toBeChecked();
-    });
-
-    it('keeps bulk selection on the displayed page and clears it when the page changes', async () => {
-        (jest.mocked(adminService.getUsers) as jest.Mock)
-            .mockResolvedValueOnce({ users: mockUsers, total: 101, page: 1, limit: 100 })
-            .mockResolvedValueOnce({ users: [{ id: 101, username: 'page2', role: 'user' }], total: 101, page: 2, limit: 100 });
-        renderUserManagement();
-        await screen.findByText('user1');
-        fireEvent.click(screen.getByRole('checkbox', { name: /select user1/i }));
-        fireEvent.click(screen.getByRole('button', { name: /^next$/i }));
-        await screen.findByText('page2');
-        expect(screen.getByRole('checkbox', { name: /select page2/i })).not.toBeChecked();
-        expect(screen.getByRole('button', { name: /^lock selected$/i })).toBeDisabled();
-    });
-
-    it('reports a failed bulk request and retains selection for retry', async () => {
-        (jest.mocked(adminService.setUsersSubmissionLock) as jest.Mock).mockRejectedValue(new Error('Network error'));
-        renderUserManagement();
-        await screen.findByText('user1');
-        fireEvent.click(screen.getByRole('checkbox', { name: /select user1/i }));
-        fireEvent.click(screen.getByRole('button', { name: /unlock selected/i }));
-        fireEvent.click(screen.getByRole('button', { name: /^unlock$/i }));
-        expect(await screen.findByRole('alert')).toHaveTextContent(/failed to update selected users/i);
-        expect(screen.getByRole('checkbox', { name: /select user1/i })).toBeChecked();
-    });
-
-    it('clears a prior bulk success before another action that fails', async () => {
-        (jest.mocked(adminService.setUsersSubmissionLock) as jest.Mock)
-            .mockResolvedValueOnce({ updatedIds: [2], skippedIds: [] })
-            .mockRejectedValueOnce(new Error('Network error'));
-        renderUserManagement();
-        await screen.findByText('user1');
-
-        fireEvent.click(screen.getByRole('checkbox', { name: /select user1/i }));
-        fireEvent.click(screen.getByRole('button', { name: /^lock selected$/i }));
-        fireEvent.click(screen.getByRole('button', { name: /^lock$/i }));
-        expect(await screen.findByRole('status')).toHaveTextContent(/updated 1 user/i);
-
-        fireEvent.click(screen.getByRole('checkbox', { name: /select user1/i }));
-        fireEvent.click(screen.getByRole('button', { name: /^unlock selected$/i }));
-        expect(screen.queryByText(/updated 1 user/i)).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: /^unlock$/i }));
-        expect(await screen.findByRole('alert')).toHaveTextContent(/failed to update selected users/i);
-        expect(screen.queryByText(/updated 1 user/i)).not.toBeInTheDocument();
-    });
-
-    it('opens and closes AddUserModal', async () => {
-        renderUserManagement();
-
-        await waitFor(() => screen.getByText('+ New User'));
-        fireEvent.click(screen.getByText('+ New User'));
-
-        expect(screen.getByRole('heading', { name: /create new user/i })).toBeInTheDocument();
-
-        fireEvent.click(screen.getByText(/cancel/i));
-        await waitFor(() => {
-            expect(screen.queryByRole('heading', { name: /create new user/i })).not.toBeInTheDocument();
-        });
-    });
-
-    it('calls deleteUser service when confirmed', async () => {
-        (jest.mocked(adminService.deleteUser) as jest.Mock).mockResolvedValue({ message: 'Success' });
-        renderUserManagement();
-
-        await waitFor(() => screen.getByText('user1'));
-
-        const userRow = screen.getAllByRole('row').find(r => r.textContent.includes('user1'));
-        fireEvent.click(within(userRow).getByRole('button', { name: /row actions for user1/i }));
-        fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
-
-        expect(screen.getByText(/confirm deletion/i)).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
-
-        await waitFor(() => {
-            expect(adminService.deleteUser).toHaveBeenCalledWith(2);
-        });
-    });
-
-    it('displays error message on service failure', async () => {
-        (jest.mocked(adminService.getUsers) as jest.Mock).mockRejectedValue(new Error('Fetch failed'));
-        renderUserManagement();
-
-        await waitFor(() => {
-            expect(screen.getByText(/failed to fetch users/i)).toBeInTheDocument();
-        });
-    });
-
-    it('opens the Reset Password modal from the row actions (AUTH-004)', async () => {
-        renderUserManagement();
-
-        await waitFor(() => screen.getByText('user1'));
-
-        const userRow = screen.getAllByRole('row').find(r => r.textContent.includes('user1'));
-        fireEvent.click(within(userRow).getByRole('button', { name: /row actions for user1/i }));
-        fireEvent.click(screen.getByRole('menuitem', { name: 'Reset password' }));
-
-        expect(
-            screen.getByRole('heading', { name: 'Reset Password — user1' }),
-        ).toBeInTheDocument();
-        expect(screen.getByLabelText(/^new password/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/confirm new password/i)).toBeInTheDocument();
-    });
-
-    it('disables the Reset password action for protected users', async () => {
-        renderUserManagement();
-
-        await waitFor(() => screen.getByText('Nonbangkok'));
-
-        const adminRow = screen.getAllByRole('row').find(r => r.textContent.includes('Nonbangkok'));
-        fireEvent.click(within(adminRow).getByRole('button', { name: /row actions for Nonbangkok/i }));
-        expect(
-            screen.getByRole('menuitem', { name: 'Reset password' }),
-        ).toHaveAttribute('aria-disabled', 'true');
-    });
+  it('delete is type-to-confirm and names the submissions and solves that go with it', async () => {
+    jest.mocked(adminService.deleteUser).mockResolvedValue({ message: 'ok' });
+    renderPage();
+    await screen.findByRole('button', { name: 'tonkla' });
+    await userEvent.click(within(rowFor('tonkla')).getByRole('button', { name: /Actions for tonkla/ }), { delay: 20 } as never);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete user' }), { delay: 20 } as never);
+    const dialog = await screen.findByRole('dialog', { name: 'Delete tonkla?' });
+    expect(dialog).toHaveTextContent('642 submissions and 180 solves');
+    const confirm = within(dialog).getByRole('button', { name: 'Delete user' });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'tonkla' } });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(adminService.deleteUser).toHaveBeenCalledWith(3));
+  });
 });

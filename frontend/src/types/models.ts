@@ -250,6 +250,11 @@ export interface AdminUser {
   role: UserRole;
   created_at?: string;
   submissions_locked?: boolean;
+  /** B5 facts from GET /admin/users. */
+  last_active_at?: string | null;
+  solved_count?: number;
+  xp?: number;
+  submission_count?: number;
 }
 
 export interface BatchCreatedUser {

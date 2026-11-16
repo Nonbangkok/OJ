@@ -1,349 +1,231 @@
-import { useState } from 'react';
-import useUserManagement from '../../../hooks/admin/useUserManagement';
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { UsersThree } from '@phosphor-icons/react';
+import {
+  ActionMenu, BulkBar, Button, ConfirmDialog, DataTable, Dialog, FilterBar, InlineError, InlineNotice, PageHeader,
+  SegmentedControl, StatusDot, type DataTableColumn,
+} from '../../../components/ui';
 import { useAuth } from '../../../context/AuthContext';
-import EditUserModal from './EditUserModal';
-import ConfirmationModal from '../shared/ConfirmationModal';
-import AddUserModal from './AddUserModal';
-import ResetPasswordModal from './ResetPasswordModal';
-import BatchUserCreation from './BatchUserCreation';
-import styles from '../shared/Management.module.css';
+import { useUrlFilters } from '../../../hooks/useUrlFilters';
 import adminService from '../../../services/adminService';
-import tableStyles from '../../../components/styles/Table.module.css';
-import { ActionMenu, Button, StatusBadge, PageHeader } from '../../../components/ui';
-import type { AdminUser } from '../../../types';
-import { USER_PAGE_SIZE } from '../../../hooks/admin/useUserManagement';
+import type { AdminUser, UserRole } from '../../../types';
 import { APP_CONSTANTS } from '../../../utils/constants';
+import { downloadCsv } from '../../../utils/downloadCsv';
+import { formatTimeAgo } from '../../../utils/formatters';
+import AddUserModal from './AddUserModal';
+import BatchCreateDrawer from './BatchCreateDrawer';
+import ResetPasswordModal from './ResetPasswordModal';
+import UserEditDrawer from './UserEditDrawer';
+import styles from './Users.module.css';
 
-const UserManagement = () => {
-  // Keep the controlled search/filter state above the data hook so result
-  // updates never replace the filter toolbar or its input element.
-  const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('all');
+const PAGE_SIZE = 50;
+const FILTER_KEYS = ['q', 'role', 'locked'] as const;
+const ROLE_SEGMENTS = [
+  { value: 'all', label: 'All' }, { value: 'user', label: 'Students' }, { value: 'staff', label: 'Staff' }, { value: 'admin', label: 'Admins' },
+] as const;
+const ROLE_LABEL: Record<UserRole, string> = { user: 'Student', staff: 'Staff', admin: 'Admin' };
+const JOINED = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const isProtected = (u: AdminUser) => u.username === APP_CONSTANTS.SYSTEM_ADMIN_USERNAME;
+const message = (err: unknown, fallback: string) =>
+  (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? fallback;
 
-  const {
-    users,
-    page,
-    total,
-    loading,
-    error,
-    setError,
-    editingUser,
-    setEditingUser,
-    deletingUser,
-    setDeletingUser,
-    isAddModalOpen,
-    setIsAddModalOpen,
-    fetchUsers,
-    goToPage,
-    handleEdit,
-    handleDeleteClick,
-    handleConfirmDelete,
-    handleSave,
-    handleAddNewUser
-  } = useUserManagement(search, roleFilter);
+/** Users (§7.8): filters, server-paged table, bulk lock/role/export, edit Drawer, typed delete. */
+export default function UserManagement() {
+  const { user: me } = useAuth();
+  const navigate = useNavigate();
+  const { values, set } = useUrlFilters(FILTER_KEYS);
+  const role = (values.role || 'all') as (typeof ROLE_SEGMENTS)[number]['value'];
+  const locked = values.locked === 'locked' || values.locked === 'unlocked' ? values.locked : undefined;
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState<{ users: AdminUser[]; total: number } | null>(null);
+  const [counts, setCounts] = useState<{ all: number; staff: number; admin: number } | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [editing, setEditing] = useState<AdminUser | null>(null);
+  const [resetting, setResetting] = useState<AdminUser | null>(null);
+  const [deleting, setDeleting] = useState<AdminUser | null>(null);
+  const [roleDialog, setRoleDialog] = useState<UserRole | null>(null);
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [version, setVersion] = useState(0);
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
-  const { user: currentUser } = useAuth();
+  useEffect(() => {
+    let cancelled = false;
+    adminService.getUsers({ page, limit: PAGE_SIZE, search: values.q || undefined, role, locked })
+      .then((result) => { if (!cancelled) { setData({ users: result.users, total: result.total }); setError(null); } })
+      .catch((err) => { if (!cancelled) setError(message(err, "Couldn't load users.")); });
+    return () => { cancelled = true; };
+  }, [page, values.q, role, locked, version]);
 
-  // AUTH-004: target of the pending admin password reset.
-  const [resettingPasswordUser, setResettingPasswordUser] = useState<AdminUser | null>(null);
-  const [submissionLockTarget, setSubmissionLockTarget] = useState<AdminUser | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
-  const [bulkLockAction, setBulkLockAction] = useState<boolean | null>(null);
-  const [bulkMessage, setBulkMessage] = useState('');
-  const [bulkError, setBulkError] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      adminService.getUsers({ limit: 1 }), adminService.getUsers({ role: 'staff', limit: 1 }), adminService.getUsers({ role: 'admin', limit: 1 }),
+    ]).then(([all, staff, admins]) => { if (!cancelled) setCounts({ all: all.total, staff: staff.total, admin: admins.total }); })
+      .catch(() => { /* the header count is decoration */ });
+    return () => { cancelled = true; };
+  }, [version]);
 
-  // A selection belongs to the visible query and page, never to another page.
-  // Adjusted during render whenever the page or query changes.
-  const [selectionScope, setSelectionScope] = useState({ page, search, roleFilter });
-  if (
-    selectionScope.page !== page
-    || selectionScope.search !== search
-    || selectionScope.roleFilter !== roleFilter
-  ) {
-    setSelectionScope({ page, search, roleFilter });
-    setSelectedIds(new Set());
-    setBulkLockAction(null);
-    setBulkMessage('');
-    setBulkError('');
-  }
-
-  const displayedIds = users.map((user) => user.id);
-  const selectedDisplayedIds = displayedIds.filter((id) => selectedIds.has(id));
-  const allDisplayedSelected = displayedIds.length > 0 && selectedDisplayedIds.length === displayedIds.length;
-
-  const startBulkLock = (locked: boolean) => {
-    setBulkMessage('');
-    setBulkError('');
-    setBulkLockAction(locked);
+  // Any filter change starts a fresh selection on page 1 (a selection only means what is on screen).
+  const setFilter = (key: (typeof FILTER_KEYS)[number], value: string | null) => {
+    setSelected(new Set());
+    setPage(1);
+    set(key, value);
   };
 
-  const confirmBulkLock = async () => {
-    if (bulkLockAction === null || selectedDisplayedIds.length === 0) return;
+  const users = data?.users ?? [];
+  const selectedUsers = users.filter((u) => selected.has(String(u.id)));
+  const selectedIds = selectedUsers.map((u) => u.id);
+
+  const bulkLock = async (lockIt: boolean) => {
     try {
-      setBulkError('');
-      const { updatedIds, skippedIds } = await adminService.setUsersSubmissionLock(
-        selectedDisplayedIds, bulkLockAction,
-      );
-      setBulkLockAction(null);
-      setSelectedIds(new Set());
-      setBulkMessage(`Updated ${updatedIds.length} user${updatedIds.length === 1 ? '' : 's'}; `
-        + `skipped ${skippedIds.length}${skippedIds.length ? ` (IDs: ${skippedIds.join(', ')})` : ''}.`
-        + (skippedIds.length ? ' Skipped accounts are ineligible or no longer exist.' : ''));
-      await fetchUsers(page);
-    } catch (err) {
-      setBulkLockAction(null);
-      setBulkError('Failed to update selected users. Selection was kept; please retry.');
-      console.error(err);
-    }
+      // The selection stays, so the same set can be exported or re-roled next.
+      await adminService.setUsersSubmissionLock(selectedIds, lockIt);
+      refresh();
+    } catch (err) { setError(message(err, "Couldn't update the selected users.")); }
   };
 
-  // ADMIN-008: filtered totals and rows are both server-paged.
-  const pageCount = Math.max(1, Math.ceil(total / USER_PAGE_SIZE));
-  const rangeStart = total === 0 ? 0 : (page - 1) * USER_PAGE_SIZE + 1;
-  const rangeEnd = Math.min(page * USER_PAGE_SIZE, total);
+  const exportCsv = () => downloadCsv('users.csv', [
+    ['username', 'role', 'status', 'solved', 'joined'],
+    ...selectedUsers.map((u) => [u.username, u.role, u.submissions_locked ? 'locked' : 'active', String(u.solved_count ?? 0), u.created_at ?? '']),
+  ]);
+
+  const applyRole = async () => {
+    if (!roleDialog) return;
+    try {
+      const result = await adminService.setUsersRole(selectedIds, roleDialog as 'user' | 'staff' | 'admin');
+      setRoleDialog(null);
+      setSelected(new Set());
+      setNotice(result.skipped.length > 0
+        ? `${result.updated.length} updated, ${result.skipped.length} user${result.skipped.length === 1 ? '' : 's'} skipped (the system admin and your own account keep their role).`
+        : `${result.updated.length} updated.`);
+      refresh();
+    } catch (err) { setError(message(err, "Couldn't change the role.")); }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleting) return;
+    try {
+      await adminService.deleteUser(deleting.id);
+      setDeleting(null);
+      refresh();
+    } catch (err) { setError(message(err, "Couldn't delete the user.")); setDeleting(null); }
+  };
+
+  const columns: DataTableColumn<AdminUser>[] = [
+    { key: 'username', header: 'Username', mobile: 'primary', cell: (u) => <span className={styles.username}>{u.username}</span> },
+    { key: 'role', header: 'Role', mobile: 'meta', cell: (u) => <span className={u.role === 'user' ? styles.muted : undefined}>{ROLE_LABEL[u.role]}</span> },
+    { key: 'status', header: 'Status', mobile: 'meta', cell: (u) => <StatusDot tone={u.submissions_locked ? 'warn' : 'pass'} label={u.submissions_locked ? 'Locked' : 'Active'} /> },
+    { key: 'solved', header: 'Solved', align: 'right', mobile: 'meta', cell: (u) => <span className={styles.mono}>{u.solved_count ?? 0}</span> },
+    { key: 'joined', header: 'Joined', mobile: 'hidden', cell: (u) => <span className={styles.muted}>{u.created_at ? JOINED.format(new Date(u.created_at)) : '—'}</span> },
+    { key: 'active', header: 'Last active', mobile: 'meta', cell: (u) => <span className={styles.muted}>{u.last_active_at ? formatTimeAgo(u.last_active_at) : '—'}</span> },
+  ];
+
+  const rowActions = (u: AdminUser) => (isProtected(u)
+    ? [{ key: 'profile', label: 'View profile', onClick: () => navigate(`/profile/${u.username}`) }]
+    : [
+      { key: 'edit', label: 'Edit', onClick: () => setEditing(u) },
+      { key: 'profile', label: 'View profile', onClick: () => navigate(`/profile/${u.username}`) },
+      { key: 'password', label: 'Reset password', onClick: () => setResetting(u) },
+      ...(u.id === me?.id ? [] : [{ key: 'delete', label: 'Delete user', variant: 'danger' as const, onClick: () => setDeleting(u) }]),
+    ]);
+
+  const meta = counts ? `${counts.all} accounts · ${counts.staff} staff · ${counts.admin} admin${counts.admin === 1 ? '' : 's'}` : undefined;
+  const lastPage = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
 
   return (
-    <>
-      <div className={styles['management-container']}>
-        {/* --- Page header: creation only --------------------------------- */}
-        <PageHeader
-          breadcrumb={[{ label: 'Manage' }]}
-          title="Users"
-          actions={<Button onClick={() => setIsAddModalOpen(true)}>+ New User</Button>}
+    <div className={styles.page}>
+      <PageHeader
+        breadcrumb={[{ label: 'Manage' }]}
+        title="Users"
+        meta={meta}
+        actions={(
+          <>
+            <ActionMenu label="More user actions" items={[{ key: 'add', label: 'Add user', onClick: () => setAddOpen(true) }]} />
+            <Button onClick={() => setBatchOpen(true)}><UsersThree size={16} aria-hidden="true" />Create users</Button>
+          </>
+        )}
+      />
+      <FilterBar
+        search={{ value: values.q, onChange: (value) => setFilter('q', value || null), placeholder: 'Search username' }}
+        segments={<SegmentedControl aria-label="Role" options={ROLE_SEGMENTS} value={role} onChange={(value) => setFilter('role', value === 'all' ? null : value)} />}
+        filters={[{
+          key: 'locked', label: 'Locked', value: locked,
+          options: [{ value: 'locked', label: 'Locked' }, { value: 'unlocked', label: 'Not locked' }],
+          onChange: (value) => setFilter('locked', value),
+        }]}
+        resultCount={data ? `${data.total} users` : undefined}
+      />
+      {error && <InlineError message={error} />}
+      {notice && <InlineNotice title={notice} />}
+      {selectedIds.length > 0 && (
+        <BulkBar
+          count={selectedIds.length}
+          onClear={() => setSelected(new Set())}
+          actions={[
+            { key: 'lock', label: 'Lock', onClick: () => bulkLock(true) },
+            { key: 'unlock', label: 'Unlock', onClick: () => bulkLock(false) },
+            { key: 'role', label: 'Change role', onClick: () => setRoleDialog('user') },
+            { key: 'export', label: 'Export CSV', onClick: exportCsv },
+          ]}
         />
-
-        {/* --- Filter / scope bar ----------------------------------------- */}
-        <div className={styles['users-toolbar']} data-testid="users-toolbar">
-          <div className={`${styles['filter-bar']} ${styles['users-filter-row']}`}>
-            <input
-              type="search"
-              className={styles['filter-search']}
-              placeholder="Search users…"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              aria-label="Search users"
-            />
-            <label className={styles['filter-control']}>
-              <span className={styles['filter-label']}>Role</span>
-              <select
-                value={roleFilter}
-                onChange={(event) => setRoleFilter(event.target.value)}
-                aria-label="Filter users by role"
-              >
-                <option value="all">All</option>
-                {['admin', 'staff', 'user'].map(role => (
-                  <option key={role} value={role}>{role}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className={`${styles['bulk-actions']} ${styles['users-bulk-row']}`}>
-            <span>{selectedDisplayedIds.length} selected on this page</span>
-            <Button size="compact" variant="secondary" disabled={!selectedDisplayedIds.length || loading}
-              onClick={() => startBulkLock(true)}>Lock selected</Button>
-            <Button size="compact" variant="secondary" disabled={!selectedDisplayedIds.length || loading}
-              onClick={() => startBulkLock(false)}>Unlock selected</Button>
-          </div>
+      )}
+      <DataTable<AdminUser>
+        caption="Users"
+        columns={columns}
+        rows={users}
+        rowKey={(u) => String(u.id)}
+        rowLabel={(u) => u.username}
+        onRowClick={(u) => { if (!isProtected(u)) setEditing(u); }}
+        rowActions={rowActions}
+        selection={{ selected, onChange: setSelected }}
+        loading={data === null && !error}
+      />
+      {lastPage > 1 && (
+        <div className={styles.pager}>
+          <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>
+          <span className={styles.mono}>{`${page} / ${lastPage}`}</span>
+          <Button variant="secondary" disabled={page >= lastPage} onClick={() => setPage((p) => p + 1)}>Next</Button>
         </div>
+      )}
 
-        {(loading || error || bulkError || bulkMessage) && (
-          <div className={styles['users-feedback']}>
-            {loading && <p role="status">Loading users…</p>}
-            {error && (
-              <div className="error-message" role="alert">
-                {error}{' '}
-                <Button variant="secondary" size="compact" onClick={() => fetchUsers(page)}>
-                  Retry
-                </Button>
-              </div>
-            )}
-            {bulkError && <div className="error-message" role="alert">{bulkError}</div>}
-            {bulkMessage && <p role="status">{bulkMessage}</p>}
-          </div>
-        )}
-
-        {/* --- Table: Edit + overflow ------------------------------------ */}
-        <div className={`${tableStyles['table-container']} ${styles['users-table-wrap']}`}>
-          <table className={tableStyles.table}>
-            <thead>
-              <tr>
-                <th>
-                  <input
-                    type="checkbox"
-                    aria-label="Select displayed users"
-                    checked={allDisplayedSelected}
-                    disabled={!displayedIds.length || loading}
-                    onChange={(event) => setSelectedIds(event.target.checked
-                      ? new Set(displayedIds) : new Set())}
-                  />
-                </th>
-                <th className={styles['col-left']}>Username</th>
-                <th className={styles['col-center']}>Role</th>
-                <th className={styles['col-center']}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(user => {
-                const canManage = currentUser && user.id !== currentUser.id
-                  && user.username !== APP_CONSTANTS.SYSTEM_ADMIN_USERNAME;
-                return (
-                  <tr key={user.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${user.username}`}
-                        checked={selectedIds.has(user.id)}
-                        disabled={loading}
-                        onChange={(event) => setSelectedIds((current) => {
-                          const next = new Set(current);
-                          if (event.target.checked) next.add(user.id);
-                          else next.delete(user.id);
-                          return next;
-                        })}
-                      />
-                    </td>
-                    <td className={styles['col-left']}>{user.username}</td>
-                    <td className={styles['col-center']}>
-                      <StatusBadge tone={user.role === 'admin' ? 'info' : 'neutral'} soft>
-                        {user.role}
-                      </StatusBadge>
-                      {user.role === 'user' && user.submissions_locked && (
-                        <StatusBadge tone="danger" soft>Submissions locked</StatusBadge>
-                      )}
-                    </td>
-                    <td className={styles['col-center']}>
-                      <div className={styles['row-actions']}>
-                        <Button
-                          size="compact"
-                          variant="secondary"
-                          disabled={!canManage}
-                          onClick={() => handleEdit(user)}
-                        >
-                          Edit
-                        </Button>
-                        <ActionMenu
-                          label={`Row actions for ${user.username}`}
-                          items={[
-                            ...(user.role === 'user' ? [{
-                              key: 'submission-lock',
-                              label: user.submissions_locked ? 'Unlock submissions' : 'Lock submissions',
-                              disabled: !canManage,
-                              onClick: () => setSubmissionLockTarget(user),
-                            }] : []),
-                            {
-                              key: 'reset-password',
-                              label: 'Reset password',
-                              disabled: !canManage,
-                              onClick: () => setResettingPasswordUser(user),
-                            },
-                            {
-                              key: 'delete',
-                              label: 'Delete',
-                              variant: 'danger',
-                              disabled: !canManage,
-                              onClick: () => handleDeleteClick(user),
-                            },
-                          ]}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {!users.length && !loading && !error && (
-            <p className={styles['empty-state']}>No users found.</p>
-          )}
+      {editing && (
+        <UserEditDrawer user={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh(); }} onResetPassword={(u) => setResetting(u)} />
+      )}
+      <ResetPasswordModal user={resetting} onClose={() => setResetting(null)} />
+      <BatchCreateDrawer open={batchOpen} onClose={() => setBatchOpen(false)} onDone={() => { setBatchOpen(false); refresh(); }} />
+      <AddUserModal
+        isOpen={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSave={async (userData) => { await adminService.createUser(userData as never); setAddOpen(false); refresh(); }}
+      />
+      <Dialog open={roleDialog !== null} title={`Change role for ${selectedIds.length} users`} onClose={() => setRoleDialog(null)}>
+        <SegmentedControl
+          aria-label="New role"
+          options={[{ value: 'user', label: 'Student' }, { value: 'staff', label: 'Staff' }, { value: 'admin', label: 'Admin' }] as const}
+          value={(roleDialog ?? 'user') as 'user' | 'staff' | 'admin'}
+          onChange={(value) => setRoleDialog(value)}
+        />
+        <p className={styles.lead}>The system admin and your own account keep their role.</p>
+        <div className={styles.footer}>
+          <Button variant="secondary" onClick={() => setRoleDialog(null)}>Cancel</Button>
+          <Button onClick={applyRole}>Change role</Button>
         </div>
-
-        {/* --- Pagination (ADMIN-008) ------------------------------------ */}
-        {pageCount > 1 && (
-          <div className={styles['filter-bar']} role="navigation" aria-label="User list pages">
-            <Button
-              variant="secondary"
-              size="compact"
-              disabled={page <= 1 || loading}
-              onClick={() => goToPage(page - 1)}
-            >
-              Prev
-            </Button>
-            <span aria-live="polite">
-              {rangeStart}–{rangeEnd} of {total}
-            </span>
-            <Button
-              variant="secondary"
-              size="compact"
-              disabled={page >= pageCount || loading}
-              onClick={() => goToPage(page + 1)}
-            >
-              Next
-            </Button>
-          </div>
-        )}
-
-        {editingUser && (
-          <EditUserModal
-            user={editingUser}
-            onClose={() => setEditingUser(null)}
-            onSave={handleSave}
-          />
-        )}
-        <ConfirmationModal
-          isOpen={!!deletingUser}
-          onClose={() => setDeletingUser(null)}
-          onConfirm={handleConfirmDelete}
-          title="Confirm Deletion"
-          message={`Are you sure you want to delete user "${deletingUser?.username}"? All related submissions will also be deleted.`}
+      </Dialog>
+      {deleting && (
+        <ConfirmDialog
+          open
+          tier="typed"
+          title={`Delete ${deleting.username}?`}
+          body={`This deletes the account and its ${deleting.submission_count ?? 0} submissions and ${deleting.solved_count ?? 0} solves (XP and ranking). It cannot be undone.`}
+          confirmLabel="Delete user"
+          confirmText={deleting.username}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleting(null)}
         />
-        <ConfirmationModal
-          isOpen={!!submissionLockTarget}
-          onClose={() => setSubmissionLockTarget(null)}
-          onConfirm={async () => {
-            if (!submissionLockTarget) return;
-            try {
-              await adminService.setUserSubmissionLock(
-                submissionLockTarget.id,
-                !submissionLockTarget.submissions_locked,
-              );
-              setSubmissionLockTarget(null);
-              await fetchUsers(page);
-            } catch (err) {
-              setError('Failed to update submission lock. Please retry.');
-              console.error(err);
-            }
-          }}
-          title={submissionLockTarget?.submissions_locked ? 'Unlock user submissions' : 'Lock user submissions'}
-          message={submissionLockTarget?.submissions_locked
-            ? `Allow ${submissionLockTarget?.username} to submit solutions and join contests again?`
-            : `Lock ${submissionLockTarget?.username}? This will prevent this user from submitting and joining contests until unlocked.`}
-          confirmText={submissionLockTarget?.submissions_locked ? 'Unlock' : 'Lock'}
-          confirmStyle={submissionLockTarget?.submissions_locked ? 'default' : 'danger'}
-        />
-        <ConfirmationModal
-          isOpen={bulkLockAction !== null}
-          onClose={() => setBulkLockAction(null)}
-          onConfirm={confirmBulkLock}
-          title={bulkLockAction ? 'Lock selected users' : 'Unlock selected users'}
-          message={`${bulkLockAction ? 'Lock' : 'Unlock'} ${selectedDisplayedIds.length} selected users? `
-            + 'Only regular user accounts can be changed. The result will report skipped accounts.'}
-          confirmText={bulkLockAction ? 'Lock' : 'Unlock'}
-          confirmStyle={bulkLockAction ? 'danger' : 'default'}
-        />
-        <AddUserModal
-          isOpen={isAddModalOpen}
-          onClose={() => setIsAddModalOpen(false)}
-          onSave={handleAddNewUser}
-        />
-        <ResetPasswordModal
-          user={resettingPasswordUser}
-          onClose={() => setResettingPasswordUser(null)}
-        />
-      </div>
-      <BatchUserCreation onUsersCreated={fetchUsers} />
-    </>
+      )}
+    </div>
   );
-};
-
-export default UserManagement;
+}

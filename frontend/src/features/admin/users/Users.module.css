@@ -1,0 +1,90 @@
+/* Users (§7.8): page, drawers and dialogs. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.username {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.mono {
+  font-family: var(--font-family-mono);
+}
+
+.lead {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.fieldRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 12px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color);
+}
+
+.passwords {
+  width: 100%;
+  margin-top: 14px;
+  border-collapse: collapse;
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+}
+
+.passwords th {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  font-family: var(--font-family-sans-serif);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.passwords td {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--background-tertiary);
+  color: var(--text-primary);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
