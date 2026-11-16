@@ -85,6 +85,30 @@ export interface UserAvatarRow {
  * visible-problems scope for every viewer (admin included): profile
  * semantics are stable and never depend on who is looking.
  */
+/**
+ * The `user_submissions` CTE behind every profile stat (and the Home
+ * streak/week): standard + contest submissions of one user, to visible
+ * problems only. `userIdSql` is a SQL expression for the user's id.
+ *
+ * PROFILE-PROBLEM-SCOPE: every aggregate flows through this CTE, so the
+ * visible-problems filter sits here, once — hidden problems drop out of
+ * solved/attempted/score/verdicts/languages/activity/AC-day streaks and
+ * achievements together. The INNER join is the whole point: submissions to
+ * hidden problems must vanish from every stat, and reappear when the
+ * problem is shown again.
+ */
+export const userSubmissionsCte = (userIdSql: string): string => `user_submissions AS (
+        SELECT s.problem_id, s.language, s.overall_status, s.score, s.submitted_at
+        FROM submissions s
+        JOIN problems p ON p.id = s.problem_id AND p.is_visible = true
+        WHERE s.user_id = ${userIdSql}
+        UNION ALL
+        SELECT cs.problem_id, cs.language, cs.overall_status, cs.score, cs.submitted_at
+        FROM contest_submissions cs
+        JOIN problems p ON p.id = cs.problem_id AND p.is_visible = true
+        WHERE cs.user_id = ${userIdSql}
+      )`;
+
 export const getUserProfileStats = async (
     username: string,
 ): Promise<UserProfileStatsRow | null> => {
@@ -96,23 +120,7 @@ export const getUserProfileStats = async (
         category_stats_raw: Record<string, number>;
         category_totals_raw: Record<string, number>;
     }>(`
-      WITH user_submissions AS (
-        -- PROFILE-PROBLEM-SCOPE: every aggregate below flows through this
-        -- CTE, so the visible-problems filter sits here, once — hidden
-        -- problems drop out of solved/attempted/score/verdicts/languages/
-        -- activity/AC-day streaks and achievements together. The INNER join
-        -- is the whole point: submissions to hidden problems must vanish
-        -- from every stat, and reappear when the problem is shown again.
-        SELECT s.problem_id, s.language, s.overall_status, s.score, s.submitted_at
-        FROM submissions s
-        JOIN problems p ON p.id = s.problem_id AND p.is_visible = true
-        WHERE s.user_id = (SELECT id FROM users WHERE username = $1)
-        UNION ALL
-        SELECT cs.problem_id, cs.language, cs.overall_status, cs.score, cs.submitted_at
-        FROM contest_submissions cs
-        JOIN problems p ON p.id = cs.problem_id AND p.is_visible = true
-        WHERE cs.user_id = (SELECT id FROM users WHERE username = $1)
-      ),
+      WITH ${userSubmissionsCte('(SELECT id FROM users WHERE username = $1)')},
       best_scores AS (
         SELECT problem_id, MAX(score) AS best_score
         FROM user_submissions

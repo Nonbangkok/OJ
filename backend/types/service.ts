@@ -1,3 +1,4 @@
+import type { UserProgression } from '../services/progressionService';
 import { Readable } from 'stream';
 import { UPLOAD_STATUS, type ProblemFileRole, type ProblemType } from '../constants';
 import type { ProblemFileInput } from '../utils/headerProblemFiles';
@@ -183,6 +184,48 @@ export interface ProblemStatsRow {
   latest_submission_status: string | null;
   best_submission_status: string | null;
   best_submission_results: unknown;
+}
+
+/** A problem the Home page links to, with the XP a first solve would award. */
+export interface HomeProblemRef {
+  id: string;
+  title: string;
+  difficulty: number | null;
+  xp: number;
+}
+
+/** The most recently tried, still unsolved problem. */
+export interface HomeContinue extends HomeProblemRef {
+  bestScore: number;
+  attempts: number;
+  lastTriedAt: string;
+  latestStatus: string;
+  /** Per-case statuses of the best submission (empty for a compile log or pending). */
+  caseStatuses: string[];
+}
+
+/** B1: the viewer's progress through one collection (visible standalone problems only). */
+export interface CollectionProgress {
+  id: number;
+  name: string;
+  solved: number;
+  total: number;
+  /** The easiest unsolved problem in the collection, null when complete. */
+  next: HomeProblemRef | null;
+}
+
+/** GET /me/home */
+export interface HomeSummary {
+  progression: UserProgression;
+  currentStreak: number;
+  solvedToday: boolean;
+  /** 7 days, oldest first; the last entry is today (profile timezone). */
+  week: { day: string; solved: number }[];
+  continue: HomeContinue | null;
+  /** Up to 3 easiest unsolved problems, only when there is nothing to continue. */
+  startWith: HomeProblemRef[];
+  collections: CollectionProgress[];
+  levelUp: { remaining: number; problem: HomeProblemRef } | null;
 }
 
 /** Per-status problem counts for the viewer (GET /problem-status-counts); buckets partition `all`. */
