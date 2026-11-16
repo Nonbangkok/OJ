@@ -122,7 +122,8 @@ export default function AiDocs({ embedded = false, inHub = false }: { embedded?:
 
   return (
     <section className={styles.docs} aria-label={AI_DOC_TITLE}>
-      {inHub ? (
+      {/* Under the hub or inside a draft workspace the page header is already there: one H1. */}
+      {inHub || embedded ? (
         <div className={styles.hubToolbar}>
           <p>The authoring API as one reference document — the copy button copies the whole page as prompt-ready markdown.</p>
           <Button

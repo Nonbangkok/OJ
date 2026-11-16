@@ -2,6 +2,7 @@ import {
   listStatus, readinessFromSummary, readinessFromWorkspace, readinessOf, type ReadinessInput,
 } from '../../../features/admin/authoring/readiness';
 import { jobLabel, jobStatus } from '../../../features/admin/authoring/status';
+import { formatDecimalSize } from '../../../features/admin/authoring/testcaseSize';
 import type { Draft, DraftSummary, Job } from '../../../features/admin/authoring/types';
 
 const base = (over: Partial<ReadinessInput> = {}): ReadinessInput => ({
@@ -66,6 +67,31 @@ describe('readinessOf', () => {
     expect(readinessOf(base()).verified).toBe('todo');
   });
 
+  it('final review: a successful verify now beats a compile that failed at an older revision', () => {
+    const r = readinessOf(base({ latestJobs: { compile_solution: at('failed', 4), verify_all: at('succeeded') } }));
+    expect(r.solution).toBe('done');
+    // A compile that failed at an older revision with nothing newer still reads failed.
+    expect(readinessOf(base({ latestJobs: { compile_solution: at('failed', 4) } })).solution).toBe('failed');
+  });
+
+  it('final review: verified becomes stale after an edit (the server nulls verifiedRevision on every bump)', () => {
+    const edited = base({ verifiedRevision: null, latestJobs: { verify_all: at('succeeded', 4) } });
+    expect(readinessOf(edited).verified).toBe('stale');
+  });
+
+  it('final review: a published draft re-synced from its profile still reads verified', () => {
+    const synced = base({ status: 'published', verifiedRevision: null, latestJobs: { verify_all: at('succeeded', 4) } });
+    expect(readinessOf(synced).verified).toBe('done');
+  });
+
+  it('final review: failures win over missing pieces (outputs, inputs, first PDF)', () => {
+    expect(readinessOf(base({ testcases: { total: 10, withOutput: 4 }, latestJobs: { generate_outputs: at('failed') } })).testcases).toBe('failed');
+    expect(readinessOf(base({ testcases: { total: 0, withOutput: 0 }, latestJobs: { run_generator: at('timed_out') } })).testcases).toBe('failed');
+    expect(readinessOf(base({ latestPdfRevision: null, latestJobs: { build_pdf: at('failed') } })).pdf).toBe('failed');
+    // A failure that a newer success replaced is not reported: latestJobs holds the newest job per type.
+    expect(readinessOf(base({ latestJobs: { run_generator: at('succeeded') } })).testcases).toBe('done');
+  });
+
   it('a published draft keeps its stored readiness (all done)', () => {
     expect(Object.values(readinessOf(base({ status: 'published', verifiedRevision: 5, latestJobs: { compile_solution: at('succeeded'), compile_generator: at('succeeded') } })))).toEqual(
       ['done', 'done', 'done', 'done', 'done', 'done'],
@@ -126,5 +152,20 @@ describe('job vocabulary', () => {
     expect(jobStatus('timed_out')).toEqual({ label: 'Timed out', tone: 'danger' });
     expect(jobStatus('cancelled').label).toBe('Cancelled');
     expect(jobStatus('stale').label).toBe('Stale');
+  });
+});
+
+describe('minor fixes', () => {
+  it('a running job shows in the list status (B7 activeJob)', () => {
+    expect(listStatus(summary({ readiness: { ...summary().readiness, activeJob: true } }))).toEqual({ tone: 'warn', label: 'Job running' });
+    // A published problem keeps its live status while a profile sync runs.
+    expect(listStatus(summary({ status: 'published', readiness: { ...summary().readiness, activeJob: true } })).label).toBe('Published · rev 5');
+  });
+
+  it('sizes never read "1000 kB"', () => {
+    expect(formatDecimalSize(999_499)).toBe('999 kB');
+    expect(formatDecimalSize(999_999)).toBe('1.0 MB');
+    expect(formatDecimalSize(84_000)).toBe('84 kB');
+    expect(formatDecimalSize(9_960)).toBe('10 kB');
   });
 });

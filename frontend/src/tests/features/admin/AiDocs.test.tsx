@@ -165,3 +165,9 @@ test('the markdown and the rendered page describe the same endpoints', () => {
     expect(markdown).toContain(fragment);
   }
 });
+
+test('minor: inside a draft workspace the AI docs tab adds no second H1', async () => {
+  show('/admin/authoring/d1/ai-docs');
+  expect(await screen.findByRole('button', { name: 'Copy for AI agent' })).toBeInTheDocument();
+  expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+});

@@ -10,7 +10,8 @@ const STATUS_DOT = {
 
 export function saveStateText(draft: Draft, saveState: SaveState, conflict: boolean): string {
   if (draft.status === 'published') return 'Published · read-only';
-  if (conflict) return 'Server state changed';
+  // The conflict banner explains what happened; the save state only says the edits aren't saved.
+  if (conflict) return 'Unsaved';
   if (saveState === 'saving') return 'Saving…';
   if (saveState === 'dirty') return 'Unsaved';
   if (saveState === 'error') return 'Save failed — will retry after you edit again';
@@ -51,7 +52,7 @@ export default function WorkspaceHeader({
     );
   } else if (!published && !onVerifyTab) {
     if (canPublish) primary = <Button onClick={onPublish}>Publish</Button>;
-    else if (draft.verifiedRevision !== draft.revision) primary = <Button disabled={actionsDisabled} onClick={onVerify}>Verify</Button>;
+    else if (draft.verifiedRevision !== draft.revision) primary = <Button disabled={actionsDisabled || !draft.solutionCpp.trim()} onClick={onVerify}>Verify</Button>;
   }
 
   return (

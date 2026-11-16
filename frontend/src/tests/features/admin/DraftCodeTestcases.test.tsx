@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import api from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
@@ -108,9 +109,11 @@ describe('Solution, Generator and Testcases tabs (§7.9)', () => {
   it('phone: testcases can be inspected but not changed', async () => {
     jest.mocked(useMediaQuery).mockReturnValue(true);
     show('/admin/authoring/d1/testcases');
-    expect(await screen.findByRole('button', { name: 'Inspect 1.in' })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: 'Append testcase' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Delete 1.in' })).toBeNull();
+    const user = userEvent.setup({ delay: 10 });
+    await user.click(await screen.findByRole('button', { name: 'Actions for 1.in' }));
+    expect(await screen.findByRole('menuitem', { name: 'Inspect' })).not.toHaveAttribute('aria-disabled');
+    expect(screen.queryByRole('menuitem', { name: 'Delete' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Drop testcase files here/ })).toBeNull();
     expect(screen.getByText('Best edited on a larger screen')).toBeInTheDocument();
   });
 });

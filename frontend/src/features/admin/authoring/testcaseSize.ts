@@ -14,9 +14,9 @@ export function formatByteSize(bytes: number): string {
 /** Decimal sizes used across the redesign: "15 B", "84 kB", "2.4 MB". */
 export function formatDecimalSize(bytes: number): string {
   if (bytes < 1000) return `${bytes} B`;
-  if (bytes < 1_000_000) {
-    const kb = bytes / 1000;
-    return `${kb < 10 ? kb.toFixed(1) : Math.round(kb)} kB`;
-  }
+  const kb = bytes / 1000;
+  // Round first, so 999,999 B reads "1.0 MB" rather than "1000 kB".
+  if (kb < 9.95) return `${kb.toFixed(1)} kB`;
+  if (Math.round(kb) < 1000) return `${Math.round(kb)} kB`;
   return `${(bytes / 1_000_000).toFixed(1)} MB`;
 }

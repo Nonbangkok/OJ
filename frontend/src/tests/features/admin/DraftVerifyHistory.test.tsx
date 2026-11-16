@@ -5,6 +5,7 @@ import { useAuth } from '../../../context/AuthContext';
 import useStatementPreview from '../../../features/admin/authoring/useStatementPreview';
 import ProblemAuthoring from '../../../features/admin/authoring/ProblemAuthoring';
 import { DraftJobs, DraftSolution, DraftTestcases, DraftVerify } from '../../../features/admin/authoring/DraftWorkspace';
+import { publishBlockReason } from '../../../features/admin/authoring/ReadinessList';
 
 jest.mock('../../../services/api');
 jest.mock('../../../context/AuthContext', () => ({ useAuth: jest.fn() }));
@@ -171,5 +172,21 @@ describe('History (§7.9)', () => {
     expect(within(drawer).getByRole('table', { name: 'Cases' })).toBeInTheDocument();
     expect(drawer).toHaveTextContent('case 7: expected 3, got 4');
     await waitFor(() => expect(api.get).toHaveBeenCalledWith('/admin/authoring/jobs/v1'));
+  });
+});
+
+describe('minor: the Publish reason names the real blocker', () => {
+  const done = [{ key: 'verified', state: 'done', title: '', detail: '' }] as Parameters<typeof publishBlockReason>[0]['rows'];
+  it('conflict, busy, saving, a running job, then verify', () => {
+    const at = (over: Partial<Parameters<typeof publishBlockReason>[0]>) => publishBlockReason({
+      rows: done, canPublish: false, published: false, activeJob: false, conflict: false, busy: false, dirty: false, verified: true, ...over,
+    });
+    expect(at({ conflict: true })).toBe('The server has newer changes — sync them before publishing.');
+    expect(at({ activeJob: true })).toBe('Wait for the running job to finish.');
+    expect(at({ dirty: true })).toBe('Your edits are saving — publish once they are saved.');
+    expect(at({ busy: true })).toBe('Wait for the current action to finish.');
+    expect(at({ verified: false })).toBe('Verify this revision before publishing.');
+    expect(at({ canPublish: true })).toBeNull();
+    expect(at({ published: true })).toBe('Published — start a new revision to change it.');
   });
 });

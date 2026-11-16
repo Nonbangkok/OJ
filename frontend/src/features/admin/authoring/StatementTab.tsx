@@ -7,18 +7,12 @@ import authoringService from '../../../services/admin/authoringService';
 import { Asset, Draft } from './types';
 import useStatementPreview from './useStatementPreview';
 import LivePreview from './LivePreview';
+import { formatDecimalSize } from './testcaseSize';
 import LargeScreenNotice, { useSmallScreen } from './LargeScreenNotice';
 import styles from './Statement.module.css';
 
 const IMAGE_TYPES = ['.jpg', '.jpeg', '.png', '.webp'];
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
-
-/** Decimal sizes, matching the rest of the redesign: "84 kB", "2.4 MB". */
-const formatSize = (bytes: number): string => {
-  if (bytes < 1000) return `${bytes} B`;
-  if (bytes < 1_000_000) return `${Math.round(bytes / 1000)} kB`;
-  return `${(bytes / 1_000_000).toFixed(1)} MB`;
-};
 
 /** One-line PDF state: revision, stale warning, Rebuild / Open (or Build PDF when none exists). */
 export function PdfRow({ draft, disabled, onBuild }: { draft: Draft; disabled: boolean; onBuild: () => void }) {
@@ -57,15 +51,19 @@ export function StatementAssets({ draft, disabled, mutate, onError }: {
     return () => { cancelled = true; };
   }, [draft.id, draft.revision, onError]);
 
+  // One operation for the whole drop: each upload bumps the revision, so the
+  // next file is sent against the revision the server holds now.
   const upload = (files: File[]) => {
-    for (const file of files) {
-      void mutate(async () => {
+    void mutate(async () => {
+      let revision = draft.revision;
+      for (const [index, file] of files.entries()) {
+        if (index > 0) revision = (await authoringService.getDraft(draft.id)).revision;
         const data = new FormData();
-        data.append('expectedRevision', String(draft.revision));
+        data.append('expectedRevision', String(revision));
         data.append('asset', file);
         await authoringService.uploadAsset(draft.id, data);
-      });
-    }
+      }
+    });
   };
 
   return (
@@ -88,7 +86,7 @@ export function StatementAssets({ draft, disabled, mutate, onError }: {
                     {path}{' '}
                     <Button size="compact" variant="secondary" aria-label={`Copy the path of ${asset.filename}`} onClick={() => { void navigator.clipboard?.writeText(path); }}>Copy</Button>
                   </td>
-                  <td className={`${styles.num} ${styles.mono}`}>{formatSize(asset.sizeBytes)}</td>
+                  <td className={`${styles.num} ${styles.mono}`}>{formatDecimalSize(asset.sizeBytes)}</td>
                   <td className={styles.action}>
                     <ActionMenu label={`Actions for ${asset.filename}`} items={[
                       { key: 'delete', label: 'Delete', variant: 'danger', disabled, onClick: () => setDeleting(asset) },

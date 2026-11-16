@@ -1,12 +1,13 @@
-import type { CSSProperties, ReactNode } from 'react';
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Group, Panel, Separator, useDefaultLayout, useGroupRef } from 'react-resizable-panels';
-import { Button, Dialog } from '../../../components/ui';
+import { Button, Dialog, SegmentedControl, StatusBadge } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
 import useAuthoringDraft from './useAuthoringDraft';
 import useStatementPreview from './useStatementPreview';
 import LivePreview from './LivePreview';
+import CodeEditor from './CodeEditor';
+import { useSmallScreen } from './LargeScreenNotice';
 import { jobLabel } from './status';
 import { StatementAssets } from './StatementTab';
 import styles from './Authoring.module.css';
@@ -16,8 +17,11 @@ const previewZoomKey = (id: string) => `oj-authoring-statement-preview-zoom:${id
 const MIN_PREVIEW_ZOOM = 50;
 const MAX_PREVIEW_ZOOM = 200;
 const PREVIEW_ZOOM_STEP = 10;
-// Preview pagination: fixed A4-ish aspect slices keep page boundaries visible.
-const PREVIEW_PAGE_ASPECT = 297 / 210; // height / width of A4
+/** 100% is fit-to-width: the preview fills the pane's width. */
+const FIT_ZOOM = 100;
+const SAVE_HINT = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘S' : 'Ctrl+S';
+const EDITOR_PANES = [{ value: 'source', label: 'Source' }, { value: 'preview', label: 'Preview' }] as const;
+const PREVIEW_MODES = [{ value: 'preview', label: 'Preview' }, { value: 'pdf', label: 'PDF' }] as const;
 
 type StatementRecovery = { baseRevision: number; statementHtml: string };
 
@@ -38,8 +42,8 @@ function writeRecovery(id: string, recovery: StatementRecovery | null) {
 function readPreviewZoom(id: string) {
   try {
     const zoom = Number(window.localStorage.getItem(previewZoomKey(id)));
-    return Number.isFinite(zoom) && zoom >= MIN_PREVIEW_ZOOM && zoom <= MAX_PREVIEW_ZOOM ? zoom : 100;
-  } catch { return 100; }
+    return Number.isFinite(zoom) && zoom >= MIN_PREVIEW_ZOOM && zoom <= MAX_PREVIEW_ZOOM ? zoom : FIT_ZOOM;
+  } catch { return FIT_ZOOM; }
 }
 
 // Layout persistence must never crash the editor when browser storage is unavailable (private mode).
@@ -56,49 +60,6 @@ const layoutStorage = {
     try { window.localStorage.setItem(key, value); } catch { /* Remembering the split is optional. */ }
   },
 };
-
-function useCompactEditorLayout() {
-  const [compact, setCompact] = useState(false);
-  useEffect(() => {
-    const media = window.matchMedia?.('(max-width: 800px)');
-    if (!media) return;
-    const sync = () => setCompact(media.matches);
-    sync(); media.addEventListener('change', sync);
-    return () => media.removeEventListener('change', sync);
-  }, []);
-  return compact;
-}
-
-/** Preview-mode tab styled entirely through inline styles: some Safari
- *  builds resolved the class/pseudo-class cascade differently and rendered
- *  the selected tab's text invisible. Inline styles outrank every CSS rule
- *  and browser default, and hover is tracked in React state, so the colors
- *  are engine-proof by construction. */
-function PreviewModeTab({ selected, onSelect, children }: {
-  selected: boolean; onSelect: () => void; children: ReactNode;
-}) {
-  const [hovered, setHovered] = useState(false);
-  const base: CSSProperties = {
-    padding: '0.3rem 0.9rem',
-    fontSize: '0.8rem',
-    cursor: 'pointer',
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
-    border: '1px solid var(--border-color)',
-    borderBottom: 0,
-  };
-  const style: CSSProperties = selected
-    ? { ...base, background: 'var(--action-primary-background)', color: 'var(--action-primary-foreground)', fontWeight: 600 }
-    : hovered
-      ? { ...base, background: 'var(--background-tertiary)', color: 'var(--text-primary)' }
-      : { ...base, background: 'var(--background-secondary)', color: 'var(--text-primary)' };
-  return <button type="button" role="tab" aria-selected={selected}
-    style={style} onClick={onSelect}
-    onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-    onFocus={() => setHovered(true)} onBlur={() => setHovered(false)}>
-    {children}
-  </button>;
-}
 
 /** Embeds the runner-built PDF. While a build job runs, the currently loaded
  *  file stays put (switching src mid-load aborts the request and can leave
@@ -133,14 +94,17 @@ export default function StatementEditor({ id }: { id: string }) {
   const buildPdf = useCallback(() => model.runJob('pdf'), [model]);
   // Switching to the Actual PDF tab with a stale PDF builds it automatically —
   // one job at a time; the guard inside runJob prevents double submission.
+  const small = useSmallScreen();
+  const [pane, setPane] = useState<'source' | 'preview'>('source');
   const autoBuiltRef = useRef('');
   useEffect(() => {
-    if (!pdfMode || !pdfStale || model.activeJob || model.actionsDisabled) return;
+    // On a phone the PDF is only on screen while the Preview pane is showing.
+    if (!pdfMode || (small && pane !== 'preview') || !pdfStale || model.activeJob || model.actionsDisabled) return;
     const key = `${draft?.revision}:${draft?.latestPdfRevision}`;
     if (autoBuiltRef.current === key) return; // one auto-build per stale state
     autoBuiltRef.current = key;
     void buildPdf();
-  }, [pdfMode, pdfStale, model.activeJob, model.actionsDisabled, draft?.revision, draft?.latestPdfRevision, buildPdf]);
+  }, [pdfMode, small, pane, pdfStale, model.activeJob, model.actionsDisabled, draft?.revision, draft?.latestPdfRevision, buildPdf]);
   useEffect(() => { if (!pdfStale) autoBuiltRef.current = ''; }, [pdfStale]);
   const recoveryHandled = useRef(false);
   const recoveryBaseRevision = useRef<number | null>(null);
@@ -150,7 +114,6 @@ export default function StatementEditor({ id }: { id: string }) {
     id: `oj-authoring-statement-layout:${id}`,
     storage: layoutStorage,
   });
-  const compactLayout = useCompactEditorLayout();
   // While the divider is dragged, embedded documents (preview iframe / PDF embed) must not swallow the
   // pointer events, or the drag never sees its pointermove/pointerup and gets stuck.
   const [resizing, setResizing] = useState(false);
@@ -231,30 +194,75 @@ export default function StatementEditor({ id }: { id: string }) {
 
   const editorDisabled = (model.busy && model.saveState !== 'saving') || !!model.activeJob;
   const zoomScale = previewZoom / 100;
-  const editorState = draft.status === 'published' ? 'Published — editing available'
-    : draft.publishedAt ? 'Editing — live problem unchanged'
-      : model.conflict ? 'Server conflict'
-        : dirty ? (model.saveState === 'saving' ? 'Saving…' : 'Unsaved changes') : 'Saved';
+  const saveText = model.conflict ? 'Unsaved'
+    : model.saveState === 'saving' ? 'Saving…'
+      : model.saveState === 'error' ? 'Save failed'
+        : dirty ? 'Unsaved' : `Saved · rev ${draft.revision}`;
+  // Edits here never touch the live problem until it is published again.
+  const liveUnchanged = draft.status === 'published' || !!draft.publishedAt;
   const previewStatusText = preview.state === 'waiting' ? 'Preparing live preview…' : preview.state === 'loading' ? 'Rendering live preview…'
     : preview.state === 'error' ? preview.error : 'Live preview is up to date';
+
+  const source = <CodeEditor label="Statement source" language="html" fill minLines={1} value={form.statementHtml}
+    disabled={editorDisabled} onChange={(statementHtml) => {
+      const baseRevision = dirty ? recoveryBaseRevision.current ?? draft.revision : draft.revision;
+      recoveryBaseRevision.current = baseRevision;
+      writeRecovery(id, { baseRevision, statementHtml });
+      model.edit('statementHtml', statementHtml);
+    }} />;
+  const previewBody = <>
+    <div className={styles.previewModeBar}>
+      <SegmentedControl aria-label="Preview mode" options={PREVIEW_MODES} value={pdfMode ? 'pdf' : 'preview'}
+        onChange={(mode) => setPdfMode(mode === 'pdf')} />
+    </div>
+    <div className={styles.previewViewport}>
+      {pdfMode
+        ? (draft.hasLatestPdf
+          ? <PdfEmbed draftId={draft.id} revision={draft.latestPdfRevision} buildRunning={!!model.activeJob} />
+          : <div className={styles.previewEmpty}>No PDF built yet.</div>)
+        : (preview.shell && preview.state !== 'error'
+          ? <LivePreview shell={preview.shell} statement={preview.html} zoomScale={zoomScale} />
+          : <div className={styles.previewEmpty} role={preview.state === 'error' ? 'alert' : 'status'}>
+            {preview.state === 'error' ? preview.error
+              : preview.state === 'loading' ? 'Rendering live preview…' : 'Preparing live preview…'}
+          </div>)}
+    </div>
+    {pdfMode && pdfStale && !model.activeJob && (
+      <div className={styles.pdfStaleBar} role="status">
+        <span>
+          {draft.hasLatestPdf && draft.latestPdfRevision !== null
+            ? <><span>{`PDF is from rev ${draft.latestPdfRevision}`}</span>{dirty ? ' · your unsaved edits are not in it' : ''}</>
+            : 'No PDF yet.'}
+        </span>
+        <Button disabled={model.actionsDisabled} onClick={() => void buildPdf()}>Build PDF now</Button>
+      </div>
+    )}
+  </>;
+
   return <main className={styles.editorShell}>
     <header className={styles.editorHeader}>
       <div className={styles.editorHeaderLeft}>
         <Link to={`/admin/authoring/${encodeURIComponent(id)}`}>← Workspace</Link>
-        <div className={styles.editorTitle}><h1>Edit Task: {draft.problemId}</h1></div>
+        <div className={styles.editorTitle}>
+          <h1>{draft.title || draft.problemId}</h1>
+          <span className={styles.editorProblemId}>{draft.problemId}</span>
+        </div>
       </div>
-      <strong className={styles.editorStateCenter}>{editorState}</strong>
+      <div className={styles.editorStateCenter}>
+        <span>{saveText}</span>
+        {liveUnchanged && <StatusBadge tone="info" soft>Published · live unchanged</StatusBadge>}
+      </div>
       <div className={styles.editorHeaderRight}>
         <span className={styles.previewStatusChip} role="status">{previewStatusText}</span>
-        <span className={styles.previewZoomControls} aria-label="Preview zoom controls">
+        <span className={styles.previewZoomControls} role="group" aria-label="Preview zoom">
           <button type="button" aria-label="Zoom out" disabled={previewZoom <= MIN_PREVIEW_ZOOM}
             onClick={() => setPreviewZoom(zoom => Math.max(MIN_PREVIEW_ZOOM, zoom - PREVIEW_ZOOM_STEP))}>−</button>
-          <output aria-label="Preview zoom">{previewZoom}%</output>
+          <button type="button" aria-label="Fit to width" aria-pressed={previewZoom === FIT_ZOOM}
+            onClick={() => setPreviewZoom(FIT_ZOOM)}>{previewZoom === FIT_ZOOM ? 'Fit' : `${previewZoom}%`}</button>
           <button type="button" aria-label="Zoom in" disabled={previewZoom >= MAX_PREVIEW_ZOOM}
             onClick={() => setPreviewZoom(zoom => Math.min(MAX_PREVIEW_ZOOM, zoom + PREVIEW_ZOOM_STEP))}>+</button>
-          <button type="button" aria-label="Reset preview zoom" disabled={previewZoom === 100}
-            onClick={() => setPreviewZoom(100)}>Reset</button>
         </span>
+        <span className={styles.editorSaveHint}>{`${SAVE_HINT} save`}</span>
         <Button variant="secondary" size="compact" onClick={() => setShowAssets(true)}>Assets &amp; help</Button>
       </div>
     </header>
@@ -269,51 +277,24 @@ export default function StatementEditor({ id }: { id: string }) {
       {model.activeJob && <p className={styles.editorStatus} role="status">Active job: {jobLabel(model.activeJob.jobType)} — {model.activeJob.status}</p>}
       {recovered && <p className={styles.editorStatus} role="status">Recovered unsaved statement from this browser tab.</p>}
     </section>
-    {/* resizeTargetMinimumSize keeps v2's grab zone (8px bar +-5px mouse, +-15px touch). */}
-    <Group groupRef={panels} defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}
-      resizeTargetMinimumSize={{ fine: 18, coarse: 38 }}
-      orientation={compactLayout ? 'vertical' : 'horizontal'} className={resizing ? `${styles.editorWorkspace} ${styles.editorWorkspaceResizing}` : styles.editorWorkspace} role="region" aria-label="Statement editor">
-      <Panel id="source" defaultSize="50" minSize="25" className={styles.sourcePane}>
-        <textarea id="statement-source" aria-label="Statement source" spellCheck={false} value={form.statementHtml}
-          readOnly={editorDisabled} onChange={event => {
-            const statementHtml = event.target.value;
-            const baseRevision = dirty ? recoveryBaseRevision.current ?? draft.revision : draft.revision;
-            recoveryBaseRevision.current = baseRevision;
-            writeRecovery(id, { baseRevision, statementHtml });
-            model.edit('statementHtml', statementHtml);
-          }} />
-      </Panel>
-      <Separator className={styles.editorResizeHandle} aria-label="Resize source and preview panes" disableDoubleClick onPointerDown={() => setResizing(true)}
-        onDoubleClick={() => panels.current?.setLayout({ source: 50, preview: 50 })} />
-      <Panel id="preview" defaultSize="50" minSize="25" className={styles.previewPane}>
-        <div className={styles.previewModeBar} role="tablist" aria-label="Preview mode">
-          <PreviewModeTab selected={pdfMode === false} onSelect={() => setPdfMode(false)}>Live HTML</PreviewModeTab>
-          <PreviewModeTab selected={pdfMode === true} onSelect={() => setPdfMode(true)}>
-            Actual PDF
-            {pdfStale && <span className={styles.previewStaleDot} aria-label="PDF is outdated" title="Statement changed since the last build" />}
-          </PreviewModeTab>
+    {small
+      ? <div className={styles.editorCompact}>
+        <div className={styles.editorPaneTabs}>
+          <SegmentedControl<'source' | 'preview'> aria-label="Editor pane" options={EDITOR_PANES} value={pane} onChange={setPane} />
         </div>
-        <div className={styles.previewViewport}>
-          {pdfMode
-            ? (draft.hasLatestPdf
-              ? <PdfEmbed draftId={draft.id} revision={draft.latestPdfRevision}
-                buildRunning={!!model.activeJob} />
-              : <div className={styles.previewEmpty}>No PDF built yet.</div>)
-            : (preview.shell && preview.state !== 'error'
-              ? <LivePreview shell={preview.shell} statement={preview.html} zoomScale={zoomScale} />
-              : <div className={styles.previewEmpty} role={preview.state === 'error' ? 'alert' : 'status'}>
-                {preview.state === 'error' ? preview.error
-                  : preview.state === 'loading' ? 'Rendering live preview…' : 'Preparing live preview…'}
-              </div>)}
+        <div className={styles.editorCompactPane} role="region" aria-label="Statement editor">
+          {pane === 'source' ? <div className={styles.sourcePane}>{source}</div> : <div className={styles.previewPane}>{previewBody}</div>}
         </div>
-        {pdfMode && pdfStale && !model.activeJob && (
-          <div className={styles.pdfStaleBar} role="status">
-            <span>{draft.hasLatestPdf ? 'Statement changed since this PDF was built.' : 'No PDF yet.'}</span>
-            <Button disabled={model.actionsDisabled} onClick={() => void buildPdf()}>Build PDF now</Button>
-          </div>
-        )}
-      </Panel>
-    </Group>
+      </div>
+      /* resizeTargetMinimumSize keeps v2's grab zone (8px bar +-5px mouse, +-15px touch). */
+      : <Group groupRef={panels} defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}
+        resizeTargetMinimumSize={{ fine: 18, coarse: 38 }}
+        orientation="horizontal" className={resizing ? `${styles.editorWorkspace} ${styles.editorWorkspaceResizing}` : styles.editorWorkspace} role="region" aria-label="Statement editor">
+        <Panel id="source" defaultSize="50" minSize="25" className={styles.sourcePane}>{source}</Panel>
+        <Separator className={styles.editorResizeHandle} aria-label="Resize source and preview panes" disableDoubleClick onPointerDown={() => setResizing(true)}
+          onDoubleClick={() => panels.current?.setLayout({ source: 50, preview: 50 })} />
+        <Panel id="preview" defaultSize="50" minSize="25" className={styles.previewPane}>{previewBody}</Panel>
+      </Group>}
     {showAssets && <Dialog open wide title="Statement assets & syntax help"
       description={'The runner-built PDF remains authoritative.'}
       onClose={() => setShowAssets(false)}

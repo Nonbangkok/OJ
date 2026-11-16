@@ -52,11 +52,13 @@ export function readinessRows(draft: Draft, jobs: Job[], states: Record<'stateme
     failed: 'The last PDF build failed.',
   };
   const verify = newest('verify_all');
+  const lastGoodVerify = jobs.filter((j) => j.jobType === 'verify_all' && j.status === 'succeeded')
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
   const caseCount = verify?.status === 'succeeded' ? verify.resultSummary?.verification?.caseCount : undefined;
   const verifiedDetail: Record<ReadinessState, string> = {
     done: caseCount ? `All checks passed · ${plural(caseCount, 'testcase')} ran against the solution.` : 'All checks passed.',
     todo: 'Never verified.',
-    stale: `Last verified at rev ${draft.verifiedRevision ?? '—'}.`,
+    stale: `Last verified at rev ${draft.verifiedRevision ?? lastGoodVerify?.draftRevision ?? '—'}.`,
     failed: `The last verify failed at rev ${rev}.`,
   };
 
@@ -82,7 +84,8 @@ export function readinessRows(draft: Draft, jobs: Job[], states: Record<'stateme
     },
     {
       key: 'testcases', state: states.testcases, title: 'Testcases',
-      detail: total === 0 ? 'No testcases yet.'
+      detail: states.testcases === 'failed' ? 'The last generate run failed — see History.'
+        : total === 0 ? 'No testcases yet.'
         : withOutput === total ? `${plural(total, 'case')}, all with outputs${size}`
           : `${total - withOutput} of ${plural(total, 'case')} missing outputs${size}`,
       fix: { label: 'Open testcases', action: { kind: 'tab', to: 'testcases' } },
@@ -108,6 +111,22 @@ export function publishReason(rows: ReadinessRow[]): string | null {
   if (needs.length === 0) return null;
   const list = needs.length === 1 ? needs[0] : `${needs.slice(0, -1).join(', ')} and ${needs[needs.length - 1]}`;
   return `${list.charAt(0).toUpperCase()}${list.slice(1)} before publishing.`;
+}
+
+/** Why Publish is disabled: the failing rows first, then whatever else holds it (§7.9). Null when it can publish. */
+export function publishBlockReason({ rows, canPublish, published, activeJob, conflict, busy, dirty, verified }: {
+  rows: ReadinessRow[]; canPublish: boolean; published: boolean; activeJob: boolean;
+  conflict: boolean; busy: boolean; dirty: boolean; verified: boolean;
+}): string | null {
+  if (canPublish) return null;
+  if (published) return 'Published — start a new revision to change it.';
+  const fromRows = publishReason(rows);
+  if (fromRows) return fromRows;
+  if (conflict) return 'The server has newer changes — sync them before publishing.';
+  if (activeJob) return 'Wait for the running job to finish.';
+  if (dirty) return 'Your edits are saving — publish once they are saved.';
+  if (busy) return 'Wait for the current action to finish.';
+  return verified ? 'Wait for the draft to be marked ready.' : 'Verify this revision before publishing.';
 }
 
 export default function ReadinessList({ draft, rows, disabled, onFix }: {

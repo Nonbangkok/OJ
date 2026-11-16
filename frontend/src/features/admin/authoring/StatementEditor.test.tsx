@@ -1,11 +1,13 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { useMediaQuery } from '../../../hooks/useMediaQuery';
 import useAuthoringDraft from './useAuthoringDraft';
 import useStatementPreview from './useStatementPreview';
 import StatementEditor from './StatementEditor';
 
 jest.mock('./useAuthoringDraft');
 jest.mock('./useStatementPreview', () => ({ __esModule: true, default: jest.fn() }));
+jest.mock('../../../hooks/useMediaQuery', () => ({ useMediaQuery: jest.fn() }));
 
 const draft = {
   id: 'd1', problemId: 'sum', title: 'Sum', authorProfileId: null, authorAkaName: 'AKA',
@@ -178,7 +180,7 @@ test('the Actual PDF embed keeps the loaded revision while a build runs, then sw
   const job = { id: 'j1', jobType: 'pdf', status: 'running' };
   mockedUseAuthoringDraft.mockReturnValue(withPdf(2, job));
   const { rerender } = render(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
-  fireEvent.click(screen.getByRole('tab', { name: /Actual PDF/ }));
+  fireEvent.click(within(screen.getByRole('group', { name: 'Preview mode' })).getByRole('button', { name: 'PDF' }));
   const pdfFrame = () => screen.getByTitle('Latest runner-built PDF');
   expect(pdfFrame().getAttribute('src')).toContain('revision=2');
   const loaded = pdfFrame();
@@ -192,4 +194,104 @@ test('the Actual PDF embed keeps the loaded revision while a build runs, then sw
   rerender(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
   expect(pdfFrame()).not.toBe(loaded);
   expect(pdfFrame().getAttribute('src')).toContain('revision=3');
+});
+
+describe('full-screen editor chrome (§7.9)', () => {
+  const showWith = (over: { draftOver?: Record<string, unknown>; [key: string]: unknown } = {}) => {
+    const { draftOver, ...rest } = over;
+    const d = { ...draft, ...draftOver };
+    mockedUseAuthoringDraft.mockReturnValue({ ...model(), draft: d, form: d, ...rest } as unknown as ReturnType<typeof useAuthoringDraft>);
+    mockedUseStatementPreview.mockReturnValue({ html: '', state: 'waiting', error: '', shell: '' });
+    return render(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
+  };
+  const idle = { busy: false, dirty: false, saveState: 'saved', actionsDisabled: false };
+
+  test('the top bar: back to the workspace, the title and the save state', () => {
+    showWith(idle);
+    const bar = screen.getByRole('banner');
+    expect(within(bar).getByRole('link', { name: '← Workspace' })).toHaveAttribute('href', '/admin/authoring/d1');
+    expect(within(bar).getByRole('heading', { level: 1 })).toHaveTextContent('Sum');
+    expect(within(bar).getByText('Saved · rev 3')).toBeInTheDocument();
+    expect(within(bar).getByText(/(⌘S|Ctrl\+S) save/)).toBeInTheDocument();
+    expect(within(bar).queryByText('Published · live unchanged')).toBeNull();
+  });
+
+  test('save state reads Saving… and Unsaved', () => {
+    const { unmount } = showWith();
+    expect(screen.getByText('Saving…')).toBeInTheDocument();
+    unmount();
+    showWith({ busy: false, saveState: 'dirty' });
+    expect(screen.getByText('Unsaved')).toBeInTheDocument();
+  });
+
+  test('minor: under a server conflict the editor save state reads Unsaved', () => {
+    showWith({ ...idle, conflict: true, dirty: true, saveState: 'dirty' });
+    expect(within(screen.getByRole('banner')).getByText('Unsaved')).toBeInTheDocument();
+    expect(within(screen.getByRole('banner')).queryByText('Server state changed')).toBeNull();
+  });
+
+  test('a published draft carries the "live unchanged" badge', () => {
+    showWith({ ...idle, draftOver: { status: 'published', publishedAt: '2026-11-10T00:00:00Z' } });
+    expect(screen.getByText('Published · live unchanged')).toBeInTheDocument();
+  });
+
+  test('Preview / PDF segment and − Fit + zoom, Fit by default', () => {
+    window.localStorage.clear();
+    showWith(idle);
+    const mode = screen.getByRole('group', { name: 'Preview mode' });
+    expect(within(mode).getByRole('button', { name: 'Preview' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(mode).getByRole('button', { name: 'PDF' })).toHaveAttribute('aria-pressed', 'false');
+    const fit = screen.getByRole('button', { name: 'Fit to width' });
+    expect(fit).toHaveTextContent('Fit');
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(fit).toHaveTextContent('110%');
+    fireEvent.click(fit);
+    expect(fit).toHaveTextContent('Fit');
+  });
+
+  test('the source is the shared code editor with HTML highlighting', () => {
+    const { container } = showWith({ ...idle, draftOver: { statementHtml: '<p>Sum</p>' } });
+    expect(screen.getByRole('textbox', { name: 'Statement source' })).toHaveValue('<p>Sum</p>');
+    expect(container.querySelector('.hljs-tag')).not.toBeNull();
+  });
+
+  test('a stale PDF says which revision it is from and builds it', () => {
+    const runJob = jest.fn();
+    showWith({ ...idle, runJob, draftOver: { hasLatestPdf: true, latestPdfRevision: 2 } });
+    fireEvent.click(within(screen.getByRole('group', { name: 'Preview mode' })).getByRole('button', { name: 'PDF' }));
+    expect(screen.getByText('PDF is from rev 2')).toBeInTheDocument();
+    // The existing auto-build on switching to a stale PDF is kept.
+    expect(runJob).toHaveBeenCalledWith('pdf');
+    fireEvent.click(screen.getByRole('button', { name: 'Build PDF now' }));
+    expect(runJob).toHaveBeenCalledTimes(2);
+  });
+
+  test('final review: on a phone, a stale PDF builds only while the Preview pane is showing', () => {
+    jest.mocked(useMediaQuery).mockReturnValue(true);
+    const runJob = jest.fn();
+    const { rerender } = showWith({ ...idle, runJob, draftOver: { hasLatestPdf: true, latestPdfRevision: 2 } });
+    fireEvent.click(within(screen.getByRole('group', { name: 'Editor pane' })).getByRole('button', { name: 'Preview' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Preview mode' })).getByRole('button', { name: 'PDF' }));
+    expect(runJob).toHaveBeenCalledTimes(1);
+    fireEvent.click(within(screen.getByRole('group', { name: 'Editor pane' })).getByRole('button', { name: 'Source' }));
+    runJob.mockClear();
+    // A new stale state (the next autosave) while the author is typing in Source.
+    const d = { ...draft, hasLatestPdf: true, latestPdfRevision: 2, revision: 4 };
+    mockedUseAuthoringDraft.mockReturnValue({ ...model(), ...idle, runJob, draft: d, form: d } as unknown as ReturnType<typeof useAuthoringDraft>);
+    rerender(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
+    expect(screen.getByRole('textbox', { name: 'Statement source' })).toBeInTheDocument();
+    expect(runJob).not.toHaveBeenCalled();
+  });
+
+  test('below 768 px: Source / Preview tabs instead of the split', () => {
+    jest.mocked(useMediaQuery).mockReturnValue(true);
+    showWith(idle);
+    expect(screen.queryByRole('separator', { name: 'Resize source and preview panes' })).toBeNull();
+    const panes = screen.getByRole('group', { name: 'Editor pane' });
+    expect(within(panes).getByRole('button', { name: 'Source' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('textbox', { name: 'Statement source' })).toBeInTheDocument();
+    fireEvent.click(within(panes).getByRole('button', { name: 'Preview' }));
+    expect(screen.queryByRole('textbox', { name: 'Statement source' })).toBeNull();
+    expect(screen.getByRole('group', { name: 'Preview mode' })).toBeInTheDocument();
+  });
 });

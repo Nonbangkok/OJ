@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { Button, ConfirmDialog, Dialog, InlineNotice } from '../../../components/ui';
+import type { Job } from './types';
 import authoringService from '../../../services/admin/authoringService';
 import { getErrorMessage } from '../../../utils/error';
 import WorkspaceHeader from './WorkspaceHeader';
@@ -12,9 +13,9 @@ import LastCompile from './LastCompile';
 import LargeScreenNotice, { useSmallScreen } from './LargeScreenNotice';
 import useAuthoringDraft from './useAuthoringDraft';
 import { Profile } from './types';
-import { verifyFailureExplanation } from './status';
+import { jobLabel, verifyFailureExplanation } from './status';
 import JobHistory from './JobHistory';
-import ReadinessList, { publishReason, readinessRows, type ReadinessFix } from './ReadinessList';
+import ReadinessList, { publishBlockReason, readinessRows, type ReadinessFix } from './ReadinessList';
 import verifyStyles from './Verify.module.css';
 import MetadataFields from './MetadataFields';
 import StatementTab from './StatementTab';
@@ -105,6 +106,7 @@ export default function DraftWorkspace({ id }: { id: string }) {
       {model.recovered && <p role="status">Recovered unsaved edits from this browser tab.</p>}
       {model.conflict && <div role="alert" className={styles.conflictBanner}><p>Server state changed. Your unsaved text is retained.</p>
         <Button variant="secondary" disabled={model.busy} onClick={() => setLeaveGuard(true)}>Discard local changes and sync</Button></div>}
+      <LastJobFailure jobs={model.jobs} revision={draft.revision} historyHref={`${base}/jobs`} onVerifyTab={onVerifyTab} />
       <Outlet context={workspace} />
     </div>
     {confirm && <Dialog open title={confirm.action === 'publish' ? 'Publish this problem?' : 'Replace stored files?'}
@@ -337,12 +339,10 @@ function VerifySection() {
 
   const rows = readinessRows(draft, model.jobs, readinessOf(readinessFromWorkspace(draft, model.jobs)), testcaseBytes);
   const published = draft.status === 'published';
-  const reason = model.canPublish ? null
-    : published ? 'Published — start a new revision to change it.'
-      : publishReason(rows)
-        ?? (model.activeJob ? 'Wait for the running job to finish.'
-          : model.dirty || model.saveState === 'saving' ? 'Your edits are saving — publish once they are saved.'
-            : 'Verify this revision before publishing.');
+  const reason = publishBlockReason({
+    rows, canPublish: model.canPublish, published, activeJob: !!model.activeJob, conflict: model.conflict,
+    busy: model.busy, dirty: model.dirty || model.saveState === 'saving', verified: draft.verifiedRevision === draft.revision,
+  });
   const onFix = (fix: ReadinessFix) => {
     if (fix.kind === 'tab') navigate(fix.to, { relative: 'path' });
     else if (fix.kind === 'compile') void model.runJob('compile', { target: 'solution' });
@@ -362,6 +362,22 @@ function VerifySection() {
   </section>;
 }
 
+/** The newest job, when it failed at this revision: the old rail's last-result line, now above the tab. */
+function LastJobFailure({ jobs, revision, historyHref, onVerifyTab }: {
+  jobs: Job[]; revision: number; historyHref: string; onVerifyTab: boolean;
+}) {
+  const last = [...jobs].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+  if (!last || last.draftRevision !== revision || (last.status !== 'failed' && last.status !== 'timed_out')) return null;
+  // The Verify tab explains a failed Verify All in full.
+  if (onVerifyTab && last.jobType === 'verify_all') return null;
+  const timedOut = last.status === 'timed_out';
+  return <div role="alert" className={verifyStyles.plainAlert}>
+    <InlineNotice tone={timedOut ? 'warning' : 'danger'} title={`${jobLabel(last.jobType)} ${timedOut ? 'timed out' : 'failed'} at rev ${last.draftRevision}`}>
+      {last.errorMessage ? `${last.errorMessage}. ` : ''}<Link to={historyHref}>See History</Link>
+    </InlineNotice>
+  </div>;
+}
+
 /** The newest Verify All when it failed: the failing case and what it means. */
 function VerifyFailure({ jobs }: { jobs: import('./types').Job[] }) {
   const verify = jobs.filter((job) => job.jobType === 'verify_all')
@@ -369,7 +385,7 @@ function VerifyFailure({ jobs }: { jobs: import('./types').Job[] }) {
   if (!verify || (verify.status !== 'failed' && verify.status !== 'timed_out')) return null;
   const { title, detail } = verifyFailureExplanation(verify);
   const failedCase = verify.resultSummary?.failedCase;
-  return <div role="alert">
+  return <div role="alert" className={verifyStyles.plainAlert}>
     <InlineNotice tone={verify.status === 'timed_out' ? 'warning' : 'danger'} title={`${title}.`}>
       {detail}
       {failedCase && <> Failing testcase: <code>{`#${failedCase.caseNumber}`}</code>

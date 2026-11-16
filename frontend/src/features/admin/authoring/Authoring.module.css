@@ -737,6 +737,7 @@
   height: 100dvh;
   overflow: hidden;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   text-align: left;
   color: var(--text-primary);
@@ -771,7 +772,10 @@
 }
 /* The editing-state label occupies the header's true center column. */
 .editorStateCenter {
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   white-space: nowrap;
 }
 .previewStatusChip {
@@ -848,24 +852,6 @@
   display: flex;
   flex-direction: column;
 }
-.sourcePane textarea {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  box-sizing: border-box;
-  resize: none;
-  border: 0;
-  border-radius: 0;
-  padding: 1rem;
-  color: var(--text-primary);
-  background: var(--background-primary);
-  font: 0.9rem/1.55 monospace;
-  tab-size: 4;
-  outline: none;
-}
-.sourcePane textarea:focus {
-  box-shadow: inset 0 0 0 2px var(--accent-primary);
-}
 /* react-resizable-panels 4 sets an inline `flex: 0 0 auto` on the separator, which
    beats any flex shorthand here; the thickness comes from width/height instead. */
 .editorResizeHandle {
@@ -886,15 +872,13 @@
   display: flex;
   flex-direction: column;
 }
-/* Live HTML vs Actual PDF switch above the preview viewport. */
+/* Preview / PDF switch above the preview viewport. */
 .previewModeBar {
   display: flex;
   gap: 0.25rem;
-  padding: 0.35rem 0.5rem 0;
+  padding: 0.4rem 0.5rem;
   background: var(--statement-desk);
 }
-/* Tab buttons are styled inline by PreviewModeTab — no class rules here,
-   so no engine's cascade can intervene. */
 .previewPdfEmbed {
   flex: 1;
   width: 100%;
@@ -1032,12 +1016,6 @@
   }
 }
 @media (max-width: 800px) {
-  .editorShell {
-    height: auto;
-    min-height: 100dvh;
-    overflow: auto;
-    grid-template-rows: auto auto auto auto;
-  }
   /* Narrow screens: stack left/center/right into rows; the state label
      spans the middle row, centered. */
   .editorHeader {
@@ -1050,14 +1028,14 @@
   }
   .editorHeaderRight {
     justify-content: flex-end;
+    flex-wrap: wrap;
   }
-  .editorWorkspace {
-    min-height: 100dvh;
-  }
-  .editorResizeHandle {
-    width: auto;
-    height: 8px;
-    cursor: row-resize;
+}
+/* Phones edit with Source / Preview tabs: no keyboard hint, no preview chip. */
+@media (max-width: 767px) {
+  .editorSaveHint,
+  .previewStatusChip {
+    display: none;
   }
 }
 
@@ -1227,6 +1205,7 @@
   background: var(--editor-bg);
 }
 .codeLabel {
+  display: block;
   padding: 0.4rem 0.9rem;
   font-family: var(--font-family-mono);
   font-size: 0.8rem;
@@ -1373,3 +1352,60 @@
 .difficultyChip3 { background-color: var(--difficulty-band-3); }
 .difficultyChip4 { background-color: var(--difficulty-band-4); }
 .difficultyChip5 { background-color: var(--difficulty-band-5); }
+
+/* The full-screen statement editor: the code editor fills its pane. */
+.codeEditorFill {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+  border: none;
+}
+
+.codeEditorFill .codeWrap {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
+}
+
+/* Full-screen editor top bar (§7.9). */
+.editorProblemId {
+  display: block;
+  font-family: var(--font-family-mono);
+  font-size: 0.75rem;
+  color: var(--editor-chrome-muted);
+}
+
+.editorSaveHint {
+  font-family: var(--font-family-mono);
+  font-size: 0.75rem;
+  color: var(--editor-chrome-muted);
+  white-space: nowrap;
+}
+
+/* Below 768 px: Source / Preview tabs instead of the split. */
+.editorCompact {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.editorPaneTabs {
+  display: flex;
+  justify-content: center;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--editor-chrome-bg);
+}
+
+.editorCompactPane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.editorCompactPane > div {
+  flex: 1;
+}

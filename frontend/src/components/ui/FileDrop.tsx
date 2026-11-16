@@ -76,6 +76,7 @@ export function FileDrop({ label, hint, accept, multiple = false, maxBytes, disa
         ref={inputRef}
         type="file"
         hidden
+        className={styles.picker}
         multiple={multiple}
         accept={accept?.join(',')}
         onChange={(e) => { take(e.target.files); e.target.value = ''; }}

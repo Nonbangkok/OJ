@@ -2,83 +2,137 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 const fixedTime = new Date('2026-09-16T09:00:00+07:00');
 
+// B7 draft list rows (with readiness) for the Authoring hub.
+const job = (status: string, revision: number) => ({ status, revision });
 const drafts = [
   {
-    id: 'draft-20260916-01',
-    revision: 4,
-    verifiedRevision: 4,
-    status: 'draft',
-    hasLatestPdf: false,
-    latestPdfRevision: null,
-    hasAuthorProfileImage: false,
-    updatedAt: '2026-09-16T02:00:00.000Z',
-    publishedAt: null,
-    problemId: 'international-marathon-route',
-    title: 'International Marathon Route Reconstruction',
-    authorProfileId: 'profile-international',
-    authorAkaName: 'International Algorithmic Marathon Author',
-    authorRealName: 'Dr. Alexandria International-Longname von Algorithmus',
-    language: 'English',
-    countryCode: 'THA',
-    timeLimitMs: 2000,
-    memoryLimitMb: 512,
-    statementHtml: '<p>Deterministic visual fixture.</p>',
-    solutionCpp: '#include <bits/stdc++.h>\nint main() { return 0; }',
-    generatorCpp: null,
-    templateVersion: 'red-gate-v1',
-    testcaseStats: { total: 2, withOutput: 2 },
+    id: 'd-bfs', problemId: 'hp_graph_bfs', title: 'Shortest hops', authorProfileId: 'profile-ada', authorAkaName: 'Ada',
+    status: 'generated', revision: 14, verifiedRevision: 12, createdBy: 1,
+    createdAt: '2026-09-01T02:00:00.000Z', updatedAt: '2026-09-16T01:40:00.000Z', publishedAt: null,
+    readiness: {
+      hasStatement: true, hasSolution: true, hasGenerator: true, testcases: { total: 24, withOutput: 24 }, latestPdfRevision: 12,
+      latestJobs: { compile_solution: job('succeeded', 14), build_pdf: job('succeeded', 12), verify_all: job('failed', 12) },
+      activeJob: false,
+    },
   },
   {
-    id: 'draft-20260916-02',
-    revision: 7,
-    verifiedRevision: 7,
-    status: 'ready',
-    hasLatestPdf: true,
-    latestPdfRevision: 7,
-    hasAuthorProfileImage: false,
-    updatedAt: '2026-09-16T02:10:00.000Z',
-    publishedAt: null,
-    problemId: 'stable-scheduling',
-    title: 'Stable Scheduling Across Time Zones',
-    authorProfileId: 'profile-precision',
-    authorAkaName: 'Precision Scheduling Collective',
-    authorRealName: 'Professor Beatrice Deterministic Fixture',
-    language: 'Thai',
-    countryCode: 'THA',
-    timeLimitMs: 1000,
-    memoryLimitMb: 256,
-    statementHtml: '<p>Second deterministic visual fixture.</p>',
-    solutionCpp: '#include <iostream>\nint main() { return 0; }',
-    generatorCpp: '#include <iostream>\nint main() { return 0; }',
-    templateVersion: 'red-gate-v1',
-    testcaseStats: { total: 2, withOutput: 2 },
+    id: 'd-sched', problemId: 'stable-scheduling', title: 'Stable Scheduling Across Time Zones', authorProfileId: 'profile-precision',
+    authorAkaName: 'Precision Scheduling Collective With Deliberately Long Attribution',
+    status: 'ready', revision: 7, verifiedRevision: 7, createdBy: 1,
+    createdAt: '2026-09-02T02:00:00.000Z', updatedAt: '2026-09-15T08:10:00.000Z', publishedAt: null,
+    readiness: {
+      hasStatement: true, hasSolution: true, hasGenerator: false, testcases: { total: 12, withOutput: 12 }, latestPdfRevision: 7,
+      latestJobs: { compile_solution: job('succeeded', 7), build_pdf: job('succeeded', 7), verify_all: job('succeeded', 7) },
+      activeJob: false,
+    },
+  },
+  {
+    id: 'd-route', problemId: 'international-marathon-route', title: 'International Marathon Route Reconstruction',
+    authorProfileId: 'profile-international', authorAkaName: 'International Algorithmic Marathon Author',
+    status: 'published', revision: 4, verifiedRevision: 4, createdBy: 2,
+    createdAt: '2026-08-20T02:00:00.000Z', updatedAt: '2026-09-10T02:00:00.000Z', publishedAt: '2026-09-10T02:00:00.000Z',
+    readiness: {
+      hasStatement: true, hasSolution: true, hasGenerator: true, testcases: { total: 30, withOutput: 30 }, latestPdfRevision: 4,
+      latestJobs: { compile_solution: job('succeeded', 4), build_pdf: job('succeeded', 4), verify_all: job('succeeded', 4) },
+      activeJob: false,
+    },
+  },
+  {
+    id: 'd-sum', problemId: 'sum_two', title: 'Sum of two', authorProfileId: null, authorAkaName: 'author.admin',
+    status: 'draft', revision: 1, verifiedRevision: null, createdBy: 1,
+    createdAt: '2026-09-16T00:30:00.000Z', updatedAt: '2026-09-16T00:30:00.000Z', publishedAt: null,
+    readiness: {
+      hasStatement: false, hasSolution: false, hasGenerator: false, testcases: { total: 0, withOutput: 0 }, latestPdfRevision: null,
+      latestJobs: {}, activeJob: false,
+    },
   },
 ];
 
+// B8 profile list rows (drafts using each profile, the linked account).
 const profiles = [
   {
-    id: 'profile-international',
-    userId: 701,
-    akaName: 'International Algorithmic Marathon Author',
-    realName: 'Dr. Alexandria International-Longname von Algorithmus',
-    defaultLanguage: 'English',
-    countryCode: 'THA',
-    hasProfileImage: false,
-    createdAt: '2026-09-01T00:00:00.000Z',
-    updatedAt: '2026-09-16T02:00:00.000Z',
+    id: 'profile-ada', userId: 12, akaName: 'Ada', realName: 'Ada Lovelace', defaultLanguage: 'Thai', countryCode: 'THA',
+    hasProfileImage: false, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-09-14T02:00:00.000Z',
+    draftCount: 1, linkedUsername: 'ada.l',
   },
   {
-    id: 'profile-precision',
-    userId: null,
-    akaName: 'Precision Scheduling Collective With Deliberately Long Attribution',
-    realName: 'Professor Beatrice Deterministic Fixture for Cross-Viewport Regression Coverage',
-    defaultLanguage: 'Thai',
-    countryCode: 'THA',
-    hasProfileImage: false,
-    createdAt: '2026-09-02T00:00:00.000Z',
-    updatedAt: '2026-09-16T02:10:00.000Z',
+    id: 'profile-international', userId: 701, akaName: 'International Algorithmic Marathon Author',
+    realName: 'Dr. Alexandria International-Longname von Algorithmus', defaultLanguage: 'English', countryCode: 'THA',
+    hasProfileImage: false, createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-16T02:00:00.000Z',
+    draftCount: 1, linkedUsername: 'alexandria.longname',
+  },
+  {
+    id: 'profile-precision', userId: null, akaName: 'Precision Scheduling Collective With Deliberately Long Attribution',
+    realName: 'Professor Beatrice Deterministic Fixture for Cross-Viewport Regression Coverage', defaultLanguage: 'Thai',
+    countryCode: 'THA', hasProfileImage: false, createdAt: '2026-09-02T00:00:00.000Z', updatedAt: '2026-09-16T02:10:00.000Z',
+    draftCount: 1, linkedUsername: null,
   },
 ];
+
+// The workspace draft (rev 14): verified at 12, PDF from 12, a failed verify at 12.
+const statementHtml = [
+  '<h2>Shortest hops</h2>',
+  '<p>A city has <b>n</b> intersections and <b>m</b> one-way roads. Find the fewest roads from intersection 1 to every other intersection.</p>',
+  '<h3>Input</h3>',
+  '<p>The first line holds n and m (1 ≤ n, m ≤ 200000). Each of the next m lines holds a road a → b.</p>',
+  '<h3>Output</h3>',
+  '<p>Print n numbers: the fewest roads to each intersection, or -1 when it cannot be reached.</p>',
+].join('\n');
+const solutionCpp = [
+  '#include <bits/stdc++.h>',
+  'using namespace std;',
+  '',
+  'int main() {',
+  '  int n, m;',
+  '  cin >> n >> m;',
+  '  vector<vector<int>> g(n + 1);',
+  '  for (int i = 0; i < m; i++) { int a, b; cin >> a >> b; g[a].push_back(b); }',
+  '  vector<int> d(n + 1, -1);',
+  '  queue<int> q; q.push(1); d[1] = 0;',
+  '  while (!q.empty()) {',
+  '    int u = q.front(); q.pop();',
+  '    for (int v : g[u]) if (d[v] < 0) { d[v] = d[u] + 1; q.push(v); }',
+  '  }',
+  '  for (int i = 1; i <= n; i++) cout << d[i] << " \\n"[i == n];',
+  '}',
+].join('\n');
+const workspaceDraft = {
+  id: 'd-bfs', problemId: 'hp_graph_bfs', title: 'Shortest hops', authorProfileId: 'profile-ada', authorAkaName: 'Ada',
+  authorRealName: 'Ada Lovelace', language: 'Thai', countryCode: 'THA', categories: ['Graph'], difficulty: 1600,
+  timeLimitMs: 1000, memoryLimitMb: 256, statementHtml, solutionCpp,
+  generatorCpp: '#include <bits/stdc++.h>\nint main(int argc, char** argv) {\n  std::mt19937 rng(std::stoi(argv[1]));\n  std::cout << 5 << " " << 4 << "\\n";\n}',
+  templateVersion: 'red-gate-v1', revision: 14, verifiedRevision: 12, hasLatestPdf: true, latestPdfRevision: 12,
+  status: 'generated', publishedAt: null, hasAuthorProfileImage: false, updatedAt: '2026-09-16T01:40:00.000Z',
+  testcaseStats: { total: 24, withOutput: 24 },
+};
+const workspaceJob = (over: Record<string, unknown>) => ({
+  draftId: 'd-bfs', errorCode: null, errorMessage: null, resultSummary: null, ...over,
+});
+export const workspaceJobs = [
+  workspaceJob({ id: 'j-compile', jobType: 'compile_solution', status: 'succeeded', draftRevision: 14, createdAt: '2026-09-16T01:38:00.000Z',
+    resultSummary: { durationMs: 1800, warnings: [] }, log: 'g++ -std=c++20 -O2 solution.cpp\n' }),
+  workspaceJob({ id: 'j-outputs', jobType: 'generate_outputs', status: 'succeeded', draftRevision: 13, createdAt: '2026-09-16T01:20:00.000Z' }),
+  workspaceJob({ id: 'j-verify', jobType: 'verify_all', status: 'failed', draftRevision: 12, createdAt: '2026-09-16T01:05:00.000Z',
+    errorCode: 'wrong_answer', errorMessage: 'output mismatch on case 7',
+    resultSummary: {
+      failedCase: { caseNumber: 7, durationMs: 41 },
+      verification: {
+        checks: { solution_compiles: 'passed', outputs_match: 'failed', pdf_current: 'passed' }, caseCount: 24,
+        totalTestcaseBytes: 3_100_008, memoryLimitMb: 256, peakMemoryBytes: null, warnings: [],
+        cases: Array.from({ length: 7 }, (_, i) => ({ caseId: `c${i + 1}`, caseNumber: i + 1, durationMs: 18 + i * 3 })),
+      },
+    },
+    log: 'case 1 ok 18 ms\ncase 2 ok 21 ms\ncase 3 ok 24 ms\ncase 4 ok 27 ms\ncase 5 ok 30 ms\ncase 6 ok 33 ms\ncase 7 wrong answer: expected "3 4 -1", got "3 4 5"\n' }),
+  workspaceJob({ id: 'j-pdf', jobType: 'build_pdf', status: 'succeeded', draftRevision: 12, createdAt: '2026-09-16T00:58:00.000Z' }),
+  workspaceJob({ id: 'j-gen', jobType: 'run_generator', status: 'timed_out', draftRevision: 11, createdAt: '2026-09-15T09:30:00.000Z',
+    errorCode: 'generator_timeout', errorMessage: 'The generator ran longer than 10 s' }),
+];
+const workspaceTestcases = Array.from({ length: 24 }, (_, i) => ({
+  id: `c${i + 1}`, caseNumber: i + 1, filename: i === 23 ? 'max_chain_200000.in' : `${String(i + 1).padStart(2, '0')}.in`,
+  inputBytes: 100_000, outputBytes: 29_167, hasOutput: true, source: i < 2 ? 'uploaded' : 'generated', sourceRevision: 13,
+  createdAt: '2026-09-16T01:20:00.000Z', updatedAt: '2026-09-16T01:20:00.000Z',
+}));
+const previewShell = '<!doctype html><html><head><style>body{font-family:Georgia,serif;margin:0;padding:32px 40px;color:#1d1d1f;background:#fff;line-height:1.55}h2{margin-top:0}</style></head><body><article id="statement"></article></body></html>';
 
 export function json(body: unknown) {
   return {
@@ -110,6 +164,31 @@ export async function mockAdminApi(page: Page): Promise<void> {
   // matches the username to an Author Profile AKA; 'author.admin' matches none.
   await page.route('**/api/admin/authoring/drafts?scope=mine', (route) => route.fulfill(json([])));
   await page.route('**/api/admin/author-profiles', (route) => route.fulfill(json(profiles)));
+}
+
+/** mockAdminApi plus a full draft workspace for `d-bfs` (§7.9 visual baselines). */
+export async function mockAuthoringApi(page: Page, options: { jobs?: unknown[] } = {}): Promise<void> {
+  await mockAdminApi(page);
+  const jobs = options.jobs ?? workspaceJobs;
+  await page.route('**/api/admin/authoring/profile-syncs', (route) => route.fulfill(json([])));
+  await page.route(/\/api\/admin\/author-profiles\/user-candidates/, (route) => route.fulfill(json([
+    { id: 12, username: 'ada.l', role: 'staff', linkedProfile: { id: 'profile-ada', akaName: 'Ada' } },
+    { id: 31, username: 'adam.k', role: 'user', linkedProfile: null },
+  ])));
+  await page.route(/\/api\/admin\/authoring\/drafts\/d-bfs(\?|$)/, (route) => route.fulfill(json(workspaceDraft)));
+  await page.route('**/api/admin/authoring/drafts/d-bfs/jobs', (route) => route.fulfill(json(jobs)));
+  await page.route(/\/api\/admin\/authoring\/jobs\/[^/]+$/, (route) => {
+    const id = route.request().url().split('/').pop();
+    return route.fulfill(json((jobs as Array<{ id: string }>).find((j) => j.id === id) ?? null));
+  });
+  await page.route('**/api/admin/authoring/drafts/d-bfs/testcases', (route) =>
+    route.fulfill(json({ revision: 14, testcases: workspaceTestcases })));
+  await page.route('**/api/admin/authoring/drafts/d-bfs/assets', (route) =>
+    route.fulfill(json([{ id: 'a1', filename: 'graph.png', sizeBytes: 84_000 }])));
+  await page.route('**/api/admin/authoring/drafts/d-bfs/preview-context', (route) =>
+    route.fulfill(json({ html: previewShell, assets: [{ id: 'a1', filename: 'graph.png' }] })));
+  await page.route('**/api/admin/authoring/drafts/d-bfs/preview', (route) =>
+    route.fulfill(json({ html: `<html><body><article id="statement">${statementHtml}</article></body></html>` })));
 }
 
 export async function waitForStableUi(page: Page): Promise<void> {

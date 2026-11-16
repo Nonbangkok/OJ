@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import authoringService from '../../../services/admin/authoringService';
 import { TestcaseMetadata } from './types';
 import { previewText } from './testcasePreview';
+import { planTestcaseDrop } from './testcaseDrop';
 
 export interface Preview {
   filename: string;
@@ -43,27 +44,22 @@ export default function useTestcaseFiles({ draftId, revision, disabled, onMutate
   useLayoutEffect(() => { errorHandler.current = onError; });
   const locked = disabled || busy || loading || !loaded || savedRevision > revision;
 
-  // File selections and dialogs, reset after every successful mutation.
-  const [input, setInput] = useState<File | null>(null);
-  const [output, setOutput] = useState<File | null>(null);
+  // The dropped ZIP awaiting confirmation, the replace dialog and the confirmations.
   const [archive, setArchive] = useState<File | null>(null);
+  const [dropError, setDropError] = useState('');
   const [editing, setEditing] = useState<TestcaseMetadata | null>(null);
   const [replacementInput, setReplacementInput] = useState<File | null>(null);
   const [replacementOutput, setReplacementOutput] = useState<File | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-  const [formVersion, setFormVersion] = useState(0);
   const [replacementVersion, setReplacementVersion] = useState(0);
 
   function resetFiles() {
-    setInput(null);
-    setOutput(null);
     setArchive(null);
     setReplacementInput(null);
     setReplacementOutput(null);
     setEditing(null);
     setConfirmation(null);
     setPreview(null);
-    setFormVersion((value) => value + 1);
   }
 
   const reportError = useCallback((error: unknown) => {
@@ -124,14 +120,15 @@ export default function useTestcaseFiles({ draftId, revision, disabled, onMutate
     }
   }, [busy, draftId, inspecting, reportError]);
 
-  function multipart(files: { input?: File | null; output?: File | null; archive?: File | null }) {
+  function multipart(files: { input?: File | null; output?: File | null; archive?: File | null }, atRevision = revision) {
     const body = new FormData();
-    body.append('expectedRevision', String(revision));
+    body.append('expectedRevision', String(atRevision));
     for (const [name, file] of Object.entries(files)) if (file) body.append(name, file);
     return body;
   }
 
-  const mutate = useCallback(async (request: () => Promise<{ revision: number }>) => {
+  /** `error`: a later step failed after earlier ones changed the set — refresh first, then report it. */
+  const mutate = useCallback(async (request: () => Promise<{ revision: number; error?: unknown }>) => {
     if (locked || pending.current) return;
     pending.current = true;
     onBusyChange?.(true);
@@ -155,6 +152,7 @@ export default function useTestcaseFiles({ draftId, revision, disabled, onMutate
         refreshError = error;
       }
       if (refreshError) throw refreshError;
+      if (result.error) throw result.error;
       if (!mounted.current) return;
       resetFiles();
     } catch (error) {
@@ -184,11 +182,31 @@ export default function useTestcaseFiles({ draftId, revision, disabled, onMutate
     }
   }, [busy, loading, onBusyChange, onMutated, refreshList, reportError, revision, savedRevision]);
 
-  const appendTestcase = useCallback(() => {
-    if (!input) return;
-    void mutate(() => authoringService.appendTestcase(draftId, multipart({ input, output })));
+  /** One drop: `n.in` (+ `n.out`/`n.ans`) pairs append in order, each against the revision the last returned; a lone .zip asks to replace all. */
+  const drop = useCallback((files: File[]) => {
+    if (locked || pending.current) return;
+    const plan = planTestcaseDrop(files);
+    if (plan.kind === 'invalid') { setDropError(plan.reason); return; }
+    setDropError('');
+    if (plan.kind === 'zip') {
+      setArchive(plan.archive);
+      setConfirmation({ kind: 'zip', revision });
+      return;
+    }
+    void mutate(async () => {
+      let atRevision = revision;
+      for (const [index, pair] of plan.pairs.entries()) {
+        try {
+          ({ revision: atRevision } = await authoringService.appendTestcase(draftId, multipart(pair, atRevision)));
+        } catch (error) {
+          if (index === 0) throw error;
+          return { revision: atRevision, error };
+        }
+      }
+      return { revision: atRevision };
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftId, input, mutate, output, revision]);
+  }, [draftId, locked, mutate, revision]);
 
   const replaceTestcaseFiles = useCallback(() => {
     if (!editing || (!replacementInput && !replacementOutput)) return;
@@ -212,9 +230,9 @@ export default function useTestcaseFiles({ draftId, revision, disabled, onMutate
 
   return {
     testcases, loading, loaded, busy, inspecting, preview, setPreview, errorMessage, savedRevision, locked,
-    input, setInput, output, setOutput, archive, setArchive,
+    archive, dropError, drop,
     editing, setEditing, replacementInput, setReplacementInput, replacementOutput, setReplacementOutput,
-    confirmation, setConfirmation, formVersion, replacementVersion, setReplacementVersion,
-    inspect, mutate, retryRefresh, appendTestcase, replaceTestcaseFiles, confirmMutation,
+    confirmation, setConfirmation, replacementVersion, setReplacementVersion,
+    inspect, mutate, retryRefresh, replaceTestcaseFiles, confirmMutation,
   };
 }

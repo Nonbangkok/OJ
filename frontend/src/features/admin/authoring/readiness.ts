@@ -28,20 +28,26 @@ export function readinessOf(input: ReadinessInput): Record<ReadinessKey, Readine
   const failedNow = (type: string) => FAILED.has(jobs[type]?.status ?? '') && jobs[type]?.revision === revision;
   const compiled = (present: boolean, compileJob: string, alsoDoneBy?: string): ReadinessState => {
     if (!present) return 'todo';
-    if (FAILED.has(jobs[compileJob]?.status ?? '')) return 'failed';
+    // Success at this revision first: a Verify that compiled the fixed code beats an older failed Compile.
     if (succeededNow(compileJob) || (alsoDoneBy !== undefined && succeededNow(alsoDoneBy))) return 'done';
+    if (FAILED.has(jobs[compileJob]?.status ?? '')) return 'failed';
     return 'stale';
   };
 
-  const testcases: ReadinessState = input.testcases.total === 0 ? 'todo'
-    : input.testcases.withOutput < input.testcases.total ? 'stale'
-      : failedNow('generate_outputs') ? 'failed' : 'done';
-  const pdf: ReadinessState = input.latestPdfRevision === null ? 'todo'
-    : failedNow('build_pdf') ? 'failed'
+  // A failure at this revision wins over missing pieces, so a failed run never hides as "to do"/"out of date".
+  const testcases: ReadinessState = failedNow('generate_outputs') || failedNow('run_generator') ? 'failed'
+    : input.testcases.total === 0 ? 'todo'
+      : input.testcases.withOutput < input.testcases.total ? 'stale' : 'done';
+  const pdf: ReadinessState = failedNow('build_pdf') ? 'failed'
+    : input.latestPdfRevision === null ? 'todo'
       : input.latestPdfRevision === revision ? 'done' : 'stale';
+  // The server nulls verifiedRevision on every revision bump, so "verified before" comes from the jobs.
+  const verifiedBefore = input.verifiedRevision !== null || jobs.verify_all?.status === 'succeeded';
   const verified: ReadinessState = input.verifiedRevision === revision ? 'done'
     : failedNow('verify_all') ? 'failed'
-      : input.verifiedRevision !== null ? 'stale' : 'todo';
+      // A published draft re-synced from its profile (revision bumped, not re-verified) stays verified.
+      : input.status === 'published' && verifiedBefore ? 'done'
+        : verifiedBefore ? 'stale' : 'todo';
 
   return {
     statement: input.hasStatement ? 'done' : 'todo',
@@ -93,6 +99,7 @@ export function readinessFromWorkspace(draft: Draft, jobs: Job[]): ReadinessInpu
 /** The list's status cell: a dot tone and its label. */
 export function listStatus(row: DraftSummary): { tone: 'neutral' | 'warn' | 'ok' | 'bad'; label: string } {
   if (row.status === 'published') return { tone: 'ok', label: `Published · rev ${row.revision}` };
+  if (row.readiness.activeJob) return { tone: 'warn', label: 'Job running' };
   const verify = row.readiness.latestJobs.verify_all;
   if (verify && FAILED.has(verify.status) && verify.revision === row.revision) return { tone: 'bad', label: 'Verify failed' };
   if (row.status === 'ready') return { tone: 'ok', label: 'Ready' };

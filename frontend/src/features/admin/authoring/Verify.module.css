@@ -56,10 +56,17 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  font-size: 13px;
 }
 
 .link {
-  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.link:hover {
+  color: var(--text-primary);
 }
 
 .footer {
@@ -122,6 +129,8 @@
 }
 
 .muted {
+  margin: 0;
+  font-size: 13px;
   color: var(--text-muted);
 }
 
@@ -133,4 +142,20 @@
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
+}
+
+/* The failure notice is an InlineNotice; undo the workspace's generic alert bar. */
+.plainAlert.plainAlert.plainAlert {
+  border-left: none;
+  background: none;
+  padding: 0;
+}
+
+.tab.tab {
+  margin-inline: 0;
+}
+
+.drawerSection {
+  display: grid;
+  gap: 8px;
 }
