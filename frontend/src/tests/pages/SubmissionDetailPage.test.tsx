@@ -48,6 +48,22 @@ describe('SubmissionDetailPage', () => {
         expect(within(code).queryByText(source)).toBeNull();
     });
 
+    it('a Python run is measured against the limits the judge gave it (time x4, memory x2)', async () => {
+        jest.mocked(submissionService.getById).mockResolvedValue({ ...detail, language: 'python' } as never);
+        renderAt('/submissions/48213');
+        expect(await screen.findByText(/Time \/ 4000 ms/)).toBeInTheDocument();
+        expect(screen.getByText(/Memory \/ 512 MB/)).toBeInTheDocument();
+    });
+
+    it('Edit & resubmit brings this submission\'s code and language into the editor', async () => {
+        localStorage.clear();
+        jest.mocked(submissionService.getById).mockResolvedValue({ ...detail, language: 'python', code: 'print(42)' } as never);
+        renderAt('/submissions/48213');
+        fireEvent.click(await screen.findByRole('link', { name: 'Edit & resubmit' }));
+        const cache = JSON.parse(localStorage.getItem('oj-submission-cache') ?? '{}');
+        expect(cache['vec:python'].code).toBe('print(42)');
+    });
+
     it('passes the contest id through on contest routes', async () => {
         jest.mocked(submissionService.getById).mockResolvedValue(detail as never);
         renderAt('/contests/3/submissions/48213');

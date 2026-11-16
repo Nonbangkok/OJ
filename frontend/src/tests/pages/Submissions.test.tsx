@@ -40,6 +40,28 @@ describe('Submissions page', () => {
         expect(within(first).getByText('12.3 MB')).toBeInTheDocument();
     });
 
+    it('only rows the viewer may open link to a detail page (the server lets owners and staff in)', async () => {
+        jest.mocked(submissionService.getAll).mockResolvedValue([row(48213), row(48300, { username: 'ploy.s' })] as never);
+        const view = renderAt();
+        await screen.findByRole('link', { name: '#48213' });
+        const table = screen.getByRole('table', { name: 'Submissions' });
+        const other = within(table).getAllByRole('row')[2];
+        expect(within(other).getByText('#48300')).toBeInTheDocument();
+        expect(within(other).queryByRole('link', { name: /#48300|vector::erase/ })).toBeNull();
+        view.unmount();
+
+        jest.mocked(useAuth).mockReturnValue({ user: staff, isLoading: false, refreshUser: jest.fn() } as never);
+        renderAt();
+        expect(await screen.findByRole('link', { name: '#48300' })).toHaveAttribute('href', '/submissions/48300');
+    });
+
+    it('a guest sees the feed with no detail links', async () => {
+        jest.mocked(useAuth).mockReturnValue({ user: null, isLoading: false, refreshUser: jest.fn() } as never);
+        renderAt();
+        expect(await screen.findByText('#48213')).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: '#48213' })).toBeNull();
+    });
+
     it('never nests a link inside the row link (the problem title is plain text)', async () => {
         const { container } = renderAt();
         await screen.findByRole('link', { name: '#48213' });

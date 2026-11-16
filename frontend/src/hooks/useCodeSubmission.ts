@@ -7,35 +7,11 @@ import { APP_CONSTANTS } from '../utils/constants';
 import type { SubmissionLanguage } from '../utils/constants';
 import type { SubmitRequest } from '../types';
 import type { FormEvent, MutableRefObject } from 'react';
+import { readSubmissionCache, writeSubmissionCache } from '../utils/submissionDrafts';
 
 // Register the highlight.js grammar for every supported language.
 hljs.registerLanguage('cpp', cpp);
 hljs.registerLanguage('python', python);
-
-const SUBMISSION_CACHE_KEY = 'oj-submission-cache';
-
-interface CachedSubmission {
-  code: string;
-  timestamp: number;
-}
-
-type SubmissionCache = Record<string, CachedSubmission>;
-
-const readSubmissionCache = (): SubmissionCache => {
-  try {
-    return JSON.parse(localStorage.getItem(SUBMISSION_CACHE_KEY) || '{}');
-  } catch {
-    return {};
-  }
-};
-
-const writeSubmissionCache = (cache: SubmissionCache): void => {
-  try {
-    localStorage.setItem(SUBMISSION_CACHE_KEY, JSON.stringify(cache));
-  } catch (error) {
-    console.error('Failed to write to localStorage:', error);
-  }
-};
 
 /** Reads a dropped file as text (FileReader works in every browser and jsdom). */
 const readFileText = (file: File): Promise<string> =>

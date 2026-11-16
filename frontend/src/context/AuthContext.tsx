@@ -11,6 +11,7 @@ import {
 import authService from '../services/authService';
 import { clearSessionExpiryRedirect } from '../services/api';
 import type { AuthUser } from '../types';
+import { clearSubmissionDrafts } from '../utils/submissionDrafts';
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -108,6 +109,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       // A guest's later 401s are normal, not a "session expired" redirect.
       window.sessionStorage.removeItem('oj:had-session');
+      clearSubmissionDrafts();
       setUser(null);
     }
   }, []);

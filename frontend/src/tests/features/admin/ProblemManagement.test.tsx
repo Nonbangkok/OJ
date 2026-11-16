@@ -391,7 +391,7 @@ describe('ProblemManagement Component', () => {
     });
 
     it('staff get no bulk Rejudge (the rejudge routes are admin-only)', async () => {
-        render(<BrowserRouter><ProblemManagement currentUser={{ id: 2, username: 'kru', role: 'staff' }} /></BrowserRouter>);
+        render(<BrowserRouter><ProblemManagement currentUser={{ username: 'kru', role: 'staff' }} /></BrowserRouter>);
         await waitFor(() => screen.getByText('Problem 2'));
         fireEvent.click(screen.getAllByRole('checkbox')[1]);
         expect(screen.getByText('1 selected')).toBeInTheDocument();

@@ -94,14 +94,21 @@ const SubmissionsView = ({
         onLoadMore: () => setVisible((v) => v + REVEAL_STEP),
     });
 
-    const detailHref = (s: SubmissionSummary) => (contestId
-        ? `/contests/${contestId}/submissions/${s.id}`
-        : `/submissions/${s.id}`);
+    // The server opens a submission to its owner and to staff only; other rows get no link.
+    const canOpen = (s: SubmissionSummary) => Boolean(currentUser)
+        && (isStaff || s.username.toLowerCase() === currentUser?.username.toLowerCase());
+    const detailHref = (s: SubmissionSummary) => {
+        if (!canOpen(s)) return null;
+        return contestId ? `/contests/${contestId}/submissions/${s.id}` : `/submissions/${s.id}`;
+    };
 
     const columns: DataTableColumn<SubmissionSummary>[] = [
         {
             key: 'id', header: 'ID', mobile: 'meta',
-            cell: (s) => <Link to={detailHref(s)} className={styles.mono}>{`#${s.id}`}</Link>,
+            cell: (s) => {
+                const href = detailHref(s);
+                return href ? <Link to={href} className={styles.mono}>{`#${s.id}`}</Link> : <span className={styles.mono}>{`#${s.id}`}</span>;
+            },
         },
         { key: 'when', header: 'When', mobile: 'meta', cell: (s) => <span className={styles.muted}>{formatTimeAgo(s.submitted_at)}</span> },
         ...(problemId ? [] : [{
