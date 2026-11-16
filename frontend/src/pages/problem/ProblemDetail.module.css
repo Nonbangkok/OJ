@@ -50,6 +50,12 @@
   white-space: nowrap;
 }
 
+.action {
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
 .action:hover {
   background: var(--background-tertiary);
 }

@@ -7,7 +7,7 @@ import useLiveSubmission from '../../features/submission/useLiveSubmission';
 import Submissions from '../submission/Submissions';
 import problemService from '../../services/problemService';
 import { useProblemDetail } from '../../hooks/useProblemDetail';
-import { Button, EmptyState, InlineError, InlineNotice, PageHeader, ScoreCell, TestcaseStrip } from '../../components/ui';
+import { EmptyState, InlineError, InlineNotice, PageHeader, ScoreCell, TestcaseStrip } from '../../components/ui';
 import LoadingPage from '../../components/shared/LoadingPage';
 import type { ProblemDetail as ProblemDetailModel } from '../../types';
 
@@ -162,7 +162,7 @@ const ProblemDetail = () => {
                 actions={(
                   <>
                     <Link to={`${submissionsBase}/${submission.id}`} className={styles.action}>View submitted code</Link>
-                    <Button variant="secondary" onClick={() => document.getElementById('code')?.focus()}>Edit &amp; resubmit</Button>
+                    <button type="button" className={styles.action} onClick={() => document.getElementById('code')?.focus()}>Edit &amp; resubmit</button>
                   </>
                 )}
               />

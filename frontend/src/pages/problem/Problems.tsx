@@ -325,6 +325,7 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
         segments={isGuest ? undefined : (
           <SegmentedControl<StatusSegment>
             aria-label="Problem status"
+            className={styles.segments}
             value={status}
             onChange={(value) => updateUrl({ status: value === 'all' ? '' : value })}
             options={[

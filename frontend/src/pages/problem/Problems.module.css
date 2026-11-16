@@ -46,6 +46,11 @@
   gap: 8px;
 }
 
+.segments {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .toggle,
 .sortSelect {
   padding: 5px 10px;
