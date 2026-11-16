@@ -193,7 +193,7 @@ describe('ProblemManagement Component', () => {
             expect(screen.getByText('1/3')).toBeInTheDocument();
             expect(screen.getByText('33%')).toBeInTheDocument();
         });
-        expect(screen.getByRole('button', { name: 'Batch Upload' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Import ZIP' })).toBeInTheDocument();
         expect(container.querySelector('input[type="file"][accept=".zip"]')).toBe(fileInput);
 
         await act(async () => {
@@ -214,7 +214,7 @@ describe('ProblemManagement Component', () => {
         expect(screen.getByText('Processing: P-002')).toBeInTheDocument();
         expect(screen.getByText('1/3')).toBeInTheDocument();
         expect(screen.getByText('33%')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Batch Upload' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Import ZIP' })).toBeInTheDocument();
         expect(container.querySelector('input[type="file"][accept=".zip"]')).toBe(fileInput);
     });
 
@@ -224,48 +224,12 @@ describe('ProblemManagement Component', () => {
 
         await waitFor(() => screen.getByText('Problem 2'));
 
-        const hiddenBtn = screen.getByRole('button', { name: /hidden/i });
-        fireEvent.click(hiddenBtn);
+        // Visibility is a status dot now; it changes from the row menu (§7.8).
+        const p2Row = screen.getAllByRole('row').find(r => r.textContent.includes('Problem 2'));
+        fireEvent.click(within(p2Row).getByRole('button', { name: /row actions for P2/i }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Show' }));
 
         expect(adminService.updateProblemVisibility).toHaveBeenCalledWith('P2', true);
-    });
-
-    it('preselects the existing collection when editing a collected problem', async () => {
-        const collectionId = 17;
-        const collectedProblem = {
-            ...mockProblems[0],
-            collection_id: collectionId,
-            collection_name: 'Chapter 1',
-        };
-        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(makePage([collectedProblem]));
-        (jest.mocked(adminService.getCollections) as jest.Mock).mockResolvedValue([
-            { id: collectionId, name: 'Chapter 1', problem_count: 1, status: 'all_visible', created_at: '', updated_at: '' },
-        ]);
-        (jest.mocked(adminService.getAuthors) as jest.Mock).mockResolvedValue([]);
-        // GET /admin/problems/:id currently returns problem detail without
-        // collection_id, while the paged admin row already carries that ID.
-        (jest.mocked(adminService.getProblemDetail) as jest.Mock).mockResolvedValue({
-            id: collectedProblem.id,
-            title: collectedProblem.title,
-            author: collectedProblem.author,
-            categories: [],
-            difficulty: null,
-            time_limit_ms: 1000,
-            memory_limit_mb: 256,
-            has_pdf: false,
-            is_visible: true,
-            contest_id: null,
-        });
-
-        renderProblemManagement();
-        const row = await screen.findByText('Problem 1').then(element => element.closest('tr'));
-        fireEvent.click(within(row).getByRole('button', { name: 'Edit' }));
-
-        const collectionSelect = () => screen.getAllByLabelText('Collection').at(-1);
-        await waitFor(() => {
-            expect(collectionSelect()).toHaveValue(String(collectionId));
-        });
-        expect(collectionSelect()).toHaveDisplayValue('Chapter 1');
     });
 
     it('disables visibility toggle for problems in active contests', async () => {
@@ -273,10 +237,10 @@ describe('ProblemManagement Component', () => {
 
         await waitFor(() => screen.getByText('Problem 3'));
 
-        expect(screen.getByText(/in running contest/i)).toBeInTheDocument();
         const p3Row = screen.getAllByRole('row').find(r => r.textContent.includes('Problem 3'));
-        const toggleBtn = within(p3Row).queryByRole('button', { name: /visible|hidden/i });
-        expect(toggleBtn).not.toBeInTheDocument();
+        expect(within(p3Row).getByText('In contest')).toBeInTheDocument();
+        fireEvent.click(within(p3Row).getByRole('button', { name: /row actions for P3/i }));
+        expect(screen.queryByRole('menuitem', { name: /^(show|hide)$/i })).not.toBeInTheDocument();
     });
 
     it('handles bulk actions (Hide All)', async () => {
@@ -287,9 +251,9 @@ describe('ProblemManagement Component', () => {
         expect(screen.getByText('1 selected')).toBeInTheDocument();
 
         // Global visibility actions live behind the More menu now.
-        await waitFor(() => screen.getByRole('button', { name: /more global actions/i }));
-        fireEvent.click(screen.getByRole('button', { name: /more global actions/i }));
-        fireEvent.click(screen.getByRole('menuitem', { name: /hide all problems/i }));
+        await waitFor(() => screen.getByRole('button', { name: 'More problem actions' }));
+        fireEvent.click(screen.getByRole('button', { name: 'More problem actions' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: /^hide all \d+ matching$/i }));
 
         // Check confirmation modal
         expect(screen.getByText(/hide all 2 matching eligible problems/i)).toBeInTheDocument();
@@ -307,8 +271,8 @@ describe('ProblemManagement Component', () => {
         (jest.mocked(adminService.setProblemsVisibility) as jest.Mock).mockRejectedValueOnce(new Error('offline'));
         renderProblemManagement();
         await waitFor(() => screen.getByText('Problem 1'));
-        fireEvent.click(screen.getByRole('button', { name: /more global actions/i }));
-        fireEvent.click(screen.getByRole('menuitem', { name: /hide all problems/i }));
+        fireEvent.click(screen.getByRole('button', { name: 'More problem actions' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: /^hide all \d+ matching$/i }));
         fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
 
         expect(await screen.findByRole('alert')).toHaveTextContent('Failed to hide all problems.');
@@ -327,18 +291,18 @@ describe('ProblemManagement Component', () => {
 
         const search = screen.getByLabelText('Search problems');
         fireEvent.change(search, { target: { value: 'P1' } });
-        fireEvent.click(screen.getByRole('button', { name: /more global actions/i }));
-        expect(screen.getByRole('menuitem', { name: /hide all problems/i })).toHaveAttribute('aria-disabled', 'true');
+        fireEvent.click(screen.getByRole('button', { name: 'More problem actions' }));
+        expect(screen.getByRole('menuitem', { name: /^hide all \d+ matching$/i })).toHaveAttribute('aria-disabled', 'true');
 
         await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(
             expect.objectContaining({ search: 'P1', limit: 25 }),
         ), { timeout: 1500 });
         expect(screen.getByLabelText('Search problems')).toBe(search);
-        expect(screen.getByRole('menuitem', { name: /hide all problems/i })).toHaveAttribute('aria-disabled', 'true');
+        expect(screen.getByRole('menuitem', { name: /^hide all \d+ matching$/i })).toHaveAttribute('aria-disabled', 'true');
 
         await act(async () => { resolveSearch(makePage([mockProblems[0]], { bulkEligibleCount: 1 })); });
-        await waitFor(() => expect(screen.getByRole('menuitem', { name: /hide all problems/i })).toBeEnabled());
-        fireEvent.click(screen.getByRole('menuitem', { name: /hide all problems/i }));
+        await waitFor(() => expect(screen.getByRole('menuitem', { name: /^hide all \d+ matching$/i })).toBeEnabled());
+        fireEvent.click(screen.getByRole('menuitem', { name: /^hide all \d+ matching$/i }));
         expect(screen.getByText(/hide all 1 matching eligible problem/i)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
         await waitFor(() => expect(adminService.setProblemsVisibility).toHaveBeenCalledWith({ search: 'P1' }, false));
@@ -463,31 +427,6 @@ describe('ProblemManagement Component', () => {
             expect(adminService.rejudgeProblem).toHaveBeenCalledWith('P2');
         });
         expect(await screen.findByText(/rejudge failed on the server/i)).toBeInTheDocument();
-    });
-
-    it('opens the testcases dialog from a row action and expands a case', async () => {
-        (jest.mocked(adminService.getProblemTestcases) as jest.Mock).mockResolvedValueOnce({
-            testcases: [{ case_number: 1, input_bytes: 10, output_bytes: 20 }],
-            total: 1,
-        });
-        (jest.mocked(adminService.getProblemTestcase) as jest.Mock).mockResolvedValueOnce({
-            caseNumber: 1,
-            input: { bytes: 10, truncated: false, content: '1 2' },
-            output: { bytes: 20, truncated: false, content: '3' },
-        });
-        renderProblemManagement();
-
-        await waitFor(() => screen.getByText('Problem 1'));
-        const p1Row = screen.getAllByRole('row').find(r => r.textContent.includes('Problem 1'));
-        fireEvent.click(within(p1Row).getByRole('button', { name: /row actions for P1/i }));
-        fireEvent.click(screen.getByRole('menuitem', { name: 'View Testcases' }));
-
-        expect(await screen.findByText('Testcases: P1')).toBeInTheDocument();
-        expect(await screen.findByText('1 testcase')).toBeInTheDocument();
-
-        fireEvent.click(await screen.findByRole('button', { name: /#1/i }));
-        expect(await screen.findByText('1 2')).toBeInTheDocument();
-        expect(adminService.getProblemTestcase).toHaveBeenCalledWith('P1', 1);
     });
 
     describe('bulk selection', () => {
@@ -1048,143 +987,76 @@ describe('ProblemManagement Component', () => {
         });
     });
 
-    describe('header problem type', () => {
-        const filesInfo = (over = {}) => ({
-            problem_type: 'header',
-            submission_filename: 'student.h',
-            files: [
-                { role: 'grader', filename: 'grader.cpp', bytes: 2048 },
-                { role: 'starter', filename: 'student.h', bytes: 100 },
-            ],
-            ...over,
-        });
-
+    describe('phase 5 list (key-pages §4)', () => {
+        const facts = [
+            { id: 'P1', title: 'Problem 1', author: 'admin', is_visible: true, contest_id: null, contest_status: null, problem_type: 'standard', difficulty: 1200, testcase_count: 10, time_limit_ms: 1000, memory_limit_mb: 256, collection_id: 2, collection_name: 'Sorting', submission_count: 4, type_locked: true },
+            { id: 'H1', title: 'Header one', author: 'admin', is_visible: false, contest_id: null, contest_status: null, problem_type: 'header', difficulty: null, testcase_count: 0, time_limit_ms: 2000, memory_limit_mb: 512, collection_id: null, collection_name: null, submission_count: 0, type_locked: false },
+            { id: 'C1', title: 'Contest only', author: 'admin', is_visible: false, contest_id: 1, contest_status: 'running', problem_type: 'standard', difficulty: 900, testcase_count: 3, time_limit_ms: 1000, memory_limit_mb: 256, collection_id: null, collection_name: null, submission_count: 0, type_locked: false },
+        ];
         beforeEach(() => {
-            (jest.mocked(adminService.getAuthors) as jest.Mock).mockResolvedValue([]);
-            (jest.mocked(adminService.getProblemDetail) as jest.Mock).mockResolvedValue({
-                id: 'P1', title: 'Problem 1', author: 'admin', time_limit_ms: 1000, memory_limit_mb: 256,
-                has_pdf: false, is_visible: true, categories: [], difficulty: null,
-            });
+            (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(makePage(facts));
         });
+        const rowOf = (id: string) => screen.getByText(id, { selector: 'td *, td' }).closest('tr') as HTMLElement;
 
-        const openEdit = async () => {
+        it('header: Import ZIP, New problem, and a page menu with collections and the scoped Show/Hide all', async () => {
             renderProblemManagement();
-            const row = await screen.findByText('Problem 1').then(element => element.closest('tr'));
-            fireEvent.click(within(row).getByRole('button', { name: 'Edit' }));
-            return screen.findByRole('dialog');
-        };
+            expect(await screen.findByRole('button', { name: 'Import ZIP' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'New problem' })).toBeInTheDocument();
+            await userEvent.click(screen.getByRole('button', { name: 'More problem actions' }), { delay: 20 } as never);
+            expect(await screen.findByRole('menuitem', { name: 'Manage collections' })).toBeInTheDocument();
+            expect(screen.getByRole('menuitem', { name: 'Show all 2 matching' })).toBeInTheDocument();
+            expect(screen.getByRole('menuitem', { name: 'Hide all 2 matching' })).toBeInTheDocument();
+        });
 
-        it('shows the filename input defaulting to student.h when switching a new problem to Header', async () => {
+        it('columns: type tag, difficulty, tests, limits, collection, visibility dot', async () => {
             renderProblemManagement();
-            await screen.findByText('Problem 1');
-            fireEvent.click(screen.getByRole('button', { name: /new problem|add problem|create/i }));
-            const dialog = await screen.findByRole('dialog');
-            expect(within(dialog).queryByLabelText('Submission filename')).not.toBeInTheDocument();
-            fireEvent.click(within(dialog).getByRole('button', { name: 'Header' }));
-            expect(within(dialog).getByLabelText('Submission filename')).toHaveValue('student.h');
-            // Files can only be uploaded for a saved problem.
-            expect(within(dialog).queryByText('Grader files')).not.toBeInTheDocument();
+            await screen.findByText('Header one');
+            const headers = within(screen.getByRole('table')).getAllByRole('columnheader').map((h) => h.textContent);
+            expect(headers).toEqual(expect.arrayContaining(['ID', 'Title', 'Difficulty', 'Tests', 'Limits', 'Collection', 'Visibility']));
+            expect(within(rowOf('H1')).getByText('HEADER')).toBeInTheDocument();
+            expect(within(rowOf('P1')).queryByText('STANDARD')).toBeNull();
+            expect(within(rowOf('P1')).getByText('1000 ms · 256 MB')).toBeInTheDocument();
+            expect(within(rowOf('P1')).getByText('Sorting')).toBeInTheDocument();
+            expect(within(rowOf('P1')).getByText('Visible')).toBeInTheDocument();
+            expect(within(rowOf('H1')).getByText('Hidden')).toBeInTheDocument();
+            expect(within(rowOf('C1')).getByText('In contest')).toBeInTheDocument();
         });
 
-        it('lists current files and replaces a role with the uploaded ZIP, then re-lists', async () => {
-            (jest.mocked(adminService.getProblemFiles) as jest.Mock)
-                .mockResolvedValueOnce(filesInfo())
-                .mockResolvedValueOnce(filesInfo({ files: [{ role: 'grader', filename: 'new.cpp', bytes: 5 }] }));
-            (jest.mocked(adminService.replaceProblemFiles) as jest.Mock).mockResolvedValue({ message: 'ok' });
-            const dialog = await openEdit();
-
-            expect(await within(dialog).findByText('grader.cpp')).toBeInTheDocument();
-            expect(within(dialog).getByText('2.0 KB')).toBeInTheDocument();
-            expect(within(dialog).getByLabelText('Submission filename')).toHaveValue('student.h');
-
-            const zip = new File(['zip'], 'grader.zip', { type: 'application/zip' });
-            await userEvent.upload(within(dialog).getByLabelText('Replace all grader files'), zip);
-
-            await waitFor(() => expect(adminService.replaceProblemFiles).toHaveBeenCalledWith('P1', 'grader', zip));
-            expect(await within(dialog).findByText('new.cpp')).toBeInTheDocument();
-            expect(within(dialog).queryByText('grader.cpp')).not.toBeInTheDocument();
-        });
-
-        it('shows the API message inline when an upload is rejected', async () => {
-            (jest.mocked(adminService.getProblemFiles) as jest.Mock).mockResolvedValue(filesInfo());
-            (jest.mocked(adminService.replaceProblemFiles) as jest.Mock).mockRejectedValue({
-                response: { status: 400, data: { message: 'Grader files need at least one .cpp file.' } },
-            });
-            const dialog = await openEdit();
-            await within(dialog).findByText('grader.cpp');
-            await userEvent.upload(within(dialog).getByLabelText('Replace all starter files'), new File(['z'], 's.zip'));
-            expect(await within(dialog).findByText('Grader files need at least one .cpp file.')).toBeInTheDocument();
-        });
-
-        it('shows the lock message when saving a type change is refused with 409', async () => {
-            (jest.mocked(adminService.getProblemFiles) as jest.Mock).mockResolvedValue(filesInfo());
-            const message = 'Problem type and submission filename cannot change after submissions exist.';
-            (jest.mocked(adminService.updateProblem) as jest.Mock).mockRejectedValue({
-                response: { status: 409, data: { message } },
-            });
-            const dialog = await openEdit();
-            await within(dialog).findByText('grader.cpp');
-            fireEvent.change(within(dialog).getByLabelText('Submission filename'), { target: { value: 'other.h' } });
-            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
-
-            expect(await within(dialog).findByText(new RegExp(message))).toBeInTheDocument();
-            await waitFor(() => expect(within(dialog).getByLabelText('Submission filename')).toBeDisabled());
-            expect(within(dialog).getByRole('button', { name: 'Standard' })).toBeDisabled();
-            expect(within(dialog).getByText('Locked after the first submission.')).toBeInTheDocument();
-            expect(adminService.updateProblem).toHaveBeenCalledWith('P1', expect.objectContaining({
-                problem_type: 'header', submission_filename: 'other.h',
-            }));
-        });
-
-        const savedPayload = () => (jest.mocked(adminService.updateProblem) as jest.Mock).mock.calls[0][1];
-
-        it('never sends type fields when saving a standard problem edit', async () => {
-            (jest.mocked(adminService.getProblemFiles) as jest.Mock).mockResolvedValue(
-                filesInfo({ problem_type: 'standard', submission_filename: null, files: [] }));
-            (jest.mocked(adminService.updateProblem) as jest.Mock).mockResolvedValue({});
-            const dialog = await openEdit();
-            await waitFor(() => expect(adminService.getProblemFiles).toHaveBeenCalled());
-            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
-            await waitFor(() => expect(adminService.updateProblem).toHaveBeenCalled());
-            expect(savedPayload()).not.toHaveProperty('problem_type');
-            expect(savedPayload()).not.toHaveProperty('submission_filename');
-        });
-
-        it('never sends type fields when creating a standard problem', async () => {
-            (jest.mocked(adminService.createProblem) as jest.Mock).mockResolvedValue({ id: 'N1' });
+        it('clicking a row opens the problem page; the menu carries Testcases, Copy link and a red Delete', async () => {
             renderProblemManagement();
             await screen.findByText('Problem 1');
-            fireEvent.click(screen.getByRole('button', { name: /new problem/i }));
-            const dialog = await screen.findByRole('dialog');
-            fireEvent.change(within(dialog).getByLabelText('Problem ID'), { target: { value: 'N1' } });
-            fireEvent.change(within(dialog).getByLabelText('Title'), { target: { value: 'New' } });
-            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
-            await waitFor(() => expect(adminService.createProblem).toHaveBeenCalled());
-            const payload = (jest.mocked(adminService.createProblem) as jest.Mock).mock.calls[0][1] ?? (jest.mocked(adminService.createProblem) as jest.Mock).mock.calls[0][0];
-            expect(payload).not.toHaveProperty('problem_type');
-            expect(payload).not.toHaveProperty('submission_filename');
+            await userEvent.click(within(rowOf('P1')).getByRole('button', { name: 'Row actions for P1' }), { delay: 20 } as never);
+            const labels = (await screen.findAllByRole('menuitem')).map((m) => m.textContent);
+            expect(labels).toEqual(['Edit', 'Testcases', 'Rejudge', 'Hide', 'Copy link', 'Delete']);
+            await userEvent.click(screen.getByRole('menuitem', { name: 'Testcases' }), { delay: 20 } as never);
+            expect(window.location.pathname).toBe('/admin/problems/P1/testcases');
+            fireEvent.click(within(rowOf('H1')).getByText('Header one'));
+            expect(window.location.pathname).toBe('/admin/problems/H1');
         });
 
-        it('omits type fields when the files fetch fails, leaving the saved type untouched', async () => {
-            (jest.mocked(adminService.getProblemFiles) as jest.Mock).mockRejectedValue(new Error('boom'));
-            (jest.mocked(adminService.updateProblem) as jest.Mock).mockResolvedValue({});
-            const dialog = await openEdit();
-            await waitFor(() => expect(adminService.getProblemFiles).toHaveBeenCalled());
-            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
-            await waitFor(() => expect(adminService.updateProblem).toHaveBeenCalled());
-            expect(savedPayload()).not.toHaveProperty('problem_type');
-            expect(savedPayload()).not.toHaveProperty('submission_filename');
+        it('New problem asks only for id and title, then opens the new problem page', async () => {
+            (jest.mocked(adminService.createProblem) as jest.Mock).mockResolvedValue({ id: 'new_one' });
+            renderProblemManagement();
+            fireEvent.click(await screen.findByRole('button', { name: 'New problem' }));
+            const dialog = await screen.findByRole('dialog', { name: 'New problem' });
+            fireEvent.change(within(dialog).getByLabelText('Problem id'), { target: { value: 'new_one' } });
+            fireEvent.change(within(dialog).getByLabelText('Title'), { target: { value: 'A new one' } });
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Create problem' }));
+            await waitFor(() => expect(adminService.createProblem).toHaveBeenCalledWith(expect.objectContaining({
+                id: 'new_one', title: 'A new one', author: 'admin', time_limit_ms: 1000, memory_limit_mb: 256,
+            })));
+            await waitFor(() => expect(window.location.pathname).toBe('/admin/problems/new_one'));
         });
 
-        it('sends standard with a null filename when a header problem is switched back', async () => {
-            (jest.mocked(adminService.getProblemFiles) as jest.Mock).mockResolvedValue(filesInfo());
-            (jest.mocked(adminService.updateProblem) as jest.Mock).mockResolvedValue({});
-            const dialog = await openEdit();
-            await within(dialog).findByText('grader.cpp');
-            fireEvent.click(within(dialog).getByRole('button', { name: 'Standard' }));
-            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
-            await waitFor(() => expect(adminService.updateProblem).toHaveBeenCalled());
-            expect(savedPayload()).toEqual(expect.objectContaining({ problem_type: 'standard', submission_filename: null }));
+        it('a duplicate id says so in the dialog', async () => {
+            (jest.mocked(adminService.createProblem) as jest.Mock).mockRejectedValue({ response: { status: 409, data: { message: "Problem ID 'P1' already exists." } } });
+            renderProblemManagement();
+            fireEvent.click(await screen.findByRole('button', { name: 'New problem' }));
+            const dialog = await screen.findByRole('dialog', { name: 'New problem' });
+            fireEvent.change(within(dialog).getByLabelText('Problem id'), { target: { value: 'P1' } });
+            fireEvent.change(within(dialog).getByLabelText('Title'), { target: { value: 'Dup' } });
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Create problem' }));
+            expect(await within(dialog).findByText('Problem id already exists.')).toBeInTheDocument();
         });
     });
 });

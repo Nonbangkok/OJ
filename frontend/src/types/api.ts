@@ -214,3 +214,10 @@ export interface RejudgeResponse {
   /** Rows excluded because a judge was already in flight for them. */
   busy?: number;
 }
+
+/** GET /admin/contests/:id/participants */
+export interface AdminContestParticipant {
+  user_id: number;
+  username: string;
+  joined_at: string;
+}

@@ -313,3 +313,24 @@ export const deleteContest = async (contestId: string): Promise<'deleted' | 'not
     }
     return 'deleted';
 };
+
+export interface AdminContestParticipant {
+    user_id: number;
+    username: string;
+    joined_at: string;
+}
+
+/** Staff Participants tab: who joined and when, earliest first; null when the contest doesn't exist. */
+export const getContestParticipants = async (contestId: string): Promise<AdminContestParticipant[] | null> => {
+    const contest = await getContestById(contestId);
+    if (!contest) return null;
+    const result = await db.query<AdminContestParticipant>(
+        `SELECT cp.user_id, u.username, cp.joined_at
+         FROM contest_participants cp
+         JOIN users u ON u.id = cp.user_id
+         WHERE cp.contest_id = $1
+         ORDER BY cp.joined_at ASC, u.username ASC`,
+        [contestId],
+    );
+    return result.rows;
+};

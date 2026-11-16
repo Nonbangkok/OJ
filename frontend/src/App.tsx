@@ -53,7 +53,8 @@ import ProblemManagement from './features/admin/problems/ProblemManagement';
 import ContestManagement from './features/admin/contests/ContestManagement';
 import Settings from './features/admin/settings/Settings';
 import AnalysisPage from './features/admin/analysis/AnalysisPage';
-import ManagePlaceholder from './features/admin/ManagePlaceholder';
+import ProblemEditPage from './features/admin/problems/ProblemEditPage';
+import ContestEditPage from './features/admin/contests/ContestEditPage';
 import ProblemAuthoring from './features/admin/authoring/ProblemAuthoring';
 import {
   DraftMetadata,
@@ -73,7 +74,8 @@ const PublicProblemsRoute = () => {
 
 const AdminProblemsRoute = () => {
   const initialPageSpan = useLoaderData() as AdminProblemListLoaderData;
-  return <ProblemManagement initialPageSpan={initialPageSpan} />;
+  const { user } = useAuth();
+  return <ProblemManagement initialPageSpan={initialPageSpan} currentUser={user} />;
 };
 
 // The root route owns React Router's native, history-entry-keyed restoration.
@@ -135,7 +137,7 @@ export const appRoutes = createRoutesFromElements(
       <Route index element={<Admin />} />
       <Route path="users" element={<UserManagement />} />
       <Route path="problems" loader={adminProblemsLoader} shouldRevalidate={revalidateProblemListOnPathChange} element={<AdminProblemsRoute />} />
-      <Route path="problems/:problemId/:tab?" element={<ManagePlaceholder backTo="/admin/problems" backLabel="Back to Problems" />} />
+      <Route path="problems/:problemId/:tab?" element={<ProblemEditPage />} />
       <Route path="authoring" element={<ProblemAuthoring />} />
       <Route path="authoring/profiles" element={<ProblemAuthoring />} />
       <Route path="authoring/ai-docs" element={<ProblemAuthoring />} />
@@ -152,7 +154,7 @@ export const appRoutes = createRoutesFromElements(
       </Route>
       <Route path="authoring/:draftId/editor" element={<ProblemAuthoring editorMode />} />
       <Route path="contests" element={<ContestManagement />} />
-      <Route path="contests/:contestId/:tab?" element={<ManagePlaceholder backTo="/admin/contests" backLabel="Back to Contests" />} />
+      <Route path="contests/:contestId/:tab?" element={<ContestEditPage />} />
       <Route path="settings" element={<Settings />} />
       <Route path="analysis" element={<AnalysisPage />} />
       <Route path="analysis/:tab" element={<AnalysisPage />} />

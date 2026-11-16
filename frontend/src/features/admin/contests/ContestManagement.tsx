@@ -1,304 +1,190 @@
-import { useMemo, useState } from 'react';
-import useContestManagement from '../../../hooks/admin/useContestManagement';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Button, ConfirmDialog, DataTable, FilterBar, InlineError, PageHeader, SegmentedControl, StatusDot,
+  type ActionMenuItem, type DataTableColumn,
+} from '../../../components/ui';
+import adminService from '../../../services/adminService';
 import useRejudge from '../../../hooks/admin/useRejudge';
-import ContestModal from './ContestModal';
-import ProblemMigrationModal from '../problems/ProblemMigrationModal';
-import ConfirmationModal from '../shared/ConfirmationModal';
+import { useAuth } from '../../../context/AuthContext';
+import { useCountdown } from '../../../components/shell/useCountdown';
+import { getErrorMessage } from '../../../utils/error';
 import RejudgeFeedbackBox from '../shared/RejudgeFeedbackBox';
-import styles from '../shared/Management.module.css';
-import tableStyles from '../../../components/styles/Table.module.css';
-import LoadingPage from '../../../components/shared/LoadingPage';
-import { ActionMenu, Button, PageHeader } from '../../../components/ui';
+import CreateContestDrawer from './CreateContestDrawer';
+import { BANGKOK_NOTE, formatBangkokStart, formatDuration } from './bangkokTime';
+import type { Contest } from '../../../types';
+import styles from './Contests.module.css';
 
-const ContestManagement = () => {
-  const {
-    contests,
-    loading,
-    error,
-    isModalOpen,
-    setIsModalOpen,
-    editingContest,
-    setEditingContest,
-    isMigrationModalOpen,
-    setIsMigrationModalOpen,
-    migrationContest,
-    setMigrationContest,
-    isConfirmModalOpen,
-    setIsConfirmModalOpen,
-    contestToDelete,
-    setContestToDelete,
-    fetchContests,
-    handleDelete,
-    handleEdit,
-    handleCreate,
-    handleManageProblems,
-    handleToggleVisibility,
-    getStatusBadge,
-    formatDateTime
-  } = useContestManagement(styles);
+type StatusFilter = 'all' | 'scheduled' | 'running' | 'finished';
+const SEGMENTS: Array<{ value: StatusFilter; label: string }> = [
+  { value: 'all', label: 'All' }, { value: 'scheduled', label: 'Scheduled' }, { value: 'running', label: 'Running' }, { value: 'finished', label: 'Finished' },
+];
+// "finishing" (ended, last judges draining) files under Finished.
+const bucketOf = (status: string): StatusFilter => (status === 'running' ? 'running' : status === 'scheduled' ? 'scheduled' : 'finished');
 
+function RunningLeft({ end }: { end: string }) {
+  const { label } = useCountdown(end);
+  return <StatusDot tone="pass" label={`Running · ${label.replace(/^0(\d):/, '$1:')} left`} />;
+}
+
+function ContestStatus({ contest }: { contest: Contest }) {
+  if (contest.status === 'running') return <RunningLeft end={contest.end_time} />;
+  if (contest.status === 'scheduled') return <StatusDot tone="neutral" label="Scheduled" />;
+  if (contest.status === 'finishing') return <StatusDot tone="warn" label="Judging" />;
+  return <StatusDot tone="neutral" label="Finished" />;
+}
+
+/** Contests list (§7.8): status segments, facts per row, ⋯ menu, create drawer. */
+export default function ContestManagement() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const [contests, setContests] = useState<Contest[] | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState<StatusFilter>('all');
+  const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<Contest | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const {
-    isRejudgeConfirmOpen,
-    rejudgeTarget,
-    rejudgeFeedback,
-    handleRejudgeClick,
-    handleCloseRejudgeConfirm,
-    handleConfirmRejudge,
-    dismissRejudgeFeedback,
+    isRejudgeConfirmOpen, rejudgeTarget, rejudgeFeedback, handleRejudgeClick, handleCloseRejudgeConfirm, handleConfirmRejudge, dismissRejudgeFeedback,
   } = useRejudge();
 
-  // --- Filters: title search x status -------------------------------------
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  useEffect(() => {
+    let cancelled = false;
+    adminService.getContests()
+      .then((list) => { if (!cancelled) setContests(list as Contest[]); })
+      .catch((err) => { if (!cancelled) setLoadError(getErrorMessage(err, 'Failed to load contests.')); });
+    return () => { cancelled = true; };
+  }, []);
 
-  const statuses = useMemo(
-    () => [...new Set(contests.map(contest => contest.status))].sort(),
-    [contests],
-  );
-
-  const visibleContests = useMemo(() => {
+  const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return contests.filter(contest => {
-      if (statusFilter !== 'all' && contest.status !== statusFilter) return false;
-      if (!query) return true;
-      return contest.title.toLowerCase().includes(query);
-    });
-  }, [contests, statusFilter, search]);
+    return (contests ?? []).filter((c) => (status === 'all' || bucketOf(c.status) === status)
+      && (!query || c.title.toLowerCase().includes(query)));
+  }, [contests, status, search]);
 
-  if (loading) {
-    return <LoadingPage />;
-  }
+  const toggleVisibility = async (contest: Contest) => {
+    setActionError('');
+    try {
+      await adminService.updateContestVisibility(contest.id, !contest.is_visible);
+      setContests((prev) => (prev ?? []).map((c) => (c.id === contest.id ? { ...c, is_visible: !contest.is_visible } : c)));
+    } catch (err) {
+      setActionError(getErrorMessage(err, 'Failed to change visibility.'));
+    }
+  };
+
+  const remove = async () => {
+    if (!deleting) return;
+    setDeleteBusy(true);
+    setActionError('');
+    try {
+      await adminService.deleteContest(deleting.id);
+      setContests((prev) => (prev ?? []).filter((c) => c.id !== deleting.id));
+      setDeleting(null);
+    } catch (err) {
+      setActionError(getErrorMessage(err, 'Failed to delete the contest.'));
+      setDeleting(null);
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
+  const columns: DataTableColumn<Contest>[] = [
+    { key: 'title', header: 'Title', mobile: 'primary', cell: (c) => <span className={styles.title}>{c.title}</span> },
+    { key: 'status', header: 'Status', mobile: 'meta', cell: (c) => <ContestStatus contest={c} /> },
+    { key: 'starts', header: 'Starts', mobile: 'meta', cell: (c) => <span className={styles.mono}>{formatBangkokStart(c.start_time)}</span> },
+    {
+      key: 'duration', header: 'Duration', align: 'right', mobile: 'hidden',
+      cell: (c) => <span className={styles.mono}>{formatDuration(Date.parse(c.end_time) - Date.parse(c.start_time))}</span>,
+    },
+    { key: 'participants', header: 'Participants', align: 'right', mobile: 'hidden', cell: (c) => <span className={styles.mono}>{Number(c.participant_count ?? 0)}</span> },
+    { key: 'problems', header: 'Problems', align: 'right', mobile: 'hidden', cell: (c) => <span className={styles.mono}>{Number(c.problem_count ?? 0)}</span> },
+    {
+      key: 'visibility', header: 'Visibility', mobile: 'hidden',
+      cell: (c) => <StatusDot tone={c.is_visible ? 'pass' : 'warn'} label={c.is_visible ? 'Visible' : 'Hidden'} />,
+    },
+  ];
+
+  const rowActions = (c: Contest): ActionMenuItem[] => [
+    { key: 'edit', label: 'Edit', onClick: () => navigate(`/admin/contests/${c.id}`) },
+    { key: 'open', label: 'Open contest page', onClick: () => navigate(`/contests/${c.id}`) },
+    { key: 'visibility', label: c.is_visible ? 'Hide' : 'Show', onClick: () => { void toggleVisibility(c); } },
+    ...(isAdmin ? [{
+      key: 'rejudge',
+      label: 'Rejudge',
+      disabled: c.status === 'finished',
+      title: c.status === 'finished'
+        ? 'Finished contest — its scoreboard is frozen. Rejudge its problems individually instead.'
+        : 'Re-run every submission in this contest against the current testcases and limits',
+      onClick: () => handleRejudgeClick({ kind: 'contest', id: c.id, title: c.title }),
+    }] : []),
+    {
+      key: 'delete',
+      label: 'Delete',
+      variant: 'danger' as const,
+      disabled: c.status === 'running',
+      title: c.status === 'running' ? 'A running contest can’t be deleted.' : undefined,
+      onClick: () => setDeleting(c),
+    },
+  ];
+
+  const countLabel = `${rows.length} ${rows.length === 1 ? 'contest' : 'contests'}`;
 
   return (
-    <div className={styles['management-container']}>
-      {/* --- Page header: creation only ------------------------------------ */}
+    <div className={styles.page}>
       <PageHeader
         breadcrumb={[{ label: 'Manage' }]}
         title="Contests"
-        actions={<Button onClick={handleCreate}>+ New Contest</Button>}
+        meta={BANGKOK_NOTE}
+        actions={<Button onClick={() => setCreating(true)}>New contest</Button>}
+      />
+      <FilterBar
+        search={{ value: search, onChange: setSearch, placeholder: 'Search contests…' }}
+        segments={<SegmentedControl aria-label="Contest status" options={SEGMENTS} value={status} onChange={(v) => setStatus(v as StatusFilter)} />}
+        resultCount={contests ? countLabel : undefined}
+      />
+      {actionError && <InlineError message={actionError} />}
+      <RejudgeFeedbackBox feedback={rejudgeFeedback} onDismiss={dismissRejudgeFeedback} />
+      <DataTable<Contest>
+        caption="Contests"
+        columns={columns}
+        rows={rows}
+        rowKey={(c) => String(c.id)}
+        rowLabel={(c) => c.title}
+        rowHref={(c) => `/admin/contests/${c.id}`}
+        rowActions={rowActions}
+        loading={contests === null && !loadError}
+        error={loadError ? { message: loadError } : undefined}
+        empty={search || status !== 'all' ? 'No contests match these filters.' : 'No contests yet. Create one to schedule a round.'}
       />
 
-      {/* --- Filter / scope bar -------------------------------------------- */}
-      <div className={styles['filter-bar']}>
-        <input
-          type="search"
-          className={styles['filter-search']}
-          placeholder="Search contests…"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          aria-label="Search contests"
-        />
-        <label className={styles['filter-control']}>
-          <span className={styles['filter-label']}>Status</span>
-          <select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            aria-label="Filter contests by status"
-          >
-            <option value="all">All</option>
-            {statuses.map(status => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      {error && (
-        <div className={styles.error}>
-          <h3>Error: {error}</h3>
-        </div>
-      )}
-
-      {/* Rejudge feedback sits above the table so the outcome is visible
-          without scrolling past the toolbar. */}
-      <RejudgeFeedbackBox feedback={rejudgeFeedback} onDismiss={dismissRejudgeFeedback} />
-
-      {/* --- Table: Edit + Problems + overflow ---------------------------- */}
-      <div className={`${tableStyles['table-container']} ${styles.tableWrap}`}>
-        <table className={tableStyles.table}>
-          <thead>
-            <tr>
-              <th className={styles['col-left']}>Title</th>
-              <th className={styles['col-center']}>Status</th>
-              <th className={styles['col-left']}>Start / End</th>
-              <th className={styles['col-center']}>Participants</th>
-              <th className={styles['col-center']}>Problems</th>
-              <th className={styles['col-center']}>Visibility</th>
-              <th className={styles['col-center']}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleContests.map(contest => (
-              <tr key={contest.id}>
-                <td className={styles['col-left']}>
-                  {contest.title}
-                </td>
-
-                <td className={styles['col-center']}>
-                  {getStatusBadge(contest.status)}
-                </td>
-
-                <td className={styles['col-left']}>
-                  <div className={styles.timeInfo}>
-                    <div className={styles.timeRow}>
-                      <span className={styles.timeLabel}>Start:</span>
-                      <span className={styles.timeValue}>
-                        {formatDateTime(contest.start_time)}
-                      </span>
-                    </div>
-                    <div className={styles.timeRow}>
-                      <span className={styles.timeLabel}>End:</span>
-                      <span className={styles.timeValue}>
-                        {formatDateTime(contest.end_time)}
-                      </span>
-                    </div>
-                  </div>
-                </td>
-
-                <td className={styles['col-center']}>
-                  <span className={styles.statValue}>
-                    {contest.participant_count || 0}
-                  </span>
-                </td>
-
-                <td className={styles['col-center']}>
-                  <span className={styles.statValue}>
-                    {contest.problem_count || 0}
-                  </span>
-                </td>
-
-                <td className={styles['col-center']}>
-                  <button
-                    type="button"
-                    className={`${styles['visibility-badge']} ${contest.is_visible ? styles['visibility-visible'] : styles['visibility-hidden']}`}
-                    onClick={() => handleToggleVisibility(contest.id, contest.is_visible)}
-                    title={contest.is_visible ? 'Visible — click to hide' : 'Hidden — click to show'}
-                  >
-                    {contest.is_visible ? 'Visible' : 'Hidden'}
-                  </button>
-                </td>
-
-                <td className={styles['col-center']}>
-                  <div className={styles['row-actions']}>
-                    <Button
-                      size="compact"
-                      variant="secondary"
-                      onClick={() => handleEdit(contest)}
-                      title="Edit Contest"
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      size="compact"
-                      onClick={() => handleManageProblems(contest)}
-                      title="Manage Problems"
-                      disabled={contest.status === 'finished'}
-                    >
-                      Problems
-                    </Button>
-                    <ActionMenu
-                      label={`Row actions for ${contest.title}`}
-                      items={[
-                        {
-                          key: 'toggle-visibility',
-                          label: contest.is_visible ? 'Hide Contest' : 'Show Contest',
-                          onClick: () => handleToggleVisibility(contest.id, contest.is_visible),
-                          title: contest.is_visible
-                            ? 'Hide this contest from normal users and guests (reversible; status, timing, and data are untouched)'
-                            : 'Make this contest visible to normal users and guests again',
-                        },
-                        {
-                          key: 'rejudge',
-                          label: 'Rejudge',
-                          disabled: contest.status === 'finished',
-                          title: contest.status === 'finished'
-                            ? 'Finished contest — its scoreboard is frozen. Rejudge its problems individually instead.'
-                            : 'Re-run every submission in this contest against the current testcases and limits',
-                          onClick: () => handleRejudgeClick({ kind: 'contest', id: contest.id, title: contest.title }),
-                        },
-                        {
-                          key: 'delete',
-                          label: 'Delete',
-                          variant: 'danger',
-                          disabled: contest.status === 'running',
-                          onClick: () => {
-                            setContestToDelete(contest.id);
-                            setIsConfirmModalOpen(true);
-                          },
-                        },
-                      ]}
-                    />
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!visibleContests.length && (
-          <p className={styles['empty-state']}>No contests found.</p>
-        )}
-      </div>
-
-      {/* Contest Modal */}
-      {isModalOpen && (
-        <ContestModal
-          contest={editingContest}
-          onClose={() => {
-            setIsModalOpen(false);
-            setEditingContest(null);
-          }}
-          onSuccess={() => {
-            fetchContests();
-            setIsModalOpen(false);
-            setEditingContest(null);
-          }}
-        />
-      )}
-
-      {/* Problem Migration Modal */}
-      {isMigrationModalOpen && migrationContest && (
-        <ProblemMigrationModal
-          contest={migrationContest}
-          onClose={() => {
-            setIsMigrationModalOpen(false);
-            setMigrationContest(null);
-          }}
-          onSuccess={() => {
-            fetchContests();
-            setIsMigrationModalOpen(false);
-            setMigrationContest(null);
-          }}
-        />
-      )}
-
-      {/* Confirmation Modal */}
-      {isConfirmModalOpen && (
-        <ConfirmationModal
-          isOpen={isConfirmModalOpen}
-          onClose={() => {
-            setIsConfirmModalOpen(false);
-            setContestToDelete(null);
-          }}
-          onConfirm={handleDelete}
-          title="Delete Contest"
-          message="Are you sure you want to delete this contest? This action cannot be undone."
-        />
-      )}
-
-      {/* Rejudge confirmation */}
-      <ConfirmationModal
-        isOpen={isRejudgeConfirmOpen}
-        onClose={handleCloseRejudgeConfirm}
-        onConfirm={handleConfirmRejudge}
-        title="Confirm Rejudge"
-        message={rejudgeTarget
-          ? `Rejudge re-runs every submission for contest "${rejudgeTarget.title}" against the current testcases and limits. Scores may change.`
-          : ''}
-        confirmText="Rejudge"
-        confirmStyle="default"
+      <CreateContestDrawer
+        open={creating}
+        onClose={() => setCreating(false)}
+        onCreated={(id) => { setCreating(false); navigate(`/admin/contests/${id}/problems`); }}
+      />
+      <ConfirmDialog
+        open={deleting !== null}
+        tier="typed"
+        confirmText={deleting?.title ?? ''}
+        title={`Delete ${deleting?.title ?? ''}?`}
+        body="Its problems go back to the general pool; its participants, contest submissions and scoreboard are deleted. This can't be undone."
+        confirmLabel="Delete contest"
+        busy={deleteBusy}
+        onConfirm={() => { void remove(); }}
+        onCancel={() => setDeleting(null)}
+      />
+      <ConfirmDialog
+        open={isRejudgeConfirmOpen}
+        tier="plain"
+        title={`Rejudge ${rejudgeTarget?.title ?? ''}?`}
+        body="Every submission in this contest is re-run against the current testcases and limits. Scores may change."
+        confirmLabel="Rejudge"
+        onConfirm={() => { void handleConfirmRejudge(); }}
+        onCancel={handleCloseRejudgeConfirm}
       />
     </div>
   );
 }
-
-export default ContestManagement;

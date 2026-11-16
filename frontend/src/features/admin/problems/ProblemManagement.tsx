@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import useProblemManagement from '../../../hooks/admin/useProblemManagement';
 import useProblemSelection from '../../../hooks/admin/useProblemSelection';
 import useRejudge from '../../../hooks/admin/useRejudge';
-import ProblemModal from './ProblemModal';
+import CreateProblemDialog from './CreateProblemDialog';
 import CollectionsDialog from './CollectionsDialog';
-import TestcasesDialog from './TestcasesDialog';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import RejudgeFeedbackBox from '../shared/RejudgeFeedbackBox';
 import adminService from '../../../services/adminService';
@@ -14,13 +13,13 @@ import type { AdminProblemsQuery } from '../../../types';
 import { ADMIN_PROBLEMS_PAGE } from '../../../config/constants';
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
-import { ActionMenu, Button, StatusBadge, PageHeader } from '../../../components/ui';
+import { ActionMenu, Button, StatusBadge, StatusDot, PageHeader } from '../../../components/ui';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useInfiniteScroll } from '../../../hooks/useInfiniteScroll';
 import { buildAdminProblemListQuery, type AdminProblemListLoaderData } from '../../../routing/problemListLoaders';
 
 interface ProblemManagementProps {
-  currentUser?: { username?: string } | null;
+  currentUser?: { username?: string; role?: string } | null;
   initialPageSpan?: AdminProblemListLoaderData;
 }
 
@@ -32,6 +31,10 @@ const COLLECTION_STATUS_LABEL: Record<CollectionWithStats['status'], string> = {
 };
 
 const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: ProblemManagementProps) => {
+  const navigate = useNavigate();
+  // Rejudge is admin-only on the server (POST /admin/rejudge/problem/:id).
+  const isAdmin = currentUser?.role === 'admin';
+  const [createOpen, setCreateOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const urlSearch = searchParams.get('search') || '';
   const urlCollection = searchParams.get('collection') || 'all';
@@ -207,7 +210,6 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
   // --- Collections --------------------------------------------------------
   const [collections, setCollections] = useState<CollectionWithStats[]>([]);
   const [collectionsOpen, setCollectionsOpen] = useState(false);
-  const [testcasesProblem, setTestcasesProblem] = useState<{ id: string } | null>(null);
   const [collectionConfirm, setCollectionConfirm] = useState<{ id: number; name: string; count: number; isVisible: boolean } | null>(null);
   const [moveConfirm, setMoveConfirm] = useState<{ collectionId: number | null; name: string } | null>(null);
   const [deleteSelectionConfirm, setDeleteSelectionConfirm] = useState(false);
@@ -333,8 +335,16 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
         title="Problems"
         actions={(
           <>
-            <Button variant="secondary" onClick={handleTriggerBatchUpload}>Batch Upload</Button>
-            <Button onClick={handleCreate}>+ New Problem</Button>
+            <Button variant="secondary" onClick={handleTriggerBatchUpload}>Import ZIP</Button>
+            <ActionMenu
+              label="More problem actions"
+              items={[
+                { key: 'manage-collections', label: 'Manage collections', onClick: () => setCollectionsOpen(true) },
+                { key: 'show-all', label: `Show all ${bulkEligibleCount} matching`, onClick: handleShowAll, disabled: !bulkScopeReady || bulkEligibleCount === 0, title: `Set all ${bulkEligibleCount} matching eligible problems to visible` },
+                { key: 'hide-all', label: `Hide all ${bulkEligibleCount} matching`, onClick: handleHideAll, disabled: !bulkScopeReady || bulkEligibleCount === 0, title: `Set all ${bulkEligibleCount} matching eligible problems to hidden` },
+              ]}
+            />
+            <Button onClick={() => setCreateOpen(true)}>New problem</Button>
           </>
         )}
       />
@@ -388,17 +398,9 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
             ))}
           </select>
         </label>
-        {/* Show/Hide All are server-side actions over every eligible problem
-            matching the current filters; the header checkbox stays page-scoped. */}
-        <ActionMenu
-          label="More global actions"
-          trigger="text"
-          items={[
-            { key: 'manage-collections', label: 'Manage Collections', onClick: () => setCollectionsOpen(true) },
-            { key: 'show-all', label: 'Show all problems', onClick: handleShowAll, disabled: !bulkScopeReady || bulkEligibleCount === 0, title: `Set all ${bulkEligibleCount} matching eligible problems to visible` },
-            { key: 'hide-all', label: 'Hide all problems', onClick: handleHideAll, disabled: !bulkScopeReady || bulkEligibleCount === 0, title: `Set all ${bulkEligibleCount} matching eligible problems to hidden` },
-          ]}
-        />
+        <span className={styles['filter-count']} aria-live="polite">
+          {`${visibleProblems.length}${hasMore ? '+' : ''} ${visibleProblems.length === 1 && !hasMore ? 'problem' : 'problems'}`}
+        </span>
       </div>
 
       {/* --- 3a. Collection context (only with a specific collection) ----- */}
@@ -534,14 +536,17 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
               </th>
               <th className={styles['col-left']}>ID</th>
               <th className={styles['col-left']}>Title</th>
+              <th className={styles['col-right']}>Difficulty</th>
+              <th className={styles['col-right']}>Tests</th>
+              <th className={styles['col-left']}>Limits</th>
               <th className={styles['col-left']}>Collection</th>
-              <th className={styles['col-center']}>Visibility</th>
-              <th className={styles['col-center']}>Actions</th>
+              <th className={styles['col-left']}>Visibility</th>
+              <th className={styles['col-center']}><span className="visually-hidden">Actions</span></th>
             </tr>
           </thead>
           <tbody>
             {visibleProblems.length === 0 && !loading && !error && (
-              <tr><td colSpan={6}>No problems match the current filters.</td></tr>
+              <tr><td colSpan={9}>No problems match the current filters.</td></tr>
             )}
             {visibleProblems.map(problem => {
               const selected = isProblemSelected(problem.id);
@@ -553,8 +558,13 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
               return (
               <tr
                 key={problem.id}
-                className={rowClasses || undefined}
+                className={[rowClasses, styles['row-clickable']].filter(Boolean).join(' ')}
                 onPointerEnter={() => isDragging && handleDragOverRow(problem.id)}
+                onClick={(event) => {
+                  // Row click opens the editor (§7.8); links, buttons and checkboxes keep their own job.
+                  if ((event.target as HTMLElement).closest('a, button, input, [role="menuitem"]')) return;
+                  navigate(`/admin/problems/${encodeURIComponent(problem.id)}`);
+                }}
               >
                 <td
                   className={styles['col-checkbox']}
@@ -576,59 +586,47 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
                   />
                 </td>
                 <td className={styles['col-left']}>
-                  <Link to={`/problems/${encodeURIComponent(problem.id)}`}>{problem.id}</Link>
+                  <Link to={`/problems/${encodeURIComponent(problem.id)}`} className={styles['problem-id']}>{problem.id}</Link>
                 </td>
-                <td className={styles['col-left']}>{problem.title}</td>
+                <td className={styles['col-left']}>
+                  <span className={styles['problem-title']}>{problem.title}</span>
+                  {problem.problem_type === 'header' && <StatusBadge>HEADER</StatusBadge>}
+                </td>
+                <td className={`${styles['col-right']} ${styles.mono}`}>{problem.difficulty ?? '—'}</td>
+                <td className={`${styles['col-right']} ${styles.mono}`}>{problem.testcase_count ?? '—'}</td>
+                <td className={`${styles['col-left']} ${styles.mono}`}>
+                  {problem.time_limit_ms ? `${problem.time_limit_ms} ms · ${problem.memory_limit_mb} MB` : '—'}
+                </td>
                 <td className={styles['col-left']}>
                   {problem.collection_id !== null
                     ? <span title={problem.collection_name ?? undefined}>{problem.collection_name}</span>
-                    : <span className={styles['no-collection']}>No Collection</span>}
+                    : null}
                 </td>
                 <td className={styles['col-center']}>
-                  {problem.contest_id && (problem.contest_status === 'scheduled' || problem.contest_status === 'running') ? (
-                    <span className={`${styles['contest-status-badge']} ${styles[problem.contest_status === 'scheduled' ? 'scheduled' : 'running']}`}>
-                      {problem.contest_status === 'scheduled' ? 'In Scheduled Contest' : 'In Running Contest'}
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      className={`${styles['visibility-badge']} ${problem.is_visible ? styles['visibility-visible'] : styles['visibility-hidden']}`}
-                      onClick={() => handleToggleVisibility(problem.id, problem.is_visible)}
-                      title={problem.is_visible ? 'Visible — click to hide' : 'Hidden — click to show'}
-                    >
-                      {problem.is_visible ? 'Visible' : 'Hidden'}
-                    </button>
-                  )}
+                  {problem.contest_id && (problem.contest_status === 'scheduled' || problem.contest_status === 'running')
+                    ? <StatusDot tone="neutral" label="In contest" />
+                    : <StatusDot tone={problem.is_visible ? 'pass' : 'warn'} label={problem.is_visible ? 'Visible' : 'Hidden'} />}
                 </td>
                 <td className={styles['col-center']}>
                   <div className={styles['row-actions']}>
-                    <Button size="compact" variant="secondary" onClick={() => handleEdit(problem)}>Edit</Button>
                     <ActionMenu
                       label={`Row actions for ${problem.id}`}
                       items={[
-                        {
+                        { key: 'edit', label: 'Edit', onClick: () => navigate(`/admin/problems/${encodeURIComponent(problem.id)}`) },
+                        { key: 'testcases', label: 'Testcases', onClick: () => navigate(`/admin/problems/${encodeURIComponent(problem.id)}/testcases`) },
+                        ...(isAdmin ? [{
                           key: 'rejudge',
                           label: 'Rejudge',
                           title: 'Re-run every submission for this problem against the current testcases and limits',
                           onClick: () => handleRejudgeClick({ kind: 'problem', id: problem.id, title: problem.title }),
-                        },
-                        {
-                          key: 'testcases',
-                          label: 'View Testcases',
-                          title: 'Inspect this problem\'s testcase data (input/output per case)',
-                          onClick: () => setTestcasesProblem({ id: problem.id }),
-                        },
-                        {
+                        }] : []),
+                        ...(problem.contest_id && (problem.contest_status === 'scheduled' || problem.contest_status === 'running') ? [] : [{
                           key: 'toggle-visibility',
-                          label: problem.is_visible ? 'Hide Problem' : 'Show Problem',
+                          label: problem.is_visible ? 'Hide' : 'Show',
                           onClick: () => handleToggleVisibility(problem.id, problem.is_visible),
-                        },
-                        {
-                          key: 'delete',
-                          label: 'Delete',
-                          variant: 'danger',
-                          onClick: () => handleDeleteClick(problem.id),
-                        },
+                        }]),
+                        { key: 'copy-link', label: 'Copy link', onClick: () => { void navigator.clipboard?.writeText(`${window.location.origin}/problems/${encodeURIComponent(problem.id)}`); } },
+                        { key: 'delete', label: 'Delete', variant: 'danger' as const, onClick: () => handleDeleteClick(problem.id) },
                       ]}
                     />
                   </div>
@@ -683,10 +681,6 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
         onChanged={refreshAfterCollectionChange}
         collections={collections}
       />
-      <TestcasesDialog
-        problem={testcasesProblem}
-        onClose={() => setTestcasesProblem(null)}
-      />
       {collectionConfirm && (
         <ConfirmationModal
           isOpen
@@ -713,16 +707,12 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
         message="This permanently deletes the selected problems and their test cases and submissions. This action cannot be undone."
         confirmText={`Delete ${selectedCount}`}
       />
-      {isModalOpen && (
-        <ProblemModal
-          collections={collections}
-          problem={editingProblem}
-          onClose={handleCloseModal}
-          onSave={handleSave}
-          uploadProgress={uploadProgress}
-          currentUser={currentUser}
-        />
-      )}
+      <CreateProblemDialog
+        open={createOpen}
+        author={currentUser?.username ?? ''}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(id) => { setCreateOpen(false); navigate(`/admin/problems/${encodeURIComponent(id)}`); }}
+      />
       <ConfirmationModal
         isOpen={isConfirmModalOpen}
         onClose={() => setIsConfirmModalOpen(false)}

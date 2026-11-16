@@ -24,6 +24,7 @@ import {
   createContest,
   deleteContest,
   getContestDetail,
+  getContestParticipants,
   joinContest,
   listContests,
   moveSingleProblemToMainSystem,
@@ -200,6 +201,17 @@ router.get('/admin/contests/:id/admin-problems', requireAuth, requireStaffOrAdmi
   res.json(problems);
 }));
 
+
+// Participants of a contest, with join times (staff Participants tab).
+router.get('/admin/contests/:id/participants', requireAuth, requireStaffOrAdmin,
+  validateRequest({ params: contestIdParamSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const participants = await getContestParticipants(String(req.params.id));
+  if (!participants) {
+    throw new AppError('Contest not found', 404);
+  }
+  res.json(participants);
+}));
 
 // Move problems to/from contest (Admin)
 router.post('/admin/contests/:id/problems', requireAuth, requireStaffOrAdmin,

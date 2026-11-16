@@ -1,6 +1,7 @@
 import api from '../api';
 
 import type {
+  ApiMessageResponse,
   ContestListResponse,
   ContestMutationResponse,
   ContestProblemsMutationResponse,
@@ -9,6 +10,7 @@ import type {
   RejudgeResponse,
 } from '../../types';
 import type {
+  AdminContestParticipant,
   CreateContestRequest,
   MigrateContestProblemsRequest,
   UpdateContestRequest,
@@ -74,6 +76,23 @@ const contestsAdminService = {
       : payloadOrProblemIds;
 
     const response = await api.post<ContestProblemsMutationResponse>(`/admin/contests/${contestId}/problems`, payload);
+    return response.data;
+  },
+
+  /** PUT /admin/contests/:id/problem-order — every contest problem id, once, in the new order. */
+  reorderProblems: async (contestId: string | number, problemIds: string[]): Promise<void> => {
+    await api.put(`/admin/contests/${contestId}/problem-order`, { problemIds });
+  },
+
+  /** Returns one problem from the contest to the practice set. */
+  removeContestProblem: async (contestId: string | number, problemId: string): Promise<ApiMessageResponse> => {
+    const response = await api.delete<ApiMessageResponse>(`/admin/contests/${contestId}/problems/${encodeURIComponent(problemId)}`);
+    return response.data;
+  },
+
+  /** Staff Participants tab: who joined and when, earliest first. */
+  getContestParticipants: async (contestId: string | number): Promise<AdminContestParticipant[]> => {
+    const response = await api.get<AdminContestParticipant[]>(`/admin/contests/${contestId}/participants`);
     return response.data;
   },
 };

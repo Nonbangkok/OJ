@@ -356,4 +356,25 @@ describe('adminService', () => {
             );
         });
     });
+
+    describe('contest editor (phase 5)', () => {
+        it('reorderProblems PUTs the full id order', async () => {
+            jest.mocked(api.put).mockResolvedValueOnce({ data: undefined } as never);
+            await adminService.reorderProblems(7, ['B', 'A']);
+            expect(api.put).toHaveBeenCalledWith('/admin/contests/7/problem-order', { problemIds: ['B', 'A'] });
+        });
+
+        it('removeContestProblem DELETEs one problem, URL-encoded', async () => {
+            jest.mocked(api.delete).mockResolvedValueOnce({ data: { message: 'ok' } } as never);
+            await adminService.removeContestProblem(7, 'A/1');
+            expect(api.delete).toHaveBeenCalledWith('/admin/contests/7/problems/A%2F1');
+        });
+
+        it('getContestParticipants GETs the staff participants list', async () => {
+            const rows = [{ user_id: 2, username: 'mint', joined_at: '2026-11-20T02:00:00.000Z' }];
+            jest.mocked(api.get).mockResolvedValueOnce({ data: rows } as never);
+            await expect(adminService.getContestParticipants(7)).resolves.toEqual(rows);
+            expect(api.get).toHaveBeenCalledWith('/admin/contests/7/participants');
+        });
+    });
 });

@@ -895,3 +895,53 @@
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
+
+/* Phase 5 Problems list (§7.8, key-pages §4). */
+.filter-count {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.row-clickable {
+  cursor: pointer;
+}
+
+.problem-id {
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.problem-title {
+  margin-right: 8px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.mono {
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+}
+
+.col-right {
+  text-align: right;
+}
+
+.dialog-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}

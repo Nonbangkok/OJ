@@ -11,7 +11,7 @@
  *
  *   XP = round(20 * (difficulty / 800) ^ 1.5)
  *
- * 800 -> 20 XP, 1600 -> 57 XP, 2200 -> 91 XP, 3500 -> 182 XP.
+ * 800 -> 20 XP, 1600 -> 57 XP, 2200 -> 91 XP, 3500 -> 183 XP.
  * Unrated (null difficulty) problems use UNRATED_PROBLEM_XP.
  */
 export const XP_PROGRESSION = {

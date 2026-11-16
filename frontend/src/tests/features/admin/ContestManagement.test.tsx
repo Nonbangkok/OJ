@@ -1,278 +1,197 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import ContestManagement from '../../../features/admin/contests/ContestManagement';
 import adminService from '../../../services/adminService';
-import { BrowserRouter } from 'react-router-dom';
+import { useAuth } from '../../../context/AuthContext';
 
-// Mock services
 jest.mock('../../../services/adminService');
+jest.mock('../../../context/AuthContext');
 
-// Mock ThemeContext to prevent useTheme errors from child components
-jest.mock('../../../context/ThemeContext', () => ({
-    useTheme: jest.fn(() => ({ theme: 'light' })),
-}));
-
-// Mock LoadingPage to control what text appears during loading state
-jest.mock('../../../components/shared/LoadingPage', () => () => <div>Loading Contests...</div>);
-
-const mockContests = [
-    {
-        id: 1,
-        title: 'Contest 1',
-        description: null,
-        status: 'scheduled',
-        start_time: '2026-01-01T10:00:00Z',
-        end_time: '2026-01-01T12:00:00Z',
-        participant_count: 5,
-        problem_count: 3,
-        is_visible: true
-    },
-    {
-        id: 2,
-        title: 'Contest 2',
-        description: null,
-        status: 'running',
-        start_time: '2025-01-01T10:00:00Z',
-        end_time: '2026-12-31T12:00:00Z',
-        participant_count: 10,
-        problem_count: 5,
-        is_visible: true
-    },
-    {
-        id: 3,
-        title: 'Contest 3',
-        description: null,
-        status: 'finished',
-        start_time: '2024-01-01T10:00:00Z',
-        end_time: '2024-01-01T12:00:00Z',
-        participant_count: 20,
-        problem_count: 4,
-        is_visible: false
-    }
+const NOW = Date.parse('2026-11-20T03:00:00.000Z');
+const contests = [
+  { id: 1, title: 'Weekly 12', description: null, status: 'scheduled', start_time: '2026-11-27T12:00:00.000Z', end_time: '2026-11-27T14:00:00.000Z', participant_count: '5', problem_count: 3, is_visible: true },
+  { id: 2, title: 'Mid-term practice', description: null, status: 'running', start_time: '2026-11-20T02:00:00.000Z', end_time: '2026-11-20T04:12:08.000Z', participant_count: '41', problem_count: 6, is_visible: true },
+  { id: 3, title: 'Old round', description: null, status: 'finished', start_time: '2026-01-01T03:00:00.000Z', end_time: '2026-01-01T06:30:00.000Z', participant_count: '20', problem_count: 4, is_visible: false },
 ];
 
-const mockCurrentUser = { id: 1, username: 'admin', role: 'admin' };
-
-const renderContestManagement = () => {
-    return render(
-        <BrowserRouter>
-            <ContestManagement />
-        </BrowserRouter>
-    );
+const Where = () => <p data-testid="where">{useLocation().pathname}</p>;
+const renderList = () => render(
+  <MemoryRouter initialEntries={['/admin/contests']}>
+    <Routes>
+      <Route path="/admin/contests" element={<><ContestManagement /><Where /></>} />
+      <Route path="/admin/contests/:contestId/:tab?" element={<Where />} />
+      <Route path="/contests/:contestId" element={<Where />} />
+    </Routes>
+  </MemoryRouter>,
+);
+const rowOf = async (title: string) => (await screen.findByRole('link', { name: title })).closest('tr') as HTMLElement;
+const openMenu = async (title: string) => {
+  const user = userEvent.setup({ delay: 20 });
+  await user.click(within(await rowOf(title)).getByRole('button', { name: `Actions for ${title}` }));
+  return user;
 };
 
-describe('ContestManagement Component', () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
-        (jest.mocked(adminService.getContests) as jest.Mock).mockResolvedValue(mockContests);
-    });
+describe('ContestManagement (§7.8)', () => {
+  beforeEach(() => {
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    jest.mocked(useAuth).mockReturnValue({ user: { id: 1, username: 'kru', role: 'admin' } } as ReturnType<typeof useAuth>);
+    jest.mocked(adminService.getContests).mockResolvedValue(contests as never);
+    jest.mocked(adminService.updateContestVisibility).mockResolvedValue({ message: 'ok', contest: { ...contests[0], is_visible: false } } as never);
+    jest.mocked(adminService.deleteContest).mockResolvedValue({ message: 'ok' } as never);
+  });
+  afterEach(() => jest.restoreAllMocks());
 
-    it('renders loading state initially', () => {
-        (jest.mocked(adminService.getContests) as jest.Mock).mockReturnValue(new Promise(() => { }));
-        renderContestManagement();
-        expect(screen.getByText(/loading contests\.\.\.$/i)).toBeInTheDocument();
-    });
+  it('header says the timezone and offers New contest; status segments filter', async () => {
+    renderList();
+    expect(await screen.findByText('Times are Asia/Bangkok (UTC+7)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New contest' })).toBeInTheDocument();
+    await rowOf('Weekly 12');
+    fireEvent.click(screen.getByRole('button', { name: 'Running' }));
+    expect(screen.queryByRole('link', { name: 'Weekly 12' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Mid-term practice' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'All' }));
+    expect(screen.getByRole('link', { name: 'Weekly 12' })).toBeInTheDocument();
+  });
 
-    it('renders contest list correctly', async () => {
-        renderContestManagement();
+  it('rows: title link, status with time left, start, duration, counts and visibility', async () => {
+    renderList();
+    const weekly = await rowOf('Weekly 12');
+    expect(within(weekly).getByRole('link', { name: 'Weekly 12' })).toHaveAttribute('href', '/admin/contests/1');
+    expect(weekly).toHaveTextContent('Scheduled');
+    expect(weekly).toHaveTextContent('27 Nov 2026, 19:00');
+    expect(weekly).toHaveTextContent('2 h');
+    expect(within(await rowOf('Mid-term practice')).getByText('Running · 1:12:08 left')).toBeInTheDocument();
+    const old = await rowOf('Old round');
+    expect(old).toHaveTextContent('Finished');
+    expect(old).toHaveTextContent('3 h 30 m');
+    expect(old).toHaveTextContent('Hidden');
+    expect(old).toHaveTextContent(/20\s*4/);
+  });
 
-        await waitFor(() => {
-            expect(screen.getByRole('heading', { level: 1, name: 'Contests' })).toBeInTheDocument();
-            expect(screen.getByText('Contest 1')).toBeInTheDocument();
-            expect(screen.getByText('Scheduled')).toBeInTheDocument();
-            expect(screen.getByText('Running')).toBeInTheDocument();
-            expect(screen.getByText('Finished')).toBeInTheDocument();
-        });
-    });
+  it('row menu: Edit opens the editor', async () => {
+    renderList();
+    const user = await openMenu('Weekly 12');
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/admin\/contests\/1$/);
+  });
 
-    it('shows correct participant and problem counts', async () => {
-        renderContestManagement();
+  it('row menu: Open contest page goes to the student view', async () => {
+    renderList();
+    const user = await openMenu('Weekly 12');
+    await user.click(await screen.findByRole('menuitem', { name: 'Open contest page' }));
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/contests\/1$/);
+  });
 
-        await waitFor(() => {
-            const rows = screen.getAllByRole('row');
-            const c1Row = rows.find(r => r.textContent.includes('Contest 1'));
-            expect(within(c1Row).getByText('5')).toBeInTheDocument(); // Participants
-            expect(within(c1Row).getByText('3')).toBeInTheDocument(); // Problems
-        });
-    });
+  it('Show/Hide from the menu updates the row', async () => {
+    renderList();
+    const user = await openMenu('Weekly 12');
+    await user.click(await screen.findByRole('menuitem', { name: 'Hide' }));
+    await waitFor(() => expect(adminService.updateContestVisibility).toHaveBeenCalledWith(1, false));
+    expect(await rowOf('Weekly 12')).toHaveTextContent('Hidden');
+  });
 
-    it('opens ContestModal for creating new contest', async () => {
-        renderContestManagement();
+  it('Delete asks for the title and is disabled while running', async () => {
+    renderList();
+    let user = await openMenu('Mid-term practice');
+    expect(await screen.findByRole('menuitem', { name: 'Delete' })).toHaveAttribute('aria-disabled', 'true');
+    await user.keyboard('{Escape}');
+    user = await openMenu('Weekly 12');
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete Weekly 12?' });
+    const confirm = within(dialog).getByRole('button', { name: 'Delete contest' });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'Weekly 12' } });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(adminService.deleteContest).toHaveBeenCalledWith(1));
+  });
 
-        await waitFor(() => screen.getByText('+ New Contest'));
-        fireEvent.click(screen.getByText('+ New Contest'));
+  it('admins can rejudge a contest from the menu', async () => {
+    renderList();
+    await openMenu('Weekly 12');
+    expect(await screen.findByRole('menuitem', { name: 'Rejudge' })).toBeInTheDocument();
+  });
 
-        expect(screen.getByText(/create contest/i)).toBeInTheDocument();
-    });
+  it('staff do not get Rejudge (the server route is admin-only)', async () => {
+    jest.mocked(useAuth).mockReturnValue({ user: { id: 2, username: 'ta', role: 'staff' } } as ReturnType<typeof useAuth>);
+    renderList();
+    await openMenu('Weekly 12');
+    await screen.findByRole('menuitem', { name: 'Open contest page' });
+    expect(screen.queryByRole('menuitem', { name: 'Rejudge' })).toBeNull();
+  });
+});
 
-    it('opens ContestModal for editing existing contest', async () => {
-        renderContestManagement();
+describe('Create contest drawer', () => {
+  beforeEach(() => {
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    jest.mocked(useAuth).mockReturnValue({ user: { id: 1, username: 'kru', role: 'admin' } } as ReturnType<typeof useAuth>);
+    jest.mocked(adminService.getContests).mockResolvedValue([] as never);
+    jest.mocked(adminService.createContest).mockResolvedValue({ id: 9, title: 'Weekly 13' } as never);
+    jest.mocked(adminService.updateContestVisibility).mockResolvedValue({ message: 'ok' } as never);
+  });
+  afterEach(() => jest.restoreAllMocks());
 
-        await waitFor(() => screen.getByText('Contest 1'));
-        const c1Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 1'));
-        fireEvent.click(within(c1Row).getByText(/edit/i));
+  const openDrawer = async () => {
+    renderList();
+    fireEvent.click(await screen.findByRole('button', { name: 'New contest' }));
+    return screen.findByRole('dialog', { name: 'New contest' });
+  };
 
-        expect(screen.getByText(/edit contest/i)).toBeInTheDocument();
-    });
+  it('posts Bangkok start and end as ISO, then opens the Problems tab', async () => {
+    const drawer = await openDrawer();
+    expect(drawer).toHaveTextContent('Times are Asia/Bangkok (UTC+7)');
+    fireEvent.change(within(drawer).getByLabelText('Title'), { target: { value: 'Weekly 13' } });
+    fireEvent.change(within(drawer).getByLabelText('Start date'), { target: { value: '2026-11-27' } });
+    fireEvent.change(within(drawer).getByLabelText('Start time'), { target: { value: '19:00' } });
+    fireEvent.click(within(drawer).getByRole('button', { name: '2 h' }));
+    expect(drawer).toHaveTextContent('Ends Fri 27 Nov, 21:00');
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Create contest' }));
+    await waitFor(() => expect(adminService.createContest).toHaveBeenCalledWith({
+      title: 'Weekly 13', description: '', startTime: '2026-11-27T12:00:00.000Z', endTime: '2026-11-27T14:00:00.000Z',
+    }));
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/admin/contests/9/problems'));
+    expect(adminService.updateContestVisibility).not.toHaveBeenCalled();
+  });
 
-    it('disables "Problems" button for finished contests', async () => {
-        renderContestManagement();
+  it('offers 15-minute start times, accepts a free time, and supports a custom duration', async () => {
+    const drawer = await openDrawer();
+    const time = within(drawer).getByLabelText('Start time');
+    const options = Array.from(document.getElementById(time.getAttribute('list') as string)?.querySelectorAll('option') ?? []).map((o) => o.getAttribute('value'));
+    expect(options).toHaveLength(96);
+    expect(options.slice(0, 3)).toEqual(['00:00', '00:15', '00:30']);
+    fireEvent.change(within(drawer).getByLabelText('Title'), { target: { value: 'Odd' } });
+    fireEvent.change(within(drawer).getByLabelText('Start date'), { target: { value: '2026-11-27' } });
+    fireEvent.change(time, { target: { value: '19:07' } });
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Custom' }));
+    fireEvent.change(within(drawer).getByLabelText('Hours'), { target: { value: '1' } });
+    fireEvent.change(within(drawer).getByLabelText('Minutes'), { target: { value: '45' } });
+    expect(drawer).toHaveTextContent('Ends Fri 27 Nov, 20:52');
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Create contest' }));
+    await waitFor(() => expect(adminService.createContest).toHaveBeenCalledWith(expect.objectContaining({
+      startTime: '2026-11-27T12:07:00.000Z', endTime: '2026-11-27T13:52:00.000Z',
+    })));
+  });
 
-        await waitFor(() => screen.getByText('Contest 3'));
-        const c3Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 3'));
-        const problemsBtn = within(c3Row).getByRole('button', { name: /problems/i });
-        expect(problemsBtn).toBeDisabled();
-    });
+  it('a hidden new contest is hidden right after it is created', async () => {
+    const drawer = await openDrawer();
+    fireEvent.change(within(drawer).getByLabelText('Title'), { target: { value: 'Secret' } });
+    fireEvent.change(within(drawer).getByLabelText('Start date'), { target: { value: '2026-11-27' } });
+    fireEvent.change(within(drawer).getByLabelText('Start time'), { target: { value: '19:00' } });
+    fireEvent.click(within(drawer).getByRole('switch', { name: 'Visible to students' }));
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Create contest' }));
+    await waitFor(() => expect(adminService.updateContestVisibility).toHaveBeenCalledWith(9, false));
+  });
 
-    it('blocks deletion of running contests', async () => {
-        renderContestManagement();
-
-        await waitFor(() => screen.getByText('Contest 2'));
-        const c2Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 2'));
-        fireEvent.click(within(c2Row).getByRole('button', { name: /row actions for Contest 2/i }));
-        const deleteItem = screen.getByRole('menuitem', { name: 'Delete' });
-        expect(deleteItem).toHaveAttribute('aria-disabled', 'true');
-    });
-
-    it('handles contest deletion for non-running contests', async () => {
-        (jest.mocked(adminService.deleteContest) as jest.Mock).mockResolvedValue({ message: 'Deleted' });
-        renderContestManagement();
-
-        await waitFor(() => screen.getByText('Contest 1'));
-        const c1Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 1'));
-        fireEvent.click(within(c1Row).getByRole('button', { name: /row actions for Contest 1/i }));
-        fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
-
-        expect(screen.getByText(/are you sure you want to delete this contest/i)).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
-
-        await waitFor(() => {
-            expect(adminService.deleteContest).toHaveBeenCalledWith(1);
-        });
-    });
-
-    it('disables Rejudge for finished contests with a visible reason', async () => {
-        renderContestManagement();
-
-        await waitFor(() => screen.getByText('Contest 3'));
-        const c3Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 3'));
-        fireEvent.click(within(c3Row).getByRole('button', { name: /row actions for Contest 3/i }));
-        const rejudgeItem = screen.getByRole('menuitem', { name: 'Rejudge' });
-        expect(rejudgeItem).toHaveAttribute('aria-disabled', 'true');
-        expect(rejudgeItem).toHaveAttribute('title', 'Finished contest — its scoreboard is frozen. Rejudge its problems individually instead.');
-    });
-
-    it('opens the rejudge confirm dialog and reports queued/skipped counts', async () => {
-        (jest.mocked(adminService.rejudgeContest) as jest.Mock).mockResolvedValueOnce({ queued: 6, skipped: 2 });
-        renderContestManagement();
-
-        await waitFor(() => screen.getByText('Contest 2'));
-        const c2Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 2'));
-        fireEvent.click(within(c2Row).getByRole('button', { name: /row actions for Contest 2/i }));
-        fireEvent.click(screen.getByRole('menuitem', { name: 'Rejudge' }));
-
-        // Confirm dialog explains the consequences in plain language.
-        expect(screen.getByText(/re-runs every submission for contest "contest 2"/i)).toBeInTheDocument();
-        expect(screen.getByText(/scores may change/i)).toBeInTheDocument();
-        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /rejudge/i }));
-
-        await waitFor(() => {
-            expect(adminService.rejudgeContest).toHaveBeenCalledWith(2);
-        });
-        expect(await screen.findByText(/rejudge queued for 6 submissions \(2 skipped — no stored code\)/i)).toBeInTheDocument();
-    });
-
-    it('renders visibility badges per row (Visible/Hidden)', async () => {
-        renderContestManagement();
-
-        await waitFor(() => screen.getByText('Contest 3'));
-        const rows = screen.getAllByRole('row');
-        const c1Row = rows.find(r => r.textContent.includes('Contest 1'));
-        const c3Row = rows.find(r => r.textContent.includes('Contest 3'));
-
-        expect(within(c1Row).getByTitle('Visible — click to hide')).toHaveTextContent('Visible');
-        expect(within(c3Row).getByTitle('Hidden — click to show')).toHaveTextContent('Hidden');
-    });
-
-    it('still lists hidden contests (management shows both)', async () => {
-        renderContestManagement();
-
-        await waitFor(() => {
-            expect(screen.getByText('Contest 3')).toBeInTheDocument();
-        });
-    });
-
-    it('toggles a visible contest to hidden via the row menu and updates the row', async () => {
-        (jest.mocked(adminService.updateContestVisibility) as jest.Mock)
-            .mockResolvedValueOnce({ message: 'ok', contest: { id: 1, title: 'Contest 1', is_visible: false } });
-        renderContestManagement();
-
-        await waitFor(() => screen.getByText('Contest 1'));
-        const c1Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 1'));
-        fireEvent.click(within(c1Row).getByRole('button', { name: /row actions for Contest 1/i }));
-        fireEvent.click(screen.getByRole('menuitem', { name: 'Hide Contest' }));
-
-        await waitFor(() => {
-            expect(adminService.updateContestVisibility).toHaveBeenCalledWith(1, false);
-        });
-        // Row flips to Hidden without a refetch.
-        const updatedRow = await screen.findAllByRole('row').then(rows =>
-            rows.find(r => r.textContent.includes('Contest 1'))
-        );
-        await waitFor(() => {
-            expect(within(updatedRow).getByTitle('Hidden — click to show')).toHaveTextContent('Hidden');
-        });
-    });
-
-    it('toggles a hidden contest to visible via the row menu and updates the row', async () => {
-        (jest.mocked(adminService.updateContestVisibility) as jest.Mock)
-            .mockResolvedValueOnce({ message: 'ok', contest: { id: 3, title: 'Contest 3', is_visible: true } });
-        renderContestManagement();
-
-        await waitFor(() => screen.getByText('Contest 3'));
-        const c3Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 3'));
-        fireEvent.click(within(c3Row).getByRole('button', { name: /row actions for Contest 3/i }));
-        fireEvent.click(screen.getByRole('menuitem', { name: 'Show Contest' }));
-
-        await waitFor(() => {
-            expect(adminService.updateContestVisibility).toHaveBeenCalledWith(3, true);
-        });
-        const updatedRow = await screen.findAllByRole('row').then(rows =>
-            rows.find(r => r.textContent.includes('Contest 3'))
-        );
-        await waitFor(() => {
-            expect(within(updatedRow).getByTitle('Visible — click to hide')).toHaveTextContent('Visible');
-        });
-    });
-
-    it('keeps the old state and shows an error when the toggle API fails', async () => {
-        (jest.mocked(adminService.updateContestVisibility) as jest.Mock)
-            .mockRejectedValueOnce({ response: { data: { message: 'Contest not found' } } });
-        renderContestManagement();
-
-        await waitFor(() => screen.getByText('Contest 1'));
-        const c1Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 1'));
-        fireEvent.click(within(c1Row).getByRole('button', { name: /row actions for Contest 1/i }));
-        fireEvent.click(screen.getByRole('menuitem', { name: 'Hide Contest' }));
-
-        await waitFor(() => {
-            expect(screen.getByText(/error: contest not found/i)).toBeInTheDocument();
-        });
-        // No optimistic lie: the badge still says Visible.
-        const row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 1'));
-        expect(within(row).getByTitle('Visible — click to hide')).toHaveTextContent('Visible');
-    });
-
-    it('toggles visibility by clicking the badge directly', async () => {
-        (jest.mocked(adminService.updateContestVisibility) as jest.Mock)
-            .mockResolvedValueOnce({ message: 'ok', contest: { id: 2, title: 'Contest 2', is_visible: false } });
-        renderContestManagement();
-
-        await waitFor(() => screen.getByText('Contest 2'));
-        const c2Row = screen.getAllByRole('row').find(r => r.textContent.includes('Contest 2'));
-        fireEvent.click(within(c2Row).getByTitle('Visible — click to hide'));
-
-        await waitFor(() => {
-            expect(adminService.updateContestVisibility).toHaveBeenCalledWith(2, false);
-        });
-    });
+  it('refuses a start in the past or a malformed time without posting', async () => {
+    const drawer = await openDrawer();
+    fireEvent.change(within(drawer).getByLabelText('Title'), { target: { value: 'Late' } });
+    fireEvent.change(within(drawer).getByLabelText('Start date'), { target: { value: '2026-11-19' } });
+    fireEvent.change(within(drawer).getByLabelText('Start time'), { target: { value: '19:00' } });
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Create contest' }));
+    expect(await within(drawer).findByText('Start must be in the future.')).toBeInTheDocument();
+    fireEvent.change(within(drawer).getByLabelText('Start time'), { target: { value: '7pm' } });
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Create contest' }));
+    expect(await within(drawer).findByText('Use 24-hour time, e.g. 19:00.')).toBeInTheDocument();
+    expect(adminService.createContest).not.toHaveBeenCalled();
+  });
 });

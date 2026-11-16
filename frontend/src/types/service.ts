@@ -87,7 +87,8 @@ export interface CreateProblemRequest {
   submission_filename?: string | null;
 }
 
-export interface UpdateProblemRequest extends CreateProblemRequest {}
+/** PUT /admin/problems/:id — `id` (the new id) is required; every omitted field is left unchanged. */
+export type UpdateProblemRequest = Partial<Omit<CreateProblemRequest, 'id'>> & { id: string };
 
 export interface CreateContestRequest {
   title: string;
