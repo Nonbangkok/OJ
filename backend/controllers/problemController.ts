@@ -13,6 +13,7 @@ import {
   deleteProblems,
   getAdminProblemsPage,
   getProblemDetail,
+  getAdminProblemFacts,
   getProblemExportBundle,
   getProblemPdfWithAccess,
   getProblemStarterAccess,
@@ -201,11 +202,11 @@ router.get('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
   validateRequest({ params: problemIdParamSchema }),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const problemDetail = await getProblemDetail(id);
+  const [problemDetail, facts] = await Promise.all([getProblemDetail(id), getAdminProblemFacts(id)]);
   if (!problemDetail) {
     throw new AppError('Problem not found', 404);
   }
-  res.json(problemDetail);
+  res.json({ ...problemDetail, ...facts });
 }));
 
 router.get('/problems/:id/pdf', requirePublicAccess,

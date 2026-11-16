@@ -748,6 +748,47 @@ const buildAdminProblemFilter = (options: AdminProblemFilters, params: unknown[]
  * come from the presence of an extra row — the same contract as the public
  * list.
  */
+/**
+ * B6 facts joined onto a \`page\` CTE of problems: testcase count, practice +
+ * contest submission count, and type_locked (any submission locks the type).
+ */
+const ADMIN_PROBLEM_FACTS_SQL = `
+    , tc AS (
+      SELECT problem_id, COUNT(*)::int AS n,
+             COALESCE(SUM(octet_length(input_data) + octet_length(output_data)), 0)::bigint AS bytes
+      FROM testcases WHERE problem_id IN (SELECT id FROM page) GROUP BY problem_id
+    ),
+    subs AS (
+      SELECT problem_id, COUNT(*)::int AS n
+      FROM (SELECT problem_id FROM submissions WHERE problem_id IN (SELECT id FROM page)
+            UNION ALL
+            SELECT problem_id FROM contest_submissions WHERE problem_id IN (SELECT id FROM page)) s
+      GROUP BY problem_id
+    )
+    SELECT page.*, COALESCE(tc.n, 0) AS testcase_count, COALESCE(tc.bytes, 0)::float8 AS testcase_bytes,
+           COALESCE(subs.n, 0) AS submission_count, COALESCE(subs.n, 0) > 0 AS type_locked
+    FROM page
+    LEFT JOIN tc ON tc.problem_id = page.id
+    LEFT JOIN subs ON subs.problem_id = page.id`;
+
+export interface AdminProblemFacts {
+  testcase_count: number;
+  testcase_bytes: number;
+  submission_count: number;
+  type_locked: boolean;
+}
+
+/** B6 facts for the problem editor header and testcases tab. */
+export const getAdminProblemFacts = async (id: string): Promise<AdminProblemFacts | null> => {
+  const result = await db.query<AdminProblemFacts>(
+    `WITH page AS (SELECT id FROM problems WHERE id = $1)
+     ${ADMIN_PROBLEM_FACTS_SQL}`,
+    [id],
+  );
+  const row = result.rows[0];
+  return row ? { testcase_count: row.testcase_count, testcase_bytes: Number(row.testcase_bytes), submission_count: row.submission_count, type_locked: row.type_locked } : null;
+};
+
 export const getAdminProblemsPage = async (
   options: AdminProblemListOptions = {},
 ): Promise<AdminProblemsPage> => {
@@ -768,14 +809,19 @@ export const getAdminProblemsPage = async (
   const fetchLimitParam = params.length;
 
   const query = `
-    SELECT p.id, p.title, p.author, p.categories, p.difficulty, p.collection_id,
-           col.name AS collection_name, p.is_visible, p.contest_id, c.status AS contest_status
-    FROM problems p
-    LEFT JOIN contests c ON p.contest_id = c.id
-    LEFT JOIN collections col ON p.collection_id = col.id
-    ${filters.length ? `WHERE ${filters.join(' AND ')}` : ''}
-    ORDER BY p.id ASC
-    LIMIT $${fetchLimitParam}
+    WITH page AS (
+      SELECT p.id, p.title, p.author, p.categories, p.difficulty, p.collection_id,
+             col.name AS collection_name, p.is_visible, p.contest_id, c.status AS contest_status,
+             p.problem_type, p.time_limit_ms, p.memory_limit_mb
+      FROM problems p
+      LEFT JOIN contests c ON p.contest_id = c.id
+      LEFT JOIN collections col ON p.collection_id = col.id
+      ${filters.length ? `WHERE ${filters.join(' AND ')}` : ''}
+      ORDER BY p.id ASC
+      LIMIT $${fetchLimitParam}
+    )
+    ${ADMIN_PROBLEM_FACTS_SQL}
+    ORDER BY page.id ASC
   `;
   const result = await db.query<AdminProblemRow>(query, params);
   const hasMore = result.rows.length > limit;
