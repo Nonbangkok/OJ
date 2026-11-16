@@ -1,8 +1,13 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import api from '../../../services/api';
 import JobHistory from '../../../features/admin/authoring/JobHistory';
 
 jest.mock('../../../services/api');
+
+// DataTable rows use the router.
+const render = (ui: ReactElement) => rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
 
 const baseJob = {
   id: 'j1',
@@ -33,16 +38,16 @@ test('renders sync_pdf jobs with the profile sync label and explainer', async ()
   expect(screen.getByText('Verify All')).toBeInTheDocument();
 });
 
-test('a failed sync job surfaces its error through the inspect dialog', async () => {
+test('a failed sync job surfaces its error in the job drawer', async () => {
   const jobs = [{ ...baseJob, id: 'sync1', jobType: 'sync_pdf', status: 'failed',
     errorCode: 'sync_republish_failed',
     errorMessage: 'The published problem changed outside authoring; the PDF was not republished' }];
   jest.mocked(api.get).mockResolvedValue({ data: jobs[0] });
   render(<JobHistory jobs={jobs} onError={jest.fn()} />);
 
-  fireEvent.click(screen.getByRole('button', { name: /Inspect Profile sync PDF/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Profile sync PDF' }));
 
-  const dialog = await screen.findByRole('dialog');
+  const dialog = await screen.findByRole('dialog', { name: 'Profile sync PDF · rev 4' });
   expect(dialog).toHaveTextContent('Profile sync — the author snapshot was refreshed');
   expect(screen.getByRole('alert')).toHaveTextContent('sync_republish_failed');
   expect(dialog).toHaveTextContent('failed');

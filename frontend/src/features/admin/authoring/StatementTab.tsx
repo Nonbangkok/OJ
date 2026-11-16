@@ -1,24 +1,48 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '../../../components/ui';
+import { FilePdf } from '@phosphor-icons/react';
+import { ActionMenu, Button, ConfirmDialog, FileDrop } from '../../../components/ui';
+import buttonStyles from '../../../components/ui/Button.module.css';
 import authoringService from '../../../services/admin/authoringService';
 import { Asset, Draft } from './types';
-import styles from './Authoring.module.css';
+import useStatementPreview from './useStatementPreview';
+import LivePreview from './LivePreview';
+import LargeScreenNotice, { useSmallScreen } from './LargeScreenNotice';
+import styles from './Statement.module.css';
 
-export function PdfPreview({ draft }: { draft: Draft }) {
-  const [open, setOpen] = useState(false);
-  const url = authoringService.draftPdfUrl(draft.id, draft.latestPdfRevision);
-  if (!draft.hasLatestPdf) return <p className={styles.pdfPanelEmpty}>No PDF yet. Build PDF from Verify &amp; Publish.</p>;
-  return <section className={styles.pdfPanel}>
-    <div className={styles.pdfPanelHead}>
-      <p className={styles.pdfPanelText}>{draft.latestPdfRevision !== draft.revision ? 'PDF is outdated — rebuild from Verify & Publish.' : 'PDF is up to date.'}</p>
-      <div className={styles.pdfPanelActions}>
-        <Button variant="secondary" size="compact" onClick={() => setOpen(p => !p)}>{open ? 'Hide PDF' : 'Preview PDF'}</Button>
-        <a className={styles.pdfOpenLink} href={url} target="_blank" rel="noreferrer">Open actual PDF ↗</a>
+const IMAGE_TYPES = ['.jpg', '.jpeg', '.png', '.webp'];
+const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+
+/** Decimal sizes, matching the rest of the redesign: "84 kB", "2.4 MB". */
+const formatSize = (bytes: number): string => {
+  if (bytes < 1000) return `${bytes} B`;
+  if (bytes < 1_000_000) return `${Math.round(bytes / 1000)} kB`;
+  return `${(bytes / 1_000_000).toFixed(1)} MB`;
+};
+
+/** One-line PDF state: revision, stale warning, Rebuild / Open (or Build PDF when none exists). */
+export function PdfRow({ draft, disabled, onBuild }: { draft: Draft; disabled: boolean; onBuild: () => void }) {
+  if (!draft.hasLatestPdf || draft.latestPdfRevision === null) {
+    return (
+      <div className={styles.pdfRow}>
+        <FilePdf size={18} aria-hidden="true" className={styles.pdfIcon} />
+        <span className={styles.grow}>No PDF yet</span>
+        <Button size="compact" variant="secondary" disabled={disabled} onClick={onBuild}>Build PDF</Button>
       </div>
+    );
+  }
+  const stale = draft.latestPdfRevision !== draft.revision;
+  return (
+    <div className={styles.pdfRow}>
+      <FilePdf size={18} aria-hidden="true" className={stale ? styles.pdfIconStale : styles.pdfIcon} />
+      <span className={styles.grow}>
+        <b>PDF</b> <span className={styles.mono}>{`PDF rev ${draft.latestPdfRevision}`}</span>
+        {stale && <span className={styles.stale}> · <span>{`older than the draft (rev ${draft.revision})`}</span></span>}
+      </span>
+      <Button size="compact" variant="secondary" disabled={disabled} onClick={onBuild}>Rebuild</Button>
+      <a className={styles.link} href={authoringService.draftPdfUrl(draft.id, draft.latestPdfRevision)} target="_blank" rel="noreferrer">Open</a>
     </div>
-    {open && <iframe className={styles.frame} title="Actual problem PDF" src={url} />}
-  </section>;
+  );
 }
 
 export function StatementAssets({ draft, disabled, mutate, onError }: {
@@ -26,46 +50,102 @@ export function StatementAssets({ draft, disabled, mutate, onError }: {
   mutate: (action: () => Promise<unknown>) => Promise<void>; onError: (error: unknown) => void;
 }) {
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [file, setFile] = useState<File | null>(null);
+  const [deleting, setDeleting] = useState<Asset | null>(null);
   useEffect(() => {
     let cancelled = false;
-    authoringService.listAssets(draft.id).then(list => { if (!cancelled) setAssets(list); }).catch(onError);
+    authoringService.listAssets(draft.id).then((list) => { if (!cancelled) setAssets(list); }).catch(onError);
     return () => { cancelled = true; };
   }, [draft.id, draft.revision, onError]);
-  return <section className={styles.assetsPanel}>
-    <h3>Statement assets</h3>
-    <p>JPEG, PNG or WebP; 10 MiB per normalized image / 100 MiB per draft. Save text before changing assets.</p>
-    <label>Asset image<input type="file" accept="image/png,image/jpeg,image/webp" disabled={disabled}
-      onChange={e => setFile(e.target.files?.[0] || null)} /></label>
-    <button type="button" disabled={disabled || !file} onClick={() => {
-      const selectedFile = file;
-      if (!selectedFile) return;
+
+  const upload = (files: File[]) => {
+    for (const file of files) {
       void mutate(async () => {
-        const data = new FormData(); data.append('expectedRevision', String(draft.revision)); data.append('asset', selectedFile);
-        await authoringService.uploadAsset(draft.id, data); setFile(null);
+        const data = new FormData();
+        data.append('expectedRevision', String(draft.revision));
+        data.append('asset', file);
+        await authoringService.uploadAsset(draft.id, data);
       });
-    }}>Upload asset</button>
-    <ul>{assets.map(asset => <li key={asset.id}><code>{`{{ASSET_BASE}}/${asset.filename}`}</code> ({asset.sizeBytes} bytes)
-      <button type="button" disabled={disabled} onClick={() => {
-        if (window.confirm(`Delete ${asset.filename}? Update any statement references afterward.`)) void mutate(() =>
-          authoringService.deleteAsset(draft.id, asset.id, draft.revision));
-      }}>Delete {asset.filename}</button></li>)}</ul>
-  </section>;
+    }
+  };
+
+  return (
+    <section className={styles.section} aria-labelledby="statement-images-title">
+      <div className={styles.sectionHead}>
+        <h3 id="statement-images-title">Images</h3>
+        <span className={styles.muted}>JPEG, PNG or WebP · 10 MB each · 100 MB per draft</span>
+      </div>
+      <FileDrop label="Drop images here" hint="Save your text first — uploading changes the draft." accept={IMAGE_TYPES} maxBytes={IMAGE_MAX_BYTES} multiple disabled={disabled} onFiles={upload} />
+      {assets.length > 0 && (
+        <table className={styles.table} aria-label="Statement images">
+          <thead><tr><th>File</th><th>Use in the statement</th><th className={styles.num}>Size</th><th><span className={styles.srOnly}>Actions</span></th></tr></thead>
+          <tbody>
+            {assets.map((asset) => {
+              const path = `{{ASSET_BASE}}/${asset.filename}`;
+              return (
+                <tr key={asset.id}>
+                  <td>{asset.filename}</td>
+                  <td className={styles.mono}>
+                    {path}{' '}
+                    <Button size="compact" variant="secondary" aria-label={`Copy the path of ${asset.filename}`} onClick={() => { void navigator.clipboard?.writeText(path); }}>Copy</Button>
+                  </td>
+                  <td className={`${styles.num} ${styles.mono}`}>{formatSize(asset.sizeBytes)}</td>
+                  <td className={styles.action}>
+                    <ActionMenu label={`Actions for ${asset.filename}`} items={[
+                      { key: 'delete', label: 'Delete', variant: 'danger', disabled, onClick: () => setDeleting(asset) },
+                    ]} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+      <ConfirmDialog
+        open={deleting !== null}
+        tier="destructive"
+        title={`Delete ${deleting?.filename ?? ''}?`}
+        body="The statement keeps any reference to it until you update the text."
+        confirmLabel="Delete image"
+        onConfirm={() => {
+          const target = deleting;
+          setDeleting(null);
+          if (target) void mutate(() => authoringService.deleteAsset(draft.id, target.id, draft.revision));
+        }}
+        onCancel={() => setDeleting(null)}
+      />
+    </section>
+  );
 }
 
+/** Statement tab (§7.9): the rendered statement read-only, Edit statement, the PDF row, images. */
 export default function StatementTab({ draft, disabled, onBuild, mutate, onError }: {
   draft: Draft; disabled: boolean; onBuild: () => void;
   mutate: (action: () => Promise<unknown>) => Promise<void>; onError: (error: unknown) => void;
 }) {
-  // The Build PDF action lives in Verify & Publish (checklist + button); this
-  // tab keeps only the statement source editing and its artifacts.
-  void onBuild;
-  return <section>
-    <h2>Statement</h2>
-    <div className={styles.actions}>
-      <Link className={styles.primaryLink} to={`/admin/authoring/${encodeURIComponent(draft.id)}/editor`}>Open full-screen editor</Link>
-    </div>
-    <PdfPreview draft={draft} />
-    <StatementAssets draft={draft} disabled={disabled} mutate={mutate} onError={onError} />
-  </section>;
+  const small = useSmallScreen();
+  const preview = useStatementPreview(draft.id, draft.statementHtml, draft.revision);
+  return (
+    <section className={styles.tab} aria-label="Statement">
+      <div className={styles.card}>
+        <div className={styles.cardHead}>
+          <b>Statement</b>
+          {!small && (
+            <Link className={['oj-button', buttonStyles.button, buttonStyles.secondary, buttonStyles.compact, styles.linkButton].join(' ')}
+              to={`/admin/authoring/${encodeURIComponent(draft.id)}/editor`}>Edit statement</Link>
+          )}
+        </div>
+        <div className={styles.cardBody}>
+          {preview.shell && preview.state !== 'error'
+            ? <LivePreview shell={preview.shell} statement={preview.html} zoomScale={1} />
+            : <p className={styles.muted} role={preview.state === 'error' ? 'alert' : 'status'}>
+              {preview.state === 'error' ? preview.error : 'Rendering the statement…'}
+            </p>}
+        </div>
+      </div>
+      <PdfRow draft={draft} disabled={disabled} onBuild={onBuild} />
+      {small
+        ? <LargeScreenNotice detail="Read the statement here; edit it and its images on a larger screen." />
+        : <StatementAssets draft={draft} disabled={disabled} mutate={mutate} onError={onError} />}
+    </section>
+  );
 }

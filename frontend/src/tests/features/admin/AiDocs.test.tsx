@@ -100,19 +100,12 @@ test('the drafts list links to AI Docs', async () => {
   expect(link).toHaveAttribute('href', '/admin/authoring/ai-docs');
 });
 
-test('AI Docs is the last entry of the draft workspace left nav', async () => {
+test('AI docs is the last link of the draft step bar, after History', async () => {
   show('/admin/authoring/d1');
-  const nav = await screen.findByRole('navigation', { name: 'Draft sections' }, { timeout: 3000 });
+  const nav = await screen.findByRole('navigation', { name: 'Draft steps' }, { timeout: 3000 });
   const links = Array.from(nav.querySelectorAll('a'));
   expect(links.map(a => a.textContent)).toEqual([
-    'Metadata',
-    'Statement',
-    'Solution',
-    'Generator',
-    'Testcases',
-    'Verify & Publish',
-    'History & Logs',
-    'AI Docs',
+    'Metadata', 'Statement', 'Solution', 'Generator', 'Testcases', 'Verify & publish', 'History', 'AI docs',
   ]);
   expect(links[links.length - 1]).toHaveAttribute('href', '/admin/authoring/d1/ai-docs');
 });

@@ -1,0 +1,114 @@
+/* Solution / Generator (§7.9): editor beside the last compile. */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.editorHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.panel {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 14px 12px;
+  font-size: 13px;
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.panelHead b {
+  font-weight: 500;
+}
+
+.facts {
+  margin: 0;
+}
+
+.facts > div {
+  display: flex;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.facts dt {
+  width: 80px;
+  color: var(--text-muted);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.mono {
+  font-family: var(--font-family-mono);
+}
+
+.note {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.error {
+  margin: 8px 0 0;
+  color: var(--verdict-wrong);
+}
+
+.log {
+  margin: 8px 0 0;
+  max-height: 160px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  font: 12px/1.6 var(--font-family-mono);
+  white-space: pre-wrap;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.seed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.seed input {
+  width: 120px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-primary);
+  font: 13px var(--font-family-mono);
+}

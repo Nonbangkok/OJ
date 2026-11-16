@@ -89,13 +89,13 @@ test('staff can open authoring like admins; plain users are rejected', async () 
   expect(api.get).not.toHaveBeenCalled();
 });
 
-test('the metadata category checkboxes toggle multiple categories and default to none', async () => {
+test('the metadata category chips toggle multiple categories and default to none', async () => {
   show('/admin/authoring/d1');
-  const graph = await screen.findByRole('checkbox', { name: 'Graph' });
-  const math = screen.getByRole('checkbox', { name: 'Math' });
-  // An uncategorized draft starts with every checkbox clear.
-  expect(graph).not.toBeChecked();
-  expect(math).not.toBeChecked();
+  const graph = await screen.findByRole('button', { name: 'Graph' });
+  const math = screen.getByRole('button', { name: 'Math' });
+  // An uncategorized draft starts with every chip off.
+  expect(graph).toHaveAttribute('aria-pressed', 'false');
+  expect(math).toHaveAttribute('aria-pressed', 'false');
   jest.mocked(api.patch).mockResolvedValue({ data: { ...draft, revision: 4 } });
   fireEvent.click(graph);
   fireEvent.click(math);
@@ -129,18 +129,20 @@ test('the metadata difficulty dropdown saves a rating and clears back to Unrated
 test('tabs preserve edits and disable job actions until explicit Save succeeds', async () => {
   show('/admin/authoring/d1');
   fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Edited title' } });
-  expect(screen.getByText(/saving/i)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('link', { name: 'Statement' }));
-  fireEvent.click(screen.getByRole('link', { name: 'Verify & Publish' }));
-  expect(screen.getByRole('button', { name: 'Build PDF' })).toBeDisabled();
-  fireEvent.click(screen.getByRole('link', { name: 'Solution' }));
-  expect(screen.getByRole('button', { name: 'Compile solution' })).toBeDisabled();
+  // A pending autosave reads "Unsaved" until the save starts (§7.9 save state).
+  expect(screen.getByText('Unsaved')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('link', { name: /^Statement,/ }));
+  fireEvent.click(screen.getByRole('link', { name: /^Verify & publish,/ }));
+  // Build PDF appears in the checklist and the PDF row; both wait for the save.
+  for (const button of screen.getAllByRole('button', { name: 'Build PDF' })) expect(button).toBeDisabled();
+  fireEvent.click(screen.getByRole('link', { name: /^Solution,/ }));
+  expect(screen.getByRole('button', { name: 'Compile' })).toBeDisabled();
   jest
     .mocked(api.patch)
     .mockResolvedValue({ data: { ...draft, title: 'Edited title', revision: 4, status: 'draft' } });
   // The Save now button is gone: autosave fires shortly after the edit.
   await waitFor(
-    () => expect(screen.getByRole('button', { name: 'Compile solution' })).toBeEnabled(),
+    () => expect(screen.getByRole('button', { name: 'Compile' })).toBeEnabled(),
     { timeout: 4000 }
   );
 });
@@ -160,8 +162,8 @@ test('a revision of a published task keeps its legacy Problem ID locked but leav
 });
 test('Statement tab opens the dedicated editor instead of embedding a narrow source textarea', async () => {
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Statement' }));
-  expect(screen.getByRole('link', { name: 'Open full-screen editor' })).toHaveAttribute(
+  fireEvent.click(await screen.findByRole('link', { name: /^Statement,/ }));
+  expect(screen.getByRole('link', { name: 'Edit statement' })).toHaveAttribute(
     'href',
     '/admin/authoring/d1/editor'
   );
@@ -170,11 +172,11 @@ test('Statement tab opens the dedicated editor instead of embedding a narrow sou
 test('opening the dedicated editor keeps unsaved workspace fields recoverable via session storage', async () => {
   show('/admin/authoring/d1');
   fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Unsaved title' } });
-  fireEvent.click(screen.getByRole('link', { name: 'Statement' }));
+  fireEvent.click(screen.getByRole('link', { name: /^Statement,/ }));
 
   // Auto-save captures unsaved edits; opening the editor no longer needs a blocking confirm.
   expect(window.sessionStorage.getItem('oj-authoring-draft:d1')).toContain('Unsaved title');
-  fireEvent.click(screen.getByRole('link', { name: 'Open full-screen editor' }));
+  fireEvent.click(screen.getByRole('link', { name: 'Edit statement' }));
   expect(screen.queryByLabelText('Statement source')).not.toBeInTheDocument();
 });
 test('unsaved statement source survives an editor route unmount such as browser Back and Forward', async () => {
@@ -320,13 +322,13 @@ test('Publish requires explicit confirmation and explains hidden visibility', as
     data: url.endsWith('/d1') ? { ...draft, hasLatestPdf: true, latestPdfRevision: 3 } : [],
   }));
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Publish problem' }));
+  fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
   expect(api.post).not.toHaveBeenCalled();
   expect(screen.getByText(/created as hidden/i)).toBeInTheDocument();
   jest.mocked(api.post).mockResolvedValue({ data: { status: 'published' } });
   fireEvent.click(screen.getByRole('button', { name: 'Confirm publish' }));
-  expect(await screen.findByText(/published — read-only/i)).toBeInTheDocument();
+  expect(await screen.findByText('Published · read-only')).toBeInTheDocument();
 });
 
 test('a changed linked profile syncs into the draft exactly once without disabling the form', async () => {
@@ -426,19 +428,19 @@ test('Generate inputs runs the generator with the seed the author entered', asyn
   ));
 });
 
-test('the Solution checklist item links to the Solution step', async () => {
+test('the Solution readiness row links to the Solution step', async () => {
   const noSolution = { ...draft, solutionCpp: '', verifiedRevision: null };
   jest.mocked(api.get).mockImplementation(async (url) => ({
     data: url.endsWith('/d1') ? noSolution : [],
   }));
   show('/admin/authoring/d1/verify');
-  const checklist = await screen.findByLabelText('Publish readiness');
-  fireEvent.click(within(checklist).getByRole('button', { name: 'add it' }));
-  expect(await screen.findByRole('heading', { name: 'Solution' })).toBeInTheDocument();
-  expect(screen.queryByRole('heading', { name: 'Testcases' })).not.toBeInTheDocument();
+  const checklist = await screen.findByRole('list', { name: 'Publish readiness' });
+  fireEvent.click(within(checklist).getByRole('button', { name: 'Open solution' }));
+  expect(await screen.findByRole('region', { name: 'Solution' })).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'Testcases' })).not.toBeInTheDocument();
 });
 
-test('the Testcases checklist item shows real pairing counts, not the draft status', async () => {
+test('the Testcases readiness row shows real pairing counts, not the draft status', async () => {
   // Status reset to 'draft' (as a fresh verify start does) while the
   // testcases themselves are complete — the checklist must still tick.
   const reset = { ...draft, status: 'draft', verifiedRevision: null };
@@ -446,32 +448,32 @@ test('the Testcases checklist item shows real pairing counts, not the draft stat
     data: url.endsWith('/d1') ? reset : [],
   }));
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
-  const checklist = screen.getByLabelText('Publish readiness');
+  fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
+  const checklist = screen.getByRole('list', { name: 'Publish readiness' });
   expect(within(checklist).getByText('Testcases')).toBeInTheDocument();
-  expect(within(checklist).getByText(/2 cases, all paired/)).toBeInTheDocument();
+  expect(within(checklist).getByText(/2 cases, all with outputs/)).toBeInTheDocument();
   expect(within(checklist).queryByText('not generated')).not.toBeInTheDocument();
 });
 
-test('the Testcases checklist item names the missing pairs', async () => {
+test('the Testcases readiness row names the missing pairs', async () => {
   const partial = { ...draft, testcaseStats: { total: 5, withOutput: 3 } };
   jest.mocked(api.get).mockImplementation(async (url) => ({
     data: url.endsWith('/d1') ? partial : [],
   }));
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
-  expect(screen.getByText(/2 of 5 cases missing expected outputs/)).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
+  expect(screen.getByText(/2 of 5 cases missing outputs/)).toBeInTheDocument();
   expect(screen.queryByText('not generated')).not.toBeInTheDocument();
 });
 
-test('the Testcases checklist item reports an empty testcase set', async () => {
+test('the Testcases readiness row reports an empty testcase set', async () => {
   const empty = { ...draft, testcaseStats: { total: 0, withOutput: 0 } };
   jest.mocked(api.get).mockImplementation(async (url) => ({
     data: url.endsWith('/d1') ? empty : [],
   }));
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
-  expect(screen.getByText(/no testcases yet/)).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
+  expect(screen.getByText('No testcases yet.')).toBeInTheDocument();
 });
 
 test('a failed verification shows a plain-language explanation with the failing case', async () => {
@@ -486,12 +488,13 @@ test('a failed verification shows a plain-language explanation with the failing 
       : [],
   }));
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
+  fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
   expect(screen.getByText(/Solution output does not match the expected output/i)).toBeInTheDocument();
-  expect(screen.getByText(/#4/)).toBeInTheDocument();
-  expect(screen.getByText(/cannot be published until verification passes/i)).toBeInTheDocument();
-  // The failure banner carries the danger tone.
-  expect(screen.getByRole('alert').className).toMatch(/verifyOutcomeFailed/);
+  const alert = screen.getByRole('alert');
+  expect(alert).toHaveTextContent('Failing testcase: #4');
+  expect(alert).toHaveTextContent(/cannot be published until verification passes/i);
+  // The failure notice carries the danger tone.
+  expect(within(alert).getByText(/does not match/i).closest('[data-tone]')).toHaveAttribute('data-tone', 'danger');
 });
 
 test('a timed-out verification uses the warning tone', async () => {
@@ -505,8 +508,8 @@ test('a timed-out verification uses the warning tone', async () => {
       : [],
   }));
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
-  expect(screen.getByRole('alert').className).toMatch(/verifyOutcomeTimedOut/);
+  fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
+  expect(screen.getByRole('alert').firstElementChild).toHaveAttribute('data-tone', 'warning');
 });
 
 test('a succeeded verification shows the passing summary', async () => {
@@ -521,9 +524,8 @@ test('a succeeded verification shows the passing summary', async () => {
       : [],
   }));
   show('/admin/authoring/d1');
-  fireEvent.click(await screen.findByRole('link', { name: 'Verify & Publish' }));
-  expect(screen.getByText(/All checks passed at revision 3/i)).toBeInTheDocument();
-  expect(screen.getByText(/7 testcases executed/i)).toBeInTheDocument();
-  // The success banner carries the green tone.
-  expect(screen.getByText(/All checks passed at revision 3/i).closest('div').className).toMatch(/verifyOutcomePassed/);
+  fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
+  const verified = within(screen.getByRole('list', { name: 'Publish readiness' })).getByText('Verified at rev 3').closest('li') as HTMLElement;
+  expect(verified).toHaveTextContent('All checks passed · 7 testcases ran against the solution.');
+  expect(verified).toHaveAttribute('data-state', 'done');
 });
