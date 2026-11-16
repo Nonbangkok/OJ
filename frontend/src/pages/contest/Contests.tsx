@@ -5,20 +5,8 @@ import { useContests } from '../../hooks/useContests';
 import LoadingPage from '../../components/shared/LoadingPage';
 import { Button, Countdown, EmptyState, InlineError, PageHeader, StatusBadge } from '../../components/ui';
 import type { Contest } from '../../types';
+import { formatWindow, plural } from '../../features/contest/format';
 import styles from './Contests.module.css';
-
-const DAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
-const TIME = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
-
-/** "Nov 16 13:00 – 16:00", or both dates when the window crosses midnight. */
-export const formatWindow = (start: string, end: string): string => {
-  const s = new Date(start);
-  const e = new Date(end);
-  const sameDay = s.toDateString() === e.toDateString();
-  return `${DAY.format(s)} ${TIME.format(s)} – ${sameDay ? '' : `${DAY.format(e)} `}${TIME.format(e)}`;
-};
-
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 type Group = { key: 'live' | 'upcoming' | 'past'; title: string; contests: Contest[] };
 
@@ -42,7 +30,7 @@ const Contests = () => {
   if (loading) return <LoadingPage />;
 
   const groups = groupContests(contests as Contest[]);
-  const count = (key: Group['key']) => groups.find((g) => g.key === key)!.contests.length;
+  const count = (key: Group['key']) => groups.find((g) => g.key === key)?.contests.length ?? 0;
 
   const join = async (contest: Contest) => {
     const result = await joinContest(contest.id);

@@ -6,6 +6,7 @@ import { subscribeSubmissions } from '../../services/realtimeService';
 import { MOBILE_QUERY, useMediaQuery } from '../../hooks/useMediaQuery';
 import type { Contest, ProblemSummary } from '../../types';
 import { useContest } from '../../features/contest/ContestContext';
+import { problemLetter } from '../../features/contest/letters';
 import { useCountdown } from './useCountdown';
 import AccountMenu from './AccountMenu';
 import styles from './ContestShell.module.css';
@@ -15,16 +16,7 @@ const IN_PROGRESS = new Set(['Pending', 'Compiling', 'Running']);
 
 export { useContestShellReload } from '../../features/contest/ContestContext';
 
-/** 0 → A … 25 → Z, 26 → AA. */
-export function problemLetter(index: number): string {
-  let n = index;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (n % 26)) + out;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return out;
-}
+export { problemLetter } from '../../features/contest/letters';
 
 function ContestClock({ contest, compact = false }: { contest: Contest; compact?: boolean }) {
   const target = contest.status === 'running' ? contest.end_time : contest.status === 'scheduled' ? contest.start_time : null;
