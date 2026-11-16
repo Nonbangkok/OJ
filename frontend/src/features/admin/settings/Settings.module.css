@@ -1,165 +1,29 @@
-/* Settings page — section-based layout (typography + dividers, no nested
-   cards). Spacing scale: 2rem page title → first section, 2.5rem between
-   sections, 0.25–0.5rem title → description. */
-
+/* Settings (§7.8): Access / Data / Danger zone rows. */
 .page {
-  text-align: left;
-  color: var(--text-primary);
-}
-
-.page > * {
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-.pageTitle {
-  font-size: var(--font-size-page-title);
-  margin: 0 0 2rem;
-}
-
-/* --- Sections ------------------------------------------------------------- */
-
-.section + .section {
-  border-top: 1px solid var(--border-color);
-  padding-top: 2.5rem;
-  margin-top: 2.5rem;
-}
-
-.sectionTitle {
-  font-size: var(--font-size-section-title);
-  font-weight: 600;
-  margin: 0 0 0.25rem;
-}
-
-.sectionDescription {
-  color: var(--text-muted);
-  font-size: var(--font-size-metadata);
-  margin: 0 0 1.5rem;
-}
-
-.groupTitle {
-  font-weight: 500;
-  color: var(--text-secondary);
-  padding: 0;
-  margin: 0 0 0.75rem;
-}
-
-/* --- Status messages ------------------------------------------------------ */
-
-.statusMessage {
-  border-radius: var(--radius-md);
-  padding: 0.625rem 0.875rem;
-  font-size: var(--font-size-metadata);
-  margin: 0 0 1rem;
-}
-
-.statusError {
-  color: var(--error-text);
-  background-color: var(--background-error);
-}
-
-.statusSuccess {
-  color: var(--text-success);
-  background-color: var(--background-success);
-}
-
-/* --- Site Access ---------------------------------------------------------- */
-
-.accessGroup {
-  border: none;
-  margin: 0;
-  padding: 0;
-}
-
-.accessOptions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.accessOption {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 0.625rem;
-  align-items: start;
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    background-color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.accessOption:hover {
-  border-color: var(--accent-primary);
-}
-
-.accessOption input[type='radio'] {
-  grid-row: 1;
-  margin: 0.2rem 0 0;
-  accent-color: var(--accent-primary);
-  cursor: pointer;
-}
-
-.accessOptionSelected {
-  border-color: var(--accent-primary);
-  background-color: color-mix(in srgb, var(--accent-primary) 6%, transparent);
-  box-shadow: 0 0 0 1px var(--accent-primary);
-}
-
-.optionTitle {
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.optionDescription {
-  grid-column: 2;
-  color: var(--text-muted);
-  font-size: var(--font-size-metadata);
-  line-height: 1.5;
-  margin-top: 0.25rem;
-}
-
-.currentMode {
-  color: var(--text-muted);
-  font-size: var(--font-size-metadata);
-  margin: 0.75rem 0 0;
-}
-
-/* --- Setting rows (Registration, Database export) -------------------------- */
-
-.settingRow {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1.5rem;
-  padding: 0.25rem 0;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 52rem;
 }
 
-.settingText {
-  flex: 1;
-  min-width: 0;
-}
-
-.settingTitle {
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.settingDescription {
+.group {
+  margin: 18px 0 2px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--text-muted);
-  font-size: var(--font-size-metadata);
-  line-height: 1.5;
-  margin: 0.25rem 0 0;
 }
 
-/* --- Toggle switch -------------------------------------------------------- */
+.saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--verdict-accepted);
+}
 
+/* Switch: a visually hidden checkbox driving a track and knob. */
 .toggleSwitch {
   position: relative;
   display: inline-block;
@@ -211,110 +75,49 @@
   transform: translateX(22px);
 }
 
-/* --- Danger zone (database import) ---------------------------------------- */
-
-.dangerZone {
-  margin-top: 1.75rem;
-  padding: 1.25rem 1.5rem;
-  border: 1px solid color-mix(in srgb, var(--status-danger) 35%, transparent);
+.danger {
+  margin-top: 14px;
+  padding: 2px 16px 6px;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  background-color: var(--danger-tint-bg);
 }
 
-.dangerZoneTitle {
-  font-size: var(--font-size-metadata);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--status-danger);
-  margin: 0 0 0.75rem;
+.danger .group {
+  color: var(--verdict-wrong);
 }
 
-.dangerZone .settingTitle {
-  margin-bottom: 0.25rem;
+.dangerButton {
+  color: var(--verdict-wrong);
 }
 
-.dangerActions {
-  margin-top: 1rem;
-}
-
-.fileInput {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  margin-top: 1rem;
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background-color: var(--input-bg);
-  color: var(--text-primary);
-}
-
-.fileInput::file-selector-button {
-  background-color: var(--background-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  padding: 0.5rem 0.8rem;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  margin-right: 0.8rem;
-  font: inherit;
-}
-
-.fileInput::file-selector-button:hover {
-  background-color: var(--background-secondary);
-}
-
-.selectedFile {
+.help {
+  margin: 0 0 12px;
+  font-size: 13px;
   color: var(--text-secondary);
-  font-size: var(--font-size-metadata);
-  margin: 0.5rem 0 0;
-  overflow-wrap: anywhere;
 }
 
-/* --- Import confirmation modal --------------------------------------------- */
-
-.modalFileLabel {
-  margin: 0;
+.phrase {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--text-secondary);
-  overflow-wrap: anywhere;
 }
 
-.confirmPhraseInput {
-  width: 100%;
-  box-sizing: border-box;
-  margin-top: 0.75rem;
-  padding: 0.625rem;
+.input {
+  padding: 8px 10px;
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background-color: var(--input-bg);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
   color: var(--text-primary);
   font: inherit;
 }
 
-.confirmPhraseInput:focus-visible {
-  outline: 3px solid var(--action-focus-ring);
-  outline-offset: 2px;
-}
-
-/* --- Responsive ------------------------------------------------------------ */
-
-@media (max-width: 768px) {
-  .accessOptions {
-    grid-template-columns: 1fr;
-  }
-
-  .settingRow {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-
-  .settingRow > .toggleSwitch {
-    align-self: flex-start;
-  }
-
-  .dangerActions > * {
-    width: 100%;
-  }
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
 }

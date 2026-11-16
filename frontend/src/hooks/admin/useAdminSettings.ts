@@ -138,8 +138,10 @@ const useAdminSettings = () => {
         }
     };
 
-    const handleFileChange = (event) => {
-        const selectedFile = event.target.files[0] || null;
+    const handleFileChange = (event) => selectDatabaseFile(event.target.files[0] || null);
+
+    /** FileDrop hands over a File directly. */
+    const selectDatabaseFile = (selectedFile) => {
         setDatabaseFile(selectedFile);
         setDatabaseError('');
 
@@ -235,6 +237,7 @@ const useAdminSettings = () => {
         handleSiteAccessModeChange,
         handleExportDatabase,
         handleFileChange,
+        selectDatabaseFile,
         handleImportDatabase
     };
 };
