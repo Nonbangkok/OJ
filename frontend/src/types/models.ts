@@ -78,6 +78,11 @@ export interface ProblemDetail extends ProblemBase {
   problem_type?: 'standard' | 'header';
   submission_filename?: string | null;
   has_starter_files?: boolean;
+  /** The problem's collection (problem page breadcrumb); null when none. */
+  collection?: { id: number; name: string } | null;
+  /** The viewer's best submission on this problem; null for guests or none. */
+  viewerBest?: { score: number; caseStatuses: string[] } | null;
+  viewerSubmissionCount?: number;
 }
 
 export interface Contest extends Record<string, unknown> {
@@ -106,6 +111,10 @@ export interface SubmissionSummary {
   score: number;
   language: string;
   submitted_at: string;
+  /** Per-case statuses for the testcase strip; empty for a compile log or pending. */
+  case_statuses?: string[];
+  max_time_ms?: number | null;
+  max_memory_kb?: number | null;
 }
 
 export interface SubmissionDetail extends SubmissionSummary {
@@ -114,6 +123,77 @@ export interface SubmissionDetail extends SubmissionSummary {
   max_memory_kb: number | null;
   results: TestCaseResult[] | string | null;
   problem_name?: string;
+  /** The problem's limits, for the time/memory bars. */
+  time_limit_ms?: number;
+  memory_limit_mb?: number;
+}
+
+/** Per-status problem counts (GET /problem-status-counts); buckets partition `all`. */
+export interface ProblemStatusCounts {
+  all: number;
+  unsolved: number;
+  attempted: number;
+  solved: number;
+}
+
+/** A problem the Home page links to, with the XP a first solve would award. */
+export interface HomeProblemRef {
+  id: string;
+  title: string;
+  difficulty: number | null;
+  xp: number;
+}
+
+export interface HomeContinue extends HomeProblemRef {
+  bestScore: number;
+  attempts: number;
+  lastTriedAt: string;
+  latestStatus: string;
+  caseStatuses: string[];
+}
+
+export interface CollectionProgress {
+  id: number;
+  name: string;
+  solved: number;
+  total: number;
+  next: HomeProblemRef | null;
+}
+
+/** GET /me/home */
+export interface HomeSummary {
+  progression: UserProgression;
+  currentStreak: number;
+  solvedToday: boolean;
+  /** 7 days, oldest first; the last entry is today. */
+  week: { day: string; solved: number }[];
+  continue: HomeContinue | null;
+  startWith: HomeProblemRef[];
+  collections: CollectionProgress[];
+  levelUp: { remaining: number; problem: HomeProblemRef } | null;
+}
+
+export type RankingWindow = 'all' | 'week';
+
+/** One ranked user (GET /scoreboard). Level and tier come from all-time XP. */
+export interface RankingRow {
+  rank: number;
+  username: string;
+  hasAvatar: boolean;
+  xp: number;
+  solved: number;
+  level: number;
+  tier: string;
+}
+
+/** GET /scoreboard?window=&page= */
+export interface GlobalRanking {
+  rows: RankingRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  window: RankingWindow;
+  viewer: RankingRow | null;
 }
 
 export interface GlobalScoreboardEntry {
@@ -255,7 +335,7 @@ export interface UserProgression {
     remaining: number;
     percentage: number;
   };
-  /** Dense global rank by total XP; null when the user has no rewards. */
+  /** Competition global rank by total XP (same as Ranking); null when the user has no rewards. */
   globalRank: number | null;
 }
 

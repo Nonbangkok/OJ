@@ -14,6 +14,14 @@ describe('Problem Service', () => {
         jest.clearAllMocks();
     });
 
+    it('getStatusCounts sends the list filters and returns the buckets', async () => {
+        const counts = { all: 142, unsolved: 97, attempted: 7, solved: 38 };
+        jest.mocked(api.get).mockResolvedValueOnce({ data: counts });
+
+        await expect(problemService.getStatusCounts({ search: 'dp', collection: 3 })).resolves.toEqual(counts);
+        expect(api.get).toHaveBeenCalledWith('/problem-status-counts', { params: { search: 'dp', collection: 3 } });
+    });
+
     it('getAllWithStats fetches problems with stats', async () => {
         const mockData = [{ id: 'P1', title: 'A problem', author: null, time_limit_ms: 1000, memory_limit_mb: 256, best_score: 100 }];
         jest.mocked(api.get).mockResolvedValueOnce({ data: { problems: mockData, nextCursor: null, hasMore: false } });
