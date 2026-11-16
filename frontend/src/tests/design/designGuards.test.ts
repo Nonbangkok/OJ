@@ -338,7 +338,7 @@ describe('page headers', () => {
   const PAGES = [
     'pages/problem/Problems.tsx', 'features/submission/SubmissionsView.tsx', 'pages/scoreboard/Scoreboard.tsx',
     'pages/contest/Contests.tsx', 'pages/contest/ContestProblems.tsx', 'pages/contest/ContestScoreboard.tsx',
-    'pages/admin/Admin.tsx', 'features/admin/users/UserManagement.tsx', 'features/admin/problems/ProblemManagement.tsx',
+    'features/admin/users/UserManagement.tsx', 'features/admin/problems/ProblemManagement.tsx',
     'features/admin/contests/ContestManagement.tsx', 'features/admin/analysis/AnalysisPage.tsx',
     'features/admin/settings/Settings.tsx', 'features/admin/authoring/ProblemAuthoring.tsx', 'features/admin/authoring/AiDocs.tsx',
     'pages/submission/SubmissionDetailPage.tsx', 'pages/problem/ProblemDetail.tsx',
@@ -357,7 +357,6 @@ describe('page headers', () => {
     ['pages/user/UserProfile.module.css', '.profile-container'],
     ['pages/problem/Problems.module.css', '.problems-page-container'],
     ['pages/contest/Contests.module.css', '.container'],
-    ['pages/admin/Admin.module.css', '.admin-container'],
   ];
   it.each(PAGE_CONTAINERS)('%s %s leaves the page width to the shell', (file, selector) => {
     const css = readSource(file).replace(/\/\*[\s\S]*?\*\//g, '');

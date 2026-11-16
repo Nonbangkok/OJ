@@ -1,236 +1,128 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Check, DownloadSimple } from '@phosphor-icons/react';
+import {
+  Button, ConfirmDialog, Dialog, FileDrop, InlineError, InlineNotice, PageHeader, SegmentedControl, SettingsRow,
+} from '../../../components/ui';
 import useAdminSettings from '../../../hooks/admin/useAdminSettings';
-import { Button, PageHeader } from '../../../components/ui';
-import ConfirmationModal from '../shared/ConfirmationModal';
+import contestService from '../../../services/contestService';
 import styles from './Settings.module.css';
 
+const IMPORT_PHRASE = 'IMPORT';
+
+/** Settings (§7.8): two flat lists of rows — Access and Data — with a Danger zone. */
 const Settings = () => {
-  const {
-    isRegistrationEnabled,
-    isLoadingRegistration,
-    registrationError,
-    registrationSuccess,
-    isPasswordChangeEnabled,
-    passwordChangeError,
-    passwordChangeSuccess,
-    handlePasswordChangeToggle,
-    siteAccessMode,
-    isSavingAccessMode,
-    accessModeError,
-    accessModeSuccess,
-    handleSiteAccessModeChange,
-    databaseFile,
-    isExporting,
-    isImporting,
-    databaseError,
-    databaseSuccess,
-    handleRegistrationToggle,
-    handleExportDatabase,
-    handleFileChange,
-    handleImportDatabase
-  } = useAdminSettings();
+  const s = useAdminSettings();
+  const [runningContest, setRunningContest] = useState<string | null>(null);
+  const [confirmPrivate, setConfirmPrivate] = useState(false);
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [phrase, setPhrase] = useState('');
 
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    contestService.getAll()
+      .then((contests) => { if (!cancelled) setRunningContest(contests.find((c) => c.status === 'running')?.title ?? null); })
+      .catch(() => { /* the warning is a courtesy */ });
+    return () => { cancelled = true; };
+  }, []);
 
-  if (isLoadingRegistration) return <div>Loading settings...</div>;
+  const saved = Boolean(s.registrationSuccess || s.passwordChangeSuccess || s.accessModeSuccess);
+  const error = s.registrationError || s.passwordChangeError || s.accessModeError;
 
-  const handleConfirmImport = async () => {
-    await handleImportDatabase();
-    setIsImportModalOpen(false);
-  };
+  const switchControl = (label: string, checked: boolean, onToggle: () => void) => (
+    <label className={styles.toggleSwitch}>
+      <input type="checkbox" role="switch" aria-label={label} checked={checked} onChange={onToggle} />
+      <span className={styles.toggleTrack} aria-hidden="true" />
+    </label>
+  );
+
+  const closeReplace = () => { setReplaceOpen(false); setPhrase(''); };
 
   return (
     <div className={styles.page}>
-      <PageHeader breadcrumb={[{ label: 'Manage' }]} title="Settings" />
+      <PageHeader
+        breadcrumb={[{ label: 'Manage' }]}
+        title="Settings"
+        actions={saved ? <span role="status" className={styles.saved}><Check size={14} weight="bold" aria-hidden="true" />Saved</span> : null}
+      />
+      {error && <InlineError message={error} />}
 
-      {/* Site Access */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Site Access</h2>
-        <p className={styles.sectionDescription}>Control who can access this Grader.</p>
-
-        {accessModeError && <p className={`${styles.statusMessage} ${styles.statusError}`}>{accessModeError}</p>}
-        {accessModeSuccess && <p className={`${styles.statusMessage} ${styles.statusSuccess}`}>{accessModeSuccess}</p>}
-
-        <fieldset className={styles.accessGroup} disabled={isSavingAccessMode}>
-          <legend className={styles.groupTitle}>Website visibility</legend>
-
-          <div className={styles.accessOptions}>
-            <label
-              className={`${styles.accessOption}${siteAccessMode === 'public' ? ` ${styles.accessOptionSelected}` : ''}`}
-              htmlFor="site-access-mode-public"
-            >
-              <input
-                type="radio"
-                id="site-access-mode-public"
-                name="site-access-mode"
-                value="public"
-                checked={siteAccessMode === 'public'}
-                onChange={() => handleSiteAccessModeChange('public')}
-              />
-              <span className={styles.optionTitle}>Public</span>
-              <span className={styles.optionDescription}>
-                Anyone can browse public OJ content without signing in. Submitting and personal actions still require
-                authentication.
-              </span>
-            </label>
-
-            <label
-              className={`${styles.accessOption}${siteAccessMode === 'private' ? ` ${styles.accessOptionSelected}` : ''}`}
-              htmlFor="site-access-mode-private"
-            >
-              <input
-                type="radio"
-                id="site-access-mode-private"
-                name="site-access-mode"
-                value="private"
-                checked={siteAccessMode === 'private'}
-                onChange={() => handleSiteAccessModeChange('private')}
-              />
-              <span className={styles.optionTitle}>Private</span>
-              <span className={styles.optionDescription}>Users must sign in before accessing Grader content.</span>
-            </label>
-          </div>
-        </fieldset>
-
-        <p className={styles.currentMode}>Current mode: {siteAccessMode === 'private' ? 'Private' : 'Public'}</p>
-      </section>
-
-      {/* Registration */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Registration</h2>
-        <p className={styles.sectionDescription}>Control whether new accounts can be created.</p>
-
-        {registrationError && (
-          <p className={`${styles.statusMessage} ${styles.statusError}`}>{registrationError}</p>
-        )}
-        {registrationSuccess && (
-          <p className={`${styles.statusMessage} ${styles.statusSuccess}`}>{registrationSuccess}</p>
-        )}
-
-        <div className={styles.settingRow}>
-          <div className={styles.settingText}>
-            <label htmlFor="registration-toggle" className={styles.settingTitle}>
-              Allow user registration
-            </label>
-            <p className={styles.settingDescription}>Users can create their own accounts.</p>
-          </div>
-          <label className={styles.toggleSwitch} htmlFor="registration-toggle">
-            <input
-              type="checkbox"
-              id="registration-toggle"
-              aria-label="Allow user registration"
-              checked={isRegistrationEnabled}
-              onChange={handleRegistrationToggle}
+      <section aria-labelledby="settings-access">
+        <h2 id="settings-access" className={styles.group}>Access</h2>
+        <SettingsRow
+          label="Site visibility"
+          help="Private: only signed-in users see anything. Public: guests can browse problems and scoreboards."
+          control={(
+            <SegmentedControl
+              aria-label="Site visibility"
+              options={[{ value: 'public', label: 'Public' }, { value: 'private', label: 'Private' }] as const}
+              value={s.siteAccessMode === 'private' ? 'private' : 'public'}
+              onChange={(mode) => { if (mode === 'private') setConfirmPrivate(true); else void s.handleSiteAccessModeChange('public'); }}
             />
-            <span className={styles.toggleTrack} aria-hidden="true"></span>
-          </label>
-        </div>
+          )}
+        />
+        <SettingsRow label="Registration" help="Let people create their own accounts." control={switchControl('Registration', Boolean(s.isRegistrationEnabled), s.handleRegistrationToggle)} />
+        <SettingsRow label="Password changes" help="Let students and staff change their own password. Admins always can." control={switchControl('Password changes', Boolean(s.isPasswordChangeEnabled), s.handlePasswordChangeToggle)} />
       </section>
 
-      {/* Password Changes */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Password Changes</h2>
-        <p className={styles.sectionDescription}>Control who can change passwords.</p>
-
-        {passwordChangeError && (
-          <p className={`${styles.statusMessage} ${styles.statusError}`}>{passwordChangeError}</p>
-        )}
-        {passwordChangeSuccess && (
-          <p className={`${styles.statusMessage} ${styles.statusSuccess}`}>{passwordChangeSuccess}</p>
-        )}
-
-        <div className={styles.settingRow}>
-          <div className={styles.settingText}>
-            <label htmlFor="password-change-toggle" className={styles.settingTitle}>
-              Allow password changes
-            </label>
-            <p className={styles.settingDescription}>
-              Users can change their own password. When off, only administrators can reset passwords.
-            </p>
-          </div>
-          <label className={styles.toggleSwitch} htmlFor="password-change-toggle">
-            <input
-              type="checkbox"
-              id="password-change-toggle"
-              aria-label="Allow password changes"
-              checked={isPasswordChangeEnabled}
-              onChange={handlePasswordChangeToggle}
-            />
-            <span className={styles.toggleTrack} aria-hidden="true"></span>
-          </label>
-        </div>
+      <section aria-labelledby="settings-data">
+        <h2 id="settings-data" className={styles.group}>Data</h2>
+        <SettingsRow
+          label="Export database"
+          help="A full dump to keep or move to another server."
+          control={<Button variant="secondary" onClick={s.handleExportDatabase} loading={s.isExporting} loadingLabel="Exporting…"><DownloadSimple size={14} aria-hidden="true" />Export</Button>}
+        />
       </section>
 
-      {/* Database */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Database</h2>
-        <p className={styles.sectionDescription}>Back up or replace the Grader database.</p>
+      <section aria-labelledby="settings-danger" className={styles.danger}>
+        <h2 id="settings-danger" className={styles.group}>Danger zone</h2>
+        <SettingsRow
+          danger
+          label="Replace database"
+          help="Overwrites every user, problem and submission with an uploaded dump. The site is offline while it runs."
+          control={<Button variant="secondary" className={styles.dangerButton} onClick={() => setReplaceOpen(true)}>Replace database…</Button>}
+        />
+      </section>
 
-        {databaseError && <p className={`${styles.statusMessage} ${styles.statusError}`}>{databaseError}</p>}
-        {databaseSuccess && <p className={`${styles.statusMessage} ${styles.statusSuccess}`}>{databaseSuccess}</p>}
+      <ConfirmDialog
+        open={confirmPrivate}
+        tier="plain"
+        title="Make the site private?"
+        body={runningContest
+          ? `${runningContest} is running — guests following it lose access. Signed-out visitors will only see the login page.`
+          : 'Signed-out visitors will only see the login page.'}
+        confirmLabel="Make private"
+        onConfirm={() => { setConfirmPrivate(false); void s.handleSiteAccessModeChange('private'); }}
+        onCancel={() => setConfirmPrivate(false)}
+      />
 
-        <div className={styles.settingRow}>
-          <div className={styles.settingText}>
-            <div className={styles.settingTitle}>Export database</div>
-            <p className={styles.settingDescription}>Download a backup of the current database.</p>
-          </div>
+      <Dialog open={replaceOpen} title="Replace database" onClose={closeReplace}>
+        <p className={styles.help}>Every user, problem and submission is replaced by the uploaded dump. This cannot be undone.</p>
+        <FileDrop
+          label="Drop a database dump"
+          hint=".sql, .dump or .tar"
+          accept={['.sql', '.dump', '.tar']}
+          onFiles={(files) => s.selectDatabaseFile(files[0] ?? null)}
+        />
+        {s.databaseFile && <p className={styles.help}>Selected: <strong>{s.databaseFile.name}</strong></p>}
+        {s.databaseError && <InlineError message={s.databaseError} />}
+        {s.databaseSuccess && <InlineNotice tone="success" title={s.databaseSuccess} />}
+        <label className={styles.phrase}>
+          {`Type ${IMPORT_PHRASE} to confirm`}
+          <input type="text" className={styles.input} value={phrase} onChange={(e) => setPhrase(e.target.value)} autoComplete="off" />
+        </label>
+        <div className={styles.footer}>
+          <Button variant="secondary" onClick={closeReplace}>Cancel</Button>
           <Button
-            variant="secondary"
-            onClick={handleExportDatabase}
-            loading={isExporting}
-            loadingLabel="Exporting…"
+            variant="destructive"
+            disabled={!s.databaseFile || phrase !== IMPORT_PHRASE || s.isImporting}
+            loading={s.isImporting}
+            loadingLabel="Replacing…"
+            onClick={() => { void s.handleImportDatabase(); }}
           >
-            Export Database
+            Replace database
           </Button>
         </div>
-
-        <div className={styles.dangerZone}>
-          <h3 className={styles.dangerZoneTitle}>Danger Zone</h3>
-          <div className={styles.settingTitle}>Import Database</div>
-          <p className={styles.settingDescription}>
-            Importing a database drops all existing tables before the uploaded dump is restored, the site enters maintenance mode until it finishes, and everyone (including you) must log in again afterwards. This action cannot be undone.
-          </p>
-
-          <input
-            type="file"
-            onChange={handleFileChange}
-            accept=".sql,.dump,.tar"
-            className={styles.fileInput}
-            aria-label="Choose database file"
-          />
-          {databaseFile && (
-            <p className={styles.selectedFile}>
-              Selected file: <strong>{databaseFile.name}</strong>
-            </p>
-          )}
-
-          <div className={styles.dangerActions}>
-            <Button
-              variant="destructive"
-              onClick={() => setIsImportModalOpen(true)}
-              loading={isImporting}
-              loadingLabel="Importing…"
-              disabled={!databaseFile}
-            >
-              Import Database
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <ConfirmationModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        onConfirm={handleConfirmImport}
-        title="Import database?"
-        message="This will permanently replace all existing database data."
-        confirmText="Import Database"
-        confirmationPhrase="IMPORT"
-      >
-        <p className={styles.modalFileLabel}>
-          Selected file: <strong>{databaseFile?.name}</strong>
-        </p>
-      </ConfirmationModal>
+      </Dialog>
     </div>
   );
 };

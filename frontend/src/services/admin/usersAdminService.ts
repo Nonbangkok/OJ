@@ -22,6 +22,13 @@ export interface AdminUsersQuery {
   limit?: number;
   search?: string;
   role?: 'all' | 'user' | 'staff' | 'admin';
+  locked?: 'locked' | 'unlocked';
+}
+
+/** PUT /admin/users/role (B5): the protected admin and the actor come back as skipped. */
+export interface AdminBulkRoleResponse {
+  updated: number[];
+  skipped: Array<{ id: number; reason: 'protected' | 'self' | 'not_found' }>;
 }
 
 const usersAdminService = {
@@ -75,6 +82,11 @@ const usersAdminService = {
     data: AdminResetPasswordRequest,
   ): Promise<ApiMessageResponse> => {
     const response = await api.put<ApiMessageResponse>(`/admin/users/${userId}/password`, data);
+    return response.data;
+  },
+
+  setUsersRole: async (ids: number[], role: 'user' | 'staff' | 'admin'): Promise<AdminBulkRoleResponse> => {
+    const response = await api.put<AdminBulkRoleResponse>('/admin/users/role', { ids, role });
     return response.data;
   },
 

@@ -1,175 +1,91 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import Settings from '../../../features/admin/settings/Settings';
 import adminService from '../../../services/adminService';
+import contestService from '../../../services/contestService';
 import { SettingsContext } from '../../../context/SettingsContext';
-import React from 'react';
 
 jest.mock('../../../services/adminService');
+jest.mock('../../../services/contestService');
 
 const mockRefreshSettings = jest.fn();
-
-const renderSettings = () =>
-    render(
-        <SettingsContext.Provider
-            value={{
-                refreshSettings: mockRefreshSettings,
-                isLoading: false,
-                registrationEnabled: true,
-                accessMode: 'public',
-                passwordChangeEnabled: true,
-                isPrivateMode: false,
-            }}
-        >
-            <Settings />
-        </SettingsContext.Provider>
-    );
+const renderSettings = () => render(
+  <SettingsContext.Provider value={{
+    refreshSettings: mockRefreshSettings, isLoading: false, registrationEnabled: true, accessMode: 'public', passwordChangeEnabled: true, isPrivateMode: false,
+  }}>
+    <Settings />
+  </SettingsContext.Provider>,
+);
 
 describe('Settings page', () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
-        (jest.mocked(adminService.getRegistrationSettings) as jest.Mock).mockResolvedValue({ enabled: true });
-        (jest.mocked(adminService.getSiteAccessMode) as jest.Mock).mockResolvedValue({ accessMode: 'public' });
-        (jest.mocked(adminService.getPasswordChangeSettings) as jest.Mock).mockResolvedValue({ enabled: true });
-    });
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.mocked(adminService.getRegistrationSettings).mockResolvedValue({ enabled: true } as never);
+    jest.mocked(adminService.getSiteAccessMode).mockResolvedValue({ accessMode: 'public' });
+    jest.mocked(adminService.getPasswordChangeSettings).mockResolvedValue({ enabled: false } as never);
+    jest.mocked(adminService.updateRegistrationSettings).mockResolvedValue({} as never);
+    jest.mocked(adminService.updatePasswordChangeSettings).mockResolvedValue({} as never);
+    jest.mocked(adminService.updateSiteAccessMode).mockResolvedValue({} as never);
+    jest.mocked(contestService.getAll).mockResolvedValue([]);
+  });
+  afterEach(() => jest.useRealTimers());
 
-    describe('registration toggle', () => {
-        it('renders the toggle as on when registration is enabled', async () => {
-            renderSettings();
+  it('groups the rows into Access, Data and a Danger zone', async () => {
+    renderSettings();
+    expect(await screen.findByRole('heading', { name: 'Access' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Data' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Danger zone' })).toBeInTheDocument();
+    expect(screen.getByText('Site visibility')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Registration' })).toBeChecked();
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Password changes' })).not.toBeChecked());
+    expect(screen.getByRole('button', { name: /Export/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replace database…' })).toBeInTheDocument();
+  });
 
-            const toggle = await screen.findByRole('checkbox', { name: 'Allow user registration' });
-            expect(toggle).toBeChecked();
-        });
+  it('saving shows "Saved" and hides it after 3 s', async () => {
+    renderSettings();
+    const sw = await screen.findByRole('switch', { name: 'Registration' });
+    jest.useFakeTimers();
+    await act(async () => { fireEvent.click(sw); });
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByRole('status')).toHaveTextContent('Saved');
+    await act(async () => { jest.advanceTimersByTime(3100); });
+    expect(screen.queryByText('Saved')).toBeNull();
+  });
 
-        it('clicking the visible switch toggles registration (toggle control forwards clicks to the input)', async () => {
-            (jest.mocked(adminService.updateRegistrationSettings) as jest.Mock).mockResolvedValueOnce({
-                message: 'Registration setting updated successfully.',
-            });
+  it('a failed save keeps the old value and shows an inline error instead of Saved', async () => {
+    jest.mocked(adminService.updateRegistrationSettings).mockRejectedValue(new Error('down'));
+    renderSettings();
+    const sw = await screen.findByRole('switch', { name: 'Registration' });
+    fireEvent.click(sw);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Failed to update registration settings.');
+    expect(sw).toBeChecked();
+    expect(screen.queryByText('Saved')).toBeNull();
+  });
 
-            renderSettings();
+  it('switching to Private asks first and warns about a running contest', async () => {
+    jest.mocked(contestService.getAll).mockResolvedValue([{ id: 1, title: 'Mid-term practice', status: 'running' } as never]);
+    renderSettings();
+    fireEvent.click(await screen.findByRole('button', { name: 'Private' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Make the site private?' });
+    expect(dialog).toHaveTextContent('Mid-term practice is running — guests following it lose access.');
+    expect(adminService.updateSiteAccessMode).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Make private' }));
+    await waitFor(() => expect(adminService.updateSiteAccessMode).toHaveBeenCalledWith('private'));
+  });
 
-            const toggle = await screen.findByRole('checkbox', { name: 'Allow user registration' });
-
-            // Click the toggle's visible control (the wrapping switch element,
-            // not the 0x0 checkbox itself). If the switch were a plain span
-            // that doesn't forward clicks, this click would be lost.
-            const switchControl = toggle.closest('label,span');
-            expect(switchControl).not.toBeNull();
-            await userEvent.click(switchControl as HTMLElement);
-
-            await waitFor(() => {
-                expect(adminService.updateRegistrationSettings).toHaveBeenCalledWith(false);
-            });
-            await waitFor(() => {
-                expect(toggle).not.toBeChecked();
-            });
-            expect(mockRefreshSettings).toHaveBeenCalled();
-        });
-
-        it('clicking the text label also toggles registration', async () => {
-            (jest.mocked(adminService.updateRegistrationSettings) as jest.Mock).mockResolvedValueOnce({
-                message: 'Registration setting updated successfully.',
-            });
-
-            renderSettings();
-
-            const toggle = await screen.findByRole('checkbox', { name: 'Allow user registration' });
-            await userEvent.click(screen.getByText('Allow user registration'));
-
-            await waitFor(() => {
-                expect(adminService.updateRegistrationSettings).toHaveBeenCalledWith(false);
-            });
-            await waitFor(() => {
-                expect(toggle).not.toBeChecked();
-            });
-        });
-
-        it('shows an error and keeps the current state when the update fails', async () => {
-            (jest.mocked(adminService.updateRegistrationSettings) as jest.Mock).mockRejectedValueOnce(
-                new Error('network')
-            );
-
-            renderSettings();
-
-            const toggle = await screen.findByRole('checkbox', { name: 'Allow user registration' });
-            await userEvent.click(toggle);
-
-            await waitFor(() => {
-                expect(screen.getByText('Failed to update registration settings.')).toBeInTheDocument();
-            });
-            expect(toggle).toBeChecked();
-            expect(mockRefreshSettings).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('site access', () => {
-        it('selecting Private saves the mode', async () => {
-            (jest.mocked(adminService.updateSiteAccessMode) as jest.Mock).mockResolvedValueOnce({
-                message: 'Site access mode updated successfully.',
-            });
-
-            renderSettings();
-
-            const privateRadio = await screen.findByRole('radio', { name: /private/i });
-            await userEvent.click(privateRadio);
-
-            await waitFor(() => {
-                expect(adminService.updateSiteAccessMode).toHaveBeenCalledWith('private');
-            });
-        });
-    });
-
-    describe('password change toggle', () => {
-        it('renders the toggle as on when password changes are enabled', async () => {
-            renderSettings();
-
-            const toggle = await screen.findByRole('checkbox', { name: 'Allow password changes' });
-            expect(toggle).toBeChecked();
-        });
-
-        it('renders the toggle as off when the fetched setting is disabled', async () => {
-            (jest.mocked(adminService.getPasswordChangeSettings) as jest.Mock).mockResolvedValue({ enabled: false });
-
-            renderSettings();
-
-            const toggle = await screen.findByRole('checkbox', { name: 'Allow password changes' });
-            expect(toggle).not.toBeChecked();
-        });
-
-        it('toggling calls the update service and refreshes the app-wide settings', async () => {
-            (jest.mocked(adminService.updatePasswordChangeSettings) as jest.Mock).mockResolvedValueOnce({
-                message: 'Password change setting updated successfully.',
-            });
-
-            renderSettings();
-
-            const toggle = await screen.findByRole('checkbox', { name: 'Allow password changes' });
-            await userEvent.click(toggle);
-
-            await waitFor(() => {
-                expect(adminService.updatePasswordChangeSettings).toHaveBeenCalledWith(false);
-            });
-            await waitFor(() => {
-                expect(toggle).not.toBeChecked();
-            });
-            expect(mockRefreshSettings).toHaveBeenCalled();
-        });
-
-        it('shows an error and keeps the current state when the update fails', async () => {
-            (jest.mocked(adminService.updatePasswordChangeSettings) as jest.Mock).mockRejectedValueOnce(
-                new Error('network')
-            );
-
-            renderSettings();
-
-            const toggle = await screen.findByRole('checkbox', { name: 'Allow password changes' });
-            await userEvent.click(toggle);
-
-            await waitFor(() => {
-                expect(screen.getByText('Failed to update password change settings.')).toBeInTheDocument();
-            });
-            expect(toggle).toBeChecked();
-            expect(mockRefreshSettings).not.toHaveBeenCalled();
-        });
-    });
+  it('Replace database… takes a file then the IMPORT confirmation', async () => {
+    jest.mocked(adminService.importDatabase).mockResolvedValue({ jobId: 'j1', progressToken: 't' } as never);
+    jest.mocked(adminService.getImportDatabaseProgress).mockResolvedValue({ status: 'done', message: 'ok' } as never);
+    renderSettings();
+    fireEvent.click(await screen.findByRole('button', { name: 'Replace database…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Replace database' });
+    const input = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['-- dump'], 'backup.sql', { type: 'application/sql' });
+    fireEvent.change(input, { target: { files: [file] } });
+    const replace = within(dialog).getByRole('button', { name: 'Replace database' });
+    expect(replace).toBeDisabled();
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'IMPORT' } });
+    fireEvent.click(replace);
+    await waitFor(() => expect(adminService.importDatabase).toHaveBeenCalled());
+  });
 });

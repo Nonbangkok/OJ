@@ -1,9 +1,14 @@
-import { Outlet, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { USER_ROLES } from '../../utils/constants';
+import { rememberManagePage } from '../../features/admin/lastManagePage';
 
 const AdminLayout = () => {
   const { user, isLoading } = useAuth();
+  const { pathname } = useLocation();
+
+  useEffect(() => { rememberManagePage(pathname); }, [pathname]);
 
   if (isLoading) {
     return <div>Loading admin layout...</div>;
