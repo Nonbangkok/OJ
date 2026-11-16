@@ -16,7 +16,7 @@ const contest = (over = {}) => ({
 const problems = [{ id: 'P1', title: 'Interval merge', author: 'x' }, { id: 'P2', title: 'Two sums', author: 'x' }, { id: 'P3', title: 'Graph walk', author: 'x' }];
 
 const Where = () => <p data-testid="where">{useLocation().pathname}</p>;
-const renderAt = (path = '/admin/contests/7') => render(
+const renderAt = (path: string | { pathname: string; state: unknown } = '/admin/contests/7') => render(
   <RouterProvider router={createMemoryRouter([
     { path: '/admin/contests/:contestId/:tab?', element: <><ContestEditPage /><Where /></> },
   ], { initialEntries: [path] })} />,
@@ -99,6 +99,11 @@ describe('ContestEditPage', () => {
     const table = await screen.findByRole('table', { name: 'Participants' });
     await waitFor(() => expect(within(table).getAllByRole('row')[1]).toHaveTextContent(/1\s*arm\s*20 Nov 2026, 09:30\s*250/));
     expect(within(table).getAllByRole('row')[2]).toHaveTextContent(/2\s*mint\s*20 Nov 2026, 09:00\s*100/);
+  });
+
+  it('shows a notice handed over by the create drawer', async () => {
+    renderAt({ pathname: '/admin/contests/7/problems', state: { notice: 'Created, but it is still visible to students.' } });
+    expect(await screen.findByText('Created, but it is still visible to students.')).toBeInTheDocument();
   });
 
   it('an unknown contest says so', async () => {

@@ -117,6 +117,12 @@ describe('ProblemEditPage', () => {
     expect(await screen.findByText(new RegExp(message))).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('Submission filename')).toBeDisabled());
     expect(adminService.updateProblem).toHaveBeenCalledWith('P1', { id: 'P1', problem_type: 'header', submission_filename: 'other.h' });
+    // The locked fields go back to their saved values, so the other edits can still be saved.
+    expect(screen.getByLabelText('Submission filename')).toHaveValue('student.h');
+    jest.mocked(adminService.updateProblem).mockResolvedValue({} as never);
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Interval merging' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(adminService.updateProblem).toHaveBeenLastCalledWith('P1', { id: 'P1', title: 'Interval merging' }));
   });
 
   it('sends standard with a null filename when a header problem is switched back', async () => {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { EmptyState, InlineError, PageHeader, StatusBadge } from '../../../components/ui';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { EmptyState, InlineError, InlineNotice, PageHeader, StatusBadge } from '../../../components/ui';
 import buttonStyles from '../../../components/ui/Button.module.css';
 import adminService from '../../../services/adminService';
 import { getErrorMessage } from '../../../utils/error';
@@ -31,6 +31,7 @@ export default function ContestEditPage() {
 function ContestEditor() {
   const { contestId = '', tab: tabParam } = useParams();
   const navigate = useNavigate();
+  const handedOver = (useLocation().state as { notice?: string } | null)?.notice;
   const id = Number(contestId);
   const base = `/admin/contests/${contestId}`;
   const [contest, setContest] = useState<Contest | null>(null);
@@ -106,6 +107,7 @@ function ContestEditor() {
           </div>
         )}
       />
+      {handedOver && <InlineNotice tone="warning" title={handedOver} />}
       <div role="tabpanel" aria-label={labels[tab].text}>
         {tab === 'settings' && (
           <ContestSettingsTab contest={contest} onSaved={(next) => setContest((prev) => (prev ? { ...prev, ...next } : prev))} />

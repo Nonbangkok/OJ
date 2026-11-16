@@ -163,7 +163,7 @@ export default function ContestManagement() {
       <CreateContestDrawer
         open={creating}
         onClose={() => setCreating(false)}
-        onCreated={(id) => { setCreating(false); navigate(`/admin/contests/${id}/problems`); }}
+        onCreated={(id, notice) => { setCreating(false); navigate(`/admin/contests/${id}/problems`, notice ? { state: { notice } } : undefined); }}
       />
       <ConfirmDialog
         open={deleting !== null}

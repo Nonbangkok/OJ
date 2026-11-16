@@ -62,6 +62,14 @@ describe('Settings page', () => {
     expect(screen.queryByText('Saved')).toBeNull();
   });
 
+  it('a failed export says so on the page, not only inside the replace dialog', async () => {
+    jest.mocked(adminService.exportDatabase).mockRejectedValue(new Error('down'));
+    renderSettings();
+    fireEvent.click(await screen.findByRole('button', { name: /Export/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Failed to export database.');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('switching to Private asks first and warns about a running contest', async () => {
     jest.mocked(contestService.getAll).mockResolvedValue([{ id: 1, title: 'Mid-term practice', status: 'running' } as never]);
     renderSettings();

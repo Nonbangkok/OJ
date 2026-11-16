@@ -15,7 +15,10 @@ const contests = [
   { id: 3, title: 'Old round', description: null, status: 'finished', start_time: '2026-01-01T03:00:00.000Z', end_time: '2026-01-01T06:30:00.000Z', participant_count: '20', problem_count: 4, is_visible: false },
 ];
 
-const Where = () => <p data-testid="where">{useLocation().pathname}</p>;
+const Where = () => {
+  const location = useLocation();
+  return <><p data-testid="where">{location.pathname}</p><p data-testid="state">{JSON.stringify(location.state ?? null)}</p></>;
+};
 const renderList = () => render(
   <MemoryRouter initialEntries={['/admin/contests']}>
     <Routes>
@@ -180,6 +183,19 @@ describe('Create contest drawer', () => {
     fireEvent.click(within(drawer).getByRole('switch', { name: 'Visible to students' }));
     fireEvent.click(within(drawer).getByRole('button', { name: 'Create contest' }));
     await waitFor(() => expect(adminService.updateContestVisibility).toHaveBeenCalledWith(9, false));
+  });
+
+  it('if hiding the new contest fails it still opens it once, and says it is visible', async () => {
+    jest.mocked(adminService.updateContestVisibility).mockRejectedValue(new Error('down'));
+    const drawer = await openDrawer();
+    fireEvent.change(within(drawer).getByLabelText('Title'), { target: { value: 'Secret' } });
+    fireEvent.change(within(drawer).getByLabelText('Start date'), { target: { value: '2026-11-27' } });
+    fireEvent.change(within(drawer).getByLabelText('Start time'), { target: { value: '19:00' } });
+    fireEvent.click(within(drawer).getByRole('switch', { name: 'Visible to students' }));
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Create contest' }));
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/admin/contests/9/problems'));
+    expect(adminService.createContest).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('state')).toHaveTextContent('still visible to students');
   });
 
   it('refuses a start in the past or a malformed time without posting', async () => {

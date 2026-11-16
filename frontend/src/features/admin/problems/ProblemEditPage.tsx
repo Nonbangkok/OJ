@@ -160,7 +160,11 @@ function ProblemEditor() {
         if (Object.keys(fieldErrors).length === 0) setSaveError(message);
         if (tab !== 'general') goTab('general');
       } else {
-        if (status === 409 && message === TYPE_LOCK_MESSAGE) setLockedBy409(true);
+        if (status === 409 && message === TYPE_LOCK_MESSAGE) {
+          // The type can no longer change: put the locked fields back so the other edits can still be saved.
+          setLockedBy409(true);
+          setForm((prev) => (prev ? { ...prev, problem_type: saved.problem_type, submission_filename: saved.submission_filename } : prev));
+        }
         setSaveError(message);
       }
     } finally {
