@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createRef, useState } from 'react';
 import { Drawer } from '../../../components/ui/Drawer';
 
@@ -15,7 +15,7 @@ describe('Drawer', () => {
 
     expect(drawer).toHaveAttribute('aria-modal', 'true');
     expect(drawer).toHaveAttribute('aria-labelledby', title.id);
-    expect(drawer.parentElement?.parentElement).toBe(document.body);
+    expect(drawer.closest('[data-base-ui-portal]')?.parentElement).toBe(document.body);
   });
 
   it('closes from its close button', () => {
@@ -60,7 +60,7 @@ describe('Drawer', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('focuses the supplied initial focus target', () => {
+  it('focuses the supplied initial focus target', async () => {
     const initialFocusRef = createRef<HTMLButtonElement>();
     render(
       <Drawer open title="Edit filters" onClose={jest.fn()} initialFocusRef={initialFocusRef}>
@@ -69,39 +69,20 @@ describe('Drawer', () => {
       </Drawer>
     );
 
-    expect(screen.getByRole('button', { name: 'Apply filters' })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Apply filters' })).toHaveFocus());
   });
 
-  it('focuses the first focusable element when no initial target is supplied', () => {
+  it('focuses the first focusable element when no initial target is supplied', async () => {
     render(
       <Drawer open title="Edit filters" onClose={jest.fn()}>
         <button>Apply filters</button>
       </Drawer>
     );
 
-    expect(screen.getByRole('button', { name: 'Close drawer' })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close drawer' })).toHaveFocus());
   });
 
-  it('wraps Tab and Shift+Tab within the drawer', () => {
-    render(
-      <Drawer open title="Edit filters" onClose={jest.fn()}>
-        <button>Apply filters</button>
-      </Drawer>
-    );
-
-    const closeButton = screen.getByRole('button', { name: 'Close drawer' });
-    const applyButton = screen.getByRole('button', { name: 'Apply filters' });
-
-    applyButton.focus();
-    fireEvent.keyDown(document, { key: 'Tab' });
-    expect(closeButton).toHaveFocus();
-
-    closeButton.focus();
-    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
-    expect(applyButton).toHaveFocus();
-  });
-
-  it('returns Tab in either direction to the appropriate drawer boundary', () => {
+  it('hides and inerts content outside the drawer while open', () => {
     render(
       <>
         <button>Outside action</button>
@@ -111,18 +92,10 @@ describe('Drawer', () => {
       </>
     );
 
-    const outsideButton = screen.getByRole('button', { name: 'Outside action' });
-    outsideButton.focus();
-    fireEvent.keyDown(document, { key: 'Tab' });
-    expect(screen.getByRole('button', { name: 'Close drawer' })).toHaveFocus();
-
-    outsideButton.focus();
-    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
-    expect(screen.getByRole('button', { name: 'Apply filters' })).toHaveFocus();
+    expect(screen.getByText('Outside action').closest('[aria-hidden="true"]')).not.toBeNull();
   });
 
-  it('restores focus to the opener and body overflow after closing', () => {
-    document.body.style.overflow = 'scroll';
+  it('restores focus to the opener and releases the scroll lock after closing', async () => {
 
     function Harness() {
       const [open, setOpen] = useState(false);
@@ -141,13 +114,12 @@ describe('Drawer', () => {
     const opener = screen.getByRole('button', { name: 'Open filters' });
     opener.focus();
     fireEvent.click(opener);
-    expect(document.body.style.overflow).toBe('hidden');
+    await waitFor(() => expect(document.documentElement.style.overflowY).toBe('hidden'));
 
     fireEvent.click(screen.getByRole('button', { name: 'Close drawer' }));
 
-    expect(opener).toHaveFocus();
-    expect(document.body.style.overflow).toBe('scroll');
-    document.body.style.overflow = '';
+    await waitFor(() => expect(opener).toHaveFocus());
+    await waitFor(() => expect(document.documentElement.style.overflowY).not.toBe('hidden'));
   });
 
   it('defaults to the right side and supports a left-side surface', () => {

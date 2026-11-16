@@ -1,8 +1,8 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ConfirmationModal from '../../../features/admin/shared/ConfirmationModal';
 
 describe('ConfirmationModal', () => {
-  it('focuses the safe action and uses the destructive Button variant', () => {
+  it('focuses the safe action and uses the destructive Button variant', async () => {
     render(
       <ConfirmationModal
         isOpen
@@ -13,7 +13,7 @@ describe('ConfirmationModal', () => {
       />
     );
 
-    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus());
     expect(screen.getByRole('button', { name: 'Confirm' })).toHaveClass('destructive');
   });
 

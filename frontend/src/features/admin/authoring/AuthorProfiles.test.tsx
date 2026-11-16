@@ -32,7 +32,8 @@ test('uses bounded profile identity and shared action hierarchy', async () => {
 
   expect(row).not.toBeNull();
   expect(row?.querySelector('[data-profile-identity]')).toHaveTextContent('Writer');
-  expect(screen.getByRole('button', { name: 'New author profile' })).toBeEnabled();
+  // The page behind the open edit dialog is hidden from the accessibility tree.
+  expect(screen.getByRole('button', { name: 'New author profile', hidden: true })).toBeEnabled();
 
   expect(screen.getByRole('button', { name: 'Remove image' })).toBeEnabled();
   expect(screen.getByRole('button', { name: 'Save profile' })).toHaveAttribute('type', 'submit');

@@ -1,9 +1,7 @@
-import { useEffect, useId, useLayoutEffect, useRef } from 'react';
+import { Dialog as BaseDialog } from '@base-ui/react/dialog';
 import type React from 'react';
-import { createPortal } from 'react-dom';
 import { Button } from './Button';
 import styles from './Drawer.module.css';
-import { getFocusableElements, wrapTabFocus } from './focusTrap';
 
 export interface DrawerProps {
   open: boolean;
@@ -14,6 +12,7 @@ export interface DrawerProps {
   initialFocusRef?: React.RefObject<HTMLElement | null>;
 }
 
+/** Side sheet: a Base UI modal dialog anchored to the left or right edge. */
 export function Drawer({
   open,
   title,
@@ -22,96 +21,29 @@ export function Drawer({
   onClose,
   initialFocusRef,
 }: DrawerProps) {
-  const titleId = useId();
-  const drawerRef = useRef<HTMLDivElement>(null);
-  const onCloseRef = useRef(onClose);
-  const initialFocusRefRef = useRef(initialFocusRef);
-
-  // Latest-value refs, refreshed after every commit and before the passive
-  // open effect below runs (see Dialog).
-  useLayoutEffect(() => {
-    onCloseRef.current = onClose;
-    initialFocusRefRef.current = initialFocusRef;
-  });
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    const drawer = drawerRef.current;
-
-    document.body.style.overflow = 'hidden';
-
-    const initialTarget = initialFocusRefRef.current?.current;
-    const fallbackTarget = drawer ? getFocusableElements(drawer)[0] : undefined;
-    (initialTarget ?? fallbackTarget ?? drawer)?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onCloseRef.current();
-        return;
-      }
-
-      if (drawer) {
-        wrapTabFocus(event, drawer);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-      previouslyFocused?.focus();
-    };
-  }, [open]);
-
-  if (!open) {
-    return null;
-  }
-
-  return createPortal(
-    // Backdrop click-to-dismiss is a mouse convenience; Escape and the focus
-    // trap give keyboard users the same control, so the overlay stays
-    // non-focusable by design.
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
-    <div
-      className={`${styles.backdrop} ${styles[side]}`}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <div
-        ref={drawerRef}
-        className={`${styles.drawer} ${styles[side]} ${styles.motionSafe}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-      >
-        <div className={styles.header}>
-          <h2 id={titleId} className={styles.title}>
-            {title}
-          </h2>
-          <Button
-            className={styles.closeButton}
-            variant="neutral"
-            size="compact"
-            aria-label="Close drawer"
-            onClick={onClose}
+  return (
+    <BaseDialog.Root open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <BaseDialog.Portal>
+        <BaseDialog.Backdrop className={styles.backdrop} />
+        <BaseDialog.Viewport className={`${styles.viewport} ${styles[side]}`}>
+          <BaseDialog.Popup
+            className={`${styles.drawer} ${styles[side]} ${styles.motionSafe}`}
+            aria-modal="true"
+            initialFocus={initialFocusRef ?? true}
           >
-            <span aria-hidden="true">×</span>
-          </Button>
-        </div>
-        <div className={styles.body}>{children}</div>
-      </div>
-    </div>,
-    document.body
+            <div className={styles.header}>
+              <BaseDialog.Title className={styles.title}>{title}</BaseDialog.Title>
+              <BaseDialog.Close
+                render={<Button className={styles.closeButton} variant="neutral" size="compact" />}
+                aria-label="Close drawer"
+              >
+                <span aria-hidden="true">×</span>
+              </BaseDialog.Close>
+            </div>
+            <div className={styles.body}>{children}</div>
+          </BaseDialog.Popup>
+        </BaseDialog.Viewport>
+      </BaseDialog.Portal>
+    </BaseDialog.Root>
   );
 }
