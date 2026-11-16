@@ -292,6 +292,15 @@ describe('User Profile Page', () => {
         expect(bar).toHaveAttribute('aria-valuemax', '500');
     });
 
+    it('lists languages by their display names', async () => {
+        jest.mocked(userService.getProfile).mockResolvedValueOnce(profileData);
+        renderPage();
+        const heading = await screen.findByRole('heading', { name: 'Languages' });
+        const card = heading.closest('section') as HTMLElement;
+        expect(within(card).getByText('C++')).toBeInTheDocument();
+        expect(within(card).queryByText('cpp')).toBeNull();
+    });
+
     it('renders the Recently Solved list from reward history', async () => {
         jest.mocked(userService.getProfile).mockResolvedValueOnce(profileData);
 

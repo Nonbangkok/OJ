@@ -8,9 +8,10 @@
 /* --- Header banner ------------------------------------------------------- */
 
 .profile-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 1.25rem;
+  gap: 1.5rem;
   background-color: var(--surface-elevated);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
@@ -37,7 +38,7 @@
 .profile-title {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.5rem;
   min-width: 0;
 }
 
@@ -224,13 +225,17 @@
 /* --- XP progression (identity card) --------------------------------------- */
 
 .progression {
-  margin-left: auto;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.5rem;
-  flex: 0 1 auto;
-  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  max-width: 560px;
+  margin-top: 2px;
+}
+
+.progression-bar {
+  flex: 1 1 180px;
+  min-width: 140px;
 }
 
 .tier-level {
@@ -240,10 +245,10 @@
 
 .xp-total {
   font-family: var(--font-family-mono);
-  font-size: 1.375rem;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-primary);
-  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .xp-remaining {
@@ -382,14 +387,18 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  margin-left: auto;
+  gap: 2px;
+  align-self: stretch;
+  justify-content: center;
+  padding-left: 1.5rem;
+  border-left: 1px solid var(--border-color);
   font-size: 13px;
   color: var(--text-muted);
 }
 
 .rank b {
   font-family: var(--font-family-mono);
-  font-size: 22px;
+  font-size: 28px;
   font-weight: 500;
   color: var(--text-primary);
 }
@@ -526,22 +535,98 @@
 
   /* Phones: avatar beside the name; level line and rank wrap below, left-aligned. */
   .profile-header {
-    flex-wrap: wrap;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 1rem;
     padding: 1.25rem;
   }
 
-  .progression,
   .rank {
-    margin-left: 0;
-    align-items: flex-start;
-    width: 100%;
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 12px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--border-color);
   }
 
-  .recent-solved-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+  .rank b {
+    font-size: 20px;
   }
 
   .recent-solved-date {
     display: none;
+  }
+}
+
+/* Name, then "Tier · Lv N · Joined …" on one line. */
+.profile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.profile-meta > span + span::before {
+  content: '·';
+  margin: 0 8px;
+  color: var(--text-muted);
+}
+
+/* Recently solved and the two breakdowns end level with each other. */
+.two-col {
+  align-items: stretch;
+}
+
+.column > .section {
+  flex: 1 1 auto;
+}
+
+/* Rows of one list share their columns (bars, XP and dates line up). */
+.breakdown-list {
+  display: grid;
+  /* A shared minimum name width, so the Verdicts and Languages bars start at the same x. */
+  grid-template-columns: minmax(11.5rem, max-content) minmax(0, 1fr) auto;
+  column-gap: 0.75rem;
+}
+
+.breakdown-list .breakdown-row {
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
+.recent-solved-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  column-gap: 0.75rem;
+}
+
+.recent-solved-list .recent-solved-row {
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
+@media (max-width: 767px) {
+  /* Phones hide the date: three shared columns. */
+  .recent-solved-list {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  /* Narrow cards: names take only what they need, so the bars keep their length. */
+  .breakdown-list {
+    grid-template-columns: max-content minmax(0, 1fr) auto;
+  }
+
+  /* Tier and join date stack instead of wrapping around a stray "·". */
+  .profile-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .profile-meta > span + span::before {
+    content: none;
   }
 }

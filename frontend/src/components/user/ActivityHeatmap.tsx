@@ -76,6 +76,7 @@ const ActivityHeatmap = ({ activity }: { activity: UserProfileDailyActivity[] })
 
   return (
     <div className={styles.wrapper}>
+      <div className={styles.inner}>
       <div ref={scrollerRef} className={styles.heatmap} role="img" aria-label="Daily submission activity over the past year">
         {monthLabels.map(({ label, week }) => (
           <span key={label + week} className={styles['month-label']} style={{ gridColumn: week + 1 }}>
@@ -100,6 +101,7 @@ const ActivityHeatmap = ({ activity }: { activity: UserProfileDailyActivity[] })
           <span key={level} className={`${styles.cell} ${styles[`level-${level}`]}`} aria-hidden="true" />
         ))}
         <span className={styles['legend-label']}>More</span>
+      </div>
       </div>
     </div>
   );
