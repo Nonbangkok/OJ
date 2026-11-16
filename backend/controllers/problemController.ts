@@ -18,6 +18,7 @@ import {
   getProblemStarterAccess,
   getProblemTestcases,
   getProblemsWithStatsForUser,
+  getProblemViewerContext,
   getProblemStatusCounts,
   type ProblemStatusFilter,
   getPublicProblemCategoryCounts,
@@ -190,8 +191,9 @@ router.get('/problems/:id',
     throw new AppError('Problem not found', 404);
   }
 
+  const viewer = await getProblemViewerContext(id, req.user?.id ?? null);
   const { is_visible, contest_id, ...problemData } = problemDetail;
-  res.json(isStaffOrAdmin ? problemDetail : problemData);
+  res.json({ ...(isStaffOrAdmin ? problemDetail : problemData), ...viewer });
 }));
 
 // Admin details - guaranteed to return everything

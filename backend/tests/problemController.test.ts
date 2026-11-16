@@ -202,6 +202,7 @@ describe('Problem Controller', () => {
                 is_visible: true
             };
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [mockProblem] });
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] }); // viewer context
 
             const res = await request(app).get('/problems/P1');
 
@@ -267,6 +268,7 @@ describe('Problem Controller', () => {
                 contest_id: null,
             };
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [mockProblem] });
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] }); // viewer context
 
             // Default app session is admin (set in beforeEach).
             const res = await request(app).get('/problems/P2');
@@ -1076,6 +1078,7 @@ describe('Problem Controller', () => {
                 id: 'H1', title: 'T', is_visible: true, problem_type: 'header',
                 submission_filename: 'student.h', has_starter_files: true,
             }] });
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] }); // viewer context
             const res = await request(buildAppAsRole(null)).get('/problems/H1');
             expect(res.status).toBe(200);
             expect(res.body).toMatchObject({ problem_type: 'header', submission_filename: 'student.h', has_starter_files: true });

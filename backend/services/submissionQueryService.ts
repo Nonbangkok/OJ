@@ -140,7 +140,7 @@ export const getSubmissions = async (
     userId: number,
     isStaffOrAdmin: boolean,
 ): Promise<SubmissionListRow[]> => {
-    const { filter, problemId, contestId, filterProblemId, filterUserId } = queryInput;
+    const { filter, problemId, contestId, filterProblemId, filterUserId, verdict } = queryInput;
     const isGuest = userId === 0;
 
     // SUB-004: page 1 (the default) reproduces the previous single-page
@@ -182,7 +182,10 @@ export const getSubmissions = async (
         queryText = `
             SELECT
               cs.id, u.username, cs.problem_id, p.title AS problem_title,
-              cs.overall_status, cs.score, cs.language, cs.submitted_at
+              cs.overall_status, cs.score, cs.language, cs.submitted_at,
+              COALESCE((SELECT jsonb_agg(r->>'status') FROM jsonb_array_elements(
+                CASE WHEN jsonb_typeof(cs.results) = 'array' THEN cs.results ELSE '[]'::jsonb END) r), '[]'::jsonb) AS case_statuses,
+              cs.max_time_ms, cs.max_memory_kb
             FROM contest_submissions cs
             JOIN users u ON cs.user_id = u.id
             JOIN problems p ON cs.problem_id = p.id
@@ -193,7 +196,10 @@ export const getSubmissions = async (
         queryText = `
             SELECT
               s.id, u.username, s.problem_id, p.title AS problem_title,
-              s.overall_status, s.score, s.language, s.submitted_at
+              s.overall_status, s.score, s.language, s.submitted_at,
+              COALESCE((SELECT jsonb_agg(r->>'status') FROM jsonb_array_elements(
+                CASE WHEN jsonb_typeof(s.results) = 'array' THEN s.results ELSE '[]'::jsonb END) r), '[]'::jsonb) AS case_statuses,
+              s.max_time_ms, s.max_memory_kb
             FROM submissions s
             JOIN users u ON s.user_id = u.id
             JOIN problems p ON s.problem_id = p.id
@@ -219,12 +225,19 @@ export const getSubmissions = async (
         conditions.push(`${sourceAlias}.problem_id = $${params.length}`);
     }
 
-    if (isStaffOrAdmin) {
-        if (filterProblemId) {
-            params.push(`%${filterProblemId}%`);
-            conditions.push(`${sourceAlias}.problem_id IN (SELECT id FROM problems WHERE id ILIKE $${params.length})`);
-        }
+    // The problem filter is open to everyone: the visibility condition above
+    // already keeps non-staff inside publicly listed problems.
+    if (filterProblemId) {
+        params.push(`%${filterProblemId}%`);
+        conditions.push(`${sourceAlias}.problem_id IN (SELECT id FROM problems WHERE id ILIKE $${params.length})`);
+    }
 
+    if (verdict) {
+        params.push(verdict);
+        conditions.push(`${sourceAlias}.overall_status = $${params.length}`);
+    }
+
+    if (isStaffOrAdmin) {
         if (filterUserId) {
             params.push(`%${filterUserId}%`);
             conditions.push(`${sourceAlias}.user_id IN (SELECT id FROM users WHERE username ILIKE $${params.length})`);
@@ -350,10 +363,11 @@ export const getSubmissionDetail = async (
     if (contestId) {
         // For contest submissions, we join with contest_problems (the snapshot)
         const result = await db.query<ContestSubmissionDetailRow>(
-            `SELECT cs.*, u.username, cp.title AS problem_name
+            `SELECT cs.*, u.username, cp.title AS problem_name, p.time_limit_ms, p.memory_limit_mb
              FROM contest_submissions cs
              LEFT JOIN users u ON cs.user_id = u.id
              LEFT JOIN contest_problems cp ON cs.problem_id = cp.problem_id AND cs.contest_id = cp.contest_id
+             LEFT JOIN problems p ON cs.problem_id = p.id
              WHERE cs.id = $1 AND cs.contest_id = $2`,
             [id, contestId],
         );
@@ -361,7 +375,7 @@ export const getSubmissionDetail = async (
     }
 
     const result = await db.query<SubmissionDetailRow>(
-        `SELECT s.*, u.username, p.title AS problem_name
+        `SELECT s.*, u.username, p.title AS problem_name, p.time_limit_ms, p.memory_limit_mb
          FROM submissions s
          LEFT JOIN users u ON s.user_id = u.id
          LEFT JOIN problems p ON s.problem_id = p.id

@@ -15,6 +15,7 @@ import {
   STATEMENT_ASSET,
   STRING_LIMITS,
   SUBMISSION_QUERY_CONFIG,
+  SUBMISSION_STATUS,
   SUBMISSION_VALIDATION,
   SUPPORTED_LANGUAGES,
   USER_ROLES,
@@ -561,6 +562,7 @@ export const submissionsQuerySchema = z.object({
   contestId: optionalTrimmedString,
   filterProblemId: optionalTrimmedString,
   filterUserId: optionalTrimmedString,
+  verdict: z.enum(Object.values(SUBMISSION_STATUS) as [string, ...string[]]).optional(),
   // SUB-004: page-based access past the hard 200-row cap. Page 1 (default)
   // is the previous behavior; the cap per page stays at LIST_LIMIT.
   page: z.coerce.number().int().min(1).max(SUBMISSION_QUERY_PAGE_MAX).default(1),

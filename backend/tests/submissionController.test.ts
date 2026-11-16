@@ -482,7 +482,11 @@ describe('Submission Controller', () => {
                     .map(([sql]) => String(sql))
                     .find((sql) => /FROM (contest_)?submissions/.test(sql) && /overall_status/.test(sql));
                 expect(feedSql).toBeDefined();
-                expect(feedSql).not.toMatch(/\bresults\b/);
+                // The only read of `results` is the per-case status list for
+                // the testcase strip; no output, log or compiler text leaves.
+                expect(feedSql).toContain("jsonb_agg(r->>'status')");
+                const withoutStatusList = feedSql!.replace(/COALESCE\(\(SELECT jsonb_agg\(r->>'status'\)[\s\S]*?AS case_statuses/, '');
+                expect(withoutStatusList).not.toMatch(/\bresults\b/);
                 expect(feedSql).not.toMatch(/\.\*/);
                 expect(feedSql).not.toMatch(/\bcode\b/);
             });
@@ -501,6 +505,22 @@ describe('Submission Controller', () => {
             expect((await request(app).get('/submissions/0')).status).toBe(400);
             expect((await request(app).get('/submissions/-5')).status).toBe(400);
             expect(db.query).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('GET /submissions verdict filter', () => {
+        it('rejects an unknown verdict with 400', async () => {
+            expect((await request(app).get('/submissions?verdict=Great')).status).toBe(400);
+            expect(db.query).not.toHaveBeenCalled();
+        });
+
+        it('passes a known verdict to the list query', async () => {
+            (db.query as jest.Mock).mockResolvedValue({ rows: [] });
+            const res = await request(app).get('/submissions?verdict=Time%20Limit%20Exceeded');
+            expect(res.status).toBe(200);
+            const [sql, params] = (db.query as jest.Mock).mock.calls.at(-1);
+            expect(String(sql)).toContain('overall_status = $');
+            expect(params).toContain('Time Limit Exceeded');
         });
     });
 

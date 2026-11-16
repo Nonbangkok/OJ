@@ -441,6 +441,44 @@ export const getProblemDetail = async (problemId: string): Promise<ProblemDetail
   return result.rows[0] ?? null;
 };
 
+/** The problem page's per-viewer context: collection, the viewer's best submission, attempt count. */
+export interface ProblemViewerContext {
+  collection: { id: number; name: string } | null;
+  viewerBest: { score: number; caseStatuses: string[] } | null;
+  viewerSubmissionCount: number;
+}
+
+export const getProblemViewerContext = async (
+  problemId: string,
+  userId: number | null,
+): Promise<ProblemViewerContext> => {
+  const result = await db.query<{
+    collection_id: number | null; collection_name: string | null;
+    best_score: number | null; best_results: unknown; submission_count: number;
+  }>(`
+    SELECT c.id AS collection_id, c.name AS collection_name,
+      best.score AS best_score, best.results AS best_results,
+      (SELECT COUNT(*)::int FROM submissions s WHERE s.user_id = $2 AND s.problem_id = p.id) AS submission_count
+    FROM problems p
+    LEFT JOIN collections c ON c.id = p.collection_id
+    LEFT JOIN LATERAL (
+      SELECT s.score, s.results FROM submissions s
+      WHERE s.user_id = $2 AND s.problem_id = p.id
+      ORDER BY s.score DESC, s.id DESC LIMIT 1
+    ) best ON true
+    WHERE p.id = $1
+  `, [problemId, userId]);
+  const row = result.rows[0];
+  const caseStatuses = Array.isArray(row?.best_results)
+    ? (row!.best_results as { status?: unknown }[]).map((r) => String(r?.status ?? ''))
+    : [];
+  return {
+    collection: row?.collection_id != null ? { id: row.collection_id, name: row.collection_name ?? '' } : null,
+    viewerBest: row?.best_score != null ? { score: Number(row.best_score), caseStatuses } : null,
+    viewerSubmissionCount: Number(row?.submission_count ?? 0),
+  };
+};
+
 /** Visibility context for the public starter-ZIP route (same rule as the PDF route). */
 export const getProblemStarterAccess = async (
   problemId: string,

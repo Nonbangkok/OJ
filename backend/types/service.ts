@@ -157,6 +157,10 @@ export interface SubmissionListRow {
   score: number;
   language: string;
   submitted_at: Date;
+  /** Per-case statuses for the testcase strip; empty for a compile log or pending. */
+  case_statuses: string[];
+  max_time_ms: number | null;
+  max_memory_kb: number | null;
 }
 
 export interface SearchUserRow {

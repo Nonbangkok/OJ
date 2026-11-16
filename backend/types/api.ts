@@ -319,6 +319,8 @@ export interface SubmissionListQuery {
     contestId?: string;
     filterProblemId?: string;
     filterUserId?: string;
+    /** Exact overall status (one of SUBMISSION_STATUS). */
+    verdict?: string;
     /** 1-based page over the LIST_LIMIT-capped feed (SUB-004). */
     page?: number;
 }
