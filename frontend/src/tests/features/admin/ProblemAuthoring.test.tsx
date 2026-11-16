@@ -323,7 +323,7 @@ test('Publish requires explicit confirmation and explains hidden visibility', as
   }));
   show('/admin/authoring/d1');
   fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
-  fireEvent.click(screen.getByRole('button', { name: 'Publish problem' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
   expect(api.post).not.toHaveBeenCalled();
   expect(screen.getByText(/created as hidden/i)).toBeInTheDocument();
   jest.mocked(api.post).mockResolvedValue({ data: { status: 'published' } });
@@ -428,19 +428,19 @@ test('Generate inputs runs the generator with the seed the author entered', asyn
   ));
 });
 
-test('the Solution checklist item links to the Solution step', async () => {
+test('the Solution readiness row links to the Solution step', async () => {
   const noSolution = { ...draft, solutionCpp: '', verifiedRevision: null };
   jest.mocked(api.get).mockImplementation(async (url) => ({
     data: url.endsWith('/d1') ? noSolution : [],
   }));
   show('/admin/authoring/d1/verify');
-  const checklist = await screen.findByLabelText('Publish readiness');
-  fireEvent.click(within(checklist).getByRole('button', { name: 'add it' }));
+  const checklist = await screen.findByRole('list', { name: 'Publish readiness' });
+  fireEvent.click(within(checklist).getByRole('button', { name: 'Open solution' }));
   expect(await screen.findByRole('region', { name: 'Solution' })).toBeInTheDocument();
   expect(screen.queryByRole('region', { name: 'Testcases' })).not.toBeInTheDocument();
 });
 
-test('the Testcases checklist item shows real pairing counts, not the draft status', async () => {
+test('the Testcases readiness row shows real pairing counts, not the draft status', async () => {
   // Status reset to 'draft' (as a fresh verify start does) while the
   // testcases themselves are complete — the checklist must still tick.
   const reset = { ...draft, status: 'draft', verifiedRevision: null };
@@ -449,31 +449,31 @@ test('the Testcases checklist item shows real pairing counts, not the draft stat
   }));
   show('/admin/authoring/d1');
   fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
-  const checklist = screen.getByLabelText('Publish readiness');
+  const checklist = screen.getByRole('list', { name: 'Publish readiness' });
   expect(within(checklist).getByText('Testcases')).toBeInTheDocument();
-  expect(within(checklist).getByText(/2 cases, all paired/)).toBeInTheDocument();
+  expect(within(checklist).getByText(/2 cases, all with outputs/)).toBeInTheDocument();
   expect(within(checklist).queryByText('not generated')).not.toBeInTheDocument();
 });
 
-test('the Testcases checklist item names the missing pairs', async () => {
+test('the Testcases readiness row names the missing pairs', async () => {
   const partial = { ...draft, testcaseStats: { total: 5, withOutput: 3 } };
   jest.mocked(api.get).mockImplementation(async (url) => ({
     data: url.endsWith('/d1') ? partial : [],
   }));
   show('/admin/authoring/d1');
   fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
-  expect(screen.getByText(/2 of 5 cases missing expected outputs/)).toBeInTheDocument();
+  expect(screen.getByText(/2 of 5 cases missing outputs/)).toBeInTheDocument();
   expect(screen.queryByText('not generated')).not.toBeInTheDocument();
 });
 
-test('the Testcases checklist item reports an empty testcase set', async () => {
+test('the Testcases readiness row reports an empty testcase set', async () => {
   const empty = { ...draft, testcaseStats: { total: 0, withOutput: 0 } };
   jest.mocked(api.get).mockImplementation(async (url) => ({
     data: url.endsWith('/d1') ? empty : [],
   }));
   show('/admin/authoring/d1');
   fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
-  expect(screen.getByText(/no testcases yet/)).toBeInTheDocument();
+  expect(screen.getByText('No testcases yet.')).toBeInTheDocument();
 });
 
 test('a failed verification shows a plain-language explanation with the failing case', async () => {
@@ -490,10 +490,11 @@ test('a failed verification shows a plain-language explanation with the failing 
   show('/admin/authoring/d1');
   fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
   expect(screen.getByText(/Solution output does not match the expected output/i)).toBeInTheDocument();
-  expect(screen.getByText(/#4/)).toBeInTheDocument();
-  expect(screen.getByText(/cannot be published until verification passes/i)).toBeInTheDocument();
-  // The failure banner carries the danger tone.
-  expect(screen.getByRole('alert').className).toMatch(/verifyOutcomeFailed/);
+  const alert = screen.getByRole('alert');
+  expect(alert).toHaveTextContent('Failing testcase: #4');
+  expect(alert).toHaveTextContent(/cannot be published until verification passes/i);
+  // The failure notice carries the danger tone.
+  expect(within(alert).getByText(/does not match/i).closest('[data-tone]')).toHaveAttribute('data-tone', 'danger');
 });
 
 test('a timed-out verification uses the warning tone', async () => {
@@ -508,7 +509,7 @@ test('a timed-out verification uses the warning tone', async () => {
   }));
   show('/admin/authoring/d1');
   fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
-  expect(screen.getByRole('alert').className).toMatch(/verifyOutcomeTimedOut/);
+  expect(screen.getByRole('alert').firstElementChild).toHaveAttribute('data-tone', 'warning');
 });
 
 test('a succeeded verification shows the passing summary', async () => {
@@ -524,8 +525,7 @@ test('a succeeded verification shows the passing summary', async () => {
   }));
   show('/admin/authoring/d1');
   fireEvent.click(await screen.findByRole('link', { name: /^Verify & publish,/ }));
-  expect(screen.getByText(/All checks passed at revision 3/i)).toBeInTheDocument();
-  expect(screen.getByText(/7 testcases executed/i)).toBeInTheDocument();
-  // The success banner carries the green tone.
-  expect(screen.getByText(/All checks passed at revision 3/i).closest('div').className).toMatch(/verifyOutcomePassed/);
+  const verified = within(screen.getByRole('list', { name: 'Publish readiness' })).getByText('Verified at rev 3').closest('li') as HTMLElement;
+  expect(verified).toHaveTextContent('All checks passed · 7 testcases ran against the solution.');
+  expect(verified).toHaveAttribute('data-state', 'done');
 });

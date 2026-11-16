@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
-import { Check, Circle } from '@phosphor-icons/react';
 import { Link, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
-import { Button, ConfirmDialog, Dialog, StatusBadge } from '../../../components/ui';
+import { Button, ConfirmDialog, Dialog, InlineNotice } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
 import { getErrorMessage } from '../../../utils/error';
 import WorkspaceHeader from './WorkspaceHeader';
@@ -13,10 +12,12 @@ import LastCompile from './LastCompile';
 import LargeScreenNotice, { useSmallScreen } from './LargeScreenNotice';
 import useAuthoringDraft from './useAuthoringDraft';
 import { Profile } from './types';
-import { draftStatus, jobLabel, jobStatus, verifyFailureExplanation } from './status';
+import { verifyFailureExplanation } from './status';
 import JobHistory from './JobHistory';
+import ReadinessList, { publishReason, readinessRows, type ReadinessFix } from './ReadinessList';
+import verifyStyles from './Verify.module.css';
 import MetadataFields from './MetadataFields';
-import StatementTab, { PdfRow } from './StatementTab';
+import StatementTab from './StatementTab';
 import TestcaseFiles from './TestcaseFiles';
 import CodeEditor from './CodeEditor';
 import AiDocs from './AiDocs';
@@ -322,58 +323,59 @@ function GeneratorSection() {
 
 function VerifySection() {
   const { model, draft, setConfirm, navigate } = useOutletContext<WorkspaceContext>();
-  const status = draftStatus(draft.status);
-  return <section className={styles.authoring}>
-    <h2>Verify & Publish</h2>
-    <div className={styles.verifyHero}>
-      <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
-      <span className={styles.verifyHeroText}>{status.hint}</span>
+  const [testcaseBytes, setTestcaseBytes] = useState<number | null>(null);
+  const { total, withOutput } = draft.testcaseStats;
+  useEffect(() => {
+    let cancelled = false;
+    authoringService.listTestcases(draft.id)
+      .then((list) => {
+        if (!cancelled) setTestcaseBytes(list.testcases.reduce((sum, t) => sum + t.inputBytes + (t.outputBytes ?? 0), 0));
+      })
+      .catch(() => { if (!cancelled) setTestcaseBytes(null); });
+    return () => { cancelled = true; };
+  }, [draft.id, draft.revision, total, withOutput]);
+
+  const rows = readinessRows(draft, model.jobs, readinessOf(readinessFromWorkspace(draft, model.jobs)), testcaseBytes);
+  const published = draft.status === 'published';
+  const reason = model.canPublish ? null
+    : published ? 'Published — start a new revision to change it.'
+      : publishReason(rows)
+        ?? (model.activeJob ? 'Wait for the running job to finish.'
+          : model.dirty || model.saveState === 'saving' ? 'Your edits are saving — publish once they are saved.'
+            : 'Verify this revision before publishing.');
+  const onFix = (fix: ReadinessFix) => {
+    if (fix.kind === 'tab') navigate(fix.to, { relative: 'path' });
+    else if (fix.kind === 'compile') void model.runJob('compile', { target: 'solution' });
+    else void model.runJob(fix.kind);
+  };
+
+  return <section className={`${styles.authoring} ${verifyStyles.tab}`} aria-label="Verify & publish">
+    <h2>Verify &amp; publish</h2>
+    <VerifyFailure jobs={model.jobs} />
+    <ReadinessList draft={draft} rows={rows} disabled={model.actionsDisabled} onFix={onFix} />
+    <div className={verifyStyles.footer}>
+      {reason && <p className={verifyStyles.reason} id="publish-reason">{reason}</p>}
+      <Button variant="secondary" disabled={model.actionsDisabled || !draft.solutionCpp.trim()} onClick={() => void model.runJob('verify')}>Verify</Button>
+      <Button variant="primary" disabled={!model.canPublish} aria-describedby={reason ? 'publish-reason' : undefined}
+        onClick={() => setConfirm({ action: 'publish', revision: draft.revision })}>Publish</Button>
     </div>
-    <VerifyOutcome draft={draft} jobs={model.jobs} />
-    <PublishChecklist draft={draft} dirty={model.dirty} canPublish={model.canPublish} disabled={model.actionsDisabled}
-      onVerify={() => void model.runJob('verify')} onPublish={() => setConfirm({ action: 'publish', revision: draft.revision })}
-      onBuildPdf={() => void model.runJob('pdf')} onGoToSolution={() => navigate('solution', { relative: 'path' })}
-      onGoToTestcases={() => navigate('testcases', { relative: 'path' })} />
-    <PdfRow draft={draft} disabled={model.actionsDisabled} onBuild={() => void model.runJob('pdf')} />
   </section>;
 }
 
-/**
- * Outcome of the most recent Verify All for the current revision: a green
- * panel when it passed, and a plain-language failure explanation (which
- * stage failed and on which testcase) when it did not.
- */
-function VerifyOutcome({ draft, jobs }: { draft: import('./types').Draft; jobs: import('./types').Job[] }) {
-  const verify = jobs.find(job => job.jobType === 'verify_all');
-  if (!verify || verify.status === 'queued' || verify.status === 'compiling' || verify.status === 'running') {
-    return null;
-  }
-  if (verify.status === 'succeeded') {
-    return <div className={`${styles.verifyOutcome} ${styles.verifyOutcomePassed}`} role="status">
-      <StatusBadge tone="success">Verified</StatusBadge>
-      <span className={styles.verifyOutcomeText}>
-        All checks passed at revision {verify.draftRevision}
-        {verify.resultSummary?.verification?.caseCount
-          ? ` — ${verify.resultSummary.verification.caseCount} testcases executed against the solution.`
-          : '.'}
-      </span>
-    </div>;
-  }
+/** The newest Verify All when it failed: the failing case and what it means. */
+function VerifyFailure({ jobs }: { jobs: import('./types').Job[] }) {
+  const verify = jobs.filter((job) => job.jobType === 'verify_all')
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+  if (!verify || (verify.status !== 'failed' && verify.status !== 'timed_out')) return null;
   const { title, detail } = verifyFailureExplanation(verify);
-  const timedOut = verify.status === 'timed_out';
-  return <div
-    className={`${styles.verifyOutcome} ${timedOut ? styles.verifyOutcomeTimedOut : styles.verifyOutcomeFailed}`}
-    role="alert">
-    <StatusBadge tone={timedOut ? 'warning' : 'danger'}>{timedOut ? 'Timed out' : 'Failed'}</StatusBadge>
-    <div className={styles.verifyOutcomeText}>
-      <strong>{title}.</strong> {detail}
-      {verify.resultSummary?.failedCase
-        ? <> Failing testcase: <code>#${verify.resultSummary.failedCase.caseNumber}</code>{verify.resultSummary.failedCase.durationMs !== undefined ? ` (${verify.resultSummary.failedCase.durationMs} ms)` : ''}.</>
-        : null}
-      <div className={styles.verifyOutcomeHint}>
-        The problem cannot be published until verification passes.
-      </div>
-    </div>
+  const failedCase = verify.resultSummary?.failedCase;
+  return <div role="alert">
+    <InlineNotice tone={verify.status === 'timed_out' ? 'warning' : 'danger'} title={`${title}.`}>
+      {detail}
+      {failedCase && <> Failing testcase: <code>{`#${failedCase.caseNumber}`}</code>
+        {failedCase.durationMs !== undefined ? ` (${failedCase.durationMs} ms)` : ''}.</>}
+      {' '}The problem cannot be published until verification passes.
+    </InlineNotice>
   </div>;
 }
 
@@ -387,49 +389,4 @@ function JobsSection() {
 /** The AI Docs reference page, embedded as the last workspace nav entry. */
 function AiDocsSection() {
   return <AiDocs embedded />;
-}
-
-function PublishChecklist({ draft, dirty, canPublish, disabled, onVerify, onPublish, onBuildPdf, onGoToSolution, onGoToTestcases }: {
-  draft: import('./types').Draft; dirty: boolean; canPublish: boolean; disabled: boolean;
-  onVerify: () => void; onPublish: () => void; onBuildPdf: () => void; onGoToSolution: () => void; onGoToTestcases: () => void;
-}) {
-  // Each gate names exactly what is missing and offers the action that fixes it.
-  const pdfCurrent = draft.hasLatestPdf && draft.latestPdfRevision === draft.revision;
-  const verified = draft.verifiedRevision === draft.revision;
-  // Testcase readiness is a fact about the stored cases (every input has its
-  // paired expected output), deliberately independent of the draft status —
-  // starting a fresh verify resets the status, but never the testcases.
-  const { total, withOutput } = draft.testcaseStats;
-  const testcasesComplete = total > 0 && withOutput === total;
-  const testcaseDetail = total === 0
-    ? 'no testcases yet'
-    : withOutput === total
-      ? `${total} ${total === 1 ? 'case' : 'cases'}, all paired`
-      : `${total - withOutput} of ${total} ${total - withOutput === 1 ? 'case' : 'cases'} missing expected outputs`;
-  const item = (done: boolean, label: string, detail: string, action?: React.ReactNode, detailWhenDone = false) =>
-    <li className={done ? styles.checkDone : styles.checkTodo} key={label}>
-      <span className={styles.checkMark} aria-hidden>{done ? <Check size={14} weight="bold" /> : <Circle size={14} />}</span>
-      <span className={styles.checkBody}>
-        <span className={styles.checkLabel}>{label}</span>
-        <span className={styles.checkDetail}>{done && !detailWhenDone ? 'Done' : detail} {!done && action}</span>
-      </span>
-    </li>;
-  return <div className={styles.verifyPanel}>
-    <ul className={styles.checklist} aria-label="Publish readiness">
-      {item(!!draft.solutionCpp.trim(), 'Solution', 'missing',
-        <>— <button type="button" className={styles.linkButton} onClick={() => onGoToSolution()}>add it</button></>)}
-      {item(testcasesComplete, 'Testcases', testcaseDetail,
-        <>— <button type="button" className={styles.linkButton} onClick={() => onGoToTestcases()}>{total === 0 ? 'add them' : 'open testcases'}</button></>, true)}
-      {item(pdfCurrent, 'PDF', draft.hasLatestPdf ? 'outdated' : 'not built',
-        <>— <button type="button" className={styles.linkButton} disabled={disabled} onClick={onBuildPdf}>build now</button></>)}
-      {item(verified, 'Verified', draft.verifiedRevision === null ? 'never verified' : 'verified',
-        <>— <button type="button" className={styles.linkButton} disabled={disabled || !draft.solutionCpp.trim()} onClick={onVerify}>verify now</button></>)}
-    </ul>
-    {dirty && <p className={styles.caution}>Unsaved edits exist — saving automatically.</p>}
-    <div className={styles.verifyActions}>
-      <Button disabled={disabled} onClick={onBuildPdf}>Build PDF</Button>
-      <Button disabled={disabled || !draft.solutionCpp.trim()} onClick={onVerify}>Verify All</Button>
-      <Button variant="primary" disabled={!canPublish} onClick={onPublish}>Publish problem</Button>
-    </div>
-  </div>;
 }

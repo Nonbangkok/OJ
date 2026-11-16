@@ -1,0 +1,136 @@
+/* Verify & publish (§7.9): readiness rows, footer, and the History drawer. */
+.tab {
+  display: grid;
+  gap: 16px;
+  max-width: 820px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.glyph {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+
+.row[data-state='done'] .glyph { color: var(--status-success); }
+.row[data-state='stale'] .glyph { color: var(--status-warning); }
+.row[data-state='failed'] .glyph { color: var(--status-danger); }
+
+.body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.detail {
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.fix {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.link {
+  font-size: 13px;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.reason {
+  margin: 0;
+  margin-right: auto;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.drawerBody {
+  display: grid;
+  gap: 14px;
+  font-size: 13px;
+}
+
+.checks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+
+.cases {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.cases th,
+.cases td {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.num {
+  text-align: right;
+  font-family: var(--font-family-mono);
+}
+
+.log {
+  margin: 0;
+  padding: 10px;
+  max-height: 320px;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
