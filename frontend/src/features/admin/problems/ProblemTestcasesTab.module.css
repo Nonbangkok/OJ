@@ -1,0 +1,144 @@
+/* Testcases tab (§7.8). */
+.summary {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th,
+.table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table th {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.num {
+  font-family: var(--font-family-mono);
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.action {
+  width: 1%;
+  text-align: right;
+}
+
+.panes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.paneTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pre {
+  margin: 0;
+  max-height: 360px;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-secondary);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.confirmBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.confirmBody p {
+  margin: 0;
+}
+
+.switchRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.toggleSwitch {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 50px;
+  height: 28px;
+}
+
+.toggleSwitch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleTrack {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  background-color: var(--action-disabled-bg);
+  border-radius: 34px;
+  transition: 0.2s;
+}
+
+.toggleTrack::before {
+  position: absolute;
+  content: '';
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: var(--background-primary);
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+.toggleSwitch input:checked + .toggleTrack {
+  background-color: var(--accent-primary);
+}
+
+.toggleSwitch input:focus-visible + .toggleTrack {
+  outline: 3px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+.toggleSwitch input:checked + .toggleTrack::before {
+  transform: translateX(22px);
+}

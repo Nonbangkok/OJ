@@ -151,6 +151,16 @@ describe('ProblemEditPage', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Statement replaced');
   });
 
+  it('Testcases and Grader files tabs render inside the editor', async () => {
+    jest.mocked(adminService.getProblemTestcases).mockResolvedValue({ testcases: [{ case_number: 1, input_bytes: 10, output_bytes: 5 }], total: 1 });
+    jest.mocked(adminService.getProblemDetail).mockResolvedValue(detail({ problem_type: 'header', submission_filename: 'student.h' }) as never);
+    jest.mocked(adminService.getProblemFiles).mockResolvedValue(filesInfo() as never);
+    renderAt('/admin/problems/P1/testcases');
+    expect(await screen.findByText('1 testcase · 15 B')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Grader files' }));
+    expect(await screen.findByText('grader.cpp')).toBeInTheDocument();
+  });
+
   it('Danger zone deletes with a typed confirm naming submissions', async () => {
     jest.mocked(adminService.deleteProblem).mockResolvedValue({ message: 'ok' });
     renderAt('/admin/problems/P1/danger');

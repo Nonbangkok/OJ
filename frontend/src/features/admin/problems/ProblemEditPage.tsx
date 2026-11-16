@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { Button, ConfirmDialog, EmptyState, InlineError, PageHeader, StatusBadge } from '../../../components/ui';
 import buttonStyles from '../../../components/ui/Button.module.css';
 import adminService from '../../../services/adminService';
 import { getErrorMessage, getErrorStatus } from '../../../utils/error';
-import type { ProblemFilesResponse } from '../../../types';
+import { useAuth } from '../../../context/AuthContext';
 import ProblemGeneralTab from './ProblemGeneralTab';
 import ProblemStatementTab from './ProblemStatementTab';
 import ProblemDangerTab from './ProblemDangerTab';
-import ProblemFilesSection from './ProblemFilesSection';
+import ProblemTestcasesTab from './ProblemTestcasesTab';
+import ProblemGraderTab from './ProblemGraderTab';
 import {
   TYPE_LOCK_MESSAGE, changedFields, fieldErrorsFrom400, formFromDetail, isFormDirty, validateForm,
   type AdminProblemEditorDetail, type FieldErrors, type ProblemEditorForm,
@@ -31,6 +32,7 @@ export default function ProblemEditPage() {
 function ProblemEditor() {
   const { problemId = '', tab: tabParam } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const base = `/admin/problems/${encodeURIComponent(problemId)}`;
 
   const [detail, setDetail] = useState<AdminProblemEditorDetail | null>(null);
@@ -39,7 +41,6 @@ function ProblemEditor() {
   const [form, setForm] = useState<ProblemEditorForm | null>(null);
   const [authors, setAuthors] = useState<Array<{ id: number; username: string }>>([]);
   const [collections, setCollections] = useState<Array<{ id: number; name: string }>>([]);
-  const [files, setFiles] = useState<ProblemFilesResponse | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saveError, setSaveError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -72,24 +73,6 @@ function ProblemEditor() {
   }, []);
 
   const savedType = detail?.problem_type ?? 'standard';
-  const loadFiles = useCallback(async () => {
-    try {
-      const info = await adminService.getProblemFiles(problemId);
-      setFiles(info ?? null);
-      return info;
-    } catch {
-      setFiles(null);
-      return undefined;
-    }
-  }, [problemId]);
-  useEffect(() => {
-    if (savedType !== 'header') return undefined;
-    let cancelled = false;
-    adminService.getProblemFiles(problemId)
-      .then((info) => { if (!cancelled) setFiles(info ?? null); })
-      .catch(() => { if (!cancelled) setFiles(null); });
-    return () => { cancelled = true; };
-  }, [savedType, problemId]);
 
   useEffect(() => {
     if (savedAt === null) return undefined;
@@ -260,13 +243,10 @@ function ProblemEditor() {
             onReplaced={() => setDetail((prev) => (prev ? { ...prev, has_pdf: true } : prev))}
           />
         )}
-        {tab === 'grader' && (
-          <div className={styles.panel}>
-            {files
-              ? <ProblemFilesSection problemId={detail.id} files={files.files} onChanged={loadFiles} />
-              : <p className={styles.muted}>Loading grader files…</p>}
-          </div>
+        {tab === 'testcases' && (
+          <ProblemTestcasesTab problemId={detail.id} submissionCount={submissionCount} canRejudge={user?.role === 'admin'} />
         )}
+        {tab === 'grader' && <ProblemGraderTab problemId={detail.id} />}
         {tab === 'danger' && (
           <ProblemDangerTab
             problemId={detail.id}

@@ -5,7 +5,6 @@ import useProblemSelection from '../../../hooks/admin/useProblemSelection';
 import useRejudge from '../../../hooks/admin/useRejudge';
 import CreateProblemDialog from './CreateProblemDialog';
 import CollectionsDialog from './CollectionsDialog';
-import TestcasesDialog from './TestcasesDialog';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import RejudgeFeedbackBox from '../shared/RejudgeFeedbackBox';
 import adminService from '../../../services/adminService';
@@ -211,7 +210,6 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
   // --- Collections --------------------------------------------------------
   const [collections, setCollections] = useState<CollectionWithStats[]>([]);
   const [collectionsOpen, setCollectionsOpen] = useState(false);
-  const [testcasesProblem, setTestcasesProblem] = useState<{ id: string } | null>(null);
   const [collectionConfirm, setCollectionConfirm] = useState<{ id: number; name: string; count: number; isVisible: boolean } | null>(null);
   const [moveConfirm, setMoveConfirm] = useState<{ collectionId: number | null; name: string } | null>(null);
   const [deleteSelectionConfirm, setDeleteSelectionConfirm] = useState(false);
@@ -682,10 +680,6 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
         onClose={() => setCollectionsOpen(false)}
         onChanged={refreshAfterCollectionChange}
         collections={collections}
-      />
-      <TestcasesDialog
-        problem={testcasesProblem}
-        onClose={() => setTestcasesProblem(null)}
       />
       {collectionConfirm && (
         <ConfirmationModal
