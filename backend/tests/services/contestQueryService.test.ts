@@ -102,8 +102,10 @@ describe('getContestDetail participant gate (Phase 3 semantics)', () => {
     const detail = await getContestDetail('1', { id: 42, role: 'user' });
 
     expect(detail?.problems).toEqual([]);
-    // No problems query ran.
-    expect(query).toHaveBeenCalledTimes(1);
+    // No problem titles were read: the only other query is the count (B4).
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(query.mock.calls[1][0]).toContain('COUNT(*)');
+    expect(query.mock.calls.some(([sql]: [string]) => /SELECT id, title/.test(sql))).toBe(false);
   });
 
   it('shows running-contest problems to a participant', async () => {

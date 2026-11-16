@@ -62,7 +62,7 @@ describe('Problem Migration Service', () => {
             await moveProblemsToContest(1, ['P1']);
 
             expect(mockClient.query).toHaveBeenCalledWith(
-                expect.stringContaining('is_visible_before_contest = is_visible'),
+                expect.stringContaining('is_visible_before_contest = p.is_visible'),
                 [1, ['P1']],
             );
         });
@@ -270,8 +270,8 @@ describe('Problem Migration Service', () => {
             // The driver table is contest_participants (LEFT JOIN scores), so
             // participants with no submissions still get a scoreboard row.
             expect(sql).toContain('FROM contest_participants cp');
-            expect(sql).toContain('LEFT JOIN UserTotalScores uts');
-            expect(sql).toContain("COALESCE(uts.total_score, 0)");
+            expect(sql).toContain('LEFT JOIN user_totals ut');
+            expect(sql).toContain('COALESCE(ut.total_score, 0)');
             expect(sql).not.toContain('JOIN contest_participants cp ON cp.user_id = uts.user_id');
         });
 
@@ -293,8 +293,8 @@ describe('Problem Migration Service', () => {
                 .find(([text]) => String(text).includes('INSERT INTO contest_scoreboards'));
             const [sql] = scoreboardCall as [string, unknown[]];
             // {problemId: {score}} — same shape the live scoreboard serves.
-            expect(sql).toContain("jsonb_object_agg(ubs.problem_id, jsonb_build_object('score', ubs.best_score))");
-            expect(sql).not.toContain('jsonb_object_agg(ubs.problem_id, ubs.best_score)');
+            expect(sql).toMatch(/jsonb_object_agg\(pb\.problem_id, jsonb_build_object\(\s*'score', pb\.best_score/);
+            expect(sql).not.toContain('jsonb_object_agg(pb.problem_id, pb.best_score)');
         });
     });
 });

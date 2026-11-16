@@ -87,6 +87,8 @@ describe('Contest Controller', () => {
             (db.query as jest.Mock).mockResolvedValueOnce({
                 rows: [{ id: 'P1', title: 'Problem 1' }]
             });
+            // 5. Problem count (B4: shown to every viewer)
+            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ problem_count: 1 }] });
 
             const res = await request(app).get('/contests/1');
 

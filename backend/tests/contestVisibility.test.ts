@@ -220,7 +220,8 @@ describe('Contest visibility gating', () => {
                 .mockResolvedValueOnce({ rows: [hiddenRow] }) // pre-check
                 .mockResolvedValueOnce({ rows: [hiddenRow] }) // detail
                 .mockResolvedValueOnce({ rows: [] })          // participant check
-                .mockResolvedValueOnce({ rows: [] });         // problems (staff sees list)
+                .mockResolvedValueOnce({ rows: [] })          // problems (staff sees list)
+                .mockResolvedValueOnce({ rows: [{ problem_count: 0 }] }); // problem count
 
             const res = await get(app, '/contests/3', 'staff');
 
@@ -233,7 +234,8 @@ describe('Contest visibility gating', () => {
             query
                 .mockResolvedValueOnce({ rows: [visibleRow] }) // pre-check
                 .mockResolvedValueOnce({ rows: [visibleRow] }) // detail
-                .mockResolvedValueOnce({ rows: [] });          // participant check
+                .mockResolvedValueOnce({ rows: [] })           // participant check
+                .mockResolvedValueOnce({ rows: [{ problem_count: 0 }] }); // problem count
 
             const res = await get(app, '/contests/3', 'user');
 

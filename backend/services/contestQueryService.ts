@@ -8,6 +8,7 @@ import {
     ContestWritePayload,
     MoveSingleProblemToMainResult,
 } from '../types/service';
+import { contestProblemOrderSql } from './contestProblemOrder';
 
 // Scoreboard and participant-facing reads were split into their own modules;
 // re-exported here so existing importers keep working.
@@ -99,7 +100,7 @@ export const listContests = async (
 export const getContestDetail = async (
     id: string,
     viewer?: { id: number; role: string },
-): Promise<(ContestDetailRow & { problems: ContestProblemsSummaryRow[]; is_participant: boolean }) | null> => {
+): Promise<(ContestDetailRow & { problems: ContestProblemsSummaryRow[]; problem_count: number; is_participant: boolean }) | null> => {
     // Visibility gate first: a hidden contest is indistinguishable from a
     // nonexistent one for non-staff viewers (same convention as hidden
     // problems). Staff/admin inspect hidden contests via direct URL.
@@ -145,7 +146,7 @@ export const getContestDetail = async (
                 `SELECT problem_id AS id, title, author
                  FROM contest_problems
                  WHERE contest_id = $1
-                 ORDER BY problem_id`,
+                 ORDER BY ${contestProblemOrderSql('contest_problems', 'position')}`,
                 [id],
             );
             problems = problemsResult.rows;
@@ -154,16 +155,26 @@ export const getContestDetail = async (
                 `SELECT id, title, author
                  FROM problems
                  WHERE contest_id = $1
-                 ORDER BY id`,
+                 ORDER BY ${contestProblemOrderSql('problems', 'contest_position')}`,
                 [id],
             );
             problems = problemsResult.rows;
         }
     }
 
+    // Everyone who can see the contest may know how many problems it has
+    // (the join gate shows their letters); titles stay gated above.
+    const countResult = await db.query<{ problem_count: number }>(
+        contest.status === CONTEST_STATUS.FINISHED
+            ? 'SELECT COUNT(*)::int AS problem_count FROM contest_problems WHERE contest_id = $1'
+            : 'SELECT COUNT(*)::int AS problem_count FROM problems WHERE contest_id = $1',
+        [id],
+    );
+
     return {
         ...contest,
         problems,
+        problem_count: countResult.rows[0]?.problem_count ?? 0,
         is_participant: isParticipant,
     };
 };
@@ -186,6 +197,7 @@ export const moveSingleProblemToMainSystem = async (
     const updateResult = await db.query<Pick<ProblemRow, 'id' | 'title'>>(
         `UPDATE problems
          SET contest_id = NULL,
+             contest_position = NULL,
              is_visible = COALESCE(is_visible_before_contest, TRUE),
              is_visible_before_contest = NULL
          WHERE id = $1 AND contest_id = $2

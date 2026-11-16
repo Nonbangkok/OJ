@@ -249,6 +249,11 @@ export const contestBodySchema = z.object({
   endTime: dateTimeString,
 });
 
+export const contestProblemOrderBodySchema = z.object({
+  problemIds: z.array(nonEmptyString).min(1).max(100)
+    .refine((ids) => new Set(ids).size === ids.length, 'Problem ids must be unique'),
+});
+
 export const moveContestProblemsBodySchema = z.object({
   problemIds: z.array(nonEmptyString).min(1),
   action: z.enum(['move_to_contest', 'move_to_main']),

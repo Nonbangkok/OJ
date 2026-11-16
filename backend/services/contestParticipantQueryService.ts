@@ -15,6 +15,7 @@ import {
     ContestProblemsForParticipantResult,
     ContestProblemStatsRow,
 } from '../types/service';
+import { contestProblemOrderSql } from './contestProblemOrder';
 
 /**
  * Contestant-facing contest problem access, split out of contestQueryService.
@@ -86,7 +87,7 @@ export const getContestProblemsForParticipant = async (
             LEFT JOIN RankedSubmissions latest ON cp.problem_id = latest.problem_id AND latest.rn_latest = 1
             LEFT JOIN RankedSubmissions best ON cp.problem_id = best.problem_id AND best.rn_best = 1
             WHERE cp.contest_id = $2
-            ORDER BY cp.problem_id
+            ORDER BY ${contestProblemOrderSql('cp', 'position')}
         `,
             [userId, contestId],
         );
@@ -107,7 +108,7 @@ export const getContestProblemsForParticipant = async (
         LEFT JOIN RankedSubmissions latest ON p.id = latest.problem_id AND latest.rn_latest = 1
         LEFT JOIN RankedSubmissions best ON p.id = best.problem_id AND best.rn_best = 1
         WHERE p.contest_id = $2
-        ORDER BY p.id
+        ORDER BY ${contestProblemOrderSql('p', 'contest_position')}
       `,
         [userId, contestId],
     );

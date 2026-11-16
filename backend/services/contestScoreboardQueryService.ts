@@ -3,6 +3,8 @@ import { ContestRow, ContestScoreboardDetailRow } from '../types/models';
 import { CONTEST_STATUS } from '../constants';
 import { ContestScoreboardResponse, ContestScoreboardRow } from '../types/service';
 import { isContestManagementRole } from './contestAccess';
+import { contestProblemOrderSql } from './contestProblemOrder';
+import { contestStandingsCte, standingsRankSql } from './contestStandingsSql';
 
 /**
  * Scoreboard computation, split out of contestQueryService.
@@ -33,18 +35,19 @@ export const getContestScoreboard = async (
     if (contest.status === CONTEST_STATUS.FINISHED) {
         const [scoreboardResult, problemsResult] = await Promise.all([
             db.query<ContestScoreboardDetailRow>(
-                `SELECT cs.*, u.username, (u.avatar_png IS NOT NULL) AS has_avatar
+                `SELECT cs.*, u.username, (u.avatar_png IS NOT NULL) AS has_avatar,
+                        ${standingsRankSql('cs')} AS rank
                  FROM contest_scoreboards cs
                  JOIN users u ON cs.user_id = u.id
                  WHERE cs.contest_id = $1
-                 ORDER BY cs.total_score DESC, cs.last_score_improvement_time ASC`,
+                 ORDER BY rank, u.username`,
                 [id],
             ),
             db.query<{ problem_id: string; title: string }>(
                 `SELECT problem_id, title
                  FROM contest_problems
                  WHERE contest_id = $1
-                 ORDER BY problem_id`,
+                 ORDER BY ${contestProblemOrderSql('contest_problems', 'position')}`,
                 [id],
             ),
         ]);
@@ -52,6 +55,8 @@ export const getContestScoreboard = async (
         return {
             scoreboard: scoreboardResult.rows,
             problems: problemsResult.rows,
+            status: contest.status,
+            start_time: contest.start_time,
         };
     }
 
@@ -59,41 +64,13 @@ export const getContestScoreboard = async (
         const [scoreboardResult, problemsResult] = await Promise.all([
             db.query<ContestScoreboardRow>(
                 `
-                WITH UserBestScores AS (
-                  SELECT
-                    cs.user_id,
-                    cs.problem_id,
-                    MAX(cs.score) AS best_score,
-                    MAX(cs.submitted_at) AS latest_score_time
-                  FROM contest_submissions cs
-                  WHERE cs.contest_id = $1
-                  GROUP BY cs.user_id, cs.problem_id
-                ),
-                UserTotalScores AS (
-                  SELECT
-                    ubs.user_id,
-                    SUM(ubs.best_score) AS total_score,
-                    jsonb_object_agg(ubs.problem_id, jsonb_build_object('score', ubs.best_score)) AS detailed_scores,
-                    MAX(ubs.latest_score_time) AS last_score_improvement_time
-                  FROM UserBestScores ubs
-                  GROUP BY ubs.user_id
-                ),
-                AllParticipants AS (
-                  SELECT
-                    cp.user_id,
-                    u.username,
-                    (u.avatar_png IS NOT NULL) AS has_avatar,
-                    COALESCE(uts.total_score, 0) AS total_score,
-                    COALESCE(uts.detailed_scores, '{}'::jsonb) AS detailed_scores,
-                    COALESCE(uts.last_score_improvement_time, cp.joined_at) AS last_score_improvement_time
-                  FROM contest_participants cp
-                  JOIN users u ON cp.user_id = u.id
-                  LEFT JOIN UserTotalScores uts ON uts.user_id = cp.user_id
-                  WHERE cp.contest_id = $1
-                )
-                SELECT *
-                FROM AllParticipants
-                ORDER BY total_score DESC, last_score_improvement_time ASC
+                ${contestStandingsCte('$1')}
+                SELECT s.user_id, u.username, (u.avatar_png IS NOT NULL) AS has_avatar,
+                       s.total_score, s.detailed_scores, s.last_score_improvement_time,
+                       ${standingsRankSql('s')} AS rank
+                FROM standings s
+                JOIN users u ON u.id = s.user_id
+                ORDER BY rank, u.username
                 `,
                 [id],
             ),
@@ -101,7 +78,7 @@ export const getContestScoreboard = async (
                 `SELECT id AS problem_id, title
                  FROM problems
                  WHERE contest_id = $1
-                 ORDER BY id`,
+                 ORDER BY ${contestProblemOrderSql('problems', 'contest_position')}`,
                 [id],
             ),
         ]);
@@ -109,6 +86,8 @@ export const getContestScoreboard = async (
         return {
             scoreboard: scoreboardResult.rows,
             problems: problemsResult.rows,
+            status: contest.status,
+            start_time: contest.start_time,
         };
     }
 
@@ -130,7 +109,7 @@ export const getContestScoreboard = async (
             `SELECT id AS problem_id, title
              FROM problems
              WHERE contest_id = $1
-             ORDER BY id`,
+             ORDER BY ${contestProblemOrderSql('problems', 'contest_position')}`,
             [id],
         ),
     ]);
@@ -138,5 +117,7 @@ export const getContestScoreboard = async (
     return {
         scoreboard: participantsResult.rows,
         problems: problemsResult.rows,
+        status: contest.status,
+        start_time: contest.start_time,
     };
 };
