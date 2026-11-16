@@ -3,44 +3,79 @@ import { useSearchParams } from 'react-router-dom';
 import styles from './Problems.module.css';
 import { useIncrementalProblems } from '../../hooks/useIncrementalProblems';
 import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
-import ProblemCard from '../../features/problem/ProblemCard';
-import { Button, PageHeader } from '../../components/ui';
-import { PROBLEMS_PAGE } from '../../config/constants';
-import { PROBLEM_DIFFICULTY_OPTIONS } from '../../utils/constants';
+import {
+  Button,
+  DataTable,
+  EmptyState,
+  FilterBar,
+  PageHeader,
+  ScoreCell,
+  SegmentedControl,
+  StatusMark,
+  TestcaseStrip,
+  verdictTone,
+  type DataTableColumn,
+  type FilterChip,
+  type VerdictTone,
+} from '../../components/ui';
+import { DIFFICULTY_BANDS, PROBLEMS_PAGE } from '../../config/constants';
+import { useAuth } from '../../context/AuthContext';
 import problemService from '../../services/problemService';
-import type { ProblemCategoryCountsResponse, ProblemFilterOptionsResponse } from '../../types';
+import { formatTimeAgo } from '../../utils/formatters';
+import type {
+  ProblemCategoryCountsResponse,
+  ProblemFilterOptionsResponse,
+  ProblemStatusCounts,
+  ProblemSummary,
+} from '../../types';
 import type { PublicProblemListLoaderData } from '../../routing/problemListLoaders';
 import { buildPublicProblemListQuery } from '../../routing/problemListLoaders';
 
 import LoadingPage from '../../components/shared/LoadingPage';
 
-const ALL_CATEGORIES = 'All';
 const UNCATEGORIZED = 'Uncategorized';
-const DIFFICULTY_SORT_NONE = '';
 const DIFFICULTY_SORT_ASC = 'difficulty-asc';
 const DIFFICULTY_SORT_DESC = 'difficulty-desc';
+const STATUSES = ['unsolved', 'attempted', 'solved'] as const;
+type StatusSegment = 'all' | typeof STATUSES[number];
+
+/** The viewer's mark for a row: solved, the best attempt's tone, or untried. */
+const rowTone = (problem: ProblemSummary): VerdictTone => {
+  if ((problem.best_score ?? 0) >= 100) return 'pass';
+  if (Number(problem.submission_count ?? 0) > 0) return verdictTone(problem.best_submission_status);
+  return 'none';
+};
+
+/** Adds the current value as an option when it is not one of the presets (legacy URLs). */
+const withCurrent = (options: FilterChip['options'], value: string | undefined, label: () => string) =>
+  value && !options.some((option) => option.value === value) ? [...options, { value, label: label() }] : options;
 
 const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemListLoaderData }) => {
+  const { user } = useAuth();
+  const isGuest = !user;
   const [searchParams, setSearchParams] = useSearchParams();
   const categoryParam = searchParams.get('category') || '';
   const selectedCategories = useMemo(() => categoryParam.split(',').filter(Boolean), [categoryParam]);
-  const hasCategoryFilter = selectedCategories.length > 0;
-  const categoryQueryValue = selectedCategories.join(',');
   const [search, setSearch] = useState(() => searchParams.get('search') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('search') || '');
   const difficultyMin = searchParams.get('difficultyMin') || '';
   const difficultyMax = searchParams.get('difficultyMax') || '';
   const difficultySort = searchParams.get('sort') ?? DIFFICULTY_SORT_ASC;
-  const [author, setAuthor] = useState(() => searchParams.get('author') || '');
-  const [debouncedAuthor, setDebouncedAuthor] = useState(() => searchParams.get('author') || '');
+  const urlAuthor = searchParams.get('author') || '';
   const collection = searchParams.get('collection') || '';
+  const statusParam = searchParams.get('status') || '';
+  const status: StatusSegment = !isGuest && (STATUSES as readonly string[]).includes(statusParam)
+    ? statusParam as StatusSegment
+    : 'all';
   const [categoryCounts, setCategoryCounts] = useState<ProblemCategoryCountsResponse | null>(null);
   const [filterOptions, setFilterOptions] = useState<ProblemFilterOptionsResponse | null>(null);
+  const [statusCounts, setStatusCounts] = useState<ProblemStatusCounts | null>(null);
+  const [totals, setTotals] = useState<ProblemStatusCounts | null>(null);
+  const [showCategories, setShowCategories] = useState(false);
 
   const urlSearch = searchParams.get('search') || '';
-  const urlAuthor = searchParams.get('author') || '';
   // Same-route navigation keeps this component mounted. Mirror an externally
-  // changed URL into the text boxes; the existing debounce governs queries.
+  // changed URL into the search box; the existing debounce governs queries.
   // Adjusted during render (not in an effect) so the box never commits a
   // stale value for one frame.
   const [mirroredUrlSearch, setMirroredUrlSearch] = useState(urlSearch);
@@ -48,17 +83,15 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
     setMirroredUrlSearch(urlSearch);
     setSearch(urlSearch);
   }
-  const [mirroredUrlAuthor, setMirroredUrlAuthor] = useState(urlAuthor);
-  if (urlAuthor !== mirroredUrlAuthor) {
-    setMirroredUrlAuthor(urlAuthor);
-    setAuthor(urlAuthor);
-  }
 
-  const updateUrlFilter = (key: string, value: string, preserveEmpty = false) => {
+  /** Writes URL filters (replace history) and resets the restored page span. */
+  const updateUrl = (patch: Record<string, string>, preserveEmpty: string[] = []) => {
     setSearchParams(previous => {
       const next = new URLSearchParams(previous);
-      if (value || preserveEmpty) next.set(key, value);
-      else next.delete(key);
+      for (const [key, value] of Object.entries(patch)) {
+        if (value || preserveEmpty.includes(key)) next.set(key, value);
+        else next.delete(key);
+      }
       next.delete('pages');
       return next;
     }, { replace: true, preventScrollReset: true });
@@ -70,25 +103,20 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
     const timer = window.setTimeout(() => setDebouncedSearch(search), PROBLEMS_PAGE.SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [search]);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedAuthor(author), PROBLEMS_PAGE.SEARCH_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [author]);
 
   // Server-side query. The public list defaults to difficulty ascending;
-  // unrated problems remain included after rated problems. Search, category,
-  // difficulty filters and sorting all run in SQL before pagination.
-  const query = useMemo(() => {
-    return buildPublicProblemListQuery({
-      search: debouncedSearch,
-      category: categoryQueryValue,
-      author: debouncedAuthor,
-      collection,
-      difficultyMin,
-      difficultyMax,
-      sort: difficultySort,
-    });
-  }, [debouncedSearch, categoryQueryValue, debouncedAuthor, collection, difficultyMin, difficultyMax, difficultySort]);
+  // unrated problems remain included after rated problems. Status, search,
+  // category, difficulty filters and sorting all run in SQL before pagination.
+  const query = useMemo(() => buildPublicProblemListQuery({
+    status: status === 'all' ? '' : status,
+    search: debouncedSearch,
+    category: categoryParam,
+    author: urlAuthor,
+    collection,
+    difficultyMin,
+    difficultyMax,
+    sort: difficultySort,
+  }), [status, debouncedSearch, categoryParam, urlAuthor, collection, difficultyMin, difficultyMax, difficultySort]);
 
   const {
     problems,
@@ -109,34 +137,42 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
   // True once any first page has finished loading. After that the controls
   // stay mounted forever — a later query change refreshes only the result
   // area, so the search input never remounts and typing keeps its focus.
-  // Sticky, so it is state set during render: React re-renders before
-  // committing, so the first committed frame after a load already sees it.
   const [hasLoaded, setHasLoaded] = useState(false);
   if (!hasLoaded && !loading && !error) setHasLoaded(true);
 
-  // Global category counts — one cheap aggregate, independent of the loaded
-  // batch, so category choices stay correct while pages stream in.
   useEffect(() => {
     let cancelled = false;
     problemService.getCategoryCounts()
-      .then(counts => {
-        if (!cancelled) setCategoryCounts(counts);
-      })
-      .catch(() => {
-        // Tabs are supplementary; the list stays fully usable without them.
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then(counts => { if (!cancelled) setCategoryCounts(counts); })
+      .catch(() => { /* Category choices are supplementary. */ });
+    problemService.getFilterOptions()
+      .then(options => { if (!cancelled) setFilterOptions(options); })
+      .catch(() => { /* Collection choices are supplementary. */ });
+    problemService.getStatusCounts({})
+      .then(counts => { if (!cancelled) setTotals(counts); })
+      .catch(() => { /* The header count is supplementary. */ });
+    return () => { cancelled = true; };
   }, []);
+
+  // Segment counts follow every list filter except the status itself.
+  const countFilters = useMemo(() => {
+    const { status: _status, sort: _sort, order: _order, limit: _limit, cursor: _cursor, ...filters } = query;
+    return filters;
+  }, [query]);
+  const countKey = JSON.stringify(countFilters);
+  useEffect(() => {
+    let cancelled = false;
+    problemService.getStatusCounts(JSON.parse(countKey))
+      .then(counts => { if (!cancelled) setStatusCounts(counts); })
+      .catch(() => { if (!cancelled) setStatusCounts(null); });
+    return () => { cancelled = true; };
+  }, [countKey]);
 
   // Record the loaded span only after it belongs to the committed URL filters.
   // This avoids reviving an old page count in the debounce window after a
-  // search/author input changes.
+  // search input changes.
   useEffect(() => {
-    if (loadedQueryKey !== JSON.stringify(query)
-      || search.trim() !== debouncedSearch.trim()
-      || author.trim() !== debouncedAuthor.trim()) return;
+    if (loadedQueryKey !== JSON.stringify(query) || search.trim() !== debouncedSearch.trim()) return;
     const loadedPages = Math.max(1, Math.ceil(problems.length / PROBLEMS_PAGE.PAGE_SIZE));
     const desiredPageParam = loadedPages > 1 ? String(loadedPages) : null;
     if (desiredPageParam === searchParams.get('pages') || (desiredPageParam === null && !searchParams.has('pages'))) return;
@@ -148,257 +184,200 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
       else next.delete('pages');
       return next;
     }, { replace: true, preventScrollReset: true });
-  }, [loadedQueryKey, query, problems.length, search, debouncedSearch, author, debouncedAuthor, searchParams, setSearchParams]);
-
-  useEffect(() => {
-    let cancelled = false;
-    problemService.getFilterOptions()
-      .then(options => {
-        if (!cancelled) setFilterOptions(options);
-      })
-      .catch(() => {
-        // The list remains usable when supplementary filter choices cannot load.
-      });
-    return () => { cancelled = true; };
-  }, []);
+  }, [loadedQueryKey, query, problems.length, search, debouncedSearch, searchParams, setSearchParams]);
 
   // Only narrowing controls affect the empty-state copy; the default sort
   // does not turn an otherwise unfiltered empty list into a filtered state.
   const hasActiveFilters = debouncedSearch.trim() !== ''
-    || hasCategoryFilter
+    || categoryParam !== ''
     || difficultyMin !== ''
     || difficultyMax !== ''
-    || debouncedAuthor.trim() !== ''
-    || collection !== '';
+    || urlAuthor.trim() !== ''
+    || collection !== ''
+    || status !== 'all';
 
-  // Keep search and ordering visible; narrowing controls and categories are
-  // grouped in one disclosure, with only selected filters summarized inline.
-  // Count each selected category separately so the badge reflects a
-  // multi-category filter, while range/author/collection remain one each.
-  const activeFilterCount = selectedCategories.length
-    + Number(difficultyMin !== '' || difficultyMax !== '')
-    + Number(author.trim() !== '')
-    + Number(collection !== '');
-  const difficultyFilterLabel = difficultyMin && difficultyMax
-    ? `Difficulty: ${difficultyMin}–${difficultyMax}`
-    : difficultyMin
-      ? `Difficulty: ≥ ${difficultyMin}`
-      : `Difficulty: ≤ ${difficultyMax}`;
-  const collectionFilterLabel = collection === 'none'
-    ? 'No collection'
-    : filterOptions?.collections.find(option => String(option.id) === collection)?.name ?? `Collection ${collection}`;
-  const clearFilterControls = () => {
-    setAuthor('');
-    setSearchParams(previous => {
-      const next = new URLSearchParams(previous);
-      ['category', 'difficultyMin', 'difficultyMax', 'author', 'collection'].forEach(key => next.delete(key));
-      next.delete('pages');
-      return next;
-    }, { replace: true, preventScrollReset: true });
+  const difficultyValue = difficultyMin || difficultyMax ? `${difficultyMin}-${difficultyMax}` : undefined;
+  const categoryOptions = [
+    ...(categoryCounts?.categories.map(({ name }) => ({ value: name, label: name })) ?? []),
+    ...(categoryCounts?.uncategorized ? [{ value: UNCATEGORIZED, label: UNCATEGORIZED }] : []),
+  ];
+  const collectionOptions = [
+    ...(filterOptions?.collections.map(option => ({ value: String(option.id), label: option.name })) ?? []),
+    ...(filterOptions?.hasUncollected ? [{ value: 'none', label: 'No collection' }] : []),
+  ];
+  const filters: FilterChip[] = [
+    {
+      key: 'difficulty',
+      label: 'Difficulty',
+      value: difficultyValue,
+      options: withCurrent(DIFFICULTY_BANDS.map(({ value, label }) => ({ value, label })), difficultyValue,
+        () => `${difficultyMin || '…'}–${difficultyMax || '…'}`),
+      onChange: (value) => {
+        const band = DIFFICULTY_BANDS.find(b => b.value === value);
+        updateUrl({ difficultyMin: band ? String(band.min) : '', difficultyMax: band ? String(band.max) : '' });
+      },
+    },
+    {
+      key: 'category',
+      label: 'Category',
+      value: categoryParam || undefined,
+      options: withCurrent(categoryOptions, categoryParam || undefined, () => selectedCategories.join(', ')),
+      onChange: (value) => updateUrl({ category: value ?? '' }),
+    },
+    {
+      key: 'collection',
+      label: 'Collection',
+      value: collection || undefined,
+      options: withCurrent(collectionOptions, collection || undefined, () => `Collection ${collection}`),
+      onChange: (value) => updateUrl({ collection: value ?? '' }),
+    },
+    // Author has no preset list: it is set from a problem's author link and
+    // shown here only so it can be removed.
+    ...(urlAuthor ? [{
+      key: 'author',
+      label: 'Author',
+      value: urlAuthor,
+      options: [{ value: urlAuthor, label: urlAuthor }],
+      onChange: () => updateUrl({ author: '' }),
+    }] : []),
+  ];
+
+  const segmentLabel = (key: StatusSegment, label: string) =>
+    statusCounts ? `${label} ${key === 'all' ? statusCounts.all : statusCounts[key]}` : label;
+
+  const visibleCategories = (problem: ProblemSummary): string[] => {
+    const categories = problem.categories ?? [];
+    return showCategories ? [...categories] : categories.filter(c => selectedCategories.includes(c));
   };
-  const setCategorySelection = (category: string, checked: boolean) => {
-    setSearchParams(previous => {
-      const next = new URLSearchParams(previous);
-      const selected = new Set((next.get('category') || '').split(',').filter(Boolean));
-      if (category === ALL_CATEGORIES) {
-        selected.clear();
-      } else if (checked) {
-        selected.add(category);
-      } else {
-        selected.delete(category);
-      }
-      if (selected.size > 0) next.set('category', [...selected].join(','));
-      else next.delete('category');
-      next.delete('pages');
-      return next;
-    }, { replace: true, preventScrollReset: true });
-  };
+
+  const columns: DataTableColumn<ProblemSummary>[] = [
+    {
+      key: 'mark',
+      header: <span className={styles.srOnly}>Status</span>,
+      cell: (p) => <StatusMark tone={rowTone(p)} />,
+      width: '28px',
+      mobile: 'hidden',
+    },
+    { key: 'id', header: 'ID', cell: (p) => <span className={styles.mono}>{p.id}</span>, mobile: 'meta' },
+    {
+      key: 'title',
+      header: 'Title',
+      mobile: 'primary',
+      cell: (p) => {
+        const categories = visibleCategories(p);
+        return categories.length === 0 ? p.title : (
+          <span className={styles.titleCell}>
+            {p.title}
+            <span className={styles.categories}>{categories.join(' · ')}</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: 'difficulty',
+      header: 'Difficulty',
+      align: 'right',
+      cell: (p) => (p.difficulty ?? '—'),
+      mobile: 'hidden',
+    },
+    {
+      key: 'best',
+      header: 'Best',
+      mobile: 'meta',
+      cell: (p) => {
+        const results = Array.isArray(p.best_submission_results) ? p.best_submission_results : [];
+        return (
+          <span className={styles.best}>
+            {results.length > 0 && <TestcaseStrip results={results} />}
+            <ScoreCell score={p.best_score} attempted={Number(p.submission_count ?? 0) > 0} />
+          </span>
+        );
+      },
+    },
+    {
+      key: 'last',
+      header: 'Last tried',
+      mobile: 'meta',
+      cell: (p) => <span className={styles.muted}>{p.latest_submission_at ? formatTimeAgo(p.latest_submission_at) : '—'}</span>,
+    },
+  ];
 
   // The full-page loader is only for the very first load. Every later
-  // refresh (typing in search, changing a filter) keeps the controls
-  // mounted — replacing the page would unmount the search input and drop
-  // the user's focus mid-word. Only the result area shows the refresh.
+  // refresh keeps the controls mounted so the search input keeps focus.
   const isInitialLoad = loading && !hasLoaded;
   if (isInitialLoad && !error) return <LoadingPage />;
   if (error && !hasLoaded) return <div className="error-message">{error}</div>;
 
+  const headerMeta = totals
+    ? (isGuest ? `${totals.all} problems` : `${totals.all} problems · ${totals.solved} solved`)
+    : undefined;
+
   return (
     <div className={styles['problems-page-container']}>
-      <PageHeader title="Problems" />
+      <PageHeader title="Problems" meta={headerMeta} />
 
-      <div className={styles['problems-controls']}>
-        <div className={styles['search-wrap']}>
-          <input
-            type="search"
-            className={styles['problems-search']}
-            placeholder="Search by name or ID…"
-            value={search}
-            onChange={event => { setSearch(event.target.value); updateUrlFilter('search', event.target.value); }}
-            aria-label="Search problems"
+      <FilterBar
+        search={{
+          value: search,
+          placeholder: 'Search problems',
+          onChange: (value) => { setSearch(value); updateUrl({ search: value }); },
+        }}
+        segments={isGuest ? undefined : (
+          <SegmentedControl<StatusSegment>
+            aria-label="Problem status"
+            value={status}
+            onChange={(value) => updateUrl({ status: value === 'all' ? '' : value })}
+            options={[
+              { value: 'all', label: segmentLabel('all', 'All') },
+              { value: 'unsolved', label: segmentLabel('unsolved', 'Unsolved') },
+              { value: 'attempted', label: segmentLabel('attempted', 'Attempted') },
+              { value: 'solved', label: segmentLabel('solved', 'Solved') },
+            ]}
           />
-        </div>
-        <div className={styles['primary-filter-actions']}>
-          <select
-            aria-label="Sort problems"
-            className={`${styles['difficulty-select']} ${styles['sort-select']}`}
-            value={difficultySort}
-            onChange={event => updateUrlFilter('sort', event.target.value, true)}
-          >
-            <option value="">Sort: Default</option>
-            <option value={DIFFICULTY_SORT_ASC}>Difficulty ↑</option>
-            <option value={DIFFICULTY_SORT_DESC}>Difficulty ↓</option>
-          </select>
-          <details className={styles['filter-popover']}>
-            <summary aria-label={`Filters${activeFilterCount ? `, ${activeFilterCount} active` : ''}`}>
-              <span>Filters</span>
-              {activeFilterCount > 0 && <span className={styles['filter-count']}>{activeFilterCount}</span>}
-              <span className={styles['filter-chevron']} aria-hidden="true">⌄</span>
-            </summary>
-            <div className={styles['filter-panel']}>
-              <div className={styles['filter-panel-header']}>
-                <strong>Filters</strong>
-                {activeFilterCount > 0 && (
-                  <button type="button" className={styles['clear-filters']} onClick={clearFilterControls}>
-                    Clear all
-                  </button>
-                )}
-              </div>
-              <div className={styles['filter-fields']}>
-                <div className={`${styles['filter-control']} ${styles['difficulty-control-group']}`}>
-                  <span>Difficulty</span>
-                  <div className={styles['difficulty-controls']}>
-                    <label className={styles['sr-only']} htmlFor="problem-difficulty-min">Difficulty minimum</label>
-                    <select id="problem-difficulty-min" aria-label="Difficulty minimum"
-                      className={styles['difficulty-select']} value={difficultyMin}
-                      onChange={event => updateUrlFilter('difficultyMin', event.target.value)}>
-                      <option value="">Min</option>
-                      {PROBLEM_DIFFICULTY_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
-                    </select>
-                    <span className={styles['difficulty-separator']} aria-hidden="true">–</span>
-                    <label className={styles['sr-only']} htmlFor="problem-difficulty-max">Difficulty maximum</label>
-                    <select id="problem-difficulty-max" aria-label="Difficulty maximum"
-                      className={styles['difficulty-select']} value={difficultyMax}
-                      onChange={event => updateUrlFilter('difficultyMax', event.target.value)}>
-                      <option value="">Max</option>
-                      {PROBLEM_DIFFICULTY_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <label className={styles['filter-control']}>
-                  <span>Collection</span>
-                  <select aria-label="Collection" className={styles['difficulty-select']} value={collection}
-                    onChange={event => updateUrlFilter('collection', event.target.value)}>
-                    <option value="">All collections</option>
-                    {filterOptions?.hasUncollected && <option value="none">No collection</option>}
-                    {filterOptions?.collections.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
-                  </select>
-                </label>
-                <label className={styles['filter-control']}>
-                  <span>Author</span>
-                  <input type="search" aria-label="Author" className={styles['difficulty-select']}
-                    placeholder="Filter by author…" value={author}
-                    onChange={event => { setAuthor(event.target.value); updateUrlFilter('author', event.target.value); }} />
-                </label>
-              </div>
-              <fieldset className={`${styles['filter-fieldset']} ${styles['category-fieldset']}`}>
-                <legend>Category</legend>
-                <div className={styles['category-options']} role="group" aria-label="Problem categories">
-                  <label className={styles['category-option']}>
-                    <input type="checkbox" checked={!hasCategoryFilter}
-                      onChange={() => setCategorySelection(ALL_CATEGORIES, true)} />
-                    <span>All</span>
-                    {categoryCounts && <small>{categoryCounts.total}</small>}
-                  </label>
-                  {categoryCounts?.categories.map(({ name, count }) => (
-                    <label key={name} className={styles['category-option']}>
-                      <input type="checkbox" value={name} checked={selectedCategories.includes(name)}
-                        onChange={event => setCategorySelection(name, event.target.checked)} />
-                      <span>{name}</span><small>{count}</small>
-                    </label>
-                  ))}
-                  {Boolean(categoryCounts?.uncategorized) && (
-                    <label className={styles['category-option']}>
-                      <input type="checkbox" value={UNCATEGORIZED} checked={selectedCategories.includes(UNCATEGORIZED)}
-                        onChange={event => setCategorySelection(UNCATEGORIZED, event.target.checked)} />
-                      <span>{UNCATEGORIZED}</span><small>{categoryCounts?.uncategorized}</small>
-                    </label>
-                  )}
-                </div>
-              </fieldset>
-            </div>
-          </details>
-        </div>
-      </div>
+        )}
+        filters={filters}
+        trailing={(
+          <>
+            <button
+              type="button"
+              className={styles.toggle}
+              aria-pressed={showCategories}
+              onClick={() => setShowCategories(on => !on)}
+            >
+              Show categories
+            </button>
+            <select
+              aria-label="Sort problems"
+              className={styles.sortSelect}
+              value={difficultySort}
+              onChange={event => updateUrl({ sort: event.target.value }, ['sort'])}
+            >
+              <option value="">Sort: Default</option>
+              <option value={DIFFICULTY_SORT_ASC}>Difficulty ↑</option>
+              <option value={DIFFICULTY_SORT_DESC}>Difficulty ↓</option>
+            </select>
+          </>
+        )}
+      />
 
-      {activeFilterCount > 0 && (
-        <div className={styles['active-filters']} aria-label="Active filters">
-          <span className={styles['active-filters-label']}>Active filters</span>
-          {hasCategoryFilter && (
-            <button type="button" className={styles['active-filter-chip']} aria-label={`Remove category filter: ${selectedCategories.join(', ')}`}
-              onClick={() => updateUrlFilter('category', '')}>
-              Category: {selectedCategories.join(', ')}<span aria-hidden="true">×</span>
-            </button>
-          )}
-          {(difficultyMin !== '' || difficultyMax !== '') && (
-            <button type="button" className={styles['active-filter-chip']} aria-label="Remove difficulty filter"
-              onClick={() => {
-                setSearchParams(previous => {
-                  const next = new URLSearchParams(previous);
-                  next.delete('difficultyMin');
-                  next.delete('difficultyMax');
-                  next.delete('pages');
-                  return next;
-                }, { replace: true, preventScrollReset: true });
-              }}>
-              {difficultyFilterLabel}<span aria-hidden="true">×</span>
-            </button>
-          )}
-          {author.trim() !== '' && (
-            <button type="button" className={styles['active-filter-chip']} aria-label="Remove author filter"
-              onClick={() => { setAuthor(''); updateUrlFilter('author', ''); }}>
-              Author: {author.trim()}<span aria-hidden="true">×</span>
-            </button>
-          )}
-          {collection !== '' && (
-            <button type="button" className={styles['active-filter-chip']} aria-label="Remove collection filter"
-              onClick={() => updateUrlFilter('collection', '')}>
-              {collectionFilterLabel}<span aria-hidden="true">×</span>
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Result-area refresh indicator: the controls above stay mounted and
-          interactive while this shows (spec: no full-page loading screen
-          between searches). A later refresh keeps the previous batch
-          visible; an empty result area shows the loading line. */}
-      {error && <div className="error-message" role="alert">{error}</div>}
-      {!error && loading && problems.length === 0 && (
-        <p className={styles['results-loading']} role="status">Loading problems…</p>
-      )}
-
-      {problems.length > 0 ? (
-        <div className={styles['problem-list']}>
-          {problems.map(problem => (
-            <ProblemCard
-              key={problem.id}
-              problem={problem}
-              highlightCategories={selectedCategories}
-            />
-          ))}
-        </div>
-      ) : (
-        !loading && (
-          <div className={styles['no-problems-container']}>
-            <div className={styles['no-problems-title']}>Problem not available.</div>
-            <div className={styles['no-problems-subtext']}>
-              {hasActiveFilters
-                ? 'No problems match the current filter.'
-                : 'Check back later or try refreshing the page.'}
-            </div>
-          </div>
-        )
-      )}
+      <DataTable<ProblemSummary>
+        caption="Problems"
+        columns={columns}
+        rows={problems}
+        rowKey={(p) => p.id}
+        rowLabel={(p) => p.title}
+        rowHref={(p) => `/problems/${p.id}`}
+        loading={loading}
+        error={error ? { message: error } : undefined}
+        empty={(
+          <EmptyState
+            title="Problem not available."
+            description={hasActiveFilters
+              ? 'No problems match the current filter.'
+              : 'Check back later or try refreshing the page.'}
+          />
+        )}
+      />
 
       {(hasMore || loadMoreError) && (
         <div className={styles['show-more-container']} ref={showMoreRef}>

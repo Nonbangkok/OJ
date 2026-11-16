@@ -6,6 +6,12 @@ import { installMockIntersectionObserver, restoreMockIntersectionObserver, trigg
 
 jest.mock('../../services/problemService');
 
+// Mutable viewer: the status segment is for signed-in users only.
+let mockViewer: { id: number; username: string; role: 'user' } | null = { id: 1, username: 'u1', role: 'user' };
+jest.mock('../../context/AuthContext', () => ({
+    useAuth: () => ({ user: mockViewer, isLoading: false }),
+}));
+
 // Mock ThemeContext to prevent useTheme errors from LoadingPage
 jest.mock('../../context/ThemeContext', () => ({
     useTheme: jest.fn(() => ({ theme: 'light' })),
@@ -41,12 +47,10 @@ const categoryCounts = {
 };
 
 const renderProblems = () => render(<BrowserRouter><Problems /></BrowserRouter>);
-const openFilters = () => {
-    const panel = document.querySelector('details');
-    if (panel && !panel.hasAttribute('open')) {
-        const summary = panel.querySelector('summary');
-        if (summary) fireEvent.click(summary);
-    }
+/** Picks an option from a desktop filter chip (Base UI menu). */
+const chooseChip = async (chip: string, option: string) => {
+    fireEvent.click(screen.getByRole('button', { name: `Add filter: ${chip}` }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: option }));
 };
 const LocationProbe = () => <output data-testid="location">{useLocation().search}</output>;
 const DetailWithBack = () => {
@@ -72,6 +76,8 @@ describe('Problems Page', () => {
         (jest.mocked(problemService.getFilterOptions) as jest.Mock).mockResolvedValue({
             collections: [{ id: 7, name: 'Practice' }], hasUncollected: true,
         });
+        (jest.mocked(problemService.getStatusCounts) as jest.Mock).mockResolvedValue({ all: 4, unsolved: 2, attempted: 1, solved: 1 });
+        mockViewer = { id: 1, username: 'u1', role: 'user' };
     });
 
     it('renders loading state initially', () => {
@@ -129,8 +135,7 @@ describe('Problems Page', () => {
         renderProblems();
         await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
         const input = screen.getByLabelText('Search problems');
-        openFilters();
-        fireEvent.click(screen.getByRole('checkbox', { name: /^Greedy/ }));
+        await chooseChip('Category', 'Greedy');
 
         // The refresh is in flight: no full-page loader, controls and the
         // previous batch stay mounted.
@@ -145,6 +150,95 @@ describe('Problems Page', () => {
         expect(screen.getByRole('alert')).toHaveTextContent(/failed to fetch problems/i);
         expect(screen.getByLabelText('Search problems')).toBe(input);
         expect(mock).toHaveBeenCalledTimes(2);
+    });
+
+    describe('redesigned toolbar (status segments and filter chips)', () => {
+        beforeEach(() => {
+            (jest.mocked(problemService.getProblemsPage) as jest.Mock).mockResolvedValue(firstPage);
+        });
+
+        it('status segment sends status and resets pages', async () => {
+            window.history.replaceState({}, '', '/problems?pages=3');
+            renderProblems();
+            await screen.findByText('Knapsack');
+            fireEvent.click(screen.getByRole('button', { name: /^Solved/ }));
+            await waitFor(() => expect(problemService.getProblemsPage).toHaveBeenLastCalledWith(
+                expect.objectContaining({ status: 'solved' }),
+            ));
+            expect(window.location.search).toContain('status=solved');
+            expect(window.location.search).not.toContain('pages=');
+            expect(screen.getByRole('button', { name: /^Solved/ })).toHaveAttribute('aria-pressed', 'true');
+        });
+
+        it('segment counts come from status-counts with the same filters', async () => {
+            window.history.replaceState({}, '', '/problems?collection=7&difficultyMin=1200&difficultyMax=1599');
+            renderProblems();
+            await screen.findByText('Knapsack');
+            await waitFor(() => expect(problemService.getStatusCounts).toHaveBeenCalledWith(
+                { collection: 7, difficultyMin: 1200, difficultyMax: 1599 },
+            ));
+            expect(problemService.getStatusCounts).toHaveBeenCalledWith({});
+            expect(await screen.findByRole('button', { name: 'Unsolved 2' })).toBeInTheDocument();
+            expect(screen.getByText('4 problems · 1 solved')).toBeInTheDocument();
+        });
+
+        it('guests see no status segment and send no status', async () => {
+            mockViewer = null;
+            window.history.replaceState({}, '', '/problems?status=solved');
+            renderProblems();
+            await screen.findByText('Knapsack');
+            expect(screen.queryByRole('button', { name: /^Solved/ })).toBeNull();
+            expect(problemService.getProblemsPage).toHaveBeenCalledWith(expect.not.objectContaining({ status: expect.anything() }));
+            expect(await screen.findByText('4 problems')).toBeInTheDocument();
+        });
+
+        it('difficulty chip sets the min/max range', async () => {
+            renderProblems();
+            await screen.findByText('Knapsack');
+            await chooseChip('Difficulty', '1200–1599');
+            await waitFor(() => expect(window.location.search).toContain('difficultyMin=1200'));
+            expect(window.location.search).toContain('difficultyMax=1599');
+            expect(await screen.findByRole('button', { name: 'Remove filter Difficulty: 1200–1599' })).toBeInTheDocument();
+        });
+
+        it('category and collection chips set their params', async () => {
+            renderProblems();
+            await screen.findByText('Knapsack');
+            await chooseChip('Category', 'Greedy');
+            await waitFor(() => expect(window.location.search).toContain('category=Greedy'));
+            await chooseChip('Collection', 'Practice');
+            await waitFor(() => expect(window.location.search).toContain('collection=7'));
+        });
+
+        it('a legacy multi-category URL shows the category chip as set', async () => {
+            window.history.replaceState({}, '', '/problems?category=Greedy,Dynamic%20Programming');
+            renderProblems();
+            await screen.findByText('Knapsack');
+            expect(screen.getByRole('button', { name: 'Remove filter Category: Greedy, Dynamic Programming' })).toBeInTheDocument();
+            expect(problemService.getProblemsPage).toHaveBeenCalledWith(expect.objectContaining({ category: 'Greedy,Dynamic Programming' }));
+        });
+
+        it('categories stay hidden until Show categories', async () => {
+            renderProblems();
+            await screen.findByText('Knapsack');
+            expect(screen.queryByText('Dynamic Programming · Data Structures')).toBeNull();
+            fireEvent.click(screen.getByRole('button', { name: 'Show categories' }));
+            expect(screen.getByText('Dynamic Programming · Data Structures')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Show categories' })).toHaveAttribute('aria-pressed', 'true');
+        });
+
+        it('rows link to the problem and show the best strip and score', async () => {
+            (jest.mocked(problemService.getProblemsPage) as jest.Mock).mockResolvedValue({
+                problems: [{ ...problem('vec', 'vector::erase'), best_score: 60, submission_count: '3',
+                    best_submission_status: 'Wrong Answer', latest_submission_at: new Date().toISOString(),
+                    best_submission_results: [{ status: 'Accepted' }, { status: 'Wrong Answer' }] }],
+                nextCursor: null, hasMore: false,
+            });
+            renderProblems();
+            expect(await screen.findByRole('link', { name: 'vector::erase' })).toHaveAttribute('href', '/problems/vec');
+            expect(screen.getByRole('img', { name: '1 of 2 test cases passed' })).toBeInTheDocument();
+            expect(screen.getByText('60')).toBeInTheDocument();
+        });
     });
 
     describe('Show More (incremental loading)', () => {
@@ -242,250 +336,9 @@ describe('Problems Page', () => {
         });
     });
 
-    describe('category filters (global counts, server-side filter)', () => {
-        it('keeps category choices inside the Filters panel and renders global counts', async () => {
-            (jest.mocked(problemService.getProblemsPage) as jest.Mock).mockResolvedValueOnce(firstPage);
 
-            renderProblems();
 
-            await waitFor(() => {
-                expect(document.querySelector('details > summary')).toBeInTheDocument();
-            });
-            expect(document.querySelector('details')).not.toHaveAttribute('open');
-            openFilters();
-            expect(screen.getByRole('checkbox', { name: /All 4/ })).toBeInTheDocument();
-            expect(screen.getByRole('checkbox', { name: /Dynamic Programming 2/ })).toBeInTheDocument();
-            expect(screen.getByRole('checkbox', { name: /Data Structures 1/ })).toBeInTheDocument();
-            expect(screen.getByRole('checkbox', { name: /Greedy 1/ })).toBeInTheDocument();
-            expect(screen.getByRole('checkbox', { name: /Uncategorized 1/ })).toBeInTheDocument();
-        });
-
-        it('selecting a category refetches the first page with the category filter', async () => {
-            (jest.mocked(problemService.getProblemsPage) as jest.Mock).mockResolvedValue(firstPage);
-
-            renderProblems();
-            await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-
-            openFilters();
-            fireEvent.click(screen.getByRole('checkbox', { name: /Greedy/ }));
-
-            await waitFor(() => {
-                expect(problemService.getProblemsPage).toHaveBeenLastCalledWith({ category: 'Greedy', sort: 'difficulty', order: 'asc', limit: 20 });
-            });
-        });
-
-        it('supports selecting multiple categories and matches any selected category', async () => {
-            const mock = jest.mocked(problemService.getProblemsPage) as jest.Mock;
-            mock.mockResolvedValue(firstPage);
-            render(
-                <MemoryRouter initialEntries={['/problems?keep=yes']}>
-                    <LocationProbe /><Problems />
-                </MemoryRouter>,
-            );
-            await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-            openFilters();
-
-            const dynamicProgramming = screen.getByRole('checkbox', { name: /Dynamic Programming/ });
-            const greedy = screen.getByRole('checkbox', { name: /Greedy/ });
-            fireEvent.click(dynamicProgramming);
-            fireEvent.click(greedy);
-
-            expect(dynamicProgramming).toBeChecked();
-            expect(greedy).toBeChecked();
-            expect(document.querySelector('summary')?.getAttribute('aria-label')).toBe('Filters, 2 active');
-            expect(within(document.querySelector('summary') as HTMLElement).getByText('2')).toBeInTheDocument();
-            expect(new URLSearchParams(screen.getByTestId('location').textContent || '').get('category'))
-                .toBe('Dynamic Programming,Greedy');
-            await waitFor(() => expect(mock).toHaveBeenLastCalledWith({
-                category: 'Dynamic Programming,Greedy', sort: 'difficulty', order: 'asc', limit: 20,
-            }));
-
-            fireEvent.click(dynamicProgramming);
-            expect(dynamicProgramming).not.toBeChecked();
-            expect(greedy).toBeChecked();
-            expect(document.querySelector('summary')?.getAttribute('aria-label')).toBe('Filters, 1 active');
-            await waitFor(() => expect(mock).toHaveBeenLastCalledWith({
-                category: 'Greedy', sort: 'difficulty', order: 'asc', limit: 20,
-            }));
-        });
-
-        it('the Uncategorized filter matches the Uncategorized sentinel', async () => {
-            (jest.mocked(problemService.getProblemsPage) as jest.Mock).mockResolvedValue(firstPage);
-
-            renderProblems();
-            await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-
-            openFilters();
-            fireEvent.click(screen.getByRole('checkbox', { name: /^Uncategorized/ }));
-
-            await waitFor(() => {
-                expect(problemService.getProblemsPage).toHaveBeenLastCalledWith({ category: 'Uncategorized', sort: 'difficulty', order: 'asc', limit: 20 });
-            });
-        });
-
-        it('hides category badges by default and shows only the selected one when filtered', async () => {
-            (jest.mocked(problemService.getProblemsPage) as jest.Mock).mockResolvedValue(firstPage);
-
-            renderProblems();
-            await waitFor(() => {
-                expect(screen.getByText('Knapsack')).toBeInTheDocument();
-            });
-
-            const card = (title: string) => within(screen.getByText(title).closest('.problem-list-item') as HTMLElement);
-            // Default "All" view: no badge text on the cards —
-            // categories can reveal problem content, so they stay hidden.
-            expect(card('Knapsack').queryByText('Dynamic Programming', { selector: 'span' })).not.toBeInTheDocument();
-            expect(card('Greedy Slots').queryByText('Greedy', { selector: 'span' })).not.toBeInTheDocument();
-
-            // Selecting a category reveals ONLY that category's badge.
-            openFilters();
-            fireEvent.click(screen.getByRole('checkbox', { name: /^Dynamic Programming/ }));
-            await waitFor(() => {
-                // Knapsack (single category) and LIS (two categories) both
-                // show the selected one; LIS's other category stays hidden.
-                expect(card('Knapsack').getByText('Dynamic Programming', { selector: 'span' })).toBeInTheDocument();
-                expect(card('LIS').getByText('Dynamic Programming', { selector: 'span' })).toBeInTheDocument();
-            });
-            expect(card('LIS').queryByText('Data Structures', { selector: 'span' })).not.toBeInTheDocument();
-
-            // Turn off Dynamic Programming, then select Greedy.
-            fireEvent.click(screen.getByRole('checkbox', { name: /^Dynamic Programming/ }));
-            fireEvent.click(screen.getByRole('checkbox', { name: /^Greedy/ }));
-            await waitFor(() => {
-                expect(card('Greedy Slots').getByText('Greedy', { selector: 'span' })).toBeInTheDocument();
-            });
-            expect(card('Knapsack').queryByText('Dynamic Programming', { selector: 'span' })).not.toBeInTheDocument();
-        });
-
-        it('reveals all categories per card through the show-categories toggle', async () => {
-            (jest.mocked(problemService.getProblemsPage) as jest.Mock).mockResolvedValue(firstPage);
-
-            renderProblems();
-            await waitFor(() => {
-                expect(screen.getByText('LIS')).toBeInTheDocument();
-            });
-
-            // Default view: every categorized card offers "Show categories";
-            // the uncategorized card (Plain Problem) offers nothing.
-            const toggles = screen.getAllByRole('button', { name: 'Show categories' });
-            expect(toggles).toHaveLength(3); // Knapsack, LIS, Greedy Slots
-
-            // Reveal LIS's categories: find its toggle via the card heading's DOM.
-            const lisHeading = screen.getByText('LIS');
-            const lisToggle = lisHeading.closest('div')?.querySelector('button') as HTMLElement;
-            expect(lisToggle).toBeTruthy();
-            fireEvent.click(lisToggle);
-            const lisCard = within(lisHeading.closest('.problem-list-item') as HTMLElement);
-            expect(lisCard.getByText('Dynamic Programming', { selector: 'span' })).toBeInTheDocument();
-            expect(lisCard.getByText('Data Structures', { selector: 'span' })).toBeInTheDocument();
-
-            // Toggling again hides them.
-            fireEvent.click(screen.getAllByRole('button', { name: 'Hide categories' })[0]);
-            expect(within(screen.getByText('LIS').closest('.problem-list-item') as HTMLElement)
-                .queryByText('Data Structures', { selector: 'span' })).not.toBeInTheDocument();
-        });
-
-        it('offers "Show all categories" for a multi-category problem under a filter', async () => {
-            (jest.mocked(problemService.getProblemsPage) as jest.Mock).mockResolvedValue(firstPage);
-
-            renderProblems();
-            await waitFor(() => {
-                expect(screen.getByText('LIS')).toBeInTheDocument();
-            });
-
-            // Filter to Dynamic Programming: LIS shows that badge and — because
-            // it carries a second category — also a "Show all categories" toggle.
-            openFilters();
-            fireEvent.click(screen.getByRole('checkbox', { name: /^Dynamic Programming/ }));
-            const showAll = await screen.findAllByRole('button', { name: 'Show all categories' });
-            expect(showAll).toHaveLength(1); // only LIS (Knapsack has a single category)
-
-            fireEvent.click(showAll[0]);
-            // Both of LIS's categories are now visible together.
-            const lisCard = within(screen.getByText('LIS').closest('.problem-list-item') as HTMLElement);
-            expect(lisCard.getByText('Dynamic Programming', { selector: 'span' })).toBeInTheDocument();
-            expect(lisCard.getByText('Data Structures', { selector: 'span' })).toBeInTheDocument();
-        });
-    });
-
-    describe('difficulty filter & sort', () => {
-        // The difficulty controls only build the server query — the backend
-        // semantics (Unrated exclusion, NULLS LAST) are covered by backend
-        // integration tests. Here we assert the emitted query params.
-        it('shows every problem including Unrated when no difficulty filter is set', async () => {
-            const mock = (jest.mocked(problemService.getProblemsPage) as jest.Mock);
-            mock.mockResolvedValue(firstPage);
-            renderProblems();
-
-            await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-            // The default request carries the difficulty ordering and batch size.
-            expect(mock).toHaveBeenLastCalledWith({ sort: 'difficulty', order: 'asc', limit: 20 });
-        });
-
-        it('sends difficulty min and max as server-side params', async () => {
-            const mock = (jest.mocked(problemService.getProblemsPage) as jest.Mock);
-            mock.mockResolvedValue(firstPage);
-            renderProblems();
-            await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-
-            openFilters();
-            fireEvent.change(screen.getByLabelText('Difficulty minimum'), { target: { value: '1000' } });
-
-            await waitFor(() => {
-                expect(mock).toHaveBeenLastCalledWith({ difficultyMin: 1000, sort: 'difficulty', order: 'asc', limit: 20 });
-            });
-
-            fireEvent.change(screen.getByLabelText('Difficulty maximum'), { target: { value: '2000' } });
-
-            await waitFor(() => {
-                expect(mock).toHaveBeenLastCalledWith({ difficultyMin: 1000, difficultyMax: 2000, sort: 'difficulty', order: 'asc', limit: 20 });
-            });
-        });
-
-        it('sends the difficulty sort params and clears back to the default view', async () => {
-            const mock = (jest.mocked(problemService.getProblemsPage) as jest.Mock);
-            mock.mockResolvedValue(firstPage);
-            renderProblems();
-            await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-
-            fireEvent.change(screen.getByLabelText('Sort problems'), { target: { value: 'difficulty-asc' } });
-            await waitFor(() => {
-                expect(mock).toHaveBeenLastCalledWith({ sort: 'difficulty', order: 'asc', limit: 20 });
-            });
-
-            fireEvent.change(screen.getByLabelText('Sort problems'), { target: { value: 'difficulty-desc' } });
-            await waitFor(() => {
-                expect(mock).toHaveBeenLastCalledWith({ sort: 'difficulty', order: 'desc', limit: 20 });
-            });
-
-            fireEvent.change(screen.getByLabelText('Sort problems'), { target: { value: '' } });
-            await waitFor(() => {
-                expect(mock).toHaveBeenLastCalledWith({ limit: 20 });
-            });
-        });
-    });
-
-    describe('public author and collection filters', () => {
-        it('accepts arbitrary author text, saves it immediately, and debounces the request', async () => {
-            const mock = jest.mocked(problemService.getProblemsPage) as jest.Mock;
-            mock.mockResolvedValue(firstPage);
-            render(
-                <MemoryRouter initialEntries={['/problems?keep=yes']}>
-                    <LocationProbe /><Problems />
-                </MemoryRouter>,
-            );
-            await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-            openFilters();
-            mock.mockClear();
-            fireEvent.change(screen.getByLabelText('Author'), { target: { value: '  nOnE  ' } });
-            expect(screen.getByLabelText('Author')).toHaveValue('  nOnE  ');
-            expect(mock).not.toHaveBeenCalled();
-            const params = new URLSearchParams(screen.getByTestId('location').textContent || '');
-            expect(params.get('author')).toBe('  nOnE  ');
-            expect(params.get('keep')).toBe('yes');
-            await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ author: 'nOnE', sort: 'difficulty', order: 'asc', limit: 20 }));
-        });
-
+    describe('URL-held filters', () => {
         it('syncs controls and results after same-route URL navigation and Back', async () => {
             const mock = jest.mocked(problemService.getProblemsPage) as jest.Mock;
             mock.mockImplementation(async (query) => query.search === 'updated'
@@ -497,48 +350,26 @@ describe('Problems Page', () => {
                 </MemoryRouter>,
             );
             await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-            openFilters();
             fireEvent.click(screen.getByRole('button', { name: 'Open filtered URL' }));
             await waitFor(() => expect(screen.getByText('Updated Result')).toBeInTheDocument());
-            openFilters();
             expect(screen.getByLabelText('Search problems')).toHaveValue('updated');
-            expect(screen.getByRole('checkbox', { name: /^Greedy/ })).toBeChecked();
-            expect(screen.getByLabelText('Difficulty minimum')).toHaveValue('1200');
-            expect(screen.getByLabelText('Difficulty maximum')).toHaveValue('2200');
+            expect(screen.getByRole('button', { name: 'Remove filter Category: Greedy' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Remove filter Difficulty: 1200–2200' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Remove filter Author: Alice' })).toBeInTheDocument();
+            expect(await screen.findByRole('button', { name: 'Remove filter Collection: Practice' })).toBeInTheDocument();
             expect(screen.getByLabelText('Sort problems')).toHaveValue('difficulty-desc');
-            expect(screen.getByLabelText('Author')).toHaveValue('Alice');
-            expect(screen.getByLabelText('Collection')).toHaveValue('7');
             expect(mock).toHaveBeenLastCalledWith({
                 search: 'updated', category: 'Greedy', difficultyMin: 1200, difficultyMax: 2200,
                 sort: 'difficulty', order: 'desc', author: 'Alice', collection: 7, limit: 20,
             });
             fireEvent.click(screen.getByRole('button', { name: 'Back to prior URL' }));
             await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-            openFilters();
             expect(screen.getByLabelText('Search problems')).toHaveValue('');
-            expect(screen.getByLabelText('Author')).toHaveValue('');
+            expect(screen.queryByRole('button', { name: /Remove filter Author/ })).toBeNull();
             expect(screen.getByTestId('location').textContent).toBe('?keep=yes');
         });
-        it('offers canonical collection choices and composes them with free-text author search', async () => {
-            const mock = jest.mocked(problemService.getProblemsPage) as jest.Mock;
-            mock.mockResolvedValue({ ...firstPage, nextCursor: 'next', hasMore: true });
-            renderProblems();
-            await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-            openFilters();
-            expect(screen.getByRole('option', { name: 'Practice' })).toBeInTheDocument();
 
-            fireEvent.change(screen.getByLabelText('Collection'), { target: { value: '7' } });
-            await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ collection: 7, sort: 'difficulty', order: 'asc', limit: 20 }));
-            fireEvent.change(screen.getByLabelText('Author'), { target: { value: 'Accountless Author' } });
-            await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ author: 'Accountless Author', collection: 7, sort: 'difficulty', order: 'asc', limit: 20 }));
-            expect(mock.mock.calls.at(-1)?.[0].cursor).toBeUndefined();
-
-            fireEvent.change(screen.getByLabelText('Author'), { target: { value: '' } });
-            fireEvent.change(screen.getByLabelText('Collection'), { target: { value: 'none' } });
-            await waitFor(() => expect(mock).toHaveBeenLastCalledWith({ collection: 'none', sort: 'difficulty', order: 'asc', limit: 20 }));
-        });
-
-        it('shows removable active-filter chips and clears filters without dropping search, sort, or other URL params', async () => {
+        it('removing one chip keeps every other filter and unrelated param', async () => {
             (jest.mocked(problemService.getProblemsPage) as jest.Mock).mockResolvedValue(firstPage);
             render(
                 <MemoryRouter initialEntries={['/problems?keep=yes&search=knapsack&sort=difficulty-desc&category=Greedy&difficultyMin=1000&author=Alice&collection=7']}>
@@ -546,32 +377,20 @@ describe('Problems Page', () => {
                 </MemoryRouter>,
             );
             await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-
-            expect(screen.getByRole('button', { name: 'Remove category filter: Greedy' })).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Remove difficulty filter' })).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Remove author filter' })).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Remove collection filter' })).toBeInTheDocument();
-            fireEvent.click(screen.getByRole('button', { name: 'Remove category filter: Greedy' }));
-            let params = new URLSearchParams(screen.getByTestId('location').textContent || '');
+            fireEvent.click(screen.getByRole('button', { name: 'Remove filter Category: Greedy' }));
+            const params = new URLSearchParams(screen.getByTestId('location').textContent || '');
             expect(params.has('category')).toBe(false);
             expect(params.get('difficultyMin')).toBe('1000');
-
-            openFilters();
-            fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
-            params = new URLSearchParams(screen.getByTestId('location').textContent || '');
+            expect(params.get('author')).toBe('Alice');
             expect(params.get('keep')).toBe('yes');
             expect(params.get('search')).toBe('knapsack');
             expect(params.get('sort')).toBe('difficulty-desc');
-            expect(params.has('category')).toBe(false);
-            expect(params.has('difficultyMin')).toBe(false);
-            expect(params.has('author')).toBe(false);
-            expect(params.has('collection')).toBe(false);
         });
 
-    it('restores every filter from the URL after navigating to a detail and back', async () => {
+        it('restores every filter from the URL after navigating to a detail and back', async () => {
             (jest.mocked(problemService.getProblemsPage) as jest.Mock).mockResolvedValue(firstPage);
             render(
-                <MemoryRouter initialEntries={['/problems?keep=yes&search=knapsack&category=Graph&difficultyMin=1000&difficultyMax=2000&sort=difficulty-desc&author=Alice&collection=7']}>
+                <MemoryRouter initialEntries={['/problems?keep=yes&search=knapsack&category=Greedy&difficultyMin=1200&difficultyMax=1599&sort=difficulty-desc&author=Alice&collection=7']}>
                     <LocationProbe />
                     <Routes>
                         <Route path="/problems" element={<Problems />} />
@@ -580,21 +399,15 @@ describe('Problems Page', () => {
                 </MemoryRouter>,
             );
             await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-            openFilters();
             expect(screen.getByLabelText('Search problems')).toHaveValue('knapsack');
-            expect(screen.getByLabelText('Difficulty minimum')).toHaveValue('1000');
-            expect(screen.getByLabelText('Difficulty maximum')).toHaveValue('2000');
-            expect(screen.getByLabelText('Sort problems')).toHaveValue('difficulty-desc');
-            expect(screen.getByLabelText('Author')).toHaveValue('Alice');
-            expect(screen.getByLabelText('Collection')).toHaveValue('7');
+            expect(screen.getByRole('button', { name: 'Remove filter Difficulty: 1200–1599' })).toBeInTheDocument();
             expect(problemService.getProblemsPage).toHaveBeenCalledWith(expect.objectContaining({
-                search: 'knapsack', category: 'Graph', difficultyMin: 1000, difficultyMax: 2000,
+                search: 'knapsack', category: 'Greedy', difficultyMin: 1200, difficultyMax: 1599,
                 sort: 'difficulty', order: 'desc', author: 'Alice', collection: 7, limit: 20,
             }));
-            fireEvent.click(screen.getAllByRole('link', { name: 'New' })[0]);
+            fireEvent.click(screen.getByRole('link', { name: /^Knapsack/ }));
             fireEvent.click(screen.getByRole('button', { name: 'Back to problems' }));
-            openFilters();
-            await waitFor(() => expect(screen.getByLabelText('Author')).toHaveValue('Alice'));
+            expect(await screen.findByRole('button', { name: 'Remove filter Author: Alice' })).toBeInTheDocument();
             expect(screen.getByTestId('location').textContent).toContain('keep=yes');
         });
 
@@ -637,66 +450,25 @@ describe('Problems Page', () => {
                 </MemoryRouter>,
             );
             await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-            openFilters();
-            fireEvent.change(screen.getByLabelText('Author'), { target: { value: 'Bob' } });
-            fireEvent.change(screen.getByLabelText('Collection'), { target: { value: '7' } });
-            fireEvent.change(screen.getByLabelText('Difficulty minimum'), { target: { value: '1000' } });
-            fireEvent.change(screen.getByLabelText('Difficulty maximum'), { target: { value: '2000' } });
+            await chooseChip('Collection', 'Practice');
+            await chooseChip('Difficulty', '1200–1599');
+            await chooseChip('Category', 'Greedy');
             fireEvent.change(screen.getByLabelText('Sort problems'), { target: { value: 'difficulty-desc' } });
-            fireEvent.click(screen.getByRole('checkbox', { name: /^Greedy/ }));
             fireEvent.change(screen.getByLabelText('Search problems'), { target: { value: 'knapsack' } });
             await waitFor(() => {
                 const params = new URLSearchParams(screen.getByTestId('location').textContent || '');
                 expect(params.get('keep')).toBe('yes');
-                expect(params.get('author')).toBe('Bob');
                 expect(params.get('collection')).toBe('7');
-                expect(params.get('difficultyMin')).toBe('1000');
-                expect(params.get('difficultyMax')).toBe('2000');
+                expect(params.get('difficultyMin')).toBe('1200');
+                expect(params.get('difficultyMax')).toBe('1599');
                 expect(params.get('sort')).toBe('difficulty-desc');
                 expect(params.get('category')).toBe('Greedy');
                 expect(params.get('search')).toBe('knapsack');
             });
-            fireEvent.click(screen.getAllByRole('link', { name: 'New' })[0]);
-            fireEvent.click(screen.getByRole('button', { name: 'Back to problems' }));
-            openFilters();
-            await waitFor(() => expect(screen.getByLabelText('Author')).toHaveValue('Bob'));
-            expect(screen.getByLabelText('Collection')).toHaveValue('7');
-            expect(screen.getByLabelText('Difficulty minimum')).toHaveValue('1000');
-            expect(screen.getByLabelText('Difficulty maximum')).toHaveValue('2000');
-            expect(screen.getByLabelText('Sort problems')).toHaveValue('difficulty-desc');
-            expect(screen.getByRole('checkbox', { name: /^Greedy/ })).toBeChecked();
-            expect(screen.getByLabelText('Search problems')).toHaveValue('knapsack');
-            fireEvent.click(screen.getByRole('button', { name: 'Back to problems' }));
+            fireEvent.click(screen.getAllByRole('button', { name: 'Back to problems' })[0]);
             // A history Back from the filtered list should reach the landing entry,
             // not a trail of intermediate filter edits.
             await waitFor(() => expect(screen.getByText('Landing page')).toBeInTheDocument());
-        });
-
-        it('keeps text typed just before navigation without sending an early search request', async () => {
-            const mock = jest.mocked(problemService.getProblemsPage) as jest.Mock;
-            mock.mockResolvedValue(firstPage);
-            render(
-                <MemoryRouter initialEntries={['/problems?keep=yes']}>
-                    <LocationProbe />
-                    <Routes>
-                        <Route path="/problems" element={<Problems />} />
-                        <Route path="/problems/:problemId" element={<DetailWithBack />} />
-                    </Routes>
-                </MemoryRouter>,
-            );
-            await waitFor(() => expect(screen.getByText('Knapsack')).toBeInTheDocument());
-            mock.mockClear();
-            fireEvent.change(screen.getByLabelText('Search problems'), { target: { value: 'very quick' } });
-            openFilters();
-            fireEvent.change(screen.getByLabelText('Author'), { target: { value: 'Writer Without Account' } });
-            expect(mock).not.toHaveBeenCalled();
-            fireEvent.click(screen.getAllByRole('link', { name: 'New' })[0]);
-            fireEvent.click(screen.getByRole('button', { name: 'Back to problems' }));
-            await waitFor(() => expect(screen.getByLabelText('Search problems')).toHaveValue('very quick'));
-            expect(screen.getByLabelText('Author')).toHaveValue('Writer Without Account');
-            expect(screen.getByTestId('location').textContent).toContain('search=very+quick');
-            expect(screen.getByTestId('location').textContent).toContain('author=Writer+Without+Account');
-            expect(screen.getByTestId('location').textContent).toContain('keep=yes');
         });
     });
 
@@ -741,8 +513,7 @@ describe('Problems Page', () => {
 
             // Apply a category filter whose (mocked) result is empty.
             mock.mockResolvedValueOnce({ problems: [], nextCursor: null, hasMore: false });
-            openFilters();
-            fireEvent.click(screen.getByRole('checkbox', { name: /^Greedy/ }));
+            await chooseChip('Category', 'Greedy');
 
             await waitFor(() => expect(screen.getByText('Problem not available.')).toBeInTheDocument());
             expect(screen.getByText(/no problems match the current filter/i)).toBeInTheDocument();
@@ -886,15 +657,16 @@ describe('Problems Page', () => {
 
             // A category change while a search is active: the list resets to
             // page 1 of the new query. The input node is never recreated.
-            openFilters();
-            fireEvent.click(screen.getByRole('checkbox', { name: /^Greedy/ }));
+            await chooseChip('Category', 'Greedy');
 
             await waitFor(() => {
                 expect(mock).toHaveBeenLastCalledWith({ search: 'knapsack', category: 'Greedy', sort: 'difficulty', order: 'asc', limit: 20 });
             }, { timeout: 2000 });
             await waitFor(() => expect(screen.getByText('Greedy One')).toBeInTheDocument());
             expect(screen.queryByText('LIS')).not.toBeInTheDocument();
-            expect(document.activeElement).toBe(input);
+            // Picking from the chip's menu returns focus to the chip (menu
+            // behaviour); the search box itself is the same node, unchanged.
+            expect(screen.getByLabelText('Search problems')).toBe(input);
             expect((input as HTMLInputElement).value).toBe('knapsack');
         });
 

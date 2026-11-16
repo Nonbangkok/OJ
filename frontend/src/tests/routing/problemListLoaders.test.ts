@@ -15,6 +15,11 @@ jest.mock('../../services/problemService');
 describe('problem list route loaders', () => {
   beforeEach(() => jest.clearAllMocks());
 
+  it('carries a valid status from the URL and drops an unknown one', () => {
+    expect(publicProblemListQueryFromUrl(new URL('http://x/problems?status=attempted'))).toMatchObject({ status: 'attempted' });
+    expect(publicProblemListQueryFromUrl(new URL('http://x/problems?status=done'))).not.toHaveProperty('status');
+  });
+
   it('preloads the public list span needed by a history entry using filter query and cursor', async () => {
     const makeProblem = (index: number): ProblemSummary => ({
       id: `p-${index}`, title: `Problem ${index}`, author: null, categories: [], best_score: null,
