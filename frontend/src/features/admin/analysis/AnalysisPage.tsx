@@ -9,6 +9,7 @@ import ContestsTab from './ContestsTab';
 import ContestDetail from './ContestDetail';
 import SubmissionsTab from './SubmissionsTab';
 import styles from './AnalysisPage.module.css';
+import { PageHeader } from '../../../components/ui';
 
 type AnalysisTab = 'overview' | 'users' | 'problems' | 'contests' | 'submissions';
 
@@ -77,7 +78,7 @@ const AnalysisPage = () => {
 
   return (
     <div className={styles.container}>
-      <h2>Analysis</h2>
+      <PageHeader breadcrumb={[{ label: 'Manage' }]} title="Analysis" />
       <div className={styles.tabs} role="tablist" aria-label="Analysis sections">
         {TABS.map(({ key, label }) => (
           <button

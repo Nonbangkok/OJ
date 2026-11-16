@@ -8,7 +8,7 @@
    action). Spacing, not a divider, separates contest facts from the user's
    own state. */
 
-/* Width comes from the shared `.container` main in ContestLayout (1200px),
+/* Width comes from the shared `.container` inside ContestShell,
    the same width the problems table and scoreboard use. */
 .container {
   padding-top: 3rem;

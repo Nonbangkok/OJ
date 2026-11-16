@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Button } from '../../../components/ui';
+import { Button, PageHeader } from '../../../components/ui';
 import { UI_TIMEOUTS } from '../../../config/constants';
 import { AI_DOC_TITLE, aiDocsSections, buildAiDocsMarkdown, DocBlock } from './aiDocsContent';
 import styles from './AiDocs.module.css';
@@ -122,16 +121,11 @@ export default function AiDocs({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <section className={styles.docs} aria-label={AI_DOC_TITLE}>
-      {!embedded && <Link to="/admin/authoring" className={styles.backLink}>← All drafts</Link>}
-      <div className={styles.header}>
-        <div className={styles.headerText}>
-          <h1>AI Docs</h1>
-          <p>
-            The authoring API as one reference document — for humans here, and for AI agents
-            via the copy button: the entire page is copied as clean, prompt-ready markdown.
-          </p>
-        </div>
-        <div className={styles.headerActions}>
+      <PageHeader
+        breadcrumb={embedded ? undefined : [{ label: 'Authoring', to: '/admin/authoring' }]}
+        title="AI docs"
+        description="The authoring API as one reference document — for humans here, and for AI agents via the copy button: the entire page is copied as clean, prompt-ready markdown."
+        actions={(
           <Button
             variant={copied ? 'secondary' : 'primary'}
             onClick={handleCopy}
@@ -139,8 +133,8 @@ export default function AiDocs({ embedded = false }: { embedded?: boolean }) {
           >
             {copied ? 'Copied!' : 'Copy for AI agent'}
           </Button>
-        </div>
-      </div>
+        )}
+      />
       {copyFailed && (
         <p role="alert" className={styles.copyError}>
           Could not access the clipboard. Copy is unavailable in this context.

@@ -4,7 +4,7 @@ import styles from './Problems.module.css';
 import { useIncrementalProblems } from '../../hooks/useIncrementalProblems';
 import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
 import ProblemCard from '../../features/problem/ProblemCard';
-import { Button } from '../../components/ui';
+import { Button, PageHeader } from '../../components/ui';
 import { PROBLEMS_PAGE } from '../../config/constants';
 import { PROBLEM_DIFFICULTY_OPTIONS } from '../../utils/constants';
 import problemService from '../../services/problemService';
@@ -224,7 +224,7 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
 
   return (
     <div className={styles['problems-page-container']}>
-      <h1>All Problems</h1>
+      <PageHeader title="Problems" />
 
       <div className={styles['problems-controls']}>
         <div className={styles['search-wrap']}>

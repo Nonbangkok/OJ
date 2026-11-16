@@ -76,7 +76,7 @@ describe('ContestManagement Component', () => {
         renderContestManagement();
 
         await waitFor(() => {
-            expect(screen.getByText('Contest Management')).toBeInTheDocument();
+            expect(screen.getByRole('heading', { level: 1, name: 'Contests' })).toBeInTheDocument();
             expect(screen.getByText('Contest 1')).toBeInTheDocument();
             expect(screen.getByText('Scheduled')).toBeInTheDocument();
             expect(screen.getByText('Running')).toBeInTheDocument();

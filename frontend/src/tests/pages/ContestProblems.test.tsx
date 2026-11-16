@@ -56,7 +56,7 @@ describe('ContestProblems Page', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByText('Contest Problems')).toBeInTheDocument();
+            expect(screen.getByRole('heading', { level: 1, name: 'Problems' })).toBeInTheDocument();
             expect(screen.getByText('Problem 1')).toBeInTheDocument();
         });
     });

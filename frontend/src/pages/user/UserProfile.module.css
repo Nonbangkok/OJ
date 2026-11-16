@@ -1,7 +1,5 @@
 .profile-container {
-  padding: 1.5rem 0 3rem;
-  max-width: 920px;
-  margin: 0 auto;
+  padding: 0 0 3rem;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;

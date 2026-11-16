@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  CaretDown,
   Gear,
   Key,
   Moon,
@@ -15,9 +14,9 @@ import { useSettings } from '../../context/SettingsContext';
 import { useTheme } from '../../context/ThemeContext';
 import ChangePasswordDialog from '../user/ChangePasswordDialog';
 
-import styles from './NavbarUserMenu.module.css';
+import styles from './AccountMenu.module.css';
 
-const NavbarUserMenu = () => {
+const AccountMenu = () => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { passwordChangeEnabled } = useSettings();
@@ -73,7 +72,7 @@ const NavbarUserMenu = () => {
           </span>
         )}
         <span className={styles.username} title={user.username}>{user.username}</span>
-        <CaretDown size={12} weight="bold" className={styles.caret} aria-hidden="true" />
+        {user.level != null && <span className={styles.level}>Lv.{user.level}</span>}
       </button>
 
       {open && (
@@ -168,4 +167,4 @@ const NavbarUserMenu = () => {
   );
 };
 
-export default NavbarUserMenu;
+export default AccountMenu;

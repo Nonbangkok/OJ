@@ -73,7 +73,7 @@ describe('ProblemManagement Component', () => {
         renderProblemManagement();
 
         await waitFor(() => {
-            expect(screen.getByText('Problem Management')).toBeInTheDocument();
+            expect(screen.getByRole('heading', { level: 1, name: 'Problems' })).toBeInTheDocument();
             expect(screen.getByText('Problem 1')).toBeInTheDocument();
             expect(screen.getByText('Problem 2')).toBeInTheDocument();
         });
@@ -767,7 +767,7 @@ describe('ProblemManagement Component', () => {
                 makePage([], { authors: [{ name: 'Alice' }], hasUnauthoredProblems: false }),
             );
             renderProblemManagement();
-            await waitFor(() => screen.getByText('Problem Management'));
+            await waitFor(() => screen.getByRole('heading', { level: 1, name: 'Problems' }));
 
             const select = screen.getByLabelText('Filter problems by author');
             expect(within(select).queryByRole('option', { name: 'No author' })).not.toBeInTheDocument();

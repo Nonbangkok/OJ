@@ -1,0 +1,78 @@
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--background-primary);
+}
+
+.shell.collapsed {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+}
+
+.main {
+  min-width: 0;
+}
+
+.strip {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 44px;
+  padding: 0 12px;
+  background: var(--background-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  margin-right: 6px;
+  color: var(--text-primary);
+}
+
+.iconButton {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: var(--background-tertiary);
+  color: var(--text-primary);
+}
+
+.mobile {
+  min-height: 100vh;
+  padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+  background: var(--background-primary);
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--topbar-height);
+  padding: 0 var(--page-gutter);
+  background: var(--background-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Keyboard focus is always visible (phase 2a review). */
+.iconButton:focus-visible,
+.brand:focus-visible {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}

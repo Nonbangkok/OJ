@@ -8,7 +8,7 @@ import RejudgeFeedbackBox from '../shared/RejudgeFeedbackBox';
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
 import LoadingPage from '../../../components/shared/LoadingPage';
-import { ActionMenu, Button } from '../../../components/ui';
+import { ActionMenu, Button, PageHeader } from '../../../components/ui';
 
 const ContestManagement = () => {
   const {
@@ -72,12 +72,11 @@ const ContestManagement = () => {
   return (
     <div className={styles['management-container']}>
       {/* --- Page header: creation only ------------------------------------ */}
-      <div className={styles['management-header']}>
-        <h2>Contest Management</h2>
-        <div className={styles['header-actions']}>
-          <Button onClick={handleCreate}>+ New Contest</Button>
-        </div>
-      </div>
+      <PageHeader
+        breadcrumb={[{ label: 'Manage' }]}
+        title="Contests"
+        actions={<Button onClick={handleCreate}>+ New Contest</Button>}
+      />
 
       {/* --- Filter / scope bar -------------------------------------------- */}
       <div className={styles['filter-bar']}>

@@ -66,7 +66,7 @@ describe('ContestScoreboard Page', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByText('Contest Scoreboard')).toBeInTheDocument();
+            expect(screen.getByRole('heading', { level: 1, name: 'Scoreboard' })).toBeInTheDocument();
             expect(screen.getByText('user1')).toBeInTheDocument();
             expect(screen.getByText('100')).toBeInTheDocument();
         });

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import useAdminSettings from '../../../hooks/admin/useAdminSettings';
-import { Button } from '../../../components/ui';
+import { Button, PageHeader } from '../../../components/ui';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import styles from './Settings.module.css';
 
@@ -41,7 +41,7 @@ const Settings = () => {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.pageTitle}>Admin Settings</h1>
+      <PageHeader breadcrumb={[{ label: 'Manage' }]} title="Settings" />
 
       {/* Site Access */}
       <section className={styles.section}>

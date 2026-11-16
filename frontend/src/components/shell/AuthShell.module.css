@@ -1,0 +1,31 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 48px var(--page-gutter);
+  box-sizing: border-box;
+  background: var(--background-primary);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.column {
+  width: 100%;
+  max-width: 360px;
+}
+
+/* Keyboard focus is always visible (phase 2a review). */
+.brand:focus-visible {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}

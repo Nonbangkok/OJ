@@ -1,0 +1,263 @@
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--background-primary);
+}
+
+.main {
+  min-width: 0;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 12px 10px;
+  background: var(--background-secondary);
+  border-right: 1px solid var(--border-color);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.leave {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.leave:hover {
+  color: var(--text-primary);
+}
+
+.title {
+  padding: 2px 8px 6px;
+  color: var(--text-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.clock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 4px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--background-primary);
+  color: var(--text-primary);
+}
+
+.clockLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.clockValue {
+  font-family: var(--font-family-mono);
+  font-size: 15px;
+}
+
+.liveTag {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--status-success);
+}
+
+.liveTag::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--status-success);
+}
+
+.problems {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 10px;
+}
+
+.problem {
+  display: grid;
+  grid-template-columns: 18px 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  text-decoration: none;
+}
+
+.problem:hover {
+  background: var(--background-tertiary);
+}
+
+.problem[aria-current='page'] {
+  background: var(--background-primary);
+  color: var(--text-primary);
+  font-weight: 500;
+  box-shadow: 0 0 0 1px var(--border-color);
+}
+
+.letter {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.problemTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score {
+  font-family: var(--font-family-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.ok { color: var(--status-success); }
+.bad { color: var(--status-danger); }
+.none { color: var(--text-faint); }
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.link:hover {
+  background: var(--background-tertiary);
+  color: var(--text-primary);
+}
+
+.link[aria-current='page'] {
+  background: var(--background-primary);
+  color: var(--text-primary);
+  font-weight: 500;
+  box-shadow: 0 0 0 1px var(--border-color);
+}
+
+/* Mobile */
+.mobile {
+  min-height: 100vh;
+  padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+  background: var(--background-primary);
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--topbar-height);
+  padding: 0 var(--page-gutter);
+  background: var(--background-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.back {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.topTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.compactClock {
+  margin-left: auto;
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+}
+
+.mobileMain {
+  min-width: 0;
+  padding: 16px var(--page-gutter);
+}
+
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  height: var(--tabbar-height);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--background-secondary);
+  border-top: 1px solid var(--border-color);
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.tab[aria-current='page'] {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Keyboard focus is always visible (phase 2a review). */
+.leave:focus-visible,
+.title:focus-visible,
+.problem:focus-visible,
+.link:focus-visible,
+.back:focus-visible,
+.tab:focus-visible {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+.footer {
+  margin-top: auto;
+  padding-top: 8px;
+}

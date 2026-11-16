@@ -79,7 +79,7 @@ describe('UserManagement Component', () => {
         renderUserManagement();
 
         await waitFor(() => {
-            expect(screen.getByText('User Management')).toBeInTheDocument();
+            expect(screen.getByRole('heading', { level: 1, name: 'Users' })).toBeInTheDocument();
             expect(screen.getByText('user1')).toBeInTheDocument();
             expect(screen.getByText('staff1')).toBeInTheDocument();
         });

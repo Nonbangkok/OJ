@@ -4,7 +4,7 @@ import { useProblems } from '../../hooks/useProblems';
 import styles from './ContestProblems.module.css';
 import shared from '../../components/styles/ContestPages.module.css';
 import tableStyles from '../../components/styles/Table.module.css';
-import { StatusBadge } from '../../components/ui';
+import { StatusBadge, PageHeader } from '../../components/ui';
 import LoadingPage from '../../components/shared/LoadingPage';
 import type { ProblemSummary } from '../../types';
 
@@ -51,9 +51,7 @@ const ContestProblems = () => {
 
   return (
     <div className={shared.page}>
-      <div className={shared.pageHeader}>
-        <h1 className={shared.pageTitle}>Contest Problems</h1>
-      </div>
+      <PageHeader title="Problems" />
 
       {problems.length === 0 ? (
         <div className={styles.empty}>

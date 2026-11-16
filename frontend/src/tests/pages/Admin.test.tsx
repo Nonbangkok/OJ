@@ -45,7 +45,7 @@ describe('Admin Page (hub)', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByRole('heading', { name: 'Admin Panel' })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { level: 1, name: 'Manage' })).toBeInTheDocument();
         });
 
         const nav = screen.getByRole('navigation', { name: 'Admin sections' });
@@ -74,7 +74,7 @@ describe('Admin Page (hub)', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByRole('heading', { name: 'Admin Panel' })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { level: 1, name: 'Manage' })).toBeInTheDocument();
         });
 
         const nav = screen.getByRole('navigation', { name: 'Admin sections' });
@@ -96,7 +96,7 @@ describe('Admin Page (hub)', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByRole('heading', { name: 'Admin Panel' })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { level: 1, name: 'Manage' })).toBeInTheDocument();
         });
 
         expect(screen.queryByRole('navigation', { name: 'Admin sections' })?.querySelectorAll('a').length ?? 0).toBe(0);

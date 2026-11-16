@@ -2,6 +2,7 @@ import { useScoreboard } from '../../hooks/useScoreboard';
 import ScoreboardTable from '../../features/scoreboard/ScoreboardTable';
 import styles from './Scoreboard.module.css';
 import LoadingPage from '../../components/shared/LoadingPage';
+import { PageHeader } from '../../components/ui';
 
 const Scoreboard = () => {
   const { scoreboard, loading, error } = useScoreboard();
@@ -11,7 +12,7 @@ const Scoreboard = () => {
 
   return (
     <div className={styles['scoreboard-container']}>
-      <h1>Scoreboard</h1>
+      <PageHeader title="Ranking" />
       <ScoreboardTable scoreboard={scoreboard} />
     </div>
   );

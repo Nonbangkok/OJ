@@ -274,22 +274,23 @@ describe('review fixes (phase 1 final review)', () => {
     });
   });
 
-  it.each(['components/navbar/Navbar.module.css', 'layouts/contest/ContestNavbar.module.css'])(
-    '%s marks the active link in text, not only with the slider', (file) => {
-      expect(decl(file, ".nav-links a[aria-current='page']", 'color')).toBe('var(--text-primary)');
-      expect(decl(file, ".nav-links a[aria-current='page']", 'font-weight')).toBe('600');
-    });
+  it('sidebar marks the current page in text, not only with a surface', () => {
+    const css = readSource('components/shell/Sidebar.module.css');
+    expect(css).toMatch(/\.item\[aria-current='page'\]\s*\{[^}]*color:\s*var\(--text-primary\)[^}]*font-weight:\s*500/);
+  });
 
   it.each([
     ['components/ui/Dialog.module.css'], ['components/ui/ActionMenu.module.css'], ['components/ui/Drawer.module.css'],
-    ['components/navbar/NavbarUserMenu.module.css'], ['components/user/XpToast.module.css'],
+    ['components/shell/AccountMenu.module.css'], ['components/user/XpToast.module.css'],
   ])('%s floats with the floating-layer shadow', (file) => {
     const shadows = [...readSource(file).matchAll(/box-shadow\s*:\s*([^;]+);/g)].map((m) => m[1].trim());
     expect(shadows).toContain('var(--box-shadow-lg)');
   });
 
-  it('contest navbar does not shrink the logo svg', () => {
-    expect(readSource('layouts/contest/ContestNavbar.module.css')).not.toMatch(/\.back-btn svg\s*\{/);
+  it('contest sidebar marks the current page in text', () => {
+    const css = readSource('components/shell/ContestShell.module.css');
+    expect(css).toMatch(/\.link\[aria-current='page'\]\s*\{[^}]*color:\s*var\(--text-primary\)/);
+    expect(css).toMatch(/\.problem\[aria-current='page'\]\s*\{[^}]*color:\s*var\(--text-primary\)/);
   });
 
   it('form controls inherit the UI font', () => {
@@ -298,5 +299,90 @@ describe('review fixes (phase 1 final review)', () => {
 
   it('accepted verdict dot uses the verdict colour', () => {
     expect(decl('pages/user/UserProfile.module.css', '.verdict-dot-accepted', 'background-color')).toBe('var(--verdict-accepted)');
+  });
+});
+
+describe('shell tokens', () => {
+  const css = readSource('index.css');
+  const root = parseTokenBlock(css, ':root');
+
+  it('defines the layout tokens', () => {
+    expect(root['--sidebar-width']).toBe('220px');
+    expect(root['--content-max-width']).toBe('1040px');
+    expect(root['--page-gutter']).toBe('28px');
+    expect(root['--tabbar-height']).toBe('56px');
+    expect(root['--topbar-height']).toBe('52px');
+  });
+
+  it('narrows the page gutter on phones', () => {
+    expect(css).toMatch(/@media \(max-width: 767px\)\s*\{\s*:root\s*\{[^}]*--page-gutter:\s*16px/);
+  });
+
+  it('the page container uses the shared width and gutter', () => {
+    expect(css).toMatch(/\.container\s*\{[^}]*max-width:\s*var\(--content-max-width\)[^}]*padding:\s*24px var\(--page-gutter\)/);
+  });
+
+  it('pins cmdk exactly', () => {
+    const pkg = JSON.parse(readSource('../package.json'));
+    expect(pkg.dependencies.cmdk).toBe('1.1.1');
+  });
+});
+
+describe('shell layout', () => {
+  it('the main column can shrink so wide tables scroll inside it', () => {
+    expect(readSource('components/shell/AppShell.module.css')).toMatch(/\.main\s*\{[^}]*min-width:\s*0/);
+  });
+});
+
+describe('page headers', () => {
+  const PAGES = [
+    'pages/problem/Problems.tsx', 'features/submission/SubmissionsView.tsx', 'pages/scoreboard/Scoreboard.tsx',
+    'pages/contest/Contests.tsx', 'pages/contest/ContestProblems.tsx', 'pages/contest/ContestScoreboard.tsx',
+    'pages/admin/Admin.tsx', 'features/admin/users/UserManagement.tsx', 'features/admin/problems/ProblemManagement.tsx',
+    'features/admin/contests/ContestManagement.tsx', 'features/admin/analysis/AnalysisPage.tsx',
+    'features/admin/settings/Settings.tsx', 'features/admin/authoring/ProblemAuthoring.tsx', 'features/admin/authoring/AiDocs.tsx',
+  ];
+  it.each(PAGES)('%s uses PageHeader and no page-level heading of its own', (file) => {
+    const src = readSource(file);
+    expect(src).toMatch(/import\s*\{[^}]*\bPageHeader\b[^}]*\}\s*from/);
+    expect(src).not.toMatch(/<h1[\s>]/);
+  });
+
+  // Page containers only: inner content measures (a form, a guest landing column) may keep a max-width.
+  const PAGE_CONTAINERS: Array<[string, string]> = [
+    ['pages/home/Home.module.css', '.home-container'],
+    ['pages/user/UserProfile.module.css', '.profile-container'],
+    ['pages/problem/Problems.module.css', '.problems-page-container'],
+    ['pages/contest/Contests.module.css', '.container'],
+    ['pages/admin/Admin.module.css', '.admin-container'],
+  ];
+  it.each(PAGE_CONTAINERS)('%s %s leaves the page width to the shell', (file, selector) => {
+    const css = readSource(file).replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].find(([, sel]) => sel.trim() === selector);
+    expect(rule).toBeDefined();
+    expect(rule?.[2]).not.toMatch(/max-width/);
+  });
+});
+
+describe('old navbars', () => {
+  it('nothing imports the removed navbars', () => {
+    const hits = listSourceFiles(['.ts', '.tsx']).filter((file) =>
+      /components\/navbar\/|layouts\/contest\/ContestNavbar|AdminNavbar/.test(readSource(file)));
+    expect(hits).toEqual([]);
+  });
+});
+
+describe('shell focus', () => {
+  it.each([
+    ['components/shell/Sidebar.module.css', ['.item', '.search', '.iconButton', '.brandLink']],
+    ['components/shell/AppShell.module.css', ['.iconButton', '.brand']],
+    ['components/shell/MobileTabBar.module.css', ['.tab', '.sheetItem']],
+    ['components/shell/ContestShell.module.css', ['.leave', '.title', '.problem', '.link', '.back', '.tab']],
+    ['components/shell/AuthShell.module.css', ['.brand']],
+  ])('%s gives every control a visible keyboard focus ring', (file, selectors) => {
+    const css = readSource(file);
+    for (const sel of selectors) {
+      expect(css).toMatch(new RegExp(`\\${sel}:focus-visible[^{]*\\{[^}]*outline:\\s*2px solid var\\(--action-focus-ring\\)`));
+    }
   });
 });

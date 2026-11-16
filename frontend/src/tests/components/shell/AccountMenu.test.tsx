@@ -1,13 +1,13 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import NavbarUserMenu from '../../components/navbar/NavbarUserMenu';
-import { useAuth } from '../../context/AuthContext';
-import { useSettings } from '../../context/SettingsContext';
-import { useTheme } from '../../context/ThemeContext';
+import AccountMenu from '../../../components/shell/AccountMenu';
+import { useAuth } from '../../../context/AuthContext';
+import { useSettings } from '../../../context/SettingsContext';
+import { useTheme } from '../../../context/ThemeContext';
 
-jest.mock('../../context/AuthContext');
-jest.mock('../../context/SettingsContext');
-jest.mock('../../context/ThemeContext', () => ({
+jest.mock('../../../context/AuthContext');
+jest.mock('../../../context/SettingsContext');
+jest.mock('../../../context/ThemeContext', () => ({
     useTheme: jest.fn(),
 }));
 
@@ -16,7 +16,7 @@ jest.mock('../../context/ThemeContext', () => ({
 const mockLogout = jest.fn();
 const mockToggleTheme = jest.fn();
 
-describe('NavbarUserMenu', () => {
+describe('AccountMenu', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         jest.mocked(useAuth).mockReturnValue({
@@ -43,7 +43,7 @@ describe('NavbarUserMenu', () => {
     const renderMenu = () =>
         render(
             <MemoryRouter>
-                <NavbarUserMenu />
+                <AccountMenu />
             </MemoryRouter>,
         );
 

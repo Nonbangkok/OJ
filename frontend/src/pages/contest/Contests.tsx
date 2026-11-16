@@ -5,6 +5,7 @@ import styles from './Contests.module.css';
 import { useContests } from '../../hooks/useContests';
 import ContestList from '../../features/contest/ContestList';
 import LoadingPage from '../../components/shared/LoadingPage';
+import { PageHeader } from '../../components/ui';
 
 const Contests = () => {
     const { user } = useAuth();
@@ -27,9 +28,7 @@ const Contests = () => {
 
     return (
         <div className={styles.container}>
-            <div className={styles.header}>
-                <h1>Contests</h1>
-            </div>
+            <PageHeader title="Contests" />
 
             {error && (
                 <div className={styles.error}>

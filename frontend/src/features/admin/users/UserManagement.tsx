@@ -9,7 +9,7 @@ import BatchUserCreation from './BatchUserCreation';
 import styles from '../shared/Management.module.css';
 import adminService from '../../../services/adminService';
 import tableStyles from '../../../components/styles/Table.module.css';
-import { ActionMenu, Button, StatusBadge } from '../../../components/ui';
+import { ActionMenu, Button, StatusBadge, PageHeader } from '../../../components/ui';
 import type { AdminUser } from '../../../types';
 import { USER_PAGE_SIZE } from '../../../hooks/admin/useUserManagement';
 import { APP_CONSTANTS } from '../../../utils/constants';
@@ -106,12 +106,11 @@ const UserManagement = () => {
     <>
       <div className={styles['management-container']}>
         {/* --- Page header: creation only --------------------------------- */}
-        <div className={styles['management-header']}>
-          <h2>User Management</h2>
-          <div className={styles['header-actions']}>
-            <Button onClick={() => setIsAddModalOpen(true)}>+ New User</Button>
-          </div>
-        </div>
+        <PageHeader
+          breadcrumb={[{ label: 'Manage' }]}
+          title="Users"
+          actions={<Button onClick={() => setIsAddModalOpen(true)}>+ New User</Button>}
+        />
 
         {/* --- Filter / scope bar ----------------------------------------- */}
         <div className={styles['users-toolbar']} data-testid="users-toolbar">

@@ -69,6 +69,9 @@ describe('realtimeService', () => {
     };
 
     const uninstall = (): void => {
+        // Streams are shared per URL inside the service; close every one this
+        // test opened so the next test starts with fresh connections.
+        MockEventSource.instances.forEach((instance) => instance.close());
         (global as { EventSource?: unknown }).EventSource = originalEventSource;
     };
 
@@ -225,6 +228,28 @@ describe('realtimeService', () => {
             unsubscribe();
 
             expect(source.closed).toBe(true);
+        });
+    });
+
+    describe('shared streams', () => {
+        beforeEach(() => install());
+
+        it('opens one EventSource per URL and closes it with the last subscriber', () => {
+            const first = jest.fn();
+            const second = jest.fn();
+            const stopFirst = subscribeSubmissions(first);
+            const stopSecond = subscribeSubmissions(second);
+            expect(MockEventSource.instances).toHaveLength(1);
+            const source = MockEventSource.instances[0];
+            source.emit('submission_update', { type: 'submission_update', submissionId: 1 });
+            expect(first).toHaveBeenCalledTimes(1);
+            expect(second).toHaveBeenCalledTimes(1);
+            stopFirst();
+            expect(source.closed).toBe(false);
+            stopSecond();
+            expect(source.closed).toBe(true);
+            subscribeSubmissions(first);
+            expect(MockEventSource.instances).toHaveLength(2);
         });
     });
 });

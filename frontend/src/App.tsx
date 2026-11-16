@@ -12,9 +12,11 @@ import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-// Components
-import Navbar from './components/navbar/Navbar';
-import ContestLayout from './layouts/contest/ContestLayout';
+// Shells
+import AppShell from './components/shell/AppShell';
+import AuthShell from './components/shell/AuthShell';
+import { CommandPaletteProvider } from './components/shell/CommandPaletteContext';
+import ContestShell from './components/shell/ContestShell';
 import AdminLayout from './layouts/admin/AdminLayout';
 
 // Pages
@@ -61,13 +63,6 @@ import {
   DraftAiDocs,
 } from './features/admin/authoring/DraftWorkspace';
 
-// New layout for standard pages
-const MainLayout = () => (
-  <main className="container">
-    <Outlet />
-  </main>
-);
-
 const PublicProblemsRoute = () => {
   const initialPageSpan = useLoaderData() as PublicProblemListLoaderData;
   return <PrivateRoute><Problems initialPageSpan={initialPageSpan} /></PrivateRoute>;
@@ -81,29 +76,36 @@ const AdminProblemsRoute = () => {
 // The root route owns React Router's native, history-entry-keyed restoration.
 // Data loaders below ensure list rows are present before the saved scroll is
 // applied when returning from a problem detail page.
+// Picks the shell for the current route: auth pages get the bare auth
+// column, contest pages render their own ContestShell (route element), the
+// statement editor is full-bleed, and everything else lives in the AppShell.
 const RootLayout = () => {
-  const location = useLocation();
+  const { pathname } = useLocation();
+  const isAuthPage = /^\/(login|register)\/?$/.test(pathname);
+  const isContestPage = /^\/contests\/[^/]+/.test(pathname);
+  const isEditor = /^\/admin\/authoring\/[^/]+\/editor\/?$/.test(pathname);
 
-  // Use a regular expression for a more robust check.
-  // This ensures that we match URLs like `/contests/123` or `/contests/some-id/problems`
-  // but explicitly NOT `/contests` or `/contests/`.
-  const isContestPage = /^\/contests\/[^/]+/.test(location.pathname);
-  const isAdminPage = /^\/admin/.test(location.pathname);
-
+  let content = <Outlet />;
+  if (isAuthPage) {
+    content = <AuthShell><Outlet /></AuthShell>;
+  } else if (!isContestPage && !isEditor) {
+    content = <AppShell><div className="container"><Outlet /></div></AppShell>;
+  }
 
   return (
-    <div className="App">
-      {isContestPage || isAdminPage ? null : <Navbar />}
-      <Outlet />
-      <ScrollRestoration />
-    </div>
+    <CommandPaletteProvider>
+      <div className="App">
+        {content}
+        <ScrollRestoration />
+      </div>
+    </CommandPaletteProvider>
   );
 };
 
 // Exported so routing can be tested with a memory router.
 export const appRoutes = createRoutesFromElements(
   <Route element={<RootLayout />} hydrateFallbackElement={<main className="container">Loading…</main>}>
-    <Route element={<MainLayout />}>
+    <Route>
       <Route path="/" element={<Home />} />
       <Route path="/problems" loader={publicProblemsLoader} shouldRevalidate={revalidateProblemListOnPathChange} element={<PublicProblemsRoute />} />
       <Route path="/problems/:problemId" element={<PrivateRoute><ProblemDetail /></PrivateRoute>} />
@@ -143,7 +145,7 @@ export const appRoutes = createRoutesFromElements(
       <Route path="analysis" element={<AnalysisPage />} />
     </Route>
 
-    <Route path="/contests/:contestId" element={<PrivateRoute><ContestLayout /></PrivateRoute>}>
+    <Route path="/contests/:contestId" element={<PrivateRoute><ContestShell /></PrivateRoute>}>
       <Route index element={<ContestDetail />} />
       <Route path="problems" element={<ContestProblems />} />
       <Route path="problems/:problemId" element={<ProblemDetail />} />

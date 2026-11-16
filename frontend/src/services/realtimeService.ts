@@ -42,31 +42,82 @@ export const isRealtimeSupported = (): boolean =>
 
 type MessageListener<T> = (payload: T) => void;
 
+interface SharedStream {
+  source: EventSource;
+  /** Listeners per SSE event name; the native listener is added once per name. */
+  listeners: Map<string, Set<(payload: unknown) => void>>;
+  onDown: Set<() => void>;
+  refs: number;
+}
+
+/**
+ * One EventSource per URL, shared by every subscriber in the tab. Browsers
+ * allow ~6 HTTP/1.1 connections per origin; a stream per component (shell +
+ * page + scoreboard) would exhaust them with a few contest tabs open.
+ */
+const streams = new Map<string, SharedStream>();
+
 const openStream = <T>(
   url: string,
   eventName: string,
   onUpdate: MessageListener<T>,
   options?: RealtimeSubscribeOptions
 ): (() => void) => {
-  const source = new EventSource(url);
+  let stream = streams.get(url);
+  // Never reuse a stream the browser has given up on (or one from a replaced
+  // EventSource implementation): open a fresh one instead.
+  if (stream && (stream.source.readyState === EventSource.CLOSED || !(stream.source instanceof EventSource))) {
+    streams.delete(url);
+    stream = undefined;
+  }
+  if (!stream) {
+    const source = new EventSource(url);
+    const created: SharedStream = { source, listeners: new Map(), onDown: new Set(), refs: 0 };
+    source.onerror = () => {
+      // CLOSED means the browser gave up (auth failure, server error) — native
+      // retry is over. CONNECTING means it is still retrying on its own.
+      if (source.readyState === EventSource.CLOSED) {
+        created.onDown.forEach((notify) => notify());
+      }
+    };
+    streams.set(url, created);
+    stream = created;
+  }
+  const shared = stream;
 
-  source.addEventListener(eventName, (event: MessageEvent<string>) => {
-    try {
-      onUpdate(JSON.parse(event.data) as T);
-    } catch {
-      // Malformed payload — drop it; polling remains the correctness net.
-    }
-  });
+  let forEvent = shared.listeners.get(eventName);
+  if (!forEvent) {
+    const set = new Set<(payload: unknown) => void>();
+    shared.listeners.set(eventName, set);
+    shared.source.addEventListener(eventName, (event: MessageEvent<string>) => {
+      let payload: unknown;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return; // Malformed payload — drop it; polling remains the correctness net.
+      }
+      set.forEach((listener) => listener(payload));
+    });
+    forEvent = set;
+  }
+  const listener = onUpdate as (payload: unknown) => void;
+  forEvent.add(listener);
+  const onDown = options?.onStreamDown;
+  if (onDown) shared.onDown.add(onDown);
+  shared.refs += 1;
 
-  source.onerror = () => {
-    // CLOSED means the browser gave up (auth failure, server error) — native
-    // retry is over. CONNECTING means it is still retrying on its own.
-    if (source.readyState === EventSource.CLOSED) {
-      options?.onStreamDown?.();
+  let closed = false;
+  return () => {
+    if (closed) return;
+    closed = true;
+    forEvent?.delete(listener);
+    if (onDown) shared.onDown.delete(onDown);
+    shared.refs -= 1;
+    if (shared.refs === 0) {
+      shared.source.close();
+      streams.delete(url);
     }
   };
-
-  return () => source.close();
 };
 
 /**
