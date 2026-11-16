@@ -143,7 +143,7 @@ Each subsection: what the page must do, and the decided layout. "Builder" marks 
 ### 7.6 Profile
 - Header: avatar, name, joined, tier · Lv, XP bar with "x to Lv n+1", global rank. One stat row: Solved, Attempted, Submissions, Current run / Best run (mono, no icons).
 - Heatmap full width, anchored right so the newest weeks show on mobile.
-- Two columns: Recently solved (+XP, date) and Verdict breakdown | Categories as horizontal bars (only categories with problems; replaces the radar chart) and Languages.
+- Categories: a **radar** (owner decision 2026-11-16, kept because it reads well) beside a solved / total / % list, mockup `phase3-pages.html` §1. Colours come from theme tokens only: area and dots `--accent-primary` (12% fill), rings and spokes `--border-color`, labels `--text-secondary`, percentages `--text-muted`. Categories with no problems stay off the radar. The radar is `aria-hidden`; the list carries the numbers. Hovering a point or a list row highlights both. Below that: Recently solved (+XP, date) | Verdict breakdown and Languages as horizontal bars.
 - Achievements: compact list, unlocked with dates, locked with progress; show next 3 + "Show all".
 
 ### 7.7 Contests
@@ -197,6 +197,8 @@ Pages (mockup for Problems: `key-pages.html` §4):
 ## 8. Figma
 
 The file "Grader Design" (`https://www.figma.com/design/1LcruSmMzO1hBruNrGWate/Grader-Design`) is empty today. After phase 2, push the real tokens (light + dark variables) and the shared components from code into it as a library. The owner's Figma plan is Starter tier, so Code Connect (Organization/Enterprise only) is not used; component names in Figma match the React component names instead. Pages not yet mocked in HTML — Profile, contest lobby/finished recap, Users/Contests editors, Analysis, Settings, the authoring workspace — are designed in Figma from that library. **This is a gate (owner decision):** before each of phases 3–6 starts, Claude puts that phase's un-mocked pages in Figma and the owner approves them; implementation of those pages waits for the approval. Pages already settled in the HTML mockups do not need a Figma pass. HTML mockups remain acceptable for quick explorations.
+
+Phase 3 status (2026-11-16): Submissions, Submission detail, Ranking, Profile, Log in, Register, private-site login, guest home and 404 are drafted on the Figma page "Phase 3 · Review". The Figma MCP tool limit on the Starter plan stopped the phone views, so (owner decision) the rest is an HTML mockup, `phase3-pages.html`: Profile with the radar (light + dark) and phone views of Submissions, Ranking and Profile. For later gates, prefer HTML mockups and keep Figma for the library.
 
 ## 9. Backend additions the UI needs
 

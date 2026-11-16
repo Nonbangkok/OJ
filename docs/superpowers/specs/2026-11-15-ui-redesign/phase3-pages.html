@@ -1,0 +1,266 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Phase 3 · Profile (radar) + phone views</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<style>
+body { margin:0; padding:32px; background:#e9e9ec; font-family:'IBM Plex Sans Thai', sans-serif; color:#18181b; }
+h2 { font-size:18px; margin:40px 0 6px; } h2:first-of-type { margin-top:0; }
+.note { max-width:880px; font-size:14px; line-height:1.65; color:#3f3f46; margin:0 0 16px; }
+.note b { color:#18181b; }
+.row { display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; }
+.cap { font-size:12.5px; color:#52525b; margin:0 0 8px; }
+
+/* Theme tokens: the same names and values as frontend/src/index.css */
+.app { --bg:#fff; --fg:#18181b; --fg2:#3f3f46; --mut:#71717a; --faint:#a1a1aa; --line:#e4e4e7; --line2:#f4f4f5; --side:#fafafa; --hover:#f4f4f5;
+  --ok:#15803d; --bad:#dc2626; --warn:#b45309; --pend:#71717a; --none:#e4e4e7; --btn:#18181b; --btnfg:#fff; --accent:#18181b; --logo-accent:#a1a1aa;
+  --h0:#ebedf0; --h1:#9be9a8; --h2:#40c463; --h3:#30a14e; --h4:#216e39;
+  font-family:'IBM Plex Sans Thai', sans-serif; background:var(--bg); color:var(--fg); font-size:14px; border-radius:10px; overflow:hidden; border:1px solid rgba(127,127,127,.25); }
+.app.dark { --bg:#0d1117; --fg:#e6edf3; --fg2:#c9d1d9; --mut:#8b949e; --faint:#6e7681; --line:#30363d; --line2:#21262d; --side:#010409; --hover:#161b22;
+  --ok:#3fb950; --bad:#f85149; --warn:#d29922; --pend:#8b949e; --none:#30363d; --btn:#e6edf3; --btnfg:#0d1117; --accent:#e6edf3; --logo-accent:#6e7681;
+  --h0:#30363d; --h1:#0e4429; --h2:#006d32; --h3:#26a641; --h4:#39d353; }
+.mono { font-family:'JetBrains Mono', monospace; }
+.mut { color:var(--mut); } .faint { color:var(--faint); } .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); } .pend { color:var(--pend); }
+
+/* desktop shell */
+.desk { flex:none; width:1280px; display:grid; grid-template-columns:220px 1fr; }
+.side { background:var(--side); border-right:1px solid var(--line); padding:12px 10px; display:flex; flex-direction:column; gap:2px; min-height:100%; box-sizing:border-box; }
+.brand { display:flex; align-items:center; gap:9px; font-weight:600; padding:4px 8px 14px; }
+.brand .col { margin-left:auto; color:var(--faint); font-size:16px; }
+.searchrow { display:flex; align-items:center; gap:8px; border:1px solid var(--line); background:var(--bg); border-radius:6px; padding:5px 8px 5px 10px; color:var(--faint); font-size:13px; margin:0 2px 6px; }
+.searchrow .k { margin-left:auto; font:11px 'JetBrains Mono', monospace; }
+.side a { display:flex; gap:10px; align-items:center; padding:7px 10px; border-radius:6px; color:var(--mut); }
+.side a i { font-size:17px; }
+.side a.on { background:var(--bg); color:var(--fg); font-weight:500; box-shadow:0 0 0 1px var(--line); }
+.grp { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); padding:14px 10px 6px; }
+.me { margin-top:auto; display:flex; gap:8px; align-items:center; padding:8px; font-size:13px; font-weight:500; }
+.me .lv { font:11.5px 'JetBrains Mono', monospace; color:var(--faint); font-weight:400; }
+.av { width:24px; height:24px; border-radius:50%; background:var(--line2); color:var(--mut); display:grid; place-items:center; font-size:11px; font-weight:500; flex:none; }
+.av.xl { width:64px; height:64px; font-size:22px; font-weight:600; }
+.wrap { max-width:1040px; padding:32px 28px 48px; box-sizing:border-box; }
+
+/* profile */
+.phd { display:flex; align-items:center; gap:20px; }
+.phd .id { flex:1; display:flex; flex-direction:column; gap:6px; }
+.phd .nm { display:flex; align-items:baseline; gap:10px; }
+.phd h1 { font-size:22px; font-weight:600; margin:0; }
+.lvl { display:flex; align-items:center; gap:12px; font-size:13px; flex-wrap:wrap; }
+.lvl b { font-weight:500; font-size:14px; }
+.bar { height:6px; border-radius:3px; background:var(--line2); overflow:hidden; }
+.bar > i { display:block; height:100%; background:var(--fg); border-radius:3px; }
+.rank { text-align:right; } .rank .v { font:500 22px 'JetBrains Mono', monospace; }
+.stats { display:grid; grid-template-columns:repeat(5, 1fr); border:1px solid var(--line); border-radius:8px; margin-top:24px; }
+.stats div { padding:12px 16px; border-right:1px solid var(--line); } .stats div:last-child { border-right:0; }
+.stats span { display:block; font-size:13px; color:var(--mut); } .stats b { font:500 18px 'JetBrains Mono', monospace; }
+.sec { margin-top:28px; }
+.sech { display:flex; align-items:baseline; gap:8px; margin-bottom:10px; } .sech b { font-weight:500; flex:1; } .sech span { font-size:13px; color:var(--mut); }
+.heat { display:grid; grid-auto-flow:column; grid-template-rows:repeat(7, 13px); gap:3px; justify-content:end; overflow:hidden; }
+.heat i { width:13px; height:13px; border-radius:3px; background:var(--h0); }
+.heat i.l1 { background:var(--h1); } .heat i.l2 { background:var(--h2); } .heat i.l3 { background:var(--h3); } .heat i.l4 { background:var(--h4); }
+.legend { display:flex; gap:4px; align-items:center; justify-content:flex-end; font-size:11px; color:var(--faint); margin-top:8px; }
+.legend i { width:10px; height:10px; border-radius:2px; display:inline-block; }
+.cols { display:grid; grid-template-columns:1fr 1fr; gap:32px; }
+.list > div { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line2); font-size:14px; }
+.list .t { flex:1; } .list .x { font:12px 'JetBrains Mono', monospace; } .list .w { font-size:13px; color:var(--mut); min-width:72px; text-align:right; }
+.hbar { display:grid; grid-template-columns:130px 1fr 52px; gap:10px; align-items:center; font-size:13px; padding:5px 0; }
+.hbar .n { font:12px 'JetBrains Mono', monospace; color:var(--fg2); text-align:right; }
+.hbar .bar > i.ok { background:var(--ok); } .hbar .bar > i.bad { background:var(--bad); } .hbar .bar > i.warn { background:var(--warn); } .hbar .bar > i.pend { background:var(--pend); } .hbar .bar > i.ink { background:var(--fg2); }
+
+/* radar */
+.radar-card { display:grid; grid-template-columns:400px 1fr; gap:32px; align-items:center; }
+.radar svg { display:block; width:100%; height:auto; overflow:visible; }
+.radar .ring { fill:none; stroke:var(--line); stroke-width:1; }
+.radar .spoke { stroke:var(--line); stroke-width:1; }
+.radar .area { fill:var(--accent); fill-opacity:.12; stroke:var(--accent); stroke-width:1.75; stroke-linejoin:round; }
+.radar .dot { fill:var(--accent); stroke:var(--bg); stroke-width:1.5; }
+.radar .lab { fill:var(--fg2); font:12px 'IBM Plex Sans Thai', sans-serif; }
+.radar .pct { fill:var(--mut); font:10.5px 'JetBrains Mono', monospace; }
+.radar .tick { fill:var(--faint); font:9.5px 'JetBrains Mono', monospace; }
+.radar .hot .dot { r:4.5; } .radar .hot .lab { fill:var(--fg); font-weight:500; }
+.catlist { font-size:13px; }
+.catlist > div { display:grid; grid-template-columns:1fr 64px 48px; gap:8px; padding:6px 0; border-bottom:1px solid var(--line2); align-items:center; }
+.catlist .n { font:12px 'JetBrains Mono', monospace; color:var(--fg2); text-align:right; }
+.catlist .p { font:12px 'JetBrains Mono', monospace; color:var(--mut); text-align:right; }
+.catlist > div.hot { background:var(--hover); box-shadow:inset 2px 0 0 var(--fg); padding-left:8px; }
+.tip { position:absolute; pointer-events:none; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 9px; font-size:12px; box-shadow:0 4px 14px rgba(0,0,0,.12); white-space:nowrap; }
+.tip b { font-weight:500; display:block; } .tip span { font:11.5px 'JetBrains Mono', monospace; color:var(--mut); }
+.ach > div { display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid var(--line2); }
+.ach .tx { flex:1; } .ach .tx b { font-weight:500; display:block; } .ach .tx span { font-size:13px; color:var(--mut); }
+.ach .prog { display:flex; align-items:center; gap:10px; } .ach .prog .bar { width:140px; }
+.ach .prog span { font:12px "JetBrains Mono", monospace; color:var(--fg2); white-space:nowrap; width:64px; text-align:right; }
+
+/* phone */
+.phone { flex:none; width:390px; height:844px; position:relative; display:flex; flex-direction:column; }
+.phone.tall { height:1720px; }
+.topbar { height:52px; flex:none; display:flex; align-items:center; gap:9px; padding:0 16px; border-bottom:1px solid var(--line); font-weight:600; font-size:15px; }
+.topbar .s { margin-left:auto; font-size:19px; color:var(--fg2); }
+.pmain { flex:1; overflow:hidden; padding:20px 16px 120px; box-sizing:border-box; }
+.tabs { position:absolute; left:0; right:0; bottom:0; height:56px; display:grid; grid-template-columns:repeat(5, 1fr); border-top:1px solid var(--line); background:var(--bg); }
+.tabs a { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:11px; color:var(--mut); }
+.tabs a i { font-size:19px; } .tabs a.on { color:var(--fg); font-weight:500; }
+.pin { position:absolute; left:0; right:0; bottom:56px; height:54px; display:flex; align-items:center; gap:10px; padding:0 16px; background:var(--hover); border-top:1px solid var(--line); box-shadow:inset 2px 0 0 var(--fg); }
+.p-h1 { font-size:22px; font-weight:600; margin:0; } .p-meta { font-size:13px; color:var(--mut); margin:2px 0 14px; }
+.ptb { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.seg { display:flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; font-size:13px; }
+.seg span { padding:6px 11px; color:var(--mut); border-right:1px solid var(--line); } .seg span:last-child { border-right:0; }
+.seg span.on { background:var(--line2); color:var(--fg); font-weight:500; }
+.btn2 { border:1px solid var(--line); background:var(--bg); border-radius:6px; padding:6px 11px; font-size:13.5px; color:var(--fg); display:inline-flex; gap:6px; align-items:center; margin-left:auto; }
+.item { padding:11px 0; border-bottom:1px solid var(--line2); }
+.item .l1 { display:flex; align-items:center; gap:8px; } .item .l1 b { flex:1; font-weight:500; }
+.item .l1 i { font-size:14px; }
+.item .l2 { display:flex; align-items:center; gap:8px; padding-left:22px; margin-top:4px; font:500 12px 'JetBrains Mono', monospace; }
+.item .l2 .id { margin-left:auto; color:var(--faint); font-weight:400; font-size:11.5px; }
+.strip { display:inline-flex; gap:2px; } .strip i { width:9px; height:6px; border-radius:1.5px; background:var(--ok); }
+.strip i.x { background:var(--bad); } .strip i.t { background:var(--warn); } .strip i.n { background:var(--none); }
+.rk { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line2); }
+.rk .r { width:22px; text-align:right; font:12.5px 'JetBrains Mono', monospace; color:var(--mut); }
+.rk .t { flex:1; } .rk .t b { display:block; font-weight:500; } .rk .t span { font-size:12.5px; color:var(--mut); }
+.rk .x { font:12.5px 'JetBrains Mono', monospace; }
+.rk.top .r, .rk.top .x { color:var(--fg); font-weight:500; } .rk.top .t b { font-weight:600; }
+.pstats { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:8px; margin:16px 0 0; }
+.pstats div { padding:10px 14px; border-bottom:1px solid var(--line); } .pstats div:nth-child(odd) { border-right:1px solid var(--line); }
+.pstats div:nth-last-child(-n+2) { border-bottom:0; }
+.pstats span { display:block; font-size:12.5px; color:var(--mut); } .pstats b { font:500 17px 'JetBrains Mono', monospace; }
+.phone .heat { grid-template-rows:repeat(7, 12px); } .phone .heat i { width:12px; height:12px; border-radius:2.5px; }
+.phone .radar-card { grid-template-columns:1fr; gap:8px; }
+</style>
+
+<h2>Phase 3 · ส่วนที่ทำต่อด้วย HTML mockup</h2>
+<p class="note">หน้าที่ Figma ยังทำไม่เสร็จ ได้แก่ Profile (กลับมาใช้ <b>radar</b>) กับฉบับมือถือของ Submissions, Ranking และ Profile
+สีทั้งหมดดึงจาก token เดียวกับเว็บ (<span class="mono">--accent-primary</span>, <span class="mono">--border-color</span>, <span class="mono">--text-secondary</span>, …) จึงเปลี่ยนตาม theme เอง
+ลองเอาเมาส์ชี้จุดบน radar จะเห็น tooltip และแถวในรายการข้าง ๆ จะถูกไฮไลต์ไปด้วย</p>
+
+<h2>1 · Profile (desktop) — สว่าง / มืด</h2>
+<p class="note"><b>Radar:</b> เส้นและพื้นใช้สี <span class="mono">--accent-primary</span> (สีหมึกของ theme: ดำในโหมดสว่าง ขาวนวลในโหมดมืด) พื้นโปร่ง 12%
+ส่วนเส้นกริดและเส้นแกนใช้สี <span class="mono">--border-color</span>
+ข้าง ๆ radar มีรายการ solved / total กับ % ให้อ่านตัวเลขจริงได้ และให้ screen reader อ่านได้ (radar เป็นภาพ จึงใส่ <span class="mono">aria-hidden</span>)
+หมวดที่ไม่มีโจทย์เลยจะไม่ขึ้นบน radar เหมือนโค้ดตอนนี้ ตัวย่อชื่อหมวดใช้ชุดเดิม (DP, D&amp;C)</p>
+<div class="row">
+  <div id="profile-light" class="app desk"></div>
+</div>
+<div class="row" style="margin-top:28px">
+  <div id="profile-dark" class="app desk dark"></div>
+</div>
+
+<h2>2 · มือถือ (390px)</h2>
+<p class="note">ด้านบนเป็น top bar มี logo กับปุ่มค้นหา ด้านล่างเป็น tab bar ห้าช่อง
+<b>Submissions:</b> แต่ละรายการมีสองบรรทัด (ชื่อโจทย์กับเวลา / ผลตรวจ แถบ testcase และ id) ตัวกรองรวมอยู่ในปุ่ม Filters ปุ่มเดียว
+<b>Ranking:</b> แถวของเราติดอยู่เหนือ tab bar
+<b>Profile:</b> heatmap ชิดขวา สัปดาห์ล่าสุดจึงอยู่ในจอ ส่วน radar ขยายเต็มความกว้างและมีรายการตัวเลขอยู่ใต้กราฟ</p>
+<div class="row">
+  <div><p class="cap">Submissions</p><div id="ph-subs" class="app phone"></div></div>
+  <div><p class="cap">Ranking</p><div id="ph-rank" class="app phone"></div></div>
+  <div><p class="cap">Profile</p><div id="ph-prof" class="app phone tall"></div></div>
+  <div><p class="cap">Profile (มืด)</p><div id="ph-prof-dark" class="app phone tall dark"></div></div>
+</div>
+
+<script>
+const LOGO = `<svg width="22" height="22" viewBox="0 0 512 512" aria-hidden="true"><defs>
+<mask id="LID-a"><circle cx="368.2" cy="148.2" r="123.1" fill="#fff"/><circle cx="351.7" cy="272.8" r="92.4" fill="#000"/></mask>
+<mask id="LID-b"><circle cx="145.4" cy="314.9" r="130.9" fill="#fff"/><circle cx="213.8" cy="405.4" r="98.3" fill="#000"/></mask>
+<mask id="LID-c"><circle cx="400.4" cy="365.9" r="101.1" fill="#fff"/><circle cx="466.6" cy="392.5" r="66.6" fill="#000"/></mask></defs>
+<circle cx="368.2" cy="148.2" r="123.1" fill="currentColor" mask="url(#LID-a)"/><circle cx="145.4" cy="314.9" r="130.9" fill="currentColor" mask="url(#LID-b)"/>
+<circle cx="400.4" cy="365.9" r="101.1" fill="var(--logo-accent)" mask="url(#LID-c)"/></svg>`;
+let logoN = 0; const logo = () => LOGO.replaceAll('LID', 'lg' + (logoN++));
+
+const CATS = [
+  ['Graph', 'Graph', 18, 40], ['Dynamic Programming', 'DP', 12, 52], ['Data Structures', 'Data Structures', 24, 38],
+  ['Math', 'Math', 15, 30], ['Strings', 'Strings', 9, 22], ['Greedy', 'Greedy', 18, 26], ['Sorting', 'Sorting', 14, 16],
+  ['Divide and Conquer', 'D&C', 4, 12], ['2D-Grid', '2D Grid', 6, 14],
+];
+
+function radar(el, size, labelPad, compact = false) {
+  const SHORT = { 'Data Structures': 'DS', Sorting: 'Sort' };
+  const n = CATS.length, cx = size / 2, cy = size / 2, R = size / 2 - labelPad;
+  const pt = (i, r) => { const a = -Math.PI / 2 + (2 * Math.PI * i) / n; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; };
+  let s = `<svg viewBox="0 0 ${size} ${size}" role="presentation" aria-hidden="true">`;
+  for (const f of [0.25, 0.5, 0.75, 1]) s += `<polygon class="ring" points="${CATS.map((_, i) => pt(i, R * f).join(',')).join(' ')}"/>`;
+  CATS.forEach((_, i) => { const [x, y] = pt(i, R); s += `<line class="spoke" x1="${cx}" y1="${cy}" x2="${x}" y2="${y}"/>`; });
+  for (const f of [0.5]) s += `<text class="tick" x="${cx + 3}" y="${cy - R * f - 3}">${f * 100}%</text>`;
+  s += `<polygon class="area" points="${CATS.map(([, , a, b], i) => pt(i, R * a / b).join(',')).join(' ')}"/>`;
+  CATS.forEach(([full, short, a, b], i) => {
+    const [x, y] = pt(i, R * a / b), [lx, ly] = pt(i, R + 16);
+    const anchor = Math.abs(lx - cx) < 4 ? 'middle' : lx > cx ? 'start' : 'end';
+    const pct = Math.round(100 * a / b);
+    s += `<g data-i="${i}"><text class="lab" x="${lx}" y="${ly}" text-anchor="${anchor}" dominant-baseline="middle">${compact ? (SHORT[short] ?? short) : short}</text>`
+      + `<text class="pct" x="${lx}" y="${ly + 14}" text-anchor="${anchor}" dominant-baseline="middle">${pct}%</text>`
+      + `<circle class="dot" cx="${x}" cy="${y}" r="3"/><circle cx="${x}" cy="${y}" r="12" fill="transparent" data-hit="${i}"/></g>`;
+  });
+  el.innerHTML = s + '</svg>';
+}
+const catList = () => `<div class="catlist">${CATS.map(([full, , a, b], i) => `<div data-i="${i}"><span>${full}</span><span class="n">${a} / ${b}</span><span class="p">${Math.round(100 * a / b)}%</span></div>`).join('')}</div>`;
+function wireRadar(app) {
+  const tip = document.createElement('div'); tip.className = 'tip'; tip.hidden = true; app.style.position = 'relative'; app.appendChild(tip);
+  const set = (i, ev) => {
+    app.querySelectorAll('[data-i]').forEach(e => e.classList.toggle('hot', String(i) === e.dataset.i));
+    if (i == null) { tip.hidden = true; return; }
+    const [full, , a, b] = CATS[i]; tip.innerHTML = `<b>${full}</b><span>${a} / ${b} solved · ${Math.round(100 * a / b)}%</span>`; tip.hidden = false;
+    const r = app.getBoundingClientRect(); tip.style.left = (ev.clientX - r.left + 12) + 'px'; tip.style.top = (ev.clientY - r.top + 12) + 'px';
+  };
+  app.addEventListener('mousemove', ev => { const h = ev.target.closest('[data-hit],.catlist [data-i]'); set(h ? (h.dataset.hit ?? h.dataset.i) : null, ev); });
+  app.addEventListener('mouseleave', () => set(null));
+}
+let seed = 7; const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+const heat = (weeks) => { let s = '<div class="heat" aria-label="Submissions per day">'; for (let w = 0; w < weeks; w++) for (let d = 0; d < 7; d++) { const busy = w > weeks * 0.6 ? 0.75 : 0.45, x = rnd(); const l = x > busy ? 0 : x < 0.06 ? 4 : x < 0.16 ? 3 : x < 0.3 ? 2 : 1; s += `<i class="${l ? 'l' + l : ''}"></i>`; } return s + '</div>'; };
+const legend = '<div class="legend">Less <i style="background:var(--h0)"></i><i style="background:var(--h1)"></i><i style="background:var(--h2)"></i><i style="background:var(--h3)"></i><i style="background:var(--h4)"></i> More</div>';
+const side = (active) => `<nav class="side"><div class="brand">${logo()}Grader<i class="ph ph-sidebar-simple col"></i></div>
+<div class="searchrow"><i class="ph ph-magnifying-glass"></i>Search<span class="k">⌘K</span></div>
+${[['house', 'Home'], ['list-checks', 'Problems'], ['paper-plane-tilt', 'Submissions'], ['ranking', 'Ranking']].map(([i, l]) => `<a class="${l === active ? 'on' : ''}"><i class="ph ph-${i}"></i>${l}</a>`).join('')}
+<div class="grp">Contests</div><a><i class="ph ph-calendar-blank"></i>All contests</a>
+<div class="me"><span class="av">N</span>nattapat<span class="lv">Lv.8</span></div></nav>`;
+const RECENT = [['Queue rotate', '+40 XP', '14 min ago'], ['BFS on a grid', '+60 XP', 'Yesterday'], ['Interval merge', '+40 XP', 'Nov 12'], ['Two pointers on a ring', '+80 XP', 'Nov 10'], ['Matrix exponent', '+120 XP', 'Nov 7']];
+const VERD = [['Accepted', 412, 'ok'], ['Wrong answer', 520, 'bad'], ['Time limit', 140, 'warn'], ['Runtime error', 96, 'bad'], ['Compilation error', 116, 'pend']];
+const ACH = [['Century', 'Solve 100 problems', [96, 100]], ['Week streak', 'Solve something 7 days in a row', [4, 7]], ['Graph explorer', 'Solve 20 graph problems', [18, 20]], ['First blood', 'First Accepted submission', 'Mar 4, 2025'], ['Night owl', 'Accepted between 00:00 and 04:00', 'Oct 2, 2025']];
+const hb = (l, n, max, cls, txt) => `<div class="hbar"><span>${l}</span><div class="bar"><i class="${cls}" style="width:${100 * n / max}%"></i></div><span class="n">${txt ?? n.toLocaleString('en-US')}</span></div>`;
+
+function profileDesk(el) {
+  el.innerHTML = side(null) + `<main class="wrap">
+  <div class="phd"><span class="av xl">N</span><div class="id"><div class="nm"><h1>nattapat</h1><span class="mut" style="font-size:13px">Joined March 2025</span></div>
+    <div class="lvl"><b>Apprentice · Lv 8</b><div class="bar" style="width:240px"><i style="width:64%"></i></div><span class="mono" style="font-size:12px;color:var(--fg2)">5,860 / 6,400 XP</span><span class="mut">540 XP to Lv 9</span></div></div>
+    <div class="rank"><div class="mut" style="font-size:13px">Global rank</div><div class="v">#214</div></div></div>
+  <div class="stats"><div><span>Solved</span><b>96</b></div><div><span>Attempted</span><b>131</b></div><div><span>Submissions</span><b>1,284</b></div><div><span>Current run</span><b>4 days</b></div><div><span>Best run</span><b>17 days</b></div></div>
+  <div class="sec"><div class="sech"><b>Activity</b><span>Submissions per day · last 12 months</span></div>${heat(53)}${legend}</div>
+  <div class="sec radar-card"><div><div class="sech"><b>Categories</b><span>share of each category solved</span></div><div class="radar"></div></div>
+    <div><div class="sech"><b>&nbsp;</b><span>solved / problems</span></div>${catList()}</div></div>
+  <div class="sec cols"><div><div class="sech"><b>Recently solved</b><span>Last 30 days</span></div><div class="list">${RECENT.map(([t, x, w]) => `<div><i class="ph-bold ph-check ok"></i><span class="t">${t}</span><span class="x ok">${x}</span><span class="w">${w}</span></div>`).join('')}</div></div>
+    <div><div class="sech"><b>Verdicts</b><span>1,284 submissions</span></div>${VERD.map(([l, n, c]) => hb(l, n, 520, c)).join('')}
+      <div class="sech" style="margin-top:22px"><b>Languages</b><span>submissions</span></div>${hb('C++', 1180, 1180, 'ink')}${hb('Python', 104, 1180, 'ink')}</div></div>
+  <div class="sec"><div class="sech"><b>Achievements</b><span>7 of 24 unlocked · Show all</span></div><div class="ach">${ACH.map(([n, d, x]) => `<div><i class="${Array.isArray(x) ? 'ph ph-circle faint' : 'ph-bold ph-check ok'}"></i><div class="tx"><b>${n}</b><span>${d}</span></div>${Array.isArray(x) ? `<div class="prog"><div class="bar"><i style="width:${100 * x[0] / x[1]}%"></i></div><span>${x[0]} / ${x[1]}</span></div>` : `<span class="mut" style="font-size:13px">Unlocked ${x}</span>`}</div>`).join('')}</div></div>
+  </main>`;
+  radar(el.querySelector(".radar"), 400, 84); wireRadar(el);
+}
+const topBar = () => `<div class="topbar">${logo()}Grader<i class="ph ph-magnifying-glass s"></i></div>`;
+const tabs = (on) => `<nav class="tabs">${[['house', 'Home'], ['list-checks', 'Problems'], ['calendar-blank', 'Contests'], ['paper-plane-tilt', 'Submissions'], ['dots-three', 'More']].map(([i, l]) => `<a class="${l === on ? 'on' : ''}"><i class="ph ph-${i}"></i>${l}</a>`).join('')}</nav>`;
+const strip = s => `<span class="strip">${[...s].map(c => `<i class="${{ P: '', F: 'x', L: 't', N: 'n' }[c]}"></i>`).join('')}</span>`;
+const MARK = { ok: 'ph-bold ph-check ok', bad: 'ph-bold ph-x bad', warn: 'ph ph-timer warn', pend: 'ph ph-circle-notch pend' };
+
+document.getElementById('ph-subs').innerHTML = topBar() + `<div class="pmain"><h1 class="p-h1">Submissions</h1><p class="p-meta">1,284 submissions · yours</p>
+<div class="ptb"><div class="seg"><span class="on">Mine</span><span>All</span></div><span class="btn2"><i class="ph ph-funnel"></i>Filters · 0</span></div>
+${[['48213', '2 min', 'vector::erase', 'bad', 'WRONG 6/10', 'PPPPPPFNNN'], ['48207', '14 min', 'Queue rotate', 'ok', 'ACCEPTED', 'PPPPPPPPPPPP'], ['48190', '1 h', 'Two sum (sorted)', 'warn', 'TIME LIMIT 8/10', 'PPPPPPPPLN'], ['48172', '3 h', 'Rolling string hash', 'bad', 'COMPILATION ERROR', ''], ['48160', '1 d', 'BFS on a grid', 'ok', 'ACCEPTED', 'PPPPPPPPPP'], ['48122', '1 d', 'Prefix sums', 'bad', 'RUNTIME ERROR 3/10', 'PPPFNNNNNN'], ['48101', '2 d', 'Binary search', 'pend', 'RUNNING', 'PPPNNNNNNN']]
+  .map(([id, w, t, c, l, s]) => `<div class="item"><div class="l1"><i class="${MARK[c]}"></i><b>${t}</b><span class="mono mut" style="font-size:12px">${w}</span></div><div class="l2"><span class="${c}">${l}</span>${s ? strip(s) : ''}<span class="id">#${id}</span></div></div>`).join('')}
+</div>` + tabs('Submissions');
+
+document.getElementById('ph-rank').innerHTML = topBar() + `<div class="pmain"><h1 class="p-h1">Ranking</h1><p class="p-meta">Ranked by total XP · 1,912 students</p>
+<div class="ptb"><div class="seg"><span class="on">All time</span><span>This week</span></div></div>
+${[[1, 'khaopan', 'Master', 22, 412, '44,980'], [2, 'ploy.s', 'Master', 21, 398, '40,310'], [3, 'tonkla', 'Expert', 19, 351, '33,020'], [4, 'mintra', 'Expert', 17, 300, '26,140'], [4, 'phum_k', 'Expert', 17, 296, '26,140'], [6, 'jirat', 'Expert', 16, 281, '23,000'], [7, 'arm.t', 'Expert', 15, 260, '19,880'], [8, 'natcha', 'Specialist', 14, 241, '17,210'], [9, 'beam', 'Specialist', 13, 220, '14,700']]
+  .map(([r, n, t, lv, s, x]) => `<div class="rk ${r <= 3 ? 'top' : ''}"><span class="r">${r}</span><span class="av">${n[0].toUpperCase()}</span><div class="t"><b>${n}</b><span>${t} · Lv ${lv} · ${s} solved</span></div><span class="x">${x}</span></div>`).join('')}
+</div><div class="pin"><span class="mono" style="font-weight:500;font-size:12.5px">214</span><span class="av">N</span><div style="flex:1"><b style="font-weight:500">nattapat</b> <span class="mut" style="font-size:12.5px">You</span><div class="mut" style="font-size:12.5px">Apprentice · Lv 8 · 96 solved</div></div><span class="mono" style="font-weight:500;font-size:12.5px">5,860</span></div>` + tabs('More');
+
+function profilePhone(el) {
+  el.innerHTML = topBar() + `<div class="pmain">
+  <div class="phd" style="gap:14px"><span class="av xl">N</span><div class="id" style="gap:2px"><h1>nattapat</h1><span style="font-size:13px;color:var(--fg2)">Apprentice · Lv 8 · rank #214</span><span class="mut" style="font-size:13px">Joined March 2025</span></div></div>
+  <div style="margin-top:16px"><div class="bar"><i style="width:64%"></i></div><div style="display:flex;margin-top:6px;font-size:13px"><span class="mono" style="flex:1;font-size:12px;color:var(--fg2)">5,860 / 6,400 XP</span><span class="mut">540 XP to Lv 9</span></div></div>
+  <div class="pstats"><div><span>Solved</span><b>96</b></div><div><span>Attempted</span><b>131</b></div><div><span>Submissions</span><b>1,284</b></div><div><span>Current run</span><b>4 days</b></div></div>
+  <div class="sec"><div class="sech"><b>Activity</b><span>newest on the right</span></div>${heat(25)}${legend}</div>
+  <div class="sec radar-card"><div><div class="sech"><b>Categories</b><span>share solved</span></div><div class="radar"></div></div>${catList()}</div>
+  <div class="sec"><div class="sech"><b>Recently solved</b></div><div class="list">${RECENT.slice(0, 3).map(([t, x, w]) => `<div><i class="ph-bold ph-check ok"></i><span class="t">${t}</span><span class="x ok">${x}</span></div>`).join('')}</div></div>
+  <div class="sec"><div class="sech"><b>Verdicts</b></div>${VERD.map(([l, n, c]) => hb(l, n, 520, c)).join('').replaceAll('grid-template-columns:130px', '')}</div>
+  </div>` + tabs('More');
+  radar(el.querySelector(".radar"), 358, 64, true); wireRadar(el);
+}
+profileDesk(document.getElementById('profile-light'));
+profileDesk(document.getElementById('profile-dark'));
+profilePhone(document.getElementById('ph-prof'));
+profilePhone(document.getElementById('ph-prof-dark'));
+</script>
