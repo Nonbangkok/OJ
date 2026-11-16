@@ -49,3 +49,12 @@ describe('ActivityHeatmap', () => {
     expect(screen.getByText('More')).toBeInTheDocument();
   });
 });
+
+test('opens scrolled to the newest weeks so they show on narrow screens', () => {
+  const spy = jest.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(900);
+  render(<ActivityHeatmap activity={[]} />);
+  const scroller = screen.getByRole('img', { name: /daily submission activity/i });
+  expect(scroller.scrollLeft).toBe(900);
+  spy.mockRestore();
+});
+

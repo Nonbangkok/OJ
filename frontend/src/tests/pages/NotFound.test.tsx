@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { appRoutes } from '../../App';
 import { AuthProvider } from '../../context/AuthContext';
@@ -17,6 +17,7 @@ const renderAppAt = (path: string) => render(
 
 describe('unknown routes', () => {
     beforeEach(() => {
+        Element.prototype.scrollIntoView = jest.fn();
         (jest.mocked(authService.checkLogin) as jest.Mock).mockRejectedValue(new Error('guest'));
         (jest.mocked(authService.getSiteConfig) as jest.Mock).mockResolvedValue({
             siteAccessMode: 'public', registrationEnabled: true, passwordChangeEnabled: true,
@@ -27,8 +28,22 @@ describe('unknown routes', () => {
         renderAppAt('/definitely/not-a-page');
 
         expect(await screen.findByRole('heading', { name: /page not found/i })).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: /back to home/i })).toHaveAttribute('href', '/');
+        expect(screen.getByRole('link', { name: 'Go home' })).toHaveAttribute('href', '/');
         expect(screen.queryByText(/hey developer/i)).not.toBeInTheDocument();
+    });
+
+    it('shows the requested path', async () => {
+        renderAppAt('/problemz/vector_eraze?tab=submit');
+
+        expect(await screen.findByRole('heading', { name: /page not found/i })).toBeInTheDocument();
+        expect(screen.getByText('/problemz/vector_eraze')).toBeInTheDocument();
+    });
+
+    it('Search opens the command palette', async () => {
+        renderAppAt('/definitely/not-a-page');
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Search for a page' }));
+        expect(await screen.findByRole('dialog')).toBeInTheDocument();
     });
 
     it('also catches unknown paths under /admin', async () => {

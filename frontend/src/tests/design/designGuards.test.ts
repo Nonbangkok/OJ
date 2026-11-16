@@ -341,6 +341,8 @@ describe('page headers', () => {
     'pages/admin/Admin.tsx', 'features/admin/users/UserManagement.tsx', 'features/admin/problems/ProblemManagement.tsx',
     'features/admin/contests/ContestManagement.tsx', 'features/admin/analysis/AnalysisPage.tsx',
     'features/admin/settings/Settings.tsx', 'features/admin/authoring/ProblemAuthoring.tsx', 'features/admin/authoring/AiDocs.tsx',
+    'pages/submission/SubmissionDetailPage.tsx', 'pages/problem/ProblemDetail.tsx',
+    // UserProfile is exempt: its identity header (avatar, name, level, rank — §7.6) is the page title.
   ];
   it.each(PAGES)('%s uses PageHeader and no page-level heading of its own', (file) => {
     const src = readSource(file);

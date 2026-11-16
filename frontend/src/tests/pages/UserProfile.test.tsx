@@ -138,22 +138,20 @@ describe('User Profile Page', () => {
         expect(jest.mocked(userService.getProfile).mock.calls.map((call) => call[0])).toEqual(['tester', 'other']);
     }, 30000);
 
-    it('displays profile stats on success', async () => {
+    it('stat row shows solved, attempted, submissions, current and best run', async () => {
         jest.mocked(userService.getProfile).mockResolvedValueOnce(profileData);
 
         renderPage();
 
-        await waitFor(() => {
-            expect(screen.getByRole('heading', { name: 'tester' })).toBeInTheDocument();
-            expect(screen.getByText((content, element) =>
-                element?.className.includes('stat-value') === true && content === '2')).toBeInTheDocument(); // solved
-            expect(screen.getByText((content, element) =>
-                element?.className.includes('stat-value') === true && content === '4')).toBeInTheDocument(); // attempted
-            expect(screen.getByText((content, element) =>
-                element?.className.includes('stat-value') === true && content === '250')).toBeInTheDocument(); // total score
-        });
+        const stats = await screen.findByRole('list', { name: 'Stats' });
+        const value = (label: string) => within(stats).getByText(label).closest('li')?.querySelector('b')?.textContent;
+        expect(value('Solved')).toBe('2');
+        expect(value('Attempted')).toBe('4');
+        expect(value('Submissions')).toBe('9');
+        expect(value('Current run')).toBe('4 days');
+        expect(value('Best run')).toBe('11 days');
+        expect(within(stats).queryByText(/Total score|Solve rate/)).toBeNull();
         expect(userService.getProfile).toHaveBeenCalledWith('tester');
-        expect(jest.mocked(userService.getProfile).mock.calls[0][0]).toBe('tester');
     });
 
     it('renders one heatmap cell per day of the activity window', async () => {
@@ -257,49 +255,24 @@ describe('User Profile Page', () => {
         });
     });
 
-    it('renders the streak panel with current and longest streak', async () => {
+
+    it('achievements show the next three locked by progress then unlocked', async () => {
         jest.mocked(userService.getProfile).mockResolvedValueOnce(profileData);
 
         renderPage();
 
-        await waitFor(() => {
-            const streakPanel = document.querySelector('div[class*="streak-panel"]');
-            expect(streakPanel).toBeTruthy();
-            expect(within(streakPanel as HTMLElement).getByText('4')).toBeInTheDocument();
-        });
-        expect(screen.getByText(/day streak/i)).toBeInTheDocument();
-        expect(screen.getByText(/longest streak/i)).toBeInTheDocument();
-        const longest = document.querySelector('span[class*="streak-longest"]');
-        expect(within(longest as HTMLElement).getByText('11')).toBeInTheDocument();
-    });
+        const section = await screen.findByRole('region', { name: 'Achievements' });
+        const items = within(section).getAllByRole('listitem');
+        const locked = items.filter((li) => li.getAttribute('data-state') === 'locked');
+        const unlocked = items.filter((li) => li.getAttribute('data-state') === 'unlocked');
+        expect(locked).toHaveLength(3);
+        expect(unlocked.map((li) => li.querySelector('b')?.textContent)).toEqual(['First Solve']);
+        const fractions = locked.map((li) => Number(li.getAttribute('data-progress')));
+        expect([...fractions].sort((a, b) => b - a)).toEqual(fractions);
+        expect(within(section).getByText('1 of 8 unlocked')).toBeInTheDocument();
 
-    it('renders every achievement with locked and unlocked states', async () => {
-        jest.mocked(userService.getProfile).mockResolvedValueOnce(profileData);
-
-        renderPage();
-
-        await waitFor(() => {
-            expect(screen.getByText('First Solve')).toBeInTheDocument();
-        });
-
-        // Unlocked card: name and description, no progress label.
-        expect(screen.getByText('Solve your first problem')).toBeInTheDocument();
-
-        // Locked cards carry the locked state and a progress label.
-        const centuryCard = screen.getByText('Century').closest('div[class*="achievement-card"]');
-        expect(centuryCard).toBeTruthy();
-        expect(centuryCard?.className).toContain('locked');
-        expect(within(centuryCard as HTMLElement).getByText('2/100 problems')).toBeInTheDocument();
-        expect(within(centuryCard as HTMLElement).getByText('locked', { exact: false })).toBeInTheDocument();
-
-        // The unlocked card is not marked locked (locked is its own token).
-        const firstSolveCard = screen.getByText('First Solve').closest('div[class*="achievement-card"]');
-        expect(firstSolveCard?.className).not.toMatch(/\blocked\b/);
-
-        // All eight catalog entries render.
-        for (const name of ['Getting Started', 'Problem Grinder', 'Century', 'On Fire', 'Unstoppable', 'Polyglot', 'Contester']) {
-            expect(screen.getByText(name)).toBeInTheDocument();
-        }
+        fireEvent.click(within(section).getByRole('button', { name: 'Show all' }));
+        expect(within(section).getAllByRole('listitem')).toHaveLength(8);
     });
 
     it('renders the XP progression block in the identity card', async () => {
@@ -308,14 +281,13 @@ describe('User Profile Page', () => {
         renderPage();
 
         await waitFor(() => {
-            expect(screen.getByText('Apprentice')).toBeInTheDocument();
+            expect(screen.getByText('Apprentice · Lv 6')).toBeInTheDocument();
         });
-        expect(screen.getByText('Level 6')).toBeInTheDocument();
-        expect(screen.getByText('2,840 XP')).toBeInTheDocument();
-        expect(screen.getByText('160 XP to Level 7')).toBeInTheDocument();
-        expect(screen.getByText('Rank #3')).toBeInTheDocument();
+        expect(screen.getByText('340 / 500 XP')).toBeInTheDocument();
+        expect(screen.getByText('160 XP to Lv 7')).toBeInTheDocument();
+        expect(screen.getByText('#3')).toBeInTheDocument();
 
-        const bar = screen.getByRole('progressbar');
+        const bar = screen.getByRole('progressbar', { name: /XP to next level/ });
         expect(bar).toHaveAttribute('aria-valuenow', '340');
         expect(bar).toHaveAttribute('aria-valuemax', '500');
     });
@@ -348,6 +320,18 @@ describe('User Profile Page', () => {
         const expectedDate = new Date('2026-09-20T10:00:00.000Z')
             .toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
         expect(screen.getByText(expectedDate)).toBeInTheDocument();
+    });
+
+    it('leaves no empty column when nothing is solved yet (Verdicts and Languages sit side by side)', async () => {
+        jest.mocked(userService.getProfile).mockResolvedValueOnce({ ...profileData, recentRewards: [] });
+        const { container } = renderPage();
+        await screen.findByRole('heading', { name: 'Verdicts' });
+        const grid = container.querySelector('.two-col') as HTMLElement;
+        const cells = Array.from(grid.children);
+        expect(cells).toHaveLength(2);
+        cells.forEach((cell) => expect(cell.textContent?.trim()).not.toBe(''));
+        expect(within(cells[0] as HTMLElement).getByRole('heading', { name: 'Verdicts' })).toBeInTheDocument();
+        expect(within(cells[1] as HTMLElement).getByRole('heading', { name: 'Languages' })).toBeInTheDocument();
     });
 
     it('hides the rank badge when the user has no rewards', async () => {
@@ -389,9 +373,9 @@ describe('User Profile Page', () => {
         renderPage();
 
         await waitFor(() => {
-            expect(screen.getByText('Novice')).toBeInTheDocument();
+            expect(screen.getByText(/^Novice · Lv/)).toBeInTheDocument();
         });
-        expect(screen.queryByText(/Rank #/)).toBeNull();
+        expect(screen.queryByText('Global rank')).toBeNull();
         expect(screen.queryByText('Recently Solved')).toBeNull();
     });
 });

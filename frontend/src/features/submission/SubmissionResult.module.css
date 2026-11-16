@@ -84,3 +84,14 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* Phones: the case line reads "3 · 110 ms · 6.7 MB"; the bars need the table's width. */
+@media (max-width: 767px) {
+  .measure {
+    display: inline;
+  }
+
+  .measure > :not(.mono) {
+    display: none;
+  }
+}

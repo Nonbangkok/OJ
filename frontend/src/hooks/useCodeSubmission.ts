@@ -176,7 +176,15 @@ const useCodeSubmission = (
   const loadFile = async (file: File) => {
     const text = await readFileText(file);
     if (!submissionFilename) {
-      setLanguage(file.name.toLowerCase().endsWith('.py') ? 'python' : 'cpp');
+      const next: SubmissionLanguage = file.name.toLowerCase().endsWith('.py') ? 'python' : 'cpp';
+      if (next !== language) {
+        // Switching language re-runs the draft-restore effect for the new key;
+        // store the file as that language's draft so the restore loads it.
+        const cache = readSubmissionCache();
+        cache[`${problemId}:${next}`] = { code: text, timestamp: new Date().getTime() };
+        writeSubmissionCache(cache);
+      }
+      setLanguage(next);
     }
     setCode(text);
   };

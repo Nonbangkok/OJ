@@ -69,8 +69,8 @@ describe('Login page session-expiry handling', () => {
         );
 
         fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'testuser' } });
-        fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
-        fireEvent.click(screen.getByRole('button', { name: /login/i }));
+        fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'password123' } });
+        fireEvent.click(screen.getByRole('button', { name: /^log in$/i }));
 
         await waitFor(() => {
             expect(mockNavigate).toHaveBeenCalledWith('/problems/abc');
@@ -91,8 +91,8 @@ describe('Login page session-expiry handling', () => {
         );
 
         fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'testuser' } });
-        fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
-        fireEvent.click(screen.getByRole('button', { name: /login/i }));
+        fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'password123' } });
+        fireEvent.click(screen.getByRole('button', { name: /^log in$/i }));
 
         await waitFor(() => {
             expect(mockNavigate).toHaveBeenCalledWith('/');

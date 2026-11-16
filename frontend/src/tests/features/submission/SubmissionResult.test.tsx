@@ -46,6 +46,23 @@ describe('SubmissionResult', () => {
     expect(screen.queryByRole('table')).toBeNull();
   });
 
+  it('shows the compiler log the judge stores (an array with one output entry), with no score line', () => {
+    renderResult({ ...base, overall_status: 'Compilation Error', score: 0,
+      results: [{ status: 'Compilation Error', output: 'student.h:3:1: error: expected ;' }] });
+    expect(screen.getByText('COMPILATION ERROR')).toBeInTheDocument();
+    expect(screen.getByText('student.h:3:1: error: expected ;')).toBeInTheDocument();
+    expect(screen.queryByText(/pts/)).toBeNull();
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  it('shows the message of a system error (e.g. judging interrupted by a restart)', () => {
+    renderResult({ ...base, overall_status: 'System Error', score: 0,
+      results: [{ status: 'System Error', output: 'Judging was interrupted by a server restart. Please resubmit.' }] });
+    expect(screen.getByText('Judging was interrupted by a server restart. Please resubmit.')).toBeInTheDocument();
+    expect(screen.queryByText(/pts/)).toBeNull();
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
   it('announces judging while pending', () => {
     renderResult({ ...base, overall_status: 'Running', score: 0, results: null });
     const status = screen.getByRole('status');

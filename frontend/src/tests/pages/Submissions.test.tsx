@@ -1,113 +1,105 @@
-import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import Submissions from '../../pages/submission/Submissions';
 import submissionService from '../../services/submissionService';
+import { subscribeSubmissions, type SubmissionUpdatePayload } from '../../services/realtimeService';
 import { useAuth } from '../../context/AuthContext';
-import { installMockIntersectionObserver, restoreMockIntersectionObserver, triggerIntersectionObservers } from '../utils/mockIntersectionObserver';
 
 jest.mock('../../services/submissionService');
-jest.mock('../../context/AuthContext', () => ({
-    useAuth: jest.fn(() => ({ user: null, isLoading: false })),
+jest.mock('../../services/realtimeService', () => ({
+    ...jest.requireActual('../../services/realtimeService'),
+    isRealtimeSupported: () => true,
+    subscribeSubmissions: jest.fn(() => () => undefined),
 }));
+jest.mock('../../context/AuthContext', () => ({ useAuth: jest.fn() }));
 
-// Mock ThemeContext to prevent useTheme errors from LoadingPage
-jest.mock('../../context/ThemeContext', () => ({
-    useTheme: jest.fn(() => ({ theme: 'light' })),
-}));
+const student = { id: 7, username: 'nattapat', role: 'user' as const };
+const staff = { id: 2, username: 'ta', role: 'staff' as const };
+const row = (id: number, over: Record<string, unknown> = {}) => ({
+    id, username: 'nattapat', problem_id: 'vec', problem_title: 'vector::erase', overall_status: 'Wrong Answer',
+    score: 60, language: 'cpp', submitted_at: new Date().toISOString(),
+    case_statuses: ['Accepted', 'Wrong Answer'], max_time_ms: 410, max_memory_kb: 12595, ...over,
+});
 
-// Mock LoadingPage to control the loading text
-jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading Submissions...</div>);
-jest.mock('react-router-dom', () => ({
-    ...jest.requireActual('react-router-dom'),
-    useParams: () => ({})
-}));
+const renderAt = (url = '/submissions') => render(<MemoryRouter initialEntries={[url]}><Submissions /></MemoryRouter>);
 
-describe('Submissions Page', () => {
-    afterEach(() => restoreMockIntersectionObserver());
-
+describe('Submissions page', () => {
     beforeEach(() => {
-        jest.clearAllMocks();
-        jest.mocked(useAuth).mockReturnValue({ user: null, isLoading: false } as ReturnType<typeof useAuth>);
-        jest.mocked(submissionService.searchProblems).mockResolvedValue([]);
-        jest.mocked(submissionService.searchUsers).mockResolvedValue([]);
+        jest.mocked(useAuth).mockReturnValue({ user: student, isLoading: false, refreshUser: jest.fn() } as never);
+        jest.mocked(submissionService.getAll).mockResolvedValue([row(48213), row(48207, { overall_status: 'Accepted', score: 100, case_statuses: ['Accepted', 'Accepted'] })] as never);
     });
 
-    it('keeps the page render stable and reports initial loading inline', () => {
-        jest.mocked(submissionService.getAll).mockReturnValue(new Promise(() => { }));
-        render(<BrowserRouter><Submissions /></BrowserRouter>);
-        expect(screen.getByRole('status')).toHaveTextContent('Loading submissions');
+    it('rows link to the detail route and show verdict, strip and limits used', async () => {
+        renderAt();
+        await screen.findByRole('link', { name: '#48213' });
+        const table = screen.getByRole('table', { name: 'Submissions' });
+        const first = within(table).getAllByRole('row')[1];
+        expect(within(first).getByRole('link', { name: /#48213/ })).toHaveAttribute('href', '/submissions/48213');
+        expect(within(first).getByText('WRONG 1/2')).toBeInTheDocument();
+        expect(within(first).getByText('410 ms')).toBeInTheDocument();
+        expect(within(first).getByText('12.3 MB')).toBeInTheDocument();
     });
 
-    it('displays submissions on success', async () => {
-        const mockSubmissions = [
-            { id: 1, problem_id: 'P1', problem_title: 'Test Problem', username: 'user1', overall_status: 'Accepted', score: 100, language: 'python', submitted_at: '2025-01-01T00:00:00Z' }
-        ];
-        jest.mocked(submissionService.getAll).mockResolvedValueOnce(mockSubmissions);
-
-        render(<BrowserRouter><Submissions /></BrowserRouter>);
-
-        await waitFor(() => {
-            expect(screen.getByText('Test Problem')).toBeInTheDocument();
-            expect(screen.getByText('Accepted')).toBeInTheDocument();
-        });
+    it('never nests a link inside the row link (the problem title is plain text)', async () => {
+        const { container } = renderAt();
+        await screen.findByRole('link', { name: '#48213' });
+        expect(container.querySelector('a a')).toBeNull();
     });
 
-    it('automatically reveals the next submissions batch near the Show More control', async () => {
-        const restoreObserver = installMockIntersectionObserver();
-        const submissions = Array.from({ length: 12 }, (_, index) => ({
-            id: index + 1,
-            problem_id: `P${index + 1}`,
-            problem_title: `Test Problem ${index + 1}`,
-            username: `user${index + 1}`,
-            overall_status: 'Accepted',
-            score: 100,
-            language: 'python',
-            submitted_at: '2025-01-01T00:00:00Z',
-        }));
-        jest.mocked(submissionService.getAll).mockResolvedValueOnce(submissions);
-
-        render(<BrowserRouter><Submissions /></BrowserRouter>);
-
-        expect(await screen.findByText('Test Problem 10')).toBeInTheDocument();
-        expect(screen.queryByText('Test Problem 11')).not.toBeInTheDocument();
-        act(() => triggerIntersectionObservers());
-
-        expect(await screen.findByText('Test Problem 11')).toBeInTheDocument();
-        expect(screen.getByText('Test Problem 12')).toBeInTheDocument();
-        restoreObserver();
+    it('draws no testcase strip for a compile error (the judge stores its log as one result entry)', async () => {
+        jest.mocked(submissionService.getAll).mockResolvedValue([
+            row(48101, { overall_status: 'Compilation Error', score: 0, case_statuses: ['Compilation Error'], max_time_ms: null, max_memory_kb: null }),
+        ] as never);
+        renderAt();
+        await screen.findByRole('link', { name: '#48101' });
+        const table = screen.getByRole('table', { name: 'Submissions' });
+        const first = within(table).getAllByRole('row')[1];
+        expect(within(first).getByText('COMPILATION ERROR')).toBeInTheDocument();
+        expect(within(first).queryByRole('img', { name: /test cases passed/ })).toBeNull();
     });
 
-    it('handles fetch error gracefully', async () => {
-        jest.mocked(submissionService.getAll).mockRejectedValueOnce(new Error('Fetch error'));
-
-        render(<BrowserRouter><Submissions /></BrowserRouter>);
-
-        await waitFor(() => {
-            expect(screen.getByText(/failed to fetch submissions/i)).toBeInTheDocument();
-        });
+    it('Mine is the default when logged in', async () => {
+        renderAt();
+        await waitFor(() => expect(submissionService.getAll).toHaveBeenCalledWith(expect.objectContaining({ filter: 'mine' })));
+        expect(screen.getByRole('button', { name: 'Mine' })).toHaveAttribute('aria-pressed', 'true');
+        fireEvent.click(screen.getByRole('button', { name: 'All' }));
+        await waitFor(() => expect(submissionService.getAll).toHaveBeenLastCalledWith(expect.objectContaining({ filter: 'all' })));
     });
 
-    it('keeps the admin problem filter focused while suggestions load', async () => {
-        jest.mocked(useAuth).mockReturnValue({
-            user: { id: 1, username: 'admin', role: 'admin', hasAvatar: false },
-            isLoading: false,
-        } as ReturnType<typeof useAuth>);
-        jest.mocked(submissionService.getAll).mockResolvedValue([]);
-        let resolveSuggestions: (value: Array<{ id: string; title: string }>) => void = () => undefined;
-        jest.mocked(submissionService.searchProblems).mockReturnValueOnce(
-            new Promise(resolve => { resolveSuggestions = resolve; }),
-        );
-        render(<BrowserRouter><Submissions /></BrowserRouter>);
-        await waitFor(() => expect(jest.mocked(submissionService.getAll)).toHaveBeenCalled());
-        const input = screen.getByPlaceholderText('Filter by Problem ID');
-        input.focus();
-        fireEvent.change(input, { target: { value: 'graph' } });
+    it('verdict chip sends verdict', async () => {
+        renderAt();
+        await screen.findByRole('table', { name: 'Submissions' });
+        fireEvent.click(screen.getByRole('button', { name: 'Add filter: Verdict' }));
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Time limit' }));
+        await waitFor(() => expect(submissionService.getAll).toHaveBeenLastCalledWith(
+            expect.objectContaining({ verdict: 'Time Limit Exceeded' }),
+        ));
+    });
 
-        await waitFor(() => expect(submissionService.searchProblems).toHaveBeenCalledWith('graph'), { timeout: 1500 });
-        expect(screen.getByPlaceholderText('Filter by Problem ID')).toBe(input);
-        expect(document.activeElement).toBe(input);
-        await act(async () => { resolveSuggestions([{ id: 'graph', title: 'Graph' }]); });
-        expect(screen.getByPlaceholderText('Filter by Problem ID')).toBe(input);
-        expect(document.activeElement).toBe(input);
+    it('staff see the user filter, students do not', async () => {
+        const { unmount } = renderAt();
+        await screen.findByRole('table', { name: 'Submissions' });
+        expect(screen.queryByRole('searchbox', { name: 'Filter by username' })).toBeNull();
+        unmount();
+        jest.mocked(useAuth).mockReturnValue({ user: staff, isLoading: false, refreshUser: jest.fn() } as never);
+        renderAt('/submissions?user=natt');
+        expect(await screen.findByRole('searchbox', { name: 'Filter by username' })).toHaveValue('natt');
+        await waitFor(() => expect(submissionService.getAll).toHaveBeenCalledWith(expect.objectContaining({ filterUserId: 'natt' })));
+    });
+
+    it('list refreshes on a submission event', async () => {
+        let push: (p: SubmissionUpdatePayload) => void = () => undefined;
+        jest.mocked(subscribeSubmissions).mockImplementation((onUpdate) => { push = onUpdate; return () => undefined; });
+        renderAt();
+        await screen.findByRole('table', { name: 'Submissions' });
+        const calls = jest.mocked(submissionService.getAll).mock.calls.length;
+        await act(async () => push({ type: 'submission_update', submissionId: 1, table: 'submissions', overall_status: 'Accepted', score: 100, user_id: 7 }));
+        await waitFor(() => expect(submissionService.getAll).toHaveBeenCalledTimes(calls + 1));
+    });
+
+    it('shows an error state when the list fails', async () => {
+        jest.mocked(submissionService.getAll).mockRejectedValue(new Error('down'));
+        renderAt();
+        expect(await screen.findByRole('alert')).toHaveTextContent('Failed to fetch submissions.');
     });
 });

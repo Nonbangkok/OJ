@@ -211,6 +211,84 @@ const submissionDetail = {
   ],
 };
 
+const strip = (passed: number, failed: string | null, total = 10) => [
+  ...Array(passed).fill('Accepted'), ...(failed ? [failed] : []),
+  ...Array(Math.max(0, total - passed - (failed ? 1 : 0))).fill('Skipped'),
+];
+
+const submissionList = [
+  { id: 48213, username: 'nattapat', problem_id: 'hp_vec04_erase', problem_title: 'vector::erase', overall_status: 'Wrong Answer',
+    score: 60, language: 'cpp', submitted_at: '2026-09-16T01:58:00.000Z', case_statuses: strip(6, 'Wrong Answer'), max_time_ms: 410, max_memory_kb: 12595 },
+  { id: 48190, username: 'nattapat', problem_id: 'queue_rotate', problem_title: 'Queue rotate', overall_status: 'Accepted',
+    score: 100, language: 'cpp', submitted_at: '2026-09-15T08:00:00.000Z', case_statuses: strip(10, null), max_time_ms: 120, max_memory_kb: 3400 },
+  { id: 48155, username: 'nattapat', problem_id: 'two_sum_sorted', problem_title: 'Two sum (sorted)', overall_status: 'Time Limit Exceeded',
+    score: 80, language: 'python', submitted_at: '2026-09-14T08:00:00.000Z', case_statuses: strip(8, 'Time Limit Exceeded'), max_time_ms: 4000, max_memory_kb: 9800 },
+  { id: 48101, username: 'nattapat', problem_id: 'bfs_grid', problem_title: 'BFS on a grid', overall_status: 'Compilation Error',
+    score: 0, language: 'cpp', submitted_at: '2026-09-13T08:00:00.000Z', case_statuses: ['Compilation Error'], max_time_ms: null, max_memory_kb: null },
+];
+
+const rankingRows = [
+  ['ploy', 9120, 214, 10, 'Expert'], ['krit', 8800, 201, 10, 'Expert'], ['mint', 8800, 199, 10, 'Expert'],
+  ['tonkla', 7310, 180, 9, 'Specialist'], ['fah', 6400, 160, 9, 'Specialist'], ['bank', 5100, 141, 8, 'Specialist'],
+  ['jane', 4300, 120, 7, 'Apprentice'], ['pete', 3900, 101, 7, 'Apprentice'],
+].map(([username, xp, solved, level, tier], i) => ({
+  rank: i === 2 ? 2 : i + 1, username, hasAvatar: false, xp, solved, level, tier,
+}));
+
+const ranking = {
+  rows: rankingRows, total: 412, page: 1, pageSize: 50, window: 'all',
+  viewer: { rank: 214, username: 'nattapat', hasAvatar: false, xp: 1940, solved: 38, level: 5, tier: 'Apprentice' },
+};
+
+const categoryStats = [
+  ['Data Structures', 14, 40], ['Graph', 6, 30], ['Greedy', 9, 20], ['Dynamic Programming', 3, 25],
+  ['Math', 4, 12], ['Sorting', 2, 6],
+].map(([category, solved, total]) => ({
+  category, solved, total, percentage: Math.round(((solved as number) / (total as number)) * 1000) / 10,
+}));
+
+const dailyActivity = Array.from({ length: 120 }, (_, i) => {
+  const day = new Date(Date.UTC(2026, 8, 16) - i * 86_400_000).toISOString().slice(0, 10);
+  return { day, count: [0, 2, 1, 0, 4, 0, 3, 1, 0, 0, 6, 2][i % 12] };
+}).filter((d) => d.count > 0);
+
+const profile = {
+  id: 7, username: 'nattapat', role: 'user', hasAvatar: false, avatarUpdatedAt: null, createdAt: '2026-06-01T00:00:00.000Z',
+  problemsAttempted: 45, problemsSolved: 38, totalScore: 4120, submissionCount: 162,
+  verdictCounts: { Accepted: 70, 'Wrong Answer': 60, 'Time Limit Exceeded': 20, 'Compilation Error': 12 },
+  languageCounts: { cpp: 140, python: 22 },
+  dailyActivity, currentStreak: 5, longestStreak: 12, lastAcDate: '2026-09-15',
+  categoryStats,
+  achievements: {
+    unlocked: [
+      { id: 'first_solve', name: 'First solve', description: 'Solve your first problem.' },
+      { id: 'ten_solves', name: 'Ten solved', description: 'Solve 10 problems.' },
+      { id: 'streak_7', name: 'Week streak', description: 'Solve on 7 days in a row.' },
+    ],
+    stats: { problemsSolved: 38, currentStreak: 5, longestStreak: 12, languagesSolvedIn: { cpp: 38 }, contestsJoined: 0 },
+  },
+  progression: homeSummary.progression,
+  recentRewards: [
+    { problemId: 'queue_rotate', problemTitle: 'Queue rotate', xpAwarded: 24, difficultySnapshot: 900, awardedAt: '2026-09-15T08:00:00.000Z' },
+    { problemId: 'pair_swap', problemTitle: 'pair swap', xpAwarded: 20, difficultySnapshot: 800, awardedAt: '2026-09-14T08:00:00.000Z' },
+  ],
+};
+
+/** A signed-out visitor on a public Grader. */
+export async function mockGuestApi(page: Page): Promise<void> {
+  await page.clock.setFixedTime(fixedTime);
+  await page.route('**/api/**', (route) =>
+    route.fulfill({ status: 404, ...json({ message: `Unhandled visual fixture: ${route.request().url()}` }) }));
+  await page.route('**/api/me', (route) => route.fulfill(json({ isAuthenticated: false })));
+  await page.route('**/api/site-config', (route) =>
+    route.fulfill(json({ accessMode: 'public', allowRegistration: true, passwordChangeEnabled: true })));
+  await page.route('**/api/contests', (route) => route.fulfill(json([])));
+  await page.route(/\/api\/problems-with-stats/, (route) =>
+    route.fulfill(json({ problems: studentProblems.map((p) => ({ ...p, best_score: null, submission_count: null,
+      latest_submission_at: null, latest_submission_status: null, best_submission_status: null, best_submission_results: null })),
+    nextCursor: null, hasMore: false })));
+}
+
 /** A signed-in student ("nattapat") with the phase 3 endpoints mocked. */
 export async function mockStudentApi(page: Page): Promise<void> {
   await page.clock.setFixedTime(fixedTime);
@@ -233,5 +311,8 @@ export async function mockStudentApi(page: Page): Promise<void> {
   await page.route('**/api/problems/hp_vec04_erase', (route) => route.fulfill(json(problemDetail)));
   await page.route('**/api/problems/hp_vec04_erase/pdf', (route) =>
     route.fulfill({ status: 200, contentType: 'text/html', body: '<body style="font:14px sans-serif;padding:24px">Statement preview</body>' }));
+  await page.route(/\/api\/submissions(\?|$)/, (route) => route.fulfill(json(submissionList)));
   await page.route(/\/api\/submissions\/48213/, (route) => route.fulfill(json(submissionDetail)));
+  await page.route(/\/api\/scoreboard/, (route) => route.fulfill(json(ranking)));
+  await page.route('**/api/users/nattapat/profile', (route) => route.fulfill(json(profile)));
 }

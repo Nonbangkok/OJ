@@ -9,48 +9,11 @@
   padding: 0 0 2.5rem;
 }
 
-.hero-title {
-  margin: 0;
-  font-size: var(--font-size-page-title);
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
-}
 
-.hero-subtitle {
-  margin: 0.5rem 0 0;
-  font-size: var(--font-size-section-title);
-  color: var(--text-secondary);
-}
 
-.hero-actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-  /* Pin to the right edge of the hero; wraps below the text when narrow. */
-  margin-left: auto;
-  padding-bottom: 0.25rem;
-}
 
-.logged-out {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 1rem;
-  padding: 3rem 1.5rem;
-  max-width: 640px;
-  margin: 4rem auto;
-}
 
-.hero-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
 
-.hero-actions > button {
-    width: 100%;
-  }
 
 .header {
   display: flex;

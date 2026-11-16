@@ -128,6 +128,17 @@ describe('ProblemDetail page', () => {
         await waitFor(() => expect(editor).toHaveValue('int main() { return 0; }'));
     });
 
+    it('a dropped file of the other language switches language and keeps the file', async () => {
+        renderPage('?tab=submit');
+        const editor = await screen.findByLabelText(/Your code/i);
+        const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+        const file = new File(['print(sum(map(int, input().split())))'], 'sol.py', { type: 'text/plain' });
+        await act(async () => { fireEvent.change(input, { target: { files: [file] } }); });
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Python' })).toHaveAttribute('aria-pressed', 'true'));
+        await waitFor(() => expect(screen.getByLabelText(/Your code/i)).toHaveValue('print(sum(map(int, input().split())))'));
+        expect(editor).toBeTruthy();
+    });
+
     it('shows the staff-only notice for a hidden problem', async () => {
         jest.mocked(problemService.getDetails).mockResolvedValue(detail({ is_visible: false }) as never);
         renderPage();

@@ -54,6 +54,21 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     expect(row.case_statuses).toEqual([]);
   });
 
+  it('a compile error as the judge stores it yields its one status (the client draws no strip for it)', async () => {
+    await submit(1, 'vis', 'Compilation Error', 0, '[{"status":"Compilation Error","output":"main.cpp:1: error"}]');
+    const [row] = await getSubmissions({ filter: 'mine' }, 1, false);
+    expect(row.case_statuses).toEqual(['Compilation Error']);
+  });
+
+  it('the problem filter also matches the problem title, within visible problems', async () => {
+    await pool.query(`INSERT INTO problems (id, title, author, categories, time_limit_ms, memory_limit_mb, is_visible)
+      VALUES ('two_sum', 'Two Sum Sorted', 'A', '{}', 1000, 256, true)`);
+    await submit(1, 'two_sum', 'Accepted', 100, '[]');
+    await submit(1, 'vis', 'Accepted', 100, '[]');
+    const rows = await getSubmissions({ filterProblemId: 'sum sorted' }, 1, false);
+    expect(rows.map(r => r.problem_id)).toEqual(['two_sum']);
+  });
+
   it('verdict filters by overall status', async () => {
     await submit(1, 'vis', 'Accepted', 100, '[]');
     await submit(1, 'vis', 'Wrong Answer', 0, '[]');

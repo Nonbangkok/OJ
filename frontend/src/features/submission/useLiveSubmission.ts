@@ -3,6 +3,7 @@ import { POLLING_INTERVALS, REALTIME } from '../../config/constants';
 import submissionService from '../../services/submissionService';
 import { subscribeSubmissions } from '../../services/realtimeService';
 import type { SubmissionDetail } from '../../types';
+import { getErrorStatus } from '../../utils/error';
 
 const PENDING = new Set(['Pending', 'Compiling', 'Running']);
 
@@ -34,7 +35,13 @@ export default function useLiveSubmission(
     let cancelled = false;
     submissionService.getById(id, contestId ?? null)
       .then((data) => { if (!cancelled) { setSubmission(data); setError(null); } })
-      .catch(() => { if (!cancelled) setError("Couldn't load this submission."); });
+      .catch((err) => {
+        if (cancelled) return;
+        const status = getErrorStatus(err);
+        setError(status === 403 ? "You can't view this submission."
+          : status === 404 ? 'Submission not found.'
+          : "Couldn't load this submission.");
+      });
     return () => { cancelled = true; };
   }, [id, contestId, refreshTick]);
 

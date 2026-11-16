@@ -86,6 +86,14 @@ describe('route → shell', () => {
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
   });
 
+  it('a signed-out visitor to a private Grader sees the private landing without the sidebar', async () => {
+    asRole(null);
+    (jest.mocked(authService.getSiteConfig) as jest.Mock).mockResolvedValue({ accessMode: 'private', allowRegistration: true, passwordChangeEnabled: true });
+    renderAt('/');
+    expect(await screen.findByRole('heading', { name: 'This Grader is private' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
+  });
+
   it('renders the 404 inside the app shell', async () => {
     asRole('user');
     renderAt('/nope');

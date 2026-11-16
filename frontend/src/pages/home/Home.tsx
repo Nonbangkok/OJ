@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { Button, Countdown, InlineError, ProgressBar } from '../../components/ui';
+import { Countdown, InlineError, ProgressBar } from '../../components/ui';
 import { isEditableTarget, isModalOpen } from '../../components/shell/keyboard';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
+import AuthRequired from '../../components/shared/AuthRequired';
+import GuestHome from '../../features/home/GuestHome';
 import CollectionsPanel from '../../features/home/CollectionsPanel';
 import ContinueBlock from '../../features/home/ContinueBlock';
 import WeekStrip from '../../features/home/WeekStrip';
@@ -39,7 +41,7 @@ const isPageLevelEnter = (event: KeyboardEvent): boolean => {
 
 const Home = () => {
   const { user } = useAuth();
-  const { isPrivateMode, registrationEnabled } = useSettings();
+  const { isPrivateMode } = useSettings();
   const navigate = useNavigate();
 
   const [summary, setSummary] = useState<HomeSummary | null>(null);
@@ -78,45 +80,7 @@ const Home = () => {
   }, [continueId, navigate]);
 
   if (!user) {
-    if (isPrivateMode) {
-      // Private-mode guest landing: no Browse Problems CTA — just the door.
-      return (
-        <div className={styles['home-container']}>
-          <section className={styles['logged-out']}>
-            <h1 className={styles['hero-title']}>Welcome to Grader</h1>
-            <p className={styles['hero-subtitle']}>
-              This Grader is private. Log in to access problems, contests, and submissions.
-            </p>
-            <div className={styles['hero-actions']}>
-              <Button variant="primary" onClick={() => navigate('/login')}>
-                Log in
-              </Button>
-              {registrationEnabled && (
-                <Button variant="secondary" onClick={() => navigate('/register')}>
-                  Create account
-                </Button>
-              )}
-            </div>
-          </section>
-        </div>
-      );
-    }
-    return (
-      <div className={styles['home-container']}>
-        <section className={styles['logged-out']}>
-          <h1 className={styles['hero-title']}>Welcome to Grader</h1>
-          <p className={styles['hero-subtitle']}>Sharpen your skills with competitive programming problems.</p>
-          <div className={styles['hero-actions']}>
-            <Button variant="primary" onClick={() => navigate('/problems')}>
-              Browse Problems
-            </Button>
-            <Button variant="secondary" onClick={() => navigate('/login')}>
-              Log in
-            </Button>
-          </div>
-        </section>
-      </div>
-    );
+    return isPrivateMode ? <AuthRequired /> : <GuestHome />;
   }
 
   const progression = summary?.progression;
