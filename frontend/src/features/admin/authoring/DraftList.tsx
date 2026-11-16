@@ -51,8 +51,8 @@ export default function DraftList() {
     Promise.all([authoringService.listDrafts(), authoringService.listDrafts('mine'), authoringService.listProfiles()])
       .then(([all, own, profileList]) => {
         if (cancelled) return;
-        setDrafts(all as unknown as DraftSummary[]);
-        setMine(own as unknown as DraftSummary[]);
+        setDrafts(all);
+        setMine(own);
         setProfiles(profileList);
       })
       .catch((err) => { if (!cancelled) setError(getErrorMessage(err, 'Could not load authoring drafts')); });

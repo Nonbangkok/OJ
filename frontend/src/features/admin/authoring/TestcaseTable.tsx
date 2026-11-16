@@ -1,3 +1,4 @@
+import { ActionMenu } from '../../../components/ui';
 import { TestcaseMetadata } from './types';
 import { formatDecimalSize } from './testcaseSize';
 import styles from './TestcaseFiles.module.css';
@@ -38,33 +39,15 @@ export default function TestcaseTable({ testcases, busy, inspecting, locked, rea
                 : <span className={styles.missing}>Missing output</span>}
             </td>
             <td className={styles.muted}>{testcase.source === 'generated' ? `generated · rev ${testcase.sourceRevision}` : testcase.source}</td>
-            <td>
-              <div className={styles.actions}>
-                <button
-                  type="button"
-                  disabled={busy || inspecting}
-                  aria-label={`Inspect ${testcase.filename}`}
-                  onClick={() => onInspect(testcase)}
-                >
-                  Inspect
-                </button>
-                {!readOnly && <button
-                  type="button"
-                  disabled={locked}
-                  aria-label={`Replace files for ${testcase.filename}`}
-                  onClick={() => onReplace(testcase)}
-                >
-                  Replace files
-                </button>}
-                {!readOnly && <button
-                  type="button"
-                  disabled={locked}
-                  aria-label={`Delete ${testcase.filename}`}
-                  onClick={() => onDelete(testcase)}
-                >
-                  Delete
-                </button>}
-              </div>
+            <td className={styles.actionCell}>
+              <ActionMenu label={`Actions for ${testcase.filename}`} items={[
+                { key: 'inspect', label: 'Inspect', disabled: busy || inspecting, onClick: () => onInspect(testcase) },
+                // Phones inspect only (§7.9 mobile policy).
+                ...(readOnly ? [] : [
+                  { key: 'replace', label: 'Replace files', disabled: locked, onClick: () => onReplace(testcase) },
+                  { key: 'delete', label: 'Delete', variant: 'danger' as const, disabled: locked, onClick: () => onDelete(testcase) },
+                ]),
+              ]} />
             </td>
           </tr>
         ))}

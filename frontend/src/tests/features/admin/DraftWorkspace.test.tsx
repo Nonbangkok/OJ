@@ -158,6 +158,25 @@ describe('Draft workspace header and step tabs (§7.9)', () => {
     expect(within(steps()).getByRole('link', { name: 'Metadata, done' })).toHaveAttribute('aria-current', 'page');
   });
 
+  it('minor: under a server conflict the header save state reads Unsaved', async () => {
+    show();
+    fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Mine' } });
+    draft = { ...base, revision: 4 };
+    serve();
+    await act(async () => { window.dispatchEvent(new Event('focus')); });
+    await screen.findByText('Server state changed. Your unsaved text is retained.');
+    const header = screen.getByRole('heading', { level: 1 }).closest('header') as HTMLElement;
+    expect(within(header).getByText('Unsaved')).toBeInTheDocument();
+    expect(within(header).queryByText('Server state changed')).toBeNull();
+  });
+
+  it('minor: the header Verify is disabled while the solution is empty', async () => {
+    draft = { ...base, solutionCpp: '  ' };
+    serve();
+    show();
+    expect(await screen.findByRole('button', { name: 'Verify' })).toBeDisabled();
+  });
+
   it('the Verify & publish tab has no header primary (its footer holds the buttons)', async () => {
     show('/admin/authoring/d1/verify');
     await screen.findByText('Saved · rev 3');

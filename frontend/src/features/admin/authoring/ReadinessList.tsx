@@ -113,6 +113,22 @@ export function publishReason(rows: ReadinessRow[]): string | null {
   return `${list.charAt(0).toUpperCase()}${list.slice(1)} before publishing.`;
 }
 
+/** Why Publish is disabled: the failing rows first, then whatever else holds it (§7.9). Null when it can publish. */
+export function publishBlockReason({ rows, canPublish, published, activeJob, conflict, busy, dirty, verified }: {
+  rows: ReadinessRow[]; canPublish: boolean; published: boolean; activeJob: boolean;
+  conflict: boolean; busy: boolean; dirty: boolean; verified: boolean;
+}): string | null {
+  if (canPublish) return null;
+  if (published) return 'Published — start a new revision to change it.';
+  const fromRows = publishReason(rows);
+  if (fromRows) return fromRows;
+  if (conflict) return 'The server has newer changes — sync them before publishing.';
+  if (activeJob) return 'Wait for the running job to finish.';
+  if (dirty) return 'Your edits are saving — publish once they are saved.';
+  if (busy) return 'Wait for the current action to finish.';
+  return verified ? 'Wait for the draft to be marked ready.' : 'Verify this revision before publishing.';
+}
+
 export default function ReadinessList({ draft, rows, disabled, onFix }: {
   draft: Draft; rows: ReadinessRow[]; disabled: boolean; onFix: (fix: ReadinessFix) => void;
 }) {

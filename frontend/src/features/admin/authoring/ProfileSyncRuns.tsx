@@ -1,5 +1,5 @@
 import { useEffect, useState, useEffectEvent } from 'react';
-import { Button, Dialog, StatusBadge, StatusDot } from '../../../components/ui';
+import { Button, Dialog, InlineError, StatusBadge, StatusDot } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
 import { formatDateTime } from '../../../utils/formatters';
 import type { ProfileSyncItem, ProfileSyncRun } from './types';
@@ -21,13 +21,15 @@ export default function ProfileSyncRuns({ onError }: { onError: (error: unknown)
   const [loading, setLoading] = useState(false);
   // Load once: the parent passes a fresh onError on every render (each keystroke in the drawer).
   const reportError = useEffectEvent(onError);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
     authoringService.listProfileSyncs()
-      .then((list) => { if (!cancelled) setRuns(list); })
-      .catch((err: unknown) => { if (!cancelled) reportError(err); });
+      .then((list) => { if (!cancelled) { setRuns(list); setLoadFailed(false); } })
+      .catch((err: unknown) => { if (!cancelled) { setLoadFailed(true); reportError(err); } });
     return () => { cancelled = true; };
-  }, []);
+  }, [attempt]);
 
   return (
     <section className={styles.syncs} aria-labelledby="profile-syncs-title">
@@ -60,7 +62,8 @@ export default function ProfileSyncRuns({ onError }: { onError: (error: unknown)
         </div>
       )}
       {runs && !runs.length && <p className={styles.hint}>No profile sync runs yet.</p>}
-      {!runs && <p role="status" className={styles.hint}>Loading sync runs…</p>}
+      {!runs && loadFailed && <InlineError message="Could not load profile syncs." onRetry={() => { setLoadFailed(false); setAttempt((n) => n + 1); }} />}
+      {!runs && !loadFailed && <p role="status" className={styles.hint}>Loading sync runs…</p>}
       {detail && (
         <Dialog open title={`Profile sync: ${detail.status} (${detail.progress.synced}/${detail.progress.total} synced)`}
           onClose={() => setDetail(null)}

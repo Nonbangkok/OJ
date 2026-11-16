@@ -103,7 +103,7 @@
   max-width: 100%;
   color: var(--text-primary);
 }
-.root button {
+.root button:not([class]) {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
@@ -111,12 +111,12 @@
   color: var(--text-primary);
   cursor: pointer;
 }
-.root button:disabled,
-.root fieldset:disabled button {
+.root button:not([class]):disabled,
+.root fieldset:disabled button:not([class]) {
   opacity: 0.55;
   cursor: not-allowed;
 }
-.root button:focus-visible,
+.root button:not([class]):focus-visible,
 .root input:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 3px;
@@ -201,47 +201,6 @@
 }
 
 /* Compact inline upload bar replacing the two big panels. */
-.uploadBar {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
-}
-.uploadForm {
-  padding: 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background: var(--background-secondary);
-}
-.uploadForm fieldset {
-  border: 0;
-  padding: 0;
-  margin: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-.uploadForm label {
-  font-size: 0.85rem;
-  font-weight: 500;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-.uploadForm button {
-  align-self: flex-start;
-  padding: 0.45rem 0.9rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background: var(--background-primary);
-  color: var(--text-primary);
-  cursor: pointer;
-}
-.uploadForm button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 
 /* Phase 6 (§7.9): summary line, numeric columns, missing outputs. */
 .summary {
@@ -301,11 +260,17 @@
   font-size: 0.875rem;
   font-weight: 500;
 }
-.tableWrap .actions {
-  flex-wrap: nowrap;
-  gap: 0.4rem;
+.actionCell {
+  width: 1%;
+  text-align: right;
 }
-.tableWrap.tableWrap button {
-  padding: 0.25rem 0.6rem;
-  font-size: 0.8125rem;
+.explain {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+.dropError {
+  margin: 0;
+  color: var(--status-danger);
+  font-size: 0.875rem;
 }

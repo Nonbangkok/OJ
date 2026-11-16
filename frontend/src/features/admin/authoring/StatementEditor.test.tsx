@@ -224,6 +224,12 @@ describe('full-screen editor chrome (§7.9)', () => {
     expect(screen.getByText('Unsaved')).toBeInTheDocument();
   });
 
+  test('minor: under a server conflict the editor save state reads Unsaved', () => {
+    showWith({ ...idle, conflict: true, dirty: true, saveState: 'dirty' });
+    expect(within(screen.getByRole('banner')).getByText('Unsaved')).toBeInTheDocument();
+    expect(within(screen.getByRole('banner')).queryByText('Server state changed')).toBeNull();
+  });
+
   test('a published draft carries the "live unchanged" badge', () => {
     showWith({ ...idle, draftOver: { status: 'published', publishedAt: '2026-11-10T00:00:00Z' } });
     expect(screen.getByText('Published · live unchanged')).toBeInTheDocument();
@@ -264,10 +270,10 @@ describe('full-screen editor chrome (§7.9)', () => {
     jest.mocked(useMediaQuery).mockReturnValue(true);
     const runJob = jest.fn();
     const { rerender } = showWith({ ...idle, runJob, draftOver: { hasLatestPdf: true, latestPdfRevision: 2 } });
-    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Editor pane' })).getByRole('button', { name: 'Preview' }));
     fireEvent.click(within(screen.getByRole('group', { name: 'Preview mode' })).getByRole('button', { name: 'PDF' }));
     expect(runJob).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole('tab', { name: 'Source' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Editor pane' })).getByRole('button', { name: 'Source' }));
     runJob.mockClear();
     // A new stale state (the next autosave) while the author is typing in Source.
     const d = { ...draft, hasLatestPdf: true, latestPdfRevision: 2, revision: 4 };
@@ -281,10 +287,10 @@ describe('full-screen editor chrome (§7.9)', () => {
     jest.mocked(useMediaQuery).mockReturnValue(true);
     showWith(idle);
     expect(screen.queryByRole('separator', { name: 'Resize source and preview panes' })).toBeNull();
-    const tabs = screen.getByRole('tablist', { name: 'Editor panes' });
-    expect(within(tabs).getByRole('tab', { name: 'Source' })).toHaveAttribute('aria-selected', 'true');
+    const panes = screen.getByRole('group', { name: 'Editor pane' });
+    expect(within(panes).getByRole('button', { name: 'Source' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('textbox', { name: 'Statement source' })).toBeInTheDocument();
-    fireEvent.click(within(tabs).getByRole('tab', { name: 'Preview' }));
+    fireEvent.click(within(panes).getByRole('button', { name: 'Preview' }));
     expect(screen.queryByRole('textbox', { name: 'Statement source' })).toBeNull();
     expect(screen.getByRole('group', { name: 'Preview mode' })).toBeInTheDocument();
   });

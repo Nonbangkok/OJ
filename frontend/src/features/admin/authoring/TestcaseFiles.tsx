@@ -1,9 +1,10 @@
-import { Button, Dialog } from '../../../components/ui';
+import { Button, Dialog, FileDrop } from '../../../components/ui';
 import { TestcaseMetadata } from './types';
 import useTestcaseFiles from './useTestcaseFiles';
 import TestcaseTable from './TestcaseTable';
 import { formatDecimalSize } from './testcaseSize';
-import { TestcasePreviewDialog, TestcaseReplaceDialog, TestcaseUploadForms } from './TestcaseDialogs';
+import { TestcasePreviewDialog, TestcaseReplaceDialog } from './TestcaseDialogs';
+import { TESTCASE_DROP_ACCEPT } from './testcaseDrop';
 import styles from './TestcaseFiles.module.css';
 
 interface Props {
@@ -34,9 +35,6 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
     model.setReplacementOutput(null);
     model.setReplacementVersion((value) => value + 1);
   }
-  function requestReplaceAll() {
-    model.setConfirmation({ kind: 'zip', revision });
-  }
   function clearConfirmation() {
     if (!busy) model.setConfirmation(null);
   }
@@ -55,10 +53,21 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
           Refresh testcases
         </button>
       </div>
-      <p>
-        Append individual files, replace an existing case, or replace the entire set with a ZIP
-        archive. An empty output file is valid; an omitted output is missing.
+      <p className={styles.explain}>
+        Drop <code>.in</code>/<code>.out</code> pairs to append cases, or one <code>.zip</code> to replace the whole set.
+        An empty output file is valid; an omitted output is missing.
       </p>
+      {!readOnly && (
+        <FileDrop
+          label="Drop testcase files here"
+          hint="05.in + 05.out appends a case (the output is optional) · one .zip replaces every testcase"
+          accept={TESTCASE_DROP_ACCEPT}
+          multiple
+          disabled={locked}
+          onFiles={model.drop}
+        />
+      )}
+      {model.dropError && <p role="alert" className={styles.dropError}>{model.dropError}</p>}
       {disabled && (
         <p>
           File changes are unavailable while this draft is read-only, has unsaved changes, or has an
@@ -108,21 +117,6 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
         />
       )}
 
-      {!readOnly && <TestcaseUploadForms
-        formVersion={model.formVersion}
-        locked={locked}
-        input={model.input}
-        output={model.output}
-        archive={model.archive}
-        onSetInput={model.setInput}
-        onSetOutput={model.setOutput}
-        onSetArchive={(file) => {
-          model.setArchive(file);
-          model.setConfirmation(null);
-        }}
-        onAppend={model.appendTestcase}
-        onReplaceAll={requestReplaceAll}
-      />}
       {model.confirmation && (
         <Dialog
           open

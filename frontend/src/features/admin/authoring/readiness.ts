@@ -99,6 +99,7 @@ export function readinessFromWorkspace(draft: Draft, jobs: Job[]): ReadinessInpu
 /** The list's status cell: a dot tone and its label. */
 export function listStatus(row: DraftSummary): { tone: 'neutral' | 'warn' | 'ok' | 'bad'; label: string } {
   if (row.status === 'published') return { tone: 'ok', label: `Published · rev ${row.revision}` };
+  if (row.readiness.activeJob) return { tone: 'warn', label: 'Job running' };
   const verify = row.readiness.latestJobs.verify_all;
   if (verify && FAILED.has(verify.status) && verify.revision === row.revision) return { tone: 'bad', label: 'Verify failed' };
   if (row.status === 'ready') return { tone: 'ok', label: 'Ready' };

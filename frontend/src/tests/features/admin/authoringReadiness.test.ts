@@ -2,6 +2,7 @@ import {
   listStatus, readinessFromSummary, readinessFromWorkspace, readinessOf, type ReadinessInput,
 } from '../../../features/admin/authoring/readiness';
 import { jobLabel, jobStatus } from '../../../features/admin/authoring/status';
+import { formatDecimalSize } from '../../../features/admin/authoring/testcaseSize';
 import type { Draft, DraftSummary, Job } from '../../../features/admin/authoring/types';
 
 const base = (over: Partial<ReadinessInput> = {}): ReadinessInput => ({
@@ -151,5 +152,20 @@ describe('job vocabulary', () => {
     expect(jobStatus('timed_out')).toEqual({ label: 'Timed out', tone: 'danger' });
     expect(jobStatus('cancelled').label).toBe('Cancelled');
     expect(jobStatus('stale').label).toBe('Stale');
+  });
+});
+
+describe('minor fixes', () => {
+  it('a running job shows in the list status (B7 activeJob)', () => {
+    expect(listStatus(summary({ readiness: { ...summary().readiness, activeJob: true } }))).toEqual({ tone: 'warn', label: 'Job running' });
+    // A published problem keeps its live status while a profile sync runs.
+    expect(listStatus(summary({ status: 'published', readiness: { ...summary().readiness, activeJob: true } })).label).toBe('Published · rev 5');
+  });
+
+  it('sizes never read "1000 kB"', () => {
+    expect(formatDecimalSize(999_499)).toBe('999 kB');
+    expect(formatDecimalSize(999_999)).toBe('1.0 MB');
+    expect(formatDecimalSize(84_000)).toBe('84 kB');
+    expect(formatDecimalSize(9_960)).toBe('10 kB');
   });
 });

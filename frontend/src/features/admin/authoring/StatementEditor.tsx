@@ -20,6 +20,7 @@ const PREVIEW_ZOOM_STEP = 10;
 /** 100% is fit-to-width: the preview fills the pane's width. */
 const FIT_ZOOM = 100;
 const SAVE_HINT = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘S' : 'Ctrl+S';
+const EDITOR_PANES = [{ value: 'source', label: 'Source' }, { value: 'preview', label: 'Preview' }] as const;
 const PREVIEW_MODES = [{ value: 'preview', label: 'Preview' }, { value: 'pdf', label: 'PDF' }] as const;
 
 type StatementRecovery = { baseRevision: number; statementHtml: string };
@@ -193,7 +194,7 @@ export default function StatementEditor({ id }: { id: string }) {
 
   const editorDisabled = (model.busy && model.saveState !== 'saving') || !!model.activeJob;
   const zoomScale = previewZoom / 100;
-  const saveText = model.conflict ? 'Server state changed'
+  const saveText = model.conflict ? 'Unsaved'
     : model.saveState === 'saving' ? 'Saving…'
       : model.saveState === 'error' ? 'Save failed'
         : dirty ? 'Unsaved' : `Saved · rev ${draft.revision}`;
@@ -278,9 +279,8 @@ export default function StatementEditor({ id }: { id: string }) {
     </section>
     {small
       ? <div className={styles.editorCompact}>
-        <div className={styles.editorPaneTabs} role="tablist" aria-label="Editor panes">
-          <button type="button" role="tab" aria-selected={pane === 'source'} onClick={() => setPane('source')}>Source</button>
-          <button type="button" role="tab" aria-selected={pane === 'preview'} onClick={() => setPane('preview')}>Preview</button>
+        <div className={styles.editorPaneTabs}>
+          <SegmentedControl<'source' | 'preview'> aria-label="Editor pane" options={EDITOR_PANES} value={pane} onChange={setPane} />
         </div>
         <div className={styles.editorCompactPane} role="region" aria-label="Statement editor">
           {pane === 'source' ? <div className={styles.sourcePane}>{source}</div> : <div className={styles.previewPane}>{previewBody}</div>}

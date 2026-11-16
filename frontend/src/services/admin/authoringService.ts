@@ -3,6 +3,7 @@ import type {
   Asset,
   Draft,
   DraftFields,
+  DraftSummary,
   Job,
   Profile,
   ProfileSyncRun,
@@ -48,8 +49,8 @@ const authoringService = {
    * Author Profile AKA identity (exact, case-normalized match — never a
    * display-name or substring comparison). Without it every draft is listed.
    */
-  listDrafts: async (scope: 'all' | 'mine' = 'all'): Promise<Draft[]> => {
-    const response = await api.get<Draft[]>(draftsBase, {
+  listDrafts: async (scope: 'all' | 'mine' = 'all'): Promise<DraftSummary[]> => {
+    const response = await api.get<DraftSummary[]>(draftsBase, {
       params: scope === 'mine' ? { scope } : {},
     });
     return response.data;

@@ -15,7 +15,7 @@ import useAuthoringDraft from './useAuthoringDraft';
 import { Profile } from './types';
 import { jobLabel, verifyFailureExplanation } from './status';
 import JobHistory from './JobHistory';
-import ReadinessList, { publishReason, readinessRows, type ReadinessFix } from './ReadinessList';
+import ReadinessList, { publishBlockReason, readinessRows, type ReadinessFix } from './ReadinessList';
 import verifyStyles from './Verify.module.css';
 import MetadataFields from './MetadataFields';
 import StatementTab from './StatementTab';
@@ -339,12 +339,10 @@ function VerifySection() {
 
   const rows = readinessRows(draft, model.jobs, readinessOf(readinessFromWorkspace(draft, model.jobs)), testcaseBytes);
   const published = draft.status === 'published';
-  const reason = model.canPublish ? null
-    : published ? 'Published — start a new revision to change it.'
-      : publishReason(rows)
-        ?? (model.activeJob ? 'Wait for the running job to finish.'
-          : model.dirty || model.saveState === 'saving' ? 'Your edits are saving — publish once they are saved.'
-            : 'Verify this revision before publishing.');
+  const reason = publishBlockReason({
+    rows, canPublish: model.canPublish, published, activeJob: !!model.activeJob, conflict: model.conflict,
+    busy: model.busy, dirty: model.dirty || model.saveState === 'saving', verified: draft.verifiedRevision === draft.revision,
+  });
   const onFix = (fix: ReadinessFix) => {
     if (fix.kind === 'tab') navigate(fix.to, { relative: 'path' });
     else if (fix.kind === 'compile') void model.runJob('compile', { target: 'solution' });
