@@ -235,7 +235,7 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
     // ({problemId: {score}}) rather than the historical bare-number map, so
     // both variants parse identically client-side.
     const scoreboardResult = await client.query(`
-      ${contestStandingsCte('$1')}
+      ${contestStandingsCte('$1', { withStatuses: true })}
       INSERT INTO contest_scoreboards (contest_id, user_id, total_score, detailed_scores, last_score_improvement_time)
       SELECT $1, user_id, total_score, detailed_scores, last_score_improvement_time
       FROM standings
