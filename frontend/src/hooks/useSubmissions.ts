@@ -30,10 +30,12 @@ export const useSubmissions = (
   const [error, setError] = useState('');
   const { values, set, setMany } = useUrlFilters(FILTER_KEYS);
   const isStaff = currentUser?.role === USER_ROLES.ADMIN || currentUser?.role === USER_ROLES.STAFF;
-  // Signed-in viewers start on their own submissions; guests on the public feed.
+  // Signed-in viewers start on their own submissions; guests on the public
+  // feed; staff watching a contest start on everyone's (§7.7).
+  const defaultFilter: SubmissionFilter = !currentUser || (contestId && isStaff) ? 'all' : 'mine';
   const filter: SubmissionFilter = values.filter === 'all' || values.filter === 'mine'
     ? values.filter
-    : (currentUser ? 'mine' : 'all');
+    : defaultFilter;
 
   // While the stream is healthy, polling is a slow safety net; once it fails
   // for good, revert to the fast interval so the page never stops updating.
