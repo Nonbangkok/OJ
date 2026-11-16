@@ -71,7 +71,7 @@
   background-color: var(--surface-elevated);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  box-shadow: var(--box-shadow);
+  box-shadow: var(--box-shadow-lg);
 }
 
 .item {

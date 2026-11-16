@@ -2,46 +2,46 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   display: inline-flex;
-  font-size: 0.9rem;
-  font-weight: 600;
-  line-height: 1.25;
-  padding: 0.5rem 1rem;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 1px 6px;
   white-space: nowrap;
 }
 
 .neutral {
-  background: var(--background-tertiary);
-  border-color: var(--border-color);
-  color: var(--text-primary);
+  background: var(--tint-neutral-bg);
+  border-color: var(--tint-neutral-border);
+  color: var(--tint-neutral-fg);
 }
 
+/* Info is deliberately neutral: no blue in the system. */
 .info {
-  background: color-mix(in srgb, var(--status-info) 15%, transparent);
-  border-color: color-mix(in srgb, var(--status-info) 40%, transparent);
-  color: var(--text-primary);
+  background: var(--tint-neutral-bg);
+  border-color: var(--tint-neutral-border);
+  color: var(--tint-neutral-fg);
 }
 
 .success {
-  background: color-mix(in srgb, var(--status-success) 15%, transparent);
-  border-color: color-mix(in srgb, var(--status-success) 40%, transparent);
-  color: var(--text-primary);
+  background: var(--tint-success-bg);
+  border-color: var(--tint-success-border);
+  color: var(--tint-success-fg);
 }
 
 .warning {
-  background: color-mix(in srgb, var(--status-warning) 15%, transparent);
-  border-color: color-mix(in srgb, var(--status-warning) 40%, transparent);
-  color: var(--text-primary);
+  background: var(--tint-warning-bg);
+  border-color: var(--tint-warning-border);
+  color: var(--tint-warning-fg);
 }
 
 .danger {
-  background: color-mix(in srgb, var(--status-danger) 15%, transparent);
-  border-color: color-mix(in srgb, var(--status-danger) 40%, transparent);
-  color: var(--text-primary);
+  background: var(--tint-danger-bg);
+  border-color: var(--tint-danger-border);
+  color: var(--tint-danger-fg);
 }
 
-/* Borderless variant for dense table cells: tinted pill, no outline. */
+/* Borderless variant for dense table cells: tinted, no outline. */
 .soft {
   border-color: transparent;
-  padding: 0.25rem 0.65rem;
-  font-size: 0.8rem;
 }

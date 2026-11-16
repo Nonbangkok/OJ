@@ -1,4 +1,5 @@
 import { useId, useRef } from 'react';
+import { CheckCircle, Warning, XCircle } from '@phosphor-icons/react';
 import useProblemModal, { TYPE_LOCK_MESSAGE } from '../../../hooks/admin/useProblemModal';
 import { useModalFocus } from '../../../components/ui/useModalFocus';
 import { Button, SegmentedControl } from '../../../components/ui';
@@ -57,7 +58,7 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser, c
 
           {validationError && (
             <div className={formStyles['error-message']} role="alert">
-              ⚠️ {validationError}
+              <Warning size={16} aria-hidden="true" /> {validationError}
             </div>
           )}
 
@@ -72,8 +73,8 @@ const ProblemModal = ({ problem, onClose, onSave, uploadProgress, currentUser, c
                   style={{ width: '100%', height: '20px' }}
                 />
               )}
-              {uploadProgress.status === 'completed' && <p>✅ Upload finished!</p>}
-              {uploadProgress.status === 'failed' && <p>❌ Upload failed.</p>}
+              {uploadProgress.status === 'completed' && <p><CheckCircle size={16} aria-hidden="true" /> Upload finished!</p>}
+              {uploadProgress.status === 'failed' && <p><XCircle size={16} aria-hidden="true" /> Upload failed.</p>}
             </div>
           )}
         </header>

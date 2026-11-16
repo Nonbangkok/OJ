@@ -13,7 +13,7 @@
   background: var(--background-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  box-shadow: var(--surface-elevation);
+  box-shadow: var(--box-shadow-lg);
   box-sizing: border-box;
   color: var(--text-primary);
   max-height: calc(100vh - 2rem);

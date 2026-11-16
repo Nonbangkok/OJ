@@ -390,7 +390,6 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
       ) : (
         !loading && (
           <div className={styles['no-problems-container']}>
-            <div className={styles['no-problems-icon']}>📂</div>
             <div className={styles['no-problems-title']}>Problem not available.</div>
             <div className={styles['no-problems-subtext']}>
               {hasActiveFilters

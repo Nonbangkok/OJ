@@ -72,7 +72,7 @@ const CodeSubmissionForm = ({ problemId, contestId, submissionFilename = null })
                 textareaId="code"
                 disabled={isSubmitting}
                 style={{
-                  fontFamily: '"Fira code", "Fira Mono", monospace',
+                  fontFamily: 'var(--font-family-mono)',
                   fontSize: UI_CONFIG.DEFAULT_EDITOR_FONT_SIZE,
                   lineHeight: 1.5, // Ensure line height matches CSS
                 }}

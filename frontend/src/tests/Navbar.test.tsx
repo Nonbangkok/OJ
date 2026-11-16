@@ -20,8 +20,6 @@ jest.mock('../context/ThemeContext', () => ({
 }));
 
 // Mock assets
-jest.mock('../assets/logo512.png', () => 'test-file-stub');
-jest.mock('../assets/logo512_darkmode.png', () => 'test-file-stub');
 
 let mockIsPrivateMode = false;
 

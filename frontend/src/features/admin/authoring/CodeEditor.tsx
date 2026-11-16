@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import hljs from 'highlight.js/lib/core';
 import cpp from 'highlight.js/lib/languages/cpp';
-import 'highlight.js/styles/atom-one-dark.css';
 import Editor from 'react-simple-code-editor';
 import styles from './Authoring.module.css';
 import { readOnlyCodeEditorProps } from '../../../utils/readOnlyCodeEditor';
@@ -64,7 +63,7 @@ export default function CodeEditor({ label, value, disabled, onChange, minLines 
           {...(disabled ? readOnlyCodeEditorProps : {})}
           textareaId={`editor-${label.replace(/\W+/g, '-')}`}
           style={{
-            fontFamily: '"Fira code", "Fira Mono", monospace',
+            fontFamily: 'var(--font-family-mono)',
             fontSize: 13,
             lineHeight: '1.55',
           }}

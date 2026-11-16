@@ -67,6 +67,12 @@
   color: var(--text-primary);
 }
 
+/* The current page is marked in text too, not only by the slider. */
+.nav-links a[aria-current='page'] {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 .slider {
   position: absolute;
   top: 50%;
@@ -126,9 +132,9 @@
 }
 
 .logout-btn:hover {
-  background-color: var(--status-danger);
-  border-color: var(--status-danger);
-  color: var(--action-button-foreground);
+  background-color: var(--button-danger-bg);
+  border-color: var(--button-danger-bg);
+  color: var(--on-fill);
 }
 
 /* --- Responsive navbar --------------------------------------------------- */

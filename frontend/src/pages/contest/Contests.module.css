@@ -33,7 +33,7 @@
 .error {
   /* Shared error banner (same as Management). */
   background: var(--danger-tint-bg);
-  color: var(--status-danger);
+  color: var(--tint-danger-fg);
   padding: 1rem 1.25rem;
   border-radius: var(--radius-md);
   margin-bottom: 1.25rem;

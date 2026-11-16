@@ -255,9 +255,9 @@
   color: var(--action-button-foreground);
 }
 
-/* White text for green bar */
+/* White text on the green fill (constant in both themes). */
 .score-bar.full span {
-  color: var(--action-button-foreground);
+  color: var(--on-fill);
 }
 
 .score-text {
@@ -269,7 +269,7 @@
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  font-family: 'Inconsolata';
+  font-family: var(--font-family-mono);
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-primary);
@@ -300,27 +300,25 @@
   font-weight: 600;
   font-size: 0.95rem;
   text-align: center;
-  transition: background-color 0.2s ease;
-  color: var(--action-button-foreground);
+  transition: background-color 0.15s ease;
+  color: var(--action-primary-foreground);
   border: 1px solid transparent;
 }
 
 .problem-action-btn.new,
 .problem-action-btn.edit {
-  background-color: var(--status-success-bg);
+  background-color: var(--action-primary-background);
 }
 
-/* Green stays green on interaction: the Edit/Continue button is a
-   success-semantic action, so hover/active use the success-green
-   hover/active tokens, never the blue accent. */
+/* Neutral primary action (no colour-coded buttons, spec §2). */
 .problem-action-btn.new:hover,
 .problem-action-btn.edit:hover {
-  background-color: var(--status-success-hover);
+  background-color: var(--action-primary-hover-background);
 }
 
 .problem-action-btn.new:active,
 .problem-action-btn.edit:active {
-  background-color: var(--status-success-active);
+  background-color: var(--action-primary-hover-background);
 }
 
 .problem-action-btn:focus-visible {

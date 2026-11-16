@@ -1,0 +1,71 @@
+/*
+ * highlight.js token colours for the Grader theme. Replaces the stock
+ * atom-one-dark stylesheet so code follows the light/dark theme. Colours
+ * come from the --code-* tokens in index.css; the editor surface supplies
+ * the background (--editor-bg), so .hljs itself stays transparent.
+ */
+.hljs {
+  color: var(--code-text);
+  background: transparent;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: var(--code-comment);
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-doctag,
+.hljs-section {
+  color: var(--code-keyword);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-meta .hljs-string {
+  color: var(--code-string);
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-variable,
+.hljs-template-variable {
+  color: var(--code-number);
+}
+
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.function_,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: var(--code-title);
+}
+
+.hljs-type,
+.hljs-built_in,
+.hljs-params,
+.hljs-attr {
+  color: var(--code-type);
+}
+
+.hljs-meta,
+.hljs-meta .hljs-keyword,
+.hljs-link,
+.hljs-deletion {
+  color: var(--code-meta);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 600;
+}

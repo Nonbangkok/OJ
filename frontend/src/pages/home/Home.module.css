@@ -157,7 +157,7 @@
 }
 
 .problem-id {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-family: var(--font-family-mono);
   color: var(--text-muted);
 }
 

@@ -1,8 +1,7 @@
 import Editor from 'react-simple-code-editor';
-import { ClipboardText } from '@phosphor-icons/react';
+import { Check, ClipboardText } from '@phosphor-icons/react';
 import useSubmissionModal from '../../../hooks/useSubmissionModal';
 import { Dialog } from '../../../components/ui/Dialog';
-import 'highlight.js/styles/atom-one-dark.css';
 
 import styles from './SubmissionModal.module.css';
 import editorStyles from '../../../components/styles/CodeEditor.module.css';
@@ -119,7 +118,7 @@ const SubmissionModal = ({ submission, onClose }) => {
                 aria-label={copySuccess ? 'Copied!' : 'Copy code'}
                 style={{ right: hasScrollbar ? '1.5rem' : '0.5rem' }}
               >
-                {copySuccess ? '✓' : <ClipboardText size={18} aria-hidden="true" />}
+                {copySuccess ? <Check size={18} aria-hidden="true" /> : <ClipboardText size={18} aria-hidden="true" />}
               </button>
               <div className={editorStyles['lineNumbersGutter']} ref={lineNumbersRef}>
                 {Array.from({ length: lineCount }).map((_, i) => (
@@ -135,7 +134,7 @@ const SubmissionModal = ({ submission, onClose }) => {
                   textareaId="code"
                   {...readOnlyCodeEditorProps}
                   style={{
-                    fontFamily: '"Fira code", "Fira Mono", monospace',
+                    fontFamily: 'var(--font-family-mono)',
                     fontSize: UI_CONFIG.DEFAULT_EDITOR_FONT_SIZE,
                     lineHeight: 1.5, // Ensure line height matches CSS
                   }}

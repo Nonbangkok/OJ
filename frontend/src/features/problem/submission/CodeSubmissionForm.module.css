@@ -5,7 +5,7 @@
   border-radius: 4px;
   background-color: var(--editor-bg); /* Keep dark background for output */
   color: var(--editor-text); /* Light grey text */
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-family: var(--font-family-mono);
 }
 
 .output-container h3 {
@@ -30,7 +30,7 @@
 
 .submission-form-container textarea#code {
   min-height: 300px;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-family: var(--font-family-mono);
   font-size: 0.95rem;
   background-color: var(--editor-bg); /* Dark background */
   color: var(--editor-text); /* Light grey text */

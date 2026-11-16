@@ -81,7 +81,7 @@ const ContestCard = ({ contest, user, onJoin }) => {
                         to="/login"
                         className={`${styles.actionBtn} ${styles.loginBtn}`}
                     >
-                        🔑 Login to Join
+                        Log in to join
                     </Link>
                 )}
             </div>

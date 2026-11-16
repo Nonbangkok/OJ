@@ -6,28 +6,29 @@ export interface ChartColorSet {
   series: string[];
 }
 
+// Neutral-first palette (UI redesign 2026-11): ink, then the verdict hues.
 const LIGHT: ChartColorSet = {
-  text: '#495057',
-  grid: '#e9ecef',
-  series: ['#0d6efd', '#198754', '#dc3545', '#ffc107', '#6f42c1', '#fd7e14', '#20c997', '#6610f2'],
+  text: '#71717a',
+  grid: '#e4e4e7',
+  series: ['#18181b', '#16a34a', '#dc2626', '#b45309', '#71717a', '#9a3412', '#a1a1aa', '#3f3f46'],
 };
 
 const DARK: ChartColorSet = {
-  text: '#adb5bd',
-  grid: '#343a46',
-  series: ['#6ea8fe', '#75b798', '#ea868f', '#ffda6a', '#a98cca', '#f78c6b', '#63d2b6', '#9d8cff'],
+  text: '#8b949e',
+  grid: '#30363d',
+  series: ['#e6edf3', '#3fb950', '#f85149', '#d29922', '#8b949e', '#f0883e', '#6e7681', '#c9d1d9'],
 };
 
 /** Series colors for verdict categories, keyed by verdict name. */
 export const VERDICT_COLORS: Record<string, string> = {
-  Accepted: '#198754',
-  'Wrong Answer': '#dc3545',
-  'Time Limit Exceeded': '#ffc107',
-  'Memory Limit Exceeded': '#fd7e14',
-  'Runtime Error': '#6f42c1',
-  'Compilation Error': '#495057',
-  'System Error': '#adb5bd',
-  Skipped: '#ced4da',
+  Accepted: '#16a34a',
+  'Wrong Answer': '#dc2626',
+  'Time Limit Exceeded': '#d97706',
+  'Memory Limit Exceeded': '#ea580c',
+  'Runtime Error': '#9a3412',
+  'Compilation Error': '#71717a',
+  'System Error': '#a1a1aa',
+  Skipped: '#d4d4d8',
 };
 
 /** Theme-aware chart colors for the analysis tab. */

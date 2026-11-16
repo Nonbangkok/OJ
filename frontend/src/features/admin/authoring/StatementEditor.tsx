@@ -84,14 +84,14 @@ function PreviewModeTab({ selected, onSelect, children }: {
     cursor: 'pointer',
     borderTopLeftRadius: 6,
     borderTopRightRadius: 6,
-    border: '1px solid #495057',
+    border: '1px solid var(--border-color)',
     borderBottom: 0,
   };
   const style: CSSProperties = selected
-    ? { ...base, background: '#6c757d', color: '#ffffff', fontWeight: 600 }
+    ? { ...base, background: 'var(--action-primary-background)', color: 'var(--action-primary-foreground)', fontWeight: 600 }
     : hovered
-      ? { ...base, background: '#0d6efd', color: '#ffffff' }
-      : { ...base, background: '#212529', color: '#ffffff' };
+      ? { ...base, background: 'var(--background-tertiary)', color: 'var(--text-primary)' }
+      : { ...base, background: 'var(--background-secondary)', color: 'var(--text-primary)' };
   return <button type="button" role="tab" aria-selected={selected}
     style={style} onClick={onSelect}
     onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}

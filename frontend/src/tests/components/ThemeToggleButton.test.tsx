@@ -21,8 +21,9 @@ describe('ThemeToggleButton', () => {
         render(<ThemeToggleButton />);
 
         expect(screen.getByRole('button')).toBeInTheDocument();
-        expect(screen.getByLabelText(/switch to dark mode/i)).toBeInTheDocument();
-        expect(screen.getByText('🌙')).toBeInTheDocument();
+        const button = screen.getByRole('button', { name: /switch to dark mode/i });
+        expect(button.querySelector('svg')).not.toBeNull();
+        expect(button).not.toHaveTextContent(/\S/);
     });
 
     it('renders with dark theme (sun icon)', () => {
@@ -30,8 +31,9 @@ describe('ThemeToggleButton', () => {
 
         render(<ThemeToggleButton />);
 
-        expect(screen.getByLabelText(/switch to light mode/i)).toBeInTheDocument();
-        expect(screen.getByText('☀️')).toBeInTheDocument();
+        const button = screen.getByRole('button', { name: /switch to light mode/i });
+        expect(button.querySelector('svg')).not.toBeNull();
+        expect(button).not.toHaveTextContent(/\S/);
     });
 
     it('calls toggleTheme when clicked', () => {

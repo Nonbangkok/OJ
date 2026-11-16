@@ -238,7 +238,7 @@
 .error {
   /* Shared error banner: danger tint + danger text + token radius. */
   background: var(--danger-tint-bg);
-  color: var(--status-danger);
+  color: var(--tint-danger-fg);
   padding: 1rem 1.25rem;
   border-radius: var(--radius-md);
   margin-bottom: 1.25rem;
@@ -494,6 +494,10 @@
   left: 50%;
   transform: translate(-50%, -50%);
   color: var(--text-primary);
+  /* Own surface: the label sits over both the fill and the empty track. */
+  background-color: var(--background-primary);
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.8rem;
   font-weight: 600;
 }

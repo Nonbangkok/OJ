@@ -4,9 +4,7 @@ import contestService from '../../services/contestService';
 import styles from './ContestNavbar.module.css';
 import NavbarUserMenu from '../../components/navbar/NavbarUserMenu';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
-import logo from '../../assets/logo512.png';
-import darkmodeLogo from '../../assets/logo512_darkmode.png';
+import GraderLogo from '../../components/brand/GraderLogo';
 import { useNavSlider } from '../../hooks/useNavSlider';
 import type { Contest } from '../../types';
 
@@ -15,8 +13,6 @@ const ContestNavbar = () => {
   const location = useLocation();
   const { user } = useAuth();
   const [contest, setContest] = useState<Contest | null>(null);
-  const { theme } = useTheme(); // Get current theme
-  const currentLogo = theme === 'dark' ? darkmodeLogo : logo; // Choose logo based on theme
   const {
     navRef,
     sliderStyle,
@@ -51,7 +47,7 @@ const ContestNavbar = () => {
       <div className={styles['navbar-container']}>
         <div className={styles['nav-left']}>
           <NavLink to="/contests" className={styles['back-btn']}>
-            <img src={currentLogo} alt="Grader Logo" className={styles['nav-logo']} />
+            <GraderLogo size={40} className={styles['nav-logo']} />
           </NavLink>
           <NavLink to={`/contests/${contestId}`} className={styles['nav-brand']}>
             {contest?.title}

@@ -18,8 +18,6 @@ jest.mock('../../../context/SettingsContext', () => ({
   }),
 }));
 jest.mock('../../../context/ThemeContext', () => ({ useTheme: jest.fn() }));
-jest.mock('../../../assets/logo512.png', () => 'light-logo');
-jest.mock('../../../assets/logo512_darkmode.png', () => 'dark-logo');
 
 const mockLogout = jest.fn(() => Promise.resolve());
 
