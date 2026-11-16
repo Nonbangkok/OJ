@@ -390,6 +390,14 @@ describe('ProblemManagement Component', () => {
         expect(await screen.findByText(/rejudge queued for 4 submissions \(1 skipped — no stored code\)/i)).toBeInTheDocument();
     });
 
+    it('staff get no bulk Rejudge (the rejudge routes are admin-only)', async () => {
+        render(<BrowserRouter><ProblemManagement currentUser={{ username: 'kru', role: 'staff' }} /></BrowserRouter>);
+        await waitFor(() => screen.getByText('Problem 2'));
+        fireEvent.click(screen.getAllByRole('checkbox')[1]);
+        expect(screen.getByText('1 selected')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Rejudge' })).toBeNull();
+    });
+
     it('bulk Rejudge rejudges every selected problem, not just the first', async () => {
         (jest.mocked(adminService.rejudgeProblem) as jest.Mock)
             .mockResolvedValueOnce({ queued: 4, skipped: 0 })

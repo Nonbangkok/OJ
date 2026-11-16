@@ -119,12 +119,6 @@
   color: var(--text-muted);
 }
 
-.fallback {
-  margin: 0;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
 @media (max-width: 767px) {
   .tabs {
     position: sticky;

@@ -28,9 +28,9 @@ const Settings = () => {
   const saved = Boolean(s.registrationSuccess || s.passwordChangeSuccess || s.accessModeSuccess);
   const error = s.registrationError || s.passwordChangeError || s.accessModeError;
 
-  const switchControl = (label: string, checked: boolean, onToggle: () => void) => (
+  const switchControl = (label: string, checked: boolean, onToggle: () => void, disabled: boolean) => (
     <label className={styles.toggleSwitch}>
-      <input type="checkbox" role="switch" aria-label={label} checked={checked} onChange={onToggle} />
+      <input type="checkbox" role="switch" aria-label={label} checked={checked} onChange={onToggle} disabled={disabled} />
       <span className={styles.toggleTrack} aria-hidden="true" />
     </label>
   );
@@ -56,12 +56,13 @@ const Settings = () => {
               aria-label="Site visibility"
               options={[{ value: 'public', label: 'Public' }, { value: 'private', label: 'Private' }] as const}
               value={s.siteAccessMode === 'private' ? 'private' : 'public'}
+              disabled={!s.loaded.accessMode || s.isSavingAccessMode}
               onChange={(mode) => { if (mode === 'private') setConfirmPrivate(true); else void s.handleSiteAccessModeChange('public'); }}
             />
           )}
         />
-        <SettingsRow label="Registration" help="Let people create their own accounts." control={switchControl('Registration', Boolean(s.isRegistrationEnabled), s.handleRegistrationToggle)} />
-        <SettingsRow label="Password changes" help="Let students and staff change their own password. Admins always can." control={switchControl('Password changes', Boolean(s.isPasswordChangeEnabled), s.handlePasswordChangeToggle)} />
+        <SettingsRow label="Registration" help="Let people create their own accounts." control={switchControl('Registration', Boolean(s.isRegistrationEnabled), s.handleRegistrationToggle, !s.loaded.registration)} />
+        <SettingsRow label="Password changes" help="Let students and staff change their own password. Admins always can." control={switchControl('Password changes', Boolean(s.isPasswordChangeEnabled), s.handlePasswordChangeToggle, !s.loaded.passwordChange)} />
       </section>
 
       <section aria-labelledby="settings-data">

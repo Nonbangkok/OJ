@@ -28,6 +28,17 @@ test('dirty edits disable actions, explicit Save sends only changed fields and t
   expect(result.current.draft?.revision).toBe(4);
 });
 
+test('a save keeps the testcase stats the save response does not carry', async () => {
+  jest.mocked(api.get).mockImplementation(async url => ({ data: url.endsWith('/jobs') ? [] : { ...draft, testcaseStats: { total: 4, withOutput: 4 } } }));
+  const { result } = renderHook(() => useAuthoringDraft('d1'));
+  await waitFor(() => expect(result.current.draft?.testcaseStats).toEqual({ total: 4, withOutput: 4 }));
+  act(() => result.current.edit('title', 'Changed'));
+  jest.mocked(api.patch).mockResolvedValue({ data: { ...draft, title: 'Changed', revision: 4, status: 'draft', verifiedRevision: null } });
+  await act(async () => { await result.current.save(); });
+  expect(result.current.draft?.revision).toBe(4);
+  expect(result.current.draft?.testcaseStats).toEqual({ total: 4, withOutput: 4 });
+});
+
 test('keeps typing during a save and serializes the newer value at the returned revision', async () => {
   const { result } = renderHook(() => useAuthoringDraft('d1'));
   await waitFor(() => expect(result.current.draft?.revision).toBe(3));

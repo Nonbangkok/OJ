@@ -21,10 +21,14 @@ import {
 const RANDOM_PASSWORD_CHARSET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}|;:,.<>?';
 const PROTECTED_ADMIN_USERNAME = 'Nonbangkok';
 
+/** The first character: letters and digits only, so a spreadsheet never reads the password as a formula (=, +, -, @). */
+const RANDOM_PASSWORD_FIRST_CHARSET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
 const buildRandomPassword = (passwordLength: number): string => {
   let password = '';
   for (let index = 0; index < passwordLength; index += 1) {
-    password += RANDOM_PASSWORD_CHARSET.charAt(randomInt(RANDOM_PASSWORD_CHARSET.length));
+    const charset = index === 0 ? RANDOM_PASSWORD_FIRST_CHARSET : RANDOM_PASSWORD_CHARSET;
+    password += charset.charAt(randomInt(charset.length));
   }
   return password;
 };

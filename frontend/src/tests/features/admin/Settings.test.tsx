@@ -44,6 +44,7 @@ describe('Settings page', () => {
   it('saving shows "Saved" and hides it after 3 s', async () => {
     renderSettings();
     const sw = await screen.findByRole('switch', { name: 'Registration' });
+    await waitFor(() => expect(sw).toBeEnabled());
     jest.useFakeTimers();
     await act(async () => { fireEvent.click(sw); });
     await act(async () => { await Promise.resolve(); });
@@ -52,10 +53,25 @@ describe('Settings page', () => {
     expect(screen.queryByText('Saved')).toBeNull();
   });
 
+  it('keeps each control disabled until its real value has loaded, and after a failed load', async () => {
+    let resolveRegistration!: (v: { enabled: boolean }) => void;
+    jest.mocked(adminService.getRegistrationSettings).mockReturnValue(new Promise((r) => { resolveRegistration = r; }) as never);
+    jest.mocked(adminService.getSiteAccessMode).mockRejectedValue(new Error('down'));
+    renderSettings();
+    const registration = screen.getByRole('switch', { name: 'Registration' });
+    expect(registration).toBeDisabled();
+    await act(async () => { resolveRegistration({ enabled: false }); });
+    expect(registration).toBeEnabled();
+    expect(registration).not.toBeChecked();
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Password changes' })).toBeEnabled());
+    for (const option of within(screen.getByRole('group', { name: 'Site visibility' })).getAllByRole('button')) expect(option).toBeDisabled();
+  });
+
   it('a failed save keeps the old value and shows an inline error instead of Saved', async () => {
     jest.mocked(adminService.updateRegistrationSettings).mockRejectedValue(new Error('down'));
     renderSettings();
     const sw = await screen.findByRole('switch', { name: 'Registration' });
+    await waitFor(() => expect(sw).toBeEnabled());
     fireEvent.click(sw);
     expect(await screen.findByRole('alert')).toHaveTextContent('Failed to update registration settings.');
     expect(sw).toBeChecked();
@@ -73,7 +89,9 @@ describe('Settings page', () => {
   it('switching to Private asks first and warns about a running contest', async () => {
     jest.mocked(contestService.getAll).mockResolvedValue([{ id: 1, title: 'Mid-term practice', status: 'running' } as never]);
     renderSettings();
-    fireEvent.click(await screen.findByRole('button', { name: 'Private' }));
+    const priv = await screen.findByRole('button', { name: 'Private' });
+    await waitFor(() => expect(priv).toBeEnabled());
+    fireEvent.click(priv);
     const dialog = await screen.findByRole('dialog', { name: 'Make the site private?' });
     expect(dialog).toHaveTextContent('Mid-term practice is running — guests following it lose access.');
     expect(adminService.updateSiteAccessMode).not.toHaveBeenCalled();

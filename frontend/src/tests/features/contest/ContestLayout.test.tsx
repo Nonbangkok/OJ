@@ -136,4 +136,19 @@ describe('ContestLayout', () => {
     expect(await screen.findByRole('navigation', { name: 'Contest' })).toBeInTheDocument();
     jest.useRealTimers();
   });
+
+  it('follows the server, not this computer\'s clock: a slow clock still leaves the lobby when the contest starts', async () => {
+    jest.useFakeTimers();
+    // This PC runs 10 minutes slow: by its clock the start is still ahead, but the server has started.
+    const start = new Date(Date.now() + 10 * 60_000).toISOString();
+    jest.mocked(contestService.getById)
+      .mockResolvedValueOnce(contest({ status: 'scheduled', start_time: start }))
+      .mockResolvedValue(contest({ status: 'running', start_time: start }));
+    renderAt('/contests/3');
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.getByText('page Midterm Practice scheduled')).toBeInTheDocument();
+    await act(async () => { jest.advanceTimersByTime(31_000); });
+    expect(await screen.findByRole('navigation', { name: 'Contest' })).toBeInTheDocument();
+    jest.useRealTimers();
+  });
 });

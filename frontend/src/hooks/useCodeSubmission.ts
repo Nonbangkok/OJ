@@ -7,35 +7,11 @@ import { APP_CONSTANTS } from '../utils/constants';
 import type { SubmissionLanguage } from '../utils/constants';
 import type { SubmitRequest } from '../types';
 import type { FormEvent, MutableRefObject } from 'react';
+import { readSubmissionCache, writeSubmissionCache } from '../utils/submissionDrafts';
 
 // Register the highlight.js grammar for every supported language.
 hljs.registerLanguage('cpp', cpp);
 hljs.registerLanguage('python', python);
-
-const SUBMISSION_CACHE_KEY = 'oj-submission-cache';
-
-interface CachedSubmission {
-  code: string;
-  timestamp: number;
-}
-
-type SubmissionCache = Record<string, CachedSubmission>;
-
-const readSubmissionCache = (): SubmissionCache => {
-  try {
-    return JSON.parse(localStorage.getItem(SUBMISSION_CACHE_KEY) || '{}');
-  } catch {
-    return {};
-  }
-};
-
-const writeSubmissionCache = (cache: SubmissionCache): void => {
-  try {
-    localStorage.setItem(SUBMISSION_CACHE_KEY, JSON.stringify(cache));
-  } catch (error) {
-    console.error('Failed to write to localStorage:', error);
-  }
-};
 
 /** Reads a dropped file as text (FileReader works in every browser and jsdom). */
 const readFileText = (file: File): Promise<string> =>
@@ -46,6 +22,20 @@ const readFileText = (file: File): Promise<string> =>
     reader.readAsText(file);
   });
 
+const LANGUAGES: SubmissionLanguage[] = ['cpp', 'python'];
+/** The language of this problem's most recent unexpired draft, if any. */
+const draftLanguage = (problemId: string): SubmissionLanguage | null => {
+  const cache = readSubmissionCache();
+  let best: { language: SubmissionLanguage; at: number } | null = null;
+  for (const language of LANGUAGES) {
+    const draft = cache[`${problemId}:${language}`];
+    if (!draft?.code || new Date().getTime() - draft.timestamp >= APP_CONSTANTS.SUBMISSION_CACHE_EXPIRY) continue;
+    if (!best || draft.timestamp > best.at) best = { language, at: draft.timestamp };
+  }
+  return best?.language ?? null;
+};
+const escapeHtml = (source: string) => source.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 const useCodeSubmission = (
   problemId: string,
   contestId: string | null | undefined,
@@ -53,9 +43,11 @@ const useCodeSubmission = (
   /** Called with the new submission's id once the judge has queued it. */
   onSubmitted?: (submissionId: number) => void,
 ) => {
-  const [selectedLanguage, setLanguage] = useState<SubmissionLanguage>('cpp');
+  // No language is preselected: the student chooses. A saved draft for this
+  // problem brings its language back (the most recent one), so code never vanishes.
+  const [selectedLanguage, setSelectedLanguage] = useState<SubmissionLanguage | null>(() => draftLanguage(problemId));
   // Header problems are C++ only; the judge rejects anything else.
-  const language: SubmissionLanguage = submissionFilename ? 'cpp' : selectedLanguage;
+  const language: SubmissionLanguage | null = submissionFilename ? 'cpp' : selectedLanguage;
   const [code, setCode] = useState(``);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -65,9 +57,22 @@ const useCodeSubmission = (
 
   // The cache key is per problem AND per language, so switching languages
   // never restores e.g. C++ code into the Python editor.
-  const cacheKey = `${problemId}:${language}`;
+  const cacheKey = language ? `${problemId}:${language}` : null;
+
+  const codeRef = useRef(code);
+  useEffect(() => { codeRef.current = code; });
+  /** Choosing the first language keeps whatever was typed before (it becomes that language's draft). */
+  const setLanguage = (next: SubmissionLanguage) => {
+    if (selectedLanguage === null && codeRef.current) {
+      const cache = readSubmissionCache();
+      cache[`${problemId}:${next}`] = { code: codeRef.current, timestamp: new Date().getTime() };
+      writeSubmissionCache(cache);
+    }
+    setSelectedLanguage(next);
+  };
 
   useEffect(() => {
+    if (!cacheKey) return;
     const cachedSubmission = readSubmissionCache();
     const problemCache = cachedSubmission[cacheKey];
 
@@ -122,6 +127,10 @@ const useCodeSubmission = (
   const handleSubmit = async (e?: Pick<FormEvent, 'preventDefault'>) => {
     e?.preventDefault();
     if (isSubmitting) return;
+    if (!language) {
+      setError('Choose a language first.');
+      return;
+    }
     setIsSubmitting(true);
     setError('');
 
@@ -140,7 +149,7 @@ const useCodeSubmission = (
       const response = await submissionService.submit(submitData);
 
       const submissionCache = readSubmissionCache();
-      submissionCache[cacheKey] = {
+      submissionCache[`${problemId}:${language}`] = {
         code: code,
         timestamp: new Date().getTime(),
       };
@@ -159,7 +168,7 @@ const useCodeSubmission = (
 
   const highlightCode = (source: string): string => {
     try {
-      return hljs.highlight(source, { language }).value;
+      return language ? hljs.highlight(source, { language }).value : escapeHtml(source);
     } catch (e) {
       console.warn('Highlighting error:', e);
       return source;
@@ -184,7 +193,7 @@ const useCodeSubmission = (
         cache[`${problemId}:${next}`] = { code: text, timestamp: new Date().getTime() };
         writeSubmissionCache(cache);
       }
-      setLanguage(next);
+      setSelectedLanguage(next);
     }
     setCode(text);
   };

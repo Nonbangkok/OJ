@@ -132,3 +132,26 @@ describe('ContestDetail: participant while running', () => {
     expect(await screen.findByText('problem table')).toBeInTheDocument();
   });
 });
+
+describe('ContestDetail: finishing', () => {
+  const finishing = (over: Partial<Contest> = {}) => contest({ status: 'finishing', end_time: new Date(Date.now() - 1000).toISOString(), ...over });
+
+  it('a viewer who did not join waits on a notice instead of bouncing to the problem table', () => {
+    renderAt(finishing());
+    expect(screen.queryByText('problem table')).toBeNull();
+    expect(screen.getByRole('heading', { name: /Weekly round #19/, level: 1 })).toBeInTheDocument();
+    expect(screen.getByText('Judging final submissions…')).toBeInTheDocument();
+  });
+
+  it('a guest waits on the same notice', () => {
+    jest.mocked(useAuth).mockReturnValue({ user: null } as ReturnType<typeof useAuth>);
+    renderAt(finishing());
+    expect(screen.queryByText('problem table')).toBeNull();
+    expect(screen.getByText('Judging final submissions…')).toBeInTheDocument();
+  });
+
+  it('a participant still goes to the problem table', () => {
+    renderAt(finishing({ is_participant: true }));
+    expect(screen.getByText('problem table')).toBeInTheDocument();
+  });
+});

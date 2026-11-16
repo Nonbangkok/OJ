@@ -8,7 +8,11 @@ import type { HomeSummary } from '../../types';
 jest.mock('../../services/contestService');
 jest.mock('../../services/homeService');
 jest.mock('../../services/problemService');
+jest.mock('../../services/submissionService');
+jest.mock('../../services/scoreboardService');
 import problemService from '../../services/problemService';
+import submissionService from '../../services/submissionService';
+import scoreboardService from '../../services/scoreboardService';
 
 const mockUser = { id: 1, username: 'testuser', role: 'user' as const, hasAvatar: false };
 
@@ -83,11 +87,89 @@ describe('Home Page (logged in)', () => {
     mockNavigate.mockReset();
     jest.mocked(homeService.getHome).mockResolvedValue(summary());
     jest.mocked(contestService.getAll).mockResolvedValue([]);
+    jest.mocked(submissionService.getAll).mockResolvedValue([]);
+    jest.mocked(scoreboardService.getRanking).mockResolvedValue({ rows: [], total: 0, page: 1, pageSize: 50, window: 'week', viewer: null });
+  });
+
+  const sub = (id: number, over: Record<string, unknown> = {}) => ({
+    id, username: 'testuser', problem_id: `p${id}`, problem_title: `Problem ${id}`, overall_status: 'Accepted', score: 100,
+    language: 'cpp', submitted_at: new Date(Date.now() - id * 60e3).toISOString(), case_statuses: ['Accepted', 'Accepted'], ...over,
+  });
+  const leader = (rank: number, username: string, xp: number) => ({ rank, username, hasAvatar: false, xp, solved: 3, level: 4, tier: 'Novice' });
+
+  it('lists your five latest submissions with verdicts, each opening its page', async () => {
+    jest.mocked(submissionService.getAll).mockResolvedValue([
+      sub(101, { overall_status: 'Wrong Answer', score: 20, case_statuses: ['Accepted', 'Wrong Answer', 'Skipped', 'Skipped', 'Skipped'] }),
+      sub(102), sub(103), sub(104), sub(105), sub(106), sub(107),
+    ] as never);
+    renderHome();
+    const recent = await screen.findByRole('region', { name: 'Recent submissions' });
+    expect(submissionService.getAll).toHaveBeenCalledWith({ filter: 'mine' });
+    const rows = await within(recent).findAllByRole('listitem');
+    expect(rows).toHaveLength(5);
+    expect(within(rows[0]).getByRole('link', { name: /Problem 101/ })).toHaveAttribute('href', '/submissions/101');
+    expect(rows[0]).toHaveTextContent('WRONG 1/5');
+    expect(within(recent).getByRole('link', { name: 'All submissions' })).toHaveAttribute('href', '/submissions');
+  });
+
+  it('says so when you have not submitted yet', async () => {
+    renderHome();
+    const recent = await screen.findByRole('region', { name: 'Recent submissions' });
+    expect(await within(recent).findByText('No submissions yet — your verdicts will show up here.')).toBeInTheDocument();
+  });
+
+  it('shows this week\'s leaders and where you stand', async () => {
+    jest.mocked(scoreboardService.getRanking).mockResolvedValue({
+      rows: [leader(1, 'ploy.s', 320), leader(2, 'thanawat99', 260), leader(3, 'krit.p', 180), leader(4, 'mintra_j', 120), leader(5, 'nan_k', 90), leader(6, 'june.t', 80)],
+      total: 30, page: 1, pageSize: 50, window: 'week', viewer: leader(12, 'testuser', 40),
+    });
+    renderHome();
+    const top = await screen.findByRole('region', { name: 'Top this week' });
+    expect(scoreboardService.getRanking).toHaveBeenCalledWith('week', 1);
+    const rows = within(top).getAllByRole('listitem');
+    expect(rows).toHaveLength(6);
+    expect(rows[0]).toHaveTextContent(/1\s*ploy\.s\s*\+320 XP/);
+    expect(rows[5]).toHaveTextContent(/12\s*You\s*\+40 XP/);
+    expect(within(top).getByRole('link', { name: 'Ranking' })).toHaveAttribute('href', '/scoreboard?window=week');
+  });
+
+  it('lists running and upcoming contests, running first, finished left out', async () => {
+    const t = (hours: number) => new Date(Date.now() + hours * 3600e3).toISOString();
+    jest.mocked(contestService.getAll).mockResolvedValue([
+      { id: 3, title: 'Monthly #12', status: 'scheduled', start_time: t(48), end_time: t(51) },
+      { id: 1, title: 'Old Cup', status: 'finished', start_time: t(-80), end_time: t(-77) },
+      { id: 2, title: 'Sprint #7', status: 'running', start_time: t(-1), end_time: t(70) },
+      { id: 4, title: 'Camp', status: 'scheduled', start_time: t(200), end_time: t(205) },
+      { id: 5, title: 'Later', status: 'scheduled', start_time: t(300), end_time: t(305) },
+    ] as never);
+    renderHome();
+    const panel = await screen.findByRole('region', { name: 'Contests' });
+    const links = within(panel).getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/contests/'));
+    expect(links.map((a) => a.textContent)).toEqual(['Sprint #7', 'Monthly #12', 'Camp']);
+    expect(within(panel).queryByText('Old Cup')).toBeNull();
+    expect(within(panel).getByRole('link', { name: 'All contests' })).toHaveAttribute('href', '/contests');
+  });
+
+  it('greets a returning student by name', async () => {
+    renderHome();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome back, testuser' })).toBeInTheDocument();
+    expect(screen.getByText('Continue where you left off')).toBeInTheDocument();
+  });
+
+  it('welcomes a brand-new student and points at a first problem', async () => {
+    jest.mocked(homeService.getHome).mockResolvedValue(summary({
+      continue: null, currentStreak: 0,
+      progression: { ...mockProfile.progression, totalXp: 0, level: 1 },
+      week: summary().week.map((d) => ({ ...d, solved: 0 })),
+      startWith: [{ id: 'easy', title: 'Easy one', difficulty: 800, xp: 20 }],
+    }));
+    renderHome();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome, testuser' })).toBeInTheDocument();
+    expect(screen.getByText('Pick a first problem to get started')).toBeInTheDocument();
   });
 
   it('shows the continue block with strip and verdict', async () => {
     renderHome();
-    expect(screen.getByRole('heading', { name: 'Continue where you left off' })).toBeInTheDocument();
     const block = await screen.findByRole('region', { name: 'Continue' });
     expect(within(block).getByRole('link', { name: 'vector::erase' })).toHaveAttribute('href', '/problems/hp_vec04_erase');
     expect(within(block).getByText('hp_vec04_erase')).toBeInTheDocument();
@@ -137,7 +219,7 @@ describe('Home Page (logged in)', () => {
     jest.mocked(contestService.getAll).mockResolvedValue([]);
     renderHome();
     await screen.findByRole('region', { name: 'Continue' });
-    expect(screen.queryByRole('heading', { name: 'Contest' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Contests' })).toBeNull();
   });
 
   it('shows an inline error with retry when the summary fails', async () => {

@@ -50,10 +50,12 @@ export const PROBLEMS_PAGE = {
  * "<min>-<max>" and maps onto the difficultyMin/difficultyMax URL params.
  */
 export const DIFFICULTY_BANDS: readonly { value: string; label: string; min: number; max: number }[] = [
-  { value: '800-1199', label: '800–1199', min: 800, max: 1199 },
-  { value: '1200-1599', label: '1200–1599', min: 1200, max: 1599 },
-  { value: '1600-1999', label: '1600–1999', min: 1600, max: 1999 },
-  { value: '2000-2399', label: '2000–2399', min: 2000, max: 2399 },
+  // Ratings step by 100 and the API accepts only multiples of 100 as bounds,
+  // so each band ends on the last rating it contains (…–1100, not …–1199).
+  { value: '800-1100', label: '800–1100', min: 800, max: 1100 },
+  { value: '1200-1500', label: '1200–1500', min: 1200, max: 1500 },
+  { value: '1600-1900', label: '1600–1900', min: 1600, max: 1900 },
+  { value: '2000-2300', label: '2000–2300', min: 2000, max: 2300 },
   { value: '2400-3500', label: '2400+', min: 2400, max: 3500 },
 ];
 

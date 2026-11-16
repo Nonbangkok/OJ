@@ -98,4 +98,22 @@ describe('Login page session-expiry handling', () => {
             expect(mockNavigate).toHaveBeenCalledWith('/');
         });
     });
+
+    it.each([
+        ['a backslash path', '%2F%5Cevil.example'],
+        ['a protocol-relative URL', '%2F%2Fevil.example'],
+        ['an absolute URL', 'https%3A%2F%2Fevil.example'],
+        ['a tab-smuggled slash', '%2F%09%2Fevil.example'],
+    ])('ignores %s in returnTo and goes home', async (_label, encoded) => {
+        window.history.replaceState({}, '', `/login?expired=1&returnTo=${encoded}`);
+        jest.mocked(authService.login).mockResolvedValueOnce({
+            message: 'Logged in',
+            user: { id: 1, username: 'testuser', role: 'user', hasAvatar: false }
+        });
+        render(<BrowserRouter><Login /></BrowserRouter>);
+        fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'testuser' } });
+        fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'password123' } });
+        fireEvent.click(screen.getByRole('button', { name: /^log in$/i }));
+        await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/'));
+    });
 });

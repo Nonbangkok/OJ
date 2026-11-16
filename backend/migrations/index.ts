@@ -1,7 +1,7 @@
 import { coreSchemaSql } from './0001CoreSchema';
 import { problemAuthoringFoundationSql } from './0002ProblemAuthoringFoundation';
 import { headerProblemsSql } from './0024HeaderProblems';
-import { submissionsUserProblemIndexSql } from './0025SubmissionsUserProblemIndex';
+import { submissionsUserProblemIndexStatements } from './0025SubmissionsUserProblemIndex';
 import { contestProblemPositionSql } from './0026ContestProblemPosition';
 import { userLastLoginSql } from './0027UserLastLogin';
 import { authoringJobsDraftTypeIndexSql } from './0028AuthoringJobsDraftTypeIndex';
@@ -63,7 +63,7 @@ export const migrations: readonly Migration[] = Object.freeze([
   { version: '0022_drop_collection_description_again', sql: dropCollectionDescriptionAgainSql },
   { version: '0023_user_submission_lock', sql: userSubmissionLockSql },
   { version: '0024_header_problems', sql: headerProblemsSql },
-  { version: '0025_submissions_user_problem_index', sql: submissionsUserProblemIndexSql },
+  { version: '0025_submissions_user_problem_index', concurrentStatements: submissionsUserProblemIndexStatements },
   { version: '0026_contest_problem_position', sql: contestProblemPositionSql },
   { version: '0027_user_last_login', sql: userLastLoginSql },
   { version: '0028_authoring_jobs_draft_type_index', sql: authoringJobsDraftTypeIndexSql },

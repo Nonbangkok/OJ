@@ -10,7 +10,6 @@ import {
     PageHeader,
     ScoreCell,
     SegmentedControl,
-    TestcaseStrip,
     VerdictText,
     type DataTableColumn,
 } from '../../components/ui';
@@ -20,6 +19,7 @@ import { PROBLEMS_PAGE } from '../../config/constants';
 import { formatTimeAgo } from '../../utils/formatters';
 import { getLanguageDisplayName } from '../../utils/constants';
 import type { AuthUser, SubmissionSummary } from '../../types';
+import { useRestoreScroll } from '../../hooks/useRestoreScroll';
 
 const NO_CASES = new Set(['Compilation Error', 'System Error']);
 
@@ -81,6 +81,8 @@ const SubmissionsView = ({
         setFilterValue,
         lastRealtimeEvent,
     } = useSubmissions(problemId, contestId);
+    // Back from a submission returns to the same place in the list (as the problem list does).
+    useRestoreScroll(!loading);
     const [problemText, setProblemText] = useDebouncedFilter(filters.problem, (next) => setFilterValue('problem', next));
     const [userText, setUserText] = useDebouncedFilter(filters.user, (next) => setFilterValue('user', next));
     const [visible, setVisible] = useState(REVEAL_STEP);
@@ -92,22 +94,29 @@ const SubmissionsView = ({
         onLoadMore: () => setVisible((v) => v + REVEAL_STEP),
     });
 
-    const detailHref = (s: SubmissionSummary) => (contestId
-        ? `/contests/${contestId}/submissions/${s.id}`
-        : `/submissions/${s.id}`);
+    // The server opens a submission to its owner and to staff only; other rows get no link.
+    const canOpen = (s: SubmissionSummary) => Boolean(currentUser)
+        && (isStaff || s.username.toLowerCase() === currentUser?.username.toLowerCase());
+    const detailHref = (s: SubmissionSummary) => {
+        if (!canOpen(s)) return null;
+        return contestId ? `/contests/${contestId}/submissions/${s.id}` : `/submissions/${s.id}`;
+    };
 
     const columns: DataTableColumn<SubmissionSummary>[] = [
         {
             key: 'id', header: 'ID', mobile: 'meta',
-            cell: (s) => <Link to={detailHref(s)} className={styles.mono}>{`#${s.id}`}</Link>,
+            cell: (s) => {
+                const href = detailHref(s);
+                return href ? <Link to={href} className={styles.mono}>{`#${s.id}`}</Link> : <span className={styles.mono}>{`#${s.id}`}</span>;
+            },
         },
         { key: 'when', header: 'When', mobile: 'meta', cell: (s) => <span className={styles.muted}>{formatTimeAgo(s.submitted_at)}</span> },
         ...(problemId ? [] : [{
-            key: 'user', header: 'User', mobile: 'hidden' as const,
+            key: 'user', header: 'User', mobile: 'hidden' as const, width: '14%',
             cell: (s: SubmissionSummary) => <Link to={`/profile/${s.username}`} className={styles.user}>{s.username}</Link>,
         }]),
         {
-            key: 'problem', header: 'Problem', mobile: 'primary',
+            key: 'problem', header: 'Problem', mobile: 'primary', width: '30%',
             cell: (s) => (
                 <span className={styles.problem}>
                     <span className={styles.mono}>{s.problem_id}</span>
@@ -121,12 +130,8 @@ const SubmissionsView = ({
             cell: (s) => {
                 // A compile log or system message is stored as one result entry, not a testcase.
                 const results = NO_CASES.has(s.overall_status) ? [] : (s.case_statuses ?? []).map((status) => ({ status }));
-                return (
-                    <span className={styles.verdict}>
-                        <VerdictText status={s.overall_status} results={results} />
-                        {results.length > 0 && <TestcaseStrip results={results} />}
-                    </span>
-                );
+                // The verdict reads "Wrong 1/5" on its own; the per-case strip lives on the detail page.
+                return <VerdictText status={s.overall_status} results={results} />;
             },
         },
         { key: 'score', header: 'Score', align: 'right', mobile: 'hidden', cell: (s) => <ScoreCell score={s.score} attempted /> },

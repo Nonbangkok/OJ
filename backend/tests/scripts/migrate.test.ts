@@ -50,6 +50,7 @@ describe('migration command', () => {
     const client: MigrationClient = {
       query: async (text) => {
         calls.push(text);
+        if (text.startsWith('SELECT pg_try_advisory_lock')) return { rows: [{ locked: true }] } as never;
         if (text.startsWith('SELECT version')) {
           return { rows: [] };
         }
@@ -68,7 +69,7 @@ describe('migration command', () => {
 
     expect(applied).toEqual(['0001_test']);
     expect(calls).toEqual([
-      'SELECT pg_advisory_lock($1)',
+      'SELECT pg_try_advisory_lock($1) AS locked',
       expect.stringContaining('CREATE TABLE IF NOT EXISTS schema_migrations'),
       expect.stringContaining('SELECT version'),
       'BEGIN',
@@ -87,6 +88,7 @@ describe('migration command', () => {
     const client: MigrationClient = {
       query: async (text) => {
         calls.push(text);
+        if (text.startsWith('SELECT pg_try_advisory_lock')) return { rows: [{ locked: true }] } as never;
         if (text.startsWith('SELECT version')) {
           return { rows: [] };
         }
@@ -108,7 +110,7 @@ describe('migration command', () => {
     ])).rejects.toThrow('migration failed');
 
     expect(calls).toEqual([
-      'SELECT pg_advisory_lock($1)',
+      'SELECT pg_try_advisory_lock($1) AS locked',
       expect.stringContaining('CREATE TABLE IF NOT EXISTS schema_migrations'),
       expect.stringContaining('SELECT version'),
       'BEGIN',
@@ -124,6 +126,7 @@ describe('migration command', () => {
     const client: MigrationClient = {
       query: async (text, params) => {
         calls.push({ text, params });
+        if (text.startsWith('SELECT pg_try_advisory_lock')) return { rows: [{ locked: true }] } as never;
         if (text.startsWith('SELECT version')) {
           return { rows: [{ version: '0001_core_schema' }] };
         }
@@ -180,6 +183,7 @@ describe('migration command', () => {
     let endCount = 0;
     const client: MigrationClient = {
       query: async (text) => {
+        if (text.startsWith('SELECT pg_try_advisory_lock')) return { rows: [{ locked: true }] } as never;
         if (text.startsWith('SELECT version')) {
           return { rows: [] };
         }
@@ -206,6 +210,7 @@ describe('migration command', () => {
     let endCount = 0;
     const client: MigrationClient = {
       query: async (text) => {
+        if (text.startsWith('SELECT pg_try_advisory_lock')) return { rows: [{ locked: true }] } as never;
         if (text.startsWith('SELECT version')) {
           return { rows: [] };
         }

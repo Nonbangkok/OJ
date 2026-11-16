@@ -131,7 +131,8 @@ export const getContestProblemDetailForParticipant = async (
         return { kind: 'inactive' };
     }
 
-    if (!(await isContestParticipant(contestId, userId))) {
+    // Staff watch a contest without joining it (§7.7); they may read its problems, never submit.
+    if (!isContestManagementRole(viewer) && !(await isContestParticipant(contestId, userId))) {
         return { kind: 'not_participant' };
     }
 
@@ -172,7 +173,8 @@ export const getContestProblemPdfForParticipant = async (
         return { kind: 'inactive' };
     }
 
-    if (!(await isContestParticipant(contestId, userId))) {
+    // Staff watch a contest without joining it (§7.7); they may read its problems, never submit.
+    if (!isContestManagementRole(viewer) && !(await isContestParticipant(contestId, userId))) {
         return { kind: 'not_participant' };
     }
 
@@ -207,7 +209,8 @@ export const getContestProblemStarterForParticipant = async (
         return { kind: 'inactive' };
     }
 
-    if (!(await isContestParticipant(contestId, userId))) {
+    // Staff watch a contest without joining it (§7.7); they may read its problems, never submit.
+    if (!isContestManagementRole(viewer) && !(await isContestParticipant(contestId, userId))) {
         return { kind: 'not_participant' };
     }
 

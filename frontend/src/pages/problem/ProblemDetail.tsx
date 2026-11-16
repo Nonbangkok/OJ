@@ -1,13 +1,11 @@
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import styles from './ProblemDetail.module.css';
 import CodeSubmissionForm from '../../features/problem/submission/CodeSubmissionForm';
-import SubmissionResult from '../../features/submission/SubmissionResult';
-import useLiveSubmission from '../../features/submission/useLiveSubmission';
 import Submissions from '../submission/Submissions';
 import problemService from '../../services/problemService';
 import { useProblemDetail } from '../../hooks/useProblemDetail';
-import { EmptyState, InlineError, InlineNotice, PageHeader, ScoreCell, TestcaseStrip } from '../../components/ui';
+import { EmptyState, InlineNotice, PageHeader, ScoreCell, TestcaseStrip } from '../../components/ui';
 import LoadingPage from '../../components/shared/LoadingPage';
 import type { ProblemDetail as ProblemDetailModel } from '../../types';
 import { useContest } from '../../features/contest/ContestContext';
@@ -22,11 +20,7 @@ const languagesLine = (problem: ProblemDetailModel) =>
     ? `C++ · submit ${problem.submission_filename}`
     : 'C++ · Python';
 
-/**
- * Statement tab: the PDF at content width with a loading line. Browsers fire
- * no error event for a PDF that will not render inline, so the open-PDF
- * fallback is always offered under the frame.
- */
+/** Statement tab: the PDF at content width with a loading line. */
 function Statement({ problem, pdfUrl }: { problem: ProblemDetailModel; pdfUrl: string }) {
   const [loaded, setLoaded] = useState(false);
   if (!problem.has_pdf) {
@@ -41,9 +35,6 @@ function Statement({ problem, pdfUrl }: { problem: ProblemDetailModel; pdfUrl: s
         className={styles.pdf}
         onLoad={() => setLoaded(true)}
       />
-      <p className={styles.fallback}>
-        Can&apos;t preview it here? <a href={pdfUrl} target="_blank" rel="noreferrer">open PDF</a>
-      </p>
     </div>
   );
 }
@@ -62,8 +53,8 @@ const ProblemDetail = () => {
   const tabParam = searchParams.get('tab') as Tab | null;
   const tab: Tab = tabParam && TABS.includes(tabParam) ? tabParam : 'statement';
   const submissionParam = Number(searchParams.get('submission'));
-  const submissionId = Number.isSafeInteger(submissionParam) && submissionParam > 0 ? submissionParam : null;
-  const { submission, error: resultError } = useLiveSubmission(submissionId, contestId);
+  const legacySubmissionId = Number.isSafeInteger(submissionParam) && submissionParam > 0 ? submissionParam : null;
+  const navigate = useNavigate();
 
   const selectTab = (next: Tab) => {
     setSearchParams((previous) => {
@@ -72,21 +63,17 @@ const ProblemDetail = () => {
       return params;
     }, { replace: true });
   };
-  const showResult = (id: number) => {
-    setSearchParams((previous) => {
-      const params = new URLSearchParams(previous);
-      params.set('tab', 'submit');
-      params.set('submission', String(id));
-      return params;
-    }, { replace: true });
-  };
+  // A new submission opens its own page, which follows the verdict live.
+  const submissionsRoot = contestId ? `/contests/${contestId}/submissions` : '/submissions';
+  const showResult = (id: number) => navigate(`${submissionsRoot}/${id}`);
 
+  // Links from before (…?tab=submit&submission=N) go to the submission page.
+  if (legacySubmissionId) return <Navigate to={`${submissionsRoot}/${legacySubmissionId}`} replace />;
   if (loading) return <LoadingPage />;
   if (error) return <div className={styles['error-message']}>{error}</div>;
   if (!problem || !problemId) return <div className={styles['error-message']}>Problem not found.</div>;
 
   const pdfUrl = problemService.getPdfUrl(problemId, contestId);
-  const submissionsBase = contestId ? `/contests/${contestId}/submissions` : '/submissions';
   const letterIndex = contest?.problems?.findIndex((p) => p.id === problemId) ?? -1;
   const letter = letterIndex >= 0 ? problemLetter(letterIndex) : null;
   const breadcrumb = contestId
@@ -168,22 +155,6 @@ const ProblemDetail = () => {
                 contestId={contestId}
                 submissionFilename={problem.submission_filename}
                 onSubmitted={showResult}
-              />
-            )}
-            {resultError && <InlineError message={resultError} />}
-            {submission && (
-              <SubmissionResult
-                submission={submission}
-                limits={{
-                  timeMs: submission.time_limit_ms ?? problem.time_limit_ms,
-                  memoryMb: submission.memory_limit_mb ?? problem.memory_limit_mb,
-                }}
-                actions={(
-                  <>
-                    <Link to={`${submissionsBase}/${submission.id}`} className={styles.action}>View submitted code</Link>
-                    <button type="button" className={styles.action} onClick={() => document.getElementById('code')?.focus()}>Edit &amp; resubmit</button>
-                  </>
-                )}
               />
             )}
           </>

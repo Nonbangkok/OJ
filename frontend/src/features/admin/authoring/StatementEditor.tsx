@@ -11,6 +11,7 @@ import { useSmallScreen } from './LargeScreenNotice';
 import { jobLabel } from './status';
 import { StatementAssets } from './StatementTab';
 import styles from './Authoring.module.css';
+import { shortcutLabel } from '../../../utils/shortcuts';
 
 const recoveryKey = (id: string) => `oj-authoring-statement:${id}`;
 const previewZoomKey = (id: string) => `oj-authoring-statement-preview-zoom:${id}`;
@@ -19,7 +20,6 @@ const MAX_PREVIEW_ZOOM = 200;
 const PREVIEW_ZOOM_STEP = 10;
 /** 100% is fit-to-width: the preview fills the pane's width. */
 const FIT_ZOOM = 100;
-const SAVE_HINT = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘S' : 'Ctrl+S';
 const EDITOR_PANES = [{ value: 'source', label: 'Source' }, { value: 'preview', label: 'Preview' }] as const;
 const PREVIEW_MODES = [{ value: 'preview', label: 'Preview' }, { value: 'pdf', label: 'PDF' }] as const;
 
@@ -262,7 +262,7 @@ export default function StatementEditor({ id }: { id: string }) {
           <button type="button" aria-label="Zoom in" disabled={previewZoom >= MAX_PREVIEW_ZOOM}
             onClick={() => setPreviewZoom(zoom => Math.min(MAX_PREVIEW_ZOOM, zoom + PREVIEW_ZOOM_STEP))}>+</button>
         </span>
-        <span className={styles.editorSaveHint}>{`${SAVE_HINT} save`}</span>
+        <span className={styles.editorSaveHint}>{`${shortcutLabel('S')} save`}</span>
         <Button variant="secondary" size="compact" onClick={() => setShowAssets(true)}>Assets &amp; help</Button>
       </div>
     </header>

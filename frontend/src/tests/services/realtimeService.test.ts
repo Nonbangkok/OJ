@@ -147,6 +147,21 @@ describe('realtimeService', () => {
             expect(onStreamDown).not.toHaveBeenCalled();
         });
 
+        it('leaving a dead stream does not orphan the fresh one that replaced it', () => {
+            install();
+            const first = subscribeSubmissions(jest.fn());
+            MockEventSource.instances[0].fail();
+            // A later subscriber opens a replacement for the dead stream…
+            const second = subscribeSubmissions(jest.fn());
+            expect(MockEventSource.instances).toHaveLength(2);
+            // …then the last holder of the dead stream leaves.
+            first();
+            // A third subscriber must share the live replacement, not open a duplicate.
+            subscribeSubmissions(jest.fn());
+            expect(MockEventSource.instances).toHaveLength(2);
+            second();
+        });
+
         it('closes the EventSource when the unsubscribe function is called', () => {
             install();
 

@@ -115,7 +115,8 @@ const openStream = <T>(
     shared.refs -= 1;
     if (shared.refs === 0) {
       shared.source.close();
-      streams.delete(url);
+      // A dead stream may already have been replaced under this url; leave the live one alone.
+      if (streams.get(url) === shared) streams.delete(url);
     }
   };
 };

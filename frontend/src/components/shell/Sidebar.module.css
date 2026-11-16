@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  width: var(--sidebar-width);
+  width: 100%;
   height: 100vh;
   height: 100dvh;
   position: sticky;
@@ -172,4 +172,59 @@
 .brandLink:focus-visible {
   outline: 2px solid var(--action-focus-ring);
   outline-offset: 2px;
+}
+
+/* Icon rail (collapsed, or dragged narrow): icons centred, names as tooltips. */
+.compact {
+  align-items: center;
+  padding: 12px 8px;
+  overflow: visible;
+}
+
+.compact .brand {
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px 0 10px;
+}
+
+.compact .brand .iconButton {
+  margin-left: 0;
+}
+
+.compact .search {
+  justify-content: center;
+  width: 36px;
+  height: 32px;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.compact .nav,
+.compact .group,
+.compact .footer {
+  align-items: center;
+  width: 100%;
+}
+
+.compact .item {
+  position: relative;
+  justify-content: center;
+  width: 40px;
+  padding: 8px 0;
+}
+
+.groupRule {
+  width: 24px;
+  margin: 10px 0 6px;
+  border-top: 1px solid var(--border-color);
+}
+
+.liveDot {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-success);
 }

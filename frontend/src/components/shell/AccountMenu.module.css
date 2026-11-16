@@ -185,3 +185,8 @@
   font-size: 0.75rem;
   color: var(--text-muted);
 }
+
+.triggerCompact {
+  justify-content: center;
+  padding: 0.1875rem;
+}

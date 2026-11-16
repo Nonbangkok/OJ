@@ -461,9 +461,11 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
                 ))}
               </select>
             </label>
-            <Button size="compact" variant="secondary" onClick={() => handleRejudgeClick({ kind: 'problems', ids: selectedProblemIds, title: `the ${selectedCount} selected problems` })} disabled={loading}>
-              Rejudge
-            </Button>
+            {isAdmin && (
+              <Button size="compact" variant="secondary" onClick={() => handleRejudgeClick({ kind: 'problems', ids: selectedProblemIds, title: `the ${selectedCount} selected problems` })} disabled={loading}>
+                Rejudge
+              </Button>
+            )}
             <Button size="compact" variant="destructive" onClick={() => setDeleteSelectionConfirm(true)} disabled={loading}>
               Delete ({selectedCount})
             </Button>

@@ -337,6 +337,21 @@ describe('adminQueryService', () => {
     expect(releaseMock).toHaveBeenCalled();
   });
 
+  it('createBatchUsers never starts a password with a spreadsheet formula character (CSV export keeps it intact)', async () => {
+    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}|;:,.<>?';
+    const queryMock = jest.fn().mockResolvedValue({ rows: [] });
+    (db.pool.connect as jest.Mock).mockResolvedValue({ query: queryMock, release: jest.fn() });
+    for (const symbol of ['=', '+', '-', '@']) {
+      // The draw for every position lands on the symbol (or past the alphabet the first position uses).
+      (randomInt as jest.Mock).mockImplementation((max: number) => Math.min(charset.indexOf(symbol), max - 1));
+      const result = await createBatchUsers({ prefix: 'team', count: 1, saltRounds: 10, passwordLength: 6 });
+      expect(result.kind).toBe('ok');
+      const [{ password }] = (result as { users: Array<{ password: string }> }).users;
+      expect(password).toHaveLength(6);
+      expect(password[0]).toMatch(/^[A-Za-z0-9]$/);
+    }
+  });
+
   it('createBatchUsers checks collisions case-insensitively (DB-08)', async () => {
     const queryMock = jest.fn()
       .mockResolvedValueOnce({}) // BEGIN

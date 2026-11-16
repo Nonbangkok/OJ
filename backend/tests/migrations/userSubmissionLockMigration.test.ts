@@ -7,6 +7,7 @@ describe('user submission lock migration', () => {
     const database = {
       query: async (sql: string, params?: readonly unknown[]) => {
         calls.push({ sql, params });
+        if (sql.startsWith('SELECT pg_try_advisory_lock')) return { rows: [{ version: '', locked: true }] };
         if (sql.startsWith('SELECT version')) return { rows: [] };
         return { rows: [] };
       },
@@ -15,12 +16,12 @@ describe('user submission lock migration', () => {
     expect(migration).toBeDefined();
 
     await expect(runMigrations(database, [migration!])).resolves.toEqual(['0023_user_submission_lock']);
-    expect(calls.map(({ sql }) => sql)).toContain(migration!.sql);
+    expect(calls.map(({ sql }) => sql)).toContain((migration as { sql: string }).sql);
     expect(calls).toContainEqual({
       sql: expect.stringContaining('INSERT INTO schema_migrations'),
       params: ['0023_user_submission_lock'],
     });
-    expect(migration!.sql.replace(/\s+/g, ' ')).toContain(
+    expect((migration as { sql: string }).sql.replace(/\s+/g, ' ')).toContain(
       'ADD COLUMN IF NOT EXISTS submissions_locked BOOLEAN NOT NULL DEFAULT FALSE',
     );
   });

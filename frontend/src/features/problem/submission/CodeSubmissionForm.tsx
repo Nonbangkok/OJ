@@ -6,6 +6,7 @@ import editorStyles from '../../../components/styles/CodeEditor.module.css';
 import styles from './CodeSubmissionForm.module.css';
 import { UI_CONFIG } from '../../../config/constants';
 import { SUPPORTED_LANGUAGES, getLanguageDisplayName } from '../../../utils/constants';
+import { shortcutLabel } from '../../../utils/shortcuts';
 
 /** Largest file the drop zone loads into the editor. */
 const MAX_SOURCE_BYTES = 256 * 1024;
@@ -110,8 +111,9 @@ const CodeSubmissionForm = ({ problemId, contestId = null, submissionFilename = 
           </div>
         </div>
         <div className={styles.submitRow}>
-          <Button type="submit" variant="primary" disabled={isSubmitting} loading={isSubmitting} loadingLabel="Submitting…">
-            Submit <kbd className={styles.kbd} aria-hidden="true">⌘↵</kbd>
+          {!language && <span className={styles.chooseHint}>Choose a language to submit.</span>}
+          <Button type="submit" variant="primary" disabled={isSubmitting || !language} loading={isSubmitting} loadingLabel="Submitting…">
+            Submit <kbd className={styles.kbd} aria-hidden="true">{shortcutLabel('↵')}</kbd>
           </Button>
         </div>
       </form>

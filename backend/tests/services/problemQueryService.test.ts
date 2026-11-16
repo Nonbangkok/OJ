@@ -260,12 +260,13 @@ describe('problemQueryService difficulty handling', () => {
   it('loads canonical public collection options beyond the current page', async () => {
     query
       .mockResolvedValueOnce({ rows: [{ id: 7, name: 'Practice' }] })
-      .mockResolvedValueOnce({ rows: [{ exists: true }] });
+      .mockResolvedValueOnce({ rows: [{ exists: true }] })
+      .mockResolvedValueOnce({ rows: [{ author: 'Ada' }, { author: 'Kru Somchai' }] });
 
     await expect(getPublicProblemFilterOptions()).resolves.toEqual({
-      collections: [{ id: 7, name: 'Practice' }], hasUncollected: true,
+      collections: [{ id: 7, name: 'Practice' }], hasUncollected: true, authors: ['Ada', 'Kru Somchai'],
     });
-    expect(query).toHaveBeenCalledTimes(2);
+    expect(query).toHaveBeenCalledTimes(3);
     for (const [sql] of query.mock.calls) {
       expect(sql).toContain('p.is_visible = true AND p.contest_id IS NULL');
     }

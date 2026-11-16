@@ -11,6 +11,12 @@ import { ContestContext, inContestShell } from './ContestContext';
 const TRANSITION_SLACK_MS = 1000;
 /** While the server lags the clock (the scheduler ticks once a minute), re-ask this often. */
 const PENDING_POLL_MS = 5000;
+/**
+ * The start/end timers run on this computer's clock, which can be minutes off on a lab PC.
+ * While a contest is scheduled or running, also re-ask the server this often so the page
+ * follows the server's state whatever the local clock says.
+ */
+const SERVER_CHECK_MS = 30_000;
 
 /** Past a start or end the server hasn't caught up with yet, or judging the last submissions. */
 const awaitingServer = (contest: Contest, now: number): boolean =>
@@ -33,7 +39,12 @@ export default function ContestLayout() {
   useEffect(() => {
     let cancelled = false;
     contestService.getById(contestId)
-      .then((data) => { if (!cancelled) { setContest(data); setError(null); } })
+      .then((data) => {
+        if (cancelled) return;
+        // Keep the same object when nothing changed, so pages keyed on the contest do not refetch.
+        setContest((previous) => (previous && JSON.stringify(previous) === JSON.stringify(data) ? previous : data));
+        setError(null);
+      })
       .catch((err: { response?: { status?: number } }) => {
         if (cancelled) return;
         setError(err.response?.status === 404 ? 'Contest not found.' : "Couldn't load this contest.");
@@ -59,7 +70,14 @@ export default function ContestLayout() {
     return () => window.clearTimeout(timer);
   }, [contest, reload]);
 
-    const value = useMemo(() => ({ contest, error, reload }), [contest, error, reload]);
+  const steady = contest?.status === 'scheduled' || contest?.status === 'running';
+  useEffect(() => {
+    if (!steady) return undefined;
+    const timer = window.setInterval(reload, SERVER_CHECK_MS);
+    return () => window.clearInterval(timer);
+  }, [steady, reload]);
+
+  const value = useMemo(() => ({ contest, error, reload }), [contest, error, reload]);
 
   let content;
   if (contest && inContestShell(contest)) {

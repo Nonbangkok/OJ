@@ -112,3 +112,18 @@ export function difficultyBand(difficulty: number | null | undefined): number | 
   if (difficulty === null || difficulty === undefined) return null;
   return DIFFICULTY_BANDS.find(boundary => difficulty <= boundary.max)?.band ?? null;
 }
+
+/**
+ * The judge's per-language multipliers on a problem's limits (mirrors backend LANGUAGE_LIMITS):
+ * Python gets time x4 and memory x2, C++ runs at the problem's own limits.
+ */
+export const LANGUAGE_LIMITS: Record<SubmissionLanguage, { timeMultiplier: number; memoryMultiplier: number }> = {
+  cpp: { timeMultiplier: 1, memoryMultiplier: 1 },
+  python: { timeMultiplier: 4, memoryMultiplier: 2 },
+};
+
+/** The limits a run in `language` was actually judged against. */
+export const judgedLimits = (language: string, timeMs: number, memoryMb: number): { timeMs: number; memoryMb: number } => {
+  const multipliers = LANGUAGE_LIMITS[language as SubmissionLanguage] ?? LANGUAGE_LIMITS.cpp;
+  return { timeMs: timeMs * multipliers.timeMultiplier, memoryMb: memoryMb * multipliers.memoryMultiplier };
+};

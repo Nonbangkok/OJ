@@ -30,9 +30,8 @@ export const useSubmissions = (
   const [error, setError] = useState('');
   const { values, set, setMany } = useUrlFilters(FILTER_KEYS);
   const isStaff = currentUser?.role === USER_ROLES.ADMIN || currentUser?.role === USER_ROLES.STAFF;
-  // Signed-in viewers start on their own submissions; guests on the public
-  // feed; staff watching a contest start on everyone's (§7.7).
-  const defaultFilter: SubmissionFilter = !currentUser || (contestId && isStaff) ? 'all' : 'mine';
+  // Every feed — main or contest, any role — starts on everyone's submissions; Mine is one click away.
+  const defaultFilter: SubmissionFilter = 'all';
   const filter: SubmissionFilter = values.filter === 'all' || values.filter === 'mine'
     ? values.filter
     : defaultFilter;

@@ -9,6 +9,10 @@ import SubmissionResult from '../../features/submission/SubmissionResult';
 import useLiveSubmission from '../../features/submission/useLiveSubmission';
 import { getLanguageDisplayName } from '../../utils/constants';
 import styles from './SubmissionDetailPage.module.css';
+import { judgedLimits, SUPPORTED_LANGUAGES, type SubmissionLanguage } from '../../utils/constants';
+import { seedSubmissionDraft } from '../../utils/submissionDrafts';
+
+const isSubmissionLanguage = (value: string): value is SubmissionLanguage => (SUPPORTED_LANGUAGES as readonly string[]).includes(value);
 
 hljs.registerLanguage('cpp', cpp);
 hljs.registerLanguage('python', python);
@@ -87,11 +91,17 @@ const SubmissionDetailPage = () => {
         <>
           <SubmissionResult
             submission={submission}
-            limits={{ timeMs: submission.time_limit_ms ?? 1000, memoryMb: submission.memory_limit_mb ?? 256 }}
+            limits={judgedLimits(submission.language, submission.time_limit_ms ?? 1000, submission.memory_limit_mb ?? 256)}
             actions={(
               <>
                 <Link to={`${problemBase}/${submission.problem_id}`} className={styles.action}>Open problem</Link>
-                <Link to={`${problemBase}/${submission.problem_id}?tab=submit`} className={styles.action}>Edit &amp; resubmit</Link>
+                <Link
+                  to={`${problemBase}/${submission.problem_id}?tab=submit`}
+                  className={styles.action}
+                  onClick={() => { if (isSubmissionLanguage(submission.language)) seedSubmissionDraft(submission.problem_id, submission.language, submission.code ?? ''); }}
+                >
+                  Edit &amp; resubmit
+                </Link>
               </>
             )}
           />

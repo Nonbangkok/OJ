@@ -403,11 +403,12 @@ export const getPublicProblemCategoryCounts = async (): Promise<ProblemCategoryC
 export interface PublicProblemFilterOptions {
   collections: Array<{ id: number; name: string }>;
   hasUncollected: boolean;
+  authors: string[];
 }
 
 /** Canonical collection options from the entire visible standalone pool, independent of pages and active filters. */
 export const getPublicProblemFilterOptions = async (): Promise<PublicProblemFilterOptions> => {
-  const [collections, uncollected] = await Promise.all([
+  const [collections, uncollected, authors] = await Promise.all([
     db.query<{ id: number; name: string }>(`
       SELECT DISTINCT c.id, c.name FROM problems p
       JOIN collections c ON c.id = p.collection_id
@@ -419,10 +420,17 @@ export const getPublicProblemFilterOptions = async (): Promise<PublicProblemFilt
         WHERE p.is_visible = true AND p.contest_id IS NULL
           AND p.collection_id IS NULL) AS exists
     `),
+    // The author filter's choices: every author of a visible practice problem.
+    db.query<{ author: string }>(`
+      SELECT DISTINCT p.author FROM problems p
+      WHERE p.is_visible = true AND p.contest_id IS NULL AND btrim(COALESCE(p.author, '')) <> ''
+      ORDER BY p.author ASC
+    `),
   ]);
   return {
     collections: collections.rows,
     hasUncollected: uncollected.rows[0]?.exists ?? false,
+    authors: authors.rows.map((row) => row.author),
   };
 };
 

@@ -14,7 +14,7 @@ import {
   progressFraction,
   progressLabel,
 } from '../../utils/achievements';
-import { difficultyBand } from '../../utils/constants';
+import { difficultyBand, getLanguageDisplayName } from '../../utils/constants';
 
 import styles from './UserProfile.module.css';
 
@@ -163,7 +163,7 @@ const UserProfile = () => {
   );
 
   const recentSection = profile.recentRewards?.length > 0 ? (
-    <div className={styles.section}>
+    <section className={styles.section}>
       <h2>Recently Solved</h2>
       <ul className={styles['recent-solved-list']}>
         {profile.recentRewards.slice(0, 5).map((reward) => {
@@ -178,11 +178,12 @@ const UserProfile = () => {
                   {reward.problemId}
                 </span>
               </Link>
-              {reward.difficultySnapshot !== null && band !== null && (
+              {/* An empty cell keeps the XP and date columns aligned when a problem is unrated. */}
+              {reward.difficultySnapshot !== null && band !== null ? (
                 <span className={styles[`difficulty-chip-${band}`]}>
                   {reward.difficultySnapshot}
                 </span>
-              )}
+              ) : <span aria-hidden="true" />}
               <span className={styles['recent-solved-gain']}>+{reward.xpAwarded} XP</span>
               <span className={styles['recent-solved-date']}>
                 {formatRewardDate(reward.awardedAt)}
@@ -191,10 +192,10 @@ const UserProfile = () => {
           );
         })}
       </ul>
-    </div>
+    </section>
   ) : null;
   const verdictsSection = Object.keys(profile.verdictCounts).length > 0 ? (
-    <div className={styles.section}>
+    <section className={styles.section}>
       <h2>Verdicts</h2>
       <ul className={styles['breakdown-list']}>
         {Object.entries(profile.verdictCounts)
@@ -215,18 +216,18 @@ const UserProfile = () => {
             </li>
           ))}
       </ul>
-    </div>
+    </section>
   ) : null;
   const languagesSection = Object.keys(profile.languageCounts).length > 0 ? (
-    <div className={styles.section}>
+    <section className={styles.section}>
       <h2>Languages</h2>
       <ul className={styles['breakdown-list']}>
         {Object.entries(profile.languageCounts)
           .sort(([, a], [, b]) => b - a)
           .map(([language, count]) => (
             <li key={language} className={styles['breakdown-row']}>
-              <span className={`${styles['breakdown-name']} ${styles['language-name']}`}>
-                {language}
+              <span className={styles['breakdown-name']}>
+                {getLanguageDisplayName(language)}
               </span>
               <span className={styles['breakdown-bar']} aria-hidden="true">
                 <span
@@ -238,7 +239,7 @@ const UserProfile = () => {
             </li>
           ))}
       </ul>
-    </div>
+    </section>
   ) : null;
   // Recently solved on the left, breakdowns on the right; with nothing solved
   // yet the two breakdowns share the row instead of leaving a blank column.
@@ -270,28 +271,35 @@ const UserProfile = () => {
         ) : (
           avatarContent
         )}
+        {/* Identity, then level: name, a meta line, and the XP bar under them. */}
         <div className={styles['profile-title']}>
           <h1>{profile.username}</h1>
-          <span className={styles['profile-joined']}>
-            Joined {formatDate(profile.createdAt)}
-          </span>
+          <p className={styles['profile-meta']}>
+            {profile.progression && (
+              <span className={styles['tier-level']}>{`${profile.progression.tier} · Lv ${profile.progression.level}`}</span>
+            )}
+            <span className={styles['profile-joined']}>
+              Joined {formatDate(profile.createdAt)}
+            </span>
+          </p>
+          {profile.progression && (
+            <div className={styles['progression']}>
+              <span className={styles['progression-bar']}>
+                <ProgressBar
+                  value={profile.progression.levelProgress.current}
+                  max={profile.progression.levelProgress.required}
+                  label={`XP to next level: ${profile.progression.levelProgress.remaining} XP remaining`}
+                />
+              </span>
+              <span className={styles['xp-total']}>
+                {`${formatXp(profile.progression.levelProgress.current)} / ${formatXp(profile.progression.levelProgress.required)} XP`}
+              </span>
+              <span className={styles['xp-remaining']}>
+                {`${formatXp(profile.progression.levelProgress.remaining)} XP to Lv ${profile.progression.level + 1}`}
+              </span>
+            </div>
+          )}
         </div>
-        {profile.progression && (
-          <div className={styles['progression']}>
-            <span className={styles['tier-level']}>{`${profile.progression.tier} · Lv ${profile.progression.level}`}</span>
-            <ProgressBar
-              value={profile.progression.levelProgress.current}
-              max={profile.progression.levelProgress.required}
-              label={`XP to next level: ${profile.progression.levelProgress.remaining} XP remaining`}
-            />
-            <span className={styles['xp-total']}>
-              {`${formatXp(profile.progression.levelProgress.current)} / ${formatXp(profile.progression.levelProgress.required)} XP`}
-            </span>
-            <span className={styles['xp-remaining']}>
-              {`${formatXp(profile.progression.levelProgress.remaining)} XP to Lv ${profile.progression.level + 1}`}
-            </span>
-          </div>
-        )}
         {profile.progression?.globalRank != null && (
           <div className={styles['rank']}>
             <span>Global rank</span>

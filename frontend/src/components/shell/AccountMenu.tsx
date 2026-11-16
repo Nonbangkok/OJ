@@ -16,7 +16,8 @@ import ChangePasswordDialog from '../user/ChangePasswordDialog';
 
 import styles from './AccountMenu.module.css';
 
-const AccountMenu = () => {
+/** `compact`: the sidebar's icon rail — the avatar alone (the name stays the accessible label). */
+const AccountMenu = ({ compact = false }: { compact?: boolean }) => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { passwordChangeEnabled } = useSettings();
@@ -54,7 +55,7 @@ const AccountMenu = () => {
           Tier/level live in the dropdown header below. */}
       <button
         type="button"
-        className={styles.trigger}
+        className={compact ? `${styles.trigger} ${styles.triggerCompact}` : styles.trigger}
         aria-label="Open user menu"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -71,8 +72,8 @@ const AccountMenu = () => {
             {user.username[0]?.toLocaleUpperCase()}
           </span>
         )}
-        <span className={styles.username} title={user.username}>{user.username}</span>
-        {user.level != null && <span className={styles.level}>Lv.{user.level}</span>}
+        {!compact && <span className={styles.username} title={user.username}>{user.username}</span>}
+        {!compact && user.level != null && <span className={styles.level}>Lv.{user.level}</span>}
       </button>
 
       {open && (
@@ -123,7 +124,7 @@ const AccountMenu = () => {
             Change Password
           </button>
           )}
-          {(user.role === 'admin' || user.role === 'staff') && (
+          {user.role === 'admin' && (
             <Link to="/admin/settings" role="menuitem" className={styles['menu-item']} onClick={close}>
               <Gear size={16} aria-hidden="true" />
               Settings

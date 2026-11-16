@@ -10,7 +10,7 @@ jest.mock('../../db', () => ({ query: jest.fn(), pool: { connect: jest.fn() } })
 const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
 
 type Detail = { score: number; attempts?: number; best_at?: string; statuses?: string[] };
-type Row = { username: string; rank: number; total_score: number; detailed_scores: Record<string, Detail>; last_score_improvement_time: Date };
+type Row = { username: string; rank: number; total_score: number; detailed_scores: Record<string, Detail>; last_score_improvement_time: Date | null };
 
 (databaseUrl ? describe : describe.skip)('contest standings (B9)', () => {
   const schema = `cst_${randomUUID().replaceAll('-', '')}`;
@@ -59,9 +59,17 @@ type Row = { username: string; rank: number; total_score: number; detailed_score
     await submit(1, 'a', 60, 30, ['Accepted', 'Accepted', 'Time Limit Exceeded']);
     const u1 = (await rows()).find((r) => r.username === 'u1')!;
     const a = u1.detailed_scores.a;
-    expect(a).toMatchObject({ score: 60, attempts: 3, statuses: ['Accepted', 'Accepted', 'Wrong Answer'] });
+    expect(a).toMatchObject({ score: 60, attempts: 3 });
+    // The live board never shows which cases a contestant fails; only the final snapshot keeps them.
+    expect(a.statuses).toBeUndefined();
     expect(new Date(a.best_at!).getTime()).toBe(at(20).getTime());
-    expect(new Date(u1.last_score_improvement_time).getTime()).toBe(at(20).getTime());
+    expect(new Date(u1.last_score_improvement_time!).getTime()).toBe(at(20).getTime());
+
+    await pool.query("UPDATE contests SET status = 'finishing' WHERE id = 1");
+    await migrateSubmissionsAfterContest(1);
+    await pool.query("UPDATE contests SET status = 'finished' WHERE id = 1");
+    const final = (await rows()).find((r) => r.username === 'u1')!;
+    expect(final.detailed_scores.a).toMatchObject({ score: 60, attempts: 3, statuses: ['Accepted', 'Accepted', 'Wrong Answer'] });
   });
 
   it('equal total and equal time share a rank', async () => {
@@ -71,11 +79,13 @@ type Row = { username: string; rank: number; total_score: number; detailed_score
     expect(summary(await rows())).toEqual([['u1', 1, 100], ['u2', 1, 100], ['u3', 3, 50]]);
   });
 
-  it('participants with no submissions get 0 and joined_at', async () => {
+  it('participants with no points share one rank, whenever they joined', async () => {
     await submit(1, 'a', 100, 10);
-    const u3 = (await rows()).find((r) => r.username === 'u3')!;
-    expect(u3).toMatchObject({ total_score: 0, detailed_scores: {} });
-    expect(new Date(u3.last_score_improvement_time).getTime()).toBe(at(5).getTime());
+    await submit(2, 'a', 0, 12);
+    const list = await rows();
+    expect(summary(list)).toEqual([['u1', 1, 100], ['u2', 2, 0], ['u3', 2, 0]]);
+    const u3 = list.find((r) => r.username === 'u3')!;
+    expect(u3).toMatchObject({ total_score: 0, detailed_scores: {}, last_score_improvement_time: null });
   });
 
   it('the response carries the contest status and start time', async () => {
@@ -89,16 +99,17 @@ type Row = { username: string; rank: number; total_score: number; detailed_score
     await submit(2, 'a', 100, 15, ['Accepted', 'Accepted']);
     await submit(2, 'b', 40, 40, ['Accepted', 'Wrong Answer']);
     await submit(2, 'b', 40, 50, ['Accepted', 'Wrong Answer']);
-    const live = (await rows()).map((r) => ({ ...r, last_score_improvement_time: new Date(r.last_score_improvement_time).getTime() }));
+    const live = (await rows()).map((r) => ({ ...r, last_score_improvement_time: r.last_score_improvement_time && new Date(r.last_score_improvement_time).getTime() }));
 
     await pool.query("UPDATE contests SET status = 'finishing' WHERE id = 1");
     await migrateSubmissionsAfterContest(1);
     await pool.query("UPDATE contests SET status = 'finished' WHERE id = 1");
-    const finished = (await rows()).map((r) => ({ ...r, last_score_improvement_time: new Date(r.last_score_improvement_time).getTime() }));
+    const finished = (await rows()).map((r) => ({ ...r, last_score_improvement_time: r.last_score_improvement_time && new Date(r.last_score_improvement_time).getTime() }));
 
     const pick = (list: typeof live) => list.map(({ username, rank, total_score, detailed_scores, last_score_improvement_time }) => ({
       username, rank, total_score, last_score_improvement_time,
-      detailed_scores: Object.fromEntries(Object.entries(detailed_scores).map(([k, v]) => [k, { ...v, best_at: v.best_at && new Date(v.best_at).getTime() }])),
+      // The snapshot adds per-case statuses for the recap; everything else matches the live board.
+      detailed_scores: Object.fromEntries(Object.entries(detailed_scores).map(([k, { statuses: _statuses, ...v }]) => [k, { ...v, best_at: v.best_at && new Date(v.best_at).getTime() }])),
     }));
     expect(pick(finished)).toEqual(pick(live));
   });

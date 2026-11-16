@@ -3,7 +3,10 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
   max-width: 52rem;
+  /* The settings column (title and rows) sits in the middle of the page. */
+  margin-inline: auto;
 }
 
 .group {

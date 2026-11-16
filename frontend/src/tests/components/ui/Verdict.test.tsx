@@ -44,17 +44,31 @@ describe('StatusMark', () => {
 });
 
 describe('TestcaseStrip', () => {
-  it('draws one segment per case and names the result', () => {
+  const tones = (container: HTMLElement) => [...container.querySelectorAll('[data-segment]')].map((s) => s.getAttribute('data-tone'));
+
+  it('the small strip is always six segments, filled in proportion to the cases passed', () => {
     const { container } = render(<TestcaseStrip results={tenWith(6)} />);
     expect(screen.getByRole('img', { name: '6 of 10 test cases passed' })).toBeInTheDocument();
-    expect(container.querySelectorAll('[data-segment]')).toHaveLength(10);
+    // 6/10 → 3.6 of 6 → 4 passed, then the failing verdict, then not reached.
+    expect(tones(container)).toEqual(['pass', 'pass', 'pass', 'pass', 'fail', 'none']);
   });
-  it('stays one bar for many cases', () => {
-    const many = results([...Array(60)].map((_, i) => (i < 45 ? 'Accepted' : i === 45 ? 'Wrong Answer' : 'Skipped')));
-    const { container } = render(<TestcaseStrip results={many} />);
-    expect(screen.getByRole('img', { name: '45 of 60 test cases passed' })).toBeInTheDocument();
-    expect(container.querySelectorAll('[data-segment]')).toHaveLength(0);
-    expect(container.querySelector('[data-strip="bar"]')).not.toBeNull();
+
+  it('full marks fill all six; a near miss still shows its failure', () => {
+    const all = render(<TestcaseStrip results={tenWith(10)} />);
+    expect(tones(all.container)).toEqual(Array(6).fill('pass'));
+    all.unmount();
+    const many = results([...Array(60)].map((_, i) => (i < 59 ? 'Accepted' : 'Time Limit Exceeded')));
+    const nearly = render(<TestcaseStrip results={many} />);
+    expect(screen.getByRole('img', { name: '59 of 60 test cases passed' })).toBeInTheDocument();
+    expect(tones(nearly.container)).toEqual(['pass', 'pass', 'pass', 'pass', 'pass', 'limit']);
+    nearly.unmount();
+    const none = render(<TestcaseStrip results={tenWith(0)} />);
+    expect(tones(none.container)).toEqual(['fail', 'none', 'none', 'none', 'none', 'none']);
+  });
+
+  it('the large strip (submission page) still shows every case', () => {
+    const { container } = render(<TestcaseStrip results={tenWith(6)} size="lg" />);
+    expect(container.querySelectorAll('[data-segment]')).toHaveLength(10);
   });
 });
 

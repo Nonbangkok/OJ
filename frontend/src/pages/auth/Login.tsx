@@ -5,6 +5,7 @@ import { useSettings } from '../../context/SettingsContext';
 import { useAuthForms } from '../../hooks/useAuthForms';
 import authService from '../../services/authService';
 import LoginForm from '../../features/auth/LoginForm';
+import { safeReturnTo } from '../../utils/safeReturnTo';
 
 const Login = () => {
   const { login } = useAuth();
@@ -23,11 +24,8 @@ const Login = () => {
     const returnParam = params.get('returnTo');
     return {
       isSessionExpired: params.get('expired') === '1',
-      // Only same-site relative paths are honoured so the param cannot be
-      // abused as an open redirect.
-      returnTo: returnParam && returnParam.startsWith('/') && !returnParam.startsWith('//')
-        ? returnParam
-        : '/',
+      // Only same-site paths are honoured so the param cannot be abused as an open redirect.
+      returnTo: safeReturnTo(returnParam),
     };
   }, [location.search]);
 

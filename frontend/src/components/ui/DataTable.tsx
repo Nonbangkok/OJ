@@ -22,7 +22,8 @@ export interface DataTableProps<T> {
   rowKey: (row: T) => string;
   caption: string;
   onRowClick?: (row: T) => void;
-  rowHref?: (row: T) => string;
+  /** A row's detail link; null leaves that row without one (e.g. a submission the viewer may not open). */
+  rowHref?: (row: T) => string | null;
   rowActions?: (row: T) => ActionMenuItem[];
   /** Name used for the row's checkbox and actions; defaults to the first primary cell when it is text. */
   rowLabel?: (row: T) => string;
@@ -60,10 +61,14 @@ export function DataTable<T>(props: DataTableProps<T>) {
     const value = primary?.cell(row);
     return typeof value === 'string' || typeof value === 'number' ? String(value) : rowKey(row);
   };
-  const activatable = Boolean(onRowClick || rowHref);
+  const hrefOf = (row: T) => rowHref?.(row) ?? null;
+  const activatable = (row: T) => Boolean(onRowClick || hrefOf(row));
   const activate = (row: T) => {
     if (onRowClick) onRowClick(row);
-    else if (rowHref) navigate(rowHref(row));
+    else {
+      const href = hrefOf(row);
+      if (href) navigate(href);
+    }
   };
   // A mouse convenience only: the keyboard path is the primary cell's link or button.
   // React bubbles clicks out of portals, so a click must land inside the row itself.
@@ -88,7 +93,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
   const cellContent = (col: DataTableColumn<T>, row: T) => {
     const content = col.cell(row);
     if (col !== primary) return content;
-    if (rowHref) return <Link to={rowHref(row)} className={styles.primaryLink}>{content}</Link>;
+    const href = hrefOf(row);
+    if (href) return <Link to={href} className={styles.primaryLink}>{content}</Link>;
     if (onRowClick) return <button type="button" className={styles.primaryLink} onClick={() => onRowClick(row)}>{content}</button>;
     return content;
   };
@@ -104,7 +110,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
           const key = rowKey(row);
           const metas = columns.filter((c) => c.mobile === 'meta');
           return (
-            <li key={key} className={`${styles.item} ${key === highlightKey ? styles.highlight : ''}`.trim()}>
+            <li key={key} data-row-key={key} className={`${styles.item} ${key === highlightKey ? styles.highlight : ''}`.trim()}>
               {selection && (
                 <input type="checkbox" aria-label={`Select ${labelOf(row)}`} checked={selection.selected.has(key)} onChange={() => toggle(key)} className={styles.checkbox} />
               )}
@@ -116,7 +122,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
                       {columns.filter((c) => c.mobile === 'primary').map((c) => <span key={c.key}>{c.cell(row)}</span>)}
                     </span>
                   );
-                  if (rowHref) return <Link to={rowHref(row)} className={styles.itemControl}>{primaryText}</Link>;
+                  const href = hrefOf(row);
+                  if (href) return <Link to={href} className={styles.itemControl}>{primaryText}</Link>;
                   if (onRowClick) return <button type="button" className={styles.itemControl} onClick={() => onRowClick(row)}>{primaryText}</button>;
                   return primaryText;
                 })()}
@@ -176,8 +183,10 @@ export function DataTable<T>(props: DataTableProps<T>) {
             return (
               <tr
                 key={key}
-                className={`${activatable ? styles.activatable : ''} ${key === highlightKey ? styles.highlight : ''}`.trim() || undefined}
-                onClick={activatable ? onRowMouse(row) : undefined}
+                // Lets list pages remember which row was on screen (useRestoreScroll).
+                data-row-key={key}
+                className={`${activatable(row) ? styles.activatable : ''} ${key === highlightKey ? styles.highlight : ''}`.trim() || undefined}
+                onClick={activatable(row) ? onRowMouse(row) : undefined}
               >
                 {selection && (
                   <td className={styles.selectCell}>

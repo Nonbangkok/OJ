@@ -137,13 +137,22 @@ describe('useSubmissions', () => {
         expect(jest.mocked(submissionService.getAll).mock.calls.length).toBeGreaterThan(callCount);
     });
 
-    it('defaults a signed-in viewer to their own submissions', async () => {
+    it('the main feed defaults a signed-in viewer to everyone\'s submissions', async () => {
         mockAuth({ id: 1, username: 'user1', role: 'user' });
         (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
         const { result } = renderHook(() => useSubmissions(undefined, undefined), { wrapper });
         await waitFor(() => expect(result.current.loading).toBe(false));
-        expect(result.current.filter).toBe('mine');
-        expect(submissionService.getAll).toHaveBeenCalledWith(expect.objectContaining({ filter: 'mine' }));
+        expect(result.current.filter).toBe('all');
+        expect(submissionService.getAll).toHaveBeenCalledWith(expect.objectContaining({ filter: 'all' }));
+    });
+
+    it.each(['user', 'staff', 'admin'] as const)('inside a contest a %s also starts on everyone\'s submissions', async (role) => {
+        mockAuth({ id: 1, username: 'user1', role });
+        (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
+        const { result } = renderHook(() => useSubmissions(undefined, 7), { wrapper });
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(result.current.filter).toBe('all');
+        expect(submissionService.getAll).toHaveBeenCalledWith(expect.objectContaining({ filter: 'all', contestId: 7 }));
     });
 
     it('updates filter when setFilter is called', async () => {
@@ -341,19 +350,5 @@ describe('useSubmissions', () => {
 
             expect(subscribeSubmissions).not.toHaveBeenCalled();
         });
-    });
-
-    it('contest submissions default to All for staff, Mine for students', async () => {
-        (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
-        mockAuth({ id: 9, username: 'staffer', role: 'staff' });
-        const staff = renderHook(() => useSubmissions(undefined, '3'), { wrapper });
-        await waitFor(() => expect(staff.result.current.loading).toBe(false));
-        expect(staff.result.current.filter).toBe('all');
-        staff.unmount();
-
-        mockAuth({ id: 1, username: 'student', role: 'user' });
-        const student = renderHook(() => useSubmissions(undefined, '3'), { wrapper });
-        await waitFor(() => expect(student.result.current.loading).toBe(false));
-        expect(student.result.current.filter).toBe('mine');
     });
 });

@@ -178,8 +178,12 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
 
       const options = await getPublicProblemFilterOptions();
       expect(options).toEqual({
-        collections: [{ id: practiceId, name: 'Practice' }], hasUncollected: true,
+        collections: [{ id: practiceId, name: 'Practice' }], hasUncollected: true, authors: expect.any(Array),
       });
+      // Authors of visible practice problems only: no hidden problem's author, no blanks.
+      expect(options.authors).toEqual(expect.arrayContaining(['Alice', 'Bob', 'none']));
+      expect(options.authors).not.toContain('Secret');
+      expect(options.authors).not.toContain(null);
       expect((await walkAll(null, { author: 'aLi', collection: practiceId, limit: 1 })).ids)
         .toEqual(['alpha-dp', 'beta-dp']);
       const narrowed = await getProblemsWithStatsForUser(null, {

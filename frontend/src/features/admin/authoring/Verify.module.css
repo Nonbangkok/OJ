@@ -152,7 +152,8 @@
 }
 
 .tab.tab {
-  margin-inline: 0;
+  /* Centred under the workspace header and step tabs (Verify & publish, History). */
+  margin-inline: auto;
 }
 
 .drawerSection {

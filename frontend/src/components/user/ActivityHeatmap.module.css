@@ -1,7 +1,15 @@
 .wrapper {
   display: flex;
   flex-direction: column;
+  align-items: center;
+}
+
+/* The year sits centred in its card; the legend stays under its right edge. */
+.inner {
+  display: flex;
+  flex-direction: column;
   gap: 0.5rem;
+  max-width: 100%;
 }
 
 .heatmap {
