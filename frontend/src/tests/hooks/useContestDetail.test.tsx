@@ -53,36 +53,13 @@ describe('useContestDetail Hook', () => {
         expect(contestService.getById).toHaveBeenCalledWith('123');
     });
 
-    it('redirects to scoreboard if contest is finished and user is participant', async () => {
-        const mockContest = {
-            id: '123',
-            status: 'finished',
-            is_participant: true
-        };
-        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce(mockContest);
-
-        renderHook(() => useContestDetail());
-
-        await waitFor(() => {
-            expect(mockNavigate).toHaveBeenCalledWith('/contests/123/scoreboard');
-        });
+    it.each([true, false])('stays on a finished contest so its recap shows (participant: %s)', async (isParticipant) => {
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce({ id: '123', status: 'finished', is_participant: isParticipant });
+        const { result } = renderHook(() => useContestDetail());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(result.current.contest).toMatchObject({ status: 'finished' });
+        expect(mockNavigate).not.toHaveBeenCalled();
     });
-
-    it('redirects to contests list if contest is finished and user is NOT participant', async () => {
-        const mockContest = {
-            id: '123',
-            status: 'finished',
-            is_participant: false
-        };
-        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce(mockContest);
-
-        renderHook(() => useContestDetail());
-
-        await waitFor(() => {
-            expect(mockNavigate).toHaveBeenCalledWith('/contests');
-        });
-    });
-
     it('handles 403 error (needs to join)', async () => {
         const error = new Error('Forbidden') as Error & { response?: { status?: number; data?: { message?: string } } };
         error.response = { status: 403 };
@@ -248,13 +225,12 @@ describe('useContestDetail Hook', () => {
         await waitFor(() => expect(result.current.loading).toBe(false));
         mockNavigate.mockClear();
 
-        // Poll 1 sees "finished" (redirects); a later 403 must still know the
-        // contest finished and redirect to the list.
+        // Poll 1 sees "finished" (stays: the recap is this page); a later 403
+        // must still know the contest finished and redirect to the list.
         await act(async () => {
             jest.advanceTimersByTime(15000);
         });
-        await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/contests'));
-        mockNavigate.mockClear();
+        expect(mockNavigate).not.toHaveBeenCalled();
         await act(async () => {
             jest.advanceTimersByTime(15000);
         });

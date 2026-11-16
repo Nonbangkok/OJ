@@ -40,9 +40,8 @@ const useContestDetail = () => {
           }
         }
 
-        if (outcome.kind === 'finished') {
-          navigate(outcome.redirectPath);
-        } else if (outcome.kind === 'forbidden') {
+        // A finished contest stays here: /contests/:id is its recap (§7.7).
+        if (outcome.kind === 'forbidden') {
           setError('You need to join this contest to view its details.');
           if (outcome.redirectPath) {
             navigate(outcome.redirectPath);

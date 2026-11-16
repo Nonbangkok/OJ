@@ -43,7 +43,7 @@ describe('useContestGuard Hook', () => {
         expect(mockNavigate).not.toHaveBeenCalled();
     });
 
-    it('redirects to scoreboard if contest is finished and user is participant', async () => {
+    it('sends a participant of a finished contest to its recap', async () => {
         const mockContest = { id: contestId, status: 'finished', is_participant: true };
         (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce(mockContest);
 
@@ -53,10 +53,10 @@ describe('useContestGuard Hook', () => {
             // Wait for initial fetch
         });
 
-        expect(mockNavigate).toHaveBeenCalledWith(`/contests/${contestId}/scoreboard`);
+        expect(mockNavigate).toHaveBeenCalledWith(`/contests/${contestId}`);
     });
 
-    it('redirects to contests list if contest is finished and user is NOT participant', async () => {
+    it('sends a non-participant of a finished contest to its recap too, not away', async () => {
         const mockContest = { id: contestId, status: 'finished', is_participant: false };
         (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValueOnce(mockContest);
 
@@ -66,7 +66,7 @@ describe('useContestGuard Hook', () => {
             // Wait for initial fetch
         });
 
-        expect(mockNavigate).toHaveBeenCalledWith('/contests');
+        expect(mockNavigate).toHaveBeenCalledWith(`/contests/${contestId}`);
     });
 
     it('handles 403 Forbidden error', async () => {

@@ -1,10 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Circle, ListChecks, PaperPlaneTilt, Ranking, Timer, X } from '@phosphor-icons/react';
 import contestService from '../../services/contestService';
 import { subscribeSubmissions } from '../../services/realtimeService';
 import { MOBILE_QUERY, useMediaQuery } from '../../hooks/useMediaQuery';
 import type { Contest, ProblemSummary } from '../../types';
+import { useContest } from '../../features/contest/ContestContext';
 import { useCountdown } from './useCountdown';
 import AccountMenu from './AccountMenu';
 import styles from './ContestShell.module.css';
@@ -12,10 +13,7 @@ import styles from './ContestShell.module.css';
 const POLL_MS = 30_000;
 const IN_PROGRESS = new Set(['Pending', 'Compiling', 'Running']);
 
-const ContestShellReloadContext = createContext<() => void>(() => undefined);
-
-/** Pages inside a contest call this after changing contest state (e.g. joining) so the sidebar refreshes. */
-export const useContestShellReload = (): (() => void) => useContext(ContestShellReloadContext);
+export { useContestShellReload } from '../../features/contest/ContestContext';
 
 /** 0 → A … 25 → Z, 26 → AA. */
 export function problemLetter(index: number): string {
@@ -59,23 +57,22 @@ function ProblemRow({ contestId, problem, index }: { contestId: string; problem:
   );
 }
 
+/**
+ * The contest sidebar (§6): only for a participant while the contest runs or
+ * finishes — ContestLayout decides, and supplies the contest.
+ */
 export default function ContestShell() {
   const { contestId = '' } = useParams();
   const isMobile = useMediaQuery(MOBILE_QUERY);
-  const [contest, setContest] = useState<Contest | null>(null);
+  const { contest } = useContest();
   const [problems, setProblems] = useState<ProblemSummary[]>([]);
-  const [version, setVersion] = useState(0);
-  const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
     let cancelled = false;
-    contestService.getById(contestId)
-      .then((data) => { if (!cancelled) setContest(data); })
-      .catch(() => { /* the page under the shell reports load errors */ });
     const loadProblems = () => {
       contestService.getProblems(contestId)
         .then((data) => { if (!cancelled) setProblems(data as ProblemSummary[]); })
-        .catch(() => { /* hidden or not started: keep the list empty */ });
+        .catch(() => { /* the page under the shell reports load errors */ });
     };
     loadProblems();
     let poll: number | undefined;
@@ -89,25 +86,10 @@ export default function ContestShell() {
       unsubscribe();
       if (poll !== undefined) window.clearInterval(poll);
     };
-  }, [contestId, version]);
-
-  // Reload at the next transition (start or end) so the sidebar never sits on 00:00:00.
-  const transition = contest?.status === 'scheduled' ? contest.start_time : contest?.status === 'running' ? contest.end_time : null;
-  useEffect(() => {
-    if (!transition) return undefined;
-    const delay = new Date(transition).getTime() - Date.now() + 1000;
-    if (delay <= 0) return undefined;
-    const timer = window.setTimeout(reload, delay);
-    return () => window.clearTimeout(timer);
-  }, [transition, reload]);
-
-  const finished = contest?.status === 'finished';
-  const showProblems = Boolean(contest) && !finished;
-  const showMine = Boolean(contest?.is_participant) && !finished;
+  }, [contestId, contest?.status]);
 
   if (isMobile) {
     return (
-      <ContestShellReloadContext.Provider value={reload}>
       <div className={styles.mobile}>
         <header className={styles.topbar}>
           <Link to="/contests" className={styles.back} aria-label="Back to contests"><ArrowLeft size={18} aria-hidden="true" /></Link>
@@ -116,17 +98,15 @@ export default function ContestShell() {
         </header>
         <main className={styles.main}><div className="container"><Outlet /></div></main>
         <nav aria-label="Contest" className={styles.tabbar}>
-          {!finished && <NavLink to={`/contests/${contestId}/problems`} className={styles.tab}><ListChecks size={20} aria-hidden="true" />Problems</NavLink>}
-          {showMine && <NavLink to={`/contests/${contestId}/submissions`} className={styles.tab}><PaperPlaneTilt size={20} aria-hidden="true" />Mine</NavLink>}
+          <NavLink to={`/contests/${contestId}/problems`} className={styles.tab}><ListChecks size={20} aria-hidden="true" />Problems</NavLink>
+          <NavLink to={`/contests/${contestId}/submissions`} className={styles.tab}><PaperPlaneTilt size={20} aria-hidden="true" />Mine</NavLink>
           <NavLink to={`/contests/${contestId}/scoreboard`} className={styles.tab}><Ranking size={20} aria-hidden="true" />Scoreboard</NavLink>
         </nav>
       </div>
-      </ContestShellReloadContext.Provider>
     );
   }
 
   return (
-    <ContestShellReloadContext.Provider value={reload}>
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
         <nav aria-label="Contest" className={styles.nav}>
@@ -137,24 +117,18 @@ export default function ContestShell() {
               <ContestClock contest={contest} />
             </>
           )}
-          {showProblems && (
-            <div className={styles.problems}>
-              {problems.map((problem, index) => (
-                <ProblemRow key={problem.id} contestId={contestId} problem={problem} index={index} />
-              ))}
-            </div>
-          )}
+          <div className={styles.problems}>
+            {problems.map((problem, index) => (
+              <ProblemRow key={problem.id} contestId={contestId} problem={problem} index={index} />
+            ))}
+          </div>
           <div className={styles.links}>
-            {!finished && (
-              <NavLink to={`/contests/${contestId}/problems`} end className={styles.link}>
-                <ListChecks size={17} aria-hidden="true" />Problems
-              </NavLink>
-            )}
-            {showMine && (
-              <NavLink to={`/contests/${contestId}/submissions`} className={styles.link}>
-                <PaperPlaneTilt size={17} aria-hidden="true" />My submissions
-              </NavLink>
-            )}
+            <NavLink to={`/contests/${contestId}/problems`} end className={styles.link}>
+              <ListChecks size={17} aria-hidden="true" />Problems
+            </NavLink>
+            <NavLink to={`/contests/${contestId}/submissions`} className={styles.link}>
+              <PaperPlaneTilt size={17} aria-hidden="true" />My submissions
+            </NavLink>
             <NavLink to={`/contests/${contestId}/scoreboard`} className={styles.link}>
               <Ranking size={17} aria-hidden="true" />Scoreboard
             </NavLink>
@@ -164,6 +138,5 @@ export default function ContestShell() {
       </aside>
       <main className={styles.main}><div className="container"><Outlet /></div></main>
     </div>
-    </ContestShellReloadContext.Provider>
   );
 }

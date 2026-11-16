@@ -39,15 +39,14 @@ export const fetchContestOutcome = async (
   }
 
   if (fetchedContest.status === 'finished') {
-    const redirectPath = fetchedContest.is_participant
-      ? `/contests/${contestId}/scoreboard`
-      : '/contests';
+    // The recap lives at /contests/:id and is open to everyone (§7.7).
+    const redirectPath = `/contests/${contestId}`;
     return { kind: 'finished', contest: fetchedContest, redirectPath };
   }
 
   return { kind: 'loaded', contest: fetchedContest };
 };
 
-/** Redirect path for a finished contest (participant → scoreboard, else list). */
-export const finishedContestRedirectPath = (contestId: string, isParticipant: boolean): string =>
-  isParticipant ? `/contests/${contestId}/scoreboard` : '/contests';
+/** Redirect path for a finished contest: its recap, for everyone. */
+export const finishedContestRedirectPath = (contestId: string, _isParticipant?: boolean): string =>
+  `/contests/${contestId}`;

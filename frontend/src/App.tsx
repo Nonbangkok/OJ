@@ -17,7 +17,7 @@ import { ToastProvider } from './components/ui';
 import AppShell from './components/shell/AppShell';
 import AuthShell from './components/shell/AuthShell';
 import { CommandPaletteProvider } from './components/shell/CommandPaletteContext';
-import ContestShell from './components/shell/ContestShell';
+import ContestLayout from './features/contest/ContestLayout';
 import AdminLayout from './layouts/admin/AdminLayout';
 
 // Pages
@@ -154,7 +154,7 @@ export const appRoutes = createRoutesFromElements(
       <Route path="analysis" element={<AnalysisPage />} />
     </Route>
 
-    <Route path="/contests/:contestId" element={<PrivateRoute><ContestShell /></PrivateRoute>}>
+    <Route path="/contests/:contestId" element={<PrivateRoute><ContestLayout /></PrivateRoute>}>
       <Route index element={<ContestDetail />} />
       <Route path="problems" element={<ContestProblems />} />
       <Route path="problems/:problemId" element={<ProblemDetail />} />
