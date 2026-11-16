@@ -2,6 +2,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { InlineError, InlineNotice, PageHeader, StatusMark, TestcaseStrip, type VerdictTone } from '../../components/ui';
 import LoadingPage from '../../components/shared/LoadingPage';
 import { useContest } from '../../features/contest/ContestContext';
+import { useAuth } from '../../context/AuthContext';
 import { problemLetter } from '../../features/contest/letters';
 import { useProblems } from '../../hooks/useProblems';
 import type { ProblemSummary } from '../../types';
@@ -18,12 +19,34 @@ const markFor = (problem: ProblemSummary): VerdictTone => {
 const ContestProblems = () => {
   const { contestId = '' } = useParams();
   const { contest } = useContest();
-  const active = Boolean(contest?.is_participant) && (contest?.status === 'running' || contest?.status === 'finishing');
-  const { problems, loading, error } = useProblems(contestId, active);
+  const { user } = useAuth();
+  const live = contest?.status === 'running' || contest?.status === 'finishing';
+  const participant = Boolean(contest?.is_participant) && live;
+  // Staff watching without joining see the titles (the server sends them) but have no scores of their own.
+  const watching = !participant && live && (user?.role === 'admin' || user?.role === 'staff');
+  const { problems, loading, error } = useProblems(contestId, participant);
 
   if (!contest) return null;
   // Not in it (or not running any more): /contests/:id shows the join gate, lobby or recap.
-  if (!active) return <Navigate to={`/contests/${contestId}`} replace />;
+  if (!participant && !watching) return <Navigate to={`/contests/${contestId}`} replace />;
+  if (watching) {
+    return (
+      <div className={styles.page}>
+        <PageHeader title="Problems" meta={`${contest.title} · watching as staff`} />
+        <table className={styles.table} aria-label="Problems">
+          <thead><tr><th scope="col">#</th><th scope="col">Problem</th></tr></thead>
+          <tbody>
+            {(contest.problems ?? []).map((problem, i) => (
+              <tr key={problem.id}>
+                <td className={styles.letter}>{problemLetter(i)}</td>
+                <td><Link to={`/contests/${contestId}/problems/${problem.id}`} className={styles.problemLink}>{problem.title}</Link></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
   if (loading) return <LoadingPage />;
 
   const rows = problems as ProblemSummary[];
@@ -43,7 +66,7 @@ const ContestProblems = () => {
           <tr>
             <th scope="col">#</th>
             <th scope="col">Problem</th>
-            <th scope="col">Best</th>
+            <th scope="col" className={styles.bestCol}>Best</th>
             <th scope="col" className={styles.right}>Score</th>
             <th scope="col" className={styles.right}>Tries</th>
           </tr>
@@ -61,8 +84,9 @@ const ContestProblems = () => {
                     <StatusMark tone={tone} />
                     <Link to={`/contests/${contestId}/problems/${problem.id}`} className={styles.problemLink}>{problem.title}</Link>
                   </span>
+                  {strip.length > 0 && <span className={styles.phoneStrip} aria-hidden="true"><TestcaseStrip results={strip} /></span>}
                 </td>
-                <td>{strip.length > 0 ? <TestcaseStrip results={strip} /> : <span className={styles.muted}>—</span>}</td>
+                <td className={styles.bestCol}>{strip.length > 0 ? <TestcaseStrip results={strip} /> : <span className={styles.muted}>—</span>}</td>
                 <td className={`${styles.right} ${styles.mono} ${tone === 'pass' ? styles.full : ''}`}>{tries > 0 && problem.best_score != null ? problem.best_score : '—'}</td>
                 <td className={`${styles.right} ${styles.mono} ${styles.muted}`}>{tries > 0 ? tries : '—'}</td>
               </tr>

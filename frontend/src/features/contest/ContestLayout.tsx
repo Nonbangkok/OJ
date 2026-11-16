@@ -9,6 +9,14 @@ import type { Contest } from '../../types';
 import { ContestContext, inContestShell } from './ContestContext';
 
 const TRANSITION_SLACK_MS = 1000;
+/** While the server lags the clock (the scheduler ticks once a minute), re-ask this often. */
+const PENDING_POLL_MS = 5000;
+
+/** Past a start or end the server hasn't caught up with yet, or judging the last submissions. */
+const awaitingServer = (contest: Contest, now: number): boolean =>
+  contest.status === 'finishing'
+  || (contest.status === 'scheduled' && now >= new Date(contest.start_time).getTime())
+  || (contest.status === 'running' && now >= new Date(contest.end_time).getTime());
 
 /**
  * Route element for `/contests/:id/*`: loads the contest once, shares it with
@@ -43,7 +51,15 @@ export default function ContestLayout() {
     return () => window.clearTimeout(timer);
   }, [transition, reload]);
 
-  const value = useMemo(() => ({ contest, error, reload }), [contest, error, reload]);
+  // Keep asking until the server settles, so a tab left open moves from the
+  // lobby into the contest, and from the last minute into the recap.
+  useEffect(() => {
+    if (!contest || !awaitingServer(contest, Date.now())) return undefined;
+    const timer = window.setTimeout(reload, PENDING_POLL_MS);
+    return () => window.clearTimeout(timer);
+  }, [contest, reload]);
+
+    const value = useMemo(() => ({ contest, error, reload }), [contest, error, reload]);
 
   let content;
   if (contest && inContestShell(contest)) {

@@ -262,3 +262,22 @@
   align-items: center;
   gap: 8px;
 }
+
+.phoneStrip {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .bestCol {
+    display: none;
+  }
+
+  .phoneStrip {
+    display: block;
+    margin: 6px 0 0 22px;
+  }
+
+  .phoneStripFlush {
+    margin-left: 0;
+  }
+}

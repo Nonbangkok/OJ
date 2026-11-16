@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { InlineError, PageHeader, StatusBadge, TestcaseStrip } from '../../components/ui';
+import { EmptyState, InlineError, PageHeader, StatusBadge, TestcaseStrip } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import contestService from '../../services/contestService';
 import type { Contest, ContestProblemScore, ContestScoreboardEntry } from '../../types';
@@ -53,12 +53,14 @@ export default function ContestRecap({ contest }: { contest: Contest }) {
         </ul>
       )}
 
+      {problems.length === 0 ? <EmptyState title="This contest had no problems." /> : (
+      <>
       <table className={styles.table} aria-label="Problems">
         <thead>
           <tr>
             <th scope="col">#</th>
             <th scope="col">Problem</th>
-            {mine && <><th scope="col">Your best</th><th scope="col" className={styles.right}>Score</th><th scope="col" className={styles.right}>Tries</th></>}
+            {mine && <><th scope="col" className={styles.bestCol}>Your best</th><th scope="col" className={styles.right}>Score</th><th scope="col" className={styles.right}>Tries</th></>}
           </tr>
         </thead>
         <tbody>
@@ -67,10 +69,15 @@ export default function ContestRecap({ contest }: { contest: Contest }) {
             return (
               <tr key={problem.id}>
                 <td className={styles.letter}>{problemLetter(i)}</td>
-                <td><Link to={`/problems/${problem.id}`} className={styles.problemLink}>{problem.title}</Link></td>
+                <td>
+                  <Link to={`/problems/${problem.id}`} className={styles.problemLink}>{problem.title}</Link>
+                  {mine && result?.statuses && result.statuses.length > 0 && (
+                    <span className={`${styles.phoneStrip} ${styles.phoneStripFlush}`} aria-hidden="true"><TestcaseStrip results={result.statuses.map((status) => ({ status }))} /></span>
+                  )}
+                </td>
                 {mine && (
                   <>
-                    <td>{result?.statuses && result.statuses.length > 0
+                    <td className={styles.bestCol}>{result?.statuses && result.statuses.length > 0
                       ? <TestcaseStrip results={result.statuses.map((status) => ({ status }))} />
                       : <span className={styles.muted}>—</span>}
                     </td>
@@ -84,6 +91,8 @@ export default function ContestRecap({ contest }: { contest: Contest }) {
         </tbody>
       </table>
       <p className={styles.sub}>Problems are back in the practice set — open one to keep working on it.</p>
+      </>
+      )}
     </div>
   );
 }

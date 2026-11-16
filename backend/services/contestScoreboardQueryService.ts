@@ -2,7 +2,7 @@ import * as db from '../db';
 import { ContestRow, ContestScoreboardDetailRow } from '../types/models';
 import { CONTEST_STATUS } from '../constants';
 import { ContestScoreboardResponse, ContestScoreboardRow } from '../types/service';
-import { isContestManagementRole } from './contestAccess';
+import { isContestManagementRole, isContestParticipant } from './contestAccess';
 import { contestProblemOrderSql } from './contestProblemOrder';
 import { contestStandingsCte, standingsRankSql } from './contestStandingsSql';
 
@@ -14,6 +14,22 @@ import { contestStandingsCte, standingsRankSql } from './contestStandingsSql';
  * - running/finishing: live aggregation over `contest_submissions`
  * - anything else (e.g. scheduled): participants with zero scores
  */
+
+/**
+ * Problem titles of a contest that has not finished are participant/staff
+ * intel (§7.7): before the start only staff see them, while it runs only
+ * participants and staff. Everyone else gets the ids with empty titles.
+ */
+const gateTitles = async (
+    problems: Array<{ problem_id: string; title: string }>,
+    status: string,
+    contestId: string,
+    viewer?: { id: number; role: string },
+): Promise<Array<{ problem_id: string; title: string }>> => {
+    if (isContestManagementRole(viewer)) return problems;
+    const canSee = status !== CONTEST_STATUS.SCHEDULED && viewer ? await isContestParticipant(contestId, viewer.id) : false;
+    return canSee ? problems : problems.map((p) => ({ ...p, title: '' }));
+};
 
 export const getContestScoreboard = async (
     id: string,
@@ -85,7 +101,7 @@ export const getContestScoreboard = async (
 
         return {
             scoreboard: scoreboardResult.rows,
-            problems: problemsResult.rows,
+            problems: await gateTitles(problemsResult.rows, contest.status, id, viewer),
             status: contest.status,
             start_time: contest.start_time,
         };
@@ -116,7 +132,7 @@ export const getContestScoreboard = async (
 
     return {
         scoreboard: participantsResult.rows,
-        problems: problemsResult.rows,
+        problems: await gateTitles(problemsResult.rows, contest.status, id, viewer),
         status: contest.status,
         start_time: contest.start_time,
     };

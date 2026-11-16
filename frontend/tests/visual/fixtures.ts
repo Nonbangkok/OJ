@@ -316,3 +316,74 @@ export async function mockStudentApi(page: Page): Promise<void> {
   await page.route(/\/api\/scoreboard/, (route) => route.fulfill(json(ranking)));
   await page.route('**/api/users/nattapat/profile', (route) => route.fulfill(json(profile)));
 }
+
+type ContestState = 'list' | 'scheduled' | 'running-guest' | 'running' | 'finishing' | 'finished';
+
+const contestStatuses = (s: string) => [...s].map((c) => ({ status: c === 'P' ? 'Accepted' : c === 'F' ? 'Wrong Answer' : c === 'T' ? 'Time Limit Exceeded' : 'Skipped' }));
+const contestProblems = [
+  { id: 'sum_digits', title: 'Sum of digits', best_score: 100, submission_count: '1', best_submission_results: contestStatuses('PPPPPPPPPP') },
+  { id: 'queue_rotate', title: 'Queue rotate', best_score: 100, submission_count: '3', best_submission_results: contestStatuses('PPPPPPPPPP') },
+  { id: 'interval', title: 'Interval merge', best_score: 60, submission_count: '4', best_submission_results: contestStatuses('PPPPPPFNNN') },
+  { id: 'detour', title: 'Shortest detour', best_score: 40, submission_count: '2', best_submission_results: contestStatuses('PPPPTNNNNN') },
+  { id: 'matrix', title: 'Matrix exponent', best_score: null, submission_count: '0', best_submission_results: null },
+];
+
+const at = (minutes: number) => new Date(fixedTime.getTime() + minutes * 60_000).toISOString();
+
+const contestFor = (state: ContestState) => {
+  const base = { id: 1, title: 'Mid-term practice', description: null, participant_count: '86', problem_count: 5, is_visible: true };
+  const problems = contestProblems.map(({ id, title }) => ({ id, title }));
+  switch (state) {
+    case 'scheduled':
+      return { ...base, title: 'Weekly round #19', status: 'scheduled', start_time: at(4 * 1440 + 372), end_time: at(4 * 1440 + 492), is_participant: false, problem_count: 6, problems: [] };
+    case 'running-guest':
+      return { ...base, status: 'running', start_time: at(-60), end_time: at(72), is_participant: false, problems: [] };
+    case 'finishing':
+      return { ...base, status: 'finishing', start_time: at(-180), end_time: at(-1), is_participant: true, problems };
+    case 'finished':
+      return { ...base, title: 'Weekly round #18', status: 'finished', start_time: at(-4 * 1440), end_time: at(-4 * 1440 + 120), is_participant: true, participant_count: '74', problems };
+    default:
+      return { ...base, status: 'running', start_time: at(-60), end_time: at(72), is_participant: true, problems };
+  }
+};
+
+const standing = (username: string, rank: number, scores: Array<[string, number, number, string, number]>) => {
+  const detailed = Object.fromEntries(scores.map(([id, score, attempts, strip, minute]) => [id, { score, attempts, best_at: at(-60 + minute), statuses: contestStatuses(strip).map((s) => s.status) }]));
+  const total = scores.reduce((sum, [, score]) => sum + score, 0);
+  const last = scores.length ? Math.max(...scores.map(([, score, , , minute]) => (score > 0 ? minute : 0))) : 1;
+  return { user_id: rank, username, has_avatar: false, rank, total_score: total, detailed_scores: detailed, last_score_improvement_time: at(-60 + last) };
+};
+
+const contestStandings = [
+  standing('ploy', 1, [['sum_digits', 100, 1, 'PPPPPPPPPP', 8], ['queue_rotate', 100, 2, 'PPPPPPPPPP', 21], ['interval', 100, 3, 'PPPPPPPPPP', 47], ['detour', 60, 2, 'PPPPPPFNNN', 55]]),
+  standing('krit', 2, [['sum_digits', 100, 1, 'PPPPPPPPPP', 6], ['queue_rotate', 100, 1, 'PPPPPPPPPP', 18], ['interval', 100, 2, 'PPPPPPPPPP', 52], ['detour', 40, 1, 'PPPPTNNNNN', 58]]),
+  standing('nattapat', 3, [['sum_digits', 100, 1, 'PPPPPPPPPP', 9], ['queue_rotate', 100, 3, 'PPPPPPPPPP', 30], ['interval', 60, 4, 'PPPPPPFNNN', 44], ['detour', 40, 2, 'PPPPTNNNNN', 50]]),
+  standing('mint', 4, [['sum_digits', 100, 1, 'PPPPPPPPPP', 12], ['queue_rotate', 100, 4, 'PPPPPPPPPP', 33], ['interval', 60, 2, 'PPPPPPFNNN', 40]]),
+  standing('tonkla', 5, [['sum_digits', 100, 2, 'PPPPPPPPPP', 15], ['interval', 0, 3, 'FNNNNNNNNN', 20]]),
+  standing('fah', 6, []),
+];
+
+/** A signed-in student on the contest pages, with contest 1 in the given state. */
+export async function mockContestApi(page: Page, state: ContestState): Promise<void> {
+  await mockStudentApi(page);
+  const contest = contestFor(state);
+  const list = [
+    contestFor('running'),
+    { ...contestFor('scheduled'), id: 19, is_participant: true, participant_count: '12' },
+    { ...contestFor('scheduled'), id: 20, title: 'Graph camp selection', start_time: at(12 * 1440), end_time: at(12 * 1440 + 300), participant_count: '0', problem_count: 8 },
+    { ...contestFor('finished'), id: 18 },
+    { ...contestFor('finished'), id: 17, title: 'Sorting sprint', start_time: at(-10 * 1440), end_time: at(-10 * 1440 + 90), participant_count: '58', problem_count: 4 },
+  ];
+  await page.route('**/api/contests', (route) => route.fulfill(json(state === 'list' ? list : [contest])));
+  await page.route('**/api/contests/1', (route) => route.fulfill(json(contest)));
+  await page.route('**/api/contests/1/problems', (route) => route.fulfill(json(contest.is_participant ? contestProblems : [])));
+  await page.route('**/api/contests/1/scoreboard', (route) => route.fulfill(json(
+    state === 'scheduled'
+      ? { scoreboard: ['nattapat', 'ploy.s', 'tonkla', 'mintra', 'phum_k', 'jirat', 'kanok', 'beam', 'fah', 'oat', 'ice', 'pim'].map((username, i) => ({ user_id: i + 1, username, total_score: 0, detailed_scores: {} })), problems: [], status: 'scheduled', start_time: contest.start_time }
+      : { scoreboard: contestStandings, problems: contestProblems.map(({ id, title }) => ({ problem_id: id, title })), status: contest.status, start_time: contest.start_time },
+  )));
+  await page.route('**/api/contests/1/problems/interval', (route) => route.fulfill(json({
+    id: 'interval', title: 'Interval merge', author: 'Ada', time_limit_ms: 1000, memory_limit_mb: 256, has_pdf: false,
+    problem_type: 'standard', submission_filename: null, has_starter_files: false,
+  })));
+}

@@ -4,8 +4,14 @@ import ContestProblems from '../../pages/contest/ContestProblems';
 import { ContestContext } from '../../features/contest/ContestContext';
 import contestService from '../../services/contestService';
 import type { Contest } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 
 jest.mock('../../services/contestService');
+jest.mock('../../context/AuthContext', () => ({ useAuth: jest.fn(() => ({ user: { id: 1, username: 'n', role: 'user' } })) }));
+
+beforeEach(() => {
+  jest.mocked(useAuth).mockReturnValue({ user: { id: 1, username: 'n', role: 'user' } } as ReturnType<typeof useAuth>);
+});
 
 const HOUR = 3_600_000;
 const contest = (over: Partial<Contest> = {}): Contest => ({
@@ -61,5 +67,14 @@ describe('ContestProblems', () => {
   it('sends a non-participant to the join gate', async () => {
     renderAt(contest({ is_participant: false }));
     expect(await screen.findByText('contest home')).toBeInTheDocument();
+  });
+
+  it('staff who have not joined see the titles, without their own columns', async () => {
+    jest.mocked(useAuth).mockReturnValue({ user: { id: 9, username: 'staffer', role: 'staff' } } as ReturnType<typeof useAuth>);
+    renderAt(contest({ is_participant: false, problems: [{ id: 'sum_digits', title: 'Sum of digits' }, { id: 'interval', title: 'Interval merge' }] } as Partial<Contest>));
+    const table = await screen.findByRole('table', { name: 'Problems' });
+    expect(within(table).getByRole('link', { name: 'Interval merge' })).toHaveAttribute('href', '/contests/3/problems/interval');
+    expect(within(table).queryByRole('columnheader', { name: 'Score' })).toBeNull();
+    expect(contestService.getProblems).not.toHaveBeenCalled();
   });
 });

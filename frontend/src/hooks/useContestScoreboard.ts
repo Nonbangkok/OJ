@@ -7,13 +7,21 @@ import type {
   ContestProblem,
   ContestProblemScore,
   ContestScoreboardEntry,
+  ContestStatus,
 } from '../types';
 import { getErrorStatus } from '../utils/error';
 import { useAuth } from '../context/AuthContext';
-import { formatDateTime as formatDateTimeShared } from '../utils/formatters';
 
-/** Normalised cell for the scoreboard table (replaced in phase 4c). */
-export type ScoreValue = { score: number; attempts: number; solved: boolean } | null;
+/** One scoreboard cell in the B9 shape; old snapshots stored a bare number or { score }. */
+export const scoreCell = (raw: unknown): ContestProblemScore | null => {
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw === 'number') return { score: raw };
+  if (typeof raw === 'object') {
+    const cell = raw as Partial<ContestProblemScore>;
+    return { ...cell, score: cell.score ?? 0 };
+  }
+  return null;
+};
 
 interface UseContestScoreboardResult {
   contest: Contest | null;
@@ -22,11 +30,11 @@ interface UseContestScoreboardResult {
   loading: boolean;
   error: string;
   lastUpdate: Date | null;
-  formatDateTime: (dateTime: Date | string) => string;
-  getProblemScore: (
-    userScores: Record<string, unknown> | null | undefined,
-    problemId: string
-  ) => ScoreValue;
+  /** True while the realtime stream is up (signed-in viewers only). */
+  connected: boolean;
+  /** Contest state and start, as carried by the scoreboard payload (B9). */
+  status: ContestStatus | null;
+  startTime: string | null;
 }
 
 const useContestScoreboard = (contestId?: string | number): UseContestScoreboardResult => {
@@ -40,6 +48,8 @@ const useContestScoreboard = (contestId?: string | number): UseContestScoreboard
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [status, setStatus] = useState<ContestStatus | null>(null);
+  const [startTime, setStartTime] = useState<string | null>(null);
   // Realtime (SSE) state — see useSubmissions for the pattern: while the
   // stream is healthy the interval poll is a slow safety net; a dead stream
   // (readyState CLOSED, not a transient retry) reverts to fast polling.
@@ -63,6 +73,8 @@ const useContestScoreboard = (contestId?: string | number): UseContestScoreboard
       setContest(contestData);
       setScoreboard(scoreboardData.scoreboard);
       setProblems(scoreboardData.problems || []);
+      setStatus(scoreboardData.status ?? null);
+      setStartTime(scoreboardData.start_time ?? null);
       setLastUpdate(new Date());
     } catch (errorValue) {
       console.error('Error fetching contest data:', errorValue);
@@ -88,6 +100,7 @@ const useContestScoreboard = (contestId?: string | number): UseContestScoreboard
       const data = await contestService.getScoreboard(contestId);
 
       setScoreboard(data.scoreboard);
+      setStatus(data.status ?? null);
       setLastUpdate(new Date());
     } catch (err) {
       console.error('Error refreshing scoreboard:', err);
@@ -137,38 +150,6 @@ const useContestScoreboard = (contestId?: string | number): UseContestScoreboard
     };
   }, [contest?.status, fetchScoreboard, realtimeDown]);
 
-  const formatDateTime = (dateTime: Date | string) =>
-    formatDateTimeShared(dateTime, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-  const getProblemScore = (
-    userScores: Record<string, unknown> | null | undefined,
-    problemId: string
-  ): ScoreValue => {
-    if (!userScores || typeof userScores !== 'object') return null;
-
-    const problemScore = userScores[problemId] as unknown;
-    if (!problemScore) return null;
-
-    if (typeof problemScore === 'number') {
-      return {
-        score: problemScore,
-        attempts: 1,
-        solved: problemScore === 100,
-      };
-    }
-
-    if (typeof problemScore === 'object') {
-      const normalizedScore = problemScore as Partial<ContestProblemScore>;
-      return {
-        score: normalizedScore.score ?? 0,
-        attempts: normalizedScore.attempts ?? 1,
-        solved: (normalizedScore.score ?? 0) === 100,
-      };
-    }
-
-    return null;
-  };
-
   return {
     contest,
     scoreboard,
@@ -176,8 +157,9 @@ const useContestScoreboard = (contestId?: string | number): UseContestScoreboard
     loading,
     error,
     lastUpdate,
-    formatDateTime,
-    getProblemScore,
+    connected: Boolean(user) && isRealtimeSupported() && !realtimeDown,
+    status: status ?? contest?.status ?? null,
+    startTime: startTime ?? contest?.start_time ?? null,
   };
 };
 
