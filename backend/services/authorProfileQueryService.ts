@@ -37,7 +37,22 @@ export type AuthorProfileListRow = Pick<
   | 'country_code'
   | 'created_at'
   | 'updated_at'
-> & { has_profile_image: boolean };
+> & {
+  has_profile_image: boolean;
+  /** B8: drafts whose author_profile_id is this profile (published included). */
+  draft_count: number;
+  linked_username: string | null;
+};
+
+/** B8: an account a profile can be linked to, and the profile it already has, if any. */
+export interface AuthorProfileUserCandidate {
+  id: number;
+  username: string;
+  role: string;
+  linkedProfile: { id: string; akaName: string } | null;
+}
+
+const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 type EditableAuthorProfileFields = Pick<
   AuthorProfileRow,
@@ -114,11 +129,18 @@ export const listAuthorProfiles = async (
   try {
     const result = await database.query<AuthorProfileListRow>(`
       SELECT
-        id, user_id, aka_name, real_name, default_language, country_code,
-        profile_image_png IS NOT NULL AS has_profile_image,
-        created_at, updated_at
-      FROM author_profiles
-      ORDER BY aka_name ASC, id ASC
+        ap.id, ap.user_id, ap.aka_name, ap.real_name, ap.default_language, ap.country_code,
+        ap.profile_image_png IS NOT NULL AS has_profile_image,
+        ap.created_at, ap.updated_at,
+        COALESCE(dc.n, 0) AS draft_count,
+        u.username AS linked_username
+      FROM author_profiles ap
+      LEFT JOIN users u ON u.id = ap.user_id
+      LEFT JOIN (
+        SELECT author_profile_id, COUNT(*)::int AS n FROM problem_drafts
+        WHERE author_profile_id IS NOT NULL GROUP BY author_profile_id
+      ) dc ON dc.author_profile_id = ap.id
+      ORDER BY ap.aka_name ASC, ap.id ASC
     `);
     return result.rows;
   } catch (error) {
@@ -272,4 +294,26 @@ export const deleteAuthorProfile = async (
 
   // Fallback for plain-query databases (unit tests).
   return runDelete(database);
+};
+
+/** B8: up to 10 accounts whose username contains `query` (prefix matches first), with any linked profile. */
+export const searchAuthorProfileUserCandidates = async (
+  query: string,
+  database: AuthorProfileDatabase = db,
+): Promise<AuthorProfileUserCandidate[]> => {
+  const escaped = escapeLike(query);
+  const result = await database.query<{ id: number; username: string; role: string; profile_id: string | null; aka_name: string | null }>(`
+    SELECT u.id, u.username, u.role, ap.id AS profile_id, ap.aka_name
+    FROM users u
+    LEFT JOIN author_profiles ap ON ap.user_id = u.id
+    WHERE u.username ILIKE $1 ESCAPE '\\'
+    ORDER BY (u.username ILIKE $2 ESCAPE '\\') DESC, u.username ASC
+    LIMIT 10
+  `, [`%${escaped}%`, `${escaped}%`]);
+  return result.rows.map((row) => ({
+    id: row.id,
+    username: row.username,
+    role: row.role,
+    linkedProfile: row.profile_id ? { id: row.profile_id, akaName: row.aka_name ?? '' } : null,
+  }));
 };

@@ -6,6 +6,7 @@ import { authorProfileImageUpload } from '../middleware/upload';
 import { validateRequest } from '../middleware/validation';
 import {
   authorProfileIdParamSchema,
+  authorProfileUserCandidatesQuerySchema,
   createAuthorProfileSchema,
   updateAuthorProfileSchema,
 } from '../schemas/requestSchemas';
@@ -18,6 +19,7 @@ import {
   getAuthorProfile,
   listAuthorProfiles,
   readAuthorProfileImage,
+  searchAuthorProfileUserCandidates,
   updateAuthorProfile,
 } from '../services/authorProfileQueryService';
 import {
@@ -45,6 +47,7 @@ const toProfileResponse = (profile: AuthorProfileRow | AuthorProfileListRow) => 
     : profile.profile_image_png !== null,
   createdAt: profile.created_at,
   updatedAt: profile.updated_at,
+  ...('draft_count' in profile ? { draftCount: profile.draft_count, linkedUsername: profile.linked_username } : {}),
 });
 
 const normalizeUpload = async (file: Express.Multer.File): Promise<Buffer> => {
@@ -97,6 +100,14 @@ router.get('/admin/author-profiles', asyncHandler(async (_req: Request, res: Res
   const profiles = await listAuthorProfiles();
   res.json(profiles.map(toProfileResponse));
 }));
+
+// B8: accounts to link a profile to (registered before the /:id routes).
+router.get('/admin/author-profiles/user-candidates',
+  validateRequest({ query: authorProfileUserCandidatesQuerySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { q } = req.query as { q: string };
+    res.json(await searchAuthorProfileUserCandidates(q));
+  }));
 
 router.get('/admin/author-profiles/:id/image',
   validateRequest({ params: authorProfileIdParamSchema }),
