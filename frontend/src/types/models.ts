@@ -95,6 +95,8 @@ export interface Contest extends Record<string, unknown> {
   created_at?: string;
   created_by?: number | null;
   participant_count?: string;
+  /** Number of problems, shown to everyone who can see the contest (titles stay gated). */
+  problem_count?: number | string;
   created_by_username?: string | null;
   problems?: ProblemBase[];
   is_participant?: boolean;

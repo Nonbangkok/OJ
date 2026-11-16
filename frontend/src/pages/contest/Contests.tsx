@@ -1,48 +1,99 @@
-import { Link } from 'react-router-dom';
-import { Warning } from '@phosphor-icons/react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Check } from '@phosphor-icons/react';
 import { useAuth } from '../../context/AuthContext';
-import styles from './Contests.module.css';
 import { useContests } from '../../hooks/useContests';
-import ContestList from '../../features/contest/ContestList';
 import LoadingPage from '../../components/shared/LoadingPage';
-import { PageHeader } from '../../components/ui';
+import { Button, Countdown, EmptyState, InlineError, PageHeader, StatusBadge } from '../../components/ui';
+import type { Contest } from '../../types';
+import styles from './Contests.module.css';
 
+const DAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+const TIME = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+/** "Nov 16 13:00 – 16:00", or both dates when the window crosses midnight. */
+export const formatWindow = (start: string, end: string): string => {
+  const s = new Date(start);
+  const e = new Date(end);
+  const sameDay = s.toDateString() === e.toDateString();
+  return `${DAY.format(s)} ${TIME.format(s)} – ${sameDay ? '' : `${DAY.format(e)} `}${TIME.format(e)}`;
+};
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+type Group = { key: 'live' | 'upcoming' | 'past'; title: string; contests: Contest[] };
+
+const groupContests = (contests: Contest[]): Group[] => {
+  const by = (pick: (c: Contest) => boolean) => contests.filter(pick);
+  const time = (iso: string) => new Date(iso).getTime();
+  return [
+    { key: 'live' as const, title: 'Live', contests: by((c) => c.status === 'running' || c.status === 'finishing').sort((a, b) => time(a.end_time) - time(b.end_time)) },
+    { key: 'upcoming' as const, title: 'Upcoming', contests: by((c) => c.status === 'scheduled').sort((a, b) => time(a.start_time) - time(b.start_time)) },
+    { key: 'past' as const, title: 'Past', contests: by((c) => c.status === 'finished').sort((a, b) => time(b.end_time) - time(a.end_time)) },
+  ];
+};
+
+/** Contests list (§7.7): Live / Upcoming / Past, one action per row. */
 const Contests = () => {
-    const { user } = useAuth();
-    const { contests, loading, error, joinContest } = useContests();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { contests, loading, error, joinContest } = useContests();
+  const isStaff = user?.role === 'admin' || user?.role === 'staff';
 
-    if (loading) return <LoadingPage />;
+  if (loading) return <LoadingPage />;
 
-    if (error && contests.length === 0) {
-        return (
-            <div className={styles.container}>
-                <div className={styles.error}>
-                    <h3>Error: {error}</h3>
-                    <Link to="/" className={styles.backLink}>
-                        ← Back to Home
-                    </Link>
-                </div>
-            </div>
-        );
+  const groups = groupContests(contests as Contest[]);
+  const count = (key: Group['key']) => groups.find((g) => g.key === key)!.contests.length;
+
+  const join = async (contest: Contest) => {
+    const result = await joinContest(contest.id);
+    if (result.success && contest.status === 'running') navigate(`/contests/${contest.id}`);
+  };
+
+  const action = (contest: Contest) => {
+    if (contest.status === 'running') {
+      return contest.is_participant
+        ? <Link to={`/contests/${contest.id}/problems`} className={`${styles.action} ${styles.primary}`}>Enter</Link>
+        : <Button size="compact" onClick={() => join(contest)}>Join</Button>;
     }
+    if (contest.status === 'scheduled') {
+      return contest.is_participant
+        ? <Link to={`/contests/${contest.id}`} className={styles.action}><Check size={14} aria-hidden="true" />Registered</Link>
+        : <Button size="compact" variant="secondary" onClick={() => join(contest)}>Join</Button>;
+    }
+    return <Link to={`/contests/${contest.id}`} className={`${styles.action} ${styles.quiet}`}>Results</Link>;
+  };
 
-    return (
-        <div className={styles.container}>
-            <PageHeader title="Contests" />
-
-            {error && (
-                <div className={styles.error}>
-                    <Warning size={16} aria-hidden="true" /> {error}
-                </div>
-            )}
-
-            <ContestList
-                contests={contests}
-                user={user}
-                onJoin={joinContest}
-            />
-        </div>
-    );
-}
+  return (
+    <div className={styles.container}>
+      <PageHeader
+        title="Contests"
+        meta={contests.length > 0 ? `${count('live')} live · ${count('upcoming')} upcoming · ${count('past')} past` : undefined}
+      />
+      {error && <InlineError message={error} />}
+      {contests.length === 0 && !error && <EmptyState title="No contests yet." />}
+      {groups.filter((g) => g.contests.length > 0).map((group) => (
+        <section key={group.key} className={styles.group} aria-labelledby={`contests-${group.key}`}>
+          <h2 id={`contests-${group.key}`} className={styles.groupTitle}>{group.title}</h2>
+          <ul className={styles.rows}>
+            {group.contests.map((contest) => (
+              <li key={contest.id} className={styles.row}>
+                <span className={styles.title}>
+                  {contest.title}
+                  {isStaff && contest.is_visible === false && <StatusBadge tone="warning">HIDDEN</StatusBadge>}
+                </span>
+                <span className={styles.window}>{formatWindow(contest.start_time, contest.end_time)}</span>
+                <span className={styles.clock}><Countdown contest={contest} /></span>
+                <span className={styles.counts}>
+                  {`${Number(contest.participant_count ?? 0)} joined · ${plural(Number(contest.problem_count ?? 0), 'problem')}`}
+                </span>
+                <span className={styles.actionCell}>{action(contest)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+};
 
 export default Contests;
