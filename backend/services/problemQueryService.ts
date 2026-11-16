@@ -9,12 +9,13 @@ import {
   ProblemExportTestcaseRow,
   ProblemsPage,
   ProblemStatsRow,
+  ProblemStatusCounts,
   ReplaceProblemTestcasesFromZipResult,
   TestcaseMetadataRow,
   TestcaseView,
   TestcaseViewPart,
 } from '../types/service';
-import { ADMIN_PROBLEM_LIST_CONFIG, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CONFIG, TESTCASE_VIEWER_CONFIG, type ProblemFileRole } from '../constants';
+import { ADMIN_PROBLEM_LIST_CONFIG, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CONFIG, SUBMISSION_QUERY_CONFIG, TESTCASE_VIEWER_CONFIG, type ProblemFileRole } from '../constants';
 import { fullyPairedCaseNumbers, pairZippedTestcaseFiles } from './testcaseZipPairing';
 import { isUniqueViolation } from '../utils/dbErrors';
 import { AppError } from '../middleware/errorHandler';
@@ -59,6 +60,9 @@ export interface ProblemListDifficultyOptions {
   order?: 'asc' | 'desc';
 }
 
+/** Per-viewer progress bucket: no submission / submitted but best < 100 / best = 100. */
+export type ProblemStatusFilter = 'solved' | 'attempted' | 'unsolved';
+
 /** Full query surface of the paginated user-facing problem list. */
 export interface ProblemListOptions extends ProblemListDifficultyOptions {
   /** Substring match on problem id or title (ILIKE, server-side). */
@@ -69,6 +73,8 @@ export interface ProblemListOptions extends ProblemListDifficultyOptions {
   author?: string;
   /** Collection id, or 'none' for problems outside a collection. */
   collection?: number | 'none';
+  /** The viewer's progress bucket (B2); requires a signed-in viewer. */
+  status?: ProblemStatusFilter;
   /** Page size (1..MAX_LIMIT); defaults to PROBLEM_LIST_CONFIG.DEFAULT_LIMIT. */
   limit?: number;
   /** Opaque next-page token from a previous response. */
@@ -163,34 +169,15 @@ const cursorCondition = (
 const escapeLikePattern = (search: string): string =>
   search.replace(/[\\%_]/g, (ch) => `\\${ch}`);
 
+/** The list filters shared by the page query and the status counts (no paging/sort). */
+export type ProblemListFilterOptions = Omit<ProblemListOptions, 'limit' | 'cursor' | 'sort' | 'order' | 'status'>;
+
 /**
- * One page of the user-facing problem list, ordered by the active sort mode.
- *
- * The problem batch is selected FIRST (filtered, cursor-positioned, limited
- * in SQL); the user's submission stats are then joined for exactly those
- * batch problem ids — the reverse of the pre-pagination shape, which
- * aggregated every submission before filtering. `limit + 1` rows are
- * fetched so hasMore/nextCursor come from the presence of an extra row.
+ * Appends the shared filter clauses (difficulty, search, category, author,
+ * collection) to `params` and returns them. `$1` must already be the viewer id.
  */
-export const getProblemsWithStatsForUser = async (
-  /** Submitting user; null for guests (public browsing) — the user-keyed
-   *  CTEs return no rows, so only the public problem columns come back. */
-  userId: number | null,
-  options: ProblemListOptions = {},
-): Promise<ProblemsPage> => {
-  const limit = options.limit ?? PROBLEM_LIST_CONFIG.DEFAULT_LIMIT;
-  if (!Number.isInteger(limit) || limit < 1 || limit > PROBLEM_LIST_CONFIG.MAX_LIMIT) {
-    throw new AppError(`limit must be an integer between 1 and ${PROBLEM_LIST_CONFIG.MAX_LIMIT}`, 400);
-  }
-
-  const sortMode: '' | 'difficulty' = options.sort === 'difficulty' ? 'difficulty' : '';
-  const order = options.order === 'desc' ? 'desc' : 'asc';
-  const cursor = options.cursor !== undefined
-    ? decodeCursor(options.cursor, { s: sortMode, o: order, id: '', d: null })
-    : null;
-
+export const buildProblemListFilters = (options: ProblemListFilterOptions, params: unknown[]): string[] => {
   const filters: string[] = [];
-  const params: unknown[] = [userId];
   if (options.difficultyMin !== undefined) {
     params.push(options.difficultyMin);
     filters.push(`p.difficulty >= $${params.length}`);
@@ -231,6 +218,74 @@ export const getProblemsWithStatsForUser = async (
   } else if (options.collection !== undefined) {
     params.push(options.collection);
     filters.push(`p.collection_id = $${params.length}`);
+  }
+  return filters;
+};
+
+const FULL_SCORE = SUBMISSION_QUERY_CONFIG.FULL_PROBLEM_SCORE;
+/** Viewer ($1) has any submission / a full-score submission on problem p. */
+const HAS_SUBMISSION = 'EXISTS (SELECT 1 FROM submissions us WHERE us.user_id = $1 AND us.problem_id = p.id)';
+const HAS_FULL_SCORE = `EXISTS (SELECT 1 FROM submissions us WHERE us.user_id = $1 AND us.problem_id = p.id AND us.score = ${FULL_SCORE})`;
+const STATUS_CLAUSE: Record<ProblemStatusFilter, string> = {
+  solved: HAS_FULL_SCORE,
+  attempted: `${HAS_SUBMISSION} AND NOT ${HAS_FULL_SCORE}`,
+  unsolved: `NOT ${HAS_SUBMISSION}`,
+};
+
+/**
+ * Per-status counts over the visible standalone problems matching the
+ * shared filters. Buckets partition `all`. A guest (null) has no progress,
+ * so every problem counts as unsolved.
+ */
+export const getProblemStatusCounts = async (
+  userId: number | null,
+  options: ProblemListFilterOptions,
+): Promise<ProblemStatusCounts> => {
+  const params: unknown[] = [userId];
+  const filters = buildProblemListFilters(options, params);
+  const result = await db.query<ProblemStatusCounts>(`
+    SELECT COUNT(*)::int AS all,
+           COUNT(*) FILTER (WHERE ${STATUS_CLAUSE.unsolved})::int AS unsolved,
+           COUNT(*) FILTER (WHERE ${STATUS_CLAUSE.attempted})::int AS attempted,
+           COUNT(*) FILTER (WHERE ${STATUS_CLAUSE.solved})::int AS solved
+    FROM problems p
+    WHERE p.is_visible = true AND p.contest_id IS NULL
+    ${filters.length ? `AND ${filters.join(' AND ')}` : ''}
+  `, params);
+  const row = result.rows[0] ?? { all: 0, unsolved: 0, attempted: 0, solved: 0 };
+  return { all: Number(row.all), unsolved: Number(row.unsolved), attempted: Number(row.attempted), solved: Number(row.solved) };
+};
+
+/**
+ * One page of the user-facing problem list, ordered by the active sort mode.
+ *
+ * The problem batch is selected FIRST (filtered, cursor-positioned, limited
+ * in SQL); the user's submission stats are then joined for exactly those
+ * batch problem ids — the reverse of the pre-pagination shape, which
+ * aggregated every submission before filtering. `limit + 1` rows are
+ * fetched so hasMore/nextCursor come from the presence of an extra row.
+ */
+export const getProblemsWithStatsForUser = async (
+  /** Submitting user; null for guests (public browsing) — the user-keyed
+   *  CTEs return no rows, so only the public problem columns come back. */
+  userId: number | null,
+  options: ProblemListOptions = {},
+): Promise<ProblemsPage> => {
+  const limit = options.limit ?? PROBLEM_LIST_CONFIG.DEFAULT_LIMIT;
+  if (!Number.isInteger(limit) || limit < 1 || limit > PROBLEM_LIST_CONFIG.MAX_LIMIT) {
+    throw new AppError(`limit must be an integer between 1 and ${PROBLEM_LIST_CONFIG.MAX_LIMIT}`, 400);
+  }
+
+  const sortMode: '' | 'difficulty' = options.sort === 'difficulty' ? 'difficulty' : '';
+  const order = options.order === 'desc' ? 'desc' : 'asc';
+  const cursor = options.cursor !== undefined
+    ? decodeCursor(options.cursor, { s: sortMode, o: order, id: '', d: null })
+    : null;
+
+  const params: unknown[] = [userId];
+  const filters = buildProblemListFilters(options, params);
+  if (options.status !== undefined) {
+    filters.push(`(${STATUS_CLAUSE[options.status]})`);
   }
   const afterCursor = cursorCondition(cursor, params);
   if (afterCursor) {

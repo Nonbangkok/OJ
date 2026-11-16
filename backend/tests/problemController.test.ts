@@ -78,7 +78,9 @@ describe('Problem Controller', () => {
         }));
         // Visibility checks in the controller read req.user.role.
         app.use((req: Request, _res: Response, next: NextFunction) => {
-            req.user = { id: 1, username: 'user1', role: 'admin', hasAvatar: false };
+            if (req.headers['x-test-guest'] !== '1') {
+                req.user = { id: 1, username: 'user1', role: 'admin', hasAvatar: false };
+            }
             next();
         });
         app.use('/', problemRouter);
@@ -139,6 +141,19 @@ describe('Problem Controller', () => {
     });
 
     describe('public problem filters', () => {
+        it('rejects status for guests with 400', async () => {
+            const res = await request(app).get('/problems-with-stats?status=solved').set('x-test-guest', '1');
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Sign in to filter by status.');
+            expect(db.query).not.toHaveBeenCalled();
+        });
+
+        it('rejects an unknown status with 400', async () => {
+            expect((await request(app).get('/problems-with-stats?status=done')).status).toBe(400);
+            expect((await request(app).get('/problem-status-counts?status=solved')).status).toBe(400);
+            expect(db.query).not.toHaveBeenCalled();
+        });
+
         it('accepts author and numeric collection alongside existing filters', async () => {
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
             const res = await request(app).get('/problems-with-stats')

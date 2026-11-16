@@ -348,7 +348,25 @@ const problemCategoryFilter = z.string()
     .max(PROBLEM_CATEGORIES.length + 1)
     .refine(categories => new Set(categories).size === categories.length, 'categories must be unique'))
   .transform(categories => categories.join(','));
+const problemListFilterShape = {
+  difficultyMin: difficultyBound.optional(),
+  difficultyMax: difficultyBound.optional(),
+  search: z.string().trim().max(STRING_LIMITS.TITLE).optional(),
+  category: problemCategoryFilter.optional(),
+  author: z.string().trim().min(1).max(STRING_LIMITS.AUTHOR).optional(),
+  collection: z.union([z.literal('none'), z.coerce.number().int().positive()]).optional(),
+};
+const difficultyRangeOrdered = ({ difficultyMin, difficultyMax }: { difficultyMin?: number; difficultyMax?: number }) =>
+  difficultyMin === undefined || difficultyMax === undefined || difficultyMin <= difficultyMax;
+
+/** GET /problem-status-counts: the list filters only (no paging, sort or status). */
+export const problemStatusCountsQuerySchema = z.object(problemListFilterShape).strict().refine(
+  difficultyRangeOrdered,
+  { message: 'difficultyMin must not exceed difficultyMax' },
+);
+
 export const problemsWithStatsQuerySchema = z.object({
+  status: z.enum(['solved', 'attempted', 'unsolved']).optional(),
   difficultyMin: difficultyBound.optional(),
   difficultyMax: difficultyBound.optional(),
   sort: z.enum(['difficulty']).optional(),

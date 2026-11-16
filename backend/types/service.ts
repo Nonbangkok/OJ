@@ -185,6 +185,14 @@ export interface ProblemStatsRow {
   best_submission_results: unknown;
 }
 
+/** Per-status problem counts for the viewer (GET /problem-status-counts); buckets partition `all`. */
+export interface ProblemStatusCounts {
+  all: number;
+  unsolved: number;
+  attempted: number;
+  solved: number;
+}
+
 /** One page of the user-facing problem list (GET /problems-with-stats). */
 export interface ProblemsPage {
   problems: ProblemStatsRow[];
