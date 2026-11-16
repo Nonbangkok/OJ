@@ -26,6 +26,7 @@ import Problems from './pages/problem/Problems';
 import ProblemDetail from './pages/problem/ProblemDetail';
 import Scoreboard from './pages/scoreboard/Scoreboard';
 import Submissions from './pages/submission/Submissions';
+import SubmissionDetailPage from './pages/submission/SubmissionDetailPage';
 import UserProfile from './pages/user/UserProfile';
 import NotFound from './pages/notfound/NotFound';
 import Login from './pages/auth/Login';
@@ -112,6 +113,7 @@ export const appRoutes = createRoutesFromElements(
       <Route path="/problems/:problemId" element={<PrivateRoute><ProblemDetail /></PrivateRoute>} />
       <Route path="/scoreboard" element={<PrivateRoute><Scoreboard /></PrivateRoute>} />
       <Route path="/submissions" element={<PrivateRoute><Submissions /></PrivateRoute>} />
+      <Route path="/submissions/:submissionId" element={<PrivateRoute><SubmissionDetailPage /></PrivateRoute>} />
       <Route path="/profile/:username" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -151,6 +153,7 @@ export const appRoutes = createRoutesFromElements(
       <Route path="problems" element={<ContestProblems />} />
       <Route path="problems/:problemId" element={<ProblemDetail />} />
       <Route path="submissions" element={<ContestSubmissions />} />
+      <Route path="submissions/:submissionId" element={<SubmissionDetailPage />} />
       <Route path="scoreboard" element={<ContestScoreboard />} />
     </Route>
   </Route>,

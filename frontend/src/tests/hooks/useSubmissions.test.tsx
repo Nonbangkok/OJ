@@ -1,4 +1,6 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { useSubmissions } from '../../hooks/useSubmissions';
 import submissionService from '../../services/submissionService';
 import {
@@ -35,6 +37,8 @@ const mockAuth = (user: object | null, refreshUser: () => Promise<void> = jest.f
     );
 };
 
+const wrapper = ({ children }: { children: ReactNode }) => <MemoryRouter>{children}</MemoryRouter>;
+
 describe('useSubmissions', () => {
     beforeEach(() => {
         jest.clearAllMocks();
@@ -53,7 +57,7 @@ describe('useSubmissions', () => {
         const mockSubmissions = [{ id: 1, overall_status: 'Accepted' }];
         (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue(mockSubmissions);
 
-        const { result } = renderHook(() => useSubmissions(undefined, undefined));
+        const { result } = renderHook(() => useSubmissions(undefined, undefined), { wrapper });
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
@@ -67,7 +71,7 @@ describe('useSubmissions', () => {
     it('handles errors when fetching submissions', async () => {
         (jest.mocked(submissionService.getAll) as jest.Mock).mockRejectedValue(new Error('Network error'));
 
-        const { result } = renderHook(() => useSubmissions(undefined, undefined));
+        const { result } = renderHook(() => useSubmissions(undefined, undefined), { wrapper });
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
@@ -81,7 +85,7 @@ describe('useSubmissions', () => {
         const mockSubmissions = [{ id: 1, problemId: 5 }];
         (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue(mockSubmissions);
 
-        const { result } = renderHook(() => useSubmissions(5, undefined));
+        const { result } = renderHook(() => useSubmissions(5, undefined), { wrapper });
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
@@ -99,7 +103,7 @@ describe('useSubmissions', () => {
         const mockSubmissions = [];
         (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue(mockSubmissions);
 
-        const { result } = renderHook(() => useSubmissions(null, 'contest-123'));
+        const { result } = renderHook(() => useSubmissions(null, 'contest-123'), { wrapper });
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
@@ -114,7 +118,7 @@ describe('useSubmissions', () => {
         const mockSubmissions = [{ id: 1 }];
         (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue(mockSubmissions);
 
-        const { result } = renderHook(() => useSubmissions(undefined, undefined));
+        const { result } = renderHook(() => useSubmissions(undefined, undefined), { wrapper });
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
@@ -133,55 +137,19 @@ describe('useSubmissions', () => {
         expect(jest.mocked(submissionService.getAll).mock.calls.length).toBeGreaterThan(callCount);
     });
 
-    it('opens modal and fetches submission details when handleViewCode is called', async () => {
-        const mockSubmissions = [];
-        const mockSubmissionDetail = { id: 1, code: 'print("hello")' };
-        (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue(mockSubmissions);
-        (jest.mocked(submissionService.getById) as jest.Mock).mockResolvedValue(mockSubmissionDetail);
-
-        const { result } = renderHook(() => useSubmissions(undefined, undefined));
-
-        await waitFor(() => {
-            expect(result.current.loading).toBe(false);
-        });
-
-        await act(async () => {
-            result.current.handleViewCode(1);
-        });
-
-        expect(submissionService.getById).toHaveBeenCalledWith(1, undefined);
-        expect(result.current.selectedSubmission).toEqual(mockSubmissionDetail);
-        expect(result.current.isModalOpen).toBe(true);
-    });
-
-    it('closes modal when handleCloseModal is called', async () => {
-        const mockSubmissions = [];
-        const mockSubmissionDetail = { id: 1 };
-        (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue(mockSubmissions);
-        (jest.mocked(submissionService.getById) as jest.Mock).mockResolvedValue(mockSubmissionDetail);
-
-        const { result } = renderHook(() => useSubmissions(undefined, undefined));
-
-        await waitFor(() => {
-            expect(result.current.loading).toBe(false);
-        });
-
-        await act(async () => {
-            result.current.handleViewCode(1);
-        });
-        expect(result.current.isModalOpen).toBe(true);
-
-        act(() => {
-            result.current.handleCloseModal();
-        });
-        expect(result.current.isModalOpen).toBe(false);
-        expect(result.current.selectedSubmission).toBe(null);
+    it('defaults a signed-in viewer to their own submissions', async () => {
+        mockAuth({ id: 1, username: 'user1', role: 'user' });
+        (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
+        const { result } = renderHook(() => useSubmissions(undefined, undefined), { wrapper });
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(result.current.filter).toBe('mine');
+        expect(submissionService.getAll).toHaveBeenCalledWith(expect.objectContaining({ filter: 'mine' }));
     });
 
     it('updates filter when setFilter is called', async () => {
         (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
 
-        const { result } = renderHook(() => useSubmissions(undefined, undefined));
+        const { result } = renderHook(() => useSubmissions(undefined, undefined), { wrapper });
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
@@ -198,13 +166,11 @@ describe('useSubmissions', () => {
     it('returns initial state values', async () => {
         (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
 
-        const { result } = renderHook(() => useSubmissions(undefined, undefined));
+        const { result } = renderHook(() => useSubmissions(undefined, undefined), { wrapper });
 
         expect(result.current.submissions).toEqual([]);
         expect(result.current.loading).toBe(true);
         expect(result.current.filter).toBe('all');
-        expect(result.current.isModalOpen).toBe(false);
-        expect(result.current.selectedSubmission).toBe(null);
     });
 
     describe('realtime (SSE)', () => {
@@ -215,7 +181,7 @@ describe('useSubmissions', () => {
         it('does not subscribe while unauthenticated', async () => {
             (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
 
-            const { result } = renderHook(() => useSubmissions(undefined, undefined));
+            const { result } = renderHook(() => useSubmissions(undefined, undefined), { wrapper });
             await waitFor(() => expect(result.current.loading).toBe(false));
 
             expect(subscribeSubmissions).not.toHaveBeenCalled();
@@ -225,7 +191,7 @@ describe('useSubmissions', () => {
             mockAuth(mockUser);
             (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
 
-            const { result } = renderHook(() => useSubmissions(undefined, undefined));
+            const { result } = renderHook(() => useSubmissions(undefined, undefined), { wrapper });
             await waitFor(() => expect(result.current.loading).toBe(false));
 
             expect(subscribeSubmissions).toHaveBeenCalledTimes(1);
@@ -254,7 +220,7 @@ describe('useSubmissions', () => {
             mockAuth(mockUser, refreshUser);
             (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
 
-            const { result } = renderHook(() => useSubmissions(undefined, undefined));
+            const { result } = renderHook(() => useSubmissions(undefined, undefined), { wrapper });
             await waitFor(() => expect(result.current.loading).toBe(false));
 
             const { listener } = lastSubscribeCall();
@@ -278,7 +244,7 @@ describe('useSubmissions', () => {
             mockAuth(mockUser, refreshUser);
             (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
 
-            const { result } = renderHook(() => useSubmissions(undefined, undefined));
+            const { result } = renderHook(() => useSubmissions(undefined, undefined), { wrapper });
             await waitFor(() => expect(result.current.loading).toBe(false));
 
             const { listener } = lastSubscribeCall();
@@ -317,7 +283,7 @@ describe('useSubmissions', () => {
 
                 // waitFor advances fake timers itself, which would fire the
                 // interval mid-wait; flush with a single act instead.
-                const { result } = renderHook(() => useSubmissions(undefined, undefined));
+                const { result } = renderHook(() => useSubmissions(undefined, undefined), { wrapper });
                 await act(async () => {});
                 expect(result.current.loading).toBe(false);
 
@@ -347,7 +313,7 @@ describe('useSubmissions', () => {
                     { id: 1, overall_status: 'Running' },
                 ]);
 
-                const { result } = renderHook(() => useSubmissions(undefined, undefined));
+                const { result } = renderHook(() => useSubmissions(undefined, undefined), { wrapper });
                 await act(async () => {});
                 expect(result.current.loading).toBe(false);
 
@@ -370,7 +336,7 @@ describe('useSubmissions', () => {
             (jest.mocked(isRealtimeSupported) as jest.Mock).mockReturnValue(false);
             (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
 
-            const { result } = renderHook(() => useSubmissions(undefined, undefined));
+            const { result } = renderHook(() => useSubmissions(undefined, undefined), { wrapper });
             await waitFor(() => expect(result.current.loading).toBe(false));
 
             expect(subscribeSubmissions).not.toHaveBeenCalled();

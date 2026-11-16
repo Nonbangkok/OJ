@@ -1,0 +1,105 @@
+import { useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import hljs from 'highlight.js/lib/core';
+import cpp from 'highlight.js/lib/languages/cpp';
+import python from 'highlight.js/lib/languages/python';
+import { CaretDown, CaretRight, Copy } from '@phosphor-icons/react';
+import { InlineError, PageHeader } from '../../components/ui';
+import SubmissionResult from '../../features/submission/SubmissionResult';
+import useLiveSubmission from '../../features/submission/useLiveSubmission';
+import { getLanguageDisplayName } from '../../utils/constants';
+import styles from './SubmissionDetailPage.module.css';
+
+hljs.registerLanguage('cpp', cpp);
+hljs.registerLanguage('python', python);
+
+const highlight = (code: string, language: string): string => {
+  try {
+    return hljs.highlight(code, { language: language === 'python' ? 'python' : 'cpp' }).value;
+  } catch {
+    return code.replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch] as string));
+  }
+};
+
+/** Collapsible, copyable source of a submission. */
+function SubmittedCode({ code, language }: { code: string; language: string }) {
+  const [open, setOpen] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const lines = code.split('\n');
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+  return (
+    <section className={styles.code} aria-label="Submitted code">
+      <div className={styles.codeHead}>
+        <button type="button" className={styles.toggle} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          {open ? <CaretDown size={14} aria-hidden="true" /> : <CaretRight size={14} aria-hidden="true" />}
+          Submitted code
+        </button>
+        <span className={styles.codeMeta}>{`${getLanguageDisplayName(language)} · ${lines.length} lines`}</span>
+        <button type="button" className={styles.copy} onClick={copy}>
+          <Copy size={14} aria-hidden="true" />
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      {open && (
+        <div className={styles.codeBody}>
+          <ol className={styles.gutter} aria-hidden="true">
+            {lines.map((_, i) => <li key={i}>{i + 1}</li>)}
+          </ol>
+          {/* highlight.js output is escaped HTML built from the code text. */}
+          <pre className={styles.pre}><code dangerouslySetInnerHTML={{ __html: highlight(code, language) }} /></pre>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** /submissions/:id (and the contest variant): the full result plus the code. */
+const SubmissionDetailPage = () => {
+  const { submissionId, contestId } = useParams();
+  const id = Number(submissionId);
+  const { submission, error } = useLiveSubmission(Number.isSafeInteger(id) && id > 0 ? id : null, contestId);
+  const listHref = contestId ? `/contests/${contestId}/submissions` : '/submissions';
+  const problemBase = contestId ? `/contests/${contestId}/problems` : '/problems';
+
+  return (
+    <div className={styles.page}>
+      <PageHeader
+        breadcrumb={[{ label: 'Submissions', to: listHref }, { label: `#${submissionId}` }]}
+        title={`Submission #${submissionId}`}
+        meta={submission ? (
+          <span className={styles.meta}>
+            <Link to={`${problemBase}/${submission.problem_id}`}>{submission.problem_title ?? submission.problem_name ?? submission.problem_id}</Link>
+            <Link to={`/profile/${submission.username}`}>{submission.username}</Link>
+            <span>{getLanguageDisplayName(submission.language)}</span>
+          </span>
+        ) : undefined}
+      />
+      {error && <InlineError message={error} />}
+      {submission && (
+        <>
+          <SubmissionResult
+            submission={submission}
+            limits={{ timeMs: submission.time_limit_ms ?? 1000, memoryMb: submission.memory_limit_mb ?? 256 }}
+            actions={(
+              <>
+                <Link to={`${problemBase}/${submission.problem_id}`} className={styles.action}>Open problem</Link>
+                <Link to={`${problemBase}/${submission.problem_id}?tab=submit`} className={styles.action}>Edit &amp; resubmit</Link>
+              </>
+            )}
+          />
+          <SubmittedCode code={submission.code} language={submission.language} />
+        </>
+      )}
+    </div>
+  );
+};
+
+export default SubmissionDetailPage;
