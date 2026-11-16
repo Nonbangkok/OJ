@@ -63,7 +63,7 @@ type Row = { username: string; rank: number; total_score: number; detailed_score
     // The live board never shows which cases a contestant fails; only the final snapshot keeps them.
     expect(a.statuses).toBeUndefined();
     expect(new Date(a.best_at!).getTime()).toBe(at(20).getTime());
-    expect(new Date(u1.last_score_improvement_time).getTime()).toBe(at(20).getTime());
+    expect(new Date(u1.last_score_improvement_time!).getTime()).toBe(at(20).getTime());
 
     await pool.query("UPDATE contests SET status = 'finishing' WHERE id = 1");
     await migrateSubmissionsAfterContest(1);

@@ -12,7 +12,7 @@ describe('header problems migration (registration)', () => {
   it('is registered with the exported SQL', () => {
     const migration = migrations.find(({ version }) => version === '0024_header_problems');
     expect(migration).toBeDefined();
-    expect(migration!.sql).toBe(headerProblemsSql);
+    expect((migration as { sql: string }).sql).toBe(headerProblemsSql);
   });
 });
 

@@ -1,7 +1,13 @@
-export type Migration = {
-  version: string;
-  sql: string;
-};
+/**
+ * A migration runs its `sql` in one transaction. A step Postgres refuses inside a
+ * transaction (CREATE INDEX CONCURRENTLY on a large live table) is written as
+ * `concurrentStatements` instead: each statement runs on its own, in order, and the
+ * version is recorded after the last one. Such statements must be safe to rerun,
+ * because a failure part-way leaves the earlier ones applied.
+ */
+export type Migration =
+  | { version: string; sql: string }
+  | { version: string; concurrentStatements: readonly string[] };
 
 export type MigrationDatabase = {
   query: (
@@ -38,6 +44,15 @@ export const runMigrations = async (
 
     for (const migration of migrations) {
       if (appliedVersions.has(migration.version)) {
+        continue;
+      }
+
+      if ('concurrentStatements' in migration) {
+        for (const statement of migration.concurrentStatements) {
+          await database.query(statement);
+        }
+        await database.query(recordAppliedVersionSql, [migration.version]);
+        newlyApplied.push(migration.version);
         continue;
       }
 

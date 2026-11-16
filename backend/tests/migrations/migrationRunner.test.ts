@@ -1,7 +1,4 @@
-type Migration = {
-  version: string;
-  sql: string;
-};
+type Migration = { version: string; sql: string } | { version: string; concurrentStatements: readonly string[] };
 
 type MigrationDatabase = {
   query: (text: string, params?: readonly unknown[]) => Promise<{ rows: Array<{ version: string }> }>;
@@ -24,7 +21,7 @@ const loadMigrationRunner = (): Required<MigrationRunnerModule> => {
   return module as Required<MigrationRunnerModule>;
 };
 
-const migrations: readonly Migration[] = [
+const migrations: ReadonlyArray<{ version: string; sql: string }> = [
   { version: '0001_core', sql: 'CREATE TABLE users (id INTEGER PRIMARY KEY)' },
   { version: '0002_problems', sql: 'CREATE TABLE problems (id TEXT PRIMARY KEY)' },
 ];
@@ -114,5 +111,31 @@ describe('migration runner', () => {
     ]);
     expect(calls.some((call) => call.text.includes('INSERT INTO schema_migrations'))).toBe(false);
     expect(calls.at(-1)?.params).toEqual([SCHEMA_MIGRATION_LOCK_ID]);
+  });
+
+  it('runs a concurrent migration statement by statement outside a transaction, then records it', async () => {
+    const calls: string[] = [];
+    const database: MigrationDatabase = {
+      query: async (text) => {
+        calls.push(text);
+        return { rows: [] };
+      },
+    };
+    const { runMigrations } = loadMigrationRunner();
+    const applied = await runMigrations(database, [{
+      version: '0003_index',
+      concurrentStatements: ['DROP INDEX CONCURRENTLY IF EXISTS idx_x', 'CREATE INDEX CONCURRENTLY idx_x ON t (a)'],
+    }]);
+    expect(applied).toEqual(['0003_index']);
+    expect(calls).toEqual([
+      'SELECT pg_advisory_lock($1)',
+      expect.stringContaining('CREATE TABLE IF NOT EXISTS schema_migrations'),
+      expect.stringContaining('SELECT version'),
+      'DROP INDEX CONCURRENTLY IF EXISTS idx_x',
+      'CREATE INDEX CONCURRENTLY idx_x ON t (a)',
+      expect.stringContaining('INSERT INTO schema_migrations'),
+      'SELECT pg_advisory_unlock($1)',
+    ]);
+    expect(calls).not.toContain('BEGIN');
   });
 });
