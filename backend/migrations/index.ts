@@ -3,6 +3,7 @@ import { problemAuthoringFoundationSql } from './0002ProblemAuthoringFoundation'
 import { headerProblemsSql } from './0024HeaderProblems';
 import { submissionsUserProblemIndexSql } from './0025SubmissionsUserProblemIndex';
 import { contestProblemPositionSql } from './0026ContestProblemPosition';
+import { userLastLoginSql } from './0027UserLastLogin';
 import { Migration } from './migrationRunner';
 import { authoringJobDeliverySql } from './0003AuthoringJobDelivery';
 import { authoringJobInputsSql } from './0004AuthoringJobInputs';
@@ -63,4 +64,5 @@ export const migrations: readonly Migration[] = Object.freeze([
   { version: '0024_header_problems', sql: headerProblemsSql },
   { version: '0025_submissions_user_problem_index', sql: submissionsUserProblemIndexSql },
   { version: '0026_contest_problem_position', sql: contestProblemPositionSql },
+  { version: '0027_user_last_login', sql: userLastLoginSql },
 ]);

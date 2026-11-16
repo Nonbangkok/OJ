@@ -19,6 +19,7 @@ import { validateRequest } from '../middleware/validation';
 import {
   adminResetUserPasswordSchema,
   adminUsersQuerySchema,
+  adminUsersRoleBodySchema,
   analyticsContestIdParamSchema,
   analyticsProblemIdParamSchema,
   batchCreateUsersSchema,
@@ -45,6 +46,7 @@ import {
   createBatchUsers,
   deleteAdminUser,
   getAdminUsers,
+  setAdminUsersRole,
   getAuthors,
   getRegistrationEnabled,
   resetAdminUserPassword,
@@ -67,13 +69,14 @@ router.get('/admin/users', requireAuth, requireAdmin,
   validateRequest({ query: adminUsersQuerySchema }),
   asyncHandler(async (req: Request, res: Response) => {
     // ADMIN-008: search/role scope is applied before paging and to the matching total.
-    const { page, limit, search, role } = req.query as unknown as {
+    const { page, limit, search, role, locked } = req.query as unknown as {
       page: number;
       limit: number;
       search?: string;
       role: string;
+      locked?: 'locked' | 'unlocked';
     };
-    const result = await getAdminUsers(page, limit, { search, role });
+    const result = await getAdminUsers(page, limit, { search, role, locked });
     res.json(result);
   }));
 
@@ -86,6 +89,14 @@ router.post('/admin/users', requireAuth, requireAdmin,
       throw new AppError('Username already exists.', 409);
     }
     res.status(201).json(createResult.data);
+  }));
+
+// B5: one role for many accounts; the protected admin and the actor are skipped, not failed.
+router.put('/admin/users/role', requireAuth, requireAdmin,
+  validateRequest({ body: adminUsersRoleBodySchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { ids, role } = req.body as { ids: number[]; role: string };
+    res.json(await setAdminUsersRole(ids, role, Number(req.user?.id)));
   }));
 
 router.put('/admin/users/submission-lock', requireAuth, requireAdmin,

@@ -327,7 +327,13 @@ export type GetProblemTestcasesResult =
 // adminQueryService
 // ---------------------------------------------------------------------------
 
-export interface AdminUserListRow extends Pick<UserRow, 'id' | 'username' | 'role' | 'created_at' | 'submissions_locked'> {}
+export interface AdminUserListRow extends Pick<UserRow, 'id' | 'username' | 'role' | 'created_at' | 'submissions_locked'> {
+  /** Latest of the last login and the last (practice or contest) submission (B5). */
+  last_active_at: string | null;
+  solved_count: number;
+  xp: number;
+  submission_count: number;
+}
 
 export interface AdminSubmissionLockRow extends Pick<UserRow, 'id' | 'username' | 'role' | 'submissions_locked'> {}
 

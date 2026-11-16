@@ -517,7 +517,9 @@ describe('Problem Controller', () => {
 
     describe('GET /admin/problems/:id', () => {
         it('should return 404 for missing admin problem detail', async () => {
-            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [] })  // detail
+                .mockResolvedValueOnce({ rows: [] }); // B6 facts
 
             const res = await request(app).get('/admin/problems/NOPE');
 

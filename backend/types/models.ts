@@ -143,10 +143,16 @@ export type ProblemDetailDTO = Pick<
 export interface AdminProblemRow extends Pick<
     ProblemRow,
     'id' | 'title' | 'author' | 'categories' | 'difficulty' | 'collection_id' | 'is_visible' | 'contest_id'
+    | 'problem_type' | 'time_limit_ms' | 'memory_limit_mb'
 > {
     /** Joined name for display; null when the problem has no collection. */
     collection_name: string | null;
     contest_status: ContestStatus | null;
+    /** B6: testcases stored, practice + contest submissions, and whether the type is locked. */
+    testcase_count: number;
+    testcase_bytes: number;
+    submission_count: number;
+    type_locked: boolean;
 }
 
 /** `testcases` table row. */
