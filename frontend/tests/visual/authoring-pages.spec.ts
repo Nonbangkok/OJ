@@ -82,6 +82,7 @@ test.describe('Draft workspace (§7.9)', () => {
     await mockAuthoringApi(page);
     await page.goto('/admin/authoring/d-bfs/testcases');
     await expect(page.getByText('24 testcases · 3.1 MB')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Actions for 01.in' })).toBeVisible();
     await shot(page, 'draft-testcases');
   });
 
@@ -124,7 +125,7 @@ test.describe('Draft workspace (§7.9)', () => {
       await expect(page.getByText('Live preview is up to date')).toBeVisible();
       await expect(page.frameLocator('iframe[title="Live statement preview"]').getByText('fewest roads').first()).toBeVisible();
     } else {
-      await expect(page.getByRole('tab', { name: 'Source' })).toHaveAttribute('aria-selected', 'true');
+      await expect(page.getByRole('group', { name: 'Editor pane' }).getByRole('button', { name: 'Source' })).toHaveAttribute('aria-pressed', 'true');
     }
     await shot(page, 'statement-editor');
   });

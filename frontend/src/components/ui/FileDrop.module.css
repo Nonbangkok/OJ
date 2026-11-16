@@ -45,3 +45,8 @@
   font-size: 13px;
   color: var(--tint-danger-fg);
 }
+
+/* The picker stays hidden even under page rules like `.page input { display: block }`. */
+.picker.picker.picker {
+  display: none;
+}
