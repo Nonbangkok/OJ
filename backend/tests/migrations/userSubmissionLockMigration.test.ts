@@ -7,6 +7,7 @@ describe('user submission lock migration', () => {
     const database = {
       query: async (sql: string, params?: readonly unknown[]) => {
         calls.push({ sql, params });
+        if (sql.startsWith('SELECT pg_try_advisory_lock')) return { rows: [{ version: '', locked: true }] };
         if (sql.startsWith('SELECT version')) return { rows: [] };
         return { rows: [] };
       },
