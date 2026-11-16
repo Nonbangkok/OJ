@@ -242,3 +242,37 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Phase 6 (§7.9): summary line, numeric columns, missing outputs. */
+.summary {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+
+.mono {
+  font-family: var(--font-family-mono);
+}
+
+.num {
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.missing {
+  color: var(--verdict-wrong);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}

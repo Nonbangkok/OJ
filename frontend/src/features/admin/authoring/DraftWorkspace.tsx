@@ -8,6 +8,9 @@ import WorkspaceHeader from './WorkspaceHeader';
 import StepTabs, { type StepPath } from './StepTabs';
 import { readinessFromWorkspace, readinessOf, type ReadinessState } from './readiness';
 import workspaceStyles from './Workspace.module.css';
+import codeStyles from './Code.module.css';
+import LastCompile from './LastCompile';
+import LargeScreenNotice, { useSmallScreen } from './LargeScreenNotice';
 import useAuthoringDraft from './useAuthoringDraft';
 import { Profile } from './types';
 import { draftStatus, jobLabel, jobStatus, verifyFailureExplanation } from './status';
@@ -232,73 +235,90 @@ function StatementSection() {
 }
 
 function SolutionSection() {
-  const { model, form, editorDisabled } = useOutletContext<WorkspaceContext>();
-  return <section className={styles.authoring}>
-    <h2>Solution</h2>
-    <CodeEditor label="solution.cpp" value={form.solutionCpp} disabled={editorDisabled}
-      onChange={value => model.edit('solutionCpp', value)} />
-    <div className={styles.sectionActions}>
-      <Button disabled={model.actionsDisabled || !form.solutionCpp.trim()} onClick={() => void model.runJob('compile', { target: 'solution' })}>Compile solution</Button>
+  const { model, draft, form, editorDisabled } = useOutletContext<WorkspaceContext>();
+  const small = useSmallScreen();
+  return <section className={styles.authoring} aria-label="Solution">
+    {small && <LargeScreenNotice detail="Read the code and its last compile here; edit and compile on a larger screen." />}
+    <div className={codeStyles.layout}>
+      <div>
+        {model.activeJob && <div className={codeStyles.editorHead}><span>Read-only while the job runs</span></div>}
+        <CodeEditor label="solution.cpp" value={form.solutionCpp} disabled={editorDisabled || small}
+          onChange={value => model.edit('solutionCpp', value)} />
+        {!small && <div className={codeStyles.actions}>
+          <Button variant="secondary" disabled={model.actionsDisabled || !form.solutionCpp.trim()} onClick={() => void model.runJob('compile', { target: 'solution' })}>Compile</Button>
+        </div>}
+      </div>
+      <LastCompile jobs={model.jobs} jobType="compile_solution" revision={draft.revision} />
     </div>
   </section>;
 }
+
 
 function TestcasesSection() {
   const { model, draft, form, setConfirm } = useOutletContext<WorkspaceContext>();
+  const small = useSmallScreen();
   const [seed, setSeed] = useState('12345');
   const seedValid = /^(0|[1-9][0-9]{0,19})$/.test(seed) && !(seed.length === 20 && seed > '18446744073709551615');
-  return <section className={styles.authoring}>
-    <h2>Testcases</h2>
-    <section className={styles.panel}>
-      <div className={styles.panelHead}>
-        <h3>Generate</h3>
+  return <section className={styles.authoring} aria-label="Testcases">
+    {!small && <div className={codeStyles.panel}>
+      <div className={codeStyles.actions} style={{ marginTop: 0, alignItems: 'center' }}>
+        <b style={{ fontWeight: 500, marginRight: 'auto' }}>Generate</b>
+        <label className={codeStyles.seed}>Generator seed<input value={seed} disabled={model.actionsDisabled || !form.generatorCpp?.trim()} inputMode="numeric" onChange={e => setSeed(e.target.value)} /></label>
+        <Button variant="secondary" disabled={model.actionsDisabled || !form.generatorCpp?.trim() || !seedValid}
+          onClick={() => setConfirm({ action: 'generate', revision: draft.revision, seed })}>Generate inputs</Button>
+        <Button variant="secondary" disabled={model.actionsDisabled || !form.solutionCpp.trim()} onClick={() => setConfirm({ action: 'outputs', revision: draft.revision })}>Generate outputs</Button>
       </div>
-      <div className={styles.panelBody}>
-        <div className={styles.generateRow}>
-          <label className={styles.seedRow}>Generator seed<input value={seed} disabled={model.actionsDisabled || !form.generatorCpp?.trim()} inputMode="numeric" onChange={e => setSeed(e.target.value)} /></label>
-          <div className={styles.actions}>
-            <Button disabled={model.actionsDisabled || !form.generatorCpp?.trim() || !seedValid}
-              onClick={() => setConfirm({ action: 'generate', revision: draft.revision, seed })}>Generate inputs</Button>
-            <Button disabled={model.actionsDisabled || !form.solutionCpp.trim()} onClick={() => setConfirm({ action: 'outputs', revision: draft.revision })}>Generate outputs</Button>
-          </div>
-        </div>
-        <p className={styles.caution}>Legacy multi-file generators may ignore the seed and write to ./input/ instead of reading OJ_SEED or argv[1].</p>
-      </div>
-    </section>
-    <section className={styles.panel}>
-      <div className={styles.panelHead}>
-        <h3>Files</h3>
-      </div>
-      <TestcaseFiles draftId={draft.id} revision={draft.revision} artifactVersion={draft.updatedAt} disabled={model.actionsDisabled} onMutated={model.refresh} onError={model.onError} onBusyChange={model.setOperationBusy} />
-    </section>
+      <p className={codeStyles.note}>Legacy multi-file generators may ignore the seed and write to ./input/ instead of reading OJ_SEED or argv[1].</p>
+    </div>}
+    {small && <LargeScreenNotice detail="Inspect cases here; add or replace them on a larger screen." />}
+    <TestcaseFiles draftId={draft.id} revision={draft.revision} artifactVersion={draft.updatedAt} disabled={model.actionsDisabled} readOnly={small} onMutated={model.refresh} onError={model.onError} onBusyChange={model.setOperationBusy} />
   </section>;
 }
 
+
 function GeneratorSection() {
-  const { model, draft, form, editorDisabled } = useOutletContext<WorkspaceContext>();
-  return <section className={styles.authoring}>
-    <h2>Generator <span className={styles.optionalTag}>optional</span></h2>
-    <CodeEditor label="generator.cpp" value={form.generatorCpp || ''} disabled={editorDisabled}
-      onChange={value => model.edit('generatorCpp', value || null)} minLines={18} />
-    <details className={styles.generatorTemplate}>
-      <summary>Reference template — the runner contract</summary>
-      <ul>
-        <li>Write 1–10 <code>.txt</code> files into <code>input/</code> — the runner collects them as the draft's testcases.</li>
-        <li>The seed arrives as <code>argv[1]</code>; using it makes generation reproducible.</li>
-        <li>Opening a file whose folder doesn't exist fails <em>silently</em> — check the stream before writing.</li>
-        <li>Exit 0; keep total runtime within the generator timeout.</li>
-      </ul>
-      <pre>{GENERATOR_TEMPLATE}</pre>
-      <Button variant="secondary" size="compact" disabled={editorDisabled || !!form.generatorCpp?.trim()}
-        onClick={() => model.edit('generatorCpp', GENERATOR_TEMPLATE)}>
-        {form.generatorCpp?.trim() ? 'Editor already has code' : 'Use this template'}
-      </Button>
-    </details>
-    <div className={styles.sectionActions}>
-      <Button disabled={model.actionsDisabled || !form.generatorCpp?.trim()} onClick={() => void model.runJob('compile', { target: 'generator' })}>Compile generator</Button>
-    </div>
+  const { model, draft, form, editorDisabled, setConfirm } = useOutletContext<WorkspaceContext>();
+  const small = useSmallScreen();
+  const [seed, setSeed] = useState('12345');
+  const seedValid = /^(0|[1-9][0-9]{0,19})$/.test(seed) && !(seed.length === 20 && seed > '18446744073709551615');
+  const hasGenerator = !!form.generatorCpp?.trim();
+  return <section className={styles.authoring} aria-label="Generator">
+    {small && <LargeScreenNotice detail="Read the generator here; edit and run it on a larger screen." />}
+    {!hasGenerator && !small && (
+      <div className={codeStyles.panel}>
+        <p className={codeStyles.note} style={{ marginTop: 0 }}>No generator — testcases can be uploaded instead.</p>
+        <div className={codeStyles.actions}>
+          <Button variant="secondary" disabled={editorDisabled} onClick={() => model.edit('generatorCpp', GENERATOR_TEMPLATE)}>Start from the template</Button>
+        </div>
+      </div>
+    )}
+    {(hasGenerator || small) && <div className={codeStyles.layout}>
+      <div>
+        {model.activeJob && <div className={codeStyles.editorHead}><span>Read-only while the job runs</span></div>}
+        <CodeEditor label="generator.cpp" value={form.generatorCpp || ''} disabled={editorDisabled || small}
+          onChange={value => model.edit('generatorCpp', value || null)} minLines={18} />
+        {!small && <div className={codeStyles.actions}>
+          <Button variant="secondary" disabled={model.actionsDisabled || !hasGenerator} onClick={() => void model.runJob('compile', { target: 'generator' })}>Compile</Button>
+          <label className={codeStyles.seed}>Seed<input value={seed} inputMode="numeric" disabled={model.actionsDisabled} onChange={e => setSeed(e.target.value)} /></label>
+          <Button variant="secondary" disabled={model.actionsDisabled || !seedValid}
+            onClick={() => setConfirm({ action: 'generate', revision: draft.revision, seed })}>Generate inputs</Button>
+        </div>}
+        <details className={styles.generatorTemplate}>
+          <summary>The runner contract</summary>
+          <ul>
+            <li>Write 1–10 <code>.txt</code> files into <code>input/</code> — the runner collects them as the draft's testcases.</li>
+            <li>The seed arrives as <code>argv[1]</code>; using it makes generation reproducible.</li>
+            <li>Opening a file whose folder doesn't exist fails <em>silently</em> — check the stream before writing.</li>
+            <li>Exit 0; keep total runtime within the generator timeout.</li>
+          </ul>
+          <pre>{GENERATOR_TEMPLATE}</pre>
+        </details>
+      </div>
+      <LastCompile jobs={model.jobs} jobType="compile_generator" revision={draft.revision} />
+    </div>}
   </section>;
 }
+
 
 function VerifySection() {
   const { model, draft, setConfirm, navigate } = useOutletContext<WorkspaceContext>();

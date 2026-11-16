@@ -136,13 +136,13 @@ test('tabs preserve edits and disable job actions until explicit Save succeeds',
   // Build PDF appears in the checklist and the PDF row; both wait for the save.
   for (const button of screen.getAllByRole('button', { name: 'Build PDF' })) expect(button).toBeDisabled();
   fireEvent.click(screen.getByRole('link', { name: /^Solution,/ }));
-  expect(screen.getByRole('button', { name: 'Compile solution' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Compile' })).toBeDisabled();
   jest
     .mocked(api.patch)
     .mockResolvedValue({ data: { ...draft, title: 'Edited title', revision: 4, status: 'draft' } });
   // The Save now button is gone: autosave fires shortly after the edit.
   await waitFor(
-    () => expect(screen.getByRole('button', { name: 'Compile solution' })).toBeEnabled(),
+    () => expect(screen.getByRole('button', { name: 'Compile' })).toBeEnabled(),
     { timeout: 4000 }
   );
 });
@@ -436,8 +436,8 @@ test('the Solution checklist item links to the Solution step', async () => {
   show('/admin/authoring/d1/verify');
   const checklist = await screen.findByLabelText('Publish readiness');
   fireEvent.click(within(checklist).getByRole('button', { name: 'add it' }));
-  expect(await screen.findByRole('heading', { name: 'Solution' })).toBeInTheDocument();
-  expect(screen.queryByRole('heading', { name: 'Testcases' })).not.toBeInTheDocument();
+  expect(await screen.findByRole('region', { name: 'Solution' })).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'Testcases' })).not.toBeInTheDocument();
 });
 
 test('the Testcases checklist item shows real pairing counts, not the draft status', async () => {

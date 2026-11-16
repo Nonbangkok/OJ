@@ -2,6 +2,7 @@ import { Button, Dialog } from '../../../components/ui';
 import { TestcaseMetadata } from './types';
 import useTestcaseFiles from './useTestcaseFiles';
 import TestcaseTable from './TestcaseTable';
+import { formatDecimalSize } from './testcaseSize';
 import { TestcasePreviewDialog, TestcaseReplaceDialog, TestcaseUploadForms } from './TestcaseDialogs';
 import styles from './TestcaseFiles.module.css';
 
@@ -13,13 +14,15 @@ interface Props {
   onError: (error: unknown) => void;
   onBusyChange?: (busy: boolean) => void;
   artifactVersion?: string;
+  /** Phones: view and inspect only. */
+  readOnly?: boolean;
 }
 
 export default function TestcaseFiles(props: Props) {
   return <TestcaseFilesContent key={props.draftId} {...props} />;
 }
 
-function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError, onBusyChange, artifactVersion }: Props) {
+function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError, onBusyChange, artifactVersion, readOnly = false }: Props) {
   const model = useTestcaseFiles({ draftId, revision, disabled, onMutated, onError, onBusyChange, artifactVersion });
   const {
     testcases, loading, loaded, busy, inspecting, preview, errorMessage, savedRevision, locked,
@@ -42,6 +45,12 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
     <section className={styles.root} aria-label="Testcase files">
       <div className={styles.heading}>
         <h3>Testcase files</h3>
+        {loaded && testcases.length > 0 && (
+          <p className={styles.summary}>
+            <span className={styles.mono}>{`${testcases.length} ${testcases.length === 1 ? 'testcase' : 'testcases'} · ${formatDecimalSize(testcases.reduce((sum, t) => sum + t.inputBytes + (t.outputBytes ?? 0), 0))}`}</span>
+            {testcases.some((t) => !t.hasOutput) && <> · <span className={styles.missing}>{`${testcases.filter((t) => !t.hasOutput).length} missing output`}</span></>}
+          </p>
+        )}
         <button type="button" disabled={busy || loading} onClick={() => void model.retryRefresh()}>
           Refresh testcases
         </button>
@@ -76,6 +85,7 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
           busy={busy}
           inspecting={inspecting}
           locked={locked}
+          readOnly={readOnly}
           onInspect={(testcase) => void model.inspect(testcase)}
           onReplace={replaceFromTable}
           onDelete={(testcase) => model.setConfirmation({ kind: 'delete', testcase, revision })}
@@ -98,7 +108,7 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
         />
       )}
 
-      <TestcaseUploadForms
+      {!readOnly && <TestcaseUploadForms
         formVersion={model.formVersion}
         locked={locked}
         input={model.input}
@@ -112,11 +122,11 @@ function TestcaseFilesContent({ draftId, revision, disabled, onMutated, onError,
         }}
         onAppend={model.appendTestcase}
         onReplaceAll={requestReplaceAll}
-      />
+      />}
       {model.confirmation && (
         <Dialog
           open
-          title={model.confirmation.kind === 'zip' ? 'Replace every testcase?' : 'Delete testcase?'}
+          title={model.confirmation.kind === 'zip' ? `Replace all ${testcases.length} ${testcases.length === 1 ? 'testcase' : 'testcases'}?` : 'Delete testcase?'}
           description={
             model.confirmation.kind === 'zip'
               ? `The archive ${model.archive?.name} will replace all ${testcases.length} existing testcases. This cannot be undone.`
