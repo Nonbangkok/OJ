@@ -256,3 +256,9 @@
     border-bottom: 0;
   }
 }
+
+.problemCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}

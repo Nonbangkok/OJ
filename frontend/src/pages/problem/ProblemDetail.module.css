@@ -133,3 +133,10 @@
     background: var(--background-primary);
   }
 }
+
+/* Contest problems carry their letter before the title (§7.7). */
+.letter {
+  font-family: var(--font-family-mono);
+  font-weight: 500;
+  color: var(--text-muted);
+}

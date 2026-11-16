@@ -80,6 +80,8 @@ export default function ContestShell() {
     };
   }, [contestId, contest?.status]);
 
+  const points = problems.reduce((sum, p) => sum + Number(p.best_score ?? 0), 0);
+
   if (isMobile) {
     return (
       <div className={styles.mobile}>
@@ -126,6 +128,7 @@ export default function ContestShell() {
             </NavLink>
           </div>
         </nav>
+        <div className={styles.total}><span>Your points</span><b>{points}</b></div>
         <div className={styles.footer}><AccountMenu /></div>
       </aside>
       <main className={styles.main}><div className="container"><Outlet /></div></main>

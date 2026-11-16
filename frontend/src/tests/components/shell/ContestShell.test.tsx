@@ -92,6 +92,14 @@ describe('ContestShell', () => {
     expect(await screen.findByRole('link', { name: /my submissions/i })).toBeInTheDocument();
   });
 
+  it('shows your points at the bottom of the sidebar', async () => {
+    jest.mocked(contestService.getById).mockResolvedValue(contest());
+    renderShell();
+    const nav = await screen.findByRole('navigation', { name: 'Contest' });
+    await within(nav).findByRole('link', { name: /A\s+Stack min/ });
+    expect(screen.getByText('Your points').parentElement).toHaveTextContent(/Your points\s*140/);
+  });
+
   it('keeps the account menu inside the contest', async () => {
     jest.mocked(contestService.getById).mockResolvedValue(contest());
     renderShell();
