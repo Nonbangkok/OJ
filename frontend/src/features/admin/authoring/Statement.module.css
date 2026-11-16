@@ -4,6 +4,8 @@
   flex-direction: column;
   gap: 14px;
   max-width: 880px;
+  /* Centred under the workspace header and step tabs. */
+  margin-inline: auto;
 }
 
 .card {
