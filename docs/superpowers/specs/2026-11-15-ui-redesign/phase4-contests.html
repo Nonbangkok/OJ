@@ -1,0 +1,355 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Phase 4 · Contest pages</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<style>
+body { margin:0; padding:32px; background:#e9e9ec; font-family:'IBM Plex Sans Thai', sans-serif; color:#18181b; }
+h2 { font-size:18px; margin:40px 0 6px; } h2:first-of-type { margin-top:0; }
+.note { max-width:880px; font-size:14px; line-height:1.65; color:#3f3f46; margin:0 0 16px; }
+.note b { color:#18181b; }
+.row { display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; }
+.cap { font-size:12.5px; color:#52525b; margin:0 0 8px; }
+
+/* Theme tokens: the same names and values as frontend/src/index.css */
+.app { --bg:#fff; --fg:#18181b; --fg2:#3f3f46; --mut:#71717a; --faint:#a1a1aa; --line:#e4e4e7; --line2:#f4f4f5; --side:#fafafa; --hover:#f4f4f5;
+  --ok:#15803d; --bad:#dc2626; --warn:#b45309; --pend:#71717a; --none:#e4e4e7; --btn:#18181b; --btnfg:#fff; --accent:#18181b; --logo-accent:#a1a1aa;
+  --h0:#ebedf0; --h1:#9be9a8; --h2:#40c463; --h3:#30a14e; --h4:#216e39;
+  font-family:'IBM Plex Sans Thai', sans-serif; background:var(--bg); color:var(--fg); font-size:14px; border-radius:10px; overflow:hidden; border:1px solid rgba(127,127,127,.25); }
+.app.dark { --bg:#0d1117; --fg:#e6edf3; --fg2:#c9d1d9; --mut:#8b949e; --faint:#6e7681; --line:#30363d; --line2:#21262d; --side:#010409; --hover:#161b22;
+  --ok:#3fb950; --bad:#f85149; --warn:#d29922; --pend:#8b949e; --none:#30363d; --btn:#e6edf3; --btnfg:#0d1117; --accent:#e6edf3; --logo-accent:#6e7681;
+  --h0:#30363d; --h1:#0e4429; --h2:#006d32; --h3:#26a641; --h4:#39d353; }
+.mono { font-family:'JetBrains Mono', monospace; }
+.mut { color:var(--mut); } .faint { color:var(--faint); } .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); } .pend { color:var(--pend); }
+
+/* desktop shell */
+.desk { flex:none; width:1280px; display:grid; grid-template-columns:220px 1fr; }
+.side { background:var(--side); border-right:1px solid var(--line); padding:12px 10px; display:flex; flex-direction:column; gap:2px; min-height:100%; box-sizing:border-box; }
+.brand { display:flex; align-items:center; gap:9px; font-weight:600; padding:4px 8px 14px; }
+.brand .col { margin-left:auto; color:var(--faint); font-size:16px; }
+.searchrow { display:flex; align-items:center; gap:8px; border:1px solid var(--line); background:var(--bg); border-radius:6px; padding:5px 8px 5px 10px; color:var(--faint); font-size:13px; margin:0 2px 6px; }
+.searchrow .k { margin-left:auto; font:11px 'JetBrains Mono', monospace; }
+.side a { display:flex; gap:10px; align-items:center; padding:7px 10px; border-radius:6px; color:var(--mut); }
+.side a i { font-size:17px; }
+.side a.on { background:var(--bg); color:var(--fg); font-weight:500; box-shadow:0 0 0 1px var(--line); }
+.grp { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); padding:14px 10px 6px; }
+.me { margin-top:auto; display:flex; gap:8px; align-items:center; padding:8px; font-size:13px; font-weight:500; }
+.me .lv { font:11.5px 'JetBrains Mono', monospace; color:var(--faint); font-weight:400; }
+.av { width:24px; height:24px; border-radius:50%; background:var(--line2); color:var(--mut); display:grid; place-items:center; font-size:11px; font-weight:500; flex:none; }
+.av.xl { width:64px; height:64px; font-size:22px; font-weight:600; }
+.wrap { max-width:1040px; padding:32px 28px 48px; box-sizing:border-box; }
+
+/* profile */
+.phd { display:flex; align-items:center; gap:20px; }
+.phd .id { flex:1; display:flex; flex-direction:column; gap:6px; }
+.phd .nm { display:flex; align-items:baseline; gap:10px; }
+.phd h1 { font-size:22px; font-weight:600; margin:0; }
+.lvl { display:flex; align-items:center; gap:12px; font-size:13px; flex-wrap:wrap; }
+.lvl b { font-weight:500; font-size:14px; }
+.bar { height:6px; border-radius:3px; background:var(--line2); overflow:hidden; }
+.bar > i { display:block; height:100%; background:var(--fg); border-radius:3px; }
+.rank { text-align:right; } .rank .v { font:500 22px 'JetBrains Mono', monospace; }
+.stats { display:grid; grid-template-columns:repeat(5, 1fr); border:1px solid var(--line); border-radius:8px; margin-top:24px; }
+.stats div { padding:12px 16px; border-right:1px solid var(--line); } .stats div:last-child { border-right:0; }
+.stats span { display:block; font-size:13px; color:var(--mut); } .stats b { font:500 18px 'JetBrains Mono', monospace; }
+.sec { margin-top:28px; }
+.sech { display:flex; align-items:baseline; gap:8px; margin-bottom:10px; } .sech b { font-weight:500; flex:1; } .sech span { font-size:13px; color:var(--mut); }
+.heat { display:grid; grid-auto-flow:column; grid-template-rows:repeat(7, 13px); gap:3px; justify-content:end; overflow:hidden; }
+.heat i { width:13px; height:13px; border-radius:3px; background:var(--h0); }
+.heat i.l1 { background:var(--h1); } .heat i.l2 { background:var(--h2); } .heat i.l3 { background:var(--h3); } .heat i.l4 { background:var(--h4); }
+.legend { display:flex; gap:4px; align-items:center; justify-content:flex-end; font-size:11px; color:var(--faint); margin-top:8px; }
+.legend i { width:10px; height:10px; border-radius:2px; display:inline-block; }
+.cols { display:grid; grid-template-columns:1fr 1fr; gap:32px; }
+.list > div { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line2); font-size:14px; }
+.list .t { flex:1; } .list .x { font:12px 'JetBrains Mono', monospace; } .list .w { font-size:13px; color:var(--mut); min-width:72px; text-align:right; }
+.hbar { display:grid; grid-template-columns:130px 1fr 52px; gap:10px; align-items:center; font-size:13px; padding:5px 0; }
+.hbar .n { font:12px 'JetBrains Mono', monospace; color:var(--fg2); text-align:right; }
+.hbar .bar > i.ok { background:var(--ok); } .hbar .bar > i.bad { background:var(--bad); } .hbar .bar > i.warn { background:var(--warn); } .hbar .bar > i.pend { background:var(--pend); } .hbar .bar > i.ink { background:var(--fg2); }
+
+/* radar */
+.radar-card { display:grid; grid-template-columns:400px 1fr; gap:32px; align-items:center; }
+.radar svg { display:block; width:100%; height:auto; overflow:visible; }
+.radar .ring { fill:none; stroke:var(--line); stroke-width:1; }
+.radar .spoke { stroke:var(--line); stroke-width:1; }
+.radar .area { fill:var(--accent); fill-opacity:.12; stroke:var(--accent); stroke-width:1.75; stroke-linejoin:round; }
+.radar .dot { fill:var(--accent); stroke:var(--bg); stroke-width:1.5; }
+.radar .lab { fill:var(--fg2); font:12px 'IBM Plex Sans Thai', sans-serif; }
+.radar .pct { fill:var(--mut); font:10.5px 'JetBrains Mono', monospace; }
+.radar .tick { fill:var(--faint); font:9.5px 'JetBrains Mono', monospace; }
+.radar .hot .dot { r:4.5; } .radar .hot .lab { fill:var(--fg); font-weight:500; }
+.catlist { font-size:13px; }
+.catlist > div { display:grid; grid-template-columns:1fr 64px 48px; gap:8px; padding:6px 0; border-bottom:1px solid var(--line2); align-items:center; }
+.catlist .n { font:12px 'JetBrains Mono', monospace; color:var(--fg2); text-align:right; }
+.catlist .p { font:12px 'JetBrains Mono', monospace; color:var(--mut); text-align:right; }
+.catlist > div.hot { background:var(--hover); box-shadow:inset 2px 0 0 var(--fg); padding-left:8px; }
+.tip { position:absolute; pointer-events:none; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 9px; font-size:12px; box-shadow:0 4px 14px rgba(0,0,0,.12); white-space:nowrap; }
+.tip b { font-weight:500; display:block; } .tip span { font:11.5px 'JetBrains Mono', monospace; color:var(--mut); }
+.ach > div { display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid var(--line2); }
+.ach .tx { flex:1; } .ach .tx b { font-weight:500; display:block; } .ach .tx span { font-size:13px; color:var(--mut); }
+.ach .prog { display:flex; align-items:center; gap:10px; } .ach .prog .bar { width:140px; }
+.ach .prog span { font:12px "JetBrains Mono", monospace; color:var(--fg2); white-space:nowrap; width:64px; text-align:right; }
+
+/* phone */
+.phone { flex:none; width:390px; height:844px; position:relative; display:flex; flex-direction:column; }
+.phone.tall { height:1720px; }
+.topbar { height:52px; flex:none; display:flex; align-items:center; gap:9px; padding:0 16px; border-bottom:1px solid var(--line); font-weight:600; font-size:15px; }
+.topbar .s { margin-left:auto; font-size:19px; color:var(--fg2); }
+.pmain { flex:1; overflow:hidden; padding:20px 16px 120px; box-sizing:border-box; }
+.tabs { position:absolute; left:0; right:0; bottom:0; height:56px; display:grid; grid-template-columns:repeat(5, 1fr); border-top:1px solid var(--line); background:var(--bg); }
+.tabs a { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:11px; color:var(--mut); }
+.tabs a i { font-size:19px; } .tabs a.on { color:var(--fg); font-weight:500; }
+.pin { position:absolute; left:0; right:0; bottom:56px; height:54px; display:flex; align-items:center; gap:10px; padding:0 16px; background:var(--hover); border-top:1px solid var(--line); box-shadow:inset 2px 0 0 var(--fg); }
+.p-h1 { font-size:22px; font-weight:600; margin:0; } .p-meta { font-size:13px; color:var(--mut); margin:2px 0 14px; }
+.ptb { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.seg { display:flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; font-size:13px; }
+.seg span { padding:6px 11px; color:var(--mut); border-right:1px solid var(--line); } .seg span:last-child { border-right:0; }
+.seg span.on { background:var(--line2); color:var(--fg); font-weight:500; }
+.btn2 { border:1px solid var(--line); background:var(--bg); border-radius:6px; padding:6px 11px; font-size:13.5px; color:var(--fg); display:inline-flex; gap:6px; align-items:center; margin-left:auto; }
+.item { padding:11px 0; border-bottom:1px solid var(--line2); }
+.item .l1 { display:flex; align-items:center; gap:8px; } .item .l1 b { flex:1; font-weight:500; }
+.item .l1 i { font-size:14px; }
+.item .l2 { display:flex; align-items:center; gap:8px; padding-left:22px; margin-top:4px; font:500 12px 'JetBrains Mono', monospace; }
+.item .l2 .id { margin-left:auto; color:var(--faint); font-weight:400; font-size:11.5px; }
+.strip { display:inline-flex; gap:2px; } .strip i { width:9px; height:6px; border-radius:1.5px; background:var(--ok); }
+.strip i.x { background:var(--bad); } .strip i.t { background:var(--warn); } .strip i.n { background:var(--none); }
+.rk { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line2); }
+.rk .r { width:22px; text-align:right; font:12.5px 'JetBrains Mono', monospace; color:var(--mut); }
+.rk .t { flex:1; } .rk .t b { display:block; font-weight:500; } .rk .t span { font-size:12.5px; color:var(--mut); }
+.rk .x { font:12.5px 'JetBrains Mono', monospace; }
+.rk.top .r, .rk.top .x { color:var(--fg); font-weight:500; } .rk.top .t b { font-weight:600; }
+.pstats { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:8px; margin:16px 0 0; }
+.pstats div { padding:10px 14px; border-bottom:1px solid var(--line); } .pstats div:nth-child(odd) { border-right:1px solid var(--line); }
+.pstats div:nth-last-child(-n+2) { border-bottom:0; }
+.pstats span { display:block; font-size:12.5px; color:var(--mut); } .pstats b { font:500 17px 'JetBrains Mono', monospace; }
+.phone .heat { grid-template-rows:repeat(7, 12px); } .phone .heat i { width:12px; height:12px; border-radius:2.5px; }
+.phone .radar-card { grid-template-columns:1fr; gap:8px; }
+</style>
+<style>
+/* Phase 4 additions */
+.desk.short { min-height:720px; }
+.tag { display:inline-block; font:500 11px 'JetBrains Mono', monospace; letter-spacing:.04em; padding:2px 6px; border-radius:4px; border:1px solid var(--line); color:var(--mut); vertical-align:middle; }
+.tag.live { color:var(--ok); border-color:currentColor; } .tag.hid { color:var(--warn); border-color:currentColor; } .tag.fin { color:var(--fg2); }
+.btn { display:inline-flex; align-items:center; gap:6px; background:var(--btn); color:var(--btnfg); border-radius:6px; padding:7px 14px; font-size:13.5px; font-weight:500; }
+.btn.sec { background:var(--bg); color:var(--fg); border:1px solid var(--line); }
+.btn.ghost { background:transparent; color:var(--mut); border:1px dashed var(--line); }
+.h1 { font-size:24px; font-weight:600; margin:0; } .meta { font-size:13px; color:var(--mut); margin:4px 0 0; }
+.hdr { display:flex; align-items:flex-end; gap:16px; margin-bottom:24px; } .hdr .grow { flex:1; }
+.ctitle { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); margin:28px 0 6px; }
+.crow { display:grid; grid-template-columns:1fr 250px 130px 150px 120px; gap:16px; align-items:center; padding:12px 0; border-bottom:1px solid var(--line2); }
+.crow b { font-weight:500; } .crow .w { font:12.5px 'JetBrains Mono', monospace; color:var(--fg2); }
+.crow .cd { font:500 13px 'JetBrains Mono', monospace; } .crow .n { font-size:13px; color:var(--mut); } .crow .a { text-align:right; }
+.big { font:500 44px 'JetBrains Mono', monospace; letter-spacing:.02em; margin:6px 0 2px; }
+.facts { display:grid; grid-template-columns:repeat(4, 1fr); border:1px solid var(--line); border-radius:8px; margin:24px 0; }
+.facts div { padding:12px 16px; border-right:1px solid var(--line); } .facts div:last-child { border-right:0; }
+.facts span { display:block; font-size:13px; color:var(--mut); } .facts b { font:500 14px 'JetBrains Mono', monospace; }
+.roster { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:13px; color:var(--fg2); }
+.roster > span { display:inline-flex; align-items:center; gap:6px; }
+.ptab { width:100%; border-collapse:collapse; font-size:14px; }
+.ptab th { text-align:left; font-weight:400; font-size:12.5px; color:var(--mut); padding:8px 10px; border-bottom:1px solid var(--line); }
+.ptab td { padding:11px 10px; border-bottom:1px solid var(--line2); } .ptab .r { text-align:right; }
+.ptab .L { font:500 13px 'JetBrains Mono', monospace; width:28px; } .ptab .m { font:12.5px 'JetBrains Mono', monospace; }
+.ptab tr.hot td { background:var(--hover); } .ptab tr.hot td:first-child { box-shadow:inset 2px 0 0 var(--fg); }
+.notice { border:1px solid var(--line); background:var(--hover); border-radius:8px; padding:14px 16px; font-size:14px; display:flex; gap:10px; align-items:center; }
+.notice i { font-size:18px; color:var(--mut); }
+.recap { display:grid; grid-template-columns:repeat(3, 1fr); border:1px solid var(--line); border-radius:8px; margin:20px 0 24px; }
+.recap div { padding:14px 18px; border-right:1px solid var(--line); } .recap div:last-child { border-right:0; }
+.recap span { display:block; font-size:13px; color:var(--mut); } .recap b { font:500 24px 'JetBrains Mono', monospace; }
+/* contest sidebar (matches ContestShell) */
+.cside { background:var(--side); border-right:1px solid var(--line); padding:12px 10px; display:flex; flex-direction:column; gap:2px; min-height:100%; box-sizing:border-box; }
+.cside .back { display:flex; gap:8px; align-items:center; color:var(--mut); font-size:13px; padding:6px 8px; }
+.cside .ct { font-weight:600; padding:8px 8px 10px; font-size:14.5px; }
+.clock { display:flex; align-items:center; gap:8px; border:1px solid var(--line); background:var(--bg); border-radius:8px; padding:9px 10px; margin:0 2px 10px; font-size:13px; color:var(--mut); }
+.clock b { font:500 15px 'JetBrains Mono', monospace; color:var(--fg); } .clock .tag { margin-left:auto; }
+.cside a { display:flex; gap:9px; align-items:center; padding:7px 8px; border-radius:6px; color:var(--fg2); font-size:13.5px; }
+.cside a .L { font:500 12.5px 'JetBrains Mono', monospace; color:var(--mut); width:14px; }
+.cside a .s { margin-left:auto; font:12px 'JetBrains Mono', monospace; color:var(--mut); }
+.cside a.on { background:var(--bg); color:var(--fg); font-weight:500; box-shadow:0 0 0 1px var(--line); }
+.cside .tot { margin-top:auto; border-top:1px solid var(--line); padding:10px 8px 2px; display:flex; font-size:13px; color:var(--mut); }
+.cside .tot b { margin-left:auto; font:500 14px 'JetBrains Mono', monospace; color:var(--fg); }
+.tabs.c3 { grid-template-columns:repeat(3, 1fr); }
+.ctop { height:52px; flex:none; display:flex; align-items:center; gap:10px; padding:0 14px; border-bottom:1px solid var(--line); font-weight:600; font-size:14.5px; }
+.ctop .cd { margin-left:auto; font:500 13px 'JetBrains Mono', monospace; }
+.pitem { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid var(--line2); }
+.pitem .L { font:500 13px 'JetBrains Mono', monospace; width:18px; color:var(--mut); } .pitem b { flex:1; font-weight:500; }
+.pitem .s { font:12.5px 'JetBrains Mono', monospace; }
+.editor { border:1px solid var(--line); border-radius:8px; height:150px; background:var(--side); }
+</style>
+
+<h2>Phase 4 · Contest pages (HTML mockup ให้อนุมัติก่อนเริ่มทำ)</h2>
+<p class="note">หน้าที่ยังไม่เคยมี mockup ตาม §7.7 ส่วน ContestShell (แถบข้างของ contest) กับ Scoreboard มีแล้วใน <span class="mono">navigation-de.html</span> และ <span class="mono">key-pages.html</span> §3 จึงใช้ของเดิม
+ตัวอย่างข้อมูลสมมติเป็น contest "Mid-term practice" มี 5 ข้อ (A–E) เวลาทั้งหมดเป็นเวลาไทย</p>
+
+<h2>1 · Contests (รายการ)</h2>
+<p class="note">แบ่งเป็นสามกลุ่ม <b>Live / Upcoming / Past</b> แต่ละแถวมีชื่อ ช่วงเวลา (mono) นับถอยหลัง (mono) <span class="mono">n joined · n problems</span> และปุ่มเดียวชิดขวา:
+<b>Enter</b> (อยู่ใน contest แล้ว), <b>Join</b>, <b>Registered</b> (ลงชื่อแล้ว รอเริ่ม → ไปหน้ารอ), <b>Results</b> (จบแล้ว)
+staff เห็นป้าย <span class="tag hid">HIDDEN</span> ที่ contest ที่ซ่อนอยู่ ถ้ากลุ่มไหนว่างก็ไม่แสดงกลุ่มนั้น ถ้าว่างทั้งหมดขึ้นข้อความธรรมดา "No contests yet."</p>
+<div class="row"><div id="list" class="app desk short"></div></div>
+
+<h2>2 · ก่อนเริ่ม (lobby)</h2>
+<p class="note">หัวเรื่องมีป้าย <span class="tag">SCHEDULED</span> นับถอยหลังตัวใหญ่ และกล่องกติกา 4 ช่อง: ช่วงเวลา ระยะเวลา จำนวนข้อ และวิธีคิดคะแนน (IOI · รวมคะแนนดีที่สุดของแต่ละข้อ · คะแนนเท่ากันดูเวลาที่คะแนนขึ้นครั้งสุดท้ายก่อน)
+ด้านล่างเป็นรายชื่อคนที่ลงชื่อแล้ว ปุ่ม <b>Join</b> กดแล้วเปลี่ยนเป็น <b>Registered</b> (ปุ่มรองที่กดไม่ได้)
+เมื่อนับถึง 0 หน้าจะเข้า contest เองและไปที่ข้อ A</p>
+<div class="row"><div id="lobby" class="app desk short"></div></div>
+
+<h2>3 · กำลังแข่ง แต่ยังไม่ได้เข้าร่วม</h2>
+<p class="note">เห็นแค่ตัวอักษรของข้อ (A–E) ชื่อข้อยังซ่อนอยู่ที่ฝั่ง server เหมือนตอนนี้ มีปุ่ม <b>Join contest</b> กดแล้วไปข้อ A ทันที ใช้แถบข้างหลักตามปกติ เพราะยังไม่ได้อยู่ใน contest</p>
+<div class="row"><div id="notjoined" class="app desk short"></div></div>
+
+<h2>4 · กำลังแข่ง เข้าร่วมแล้ว (ContestShell + ตารางข้อ) — สว่าง / มืด</h2>
+<p class="note">แถบข้างเปลี่ยนเป็นแถบของ contest (ตามที่ทำไว้ใน phase 2) <span class="mono">/contests/:id</span> เปิดมาเจอตารางข้อ: ตัวอักษร ชื่อ แถบ testcase ของคำตอบที่ดีที่สุด คะแนน และจำนวนครั้งที่ส่ง
+ตัวอักษร A, B, C… มาจากลำดับที่ admin จัด (<b>B4</b>: คอลัมน์ <span class="mono">position</span> ใหม่ใน <span class="mono">contest_problems</span>) ไม่ใช่ลำดับตัวอักษรของ id อีกต่อไป
+คะแนนรวมอยู่ล่างสุดของแถบข้าง</p>
+<div class="row"><div id="running" class="app desk short"></div></div>
+<div class="row" style="margin-top:28px"><div id="running-dark" class="app desk short dark"></div></div>
+
+<h2>5 · กำลังตรวจรอบสุดท้าย (finishing)</h2>
+<p class="note">หมดเวลาแล้วแต่ยังตรวจงานที่ส่งค้างอยู่ นาฬิกาค้างที่ <span class="mono">00:00:00</span> พร้อมข้อความ "Judging final submissions…" แถบข้างยังอยู่ แต่ปุ่ม Submit ทุกข้อปิดแล้ว</p>
+<div class="row"><div id="finishing" class="app desk short"></div></div>
+
+<h2>6 · จบแล้ว (recap)</h2>
+<p class="note">ทุกคนเข้าได้ (ตอนนี้คนที่ไม่ได้เข้าร่วมจะถูกส่งออกไป) ถ้าเคยเข้าร่วมจะเห็นสรุปของตัวเอง: อันดับสุดท้าย คะแนน และผลของแต่ละข้อ ถ้าไม่ได้เข้าร่วมจะเห็นแค่ตารางข้อกับปุ่ม <b>Scoreboard</b>
+ข้อในตารางลิงก์ไปหน้าโจทย์ปกติ เพราะหลังจบโจทย์ย้ายกลับเข้าคลังโจทย์ทั่วไปแล้ว ใช้แถบข้างหลัก ไม่ใช่แถบของ contest</p>
+<div class="row"><div id="finished" class="app desk short"></div></div>
+
+<h2>7 · หน้าโจทย์ใน contest หลังหมดเวลา</h2>
+<p class="note">เหมือนหน้าโจทย์ปกติ (§7.3) แต่มีตัวอักษรนำหน้าชื่อ ถ้าหมดเวลาแล้ว แท็บ Submit ขึ้น "Contest ended — submissions closed" ทันทีตามนาฬิกา ไม่ต้องรอให้ server ปฏิเสธก่อน</p>
+<div class="row"><div id="cproblem" class="app desk short"></div></div>
+
+<h2>8 · มือถือ (390px)</h2>
+<p class="note">ใน contest แถบล่างเหลือสามช่อง <b>Problems / Mine / Scoreboard</b> และนาฬิกาอยู่บนแถบบน รายการ contest กับหน้า recap ใช้แถบล่างหลักห้าช่อง</p>
+<div class="row">
+  <div><p class="cap">Contests</p><div id="ph-list" class="app phone"></div></div>
+  <div><p class="cap">ใน contest · ตารางข้อ</p><div id="ph-run" class="app phone"></div></div>
+  <div><p class="cap">ใน contest · มืด</p><div id="ph-run-dark" class="app phone dark"></div></div>
+  <div><p class="cap">จบแล้ว · recap</p><div id="ph-fin" class="app phone"></div></div>
+</div>
+
+<script>
+const LOGO = `<svg width="22" height="22" viewBox="0 0 512 512" aria-hidden="true"><defs>
+<mask id="LID-a"><circle cx="368.2" cy="148.2" r="123.1" fill="#fff"/><circle cx="351.7" cy="272.8" r="92.4" fill="#000"/></mask>
+<mask id="LID-b"><circle cx="145.4" cy="314.9" r="130.9" fill="#fff"/><circle cx="213.8" cy="405.4" r="98.3" fill="#000"/></mask>
+<mask id="LID-c"><circle cx="400.4" cy="365.9" r="101.1" fill="#fff"/><circle cx="466.6" cy="392.5" r="66.6" fill="#000"/></mask></defs>
+<circle cx="368.2" cy="148.2" r="123.1" fill="currentColor" mask="url(#LID-a)"/><circle cx="145.4" cy="314.9" r="130.9" fill="currentColor" mask="url(#LID-b)"/>
+<circle cx="400.4" cy="365.9" r="101.1" fill="var(--logo-accent)" mask="url(#LID-c)"/></svg>`;
+let logoN = 0; const logo = () => LOGO.replaceAll('LID', 'lg' + (logoN++));
+
+const side = (active) => `<nav class="side"><div class="brand">${logo()}Grader<i class="ph ph-sidebar-simple col"></i></div>
+<div class="searchrow"><i class="ph ph-magnifying-glass"></i>Search<span class="k">⌘K</span></div>
+${[['house', 'Home'], ['list-checks', 'Problems'], ['paper-plane-tilt', 'Submissions'], ['ranking', 'Ranking']].map(([i, l]) => `<a><i class="ph ph-${i}"></i>${l}</a>`).join('')}
+<div class="grp">Contests</div>
+<a style="color:var(--fg)"><i class="ph ph-broadcast ok"></i>Mid-term practice<span class="mono" style="margin-left:auto;font-size:11.5px;color:var(--mut)">1:12:08</span></a>
+<a class="${active === 'contests' ? 'on' : ''}"><i class="ph ph-calendar-blank"></i>All contests</a>
+<div class="me"><span class="av">N</span>nattapat<span class="lv">Lv.8</span></div></nav>`;
+
+const MARK = { ok: 'ph-bold ph-check ok', bad: 'ph-bold ph-x bad', warn: 'ph ph-timer warn', none: 'ph ph-circle faint' };
+const strip = s => `<span class="strip">${[...s].map(c => `<i class="${{ P: '', F: 'x', L: 't', N: 'n' }[c]}"></i>`).join('')}</span>`;
+const PROBS = [
+  ['A', 'Sum of digits', 'ok', 'PPPPPPPPPP', 100, 1],
+  ['B', 'Queue rotate', 'ok', 'PPPPPPPPPP', 100, 3],
+  ['C', 'Interval merge', 'bad', 'PPPPPPFNNN', 60, 4],
+  ['D', 'Shortest detour', 'warn', 'PPPPLNNNNN', 40, 2],
+  ['E', 'Matrix exponent', 'none', '', null, 0],
+];
+const cside = (active, clock, total = '300', ended = false) => `<nav class="cside"><a class="back"><i class="ph ph-arrow-left"></i>Leave contest view</a>
+<div class="ct">Mid-term practice</div>${clock}
+${PROBS.map(([L, t, st, , sc]) => `<a class="${active === L ? 'on' : ''}"><span class="L">${L}</span><i class="${MARK[st]}" style="font-size:13px"></i>${t}${sc != null ? `<span class="s">${sc}</span>` : ''}</a>`).join('')}
+<div style="height:10px"></div>
+${ended ? '' : `<a class="${active === 'mine' ? 'on' : ''}"><i class="ph ph-paper-plane-tilt"></i>My submissions</a>`}
+<a class="${active === 'board' ? 'on' : ''}"><i class="ph ph-ranking"></i>Scoreboard</a>
+<div class="tot">Your points<b>${total}</b></div></nav>`;
+const clock = (v, tag = '<span class="tag live">LIVE</span>') => `<div class="clock"><i class="ph ph-timer"></i><b>${v}</b>${tag}</div>`;
+
+/* 1 · list */
+const crow = (t, w, cd, n, a, extra = '') => `<div class="crow"><div><b>${t}</b> ${extra}</div><span class="w">${w}</span><span class="cd">${cd}</span><span class="n">${n}</span><span class="a">${a}</span></div>`;
+document.getElementById('list').innerHTML = side('contests') + `<main class="wrap">
+<div class="hdr"><div class="grow"><h1 class="h1">Contests</h1><p class="meta">1 live · 2 upcoming · 14 past</p></div></div>
+<div class="ctitle">Live</div>
+${crow('Mid-term practice', 'Nov 16 13:00 – 16:00', '<span class="ok">1:12:08 left</span>', '86 joined · 5 problems', '<span class="btn">Enter</span>')}
+<div class="ctitle">Upcoming</div>
+${crow('Weekly round #19', 'Nov 20 19:00 – 21:00', 'in 4d 6h', '12 joined · 6 problems', '<span class="btn sec"><i class="ph ph-check"></i>Registered</span>')}
+${crow('Graph camp selection', 'Nov 28 09:00 – 14:00', 'in 12d', '0 joined · 8 problems', '<span class="btn sec">Join</span>', '<span class="tag hid">HIDDEN</span>')}
+<div class="ctitle">Past</div>
+${crow('Weekly round #18', 'Nov 13 19:00 – 21:00', '<span class="mut">ended</span>', '74 joined · 6 problems', '<span class="btn ghost">Results</span>')}
+${crow('Sorting sprint', 'Nov 6 19:00 – 20:30', '<span class="mut">ended</span>', '58 joined · 4 problems', '<span class="btn ghost">Results</span>')}
+${crow('Weekly round #17', 'Nov 6 19:00 – 21:00', '<span class="mut">ended</span>', '69 joined · 6 problems', '<span class="btn ghost">Results</span>')}
+</main>`;
+
+/* 2 · lobby */
+document.getElementById('lobby').innerHTML = side('contests') + `<main class="wrap">
+<p class="meta" style="margin:0 0 6px">Contests › Weekly round #19</p>
+<div class="hdr" style="margin-bottom:8px"><div class="grow"><h1 class="h1">Weekly round #19 <span class="tag">SCHEDULED</span></h1></div><span class="btn sec"><i class="ph ph-check"></i>Registered</span></div>
+<p class="meta">Starts in</p><div class="big">4d 06:12:44</div><p class="meta">Thursday 20 November, 19:00 — you'll be taken in automatically.</p>
+<div class="facts"><div><span>Window</span><b>19:00 – 21:00</b></div><div><span>Duration</span><b>2 h</b></div><div><span>Problems</span><b>6</b></div><div><span>Scoring</span><b style="font-family:inherit;font-weight:500;font-size:13px">IOI · sum of best scores · ties by earliest last improvement</b></div></div>
+<div class="sech"><b>Registered · 12</b></div>
+<div class="roster">${['nattapat', 'ploy.s', 'tonkla', 'mintra', 'phum_k', 'jirat', 'kanok', 'beam', 'fah', 'oat', 'ice', 'pim'].map(n => `<span><span class="av">${n[0].toUpperCase()}</span>${n}</span>`).join('')}</div>
+</main>`;
+
+/* 3 · running, not joined */
+document.getElementById('notjoined').innerHTML = side('contests') + `<main class="wrap">
+<p class="meta" style="margin:0 0 6px">Contests › Mid-term practice</p>
+<div class="hdr"><div class="grow"><h1 class="h1">Mid-term practice <span class="tag live">LIVE</span></h1><p class="meta mono">13:00 – 16:00 · 1:12:08 left · 86 joined</p></div><span class="btn">Join contest</span></div>
+<div class="notice"><i class="ph ph-lock-simple"></i><span>Problem titles show once you join. Joining starts your scoring; you land on problem A.</span></div>
+<table class="ptab" style="margin-top:16px"><tr><th>#</th><th>Problem</th></tr>
+${PROBS.map(([L]) => `<tr><td class="L">${L}</td><td class="faint">Hidden until you join</td></tr>`).join('')}</table>
+</main>`;
+
+/* 4 · running, joined */
+const runningMain = `<main class="wrap">
+<div class="hdr"><div class="grow"><h1 class="h1">Problems</h1><p class="meta">Mid-term practice · 300 / 500 points</p></div></div>
+<table class="ptab"><tr><th>#</th><th>Problem</th><th>Best</th><th class="r">Score</th><th class="r">Tries</th></tr>
+${PROBS.map(([L, t, st, s, sc, n]) => `<tr><td class="L">${L}</td><td><i class="${MARK[st]}" style="font-size:13px;margin-right:8px"></i>${t}</td><td>${s ? strip(s) : '<span class="faint">—</span>'}</td><td class="r m ${st === 'ok' ? 'ok' : ''}">${sc ?? '—'}</td><td class="r m mut">${n || '—'}</td></tr>`).join('')}</table>
+</main>`;
+document.getElementById('running').innerHTML = cside(null, clock('1:12:08')) + runningMain;
+document.getElementById('running-dark').innerHTML = cside(null, clock('1:12:08')) + runningMain;
+['running', 'running-dark', 'finishing', 'cproblem'].forEach(id => { document.getElementById(id).style.gridTemplateColumns = '240px 1fr'; });
+
+/* 5 · finishing */
+document.getElementById('finishing').innerHTML = cside(null, clock('00:00:00', '<span class="tag">JUDGING</span>')) + `<main class="wrap">
+<div class="hdr"><div class="grow"><h1 class="h1">Problems</h1><p class="meta">Mid-term practice · time's up</p></div></div>
+<div class="notice" role="status"><i class="ph ph-circle-notch"></i><span><b style="font-weight:500">Judging final submissions…</b> Results and the final scoreboard appear when the last submission is judged.</span></div>
+<table class="ptab" style="margin-top:16px"><tr><th>#</th><th>Problem</th><th>Best</th><th class="r">Score</th></tr>
+${PROBS.map(([L, t, st, s, sc]) => `<tr><td class="L">${L}</td><td><i class="${MARK[st]}" style="font-size:13px;margin-right:8px"></i>${t}</td><td>${s ? strip(s) : '<span class="faint">—</span>'}</td><td class="r m">${sc ?? '—'}</td></tr>`).join('')}</table>
+</main>`;
+
+/* 6 · finished recap */
+document.getElementById('finished').innerHTML = side('contests') + `<main class="wrap">
+<p class="meta" style="margin:0 0 6px">Contests › Weekly round #18</p>
+<div class="hdr" style="margin-bottom:0"><div class="grow"><h1 class="h1">Weekly round #18 <span class="tag fin">FINAL</span></h1><p class="meta mono">Nov 13 19:00 – 21:00 · 74 joined</p></div><span class="btn">Scoreboard</span></div>
+<div class="recap"><div><span>Your final rank</span><b>#14 <span class="mut" style="font-size:14px">of 74</span></b></div><div><span>Points</span><b>380 <span class="mut" style="font-size:14px">/ 600</span></b></div><div><span>Solved</span><b>3 <span class="mut" style="font-size:14px">of 6</span></b></div></div>
+<table class="ptab"><tr><th>#</th><th>Problem</th><th>Your best</th><th class="r">Score</th><th class="r">Tries</th></tr>
+${[['A', 'Pair ordering', 'ok', 'PPPPPPPPPP', 100, 1], ['B', 'Stack min', 'ok', 'PPPPPPPPPP', 100, 2], ['C', 'Two sum (sorted)', 'ok', 'PPPPPPPPPP', 100, 5], ['D', 'Rolling string hash', 'bad', 'PPPPPPPPFN', 80, 3], ['E', 'Range minimum', 'none', '', null, 0], ['F', 'Matrix exponent', 'none', '', null, 0]]
+  .map(([L, t, st, s, sc, n]) => `<tr><td class="L">${L}</td><td><i class="${MARK[st]}" style="font-size:13px;margin-right:8px"></i><span style="text-decoration:underline;text-decoration-color:var(--line)">${t}</span></td><td>${s ? strip(s) : '<span class="faint">—</span>'}</td><td class="r m ${st === 'ok' ? 'ok' : ''}">${sc ?? '—'}</td><td class="r m mut">${n || '—'}</td></tr>`).join('')}</table>
+<p class="meta" style="margin-top:12px">Problems are back in the practice set — open one to keep working on it.</p>
+</main>`;
+
+/* 7 · contest problem, ended */
+document.getElementById('cproblem').innerHTML = cside('C', clock('00:00:00', '<span class="tag fin">ENDED</span>'), '300', false) + `<main class="wrap">
+<p class="meta" style="margin:0 0 6px">Mid-term practice › C</p>
+<div class="hdr" style="margin-bottom:10px"><div class="grow"><h1 class="h1"><span class="mono mut" style="font-weight:500">C</span>&nbsp; Interval merge</h1><p class="meta"><span class="mono">interval_merge</span> · 1000 ms · 256 MB · C++ · Python</p></div>${strip('PPPPPPFNNN')}<span class="mono" style="font-size:12px">60</span></div>
+<div style="display:flex;gap:22px;border-bottom:1px solid var(--line);font-size:14px;margin-bottom:18px"><span class="mut" style="padding:8px 0">Statement</span><span style="padding:8px 0;border-bottom:2px solid var(--fg);font-weight:500">Submit</span><span class="mut" style="padding:8px 0">Submissions 4</span></div>
+<div class="notice"><i class="ph ph-lock-simple"></i><span><b style="font-weight:500">Contest ended — submissions closed.</b> This problem returns to the practice set once judging finishes.</span></div>
+</main>`;
+
+/* 8 · phones */
+const topBar = () => `<div class="topbar">${logo()}Grader<i class="ph ph-magnifying-glass s"></i></div>`;
+const tabs = (on) => `<nav class="tabs">${[['house', 'Home'], ['list-checks', 'Problems'], ['calendar-blank', 'Contests'], ['paper-plane-tilt', 'Submissions'], ['dots-three', 'More']].map(([i, l]) => `<a class="${l === on ? 'on' : ''}"><i class="ph ph-${i}"></i>${l}</a>`).join('')}</nav>`;
+const ctabs = (on) => `<nav class="tabs c3">${[['list-checks', 'Problems'], ['paper-plane-tilt', 'Mine'], ['ranking', 'Scoreboard']].map(([i, l]) => `<a class="${l === on ? 'on' : ''}"><i class="ph ph-${i}"></i>${l}</a>`).join('')}</nav>`;
+const pc = (t, l2, a) => `<div class="item"><div class="l1"><b>${t}</b>${a}</div><div class="l2" style="padding-left:0;font-family:inherit;font-weight:400;font-size:12.5px;color:var(--mut)">${l2}</div></div>`;
+document.getElementById('ph-list').innerHTML = topBar() + `<div class="pmain"><h1 class="p-h1">Contests</h1><p class="p-meta">1 live · 2 upcoming · 14 past</p>
+<div class="ctitle" style="margin-top:8px">Live</div>${pc('Mid-term practice', '<span class="mono ok">1:12:08 left</span> · 86 joined', '<span class="btn" style="padding:5px 12px">Enter</span>')}
+<div class="ctitle">Upcoming</div>${pc('Weekly round #19', '<span class="mono">Nov 20 19:00</span> · in 4d 6h', '<span class="btn sec" style="padding:5px 10px"><i class="ph ph-check"></i>Registered</span>')}
+<div class="ctitle">Past</div>${pc('Weekly round #18', '<span class="mono">Nov 13</span> · 74 joined', '<span class="btn ghost" style="padding:5px 10px">Results</span>')}${pc('Sorting sprint', '<span class="mono">Nov 6</span> · 58 joined', '<span class="btn ghost" style="padding:5px 10px">Results</span>')}
+</div>` + tabs('Contests');
+const phRun = `<div class="ctop"><i class="ph ph-arrow-left" style="font-size:18px;color:var(--mut)"></i>Mid-term practice<span class="cd ok">1:12:08</span></div>
+<div class="pmain"><h1 class="p-h1">Problems</h1><p class="p-meta">300 / 500 points</p>
+${PROBS.map(([L, t, st, s, sc, n]) => `<div style="border-bottom:1px solid var(--line2)"><div class="pitem" style="border:0"><span class="L">${L}</span><i class="${MARK[st]}" style="font-size:13px"></i><b>${t}</b><span class="s ${st === 'ok' ? 'ok' : ''}">${sc ?? '—'}</span></div>${s ? `<div style="padding:0 0 10px 38px;margin-top:-6px">${strip(s)}<span class="mono mut" style="font-size:11.5px;margin-left:8px">${n} ${n === 1 ? 'try' : 'tries'}</span></div>` : ''}</div>`).join('')}
+</div>` + ctabs('Problems');
+document.getElementById('ph-run').innerHTML = phRun;
+document.getElementById('ph-run-dark').innerHTML = phRun;
+document.getElementById('ph-fin').innerHTML = topBar() + `<div class="pmain"><p class="meta" style="margin:0 0 4px">Contests</p><h1 class="p-h1">Weekly round #18 <span class="tag fin">FINAL</span></h1><p class="p-meta mono">Nov 13 · 74 joined</p>
+<div class="pstats"><div><span>Final rank</span><b>#14</b></div><div><span>Points</span><b>380</b></div><div><span>Solved</span><b>3 / 6</b></div><div><span>Tries</span><b>11</b></div></div>
+<div style="margin:14px 0 6px"><span class="btn" style="width:100%;justify-content:center;box-sizing:border-box">Scoreboard</span></div>
+${[['A', 'Pair ordering', 'ok', 100], ['B', 'Stack min', 'ok', 100], ['C', 'Two sum (sorted)', 'ok', 100], ['D', 'Rolling string hash', 'bad', 80], ['E', 'Range minimum', 'none', null], ['F', 'Matrix exponent', 'none', null]].map(([L, t, st, sc]) => `<div class="pitem"><span class="L">${L}</span><i class="${MARK[st]}" style="font-size:13px"></i><b>${t}</b><span class="s ${st === 'ok' ? 'ok' : ''}">${sc ?? '—'}</span></div>`).join('')}
+</div>` + tabs('Contests');
+</script>

@@ -147,12 +147,14 @@ Each subsection: what the page must do, and the decided layout. "Builder" marks 
 - Achievements: compact list, unlocked with dates, locked with progress; show next 3 + "Show all".
 
 ### 7.7 Contests
+Mockups: `phase4-contests.html` (list, lobby, running not joined, running joined + dark, finishing, finished recap, contest problem after the end, phones), `key-pages.html` §3 (scoreboard), `navigation-de.html` (ContestShell).
+- **Which shell:** ContestShell only for a participant while the contest is running or finishing (and on its problem pages). The list, lobby, running-not-joined page and finished recap use the normal AppShell.
 - **List:** sections Live / Upcoming / Past; rows with title, mono time window, mono countdown, `n joined · n problems`, one right-aligned action (Join / Enter / Registered → lobby / Results). Staff see a `HIDDEN` tag on hidden contests. Plain-text empty state.
 - **Lobby (scheduled):** title + SCHEDULED tag, large countdown, rules facts (window, duration, problem count, scoring "IOI · sum of best scores · ties by earliest last improvement"), registered roster, Join → Registered. Auto-enters when the countdown hits zero.
 - **Running, not joined:** problem letters only (titles stay hidden server-side) + Join; joining lands on problem A.
-- **Running, joined:** ContestShell; `/contests/:id` lands on the contest problem table (letter, title, strip, score, attempts).
+- **Running, joined:** ContestShell; `/contests/:id` lands on the contest problem table (letter, title, best strip, score, tries); the header meta shows `points / max`. Letters follow the admin's order (B4), not problem ids. Phones: two-line rows (letter, mark, title, score / strip, tries).
 - **Finishing:** "Judging final submissions…", timer at 00:00:00.
-- **Finished:** recap (final rank, points, per-problem result) and Scoreboard link, reachable by everyone (today non-participants are redirected away).
+- **Finished:** recap (final rank of N, points of max, solved of total, then per-problem best strip, score, tries) and a Scoreboard button, reachable by everyone (today non-participants are redirected away). Non-participants see the problem table and Scoreboard only. Problem titles link to the practice problem, since problems return to the practice set after the contest.
 - **Contest problem page:** same as §7.3 with the letter in the header; when the contest ends the Submit tab becomes "Contest ended — submissions closed" without waiting for a server rejection.
 - **Contest scoreboard** — mockup `key-pages.html` §3: header Scoreboard + LIVE/FINAL tag + "updated Ns ago" with a live dot only while SSE is connected; columns rank, participant (linked), Total with `last hh:mm:ss` under it, one column per problem headed A, B, C… (linked, full title on hover). Cells: 100 = green text on faint green, partial = plain, 0 = muted, untried = "—". Viewer row highlighted (2px left rule); a "You · #14" bar sticks to the bottom when it is off-screen. Rank uses competition ranking consistent with the global ranking. Mobile: rank/name/total fixed, problem columns scroll.
 - Contest submissions default to Mine (staff: All).
@@ -197,6 +199,8 @@ Pages (mockup for Problems: `key-pages.html` §4):
 ## 8. Figma
 
 The file "Grader Design" (`https://www.figma.com/design/1LcruSmMzO1hBruNrGWate/Grader-Design`) is empty today. After phase 2, push the real tokens (light + dark variables) and the shared components from code into it as a library. The owner's Figma plan is Starter tier, so Code Connect (Organization/Enterprise only) is not used; component names in Figma match the React component names instead. Pages not yet mocked in HTML — Profile, contest lobby/finished recap, Users/Contests editors, Analysis, Settings, the authoring workspace — are designed in Figma from that library. **This is a gate (owner decision):** before each of phases 3–6 starts, Claude puts that phase's un-mocked pages in Figma and the owner approves them; implementation of those pages waits for the approval. Pages already settled in the HTML mockups do not need a Figma pass. HTML mockups remain acceptable for quick explorations.
+
+Phase 4 status (2026-11-16): per the owner's earlier decision, the gate uses an HTML mockup, `phase4-contests.html`, awaiting approval.
 
 Phase 3 status (2026-11-16): Submissions, Submission detail, Ranking, Profile, Log in, Register, private-site login, guest home and 404 are drafted on the Figma page "Phase 3 · Review". The Figma MCP tool limit on the Starter plan stopped the phone views, so (owner decision) the rest is an HTML mockup, `phase3-pages.html`: Profile with the radar (light + dark) and phone views of Submissions, Ranking and Profile. For later gates, prefer HTML mockups and keep Figma for the library.
 
