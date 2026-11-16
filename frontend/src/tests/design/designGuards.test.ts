@@ -341,7 +341,7 @@ describe('page headers', () => {
     'features/admin/users/UserManagement.tsx', 'features/admin/problems/ProblemManagement.tsx',
     'features/admin/contests/ContestManagement.tsx', 'features/admin/analysis/AnalysisPage.tsx',
     'features/admin/problems/ProblemEditPage.tsx', 'features/admin/contests/ContestEditPage.tsx',
-    'features/admin/settings/Settings.tsx', 'features/admin/authoring/ProblemAuthoring.tsx', 'features/admin/authoring/AiDocs.tsx',
+    'features/admin/settings/Settings.tsx', 'features/admin/authoring/AuthoringHub.tsx', 'features/admin/authoring/AiDocs.tsx',
     'pages/submission/SubmissionDetailPage.tsx', 'pages/problem/ProblemDetail.tsx',
     'features/contest/ContestLobby.tsx', 'features/contest/ContestJoinGate.tsx', 'features/contest/ContestRecap.tsx',
     // UserProfile is exempt: its identity header (avatar, name, level, rank — §7.6) is the page title.

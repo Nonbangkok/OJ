@@ -1,0 +1,92 @@
+/* Authoring hub (§7.9): sub-tabs, drafts list, readiness squares. */
+.hub {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tabs {
+  display: flex;
+  gap: 22px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tab,
+.tabActive {
+  padding: 8px 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.tab:hover {
+  color: var(--text-primary);
+}
+
+.tabActive {
+  color: var(--text-primary);
+  font-weight: 500;
+  border-bottom-color: var(--text-primary);
+}
+
+.mono {
+  font-family: var(--font-family-mono);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.title {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.squares {
+  display: inline-flex;
+  gap: 3px;
+  vertical-align: middle;
+}
+
+.square {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--border-color);
+}
+
+.square[data-state='done'] {
+  background: var(--verdict-accepted);
+}
+
+.square[data-state='stale'] {
+  background: var(--verdict-time);
+}
+
+.square[data-state='failed'] {
+  background: var(--verdict-wrong);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}

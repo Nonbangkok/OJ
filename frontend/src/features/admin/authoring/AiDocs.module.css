@@ -230,3 +230,18 @@
     max-width: none;
   }
 }
+
+/* Under the Authoring hub header: a one-line intro and the copy button. */
+.hubToolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.hubToolbar p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}

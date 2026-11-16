@@ -82,7 +82,8 @@ function Block({ block }: { block: DocBlock }) {
  * link, like the Author profiles page) and embedded as the last section of
  * a draft workspace (no back link — the workspace left nav is present).
  */
-export default function AiDocs({ embedded = false }: { embedded?: boolean }) {
+/** `inHub`: rendered under the Authoring hub header, so it has no page header of its own. */
+export default function AiDocs({ embedded = false, inHub = false }: { embedded?: boolean; inHub?: boolean }) {
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -121,11 +122,9 @@ export default function AiDocs({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <section className={styles.docs} aria-label={AI_DOC_TITLE}>
-      <PageHeader
-        breadcrumb={embedded ? undefined : [{ label: 'Authoring', to: '/admin/authoring' }]}
-        title="AI docs"
-        description="The authoring API as one reference document — for humans here, and for AI agents via the copy button: the entire page is copied as clean, prompt-ready markdown."
-        actions={(
+      {inHub ? (
+        <div className={styles.hubToolbar}>
+          <p>The authoring API as one reference document — the copy button copies the whole page as prompt-ready markdown.</p>
           <Button
             variant={copied ? 'secondary' : 'primary'}
             onClick={handleCopy}
@@ -133,8 +132,23 @@ export default function AiDocs({ embedded = false }: { embedded?: boolean }) {
           >
             {copied ? 'Copied!' : 'Copy for AI agent'}
           </Button>
-        )}
-      />
+        </div>
+      ) : (
+      <PageHeader
+          breadcrumb={embedded ? undefined : [{ label: 'Authoring', to: '/admin/authoring' }]}
+          title="AI docs"
+          description="The authoring API as one reference document — for humans here, and for AI agents via the copy button: the entire page is copied as clean, prompt-ready markdown."
+          actions={(
+            <Button
+              variant={copied ? 'secondary' : 'primary'}
+              onClick={handleCopy}
+              aria-live="polite"
+            >
+              {copied ? 'Copied!' : 'Copy for AI agent'}
+            </Button>
+          )}
+        />
+      )}
       {copyFailed && (
         <p role="alert" className={styles.copyError}>
           Could not access the clipboard. Copy is unavailable in this context.
