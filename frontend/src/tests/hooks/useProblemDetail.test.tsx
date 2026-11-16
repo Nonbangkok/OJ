@@ -19,11 +19,9 @@ describe('useProblemDetail Hook', () => {
 
     it('fetches problem detail successfully without contestId', async () => {
         (jest.mocked(useParams) as jest.Mock).mockReturnValue({ problemId: '1' });
-        const mockDetails = { id: '1', title: 'Problem 1' };
-        const mockStats = [{ id: '1', accepted: 10, total: 20 }];
+        const mockDetails = { id: '1', title: 'Problem 1', viewerBest: { score: 40, caseStatuses: [] }, viewerSubmissionCount: 2 };
 
         (jest.mocked(problemService.getDetails) as jest.Mock).mockResolvedValueOnce(mockDetails);
-        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(mockStats);
 
         const { result } = renderHook(() => useProblemDetail());
 
@@ -31,7 +29,9 @@ describe('useProblemDetail Hook', () => {
             expect(result.current.loading).toBe(false);
         });
 
-        expect(result.current.problem).toEqual({ ...mockDetails, ...mockStats[0] });
+        // The detail endpoint carries the viewer's stats; no all-problems walk.
+        expect(result.current.problem).toEqual(mockDetails);
+        expect(problemService.getAllWithStats).not.toHaveBeenCalled();
         expect(result.current.error).toBe('');
     });
 

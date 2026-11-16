@@ -59,9 +59,9 @@ describe('AppShell', () => {
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
   });
 
-  it('starts collapsed on pages that still have their own rail', () => {
+  it('does not auto-collapse on problem pages (the left rail is gone)', () => {
     renderAt('/problems/abc');
-    expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
+    expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
     expect(localStorage.getItem('oj.sidebar.collapsed')).toBeNull();
   });
 

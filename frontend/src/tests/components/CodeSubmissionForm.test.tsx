@@ -28,8 +28,9 @@ describe('CodeSubmissionForm', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByRole('heading', { name: /submit solution/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'C++' })).toBeInTheDocument();
+    // The page tabs title the section; the form starts with the language choice.
+    expect(screen.getByRole('group', { name: 'Language' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'C++' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('renders a language button for every supported language', () => {

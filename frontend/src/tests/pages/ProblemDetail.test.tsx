@@ -1,148 +1,142 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import ProblemDetail from '../../pages/problem/ProblemDetail';
 import problemService from '../../services/problemService';
+import submissionService from '../../services/submissionService';
+import { subscribeSubmissions } from '../../services/realtimeService';
 
 jest.mock('../../services/problemService');
+jest.mock('../../services/submissionService');
+jest.mock('../../services/realtimeService', () => ({
+    ...jest.requireActual('../../services/realtimeService'),
+    subscribeSubmissions: jest.fn(() => () => undefined),
+}));
 jest.mock('react-router-dom', () => ({
     ...jest.requireActual('react-router-dom'),
-    useParams: () => ({ problemId: '1' })
+    useParams: () => ({ problemId: '1' }),
 }));
+// The Submissions tab renders the existing list; keep it out of these tests.
+jest.mock('../../pages/submission/Submissions', () => () => <div>Submissions list</div>);
 
-describe('ProblemDetail Page', () => {
+const detail = (over: Record<string, unknown> = {}) => ({
+    id: '1', title: 'Test Problem', author: 'Ada', difficulty: 1200, categories: [],
+    time_limit_ms: 1000, memory_limit_mb: 256, has_pdf: true, problem_type: 'standard',
+    submission_filename: null, has_starter_files: false,
+    collection: { id: 2, name: 'Basics' },
+    viewerBest: { score: 60, caseStatuses: ['Accepted', 'Wrong Answer'] },
+    viewerSubmissionCount: 3,
+    ...over,
+});
+const accepted = {
+    id: 77, username: 'u', problem_id: '1', overall_status: 'Accepted', score: 100, language: 'cpp',
+    submitted_at: new Date().toISOString(), code: 'int main(){}', max_time_ms: 12, max_memory_kb: 900,
+    results: [{ testCase: 1, status: 'Accepted', timeMs: 12, memoryKb: 900 }],
+    time_limit_ms: 1000, memory_limit_mb: 256,
+};
+
+const renderPage = (search = '') => {
+    window.history.replaceState({}, '', `/problems/1${search}`);
+    return render(<BrowserRouter><ProblemDetail /></BrowserRouter>);
+};
+
+describe('ProblemDetail page', () => {
     beforeEach(() => {
-        jest.clearAllMocks();
-    });
-
-    it('displays problem details successfully', async () => {
-        const mockProblem = {
-            id: '1', title: 'Test Problem', description: 'Test Desc', difficulty: 'easy',
-            author: null,
-            time_limit_ms: 1000, memory_limit_mb: 256
-        };
-        const mockStats = [{ id: '1', title: 'Test Problem', author: null, time_limit_ms: 1000, memory_limit_mb: 256, best_score: 0 }];
-        (jest.mocked(problemService.getDetails) as jest.Mock).mockResolvedValueOnce(mockProblem);
-        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(mockStats);
-
-        render(<BrowserRouter><ProblemDetail /></BrowserRouter>);
-
-        await waitFor(() => {
-            expect(screen.getByText('Test Problem')).toBeInTheDocument();
-            expect(screen.getByText(/time limit/i)).toBeInTheDocument();
-            expect(screen.getByText(/1000/)).toBeInTheDocument();
-        });
-    });
-
-    it('keeps difficulty and categories off the Problem Detail sidebar', async () => {
-        const detail = {
-            id: '1', title: 'Test Problem', author: 'Ada',
-            difficulty: 2100, categories: ['Graph', 'Math'],
-            time_limit_ms: 1000, memory_limit_mb: 256,
-        };
-        jest.mocked(problemService.getDetails).mockResolvedValueOnce(detail);
-        jest.mocked(problemService.getAllWithStats).mockResolvedValueOnce([]);
-
-        render(<BrowserRouter><ProblemDetail /></BrowserRouter>);
-
-        const heading = await screen.findByRole('heading', { name: 'Test Problem' });
-        const id = screen.getByText('1');
-        const author = screen.getByText('Author: Ada');
-        expect(heading.compareDocumentPosition(id) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(id.compareDocumentPosition(author) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(screen.queryByTestId('problem-difficulty')).not.toBeInTheDocument();
-        expect(screen.queryByTestId('problem-categories')).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: /categories/i })).not.toBeInTheDocument();
-        expect(screen.queryByText('Graph')).not.toBeInTheDocument();
-        expect(screen.queryByText('Math')).not.toBeInTheDocument();
-        expect(screen.getByText('Time Limit: 1000 ms')).toBeInTheDocument();
-        expect(screen.getByText('Memory Limit: 256 MB')).toBeInTheDocument();
-    });
-
-    it('keeps the simple sidebar when an unrated problem has no categories', async () => {
-        jest.mocked(problemService.getDetails).mockResolvedValueOnce({
-            id: '1', title: 'Unrated Problem', author: null,
-            difficulty: null, categories: [], time_limit_ms: 1000, memory_limit_mb: 256,
-        });
-        jest.mocked(problemService.getAllWithStats).mockResolvedValueOnce([]);
-
-        render(<BrowserRouter><ProblemDetail /></BrowserRouter>);
-
-        await screen.findByRole('heading', { name: 'Unrated Problem' });
-        expect(screen.queryByTestId('problem-difficulty')).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: /categories/i })).not.toBeInTheDocument();
-        expect(screen.queryByTestId('problem-categories')).not.toBeInTheDocument();
-        expect(screen.getByText('Time Limit: 1000 ms')).toBeInTheDocument();
-    });
-
-    it('shows the hidden-problem notice below My Submissions with clear spacing', async () => {
-        jest.mocked(problemService.getDetails).mockResolvedValueOnce({
-            id: '1', title: 'Hidden Problem', author: 'Ada', is_visible: false,
-            time_limit_ms: 1000, memory_limit_mb: 256,
-        });
-        jest.mocked(problemService.getAllWithStats).mockResolvedValueOnce([]);
-
-        render(<BrowserRouter><ProblemDetail /></BrowserRouter>);
-
-        const submissionsTab = await screen.findByRole('button', { name: 'My Submissions' });
-        const hiddenNotice = screen.getByText('This problem is currently hidden — it is only visible to staff.');
-        expect(submissionsTab.compareDocumentPosition(hiddenNotice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(hiddenNotice).toHaveClass('hidden-problem-indicator');
-    });
-
-    it('shows a back control that navigates back to the list', async () => {
-        const mockProblem = {
-            id: '1', title: 'Test Problem', author: null,
-            time_limit_ms: 1000, memory_limit_mb: 256
-        };
-        const mockStats = [{ id: '1', title: 'Test Problem', author: null, time_limit_ms: 1000, memory_limit_mb: 256, best_score: 0 }];
-        (jest.mocked(problemService.getDetails) as jest.Mock).mockResolvedValueOnce(mockProblem);
-        (jest.mocked(problemService.getAllWithStats) as jest.Mock).mockResolvedValueOnce(mockStats);
-
-        render(<BrowserRouter><ProblemDetail /></BrowserRouter>);
-
-        const back = await screen.findByRole('button', { name: 'Back to problem list' });
-        expect(back).toBeInTheDocument();
-    });
-
-    it('displays error if problem fetch fails', async () => {
-        (jest.mocked(problemService.getDetails) as jest.Mock).mockRejectedValueOnce(new Error('Fetch failed'));
-
-        render(<BrowserRouter><ProblemDetail /></BrowserRouter>);
-
-        await waitFor(() => {
-            expect(screen.getByText(/failed to fetch problem/i)).toBeInTheDocument();
-        });
-    });
-
-    it('renders a Download starter files link only when has_starter_files', async () => {
-        const detail = {
-            id: '1', title: 'Header One', author: null,
-            time_limit_ms: 1000, memory_limit_mb: 256,
-            problem_type: 'header' as const, submission_filename: 'student.h', has_starter_files: true,
-        };
-        jest.mocked(problemService.getDetails).mockResolvedValueOnce(detail);
-        jest.mocked(problemService.getAllWithStats).mockResolvedValueOnce([]);
+        jest.mocked(problemService.getDetails).mockResolvedValue(detail() as never);
+        jest.mocked(problemService.getPdfUrl).mockReturnValue('/api/problems/1/pdf');
         jest.mocked(problemService.getStarterUrl).mockReturnValue('/api/problems/1/starter');
-
-        render(<BrowserRouter><ProblemDetail /></BrowserRouter>);
-
-        const link = await screen.findByRole('link', { name: 'Download starter files' });
-        expect(link).toHaveAttribute('href', '/api/problems/1/starter');
-        expect(link).toHaveAttribute('download');
+        jest.mocked(subscribeSubmissions).mockImplementation(() => () => undefined);
+        localStorage.clear();
     });
 
-    it('hides the starter link when there are no starter files', async () => {
-        const detail = {
-            id: '1', title: 'Plain', author: null,
-            time_limit_ms: 1000, memory_limit_mb: 256,
-            problem_type: 'standard' as const, submission_filename: null, has_starter_files: false,
-        };
-        jest.mocked(problemService.getDetails).mockResolvedValueOnce(detail);
-        jest.mocked(problemService.getAllWithStats).mockResolvedValueOnce([]);
+    it('header shows id, limits, languages and author', async () => {
+        renderPage();
+        expect(await screen.findByRole('heading', { level: 1, name: 'Test Problem' })).toBeInTheDocument();
+        expect(screen.getByText('1000 ms · 256 MB')).toBeInTheDocument();
+        expect(screen.getByText('C++ · Python')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Ada' })).toHaveAttribute('href', '/problems?author=Ada');
+        const crumbs = screen.getByRole('navigation', { name: /breadcrumb/i });
+        expect(within(crumbs).getByRole('link', { name: 'Basics' })).toHaveAttribute('href', '/problems?collection=2');
+        expect(screen.getByRole('img', { name: '1 of 2 test cases passed' })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Submissions 3' })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Open PDF' })).toHaveAttribute('href', '/api/problems/1/pdf');
+    });
 
-        render(<BrowserRouter><ProblemDetail /></BrowserRouter>);
+    it('header problems show the submit filename and the starter action', async () => {
+        jest.mocked(problemService.getDetails).mockResolvedValue(detail({
+            problem_type: 'header', submission_filename: 'student.h', has_starter_files: true,
+        }) as never);
+        renderPage();
+        expect(await screen.findByText('C++ · submit student.h')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Starter' })).toHaveAttribute('href', '/api/problems/1/starter');
+    });
 
-        await screen.findByRole('heading', { name: 'Plain' });
-        expect(screen.queryByRole('link', { name: 'Download starter files' })).not.toBeInTheDocument();
+    it('tab lives in the URL', async () => {
+        renderPage();
+        await screen.findByRole('heading', { level: 1, name: 'Test Problem' });
+        expect(screen.getByRole('tab', { name: 'Statement' })).toHaveAttribute('aria-selected', 'true');
+        fireEvent.click(screen.getByRole('tab', { name: 'Submit' }));
+        expect(window.location.search).toBe('?tab=submit');
+        expect(screen.getByRole('tab', { name: 'Submit' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByRole('button', { name: /^Submit/ })).toBeInTheDocument();
+    });
+
+    it('the statement offers the open-PDF fallback under the frame', async () => {
+        renderPage();
+        expect(await screen.findByTitle('Test Problem statement')).toBeInTheDocument();
+        expect(screen.getByText(/Can't preview it here/)).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'open PDF' })).toHaveAttribute('href', '/api/problems/1/pdf');
+    });
+
+    it('submitting shows the live result inline and keeps the submission id in the URL', async () => {
+        jest.mocked(submissionService.submit).mockResolvedValue({ message: 'ok', submissionId: 77, isContestSubmission: false } as never);
+        jest.mocked(submissionService.getById).mockResolvedValue(accepted as never);
+        renderPage('?tab=submit');
+        const editor = await screen.findByLabelText(/Your code/i);
+        fireEvent.change(editor, { target: { value: 'int main(){}' } });
+        fireEvent.click(screen.getByRole('button', { name: /^Submit/ }));
+        const result = await screen.findByRole('region', { name: 'Result' });
+        expect(within(result).getAllByText('ACCEPTED').length).toBeGreaterThan(0);
+        expect(window.location.search).toContain('submission=77');
+        expect(screen.getByRole('link', { name: 'View submitted code' })).toHaveAttribute('href', '/submissions/77');
+        expect(submissionService.submit).toHaveBeenCalledWith({ problemId: '1', language: 'cpp', code: 'int main(){}' });
+    });
+
+    it('reloading with ?submission= shows that result', async () => {
+        jest.mocked(submissionService.getById).mockResolvedValue(accepted as never);
+        renderPage('?tab=submit&submission=77');
+        const result = await screen.findByRole('region', { name: 'Result' });
+        expect(within(result).getAllByText('ACCEPTED').length).toBeGreaterThan(0);
+        expect(submissionService.getById).toHaveBeenCalledWith(77, null);
+    });
+
+    it('Cmd+Enter submits', async () => {
+        jest.mocked(submissionService.submit).mockResolvedValue({ message: 'ok', submissionId: 78, isContestSubmission: false } as never);
+        jest.mocked(submissionService.getById).mockResolvedValue({ ...accepted, id: 78 } as never);
+        renderPage('?tab=submit');
+        const editor = await screen.findByLabelText(/Your code/i);
+        fireEvent.change(editor, { target: { value: 'print(1)' } });
+        fireEvent.keyDown(editor, { key: 'Enter', metaKey: true });
+        await waitFor(() => expect(submissionService.submit).toHaveBeenCalledTimes(1));
+    });
+
+    it('a dropped file fills the editor', async () => {
+        renderPage('?tab=submit');
+        const editor = await screen.findByLabelText(/Your code/i);
+        const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+        const file = new File(['int main() { return 0; }'], 'solution.cpp', { type: 'text/plain' });
+        await act(async () => { fireEvent.change(input, { target: { files: [file] } }); });
+        await waitFor(() => expect(editor).toHaveValue('int main() { return 0; }'));
+    });
+
+    it('shows the staff-only notice for a hidden problem', async () => {
+        jest.mocked(problemService.getDetails).mockResolvedValue(detail({ is_visible: false }) as never);
+        renderPage();
+        expect(await screen.findByText(/only visible to staff/)).toBeInTheDocument();
+    });
+
+    it('displays the error when the problem fails to load', async () => {
+        jest.mocked(problemService.getDetails).mockRejectedValue({ response: { status: 404 } });
+        renderPage();
+        expect(await screen.findByText('Problem 1 not found.')).toBeInTheDocument();
     });
 });
