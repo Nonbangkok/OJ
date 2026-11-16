@@ -260,6 +260,23 @@ describe('full-screen editor chrome (§7.9)', () => {
     expect(runJob).toHaveBeenCalledTimes(2);
   });
 
+  test('final review: on a phone, a stale PDF builds only while the Preview pane is showing', () => {
+    jest.mocked(useMediaQuery).mockReturnValue(true);
+    const runJob = jest.fn();
+    const { rerender } = showWith({ ...idle, runJob, draftOver: { hasLatestPdf: true, latestPdfRevision: 2 } });
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Preview mode' })).getByRole('button', { name: 'PDF' }));
+    expect(runJob).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('tab', { name: 'Source' }));
+    runJob.mockClear();
+    // A new stale state (the next autosave) while the author is typing in Source.
+    const d = { ...draft, hasLatestPdf: true, latestPdfRevision: 2, revision: 4 };
+    mockedUseAuthoringDraft.mockReturnValue({ ...model(), ...idle, runJob, draft: d, form: d } as unknown as ReturnType<typeof useAuthoringDraft>);
+    rerender(<MemoryRouter><StatementEditor id="d1" /></MemoryRouter>);
+    expect(screen.getByRole('textbox', { name: 'Statement source' })).toBeInTheDocument();
+    expect(runJob).not.toHaveBeenCalled();
+  });
+
   test('below 768 px: Source / Preview tabs instead of the split', () => {
     jest.mocked(useMediaQuery).mockReturnValue(true);
     showWith(idle);

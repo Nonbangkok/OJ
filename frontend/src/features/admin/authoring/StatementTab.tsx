@@ -57,15 +57,19 @@ export function StatementAssets({ draft, disabled, mutate, onError }: {
     return () => { cancelled = true; };
   }, [draft.id, draft.revision, onError]);
 
+  // One operation for the whole drop: each upload bumps the revision, so the
+  // next file is sent against the revision the server holds now.
   const upload = (files: File[]) => {
-    for (const file of files) {
-      void mutate(async () => {
+    void mutate(async () => {
+      let revision = draft.revision;
+      for (const [index, file] of files.entries()) {
+        if (index > 0) revision = (await authoringService.getDraft(draft.id)).revision;
         const data = new FormData();
-        data.append('expectedRevision', String(draft.revision));
+        data.append('expectedRevision', String(revision));
         data.append('asset', file);
         await authoringService.uploadAsset(draft.id, data);
-      });
-    }
+      }
+    });
   };
 
   return (

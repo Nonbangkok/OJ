@@ -139,6 +139,25 @@ describe('Draft workspace header and step tabs (§7.9)', () => {
     expect(within(nav).getByRole('link', { name: 'AI docs' })).toHaveAttribute('href', '/admin/authoring/d1/ai-docs');
   });
 
+  it('final review: a failed job at this revision turns its glyph red and says so above the tab', async () => {
+    jobs = [job({ jobType: 'generate_outputs', status: 'failed', errorMessage: 'case 3 crashed' })];
+    draft = { ...base, testcaseStats: { total: 3, withOutput: 1 } };
+    serve();
+    show('/admin/authoring/d1/metadata');
+    await screen.findByText('Saved · rev 3');
+    expect(within(steps()).getByRole('link', { name: 'Testcases, failed' })).toBeInTheDocument();
+    const notice = screen.getByRole('alert');
+    expect(notice).toHaveTextContent('Generate outputs failed at rev 3');
+    expect(notice).toHaveTextContent('case 3 crashed');
+    expect(within(notice).getByRole('link', { name: 'See History' })).toHaveAttribute('href', '/admin/authoring/d1/jobs');
+  });
+
+  it('final review: the plain draft URL marks Metadata as the current step', async () => {
+    show('/admin/authoring/d1');
+    await screen.findByText('Saved · rev 3');
+    expect(within(steps()).getByRole('link', { name: 'Metadata, done' })).toHaveAttribute('aria-current', 'page');
+  });
+
   it('the Verify & publish tab has no header primary (its footer holds the buttons)', async () => {
     show('/admin/authoring/d1/verify');
     await screen.findByText('Saved · rev 3');

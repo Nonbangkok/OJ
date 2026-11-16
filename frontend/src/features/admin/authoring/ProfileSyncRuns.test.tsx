@@ -62,3 +62,13 @@ test('surfaces a profile sync listing error', async () => {
   render(<ProfileSyncRuns onError={onError} />);
   await waitFor(() => expect(onError).toHaveBeenCalled());
 });
+
+test('final review: a parent re-render with a new onError does not refetch the sync list', async () => {
+  jest.mocked(api.get).mockResolvedValue({ data: [] });
+  const { rerender } = render(<ProfileSyncRuns onError={() => {}} />);
+  await waitFor(() => expect(api.get).toHaveBeenCalledTimes(1));
+  rerender(<ProfileSyncRuns onError={() => {}} />);
+  rerender(<ProfileSyncRuns onError={() => {}} />);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(api.get).toHaveBeenCalledTimes(1);
+});

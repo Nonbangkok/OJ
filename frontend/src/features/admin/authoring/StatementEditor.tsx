@@ -93,14 +93,17 @@ export default function StatementEditor({ id }: { id: string }) {
   const buildPdf = useCallback(() => model.runJob('pdf'), [model]);
   // Switching to the Actual PDF tab with a stale PDF builds it automatically —
   // one job at a time; the guard inside runJob prevents double submission.
+  const small = useSmallScreen();
+  const [pane, setPane] = useState<'source' | 'preview'>('source');
   const autoBuiltRef = useRef('');
   useEffect(() => {
-    if (!pdfMode || !pdfStale || model.activeJob || model.actionsDisabled) return;
+    // On a phone the PDF is only on screen while the Preview pane is showing.
+    if (!pdfMode || (small && pane !== 'preview') || !pdfStale || model.activeJob || model.actionsDisabled) return;
     const key = `${draft?.revision}:${draft?.latestPdfRevision}`;
     if (autoBuiltRef.current === key) return; // one auto-build per stale state
     autoBuiltRef.current = key;
     void buildPdf();
-  }, [pdfMode, pdfStale, model.activeJob, model.actionsDisabled, draft?.revision, draft?.latestPdfRevision, buildPdf]);
+  }, [pdfMode, small, pane, pdfStale, model.activeJob, model.actionsDisabled, draft?.revision, draft?.latestPdfRevision, buildPdf]);
   useEffect(() => { if (!pdfStale) autoBuiltRef.current = ''; }, [pdfStale]);
   const recoveryHandled = useRef(false);
   const recoveryBaseRevision = useRef<number | null>(null);
@@ -110,8 +113,6 @@ export default function StatementEditor({ id }: { id: string }) {
     id: `oj-authoring-statement-layout:${id}`,
     storage: layoutStorage,
   });
-  const small = useSmallScreen();
-  const [pane, setPane] = useState<'source' | 'preview'>('source');
   // While the divider is dragged, embedded documents (preview iframe / PDF embed) must not swallow the
   // pointer events, or the drag never sees its pointermove/pointerup and gets stuck.
   const [resizing, setResizing] = useState(false);

@@ -66,6 +66,31 @@ describe('readinessOf', () => {
     expect(readinessOf(base()).verified).toBe('todo');
   });
 
+  it('final review: a successful verify now beats a compile that failed at an older revision', () => {
+    const r = readinessOf(base({ latestJobs: { compile_solution: at('failed', 4), verify_all: at('succeeded') } }));
+    expect(r.solution).toBe('done');
+    // A compile that failed at an older revision with nothing newer still reads failed.
+    expect(readinessOf(base({ latestJobs: { compile_solution: at('failed', 4) } })).solution).toBe('failed');
+  });
+
+  it('final review: verified becomes stale after an edit (the server nulls verifiedRevision on every bump)', () => {
+    const edited = base({ verifiedRevision: null, latestJobs: { verify_all: at('succeeded', 4) } });
+    expect(readinessOf(edited).verified).toBe('stale');
+  });
+
+  it('final review: a published draft re-synced from its profile still reads verified', () => {
+    const synced = base({ status: 'published', verifiedRevision: null, latestJobs: { verify_all: at('succeeded', 4) } });
+    expect(readinessOf(synced).verified).toBe('done');
+  });
+
+  it('final review: failures win over missing pieces (outputs, inputs, first PDF)', () => {
+    expect(readinessOf(base({ testcases: { total: 10, withOutput: 4 }, latestJobs: { generate_outputs: at('failed') } })).testcases).toBe('failed');
+    expect(readinessOf(base({ testcases: { total: 0, withOutput: 0 }, latestJobs: { run_generator: at('timed_out') } })).testcases).toBe('failed');
+    expect(readinessOf(base({ latestPdfRevision: null, latestJobs: { build_pdf: at('failed') } })).pdf).toBe('failed');
+    // A failure that a newer success replaced is not reported: latestJobs holds the newest job per type.
+    expect(readinessOf(base({ latestJobs: { run_generator: at('succeeded') } })).testcases).toBe('done');
+  });
+
   it('a published draft keeps its stored readiness (all done)', () => {
     expect(Object.values(readinessOf(base({ status: 'published', verifiedRevision: 5, latestJobs: { compile_solution: at('succeeded'), compile_generator: at('succeeded') } })))).toEqual(
       ['done', 'done', 'done', 'done', 'done', 'done'],

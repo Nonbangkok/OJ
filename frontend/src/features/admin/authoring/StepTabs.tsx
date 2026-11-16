@@ -1,5 +1,5 @@
 import { CheckCircle, Circle, CircleHalf, XCircle, ClockCounterClockwise, BookOpenText } from '@phosphor-icons/react';
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import type { ReadinessState } from './readiness';
 import styles from './Workspace.module.css';
 
@@ -12,11 +12,22 @@ const GLYPH = { done: CheckCircle, todo: Circle, stale: CircleHalf, failed: XCir
 
 /** Step tabs under the workspace header, each with a status glyph; History and AI docs sit right. */
 export default function StepTabs({ base, states }: { base: string; states: Record<StepPath, ReadinessState> }) {
+  // The draft's plain URL (what the list links to) shows Metadata, so Metadata is current there.
+  const onIndex = useLocation().pathname.replace(/\/$/, '') === base;
   return (
     <nav className={styles.steps} aria-label="Draft steps">
       {(Object.keys(STEP_LABELS) as StepPath[]).map((path) => {
         const state = states[path];
         const Icon = GLYPH[state];
+        if (path === 'metadata' && onIndex) {
+          return (
+            <Link key={path} to={`${base}/${path}`} aria-current="page" aria-label={`${STEP_LABELS[path]}, ${WORDS[state]}`}
+              title={`${STEP_LABELS[path]}: ${WORDS[state]}`} className={styles.stepActive}>
+              <Icon size={14} weight={state === 'todo' ? 'regular' : 'bold'} className={styles[`glyph_${state}`]} aria-hidden="true" />
+              {STEP_LABELS[path]}
+            </Link>
+          );
+        }
         return (
           <NavLink
             key={path}

@@ -36,6 +36,7 @@ export default function UserLinkPicker({ value, onChange, currentProfileId, erro
 
   const takenBy = (c: UserCandidate) => (c.linkedProfile && c.linkedProfile.id !== currentProfileId ? c.linkedProfile.akaName : null);
   const visible = term ? results : [];
+  const pick = (c: UserCandidate) => { onChange({ id: c.id, username: c.username }); setQuery(''); setResults([]); };
 
   return (
     <div className={styles.picker} data-field="linked-user">
@@ -59,6 +60,13 @@ export default function UserLinkPicker({ value, onChange, currentProfileId, erro
             value={query}
             disabled={disabled}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // The picker sits inside the profile form: Enter picks the first free match, never submits.
+              if (e.key !== 'Enter') return;
+              e.preventDefault();
+              const first = visible.find((c) => !takenBy(c));
+              if (first) pick(first);
+            }}
           />
           {visible.length > 0 && (
             <ul id={listId} role="listbox" aria-label="Matching accounts" className={styles.options}>
@@ -72,8 +80,8 @@ export default function UserLinkPicker({ value, onChange, currentProfileId, erro
                     aria-disabled={taken ? true : undefined}
                     tabIndex={taken ? -1 : 0}
                     className={taken ? styles.optionTaken : styles.option}
-                    onClick={() => { if (!taken) { onChange({ id: c.id, username: c.username }); setQuery(''); setResults([]); } }}
-                    onKeyDown={(e) => { if (!taken && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onChange({ id: c.id, username: c.username }); setQuery(''); setResults([]); } }}
+                    onClick={() => { if (!taken) pick(c); }}
+                    onKeyDown={(e) => { if (!taken && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pick(c); } }}
                   >
                     <span className={styles.linkedName}>{c.username}</span>
                     <span className={styles.hint}>{ROLE[c.role] ?? c.role}{taken ? ` · already linked to ${taken}` : ''}</span>

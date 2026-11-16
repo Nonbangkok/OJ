@@ -52,11 +52,13 @@ export function readinessRows(draft: Draft, jobs: Job[], states: Record<'stateme
     failed: 'The last PDF build failed.',
   };
   const verify = newest('verify_all');
+  const lastGoodVerify = jobs.filter((j) => j.jobType === 'verify_all' && j.status === 'succeeded')
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
   const caseCount = verify?.status === 'succeeded' ? verify.resultSummary?.verification?.caseCount : undefined;
   const verifiedDetail: Record<ReadinessState, string> = {
     done: caseCount ? `All checks passed · ${plural(caseCount, 'testcase')} ran against the solution.` : 'All checks passed.',
     todo: 'Never verified.',
-    stale: `Last verified at rev ${draft.verifiedRevision ?? '—'}.`,
+    stale: `Last verified at rev ${draft.verifiedRevision ?? lastGoodVerify?.draftRevision ?? '—'}.`,
     failed: `The last verify failed at rev ${rev}.`,
   };
 
@@ -82,7 +84,8 @@ export function readinessRows(draft: Draft, jobs: Job[], states: Record<'stateme
     },
     {
       key: 'testcases', state: states.testcases, title: 'Testcases',
-      detail: total === 0 ? 'No testcases yet.'
+      detail: states.testcases === 'failed' ? 'The last generate run failed — see History.'
+        : total === 0 ? 'No testcases yet.'
         : withOutput === total ? `${plural(total, 'case')}, all with outputs${size}`
           : `${total - withOutput} of ${plural(total, 'case')} missing outputs${size}`,
       fix: { label: 'Open testcases', action: { kind: 'tab', to: 'testcases' } },

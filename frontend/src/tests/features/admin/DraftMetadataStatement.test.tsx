@@ -106,6 +106,22 @@ describe('Metadata and Statement tabs (§7.9)', () => {
     await waitFor(() => expect(api.delete).toHaveBeenCalledWith(expect.stringContaining('/assets/a1'), expect.anything()));
   });
 
+  it('final review: dropping several images uploads every one, each against the latest revision', async () => {
+    let revision = 14;
+    jest.mocked(api.get).mockImplementation(async (url: string) => ({
+      data: url.endsWith('/jobs') ? [] : url.endsWith('/assets') ? assets : url.endsWith('/testcases') ? { revision, testcases: [] }
+        : url.endsWith('/d1') ? { ...base, revision } : [],
+    }));
+    jest.mocked(api.post).mockImplementation(async () => { revision += 1; return { data: {} }; });
+    const { container } = show('/admin/authoring/d1/statement');
+    await screen.findByRole('table', { name: 'Statement images' });
+    const files = ['a.png', 'b.png', 'c.png'].map((name) => new File(['x'], name, { type: 'image/png' }));
+    fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, { target: { files } });
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(3));
+    const sent = jest.mocked(api.post).mock.calls.map(([, body]) => (body as FormData).get('expectedRevision'));
+    expect(sent).toEqual(['14', '15', '16']);
+  });
+
   it('phone: Statement is read-only with a large-screen notice; Metadata stays editable', async () => {
     jest.mocked(useMediaQuery).mockReturnValue(true);
     show('/admin/authoring/d1/statement');

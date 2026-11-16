@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useEffectEvent } from 'react';
 import { Button, Dialog, StatusBadge, StatusDot } from '../../../components/ui';
 import authoringService from '../../../services/admin/authoringService';
 import { formatDateTime } from '../../../utils/formatters';
@@ -19,13 +19,15 @@ export default function ProfileSyncRuns({ onError }: { onError: (error: unknown)
   const [runs, setRuns] = useState<ProfileSyncRun[] | null>(null);
   const [detail, setDetail] = useState<ProfileSyncRun | null>(null);
   const [loading, setLoading] = useState(false);
+  // Load once: the parent passes a fresh onError on every render (each keystroke in the drawer).
+  const reportError = useEffectEvent(onError);
   useEffect(() => {
     let cancelled = false;
     authoringService.listProfileSyncs()
       .then((list) => { if (!cancelled) setRuns(list); })
-      .catch(onError);
+      .catch((err: unknown) => { if (!cancelled) reportError(err); });
     return () => { cancelled = true; };
-  }, [onError]);
+  }, []);
 
   return (
     <section className={styles.syncs} aria-labelledby="profile-syncs-title">
