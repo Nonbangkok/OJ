@@ -21,6 +21,7 @@ import {
   ProblemMoveResult,
 } from '../types/service';
 import { contestProblemOrderSql } from './contestProblemOrder';
+import { contestStandingsCte } from './contestStandingsSql';
 
 /**
  * Problem Migration Service
@@ -234,35 +235,10 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
     // ({problemId: {score}}) rather than the historical bare-number map, so
     // both variants parse identically client-side.
     const scoreboardResult = await client.query(`
-      WITH UserBestScores AS (
-        SELECT
-          cs.user_id,
-          cs.problem_id,
-          MAX(cs.score) AS best_score,
-          MAX(cs.submitted_at) AS latest_score_time
-        FROM contest_submissions cs
-        WHERE cs.contest_id = $1
-        GROUP BY cs.user_id, cs.problem_id
-      ),
-      UserTotalScores AS (
-        SELECT
-          ubs.user_id,
-          SUM(ubs.best_score) AS total_score,
-          jsonb_object_agg(ubs.problem_id, jsonb_build_object('score', ubs.best_score)) AS detailed_scores,
-          MAX(ubs.latest_score_time) AS last_score_improvement_time
-        FROM UserBestScores ubs
-        GROUP BY ubs.user_id
-      )
+      ${contestStandingsCte('$1')}
       INSERT INTO contest_scoreboards (contest_id, user_id, total_score, detailed_scores, last_score_improvement_time)
-      SELECT
-        $1,
-        cp.user_id,
-        COALESCE(uts.total_score, 0),
-        COALESCE(uts.detailed_scores, '{}'::jsonb),
-        COALESCE(uts.last_score_improvement_time, cp.joined_at)
-      FROM contest_participants cp
-      LEFT JOIN UserTotalScores uts ON uts.user_id = cp.user_id
-      WHERE cp.contest_id = $1
+      SELECT $1, user_id, total_score, detailed_scores, last_score_improvement_time
+      FROM standings
       RETURNING *
     `, [contestId]);
 

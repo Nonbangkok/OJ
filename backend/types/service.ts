@@ -2,7 +2,7 @@ import type { UserProgression } from '../services/progressionService';
 import { Readable } from 'stream';
 import { UPLOAD_STATUS, type ProblemFileRole, type ProblemType } from '../constants';
 import type { ProblemFileInput } from '../utils/headerProblemFiles';
-import { ContestRow, ProblemRow, SystemSettingRow, TestcaseRow, UserRow } from './models';
+import { ContestRow, ContestStatus, ProblemRow, SystemSettingRow, TestcaseRow, UserRow } from './models';
 
 // ---------------------------------------------------------------------------
 // Generic / Shared
@@ -432,13 +432,28 @@ export interface ContestScoreboardRow {
   username: string;
   has_avatar?: boolean;
   total_score: number;
-  detailed_scores: Record<string, number> | Record<string, { score: number }>;
+  /** Snapshots taken before B9 hold bare numbers or { score } only. */
+  detailed_scores: Record<string, number> | Record<string, ContestProblemStanding>;
   last_score_improvement_time?: Date | null;
+  /** Competition rank (running, finishing, finished); absent before the start. */
+  rank?: number;
+}
+
+/** One participant's result on one contest problem (B9). */
+export interface ContestProblemStanding {
+  score: number;
+  attempts?: number;
+  /** When the best score was first reached. */
+  best_at?: string;
+  /** Per-case statuses of that best submission. */
+  statuses?: string[];
 }
 
 export interface ContestScoreboardResponse {
   scoreboard: ContestScoreboardRow[];
   problems: Array<{ problem_id: string; title: string }>;
+  status: ContestStatus;
+  start_time: Date;
 }
 
 export interface ContestWritePayload {
