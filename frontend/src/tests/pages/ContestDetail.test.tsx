@@ -1,188 +1,122 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ContestDetail from '../../pages/contest/ContestDetail';
+import { ContestContext } from '../../features/contest/ContestContext';
 import contestService from '../../services/contestService';
+import type { Contest } from '../../types';
 
 jest.mock('../../services/contestService');
 
-// Mock ThemeContext to prevent useTheme errors from LoadingPage
-jest.mock('../../context/ThemeContext', () => ({
-    useTheme: jest.fn(() => ({ theme: 'light' })),
-}));
+const HOUR = 3_600_000;
+const contest = (over: Partial<Contest> = {}): Contest => ({
+  id: 19, title: 'Weekly round #19', description: null, status: 'scheduled', is_participant: false,
+  start_time: new Date(Date.now() + 4 * 24 * HOUR).toISOString(),
+  end_time: new Date(Date.now() + 4 * 24 * HOUR + 2 * HOUR).toISOString(),
+  participant_count: '12', problem_count: 6, problems: [],
+  ...over,
+} as Contest);
 
-// Mock LoadingPage to control the loading text
-jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading Contest Data...</div>);
-jest.mock('react-router-dom', () => ({
-    ...jest.requireActual('react-router-dom'),
-    useParams: () => ({ contestId: '1' }),
-    useNavigate: () => jest.fn()
-}));
+const roster = ['nattapat', 'ploy.s', 'tonkla'].map((username, i) => ({ user_id: i + 1, username, total_score: 0, detailed_scores: {} }));
 
-jest.mock('../../context/AuthContext', () => ({
-    useAuth: () => ({ user: { id: 1, username: 'testuser', role: 'user' }, isLoading: false, login: jest.fn(), logout: jest.fn() })
-}));
+const renderAt = (value: Contest, reload = jest.fn()) => {
+  const utils = render(
+    <ContestContext.Provider value={{ contest: value, error: null, reload }}>
+      <MemoryRouter initialEntries={[`/contests/${value.id}`]}>
+        <Routes>
+          <Route path="/contests/:contestId" element={<ContestDetail />} />
+          <Route path="/contests/:contestId/problems" element={<p>problem table</p>} />
+          <Route path="/contests/:contestId/problems/:problemId" element={<p>problem page</p>} />
+        </Routes>
+      </MemoryRouter>
+    </ContestContext.Provider>,
+  );
+  return { ...utils, reload };
+};
 
-describe('ContestDetail Page', () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
-    });
+describe('ContestDetail: lobby (scheduled)', () => {
+  beforeEach(() => {
+    jest.mocked(contestService.getScoreboard).mockResolvedValue({ scoreboard: roster, problems: [] } as never);
+    jest.mocked(contestService.join).mockResolvedValue({ message: 'ok' } as never);
+  });
+  afterEach(() => jest.useRealTimers());
 
-    it('renders loading state initially', () => {
-        jest.mocked(contestService.getById).mockReturnValue(new Promise(() => { }));
-        render(<BrowserRouter><ContestDetail /></BrowserRouter>);
-        expect(screen.getByText(/loading contest data\.\.\.$/i)).toBeInTheDocument();
-    });
+  it('shows the SCHEDULED tag, a mono countdown and the rule facts', async () => {
+    renderAt(contest());
+    expect(screen.getByRole('heading', { name: /Weekly round #19/, level: 1 })).toBeInTheDocument();
+    expect(screen.getByText('SCHEDULED')).toBeInTheDocument();
+    expect(screen.getByText('Starts in')).toBeInTheDocument();
+    expect(screen.getByTestId('lobby-countdown')).toHaveTextContent(/^\dd \d\d:\d\d$/);
+    const facts = screen.getByRole('list', { name: 'Contest rules' });
+    for (const label of ['Window', 'Duration', 'Problems', 'Scoring']) expect(within(facts).getByText(label)).toBeInTheDocument();
+    expect(within(facts).getByText('2 h')).toBeInTheDocument();
+    expect(within(facts).getByText('6')).toBeInTheDocument();
+    expect(within(facts).getByText('IOI · sum of best scores · ties by earliest last improvement')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Registered · 3' })).toBeInTheDocument();
+    expect(screen.getByText('ploy.s')).toBeInTheDocument();
+  });
 
-    it('displays contest details successfully', async () => {
-        const mockContest = {
-            id: 1, title: 'Test Contest', status: 'running' as const,
-            description: null,
-            problems: [{ id: 'P1', title: 'Problem 1', author: null }],
-            is_participant: true,
-            start_time: '2026-01-01T00:00:00Z',
-            end_time: '2026-01-02T00:00:00Z',
-            participant_count: '5'
-        };
-        // The detail hook polls, so a Once-mock would be consumed by the
-        // refetch and leave the page in its error state.
-        jest.mocked(contestService.getById).mockResolvedValue(mockContest as never);
+  it('Join → Registered (disabled) and reload()', async () => {
+    const { reload, rerender } = renderAt(contest());
+    fireEvent.click(screen.getByRole('button', { name: 'Join' }));
+    await act(async () => { await Promise.resolve(); });
+    expect(contestService.join).toHaveBeenCalledWith(19);
+    expect(reload).toHaveBeenCalled();
+    rerender(
+      <ContestContext.Provider value={{ contest: contest({ is_participant: true }), error: null, reload }}>
+        <MemoryRouter initialEntries={['/contests/19']}><Routes><Route path="/contests/:contestId" element={<ContestDetail />} /></Routes></MemoryRouter>
+      </ContestContext.Provider>,
+    );
+    expect(screen.getByRole('button', { name: /Registered/ })).toBeDisabled();
+  });
 
-        render(<BrowserRouter><ContestDetail /></BrowserRouter>);
+  it('at zero calls reload once and, if still scheduled, shows "Starting…" without looping', async () => {
+    jest.useFakeTimers();
+    const { reload } = renderAt(contest({ start_time: new Date(Date.now() + 2000).toISOString() }));
+    await act(async () => { jest.advanceTimersByTime(2500); });
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('lobby-countdown')).toHaveTextContent('Starting…');
+    await act(async () => { jest.advanceTimersByTime(10_000); });
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+});
 
-        await waitFor(() => {
-            expect(screen.getByText('Test Contest')).toBeInTheDocument();
-        });
-    });
+describe('ContestDetail: running, not joined', () => {
+  const running = () => contest({
+    status: 'running', problem_count: 5, participant_count: '86',
+    start_time: new Date(Date.now() - HOUR).toISOString(), end_time: new Date(Date.now() + HOUR).toISOString(),
+  });
+  beforeEach(() => {
+    jest.mocked(contestService.join).mockResolvedValue({ message: 'ok' } as never);
+    jest.mocked(contestService.getProblems).mockResolvedValue([{ id: 'sum_digits', title: 'Sum of digits' }] as never);
+  });
 
-    it('shows compact metadata, live progress, and a solving action', async () => {
-        const mockContest = {
-            id: 1, title: 'Test Contest', status: 'running' as const,
-            description: null,
-            problems: [{ id: 'P1', title: 'Problem 1', author: null }],
-            is_participant: true,
-            start_time: '2026-01-01T00:00:00Z',
-            end_time: '2026-01-02T00:00:00Z',
-            participant_count: '5'
-        };
-        jest.mocked(contestService.getById).mockResolvedValue(mockContest as never);
-        // Per-user problem summaries power the "X / N solved" progress block.
-        jest.mocked(contestService.getProblems).mockResolvedValue([
-            { id: 'P1', title: 'Problem 1', author: null, best_score: 100, submission_count: '1' },
-            { id: 'P2', title: 'Problem 2', author: null, best_score: 0, submission_count: '0' },
-        ] as never);
+  it('shows letters A–E from problem_count with titles hidden', () => {
+    renderAt(running());
+    expect(screen.getByText('LIVE')).toBeInTheDocument();
+    const table = screen.getByRole('table', { name: 'Problems' });
+    expect(within(table).getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0].textContent)).toEqual(['A', 'B', 'C', 'D', 'E']);
+    expect(within(table).getAllByText('Hidden until you join')).toHaveLength(5);
+  });
 
-        render(<BrowserRouter><ContestDetail /></BrowserRouter>);
+  it('Join contest → join() then lands on problem A', async () => {
+    const { reload } = renderAt(running());
+    fireEvent.click(screen.getByRole('button', { name: 'Join contest' }));
+    expect(await screen.findByText('problem page')).toBeInTheDocument();
+    expect(contestService.join).toHaveBeenCalledWith(19);
+    expect(reload).toHaveBeenCalled();
+  });
 
-        await waitFor(() => {
-            expect(screen.getByText('5 participants')).toBeInTheDocument();
-            expect(screen.getByText('1 problem')).toBeInTheDocument();
-            expect(screen.getByText('Your progress')).toBeInTheDocument();
-            expect(screen.getByText('1 / 1 solved')).toBeInTheDocument();
-            expect(screen.getByText('100 points')).toBeInTheDocument();
-            expect(screen.getByText('Continue Solving')).toBeInTheDocument();
-        });
+  it('join failure shows the server message', async () => {
+    jest.mocked(contestService.join).mockRejectedValue({ response: { data: { message: 'Submissions are locked for your account' } } });
+    renderAt(running());
+    fireEvent.click(screen.getByRole('button', { name: 'Join contest' }));
+    expect(await screen.findByText('Submissions are locked for your account')).toBeInTheDocument();
+  });
+});
 
-        // The thin solved-progress bar reflects solved/total (1 of 1 here).
-        const bar = screen.getByRole('progressbar');
-        expect(bar).toHaveAttribute('aria-valuemin', '0');
-        expect(bar).toHaveAttribute('aria-valuemax', '1');
-        expect(bar).toHaveAttribute('aria-valuenow', '1');
-        expect(bar).toHaveAttribute(
-            'aria-label',
-            'Problems solved: 1 of 1'
-        );
-    });
-
-    it('offers Start Solving when nothing is solved yet', async () => {
-        const mockContest = {
-            id: 1, title: 'Test Contest', status: 'running' as const,
-            description: null,
-            problems: [
-                { id: 'P1', title: 'Problem 1', author: null },
-                { id: 'P2', title: 'Problem 2', author: null },
-            ],
-            is_participant: true,
-            start_time: '2026-01-01T00:00:00Z',
-            end_time: '2026-01-02T00:00:00Z',
-            participant_count: '5'
-        };
-        jest.mocked(contestService.getById).mockResolvedValue(mockContest as never);
-        jest.mocked(contestService.getProblems).mockResolvedValue([
-            { id: 'P1', title: 'Problem 1', author: null, best_score: 0, submission_count: '0' },
-            { id: 'P2', title: 'Problem 2', author: null, best_score: null, submission_count: null },
-        ] as never);
-
-        render(<BrowserRouter><ContestDetail /></BrowserRouter>);
-
-        await waitFor(() => {
-            expect(screen.getByText('0 / 2 solved')).toBeInTheDocument();
-            expect(screen.getByText('0 points')).toBeInTheDocument();
-            expect(screen.getByText('Start Solving')).toBeInTheDocument();
-        });
-
-        // Zero solved still renders the bar, just empty (0 of 2).
-        const bar = screen.getByRole('progressbar');
-        expect(bar).toHaveAttribute('aria-valuemax', '2');
-        expect(bar).toHaveAttribute('aria-valuenow', '0');
-    });
-
-    it('shows error if fetch fails', async () => {
-        jest.mocked(contestService.getById).mockRejectedValueOnce(new Error('Fetch failed'));
-
-        render(<BrowserRouter><ContestDetail /></BrowserRouter>);
-
-        await waitFor(() => {
-            expect(screen.getByText(/failed to load contest data/i)).toBeInTheDocument();
-        });
-    });
-
-    describe('top-right timing line', () => {
-        const contestWith = (overrides: Record<string, unknown>) => ({
-            id: 1, title: 'Test Contest', description: null,
-            problems: [{ id: 'P1', title: 'Problem 1', author: null }],
-            is_participant: true,
-            start_time: '2026-01-01T00:00:00Z',
-            end_time: '2026-01-02T00:00:00Z',
-            participant_count: '5',
-            ...overrides,
-        });
-        const hoursFromNow = (hours: number) => new Date(Date.now() + hours * 3600 * 1000).toISOString();
-
-        it('says final submissions are being judged while finishing, never "Soon remaining"', async () => {
-            jest.mocked(contestService.getById).mockResolvedValue(contestWith({ status: 'finishing' }) as never);
-
-            render(<BrowserRouter><ContestDetail /></BrowserRouter>);
-
-            expect(await screen.findByText('Judging final submissions')).toBeInTheDocument();
-            expect(screen.queryByText(/remaining/i)).not.toBeInTheDocument();
-            expect(screen.queryByText(/soon/i)).not.toBeInTheDocument();
-        });
-
-        it('shows the remaining time while running', async () => {
-            jest.mocked(contestService.getById).mockResolvedValue(
-                contestWith({ status: 'running', end_time: hoursFromNow(2.5) }) as never
-            );
-
-            render(<BrowserRouter><ContestDetail /></BrowserRouter>);
-
-            expect(await screen.findByText(/^2h (29|30)m remaining$/)).toBeInTheDocument();
-        });
-
-        it('says the contest is ending once a running contest is past its end time', async () => {
-            jest.mocked(contestService.getById).mockResolvedValue(contestWith({ status: 'running' }) as never);
-
-            render(<BrowserRouter><ContestDetail /></BrowserRouter>);
-
-            expect(await screen.findByText('Ending now')).toBeInTheDocument();
-            expect(screen.queryByText(/soon remaining/i)).not.toBeInTheDocument();
-        });
-
-        it('says the contest is starting once a scheduled contest is past its start time', async () => {
-            jest.mocked(contestService.getById).mockResolvedValue(contestWith({ status: 'scheduled' }) as never);
-
-            render(<BrowserRouter><ContestDetail /></BrowserRouter>);
-
-            expect(await screen.findByText('Starting now')).toBeInTheDocument();
-        });
-    });
+describe('ContestDetail: participant while running', () => {
+  it('goes straight to the problem table', async () => {
+    renderAt(contest({ status: 'running', is_participant: true, start_time: new Date(Date.now() - HOUR).toISOString() }));
+    expect(await screen.findByText('problem table')).toBeInTheDocument();
+  });
 });

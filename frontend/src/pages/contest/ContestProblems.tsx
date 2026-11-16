@@ -1,112 +1,75 @@
-import { useParams, Link } from 'react-router-dom';
-import { useContestGuard } from '../../hooks/useContestGuard';
-import { useProblems } from '../../hooks/useProblems';
-import styles from './ContestProblems.module.css';
-import shared from '../../components/styles/ContestPages.module.css';
-import tableStyles from '../../components/styles/Table.module.css';
-import { StatusBadge, PageHeader } from '../../components/ui';
+import { Link, Navigate, useParams } from 'react-router-dom';
+import { InlineError, InlineNotice, PageHeader, StatusMark, TestcaseStrip, type VerdictTone } from '../../components/ui';
 import LoadingPage from '../../components/shared/LoadingPage';
+import { useContest } from '../../features/contest/ContestContext';
+import { problemLetter } from '../../features/contest/letters';
+import { useProblems } from '../../hooks/useProblems';
 import type { ProblemSummary } from '../../types';
+import styles from '../../features/contest/ContestStates.module.css';
 
-/** User-centric status for a contest problem row. "New" was ambiguous —
- *  these three states say what the user has (or hasn't) done. */
-type UserProgress = {
-  label: string;
-  tone: 'neutral' | 'success' | 'warning';
-  action: string;
+const FULL = 100;
+
+const markFor = (problem: ProblemSummary): VerdictTone => {
+  if (Number(problem.submission_count ?? 0) === 0 || problem.best_score == null) return 'none';
+  return Number(problem.best_score) >= FULL ? 'pass' : 'fail';
 };
 
-const getProgress = (problem: ProblemSummary): UserProgress => {
-  const attempts = Number(problem.submission_count ?? 0);
-  const best = Number(problem.best_score ?? 0);
-
-  if (attempts > 0 && best === 100) {
-    return { label: 'Solved', tone: 'success', action: 'View' };
-  }
-  if (attempts > 0) {
-    return { label: 'Attempted', tone: 'warning', action: 'Continue' };
-  }
-  return { label: 'Unsolved', tone: 'neutral', action: 'Solve' };
-};
-
+/** A participant's contest problems (§7.7): letter, title, best strip, score, tries; points of max in the header. */
 const ContestProblems = () => {
-  const { contestId } = useParams();
+  const { contestId = '' } = useParams();
+  const { contest } = useContest();
+  const active = Boolean(contest?.is_participant) && (contest?.status === 'running' || contest?.status === 'finishing');
+  const { problems, loading, error } = useProblems(contestId, active);
 
-  // Contest access guard — handles redirect logic and polling
-  const { isAccessible, loading: guardLoading, error: guardError } = useContestGuard(contestId);
+  if (!contest) return null;
+  // Not in it (or not running any more): /contests/:id shows the join gate, lobby or recap.
+  if (!active) return <Navigate to={`/contests/${contestId}`} replace />;
+  if (loading) return <LoadingPage />;
 
-  // Fetch contest problems using the shared hook
-  const { problems, loading: problemsLoading, error: problemsError } = useProblems(
-    contestId ?? null,
-    isAccessible,
-  );
-
-  if (!contestId) {
-    return <div className="error-message">Error: No Contest ID specified in the URL.</div>;
-  }
-
-  if (guardLoading || problemsLoading) return <LoadingPage />;
-  if (guardError) return <div className="error-message">{guardError}</div>;
-  if (problemsError) return <div className="error-message">{problemsError}</div>;
+  const rows = problems as ProblemSummary[];
+  const points = rows.reduce((sum, p) => sum + Number(p.best_score ?? 0), 0);
 
   return (
-    <div className={shared.page}>
-      <PageHeader title="Problems" />
-
-      {problems.length === 0 ? (
-        <div className={styles.empty}>
-          <h3>No problems available</h3>
-          <p>Problems will appear here once the contest begins.</p>
-        </div>
-      ) : (
-        <div className={tableStyles['table-container']}>
-          <table className={`${tableStyles.table} ${styles.contestTable}`}>
-            <thead>
-              <tr>
-                <th className={styles.colProblem}>Problem</th>
-                <th className={styles.colStatus}>Status</th>
-                <th className={styles.colScore}>Score</th>
-                <th className={styles.colAttempts}>Attempts</th>
-                <th className={styles.colAction}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {problems.map((problem) => {
-                const summary = problem as ProblemSummary;
-                const attempts = Number(summary.submission_count ?? 0);
-                const best = summary.best_score;
-                const progress = getProgress(summary);
-                const linkPath = `/contests/${contestId}/problems/${problem.id}`;
-
-                return (
-                  <tr key={problem.id}>
-                    <td className={styles.colProblem}>
-                      <Link to={linkPath} className={styles.problemTitle}>{problem.title}</Link>
-                      <span className={styles.problemId}>{problem.id}</span>
-                    </td>
-                    <td className={styles.colStatus}>
-                      <StatusBadge tone={progress.tone} soft>{progress.label}</StatusBadge>
-                    </td>
-                    <td className={styles.colScore}>
-                      {attempts > 0 && best !== null && best !== undefined
-                        ? best
-                        : <span className={styles.noData}>—</span>}
-                    </td>
-                    <td className={styles.colAttempts}>
-                      {attempts > 0 ? attempts : <span className={styles.noData}>—</span>}
-                    </td>
-                    <td className={styles.colAction}>
-                      <Link to={linkPath} className={styles.actionLink}>
-                        {progress.action} →
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+    <div className={styles.page}>
+      <PageHeader title="Problems" meta={`${contest.title} · ${points} / ${rows.length * FULL} points`} />
+      {contest.status === 'finishing' && (
+        <div role="status">
+          <InlineNotice title="Judging final submissions…">Results and the final scoreboard appear when the last submission is judged.</InlineNotice>
         </div>
       )}
+      {error && <InlineError message={error} />}
+      <table className={styles.table} aria-label="Problems">
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Problem</th>
+            <th scope="col">Best</th>
+            <th scope="col" className={styles.right}>Score</th>
+            <th scope="col" className={styles.right}>Tries</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((problem, i) => {
+            const tries = Number(problem.submission_count ?? 0);
+            const strip = (problem.best_submission_results ?? []).map((r) => ({ status: r.status }));
+            const tone = markFor(problem);
+            return (
+              <tr key={problem.id}>
+                <td className={styles.letter}>{problemLetter(i)}</td>
+                <td>
+                  <span className={styles.problemCell}>
+                    <StatusMark tone={tone} />
+                    <Link to={`/contests/${contestId}/problems/${problem.id}`} className={styles.problemLink}>{problem.title}</Link>
+                  </span>
+                </td>
+                <td>{strip.length > 0 ? <TestcaseStrip results={strip} /> : <span className={styles.muted}>—</span>}</td>
+                <td className={`${styles.right} ${styles.mono} ${tone === 'pass' ? styles.full : ''}`}>{tries > 0 && problem.best_score != null ? problem.best_score : '—'}</td>
+                <td className={`${styles.right} ${styles.mono} ${styles.muted}`}>{tries > 0 ? tries : '—'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 };

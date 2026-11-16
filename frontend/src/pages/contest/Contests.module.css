@@ -2,63 +2,118 @@
   /* Width and gutters come from the app shell's .container. */
 }
 
-.header {
-  margin-bottom: 40px;
+/* Contests list (§7.7): Live / Upcoming / Past. */
+.group {
+  margin-top: 24px;
 }
 
-.header h1 {
-  /* Same page-title treatment as every other page (text-primary, not the
-     accent blue this header historically used). */
+.groupTitle {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 13rem 9.5rem 10rem 8rem;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 500;
   color: var(--text-primary);
-  margin-bottom: 0.5rem;
-  font-size: var(--font-size-page-title);
+  overflow-wrap: anywhere;
 }
 
-.header p {
+.window {
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
   color: var(--text-secondary);
-  font-size: 1.1rem;
-  max-width: 600px;
-  margin: 0 auto;
 }
 
-.loading {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--text-secondary);
-  font-size: 1.2rem;
+.clock {
+  font-size: 13px;
 }
 
-.error {
-  /* Shared error banner (same as Management). */
-  background: var(--danger-tint-bg);
-  color: var(--tint-danger-fg);
-  padding: 1rem 1.25rem;
+.counts {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.actionCell {
+  justify-self: end;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  margin-bottom: 1.25rem;
-  border-left: 4px solid var(--status-danger);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-  .container {
-    padding: 15px;
-  }
-
-  .header h1 {
-    font-size: 2rem;
-  }
+.primary {
+  border-color: transparent;
+  background: var(--action-primary-background);
+  color: var(--action-primary-foreground);
 }
 
-@media (max-width: 480px) {
-  .container {
-    padding: 10px;
+.primary:hover {
+  background: var(--action-primary-hover-background);
+}
+
+.quiet {
+  border-style: dashed;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Phones: two lines — title + action, then window · countdown · counts. */
+@media (max-width: 767px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'title action'
+      'meta meta';
+    gap: 4px 12px;
   }
 
-  .header h1 {
-    font-size: var(--font-size-page-title);
+  .title { grid-area: title; }
+  .actionCell { grid-area: action; }
+
+  .window,
+  .clock,
+  .counts {
+    grid-column: 1 / -1;
+    font-size: 12.5px;
   }
 
-  .header p {
-    font-size: 1rem;
-  }
+  .window { display: none; }
 }

@@ -10,6 +10,9 @@ import { useProblemDetail } from '../../hooks/useProblemDetail';
 import { EmptyState, InlineError, InlineNotice, PageHeader, ScoreCell, TestcaseStrip } from '../../components/ui';
 import LoadingPage from '../../components/shared/LoadingPage';
 import type { ProblemDetail as ProblemDetailModel } from '../../types';
+import { useContest } from '../../features/contest/ContestContext';
+import { problemLetter } from '../../features/contest/letters';
+import { useCountdown } from '../../components/shell/useCountdown';
 
 type Tab = 'statement' | 'submit' | 'submissions';
 const TABS: Tab[] = ['statement', 'submit', 'submissions'];
@@ -46,7 +49,15 @@ function Statement({ problem, pdfUrl }: { problem: ProblemDetailModel; pdfUrl: s
 }
 
 const ProblemDetail = () => {
-  const { problemId, contestId, problem, contest, loading, error } = useProblemDetail();
+  const { problemId, contestId, problem, contest: fetchedContest, loading, error } = useProblemDetail();
+  // Under ContestLayout the contest (and its ordered problem list) comes from context.
+  const { contest: layoutContest } = useContest();
+  const contest = contestId ? (layoutContest ?? fetchedContest) : null;
+  const endClock = useCountdown(contest?.status === 'running' ? contest.end_time : null);
+  // Submissions close at end_time by the client clock, without waiting for the server (§7.7).
+  const contestClosed = Boolean(contest) && (
+    contest?.status === 'finishing' || contest?.status === 'finished' || (contest?.status === 'running' && endClock.done)
+  );
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as Tab | null;
   const tab: Tab = tabParam && TABS.includes(tabParam) ? tabParam : 'statement';
@@ -76,8 +87,10 @@ const ProblemDetail = () => {
 
   const pdfUrl = problemService.getPdfUrl(problemId, contestId);
   const submissionsBase = contestId ? `/contests/${contestId}/submissions` : '/submissions';
+  const letterIndex = contest?.problems?.findIndex((p) => p.id === problemId) ?? -1;
+  const letter = letterIndex >= 0 ? problemLetter(letterIndex) : null;
   const breadcrumb = contestId
-    ? [{ label: contest?.title ?? 'Contest', to: `/contests/${contestId}` }]
+    ? [{ label: contest?.title ?? 'Contest', to: `/contests/${contestId}` }, ...(letter ? [{ label: letter }] : [])]
     : [
         { label: 'Problems', to: '/problems' },
         ...(problem.collection ? [{ label: problem.collection.name, to: `/problems?collection=${problem.collection.id}` }] : []),
@@ -107,7 +120,7 @@ const ProblemDetail = () => {
     <div className={styles['problem-detail-container']}>
       <PageHeader
         breadcrumb={breadcrumb}
-        title={problem.title}
+        title={letter ? <><span className={styles.letter}>{letter}</span> {problem.title}</> : problem.title}
         meta={(
           <span className={styles.meta}>
             <span className={styles.mono}>{problem.id}</span>
@@ -145,12 +158,18 @@ const ProblemDetail = () => {
         {tab === 'statement' && <Statement problem={problem} pdfUrl={pdfUrl} />}
         {tab === 'submit' && (
           <>
-            <CodeSubmissionForm
-              problemId={problemId}
-              contestId={contestId}
-              submissionFilename={problem.submission_filename}
-              onSubmitted={showResult}
-            />
+            {contestClosed ? (
+              <InlineNotice title="Contest ended — submissions closed.">
+                This problem returns to the practice set once judging finishes.
+              </InlineNotice>
+            ) : (
+              <CodeSubmissionForm
+                problemId={problemId}
+                contestId={contestId}
+                submissionFilename={problem.submission_filename}
+                onSubmitted={showResult}
+              />
+            )}
             {resultError && <InlineError message={resultError} />}
             {submission && (
               <SubmissionResult

@@ -1,119 +1,65 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { render, screen, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ContestProblems from '../../pages/contest/ContestProblems';
+import { ContestContext } from '../../features/contest/ContestContext';
 import contestService from '../../services/contestService';
+import type { Contest } from '../../types';
 
 jest.mock('../../services/contestService');
 
-// Mock ThemeContext to prevent useTheme errors from LoadingPage
-jest.mock('../../context/ThemeContext', () => ({
-    useTheme: jest.fn(() => ({ theme: 'light' })),
-}));
+const HOUR = 3_600_000;
+const contest = (over: Partial<Contest> = {}): Contest => ({
+  id: 3, title: 'Mid-term practice', description: null, status: 'running', is_participant: true,
+  start_time: new Date(Date.now() - HOUR).toISOString(), end_time: new Date(Date.now() + HOUR).toISOString(),
+  ...over,
+} as Contest);
+const results = (s: string) => [...s].map((c) => ({ status: c === 'P' ? 'Accepted' : c === 'F' ? 'Wrong Answer' : 'Skipped' }));
+const problems = [
+  { id: 'sum_digits', title: 'Sum of digits', best_score: 100, submission_count: '1', best_submission_results: results('PPPP') },
+  { id: 'interval', title: 'Interval merge', best_score: 60, submission_count: '4', best_submission_results: results('PPFN') },
+  { id: 'matrix', title: 'Matrix exponent', best_score: null, submission_count: '0', best_submission_results: null },
+];
 
-// Mock LoadingPage to control the loading text
-jest.mock('../../components/shared/LoadingPage', () => () => <div>Loading Problems...</div>);
-jest.mock('react-router-dom', () => ({
-    ...jest.requireActual('react-router-dom'),
-    useParams: () => ({ contestId: 'contest-1' }),
-    useNavigate: () => jest.fn(),
-}));
+const renderAt = (value: Contest) => render(
+  <ContestContext.Provider value={{ contest: value, error: null, reload: jest.fn() }}>
+    <MemoryRouter initialEntries={['/contests/3/problems']}>
+      <Routes>
+        <Route path="/contests/:contestId/problems" element={<ContestProblems />} />
+        <Route path="/contests/:contestId" element={<p>contest home</p>} />
+      </Routes>
+    </MemoryRouter>
+  </ContestContext.Provider>,
+);
 
-describe('ContestProblems Page', () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
-        jest.mocked(contestService.getById).mockResolvedValue({
-            id: 1,
-            title: 'Contest 1',
-            description: null,
-            start_time: '2026-01-01T00:00:00Z',
-            end_time: '2026-01-01T01:00:00Z',
-            status: 'running',
-            is_participant: true
-        });
-        jest.mocked(contestService.getProblems).mockResolvedValue([]);
-    });
+describe('ContestProblems', () => {
+  beforeEach(() => jest.mocked(contestService.getProblems).mockResolvedValue(problems as never));
 
-    it('displays loading state', () => {
-        jest.mocked(contestService.getById).mockReturnValue(new Promise(() => { }));
+  it('rows in server order with letters, title link, best strip, score and tries', async () => {
+    renderAt(contest());
+    const table = await screen.findByRole('table', { name: 'Problems' });
+    const [, a, b, c] = within(table).getAllByRole('row');
+    expect(within(a).getByText('A')).toBeInTheDocument();
+    expect(within(a).getByRole('link', { name: 'Sum of digits' })).toHaveAttribute('href', '/contests/3/problems/sum_digits');
+    expect(within(a).getByRole('img', { name: '4 of 4 test cases passed' })).toBeInTheDocument();
+    expect(within(b).getByText('B')).toBeInTheDocument();
+    expect(within(b).getByText('60')).toBeInTheDocument();
+    expect(within(b).getByText('4')).toBeInTheDocument();
+    expect(within(c).getByText('C')).toBeInTheDocument();
+    expect(within(c).getAllByText('—')).toHaveLength(3);
+  });
 
-        render(
-            <BrowserRouter>
-                <ContestProblems />
-            </BrowserRouter>
-        );
+  it('header meta shows the contest and points of max', async () => {
+    renderAt(contest());
+    expect(await screen.findByText('Mid-term practice · 160 / 300 points')).toBeInTheDocument();
+  });
 
-        expect(screen.getByText(/loading problems\.\.\.$/i)).toBeInTheDocument();
-    });
+  it('finishing says final submissions are being judged', async () => {
+    renderAt(contest({ status: 'finishing', end_time: new Date(Date.now() - 1000).toISOString() }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Judging final submissions…');
+  });
 
-    it('displays contest problems on success', async () => {
-        const mockProblems = [{ id: 'P1', title: 'Problem 1', author: null, best_score: 0 }];
-        jest.mocked(contestService.getProblems).mockResolvedValue(mockProblems);
-
-        render(
-            <BrowserRouter>
-                <ContestProblems />
-            </BrowserRouter>
-        );
-
-        await waitFor(() => {
-            expect(screen.getByRole('heading', { level: 1, name: 'Problems' })).toBeInTheDocument();
-            expect(screen.getByText('Problem 1')).toBeInTheDocument();
-        });
-    });
-
-    it('labels unattempted problems Unsolved with a Solve action', async () => {
-        const mockProblems = [{ id: 'P1', title: 'Problem 1', author: null }];
-        jest.mocked(contestService.getProblems).mockResolvedValue(mockProblems);
-
-        render(
-            <BrowserRouter>
-                <ContestProblems />
-            </BrowserRouter>
-        );
-
-        await waitFor(() => {
-            expect(screen.getByText('Unsolved')).toBeInTheDocument();
-            expect(screen.getByText('Solve →')).toBeInTheDocument();
-        });
-    });
-
-    it('labels attempted problems Attempted with attempts and best score', async () => {
-        const mockProblems = [{
-            id: 'P2', title: 'Problem 2', author: null,
-            submission_count: '2', best_score: 40,
-        }];
-        jest.mocked(contestService.getProblems).mockResolvedValue(mockProblems);
-
-        render(
-            <BrowserRouter>
-                <ContestProblems />
-            </BrowserRouter>
-        );
-
-        await waitFor(() => {
-            expect(screen.getByText('Attempted')).toBeInTheDocument();
-            expect(screen.getByText('Continue →')).toBeInTheDocument();
-            expect(screen.getByText('40')).toBeInTheDocument();
-            expect(screen.getByText('2')).toBeInTheDocument();
-        });
-    });
-
-    it('labels fully solved problems Solved with a View action', async () => {
-        const mockProblems = [{
-            id: 'P3', title: 'Problem 3', author: null,
-            submission_count: '1', best_score: 100,
-        }];
-        jest.mocked(contestService.getProblems).mockResolvedValue(mockProblems);
-
-        render(
-            <BrowserRouter>
-                <ContestProblems />
-            </BrowserRouter>
-        );
-
-        await waitFor(() => {
-            expect(screen.getByText('Solved')).toBeInTheDocument();
-            expect(screen.getByText('View →')).toBeInTheDocument();
-        });
-    });
+  it('sends a non-participant to the join gate', async () => {
+    renderAt(contest({ is_participant: false }));
+    expect(await screen.findByText('contest home')).toBeInTheDocument();
+  });
 });

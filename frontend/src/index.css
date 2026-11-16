@@ -234,7 +234,7 @@
   --action-button-foreground: var(--action-primary-foreground);
 
   /* Contest-status badges — shared by Management badges, the contest-status
-     badge on the problems table, and ContestCard's joined status. */
+     badge on the problems table.  */
   --contest-badge-scheduled-bg: var(--tint-neutral-bg);
   --contest-badge-scheduled-fg: var(--tint-neutral-fg);
   --contest-badge-scheduled-border: var(--tint-neutral-border);

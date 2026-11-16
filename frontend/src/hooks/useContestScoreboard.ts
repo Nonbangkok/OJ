@@ -12,7 +12,8 @@ import { getErrorStatus } from '../utils/error';
 import { useAuth } from '../context/AuthContext';
 import { formatDateTime as formatDateTimeShared } from '../utils/formatters';
 
-type ScoreValue = ContestProblemScore | null;
+/** Normalised cell for the scoreboard table (replaced in phase 4c). */
+export type ScoreValue = { score: number; attempts: number; solved: boolean } | null;
 
 interface UseContestScoreboardResult {
   contest: Contest | null;
