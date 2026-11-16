@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import useContestScoreboard, { scoreCell } from '../../hooks/useContestScoreboard';
 import UserAvatar from '../../components/user/UserAvatar';
 import LoadingPage from '../../components/shared/LoadingPage';
-import { InlineError, PageHeader, StatusBadge } from '../../components/ui';
+import { EmptyState, InlineError, PageHeader, StatusBadge } from '../../components/ui';
 import { formatRemaining } from '../../components/shell/useCountdown';
 import { useAuth } from '../../context/AuthContext';
 import { problemLetter } from '../../features/contest/letters';
@@ -71,6 +71,8 @@ const ContestScoreboard = () => {
         meta={meta}
       />
       {error && <InlineError message={error} />}
+      {!error && scoreboard.length === 0 && <EmptyState title="No one joined this contest." />}
+      {scoreboard.length > 0 && (
       <div className={styles.scroll}>
         <table className={styles.table} aria-label="Scoreboard">
           <thead>
@@ -126,6 +128,7 @@ const ContestScoreboard = () => {
           </tbody>
         </table>
       </div>
+      )}
       {viewer && viewerOffScreen && (
         <section className={styles.pin} aria-label="Your rank">
           <span>{`You · #${viewer.rank ?? '—'}`}</span>

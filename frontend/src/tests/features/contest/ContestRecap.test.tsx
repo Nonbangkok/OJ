@@ -86,4 +86,12 @@ describe('ContestRecap', () => {
     expect(screen.getByRole('link', { name: 'Scoreboard' })).toHaveAttribute('href', '/contests/18/scoreboard');
     await screen.findByRole('list', { name: 'Your result' });
   });
+
+  it('a contest with no problems shows a plain empty state, not an empty table', async () => {
+    jest.mocked(contestService.getScoreboard).mockResolvedValue({ scoreboard: [], problems: [], status: 'finished' } as never);
+    renderRecap(finished({ problems: [], is_participant: false }));
+    expect(await screen.findByText('This contest had no problems.')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByText(/back in the practice set/)).toBeNull();
+  });
 });

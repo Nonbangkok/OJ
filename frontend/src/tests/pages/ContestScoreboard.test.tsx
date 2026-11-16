@@ -112,4 +112,11 @@ describe('ContestScoreboard page', () => {
     renderPage();
     expect(screen.queryByText(/^last /)).toBeNull();
   });
+
+  it('says so when no one joined', () => {
+    mockHook({ status: 'finished', scoreboard: [] });
+    renderPage();
+    expect(screen.getByText('No one joined this contest.')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
+  });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { InlineError, PageHeader, StatusBadge, TestcaseStrip } from '../../components/ui';
+import { EmptyState, InlineError, PageHeader, StatusBadge, TestcaseStrip } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import contestService from '../../services/contestService';
 import type { Contest, ContestProblemScore, ContestScoreboardEntry } from '../../types';
@@ -53,6 +53,8 @@ export default function ContestRecap({ contest }: { contest: Contest }) {
         </ul>
       )}
 
+      {problems.length === 0 ? <EmptyState title="This contest had no problems." /> : (
+      <>
       <table className={styles.table} aria-label="Problems">
         <thead>
           <tr>
@@ -89,6 +91,8 @@ export default function ContestRecap({ contest }: { contest: Contest }) {
         </tbody>
       </table>
       <p className={styles.sub}>Problems are back in the practice set — open one to keep working on it.</p>
+      </>
+      )}
     </div>
   );
 }
