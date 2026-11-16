@@ -1,5 +1,5 @@
 import { renderHook, waitFor, act } from '@testing-library/react';
-import useContestScoreboard from '../../hooks/useContestScoreboard';
+import useContestScoreboard, { scoreCell } from '../../hooks/useContestScoreboard';
 import contestService from '../../services/contestService';
 import {
   isRealtimeSupported,
@@ -91,19 +91,22 @@ describe('useContestScoreboard', () => {
         expect(result.current.contest).toBeNull();
     });
 
-    it('handles getProblemScore correctly', () => {
+    it('scoreCell normalises old and B9 cells', () => {
+        expect(scoreCell(100)).toEqual({ score: 100 });
+        expect(scoreCell({ score: 50, attempts: 2, best_at: 'x', statuses: ['Accepted'] }))
+            .toEqual({ score: 50, attempts: 2, best_at: 'x', statuses: ['Accepted'] });
+        expect(scoreCell(undefined)).toBeNull();
+        expect(scoreCell({})).toEqual({ score: 0 });
+    });
+
+    it('is connected while the stream is up for a signed-in user, not once it dies', async () => {
+        (jest.mocked(contestService.getById) as jest.Mock).mockResolvedValue({ ...mockContest, status: 'running' });
+        (jest.mocked(contestService.getScoreboard) as jest.Mock).mockResolvedValue(mockScoreboardData);
         const { result } = renderHook(() => useContestScoreboard(mockContestId));
-
-        // Old format (number)
-        const oldScore = result.current.getProblemScore({ 1: 100 }, '1');
-        expect(oldScore).toEqual({ score: 100, attempts: 1, solved: true });
-
-        // New format (object)
-        const newScore = result.current.getProblemScore({ 2: { score: 50, attempts: 2 } }, '2');
-        expect(newScore).toEqual({ score: 50, attempts: 2, solved: false });
-
-        // Missing problem
-        expect(result.current.getProblemScore({ 1: 100 }, '2')).toBeNull();
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(result.current.connected).toBe(true);
+        act(() => { lastSubscribeCall().options?.onStreamDown?.(); });
+        expect(result.current.connected).toBe(false);
     });
 
     describe('realtime (SSE)', () => {

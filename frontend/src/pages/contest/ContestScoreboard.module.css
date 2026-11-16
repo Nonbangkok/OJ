@@ -1,248 +1,188 @@
-/* Scoreboard matrix: same shared table as everywhere else, plus sticky
-   leading columns for wide contests and semantic (non-button) score cells.
-
-   Column plan (table-layout: fixed, widths set on th cells):
-     Rank        72px    centered
-     Participant 260px   left, avatar + username, ellipsis on overflow
-     Score       104px   centered
-     Problems    100px   centered
-   The fixed layout keeps the participant column from absorbing the table;
-   wide contests scroll horizontally inside the shared table-container with
-   the three leading columns staying put. */
-
-/* Fixed layout with the table width computed by the component
-   (`calc(leading + N * problem)`, exposed as the --sb-* custom properties)
-   so the leading columns land on their exact planned px widths — keyword
-   widths (100% / max-content) let the browser redistribute and drift them.
-   min-width:100% stretches short contests to the container, with the slack
-   landing on the auto problem columns; wide contests scroll horizontally
-   inside the shared table-container with the leading columns sticking. */
-.scoreboardTable {
-  table-layout: fixed;
-  width: calc(var(--sb-leading, 436px) + var(--sb-problem-count, 0) * var(--sb-problem, 100px));
-  min-width: 100%;
-}
-
-/* Give larger contests more of the available desktop width. The capped
-   width still follows the number of problems, while smaller contests keep
-   the shared page width. On compact viewports the media query below uses
-   the narrower problem-column plan. */
-.widePage {
-  position: relative;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(calc(100vw - 3rem), var(--sb-scoreboard-width, 1800px));
-}
-
-/* This specific table can exceed its viewport. Keep scrolling scoped to the
-   scoreboard instead of changing overflow behavior for every site table. */
-.scoreboardTableContainer.scoreboardTableContainer {
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  scrollbar-width: thin;
-}
-
-/* Leading columns stay visible while problem columns scroll horizontally.
-   The header must match the body cells' background so rows don't show
-   through the sticky cells above them. */
-.colRank,
-.colParticipant,
-.colTotal {
-  position: sticky;
-  background-color: var(--background-secondary);
-  z-index: 2;
-}
-
-.scoreboardTable thead .colRank,
-.scoreboardTable thead .colParticipant,
-.scoreboardTable thead .colTotal {
-  background-color: var(--background-tertiary);
-  z-index: 3;
-}
-
-/* Alignment: the shared `.table th, .table td` centers everything (0,1,1);
-   these two-class selectors win and pin the plan — Participant left, the
-   numeric columns centered. */
-.scoreboardTable th.colRank,
-.scoreboardTable td.colRank {
-  text-align: center;
-}
-
-.scoreboardTable th.colParticipant,
-.scoreboardTable td.colParticipant {
-  text-align: left;
-}
-
-.scoreboardTable th.colTotal,
-.scoreboardTable td.colTotal {
-  text-align: center;
-}
-
-.scoreboardTable th.colProblem,
-.scoreboardTable td.colProblem {
-  text-align: center;
-}
-
-.colRank {
-  left: 0;
-  width: 72px;
-}
-
-.colParticipant {
-  left: 72px;
-  width: 260px;
-  max-width: 260px;
-}
-
-.colTotal {
-  left: 332px;
-  width: 104px;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Problem columns are `auto` so they absorb the slack when min-width
-   stretches a short contest to the container — while in wide contests the
-   calc() table width leaves exactly --sb-problem per auto column. Either
-   way the leading columns stay pinned to their planned px widths. */
-.colProblem {
-  width: auto;
-  text-align: center;
-}
-
-/* Column-group separation (low weight, shared border token): heavier after
-   Rank, Participant, and Score — the group boundaries — and barely-there
-   between problem columns. Inset shadows instead of borders so the sticky
-   cells don't double-stroke; clip-path keeps the trailing edge inside the
-   cell's painted box for the sticky ones. */
-.colRank,
-.colParticipant,
-.colTotal {
-  box-shadow: inset -1px 0 var(--border-color);
-  clip-path: inset(0 -1px 0 0);
-}
-
-.colProblem:not(:last-child) {
-  box-shadow: inset -1px 0 color-mix(in srgb, var(--border-color) 45%, transparent);
-  clip-path: inset(0 -1px 0 0);
-}
-
-.problemId {
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--text-primary);
-  word-break: break-word;
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  vertical-align: bottom;
-}
-
-.user-cell {
+/* Contest scoreboard (§7.7, key-pages §3). */
+.page {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.meta {
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
-/* Long usernames truncate with an ellipsis; the full name stays available
-   through the title attribute set on the cell. */
-.user-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-.totalScore {
-  font-weight: 700;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-/* Score cells are data, not buttons: subtle semantic color only. */
-.score {
-  font-weight: 600;
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.score.solved {
-  color: var(--status-success);
-  font-weight: 700;
-}
-
-.score.partial {
-  color: var(--text-primary);
-}
-
-.noAttempt {
+  gap: 8px;
+  font-size: 13px;
   color: var(--text-muted);
 }
 
-/* Medal tints for the top three (shared medal tokens). */
-.rank1 {
-  background-color: color-mix(in srgb, var(--medal-gold) 12%, transparent);
+.liveDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--verdict-accepted);
 }
 
-.rank2 {
-  background-color: color-mix(in srgb, var(--medal-silver) 12%, transparent);
+.scroll {
+  overflow-x: auto;
 }
 
-.rank3 {
-  background-color: color-mix(in srgb, var(--medal-bronze) 12%, transparent);
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
 }
 
-/* Subtle current-user highlight that stacks with medal tints. */
-.currentUser {
-  box-shadow: inset 3px 0 0 var(--accent-primary);
-  background-color: color-mix(in srgb, var(--accent-primary) 6%, transparent);
+.table th {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
-/* No Data */
-.noData {
-  text-align: center;
-  padding: 80px 20px;
-  color: var(--text-secondary);
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
+.table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--background-tertiary);
+  background: var(--background-primary);
+  vertical-align: middle;
 }
 
-.noData h3 {
+.sticky {
+  position: sticky;
+  z-index: 1;
+  background: var(--background-primary);
+}
+
+.rank {
+  left: 0;
+  width: 3rem;
+  font-family: var(--font-family-mono);
+  text-align: right !important;
+}
+
+.who {
+  left: 3rem;
+  min-width: 10rem;
+}
+
+.total {
+  left: 13rem;
+  min-width: 6rem;
+}
+
+.total b {
+  display: block;
+  font-family: var(--font-family-mono);
+  font-weight: 500;
   color: var(--text-primary);
-  margin-bottom: 10px;
-  font-size: 1.5rem;
 }
 
-.noData p {
-  margin: 0;
+.last {
+  display: block;
+  font-family: var(--font-family-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
 }
 
-/* Narrower viewports: shave the leading columns so the participant column
-   (the widest fixed one) still leaves room for problem columns. The table
-   width switches to the narrow calc in the same query; the leading columns
-   here sum to --sb-leading-narrow (320px). */
-@media (max-width: 900px) {
-  .scoreboardTable {
-    width: calc(var(--sb-leading-narrow, 320px) + var(--sb-problem-count, 0) * var(--sb-problem-narrow, 96px));
+.user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user a {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.user a:hover {
+  text-decoration: underline;
+}
+
+.cellHead {
+  text-align: center !important;
+  min-width: 4rem;
+}
+
+.cellHead a {
+  font-family: var(--font-family-mono);
+  font-weight: 500;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.cell {
+  text-align: center;
+  font-family: var(--font-family-mono);
+  color: var(--text-primary);
+}
+
+.cell[data-tone='full'] {
+  background: var(--tint-success-bg);
+  color: var(--verdict-accepted);
+}
+
+.cell[data-tone='zero'] {
+  color: var(--text-muted);
+}
+
+.untried {
+  color: var(--text-muted);
+}
+
+.tries {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.table tr[data-viewer='true'] td {
+  background: var(--background-secondary);
+}
+
+.table tr[data-viewer='true'] td:first-child {
+  box-shadow: inset 2px 0 0 var(--text-primary);
+}
+
+.user a:focus-visible,
+.cellHead a:focus-visible {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+.pin {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-color);
+  background: var(--background-secondary);
+  box-shadow: inset 2px 0 0 var(--text-primary);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.pin b {
+  margin-left: auto;
+  font-family: var(--font-family-mono);
+  font-weight: 500;
+}
+
+@media (max-width: 767px) {
+  .pin {
+    bottom: var(--tabbar-height);
   }
 
-  .colRank {
-    width: 56px;
+  .who {
+    min-width: 8rem;
   }
 
-  .colParticipant {
-    left: 56px;
-    width: 180px;
-    max-width: 180px;
-  }
-
-  .colTotal {
-    left: 236px;
-    width: 84px;
+  .total {
+    left: 11rem;
   }
 }

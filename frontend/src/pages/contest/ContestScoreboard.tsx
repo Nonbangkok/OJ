@@ -1,169 +1,139 @@
-import { useParams, Link } from 'react-router-dom';
-import useContestScoreboard from '../../hooks/useContestScoreboard';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import useContestScoreboard, { scoreCell } from '../../hooks/useContestScoreboard';
 import UserAvatar from '../../components/user/UserAvatar';
-import styles from './ContestScoreboard.module.css';
-import shared from '../../components/styles/ContestPages.module.css';
-import tableStyles from '../../components/styles/Table.module.css';
 import LoadingPage from '../../components/shared/LoadingPage';
+import { InlineError, PageHeader, StatusBadge } from '../../components/ui';
+import { formatRemaining } from '../../components/shell/useCountdown';
 import { useAuth } from '../../context/AuthContext';
-import { formatDateTime } from '../../utils/formatters';
-import type { CSSProperties } from 'react';
-import { PageHeader } from '../../components/ui';
+import { problemLetter } from '../../features/contest/letters';
+import type { ContestScoreboardEntry } from '../../types';
+import styles from './ContestScoreboard.module.css';
 
-/** Leading-column plan (px), fed to the CSS module through the --sb-*
- *  custom properties set on the table. The media query in the module swaps
- *  in narrower values (and its own narrow table-width calc) below 900px. */
-const COL_WIDTHS = {
-  rank: 72,
-  participant: 260,
-  total: 104,
-  problem: 100,
-} as const;
+const FULL = 100;
 
+const toneOf = (score: number): 'full' | 'zero' | undefined => {
+  if (score >= FULL) return 'full';
+  if (score <= 0) return 'zero';
+  return undefined;
+};
+
+/** Seconds since the last refresh, re-rendered every second. */
+function useSecondsSince(at: Date | null): number | null {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return at ? Math.max(0, Math.round((now - at.getTime()) / 1000)) : null;
+}
+
+/** "last hh:mm:ss" after the start; only rows whose cells say when each best was reached (B9). */
+const lastLine = (row: ContestScoreboardEntry, startTime: string | null): string | null => {
+  if (!startTime || !row.last_score_improvement_time || row.total_score <= 0) return null;
+  const hasTimes = Object.values(row.detailed_scores ?? {}).some((raw) => Boolean(scoreCell(raw)?.best_at));
+  if (!hasTimes) return null;
+  return `last ${formatRemaining(new Date(row.last_score_improvement_time).getTime() - new Date(startTime).getTime())}`;
+};
+
+/** Contest scoreboard (§7.7, key-pages §3). */
 const ContestScoreboard = () => {
-  const { contestId } = useParams();
+  const { contestId = '' } = useParams();
   const { user } = useAuth();
+  const { scoreboard, problems, loading, error, lastUpdate, connected, status, startTime } = useContestScoreboard(contestId);
+  const seconds = useSecondsSince(lastUpdate);
+  const viewerRow = useRef<HTMLTableRowElement | null>(null);
+  const [viewerOffScreen, setViewerOffScreen] = useState(false);
+  const viewer = scoreboard.find((row) => row.username === user?.username) ?? null;
 
-  const {
-    contest,
-    scoreboard,
-    problems,
-    loading,
-    error,
-    lastUpdate,
-    getProblemScore
-  } = useContestScoreboard(contestId);
+  useEffect(() => {
+    const node = viewerRow.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver((entries) => setViewerOffScreen(!entries[0]?.isIntersecting));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [viewer?.username, scoreboard.length]);
 
-  // Compact "Updated 01:11" — the verbose timestamp is unnecessary here.
-  const formatUpdated = (value: Date) =>
-    formatDateTime(value, { month: undefined, day: undefined, year: undefined });
+  if (loading && scoreboard.length === 0) return <LoadingPage />;
 
-  // Fixed layout only honors the per-column px widths when the table width
-  // equals their sum: with a keyword width (100%, max-content) Chromium
-  // re-distributes and the columns drift off the plan. So the width is
-  // computed from the problem count and expressed with the custom
-  // properties below; the media query in the CSS module swaps in the
-  // narrow-viewport numbers, so JS never needs to know the viewport.
-  const tableStyle = {
-    '--sb-leading': `${COL_WIDTHS.rank + COL_WIDTHS.participant + COL_WIDTHS.total}px`,
-    '--sb-problem': `${COL_WIDTHS.problem}px`,
-    '--sb-leading-narrow': '320px',
-    '--sb-problem-narrow': '96px',
-    '--sb-problem-count': String(problems.length),
-  } as CSSProperties;
-  const widePageStyle = {
-    '--sb-problem-count': String(problems.length),
-    '--sb-scoreboard-width': `${COL_WIDTHS.rank + COL_WIDTHS.participant + COL_WIDTHS.total + problems.length * COL_WIDTHS.problem}px`,
-  } as CSSProperties;
-
-  if (loading) return <LoadingPage />;
-
-  if (error) {
-    return (
-      <div className={shared.error}>
-        <h3 className={shared.errorTitle}>Error: {error}</h3>
-        <Link to="/contests" className={shared.backLink}>
-          ← Back to Contests
-        </Link>
-      </div>
-    );
-  }
+  const live = status === 'running' || status === 'finishing';
+  const meta = (
+    <span className={styles.meta}>
+      {connected && live && <span className={styles.liveDot} aria-label="Live updates on" role="img" />}
+      {seconds !== null && <span>{`updated ${seconds}s ago`}</span>}
+    </span>
+  );
 
   return (
-    <div
-      className={`${shared.page} ${problems.length > 7 ? styles.widePage : ''}`}
-      style={widePageStyle}
-    >
+    <div className={styles.page}>
       <PageHeader
-        title="Scoreboard"
-        meta={lastUpdate && contest?.status !== 'finished' ? <span>Updated {formatUpdated(lastUpdate)}</span> : undefined}
+        title={<>Scoreboard {live ? <StatusBadge tone="success">LIVE</StatusBadge> : status === 'finished' ? <StatusBadge>FINAL</StatusBadge> : null}</>}
+        meta={meta}
       />
-
-      {scoreboard.length === 0 ? (
-        <div className={styles.noData}>
-          <h3>No ranking data yet</h3>
-          <p>No participants have submitted solutions in this contest yet</p>
-        </div>
-      ) : (
-        <div className={`${tableStyles['table-container']} ${styles.scoreboardTableContainer}`}>
-          <table className={`${tableStyles.table} ${styles.scoreboardTable}`} style={tableStyle}>
-            <thead>
-              <tr>
-                <th className={styles.colRank}>Rank</th>
-                <th className={styles.colParticipant}>Participant</th>
-                <th className={styles.colTotal}>Score</th>
-                {problems.map((problem) => (
-                  <th key={problem.problem_id ?? problem.id} className={styles.colProblem}>
-                    <span className={styles.problemId}>
-                      {problem.problem_id ?? problem.id}
-                    </span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {scoreboard.map((participant, index) => {
-                const rank = index + 1;
-                const isCurrentUser = user?.username === participant.username;
+      {error && <InlineError message={error} />}
+      <div className={styles.scroll}>
+        <table className={styles.table} aria-label="Scoreboard">
+          <thead>
+            <tr>
+              <th scope="col" className={`${styles.rank} ${styles.sticky}`}>Rank</th>
+              <th scope="col" className={`${styles.who} ${styles.sticky}`}>Participant</th>
+              <th scope="col" className={`${styles.total} ${styles.sticky}`}>Total</th>
+              {problems.map((problem, i) => {
+                const id = String(problem.problem_id ?? problem.id);
                 return (
-                  <tr
-                    key={participant.user_id ?? `${participant.username}-${index}`}
-                    className={[
-                      rank <= 3 ? styles[`rank${rank}`] : '',
-                      isCurrentUser ? styles.currentUser : '',
-                    ].filter(Boolean).join(' ')}
-                  >
-                    <td className={styles.colRank}>{rank}</td>
-                    <td
-                      className={styles.colParticipant}
-                      title={participant.username}
-                    >
-                      <span className={styles['user-cell']}>
-                        <UserAvatar
-                          username={participant.username}
-                          hasAvatar={participant.has_avatar}
-                          size={24}
-                        />
-                        <span className={styles.userName}>{participant.username}</span>
-                      </span>
-                    </td>
-                    <td className={styles.colTotal}>
-                      <span className={styles.totalScore}>{participant.total_score}</span>
-                    </td>
-                    {problems.map((problem) => {
-                      const problemId = problem.problem_id ?? problem.id;
-                      const problemScore = getProblemScore(
-                        participant.detailed_scores,
-                        problemId
-                      );
-
-                      return (
-                        <td key={problemId} className={styles.colProblem}>
-                          {problemScore ? (
-                            <span
-                              className={[
-                                styles.score,
-                                problemScore.solved ? styles.solved : '',
-                                problemScore.score > 0 && !problemScore.solved ? styles.partial : '',
-                              ].filter(Boolean).join(' ')}
-                            >
-                              {problemScore.score}
-                            </span>
-                          ) : (
-                            <span className={styles.noAttempt}>—</span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
+                  <th scope="col" key={id} className={styles.cellHead}>
+                    <Link to={`/contests/${contestId}/problems/${id}`} aria-label={`${problemLetter(i)}: ${problem.title}`} title={problem.title}>
+                      {problemLetter(i)}
+                    </Link>
+                  </th>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+            </tr>
+          </thead>
+          <tbody>
+            {scoreboard.map((row) => {
+              const isViewer = row.username === user?.username;
+              const last = lastLine(row, startTime);
+              return (
+                <tr key={row.username} ref={isViewer ? viewerRow : undefined} data-viewer={isViewer ? 'true' : undefined}>
+                  <td className={`${styles.rank} ${styles.sticky}`}>{row.rank ?? ''}</td>
+                  <td className={`${styles.who} ${styles.sticky}`}>
+                    <span className={styles.user}>
+                      <UserAvatar username={row.username} hasAvatar={Boolean(row.has_avatar)} size={22} />
+                      <Link to={`/profile/${row.username}`}>{row.username}</Link>
+                    </span>
+                  </td>
+                  <td className={`${styles.total} ${styles.sticky}`}>
+                    <b>{row.total_score}</b>
+                    {last && <span className={styles.last}>{last}</span>}
+                  </td>
+                  {problems.map((problem) => {
+                    const id = String(problem.problem_id ?? problem.id);
+                    const cell = scoreCell(row.detailed_scores?.[id]);
+                    if (!cell) return <td key={id} className={`${styles.cell} ${styles.untried}`}>—</td>;
+                    return (
+                      <td key={id} className={styles.cell} data-tone={toneOf(cell.score)}>
+                        <span>{cell.score}</span>
+                        {cell.attempts !== undefined && (
+                          <span className={styles.tries}>{`${cell.attempts} ${cell.attempts === 1 ? 'try' : 'tries'}`}</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {viewer && viewerOffScreen && (
+        <section className={styles.pin} aria-label="Your rank">
+          <span>{`You · #${viewer.rank ?? '—'}`}</span>
+          <b>{viewer.total_score}</b>
+        </section>
       )}
     </div>
   );
-}
+};
 
 export default ContestScoreboard;
