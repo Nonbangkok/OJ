@@ -9,9 +9,9 @@ const Register = () => {
   const { registrationEnabled, isLoading: isLoadingSettings } = useSettings();
 
   const {
-    formData, error, setError,
+    formData, error, setError, fieldErrors,
     handleChange, validate, loading, setLoading
-  } = useAuthForms();
+  } = useAuthForms({ username: '', password: '', confirmPassword: '' });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,6 +36,7 @@ const Register = () => {
     <RegisterForm
       formData={formData}
       error={error}
+      fieldErrors={fieldErrors}
       loading={loading}
       onSubmit={handleSubmit}
       onChange={handleChange}

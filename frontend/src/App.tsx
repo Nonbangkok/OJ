@@ -9,7 +9,7 @@ import {
   useLocation,
 } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/ui';
 
@@ -37,7 +37,7 @@ import ContestDetail from './pages/contest/ContestDetail';
 import ContestProblems from './pages/contest/ContestProblems';
 import ContestSubmissions from './pages/contest/ContestSubmissions';
 import ContestScoreboard from './pages/contest/ContestScoreboard';
-import { SettingsProvider } from './context/SettingsContext';
+import { SettingsProvider, useSettings } from './context/SettingsContext';
 import PrivateRoute from './components/shared/PrivateRoute';
 import {
   adminProblemsLoader,
@@ -87,8 +87,14 @@ const RootLayout = () => {
   const isContestPage = /^\/contests\/[^/]+/.test(pathname);
   const isEditor = /^\/admin\/authoring\/[^/]+\/editor\/?$/.test(pathname);
 
+  // A signed-out visitor to a private Grader only ever sees the door: the
+  // private landing (and login/register) in the AuthShell, no sidebar.
+  const { user, isLoading: authLoading } = useAuth();
+  const { isPrivateMode, isLoading: settingsLoading } = useSettings();
+  const privateGuest = !authLoading && !settingsLoading && !user && isPrivateMode;
+
   let content = <Outlet />;
-  if (isAuthPage) {
+  if (isAuthPage || (privateGuest && !isContestPage && !isEditor)) {
     content = <AuthShell><Outlet /></AuthShell>;
   } else if (!isContestPage && !isEditor) {
     content = <AppShell><div className="container"><Outlet /></div></AppShell>;

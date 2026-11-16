@@ -1,43 +1,26 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Lock } from '@phosphor-icons/react';
-
 import { useSettings } from '../../context/SettingsContext';
-
-import styles from './AuthRequired.module.css';
+import styles from '../../features/auth/AuthForm.module.css';
 
 /**
- * Shared guest-facing "sign in to continue" screen. Rendered by PrivateRoute
- * when the site is in private mode (or by any view that needs a clean
- * login-required state) — the intended destination is preserved via the
- * returnTo query parameter so login bounces straight back.
+ * Private-mode landing (§7.10), shown inside AuthShell to signed-out
+ * visitors. The intended destination rides along as returnTo so logging in
+ * goes straight back to it.
  */
 const AuthRequired = () => {
   const { registrationEnabled } = useSettings();
   const location = useLocation();
-
-  const returnTo = encodeURIComponent(
-    location.pathname + location.search,
-  );
-
+  const target = location.pathname + location.search;
+  const loginHref = target === '/' ? '/login' : `/login?returnTo=${encodeURIComponent(target)}`;
   return (
-    <div className={styles['auth-required']}>
-      <div className={styles['auth-required-card']}>
-        <Lock size={32} weight="duotone" aria-hidden="true" />
-        <h1>Private Grader</h1>
-        <p>
-          This site is available to registered users only.
-          Log in to access problems, contests, and submissions.
-        </p>
-        <div className={styles.actions}>
-          <Link className="button button-primary" to={`/login?returnTo=${returnTo}`}>
-            Log in
-          </Link>
-          {registrationEnabled && (
-            <Link className="button button-secondary" to="/register">
-              Create account
-            </Link>
-          )}
-        </div>
+    <div className={styles.card}>
+      <h1 className={styles.title}>This Grader is private</h1>
+      <p className={styles.lead}>Log in with the account your school gave you.</p>
+      <div className={styles.actions}>
+        <Link className={`${styles.link} ${styles.linkPrimary}`} to={loginHref}>Log in</Link>
+        {registrationEnabled && (
+          <Link className={`${styles.link} ${styles.linkSecondary}`} to="/register">Create account</Link>
+        )}
       </div>
     </div>
   );

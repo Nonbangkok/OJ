@@ -51,7 +51,7 @@ describe('PrivateRoute (site-private mode)', () => {
     mockIsPrivateMode = true;
     renderAt('/problems');
     expect(screen.queryByText('protected content')).not.toBeInTheDocument();
-    expect(screen.getByText('Private Grader')).toBeInTheDocument();
+    expect(screen.getByText('This Grader is private')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',
       '/login?returnTo=%2Fproblems',

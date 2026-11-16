@@ -7,6 +7,8 @@ import type { HomeSummary } from '../../types';
 
 jest.mock('../../services/contestService');
 jest.mock('../../services/homeService');
+jest.mock('../../services/problemService');
+import problemService from '../../services/problemService';
 
 const mockUser = { id: 1, username: 'testuser', role: 'user' as const, hasAvatar: false };
 
@@ -155,28 +157,24 @@ describe('Home Page (logged out)', () => {
     mockRegistrationEnabled = true;
   });
 
-  it('renders a simple welcome with Browse Problems and login CTA, no dashboard content', () => {
+  it('public mode shows the guest home, not the dashboard', async () => {
+    jest.mocked(contestService.getAll).mockResolvedValue([]);
+    jest.mocked(problemService.getProblemsPage).mockResolvedValue({ problems: [], nextCursor: null, hasMore: false } as never);
     renderHome();
 
-    expect(screen.getByText('Welcome to Grader')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Browse Problems' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
-
-    // Dashboard content is for logged-in users only.
-    expect(screen.queryByText(/day streak/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /another quote/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Grader' })).toBeInTheDocument();
+    expect(screen.getByText(/Browse freely; log in to submit/)).toBeInTheDocument();
+    expect(screen.queryByText('Continue where you left off')).toBeNull();
     expect(homeService.getHome).not.toHaveBeenCalled();
   });
 
-  it('PRIVATE mode shows the private landing without a Browse Problems CTA', () => {
+  it('PRIVATE mode shows the private landing with Log in and Create account', () => {
     mockIsPrivateMode = true;
     renderHome();
 
-    expect(screen.getByText(/This Grader is private/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Browse Problems' })).not.toBeInTheDocument();
-    // Registration on -> Create account offered.
-    expect(screen.getByRole('button', { name: 'Create account' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'This Grader is private' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login');
+    expect(screen.getByRole('link', { name: 'Create account' })).toHaveAttribute('href', '/register');
   });
 
   it('PRIVATE mode hides Create account when registration is disabled', () => {
@@ -184,7 +182,7 @@ describe('Home Page (logged out)', () => {
     mockRegistrationEnabled = false;
     renderHome();
 
-    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Create account' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Create account' })).toBeNull();
   });
 });

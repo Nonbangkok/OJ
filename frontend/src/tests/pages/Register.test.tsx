@@ -29,7 +29,7 @@ describe('Register Page', () => {
                 <Register />
             </BrowserRouter>
         );
-        expect(screen.getByRole('heading', { name: /register/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /create account/i })).toBeInTheDocument();
         expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
         expect(screen.getByLabelText(/^password/i)).toBeInTheDocument();
     });
@@ -43,7 +43,8 @@ describe('Register Page', () => {
 
         fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'ab' } });
         fireEvent.change(screen.getByLabelText(/^password/i), { target: { value: 'password123' } });
-        fireEvent.click(screen.getByRole('button', { name: /register/i }));
+        fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: 'password123' } });
+        fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
         await waitFor(() => {
             expect(screen.getByText(/username must be at least 3 characters/i)).toBeInTheDocument();
@@ -60,7 +61,8 @@ describe('Register Page', () => {
 
         fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'newuser' } });
         fireEvent.change(screen.getByLabelText(/^password/i), { target: { value: '12345' } });
-        fireEvent.click(screen.getByRole('button', { name: /register/i }));
+        fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: '12345' } });
+        fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
         await waitFor(() => {
             expect(screen.getByText(/password must be at least 6 characters/i)).toBeInTheDocument();
@@ -82,7 +84,8 @@ describe('Register Page', () => {
 
         fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'newuser' } });
         fireEvent.change(screen.getByLabelText(/^password/i), { target: { value: 'pass123' } });
-        fireEvent.click(screen.getByRole('button', { name: /register/i }));
+        fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: 'pass123' } });
+        fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
         await waitFor(() => {
             expect(authService.register).toHaveBeenCalledWith('newuser', 'pass123');
@@ -106,7 +109,8 @@ describe('Register Page', () => {
 
         fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'newuser' } });
         fireEvent.change(screen.getByLabelText(/^password/i), { target: { value: 'pass123' } });
-        const button = screen.getByRole('button', { name: /register/i });
+        fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: 'pass123' } });
+        const button = screen.getByRole('button', { name: /create account/i });
         fireEvent.click(button);
 
         await waitFor(() => expect(button).toBeDisabled());
@@ -130,10 +134,29 @@ describe('Register Page', () => {
 
         fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'newuser' } });
         fireEvent.change(screen.getByLabelText(/^password/i), { target: { value: 'pass123' } });
-        fireEvent.click(screen.getByRole('button', { name: /register/i }));
+        fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: 'pass123' } });
+        fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
         await waitFor(() => {
             expect(screen.getByText(/username already taken/i)).toBeInTheDocument();
         });
+    });
+
+    it('confirm mismatch shows a field error and blocks submit', async () => {
+        render(<BrowserRouter><Register /></BrowserRouter>);
+        fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'newuser' } });
+        fireEvent.change(screen.getByLabelText(/^password/i), { target: { value: 'pass123' } });
+        fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: 'pass124' } });
+        fireEvent.click(screen.getByRole('button', { name: /create account/i }));
+        expect(await screen.findByText("Passwords don't match.")).toBeInTheDocument();
+        expect(screen.getByLabelText(/confirm password/i)).toHaveAttribute('aria-invalid', 'true');
+        expect(authService.register).not.toHaveBeenCalled();
+    });
+
+    it('shows the field hints', () => {
+        render(<BrowserRouter><Register /></BrowserRouter>);
+        expect(screen.getByText('At least 3 characters.')).toBeInTheDocument();
+        expect(screen.getByText('At least 6 characters.')).toBeInTheDocument();
+        expect(screen.getByLabelText(/^password/i)).toHaveAttribute('autocomplete', 'new-password');
     });
 });

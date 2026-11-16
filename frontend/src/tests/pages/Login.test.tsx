@@ -33,9 +33,9 @@ describe('Login Page', () => {
                 <Login />
             </BrowserRouter>
         );
-        expect(screen.getByRole('heading', { name: /login/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /^log in$/i })).toBeInTheDocument();
         expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
     });
 
     it('submits credentials successfully', async () => {
@@ -51,8 +51,8 @@ describe('Login Page', () => {
         );
 
         fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'testuser' } });
-        fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
-        fireEvent.click(screen.getByRole('button', { name: /login/i }));
+        fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'password123' } });
+        fireEvent.click(screen.getByRole('button', { name: /^log in$/i }));
 
         await waitFor(() => {
             expect(authService.login).toHaveBeenCalledWith('testuser', 'password123');
@@ -69,8 +69,8 @@ describe('Login Page', () => {
         );
 
         fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'testuser' } });
-        fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'wrong-password' } });
-        fireEvent.click(screen.getByRole('button', { name: /login/i }));
+        fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'wrong-password' } });
+        fireEvent.click(screen.getByRole('button', { name: /^log in$/i }));
 
         await waitFor(() => {
             expect(screen.getByText(/invalid credentials/i)).toBeInTheDocument();
@@ -83,7 +83,7 @@ describe('Login Page', () => {
                 <Login />
             </MemoryRouter>
         );
-        expect(screen.getByRole('status')).toHaveTextContent('Registration successful! Please log in.');
+        expect(screen.getByRole('status')).toHaveTextContent('Account created. Log in with your new username.');
     });
 
     it('shows no registration notice on a plain visit', () => {
@@ -108,8 +108,8 @@ describe('Login Page', () => {
         );
 
         fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'testuser' } });
-        fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
-        const button = screen.getByRole('button', { name: /login/i });
+        fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'password123' } });
+        const button = screen.getByRole('button', { name: /^log in$/i });
         fireEvent.click(button);
 
         await waitFor(() => expect(button).toBeDisabled());
@@ -118,5 +118,27 @@ describe('Login Page', () => {
 
         resolveLogin({ message: 'Logged in', user: { id: 1, username: 'testuser', role: 'user', hasAvatar: false } });
         await waitFor(() => expect(button).toBeEnabled());
+    });
+
+    it('password toggle reveals and hides with aria-pressed', () => {
+        render(<BrowserRouter><Login /></BrowserRouter>);
+        const input = screen.getByLabelText(/^password$/i);
+        const toggle = screen.getByRole('button', { name: 'Show password' });
+        expect(input).toHaveAttribute('type', 'password');
+        expect(toggle).toHaveAttribute('aria-pressed', 'false');
+        fireEvent.click(toggle);
+        expect(input).toHaveAttribute('type', 'text');
+        expect(toggle).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByLabelText(/username/i)).toHaveAttribute('autocomplete', 'username');
+        expect(input).toHaveAttribute('autocomplete', 'current-password');
+    });
+
+    it('form errors use role=alert', async () => {
+        jest.mocked(authService.login).mockRejectedValueOnce({ response: { data: { message: 'Invalid credentials' } } });
+        render(<BrowserRouter><Login /></BrowserRouter>);
+        fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'testuser' } });
+        fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'wrong-password' } });
+        fireEvent.click(screen.getByRole('button', { name: /^log in$/i }));
+        expect(await screen.findByRole('alert')).toHaveTextContent(/invalid credentials/i);
     });
 });
