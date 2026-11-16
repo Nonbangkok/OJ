@@ -23,7 +23,7 @@ test.describe('signed-in student', () => {
 
   test('home', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Continue where you left off' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Welcome back, nattapat' })).toBeVisible();
     await expect(page.getByText('vector::erase').first()).toBeVisible();
     await settle(page);
     await shot(page, 'home');

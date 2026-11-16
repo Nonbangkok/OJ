@@ -80,11 +80,11 @@ describe('ProblemDetail page', () => {
         expect(screen.getByRole('button', { name: /^Submit/ })).toBeInTheDocument();
     });
 
-    it('the statement offers the open-PDF fallback under the frame', async () => {
+    it('the statement is the PDF frame alone, without an open-PDF line under it', async () => {
         renderPage();
         expect(await screen.findByTitle('Test Problem statement')).toBeInTheDocument();
-        expect(screen.getByText(/Can't preview it here/)).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: 'open PDF' })).toHaveAttribute('href', '/api/problems/1/pdf');
+        expect(screen.queryByText(/Can't preview it here/)).toBeNull();
+        expect(screen.queryByRole('link', { name: 'open PDF' })).toBeNull();
     });
 
     it('submitting opens the new submission\'s own page, which follows the verdict live', async () => {

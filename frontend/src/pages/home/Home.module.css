@@ -29,6 +29,7 @@
 
 .title {
   margin: 0;
+  line-height: 1.2;
   font-size: var(--font-size-page-title);
   font-weight: 600;
   color: var(--text-primary);
@@ -81,4 +82,11 @@
   .columns {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.subtitle {
+  margin: 0;
+  line-height: 1.4;
+  font-size: 15px;
+  color: var(--text-secondary);
 }

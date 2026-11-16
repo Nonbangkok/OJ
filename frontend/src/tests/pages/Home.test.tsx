@@ -150,9 +150,26 @@ describe('Home Page (logged in)', () => {
     expect(within(panel).getByRole('link', { name: 'All contests' })).toHaveAttribute('href', '/contests');
   });
 
+  it('greets a returning student by name', async () => {
+    renderHome();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome back, testuser' })).toBeInTheDocument();
+    expect(screen.getByText('Continue where you left off')).toBeInTheDocument();
+  });
+
+  it('welcomes a brand-new student and points at a first problem', async () => {
+    jest.mocked(homeService.getHome).mockResolvedValue(summary({
+      continue: null, currentStreak: 0,
+      progression: { ...mockProfile.progression, totalXp: 0, level: 1 },
+      week: summary().week.map((d) => ({ ...d, solved: 0 })),
+      startWith: [{ id: 'easy', title: 'Easy one', difficulty: 800, xp: 20 }],
+    }));
+    renderHome();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome, testuser' })).toBeInTheDocument();
+    expect(screen.getByText('Pick a first problem to get started')).toBeInTheDocument();
+  });
+
   it('shows the continue block with strip and verdict', async () => {
     renderHome();
-    expect(screen.getByRole('heading', { name: 'Continue where you left off' })).toBeInTheDocument();
     const block = await screen.findByRole('region', { name: 'Continue' });
     expect(within(block).getByRole('link', { name: 'vector::erase' })).toHaveAttribute('href', '/problems/hp_vec04_erase');
     expect(within(block).getByText('hp_vec04_erase')).toBeInTheDocument();

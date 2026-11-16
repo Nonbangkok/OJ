@@ -20,11 +20,7 @@ const languagesLine = (problem: ProblemDetailModel) =>
     ? `C++ · submit ${problem.submission_filename}`
     : 'C++ · Python';
 
-/**
- * Statement tab: the PDF at content width with a loading line. Browsers fire
- * no error event for a PDF that will not render inline, so the open-PDF
- * fallback is always offered under the frame.
- */
+/** Statement tab: the PDF at content width with a loading line. */
 function Statement({ problem, pdfUrl }: { problem: ProblemDetailModel; pdfUrl: string }) {
   const [loaded, setLoaded] = useState(false);
   if (!problem.has_pdf) {
@@ -39,9 +35,6 @@ function Statement({ problem, pdfUrl }: { problem: ProblemDetailModel; pdfUrl: s
         className={styles.pdf}
         onLoad={() => setLoaded(true)}
       />
-      <p className={styles.fallback}>
-        Can&apos;t preview it here? <a href={pdfUrl} target="_blank" rel="noreferrer">open PDF</a>
-      </p>
     </div>
   );
 }

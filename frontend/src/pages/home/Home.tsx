@@ -75,12 +75,17 @@ const Home = () => {
   }
 
   const progression = summary?.progression;
+  // Anyone with progress is returning; a brand-new account gets a plain welcome.
+  // Until the summary arrives the greeting assumes a returning student (the common case).
+  const isNew = summary !== null && summary.continue === null && summary.progression.totalXp === 0
+    && summary.week.every((day) => day.solved === 0);
 
   return (
     <div className={styles['home-container']}>
       <header className={styles.header}>
         <p className={styles.dateLine}>{DATE_LINE.format(new Date())}</p>
-        <h1 className={styles.title}>Continue where you left off</h1>
+        <h1 className={styles.title}>{isNew ? `Welcome, ${user.username}` : `Welcome back, ${user.username}`}</h1>
+        <p className={styles.subtitle}>{isNew ? 'Pick a first problem to get started' : 'Continue where you left off'}</p>
       </header>
 
       {failed && <InlineError message="Couldn't load your progress." onRetry={loadSummary} />}
