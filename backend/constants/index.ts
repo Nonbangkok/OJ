@@ -178,6 +178,9 @@ export const DATABASE_POOL = {
  */
 export const ANALYTICS_TIMEZONE = 'Asia/Bangkok';
 
+/** Rows per page of the global XP ranking (GET /scoreboard). */
+export const RANKING_PAGE_SIZE = 50;
+
 export const JUDGE_CONFIG = {
     EXEC_MAX_BUFFER: 50 * 1024 * 1024, // 50MB
     TIMEOUT_BUFFER_MS: 500,

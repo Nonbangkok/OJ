@@ -164,12 +164,28 @@ export interface SearchUserRow {
   username: string;
 }
 
-export interface GlobalScoreboardRow {
+/** One ranked user in GET /scoreboard (B3). Level and tier come from all-time XP. */
+export interface RankingRow {
+  rank: number;
   username: string;
-  has_avatar: boolean;
-  total_score: string;
-  problems_solved: string;
-  last_score_improvement_time: Date | null;
+  hasAvatar: boolean;
+  /** XP in the requested window. */
+  xp: number;
+  /** First solves (reward rows) in the window. */
+  solved: number;
+  level: number;
+  tier: string;
+}
+
+/** GET /scoreboard?window=all|week&page=N */
+export interface GlobalRanking {
+  rows: RankingRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  window: 'all' | 'week';
+  /** The viewer's own row regardless of page; null for guests or no XP in the window. */
+  viewer: RankingRow | null;
 }
 
 export interface ProblemStatsRow {

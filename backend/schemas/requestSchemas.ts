@@ -566,6 +566,12 @@ export const submissionsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(SUBMISSION_QUERY_PAGE_MAX).default(1),
 }).strict();
 
+/** GET /scoreboard: the global XP ranking window and page (B3). */
+export const scoreboardQuerySchema = z.object({
+  window: z.enum(['all', 'week']).default('all'),
+  page: z.coerce.number().int().min(1).max(10000).default(1),
+}).strict();
+
 export const searchQuerySchema = z.object({
   q: optionalTrimmedString,
   contestId: optionalTrimmedString,

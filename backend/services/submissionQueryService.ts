@@ -11,7 +11,6 @@ import { hasGraderSource } from './problemFilesService';
 import { isContestManagementRole, isContestParticipant } from './contestAccess';
 import {
     ExistsRow,
-    GlobalScoreboardRow,
     IdTitlePair,
     QueueSubmissionResult,
     SearchUserRow,
@@ -372,27 +371,3 @@ export const getSubmissionDetail = async (
     return result.rows[0] ?? null;
 };
 
-export const getGlobalScoreboard = async (): Promise<GlobalScoreboardRow[]> => {
-    const result = await db.query<GlobalScoreboardRow>(`
-      WITH UserBestScores AS (
-        SELECT
-          user_id,
-          problem_id,
-          MAX(score) AS best_score,
-          MAX(submitted_at) AS latest_score_time
-        FROM submissions
-        GROUP BY user_id, problem_id
-      )
-      SELECT
-        u.username,
-        (u.avatar_png IS NOT NULL) AS has_avatar,
-        SUM(ubs.best_score) AS total_score,
-        COUNT(CASE WHEN ubs.best_score = ${SUBMISSION_QUERY_CONFIG.FULL_PROBLEM_SCORE} THEN 1 END) AS problems_solved,
-        MAX(ubs.latest_score_time) AS last_score_improvement_time
-      FROM UserBestScores ubs
-      JOIN users u ON ubs.user_id = u.id
-      GROUP BY u.username, u.avatar_png
-      ORDER BY total_score DESC, last_score_improvement_time ASC
-    `);
-    return result.rows;
-};

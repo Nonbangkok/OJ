@@ -505,16 +505,23 @@ describe('Submission Controller', () => {
     });
 
     describe('GET /scoreboard', () => {
-        it('should return global scoreboard', async () => {
-            (db.query as jest.Mock).mockResolvedValueOnce({
-                rows: [{ username: 'u1', total_score: '100', problems_solved: '1', last_score_improvement_time: null }]
-            });
+        it('returns the XP ranking envelope with the viewer row', async () => {
+            const row = { rank: 1, username: 'u1', has_avatar: false, xp: 120, solved: 3, total_xp: 120 };
+            (db.query as jest.Mock).mockImplementation((sql: string) =>
+                Promise.resolve({ rows: String(sql).includes('AS total FROM ranked') ? [{ total: 1 }] : [row] }));
 
-            const res = await request(app).get('/scoreboard');
+            const res = await request(app).get('/scoreboard?window=week&page=1');
 
             expect(res.status).toBe(200);
-            expect(res.body.length).toBe(1);
-            expect(res.body[0].username).toBe('u1');
+            expect(res.body).toMatchObject({ total: 1, page: 1, pageSize: 50, window: 'week' });
+            expect(res.body.rows[0]).toMatchObject({ rank: 1, username: 'u1', hasAvatar: false, xp: 120, solved: 3, level: 2, tier: 'Novice' });
+            expect(res.body.viewer).toMatchObject({ username: 'u1' });
+        });
+
+        it('rejects window=month and page=0 with 400', async () => {
+            expect((await request(app).get('/scoreboard?window=month')).status).toBe(400);
+            expect((await request(app).get('/scoreboard?page=0')).status).toBe(400);
+            expect(db.query).not.toHaveBeenCalled();
         });
     });
 });
