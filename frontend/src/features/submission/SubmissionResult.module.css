@@ -1,0 +1,86 @@
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
+}
+
+.verdictLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.verdictBig {
+  font-family: var(--font-family-mono);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.verdictBig[data-tone='pass'] { color: var(--verdict-accepted); }
+.verdictBig[data-tone='fail'] { color: var(--verdict-wrong); }
+.verdictBig[data-tone='limit'] { color: var(--verdict-time); }
+.verdictBig[data-tone='pending'] { color: var(--verdict-pending); }
+
+.score {
+  font-family: var(--font-family-mono);
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.meta {
+  display: flex;
+  gap: 10px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.mono {
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+}
+
+.note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.measure {
+  display: inline-grid;
+  grid-template-columns: 72px 120px;
+  align-items: center;
+  gap: 8px;
+}
+
+.log {
+  margin: 0;
+  max-height: 420px;
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-secondary);
+  color: var(--text-primary);
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
