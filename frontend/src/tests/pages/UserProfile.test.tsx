@@ -322,6 +322,18 @@ describe('User Profile Page', () => {
         expect(screen.getByText(expectedDate)).toBeInTheDocument();
     });
 
+    it('leaves no empty column when nothing is solved yet (Verdicts and Languages sit side by side)', async () => {
+        jest.mocked(userService.getProfile).mockResolvedValueOnce({ ...profileData, recentRewards: [] });
+        const { container } = renderPage();
+        await screen.findByRole('heading', { name: 'Verdicts' });
+        const grid = container.querySelector('.two-col') as HTMLElement;
+        const cells = Array.from(grid.children);
+        expect(cells).toHaveLength(2);
+        cells.forEach((cell) => expect(cell.textContent?.trim()).not.toBe(''));
+        expect(within(cells[0] as HTMLElement).getByRole('heading', { name: 'Verdicts' })).toBeInTheDocument();
+        expect(within(cells[1] as HTMLElement).getByRole('heading', { name: 'Languages' })).toBeInTheDocument();
+    });
+
     it('hides the rank badge when the user has no rewards', async () => {
         jest.mocked(userService.getProfile).mockResolvedValueOnce({
             ...profileData,

@@ -162,6 +162,95 @@ const UserProfile = () => {
     </span>
   );
 
+  const recentSection = profile.recentRewards?.length > 0 ? (
+    <div className={styles.section}>
+      <h2>Recently Solved</h2>
+      <ul className={styles['recent-solved-list']}>
+        {profile.recentRewards.slice(0, 5).map((reward) => {
+          const band = difficultyBand(reward.difficultySnapshot);
+          return (
+            <li key={`${reward.problemId}-${reward.awardedAt}`} className={styles['recent-solved-row']}>
+              <Link className={styles['recent-solved-title']} to={`/problems/${reward.problemId}`}>
+                <span className={styles['recent-solved-name']}>
+                  {reward.problemTitle ?? reward.problemId}
+                </span>
+                <span className={styles['recent-solved-id']}>
+                  {reward.problemId}
+                </span>
+              </Link>
+              {reward.difficultySnapshot !== null && band !== null && (
+                <span className={styles[`difficulty-chip-${band}`]}>
+                  {reward.difficultySnapshot}
+                </span>
+              )}
+              <span className={styles['recent-solved-gain']}>+{reward.xpAwarded} XP</span>
+              <span className={styles['recent-solved-date']}>
+                {formatRewardDate(reward.awardedAt)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  ) : null;
+  const verdictsSection = Object.keys(profile.verdictCounts).length > 0 ? (
+    <div className={styles.section}>
+      <h2>Verdicts</h2>
+      <ul className={styles['breakdown-list']}>
+        {Object.entries(profile.verdictCounts)
+          .sort(([, a], [, b]) => b - a)
+          .map(([verdict, count]) => (
+            <li key={verdict} className={styles['breakdown-row']}>
+              <span className={styles['breakdown-name']}>
+                <span className={`${styles['verdict-dot']} ${styles[`verdict-dot-${verdictClass(verdict)}`]}`} aria-hidden="true" />
+                {verdict}
+              </span>
+              <span className={styles['breakdown-bar']} aria-hidden="true">
+                <span
+                  className={styles['breakdown-bar-fill']}
+                  style={{ width: `${verdictBarWidth(verdict)}%` }}
+                />
+              </span>
+              <span className={styles['breakdown-count']}>{count}</span>
+            </li>
+          ))}
+      </ul>
+    </div>
+  ) : null;
+  const languagesSection = Object.keys(profile.languageCounts).length > 0 ? (
+    <div className={styles.section}>
+      <h2>Languages</h2>
+      <ul className={styles['breakdown-list']}>
+        {Object.entries(profile.languageCounts)
+          .sort(([, a], [, b]) => b - a)
+          .map(([language, count]) => (
+            <li key={language} className={styles['breakdown-row']}>
+              <span className={`${styles['breakdown-name']} ${styles['language-name']}`}>
+                {language}
+              </span>
+              <span className={styles['breakdown-bar']} aria-hidden="true">
+                <span
+                  className={styles['breakdown-bar-fill']}
+                  style={{ width: `${languageBarWidth(language)}%` }}
+                />
+              </span>
+              <span className={styles['breakdown-count']}>{count}</span>
+            </li>
+          ))}
+      </ul>
+    </div>
+  ) : null;
+  // Recently solved on the left, breakdowns on the right; with nothing solved
+  // yet the two breakdowns share the row instead of leaving a blank column.
+  const breakdownCells = recentSection
+    ? [
+      <div key="recent" className={styles.column}>{recentSection}</div>,
+      <div key="breakdowns" className={styles.column}>{verdictsSection}{languagesSection}</div>,
+    ]
+    : [verdictsSection, languagesSection]
+      .filter(Boolean)
+      .map((section, i) => <div key={i} className={styles.column}>{section}</div>);
+
   return (
     <div className={styles['profile-container']}>
       <div className={styles['profile-header']}>
@@ -235,91 +324,9 @@ const UserProfile = () => {
 
       <ProblemSolvingProfile categories={profile.categoryStats} />
 
-      <div className={styles['two-col']}>
-        <div className={styles.column}>
-        {profile.recentRewards?.length > 0 && (
-          <div className={styles.section}>
-            <h2>Recently Solved</h2>
-            <ul className={styles['recent-solved-list']}>
-              {profile.recentRewards.slice(0, 5).map((reward) => {
-                const band = difficultyBand(reward.difficultySnapshot);
-                return (
-                  <li key={`${reward.problemId}-${reward.awardedAt}`} className={styles['recent-solved-row']}>
-                    <Link className={styles['recent-solved-title']} to={`/problems/${reward.problemId}`}>
-                      <span className={styles['recent-solved-name']}>
-                        {reward.problemTitle ?? reward.problemId}
-                      </span>
-                      <span className={styles['recent-solved-id']}>
-                        {reward.problemId}
-                      </span>
-                    </Link>
-                    {reward.difficultySnapshot !== null && band !== null && (
-                      <span className={styles[`difficulty-chip-${band}`]}>
-                        {reward.difficultySnapshot}
-                      </span>
-                    )}
-                    <span className={styles['recent-solved-gain']}>+{reward.xpAwarded} XP</span>
-                    <span className={styles['recent-solved-date']}>
-                      {formatRewardDate(reward.awardedAt)}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-        </div>
-        <div className={styles.column}>
-        {Object.keys(profile.verdictCounts).length > 0 && (
-          <div className={styles.section}>
-            <h2>Verdicts</h2>
-            <ul className={styles['breakdown-list']}>
-              {Object.entries(profile.verdictCounts)
-                .sort(([, a], [, b]) => b - a)
-                .map(([verdict, count]) => (
-                  <li key={verdict} className={styles['breakdown-row']}>
-                    <span className={styles['breakdown-name']}>
-                      <span className={`${styles['verdict-dot']} ${styles[`verdict-dot-${verdictClass(verdict)}`]}`} aria-hidden="true" />
-                      {verdict}
-                    </span>
-                    <span className={styles['breakdown-bar']} aria-hidden="true">
-                      <span
-                        className={styles['breakdown-bar-fill']}
-                        style={{ width: `${verdictBarWidth(verdict)}%` }}
-                      />
-                    </span>
-                    <span className={styles['breakdown-count']}>{count}</span>
-                  </li>
-                ))}
-            </ul>
-          </div>
-        )}
-
-        {Object.keys(profile.languageCounts).length > 0 && (
-          <div className={styles.section}>
-            <h2>Languages</h2>
-            <ul className={styles['breakdown-list']}>
-              {Object.entries(profile.languageCounts)
-                .sort(([, a], [, b]) => b - a)
-                .map(([language, count]) => (
-                  <li key={language} className={styles['breakdown-row']}>
-                    <span className={`${styles['breakdown-name']} ${styles['language-name']}`}>
-                      {language}
-                    </span>
-                    <span className={styles['breakdown-bar']} aria-hidden="true">
-                      <span
-                        className={styles['breakdown-bar-fill']}
-                        style={{ width: `${languageBarWidth(language)}%` }}
-                      />
-                    </span>
-                    <span className={styles['breakdown-count']}>{count}</span>
-                  </li>
-                ))}
-            </ul>
-          </div>
-        )}
-        </div>
-      </div>
+      {breakdownCells.length > 0 && (
+        <div className={styles['two-col']}>{breakdownCells}</div>
+      )}
 
       <Achievements stats={profile.achievements.stats} unlockedIds={unlockedIds} />
     </div>

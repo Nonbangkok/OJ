@@ -29,6 +29,12 @@ describe('Ranking page', () => {
         expect(scoreboardService.getRanking).toHaveBeenCalledWith('all', 1);
     });
 
+    it('says "1 student" for a single ranked student', async () => {
+        jest.mocked(scoreboardService.getRanking).mockResolvedValue(ranking({ total: 1 }));
+        renderAt();
+        expect(await screen.findByText('Ranked by total XP · 1 student')).toBeInTheDocument();
+    });
+
     it('This week switches the window param', async () => {
         renderAt();
         await screen.findByRole('link', { name: 'khaopan' });

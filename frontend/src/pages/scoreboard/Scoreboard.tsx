@@ -56,7 +56,7 @@ const Scoreboard = () => {
   ];
 
   const meta = ranking
-    ? `${window === 'week' ? 'XP earned in the last 7 days' : 'Ranked by total XP'} · ${total.toLocaleString('en-US')} students`
+    ? `${window === 'week' ? 'XP earned in the last 7 days' : 'Ranked by total XP'} · ${total.toLocaleString('en-US')} ${total === 1 ? 'student' : 'students'}`
     : undefined;
 
   return (
