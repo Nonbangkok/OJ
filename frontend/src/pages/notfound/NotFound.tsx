@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Button } from '../../components/ui';
 import { useCommandPalette } from '../../components/shell/CommandPaletteContext';
 import styles from './NotFound.module.css';
+import { shortcutLabel } from '../../utils/shortcuts';
 
 /** Catch-all for URLs that match no route (§7.10): the path asked for, a way home, and search. */
 const NotFound = () => {
@@ -17,7 +18,7 @@ const NotFound = () => {
       <div className={styles.actions}>
         <Link to="/" className={styles.homeLink}>Go home</Link>
         <Button variant="secondary" onClick={open} aria-label="Search for a page">
-          Search <kbd className={styles.kbd} aria-hidden="true">⌘K</kbd>
+          Search <kbd className={styles.kbd} aria-hidden="true">{shortcutLabel('K')}</kbd>
         </Button>
       </div>
     </section>

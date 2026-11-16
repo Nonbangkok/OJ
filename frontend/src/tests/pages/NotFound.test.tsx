@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { appRoutes } from '../../App';
 import { AuthProvider } from '../../context/AuthContext';
@@ -44,6 +44,12 @@ describe('unknown routes', () => {
 
         fireEvent.click(await screen.findByRole('button', { name: 'Search for a page' }));
         expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('the Search button\'s shortcut reads Ctrl+K off Apple platforms', async () => {
+        renderAppAt('/definitely/not-a-page');
+        const button = await screen.findByRole('button', { name: 'Search for a page' });
+        expect(within(button).getByText('Ctrl+K')).toBeInTheDocument();
     });
 
     it('also catches unknown paths under /admin', async () => {

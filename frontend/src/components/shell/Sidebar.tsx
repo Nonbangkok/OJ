@@ -8,6 +8,7 @@ import { navItemsFor, type NavItem } from './navItems';
 import { useLiveContest } from './useLiveContest';
 import { useCountdown } from './useCountdown';
 import styles from './Sidebar.module.css';
+import { shortcutLabel } from '../../utils/shortcuts';
 
 export interface SidebarProps {
   onCollapse: () => void;
@@ -73,10 +74,10 @@ export default function Sidebar({ onCollapse, onOpenSearch, compact = false }: S
         </button>
       </div>
 
-      <button type="button" className={styles.search} onClick={onOpenSearch} aria-label={compact ? 'Search' : undefined} title={compact ? 'Search (⌘K)' : undefined}>
+      <button type="button" className={styles.search} onClick={onOpenSearch} aria-label={compact ? 'Search' : undefined} title={compact ? `Search (${shortcutLabel('K')})` : undefined}>
         <MagnifyingGlass size={15} aria-hidden="true" />
         {!compact && <span>Search</span>}
-        {!compact && <kbd className={styles.kbd} aria-hidden="true">⌘K</kbd>}
+        {!compact && <kbd className={styles.kbd} aria-hidden="true">{shortcutLabel('K')}</kbd>}
       </button>
 
       <nav aria-label="Main" className={styles.nav}>

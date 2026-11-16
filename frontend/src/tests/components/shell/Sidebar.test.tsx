@@ -44,6 +44,13 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /Grader 2\.0/ })).toHaveAttribute('href', '/');
   });
 
+  it('the search shortcut reads Ctrl+K off Apple platforms (jsdom reports none)', () => {
+    asUser('user');
+    renderAt('/problems');
+    expect(screen.getByText('Ctrl+K')).toBeInTheDocument();
+    expect(screen.queryByText('⌘K')).toBeNull();
+  });
+
   it('follows a role change without remounting', () => {
     asUser('user');
     const { rerender } = renderAt('/');

@@ -39,6 +39,16 @@ describe('CodeSubmissionForm', () => {
     expect(screen.queryByText('Choose a language to submit.')).toBeNull();
   });
 
+  it('the submit shortcut reads Ctrl+↵ off Apple platforms', () => {
+    render(
+      <BrowserRouter>
+        <CodeSubmissionForm problemId="aplusb" contestId={undefined} />
+      </BrowserRouter>
+    );
+    expect(screen.getByText('Ctrl+↵')).toBeInTheDocument();
+    expect(screen.queryByText('⌘↵')).toBeNull();
+  });
+
   it('renders a language button for every supported language', () => {
     render(
       <BrowserRouter>
