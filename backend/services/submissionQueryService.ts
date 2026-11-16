@@ -229,7 +229,7 @@ export const getSubmissions = async (
     // already keeps non-staff inside publicly listed problems.
     if (filterProblemId) {
         params.push(`%${filterProblemId}%`);
-        conditions.push(`${sourceAlias}.problem_id IN (SELECT id FROM problems WHERE id ILIKE $${params.length})`);
+        conditions.push(`${sourceAlias}.problem_id IN (SELECT id FROM problems WHERE id ILIKE $${params.length} OR title ILIKE $${params.length})`);
     }
 
     if (verdict) {

@@ -46,6 +46,18 @@ describe('Submissions page', () => {
         expect(container.querySelector('a a')).toBeNull();
     });
 
+    it('draws no testcase strip for a compile error (the judge stores its log as one result entry)', async () => {
+        jest.mocked(submissionService.getAll).mockResolvedValue([
+            row(48101, { overall_status: 'Compilation Error', score: 0, case_statuses: ['Compilation Error'], max_time_ms: null, max_memory_kb: null }),
+        ] as never);
+        renderAt();
+        await screen.findByRole('link', { name: '#48101' });
+        const table = screen.getByRole('table', { name: 'Submissions' });
+        const first = within(table).getAllByRole('row')[1];
+        expect(within(first).getByText('COMPILATION ERROR')).toBeInTheDocument();
+        expect(within(first).queryByRole('img', { name: /test cases passed/ })).toBeNull();
+    });
+
     it('Mine is the default when logged in', async () => {
         renderAt();
         await waitFor(() => expect(submissionService.getAll).toHaveBeenCalledWith(expect.objectContaining({ filter: 'mine' })));

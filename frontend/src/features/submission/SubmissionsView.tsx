@@ -21,6 +21,8 @@ import { formatTimeAgo } from '../../utils/formatters';
 import { getLanguageDisplayName } from '../../utils/constants';
 import type { AuthUser, SubmissionSummary } from '../../types';
 
+const NO_CASES = new Set(['Compilation Error', 'System Error']);
+
 /** Verdict chip choices: label → exact overall status. */
 const VERDICTS = [
     { value: 'Accepted', label: 'Accepted' },
@@ -117,7 +119,8 @@ const SubmissionsView = ({
         {
             key: 'verdict', header: 'Verdict', mobile: 'meta',
             cell: (s) => {
-                const results = (s.case_statuses ?? []).map((status) => ({ status }));
+                // A compile log or system message is stored as one result entry, not a testcase.
+                const results = NO_CASES.has(s.overall_status) ? [] : (s.case_statuses ?? []).map((status) => ({ status }));
                 return (
                     <span className={styles.verdict}>
                         <VerdictText status={s.overall_status} results={results} />

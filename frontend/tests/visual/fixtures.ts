@@ -224,7 +224,7 @@ const submissionList = [
   { id: 48155, username: 'nattapat', problem_id: 'two_sum_sorted', problem_title: 'Two sum (sorted)', overall_status: 'Time Limit Exceeded',
     score: 80, language: 'python', submitted_at: '2026-09-14T08:00:00.000Z', case_statuses: strip(8, 'Time Limit Exceeded'), max_time_ms: 4000, max_memory_kb: 9800 },
   { id: 48101, username: 'nattapat', problem_id: 'bfs_grid', problem_title: 'BFS on a grid', overall_status: 'Compilation Error',
-    score: 0, language: 'cpp', submitted_at: '2026-09-13T08:00:00.000Z', case_statuses: [], max_time_ms: null, max_memory_kb: null },
+    score: 0, language: 'cpp', submitted_at: '2026-09-13T08:00:00.000Z', case_statuses: ['Compilation Error'], max_time_ms: null, max_memory_kb: null },
 ];
 
 const rankingRows = [

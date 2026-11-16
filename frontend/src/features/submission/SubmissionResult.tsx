@@ -15,6 +15,7 @@ import styles from './SubmissionResult.module.css';
 
 const PENDING = new Set(['Pending', 'Compiling', 'Running']);
 const COMPILATION_ERROR = 'Compilation Error';
+const SYSTEM_ERROR = 'System Error';
 const SKIPPED = 'Skipped';
 const ACCEPTED = 'Accepted';
 
@@ -23,6 +24,12 @@ interface CaseRow extends TestCaseResult {
 }
 
 const formatMb = (kb: number) => `${(kb / 1024).toFixed(1)} MB`;
+
+/** The judge stores a compile log or system message as `[{ status, output }]`; older rows may hold a bare string. */
+const messageOf = (results: SubmissionDetail['results']): string => {
+  if (typeof results === 'string') return results;
+  return results?.find((r) => typeof r.output === 'string' && r.output.length > 0)?.output ?? '';
+};
 
 /**
  * The full verdict for one submission: big verdict and score, the testcase
@@ -64,13 +71,16 @@ export default function SubmissionResult({
     );
   }
 
+  const message = messageOf(submission.results);
+  // A compile log or system message replaces the per-case table (it carries no cases).
+  const showsMessage = status === COMPILATION_ERROR || (status === SYSTEM_ERROR && message !== '');
   const tone = verdictTone(status);
   const header = (
     <div className={styles.head}>
       <div className={styles.verdictLine}>
         <StatusMark tone={tone} size={22} />
         <span className={styles.verdictBig} data-tone={tone}>{status.toUpperCase()}</span>
-        {results.length > 0 && (
+        {results.length > 0 && !showsMessage && (
           <span className={styles.score}>{`${passedCount(results)}/${results.length} · ${submission.score} pts`}</span>
         )}
       </div>
@@ -78,13 +88,12 @@ export default function SubmissionResult({
     </div>
   );
 
-  if (status === COMPILATION_ERROR) {
-    const log = typeof submission.results === 'string' ? submission.results : '';
+  if (showsMessage) {
     return (
       <section className={styles.result} aria-label="Result">
         {header}
         {meta}
-        {log && <pre className={styles.log}>{log}</pre>}
+        {message && <pre className={styles.log}>{message}</pre>}
       </section>
     );
   }
