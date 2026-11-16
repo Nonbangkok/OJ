@@ -48,12 +48,13 @@ test.describe('signed-in student', () => {
     await shot(page, 'problems-dark');
   });
 
-  test('problem detail with an inline result', async ({ page }) => {
-    await page.goto('/problems/hp_vec04_erase?tab=submit&submission=48213');
+  // Submitting opens the submission's own page (covered by "submission detail"); this is the Submit tab.
+  test('problem detail, submit tab', async ({ page }) => {
+    await page.goto('/problems/hp_vec04_erase?tab=submit');
     await expect(page.getByRole('heading', { name: 'vector::erase', level: 1 })).toBeVisible();
-    await expect(page.getByText('WRONG ANSWER').first()).toBeVisible();
+    await expect(page.getByLabel(/Your code/i)).toBeVisible();
     await settle(page);
-    await shot(page, 'problem-detail-result');
+    await shot(page, 'problem-detail-submit');
   });
 
   test('submissions', async ({ page }) => {
