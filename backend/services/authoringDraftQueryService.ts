@@ -208,7 +208,8 @@ export const listProblemDrafts = async (
   }
 
   // One query: testcase counts and the newest job per type come from
-  // aggregates joined onto the drafts (never per-row lookups, never BYTEA).
+  // aggregates joined onto the drafts (never per-row lookups). Sources are
+  // only measured with octet_length (no detoast); BYTEA is never read.
   const result = await database.query<ProblemDraftListRow>(`
     SELECT
       problem_drafts.id, problem_drafts.problem_id, problem_drafts.title, problem_drafts.author_profile_id,
@@ -216,9 +217,9 @@ export const listProblemDrafts = async (
       problem_drafts.verified_revision, problem_drafts.created_by, problem_drafts.created_at,
       problem_drafts.updated_at, problem_drafts.published_at,
       jsonb_build_object(
-        'has_statement', problem_drafts.statement_html <> '',
-        'has_solution', problem_drafts.solution_cpp <> '',
-        'has_generator', COALESCE(problem_drafts.generator_cpp, '') <> '',
+        'has_statement', octet_length(problem_drafts.statement_html) > 0,
+        'has_solution', octet_length(problem_drafts.solution_cpp) > 0,
+        'has_generator', COALESCE(octet_length(problem_drafts.generator_cpp), 0) > 0,
         'testcase_total', COALESCE(tc.total, 0),
         'testcase_with_output', COALESCE(tc.with_output, 0),
         'latest_pdf_revision', problem_drafts.latest_pdf_revision,

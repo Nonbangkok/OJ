@@ -298,11 +298,14 @@ describe('problem draft reads and creation', () => {
 
     expect(result).toEqual(summaries);
     const sql = (db.query as jest.Mock).mock.calls[0][0] as string;
-    expect(sql).not.toContain('solution_cpp');
-    expect(sql).not.toContain('generator_cpp');
-    expect(sql).not.toContain('latest_pdf');
+    // B7 readiness may only measure the sources (octet_length, no detoast); it never selects them.
+    const withoutLengths = sql.replace(/octet_length\(problem_drafts\.(statement_html|solution_cpp|generator_cpp)\)/g, '');
+    expect(withoutLengths).not.toContain('solution_cpp');
+    expect(withoutLengths).not.toContain('generator_cpp');
+    expect(withoutLengths).not.toContain('statement_html');
+    expect(sql).not.toMatch(/latest_pdf(?!_revision)/);
     expect(sql).not.toContain('profile_image_png');
-    expect(sql).toContain('ORDER BY updated_at DESC, id ASC');
+    expect(sql).toContain('ORDER BY problem_drafts.updated_at DESC, problem_drafts.id ASC');
     // No scope → no filter parameters.
     expect(db.query).toHaveBeenCalledWith(expect.any(String), []);
   });
