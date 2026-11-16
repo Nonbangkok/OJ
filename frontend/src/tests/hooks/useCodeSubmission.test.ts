@@ -38,10 +38,10 @@ describe('useCodeSubmission', () => {
     const mockProblemId = 'problem-1';
     const mockContestId = 'contest-1';
 
-    it('initializes with default values and blank cache', () => {
+    it('starts with no language chosen when nothing is cached, so the student picks one', () => {
         const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined));
 
-        expect(result.current.language).toBe('cpp');
+        expect(result.current.language).toBeNull();
         expect(result.current.code).toBe('');
         expect(result.current.isSubmitting).toBe(false);
         expect(result.current.error).toBe('');
@@ -58,7 +58,34 @@ describe('useCodeSubmission', () => {
 
         const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined));
 
+        // A saved draft brings its language back with it.
+        expect(result.current.language).toBe('cpp');
         expect(result.current.code).toBe('console.log("cached")');
+    });
+
+    it('a saved Python draft preselects Python', () => {
+        localStorage.setItem('oj-submission-cache', JSON.stringify({
+            [`${mockProblemId}:python`]: { code: 'print(1)', timestamp: new Date().getTime() - 1000 },
+        }));
+        const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined));
+        expect(result.current.language).toBe('python');
+        expect(result.current.code).toBe('print(1)');
+    });
+
+    it('code typed before choosing a language is kept when one is chosen', () => {
+        const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined));
+        act(() => { result.current.setCode('int main() {}'); });
+        act(() => { result.current.setLanguage('cpp'); });
+        expect(result.current.language).toBe('cpp');
+        expect(result.current.code).toBe('int main() {}');
+    });
+
+    it('refuses to submit before a language is chosen', async () => {
+        const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined));
+        act(() => { result.current.setCode('print(1)'); });
+        await act(async () => { await result.current.handleSubmit({ preventDefault: jest.fn() } as never); });
+        expect(submissionService.submit).not.toHaveBeenCalled();
+        expect(result.current.error).toBe('Choose a language first.');
     });
 
     it('keys the cache per language so switching does not restore the other language\'s code', () => {
@@ -142,9 +169,8 @@ describe('useCodeSubmission', () => {
 
         const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined, null, onSubmitted));
 
-        act(() => {
-            result.current.setCode('print("hello")');
-        });
+        act(() => { result.current.setLanguage('cpp'); });
+        act(() => { result.current.setCode('print("hello")'); });
 
         const mockEvent = { preventDefault: jest.fn() } as unknown as React.FormEvent<Element>;
 

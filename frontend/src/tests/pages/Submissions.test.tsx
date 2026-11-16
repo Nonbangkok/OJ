@@ -58,12 +58,12 @@ describe('Submissions page', () => {
         expect(within(first).queryByRole('img', { name: /test cases passed/ })).toBeNull();
     });
 
-    it('Mine is the default when logged in', async () => {
+    it('All is the default when logged in, Mine one click away', async () => {
         renderAt();
-        await waitFor(() => expect(submissionService.getAll).toHaveBeenCalledWith(expect.objectContaining({ filter: 'mine' })));
-        expect(screen.getByRole('button', { name: 'Mine' })).toHaveAttribute('aria-pressed', 'true');
-        fireEvent.click(screen.getByRole('button', { name: 'All' }));
-        await waitFor(() => expect(submissionService.getAll).toHaveBeenLastCalledWith(expect.objectContaining({ filter: 'all' })));
+        await waitFor(() => expect(submissionService.getAll).toHaveBeenCalledWith(expect.objectContaining({ filter: 'all' })));
+        expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
+        fireEvent.click(screen.getByRole('button', { name: 'Mine' }));
+        await waitFor(() => expect(submissionService.getAll).toHaveBeenLastCalledWith(expect.objectContaining({ filter: 'mine' })));
     });
 
     it('verdict chip sends verdict', async () => {

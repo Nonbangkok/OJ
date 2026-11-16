@@ -63,6 +63,8 @@ export interface ProblemCategoryCountsResponse {
 export interface ProblemFilterOptionsResponse {
   collections: Array<{ id: number; name: string }>;
   hasUncollected: boolean;
+  /** Authors of visible practice problems (the Author filter's choices). */
+  authors?: string[];
 }
 export type ProblemDetailResponse = ProblemDetail;
 export type ContestProblemDetailResponse = ProblemDetail;

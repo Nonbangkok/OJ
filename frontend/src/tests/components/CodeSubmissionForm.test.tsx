@@ -28,9 +28,15 @@ describe('CodeSubmissionForm', () => {
       </BrowserRouter>
     );
 
-    // The page tabs title the section; the form starts with the language choice.
+    // The page tabs title the section; the form starts with the language choice — none made yet.
     expect(screen.getByRole('group', { name: 'Language' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'C++' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'C++' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Python' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText('Choose a language to submit.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Submit/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'C++' }));
+    expect(screen.getByRole('button', { name: /^Submit/ })).toBeEnabled();
+    expect(screen.queryByText('Choose a language to submit.')).toBeNull();
   });
 
   it('renders a language button for every supported language', () => {
@@ -57,8 +63,8 @@ describe('CodeSubmissionForm', () => {
     const cppButton = screen.getByRole('button', { name: 'C++' });
     const pythonButton = screen.getByRole('button', { name: 'Python' });
 
-    // C++ is selected by default.
-    expect(cppButton.className).toContain('active');
+    // Nothing is selected until the student chooses.
+    expect(cppButton.className).not.toContain('active');
     expect(pythonButton.className).not.toContain('active');
 
     fireEvent.click(pythonButton);
@@ -82,6 +88,7 @@ describe('CodeSubmissionForm', () => {
     fireEvent.change(screen.getByLabelText('code editor'), {
       target: { value: 'print(1)' },
     });
+    fireEvent.click(screen.getByRole('button', { name: 'C++' }));
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
 
     await waitFor(() => {
@@ -106,6 +113,7 @@ describe('CodeSubmissionForm', () => {
     fireEvent.change(screen.getByLabelText('code editor'), {
       target: { value: '#include <iostream>' },
     });
+    fireEvent.click(screen.getByRole('button', { name: 'C++' }));
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
 
     await waitFor(() => {
@@ -128,6 +136,7 @@ describe('CodeSubmissionForm', () => {
     fireEvent.change(screen.getByLabelText('code editor'), {
       target: { value: 'int main(){}' },
     });
+    fireEvent.click(screen.getByRole('button', { name: 'C++' }));
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
 
     await waitFor(() => {

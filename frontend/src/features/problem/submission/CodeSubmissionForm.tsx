@@ -110,7 +110,8 @@ const CodeSubmissionForm = ({ problemId, contestId = null, submissionFilename = 
           </div>
         </div>
         <div className={styles.submitRow}>
-          <Button type="submit" variant="primary" disabled={isSubmitting} loading={isSubmitting} loadingLabel="Submitting…">
+          {!language && <span className={styles.chooseHint}>Choose a language to submit.</span>}
+          <Button type="submit" variant="primary" disabled={isSubmitting || !language} loading={isSubmitting} loadingLabel="Submitting…">
             Submit <kbd className={styles.kbd} aria-hidden="true">⌘↵</kbd>
           </Button>
         </div>

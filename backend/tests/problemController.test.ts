@@ -181,11 +181,12 @@ describe('Problem Controller', () => {
         it('serves canonical public filter choices before the problem detail route', async () => {
             (db.query as jest.Mock)
                 .mockResolvedValueOnce({ rows: [{ id: 7, name: 'Practice' }] })
-                .mockResolvedValueOnce({ rows: [{ exists: true }] });
+                .mockResolvedValueOnce({ rows: [{ exists: true }] })
+                .mockResolvedValueOnce({ rows: [{ author: 'Ada' }, { author: 'Kru Somchai' }] });
             const res = await request(app).get('/problems/filter-options');
             expect(res.status).toBe(200);
             expect(res.body).toEqual({
-                collections: [{ id: 7, name: 'Practice' }], hasUncollected: true,
+                collections: [{ id: 7, name: 'Practice' }], hasUncollected: true, authors: ['Ada', 'Kru Somchai'],
             });
         });
     });

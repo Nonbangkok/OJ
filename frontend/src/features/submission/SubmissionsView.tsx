@@ -19,6 +19,7 @@ import { PROBLEMS_PAGE } from '../../config/constants';
 import { formatTimeAgo } from '../../utils/formatters';
 import { getLanguageDisplayName } from '../../utils/constants';
 import type { AuthUser, SubmissionSummary } from '../../types';
+import { useRestoreScroll } from '../../hooks/useRestoreScroll';
 
 const NO_CASES = new Set(['Compilation Error', 'System Error']);
 
@@ -80,6 +81,8 @@ const SubmissionsView = ({
         setFilterValue,
         lastRealtimeEvent,
     } = useSubmissions(problemId, contestId);
+    // Back from a submission returns to the same place in the list (as the problem list does).
+    useRestoreScroll(!loading);
     const [problemText, setProblemText] = useDebouncedFilter(filters.problem, (next) => setFilterValue('problem', next));
     const [userText, setUserText] = useDebouncedFilter(filters.user, (next) => setFilterValue('user', next));
     const [visible, setVisible] = useState(REVEAL_STEP);

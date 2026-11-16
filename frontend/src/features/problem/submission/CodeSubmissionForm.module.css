@@ -127,3 +127,9 @@
   font-size: 11px;
   opacity: 0.7;
 }
+
+.chooseHint {
+  margin-right: auto;
+  font-size: 13px;
+  color: var(--text-muted);
+}

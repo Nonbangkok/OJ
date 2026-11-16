@@ -10,9 +10,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  /* Shrinks before anything wraps, so a full bar stays on one line at desktop widths. */
-  flex: 0 1 260px;
+  /* A 150px base decides wrapping; it grows to 260px when there is room, so a full bar stays on one line. */
+  flex: 1 1 150px;
   min-width: 150px;
+  max-width: 260px;
   padding: 0 10px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);

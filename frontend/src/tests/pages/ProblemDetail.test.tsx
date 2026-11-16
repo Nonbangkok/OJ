@@ -91,6 +91,7 @@ describe('ProblemDetail page', () => {
         jest.mocked(submissionService.submit).mockResolvedValue({ message: 'ok', submissionId: 77, isContestSubmission: false } as never);
         renderPage('?tab=submit');
         const editor = await screen.findByLabelText(/Your code/i);
+        fireEvent.click(screen.getByRole('button', { name: 'C++' }));
         fireEvent.change(editor, { target: { value: 'int main(){}' } });
         fireEvent.click(screen.getByRole('button', { name: /^Submit/ }));
         await waitFor(() => expect(window.location.pathname).toBe('/submissions/77'));
@@ -108,6 +109,7 @@ describe('ProblemDetail page', () => {
         jest.mocked(submissionService.getById).mockResolvedValue({ ...accepted, id: 78 } as never);
         renderPage('?tab=submit');
         const editor = await screen.findByLabelText(/Your code/i);
+        fireEvent.click(screen.getByRole('button', { name: 'C++' }));
         fireEvent.change(editor, { target: { value: 'print(1)' } });
         fireEvent.keyDown(editor, { key: 'Enter', metaKey: true });
         await waitFor(() => expect(submissionService.submit).toHaveBeenCalledTimes(1));

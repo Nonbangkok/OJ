@@ -65,7 +65,7 @@ export default function Sidebar({ onCollapse, onOpenSearch, compact = false }: S
       <div className={styles.brand}>
         <Link to="/" className={styles.brandLink} aria-label={compact ? 'Grader home' : undefined}>
           <GraderLogo size={24} title="" />
-          {!compact && <span>Grader</span>}
+          {!compact && <span>Grader 2.0</span>}
         </Link>
         <button type="button" className={styles.iconButton} aria-label={compact ? 'Expand sidebar' : 'Collapse sidebar'}
           title={compact ? 'Expand sidebar ([)' : 'Collapse sidebar ([)'} onClick={onCollapse}>

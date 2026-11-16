@@ -231,15 +231,14 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
       options: withCurrent(collectionOptions, collection || undefined, () => `Collection ${collection}`),
       onChange: (value) => updateUrl({ collection: value ?? '' }),
     },
-    // Author has no preset list: it is set from a problem's author link and
-    // shown here only so it can be removed.
-    ...(urlAuthor ? [{
+    {
+      // Choices are every author of a visible practice problem; a problem page's author link sets it too.
       key: 'author',
       label: 'Author',
-      value: urlAuthor,
-      options: [{ value: urlAuthor, label: urlAuthor }],
-      onChange: () => updateUrl({ author: '' }),
-    }] : []),
+      value: urlAuthor || undefined,
+      options: withCurrent((filterOptions?.authors ?? []).map((name) => ({ value: name, label: name })), urlAuthor || undefined, () => urlAuthor),
+      onChange: (value) => updateUrl({ author: value ?? '' }),
+    },
   ];
 
   const segmentLabel = (key: StatusSegment, label: string) =>

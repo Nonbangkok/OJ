@@ -74,7 +74,7 @@ describe('Problems Page', () => {
         window.sessionStorage.clear();
         (jest.mocked(problemService.getCategoryCounts) as jest.Mock).mockResolvedValue(categoryCounts);
         (jest.mocked(problemService.getFilterOptions) as jest.Mock).mockResolvedValue({
-            collections: [{ id: 7, name: 'Practice' }], hasUncollected: true,
+            collections: [{ id: 7, name: 'Practice' }], hasUncollected: true, authors: ['Alice', 'Kru Somchai'],
         });
         (jest.mocked(problemService.getStatusCounts) as jest.Mock).mockResolvedValue({ all: 4, unsolved: 2, attempted: 1, solved: 1 });
         mockViewer = { id: 1, username: 'u1', role: 'user' };
@@ -216,6 +216,14 @@ describe('Problems Page', () => {
             await screen.findByText('Knapsack');
             expect(screen.getByRole('button', { name: 'Remove filter Category: Greedy, Dynamic Programming' })).toBeInTheDocument();
             expect(problemService.getProblemsPage).toHaveBeenCalledWith(expect.objectContaining({ category: 'Greedy,Dynamic Programming' }));
+        });
+
+        it('the Author chip lists every author and filters by the one picked', async () => {
+            renderProblems();
+            await screen.findByText('Knapsack');
+            await chooseChip('Author', 'Kru Somchai');
+            await waitFor(() => expect(problemService.getProblemsPage).toHaveBeenLastCalledWith(expect.objectContaining({ author: 'Kru Somchai' })));
+            expect(screen.getByRole('button', { name: 'Remove filter Author: Kru Somchai' })).toBeInTheDocument();
         });
 
         it('each row reveals its own categories', async () => {

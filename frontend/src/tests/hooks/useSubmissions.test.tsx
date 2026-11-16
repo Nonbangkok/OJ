@@ -137,13 +137,21 @@ describe('useSubmissions', () => {
         expect(jest.mocked(submissionService.getAll).mock.calls.length).toBeGreaterThan(callCount);
     });
 
-    it('defaults a signed-in viewer to their own submissions', async () => {
+    it('the main feed defaults a signed-in viewer to everyone\'s submissions', async () => {
         mockAuth({ id: 1, username: 'user1', role: 'user' });
         (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
         const { result } = renderHook(() => useSubmissions(undefined, undefined), { wrapper });
         await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(result.current.filter).toBe('all');
+        expect(submissionService.getAll).toHaveBeenCalledWith(expect.objectContaining({ filter: 'all' }));
+    });
+
+    it('a student in a contest still starts on their own submissions', async () => {
+        mockAuth({ id: 1, username: 'user1', role: 'user' });
+        (jest.mocked(submissionService.getAll) as jest.Mock).mockResolvedValue([]);
+        const { result } = renderHook(() => useSubmissions(undefined, 7), { wrapper });
+        await waitFor(() => expect(result.current.loading).toBe(false));
         expect(result.current.filter).toBe('mine');
-        expect(submissionService.getAll).toHaveBeenCalledWith(expect.objectContaining({ filter: 'mine' }));
     });
 
     it('updates filter when setFilter is called', async () => {
