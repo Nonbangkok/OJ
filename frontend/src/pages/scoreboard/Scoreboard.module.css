@@ -1,28 +1,96 @@
+/* Ranking (§7.5): XP ranking table, pager, and the viewer's own row pinned
+   to the bottom when it is not on the current page. */
+
 .scoreboard-container {
-  padding: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  padding-bottom: 56px;
 }
 
-.scoreboard-container h1 {
-  font-size: var(--font-size-page-title);
-  margin-bottom: 2rem;
+.user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.name,
+.topName {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.topName,
+.top {
+  font-weight: 600;
+}
+
+.name:hover,
+.topName:hover {
+  text-decoration: underline;
+}
+
+.name:focus-visible,
+.topName:focus-visible {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+.tier {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.range {
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.pinned {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-color);
+  box-shadow: inset 2px 0 0 var(--text-primary);
+  background: var(--background-secondary);
+  font-size: 13.5px;
+}
+
+.pinnedRank,
+.pinnedStat {
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
   color: var(--text-primary);
 }
 
-/* Rank special styling */
-:global([data-theme='dark']) .rank-1,
-.rank-1 {
-  background-color: rgba(255, 215, 0, 0.1); /* Gold/Yellow tint */
+.pinnedName {
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
-.rank-2 {
-  background-color: rgba(21, 21, 21, 0.1); /* Silver tint */
+.pinnedStat {
+  margin-left: auto;
 }
 
-:global([data-theme='dark']) .rank-2 {
-  background-color: rgba(235, 235, 235, 0.1); /* Silver tint */
+.pinnedStat + .pinnedStat {
+  margin-left: 0;
 }
 
-:global([data-theme='dark']) .rank-3,
-.rank-3 {
-  background-color: rgba(205, 127, 50, 0.1); /* Bronze tint */
+@media (max-width: 767px) {
+  .pinned {
+    bottom: var(--tabbar-height);
+  }
 }

@@ -196,14 +196,6 @@ export interface GlobalRanking {
   viewer: RankingRow | null;
 }
 
-export interface GlobalScoreboardEntry {
-  username: string;
-  has_avatar?: boolean;
-  total_score: number | string;
-  problems_solved: number | string;
-  last_score_improvement_time?: string | null;
-}
-
 export interface ContestProblemScore {
   score: number;
   attempts: number;

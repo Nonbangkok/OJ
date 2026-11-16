@@ -5,7 +5,6 @@ import type {
   BatchCreatedUser,
   Contest,
   ContestScoreboardPayload,
-  GlobalScoreboardEntry,
   ProblemBase,
   ProblemDetail,
   ProblemSuggestion,
@@ -83,7 +82,6 @@ export type SubmissionDetailResponse = SubmissionDetail;
 export type ProblemSearchResponse = ProblemSuggestion[];
 export type UserSearchResponse = UserSuggestion[];
 
-export type GlobalScoreboardResponse = GlobalScoreboardEntry[];
 
 /** Paged admin user list (ADMIN-008): rows + total count + paging echo. */
 export interface AdminUsersPageResponse {
