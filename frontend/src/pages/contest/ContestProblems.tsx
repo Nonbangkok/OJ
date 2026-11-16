@@ -43,7 +43,7 @@ const ContestProblems = () => {
           <tr>
             <th scope="col">#</th>
             <th scope="col">Problem</th>
-            <th scope="col">Best</th>
+            <th scope="col" className={styles.bestCol}>Best</th>
             <th scope="col" className={styles.right}>Score</th>
             <th scope="col" className={styles.right}>Tries</th>
           </tr>
@@ -61,8 +61,9 @@ const ContestProblems = () => {
                     <StatusMark tone={tone} />
                     <Link to={`/contests/${contestId}/problems/${problem.id}`} className={styles.problemLink}>{problem.title}</Link>
                   </span>
+                  {strip.length > 0 && <span className={styles.phoneStrip} aria-hidden="true"><TestcaseStrip results={strip} /></span>}
                 </td>
-                <td>{strip.length > 0 ? <TestcaseStrip results={strip} /> : <span className={styles.muted}>—</span>}</td>
+                <td className={styles.bestCol}>{strip.length > 0 ? <TestcaseStrip results={strip} /> : <span className={styles.muted}>—</span>}</td>
                 <td className={`${styles.right} ${styles.mono} ${tone === 'pass' ? styles.full : ''}`}>{tries > 0 && problem.best_score != null ? problem.best_score : '—'}</td>
                 <td className={`${styles.right} ${styles.mono} ${styles.muted}`}>{tries > 0 ? tries : '—'}</td>
               </tr>

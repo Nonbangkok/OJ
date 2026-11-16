@@ -69,9 +69,11 @@
   border-radius: var(--radius-md);
   background: var(--surface-elevated);
   color: var(--text-primary);
+  font-family: inherit;
   font-size: 13.5px;
   font-weight: 500;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .primary {

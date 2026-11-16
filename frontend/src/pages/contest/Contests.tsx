@@ -3,7 +3,7 @@ import { Check } from '@phosphor-icons/react';
 import { useAuth } from '../../context/AuthContext';
 import { useContests } from '../../hooks/useContests';
 import LoadingPage from '../../components/shared/LoadingPage';
-import { Button, Countdown, EmptyState, InlineError, PageHeader, StatusBadge } from '../../components/ui';
+import { Countdown, EmptyState, InlineError, PageHeader, StatusBadge } from '../../components/ui';
 import type { Contest } from '../../types';
 import { formatWindow, plural } from '../../features/contest/format';
 import styles from './Contests.module.css';
@@ -41,12 +41,12 @@ const Contests = () => {
     if (contest.status === 'running') {
       return contest.is_participant
         ? <Link to={`/contests/${contest.id}/problems`} className={`${styles.action} ${styles.primary}`}>Enter</Link>
-        : <Button size="compact" onClick={() => join(contest)}>Join</Button>;
+        : <button type="button" className={`${styles.action} ${styles.primary}`} onClick={() => join(contest)}>Join</button>;
     }
     if (contest.status === 'scheduled') {
       return contest.is_participant
         ? <Link to={`/contests/${contest.id}`} className={styles.action}><Check size={14} aria-hidden="true" />Registered</Link>
-        : <Button size="compact" variant="secondary" onClick={() => join(contest)}>Join</Button>;
+        : <button type="button" className={styles.action} onClick={() => join(contest)}>Join</button>;
     }
     return <Link to={`/contests/${contest.id}`} className={`${styles.action} ${styles.quiet}`}>Results</Link>;
   };

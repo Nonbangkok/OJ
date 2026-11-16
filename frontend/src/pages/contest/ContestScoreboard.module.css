@@ -173,16 +173,39 @@
   font-weight: 500;
 }
 
+.tries,
+.last {
+  white-space: nowrap;
+}
+
 @media (max-width: 767px) {
   .pin {
     bottom: var(--tabbar-height);
   }
 
+  /* Rank, name and total stay put; problem columns scroll beside them. */
+  .rank {
+    width: 2rem;
+    padding-left: 4px !important;
+    padding-right: 6px !important;
+  }
+
   .who {
-    min-width: 8rem;
+    left: 2rem;
+    min-width: 6.5rem;
+    max-width: 6.5rem;
+  }
+
+  .who .user > :first-child {
+    display: none;
   }
 
   .total {
-    left: 11rem;
+    left: 8.5rem;
+    min-width: 5rem;
+  }
+
+  .last {
+    font-size: 10.5px;
   }
 }
