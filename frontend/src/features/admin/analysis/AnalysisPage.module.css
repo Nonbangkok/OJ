@@ -14,12 +14,15 @@
 .tabs {
   display: flex;
   gap: 0.5rem;
-  margin-bottom: 1.5rem;
+  overflow-x: auto;
   border-bottom: 1px solid var(--border-color);
 }
 
 .tab,
 .tab-active {
+  display: inline-block;
+  white-space: nowrap;
+  text-decoration: none;
   padding: 0.5rem 1rem;
   background: none;
   border: none;

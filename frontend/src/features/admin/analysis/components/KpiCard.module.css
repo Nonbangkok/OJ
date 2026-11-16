@@ -20,14 +20,7 @@
 }
 
 .delta {
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.delta-up {
-  color: var(--status-success);
-}
-
-.delta-down {
-  color: var(--status-danger);
+  font-family: var(--font-family-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }

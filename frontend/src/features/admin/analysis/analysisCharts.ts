@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useTheme } from '../../../context/ThemeContext';
 
 export interface ChartColorSet {
@@ -35,4 +36,35 @@ export const VERDICT_COLORS: Record<string, string> = {
 export const useChartColors = (): ChartColorSet => {
   const { theme } = useTheme();
   return theme === 'dark' ? DARK : LIGHT;
+};
+
+/** The daily bars' stack, bottom up: one series per verdict bucket and its colour token. */
+export const DAILY_VERDICT_SERIES = [
+  { key: 'accepted', label: 'Accepted', token: '--verdict-accepted', fallback: VERDICT_COLORS.Accepted },
+  { key: 'wrong', label: 'Wrong Answer', token: '--verdict-wrong', fallback: VERDICT_COLORS['Wrong Answer'] },
+  { key: 'time', label: 'Time Limit', token: '--verdict-time', fallback: VERDICT_COLORS['Time Limit Exceeded'] },
+  { key: 'memory', label: 'Memory Limit', token: '--verdict-memory', fallback: VERDICT_COLORS['Memory Limit Exceeded'] },
+  { key: 'runtime', label: 'Runtime Error', token: '--verdict-runtime', fallback: VERDICT_COLORS['Runtime Error'] },
+  { key: 'compilation', label: 'Compilation Error', token: '--verdict-compilation', fallback: VERDICT_COLORS['Compilation Error'] },
+  { key: 'other', label: 'Other', token: '--verdict-pending', fallback: VERDICT_COLORS['System Error'] },
+] as const;
+
+export type DailyVerdictKey = typeof DAILY_VERDICT_SERIES[number]['key'];
+
+/**
+ * SVG presentation attributes can't take var(), so the verdict tokens are
+ * resolved to their computed values for the active theme (falling back to
+ * the fixed palette where a token is missing, e.g. in tests).
+ */
+export const useVerdictColors = (): Record<DailyVerdictKey, string> => {
+  const { theme } = useTheme();
+  return useMemo(() => {
+    void theme; // the theme switch changes which token values apply
+    const computed = typeof window !== 'undefined' ? window.getComputedStyle(document.documentElement) : null;
+    const out = {} as Record<DailyVerdictKey, string>;
+    for (const series of DAILY_VERDICT_SERIES) {
+      out[series.key] = computed?.getPropertyValue(series.token).trim() || series.fallback;
+    }
+    return out;
+  }, [theme]);
 };

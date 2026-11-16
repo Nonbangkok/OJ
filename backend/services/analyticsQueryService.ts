@@ -14,7 +14,8 @@ export interface OverviewAnalytics {
     newUsers: OverviewKpi;
     activeProblems: OverviewKpi;
   };
-  dailySeries: Array<{ day: string; total: number; accepted: number }>;
+  /** Per day: the total and its split by verdict ("other" = system errors, skipped, still judging). */
+  dailySeries: Array<OverviewDay>;
   verdictBreakdown: Array<{ verdict: string; count: number }>;
   topProblems: Array<{ problemId: string; title: string; submissions: number; accepted: number }>;
   topSubmitters: Array<{ userId: number; username: string; submissions: number; solved: number }>;
@@ -35,11 +36,37 @@ interface NewUsersRow {
   previous_users: string;
 }
 
+export interface OverviewDay {
+  day: string;
+  total: number;
+  accepted: number;
+  wrong: number;
+  time: number;
+  memory: number;
+  runtime: number;
+  compilation: number;
+  other: number;
+}
+
 interface DailyRow {
   day: string;
   total: string;
   accepted: string;
+  wrong?: string;
+  time?: string;
+  memory?: string;
+  runtime?: string;
+  compilation?: string;
 }
+
+const toOverviewDay = (r: DailyRow): OverviewDay => {
+  const day = {
+    day: r.day, total: toNum(r.total), accepted: toNum(r.accepted), wrong: toNum(r.wrong), time: toNum(r.time),
+    memory: toNum(r.memory), runtime: toNum(r.runtime), compilation: toNum(r.compilation),
+  };
+  const named = day.accepted + day.wrong + day.time + day.memory + day.runtime + day.compilation;
+  return { ...day, other: Math.max(0, day.total - named) };
+};
 
 interface VerdictRow {
   verdict: string;
@@ -147,7 +174,12 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
     SELECT
       to_char(date_trunc('day', submitted_at AT TIME ZONE '${ANALYTICS_TIMEZONE}'), 'YYYY-MM-DD') AS day,
       COUNT(*) AS total,
-      COUNT(*) FILTER (WHERE overall_status = '${SUBMISSION_STATUS.ACCEPTED}') AS accepted
+      COUNT(*) FILTER (WHERE overall_status = '${SUBMISSION_STATUS.ACCEPTED}') AS accepted,
+      COUNT(*) FILTER (WHERE overall_status = '${SUBMISSION_STATUS.WRONG_ANSWER}') AS wrong,
+      COUNT(*) FILTER (WHERE overall_status = '${SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED}') AS time,
+      COUNT(*) FILTER (WHERE overall_status = '${SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED}') AS memory,
+      COUNT(*) FILTER (WHERE overall_status = '${SUBMISSION_STATUS.RUNTIME_ERROR}') AS runtime,
+      COUNT(*) FILTER (WHERE overall_status = '${SUBMISSION_STATUS.COMPILATION_ERROR}') AS compilation
     FROM all_submissions
     WHERE submitted_at >= NOW() - ($1 || ' days')::interval
     GROUP BY 1
@@ -236,7 +268,7 @@ export const getOverviewAnalytics = async (days: number): Promise<OverviewAnalyt
         previous: toNum(activeProblemsResult.rows[0]?.previous_users),
       },
     },
-    dailySeries: dailyResult.rows.map((r) => ({ day: r.day, total: toNum(r.total), accepted: toNum(r.accepted) })),
+    dailySeries: dailyResult.rows.map(toOverviewDay),
     verdictBreakdown: verdictResult.rows.map((r) => ({ verdict: r.verdict, count: toNum(r.count) })),
     topProblems: topProblemsResult.rows.map((r) => ({
       problemId: r.problem_id,

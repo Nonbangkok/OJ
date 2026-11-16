@@ -6,28 +6,18 @@ import {
   CartesianGrid,
   Cell,
   Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 import { fetchOverview, OverviewAnalytics } from '../../../services/analyticsService';
+import { Button } from '../../../components/ui';
+import { downloadCsv } from '../../../utils/downloadCsv';
 import ChartCard from './components/ChartCard';
 import KpiCard from './components/KpiCard';
-import { useChartColors, VERDICT_COLORS } from './analysisCharts';
+import { DAILY_VERDICT_SERIES, useChartColors, useVerdictColors, VERDICT_COLORS } from './analysisCharts';
 import styles from './OverviewTab.module.css';
-import actionStyles from './AnalysisButtons.module.css';
-
-const DAY_OPTIONS = [7, 30, 90, 0];
-
-const rangeLabel = (days: number): string => {
-  if (days === 0) return 'All time';
-  return days === 30 ? 'Last 30 days' : `${days} days`;
-};
 
 const deltaPercent = (current: number, previous: number): number | null => {
   if (previous === 0) return null;
@@ -38,18 +28,39 @@ const deltaPercent = (current: number, previous: number): number | null => {
 const windowDelta = (allTime: boolean, current: number, previous: number): number | null =>
   allTime ? null : deltaPercent(current, previous);
 
-const OverviewTab = () => {
-  const [days, setDays] = useState(30);
+function TableCard({ title, file, rows, children }: { title: string; file: string; rows: string[][]; children: React.ReactNode }) {
+  return (
+    <div className={styles['table-card']}>
+      <div className={styles['table-head']}>
+        <h3>{title}</h3>
+        <Button size="compact" variant="secondary" aria-label={`Export ${title} as CSV`} disabled={rows.length <= 1} onClick={() => downloadCsv(file, rows)}>
+          Export CSV
+        </Button>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+interface OverviewTabProps {
+  /** Window in days; 0 = all time. */
+  days: number;
+  /** Short window label for deltas and file names, e.g. "30d" or "all". */
+  rangeKey: string;
+}
+
+const OverviewTab = ({ days, rangeKey }: OverviewTabProps) => {
   const allTime = days === 0;
   const [data, setData] = useState<OverviewAnalytics | null>(null);
   const [error, setError] = useState<string | null>(null);
   const colors = useChartColors();
+  const verdictColors = useVerdictColors();
 
   // Promise callbacks (not try/await) so state is only set once the request
   // settles; starting from Promise.resolve() also routes a synchronous throw
   // into the error callback.
   const load = useCallback((windowDays: number) => Promise.resolve().then(() => fetchOverview(windowDays)).then(
-    (overview) => { setData(overview); },
+    (overview) => { setData(overview); setError(null); },
     () => { setError('Failed to load analytics. Please try again.'); },
   ), []);
 
@@ -61,83 +72,57 @@ const OverviewTab = () => {
   if (!data) return <p className={styles.loading}>Loading analytics…</p>;
 
   const { kpis } = data;
+  const kpi = (label: string, value: { current: number; previous: number }) => (
+    <KpiCard label={label} value={value.current} deltaPercent={windowDelta(allTime, value.current, value.previous)} comparison={rangeKey} />
+  );
 
   return (
     <div className={styles.container}>
-      <div className={styles['range-selector']} role="group" aria-label="Time range">
-        {DAY_OPTIONS.map((option) => (
-          <button
-            key={option}
-            type="button"
-            className={option === days ? actionStyles['range-active'] : actionStyles['range-button']}
-            onClick={() => {
-              // Clear a stale error before the effect refetches for the new window.
-              setError(null);
-              setDays(option);
-            }}
-          >
-            {rangeLabel(option)}
-          </button>
-        ))}
-      </div>
-
       <div className={styles['kpi-row']}>
-        <KpiCard label="Submissions" value={kpis.submissions.current} deltaPercent={windowDelta(allTime, kpis.submissions.current, kpis.submissions.previous)} />
-        <KpiCard label="Unique submitters" value={kpis.uniqueSubmitters.current} deltaPercent={windowDelta(allTime, kpis.uniqueSubmitters.current, kpis.uniqueSubmitters.previous)} />
-        <KpiCard label="Accepted" value={kpis.accepted.current} deltaPercent={windowDelta(allTime, kpis.accepted.current, kpis.accepted.previous)} />
-        <KpiCard label="New users" value={kpis.newUsers.current} deltaPercent={windowDelta(allTime, kpis.newUsers.current, kpis.newUsers.previous)} />
-        <KpiCard label="Active problems" value={kpis.activeProblems.current} deltaPercent={windowDelta(allTime, kpis.activeProblems.current, kpis.activeProblems.previous)} />
+        {kpi('Submissions', kpis.submissions)}
+        {kpi('Unique submitters', kpis.uniqueSubmitters)}
+        {kpi('Accepted', kpis.accepted)}
+        {kpi('New users', kpis.newUsers)}
+        {kpi('Active problems', kpis.activeProblems)}
       </div>
 
       <ChartCard title="Submissions per day">
         <ResponsiveContainer>
-          <LineChart data={data.dailySeries}>
-            <CartesianGrid stroke={colors.grid} strokeDasharray="3 3" />
+          <BarChart data={data.dailySeries}>
+            <CartesianGrid stroke={colors.grid} strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="day" stroke={colors.text} />
             <YAxis stroke={colors.text} allowDecimals={false} />
             <Tooltip />
             <Legend />
-            <Line type="monotone" dataKey="total" name="Submissions" stroke={colors.series[0]} strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="accepted" name="Accepted" stroke={colors.series[1]} strokeWidth={2} dot={false} />
-          </LineChart>
+            {DAILY_VERDICT_SERIES.map((series) => (
+              <Bar key={series.key} dataKey={series.key} name={series.label} stackId="verdict" fill={verdictColors[series.key]} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartCard>
+
+      <ChartCard title="Verdict distribution">
+        <ResponsiveContainer>
+          <BarChart data={data.verdictBreakdown}>
+            <CartesianGrid stroke={colors.grid} strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="verdict" stroke={colors.text} />
+            <YAxis stroke={colors.text} allowDecimals={false} />
+            <Tooltip />
+            <Bar dataKey="count" name="Submissions">
+              {data.verdictBreakdown.map((entry) => (
+                <Cell key={entry.verdict} fill={VERDICT_COLORS[entry.verdict] ?? colors.series[2]} />
+              ))}
+            </Bar>
+          </BarChart>
         </ResponsiveContainer>
       </ChartCard>
 
       <div className={styles['chart-grid']}>
-        <ChartCard title="Verdict distribution">
-          <ResponsiveContainer>
-            <BarChart data={data.verdictBreakdown}>
-              <CartesianGrid stroke={colors.grid} strokeDasharray="3 3" />
-              <XAxis dataKey="verdict" stroke={colors.text} />
-              <YAxis stroke={colors.text} allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="count" name="Submissions">
-                {data.verdictBreakdown.map((entry) => (
-                  <Cell key={entry.verdict} fill={VERDICT_COLORS[entry.verdict] ?? colors.series[2]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Verdict share">
-          <ResponsiveContainer>
-            <PieChart>
-              <Pie data={data.verdictBreakdown} dataKey="count" nameKey="verdict" label={false}>
-                {data.verdictBreakdown.map((entry) => (
-                  <Cell key={entry.verdict} fill={VERDICT_COLORS[entry.verdict] ?? colors.series[2]} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      </div>
-
-      <div className={styles['chart-grid']}>
-        <div className={styles['table-card']}>
-          <h3>Top problems</h3>
+        <TableCard
+          title="Top problems"
+          file={`top-problems-${rangeKey}.csv`}
+          rows={[['Problem', 'ID', 'Submissions', 'Accepted'], ...data.topProblems.map((p) => [p.title, p.problemId, String(p.submissions), String(p.accepted)])]}
+        >
           <table>
             <thead>
               <tr><th>Problem</th><th>Submissions</th><th>Accepted</th></tr>
@@ -152,10 +137,13 @@ const OverviewTab = () => {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableCard>
 
-        <div className={styles['table-card']}>
-          <h3>Top submitters</h3>
+        <TableCard
+          title="Top submitters"
+          file={`top-submitters-${rangeKey}.csv`}
+          rows={[['User', 'Submissions', 'Solved'], ...data.topSubmitters.map((u) => [u.username, String(u.submissions), String(u.solved)])]}
+        >
           <table>
             <thead>
               <tr><th>User</th><th>Submissions</th><th>Solved</th></tr>
@@ -170,11 +158,14 @@ const OverviewTab = () => {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableCard>
       </div>
 
-      <div className={styles['table-card']}>
-        <h3>Recent contests</h3>
+      <TableCard
+        title="Recent contests"
+        file={`recent-contests-${rangeKey}.csv`}
+        rows={[['Contest', 'Status', 'Submissions', 'Participants', 'Avg score'], ...data.contestStats.map((c) => [c.title, c.status, String(c.submissions), String(c.participants), c.avgScore.toFixed(1)])]}
+      >
         <table>
           <thead>
             <tr><th>Contest</th><th>Status</th><th>Submissions</th><th>Participants</th><th>Avg score</th></tr>
@@ -191,7 +182,7 @@ const OverviewTab = () => {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableCard>
     </div>
   );
 };
