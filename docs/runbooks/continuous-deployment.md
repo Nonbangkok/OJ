@@ -248,6 +248,27 @@ If there was no rollback target (nothing was running before), fix forward or
 restore a known-good commit with `./deploy.sh`. The database is **never
 restored automatically**; the log names the pre-deploy backup.
 
+## Build cache on the server (read before pruning)
+
+The server builds images on a rotational disk. With the BuildKit cache, a
+deploy's build takes about 2 minutes; **without it, about an hour** (the
+`authoring-runner` `apt-get` step alone ~50 minutes). On Docker 29 with the
+containerd image store the base images (`node:26-*`, `ubuntu:24.04`) live only
+in that cache, so `docker builder prune` removes them too.
+
+- **Do not prune the build cache on production** unless disk space forces it.
+  If you must, rebuild the cache off-hours before the next deploy:
+  `cd /srv/docker/apps/OJ && docker compose -f docker-compose.yml -f docker-compose.production.yml build`
+  (builds images without touching the running containers).
+- The workflow job allows 120 minutes (an uncached build plus the backup).
+- **If an Actions run is cut off or the connection drops,** `cd-deploy.sh`
+  keeps running on the server and still verifies or rolls back on its own. Do
+  not re-run while `backups/.cd-deploy.lock` is held; watch the newest
+  `backups/cd-deploy-*.log` instead. Check the outcome with
+  `git -C /srv/docker/apps/OJ rev-parse --short HEAD` and
+  `docker ps --format '{{.Names}} {{.Image}}'` (the backend image tag is the
+  deployed SHA).
+
 ## Backups, the rollback target, and rolling back by hand
 
 - **Backup.** `backups/pre-deploy-<sha>-<timestamp>.dump`, a custom-format
