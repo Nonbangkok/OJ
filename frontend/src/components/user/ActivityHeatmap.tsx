@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 
 import type { UserProfileDailyActivity } from '../../types';
 
@@ -66,9 +66,17 @@ const ActivityHeatmap = ({ activity }: { activity: UserProfileDailyActivity[] })
     return labels;
   }, [weeks]);
 
+  // Newest weeks sit at the right edge: open scrolled to them so a phone
+  // shows the recent activity first (older weeks are a swipe away).
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const node = scrollerRef.current;
+    if (node) node.scrollLeft = node.scrollWidth;
+  }, [activity]);
+
   return (
     <div className={styles.wrapper}>
-      <div className={styles.heatmap} role="img" aria-label="Daily submission activity over the past year">
+      <div ref={scrollerRef} className={styles.heatmap} role="img" aria-label="Daily submission activity over the past year">
         {monthLabels.map(({ label, week }) => (
           <span key={label + week} className={styles['month-label']} style={{ gridColumn: week + 1 }}>
             {label}

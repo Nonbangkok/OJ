@@ -16,10 +16,20 @@ import styles from './ProblemSolvingProfile.module.css';
 const COMPACT_LABELS: Record<string, string> = {
   'Dynamic Programming': 'DP',
   'Divide and Conquer': 'D&C',
+  'Data Structures': 'DS',
+  Sorting: 'Sort',
   '2D-Grid': '2D Grid',
 };
 
 const compactLabel = (category: string): string => COMPACT_LABELS[category] ?? category;
+
+/** Rendered radar point; the active one (hovered here or in the list) is larger. */
+const pointFor = (activeIndex: number | null) => function RadarPoint(props: { cx?: number; cy?: number; index?: number }) {
+  const active = props.index === activeIndex;
+  return (
+    <circle cx={props.cx} cy={props.cy} r={active ? 5 : 3} fill="var(--accent-primary)" stroke="var(--background-primary)" strokeWidth={1.5} />
+  );
+};
 
 /** Clean percentage text: 100%, 66.7%, 33.3% — never trailing zeros. */
 const percentText = (percentage: number): string =>
@@ -41,7 +51,16 @@ const CategoryTooltip = ({ active, payload }: { active?: boolean; payload?: Tool
   );
 };
 
-export default function CategoryRadarChart({ categories }: { categories: CategoryStat[] }) {
+export default function CategoryRadarChart({
+  categories,
+  activeIndex = null,
+  onActiveChange,
+}: {
+  categories: CategoryStat[];
+  /** Index into the charted (total > 0) categories, shared with the list. */
+  activeIndex?: number | null;
+  onActiveChange?: (index: number | null) => void;
+}) {
   const [compact, setCompact] = useState(false);
   // Categories with no problems at all (total 0) have an undefined completion
   // — they stay in the summary as "0 / 0 —" but leave the radar, where a 0
@@ -77,6 +96,11 @@ export default function CategoryRadarChart({ categories }: { categories: Categor
           // gets extra room — its labels are the longest on the ring.
           margin={{ top: 12, right: 30, bottom: 12, left: 72 }}
           outerRadius="80%"
+          onMouseMove={(state: { activeTooltipIndex?: number | string | null }) => {
+            const index = Number(state?.activeTooltipIndex);
+            onActiveChange?.(Number.isInteger(index) ? index : null);
+          }}
+          onMouseLeave={() => onActiveChange?.(null)}
         >
           <PolarGrid stroke="var(--border-color)" />
           <PolarAngleAxis
@@ -99,13 +123,14 @@ export default function CategoryRadarChart({ categories }: { categories: Categor
             // instead of repositioning the axis.
             tick={{ fill: 'var(--text-muted)', fontSize: 9, dy: 12, opacity: 0.85 }}
           />
+          {/* Theme tokens only (§7.6): ink area at 12%, border-coloured rings. */}
           <Radar
             dataKey="percentage"
             stroke="var(--accent-primary)"
             fill="var(--accent-primary)"
-            fillOpacity={0.25}
-            strokeWidth={2}
-            dot={{ r: 3, fill: 'var(--accent-primary)', stroke: 'var(--surface-elevated)', strokeWidth: 1 }}
+            fillOpacity={0.12}
+            strokeWidth={1.75}
+            dot={pointFor(activeIndex)}
             isAnimationActive={false}
           />
           <Tooltip content={<CategoryTooltip />} />

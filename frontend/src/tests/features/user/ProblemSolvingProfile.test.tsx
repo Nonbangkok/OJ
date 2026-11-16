@@ -13,7 +13,7 @@ test('renders the section with radar axes and the exact-value summary', () => {
   render(<ProblemSolvingProfile categories={categories} />);
 
   // Section heading and the radar's axis labels.
-  expect(screen.getByRole('heading', { name: 'Problem Solving Profile' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Categories' })).toBeInTheDocument();
   expect(screen.getByText('Dynamic Programming')).toBeInTheDocument();
   expect(screen.getByText('Graph')).toBeInTheDocument();
 
@@ -36,28 +36,22 @@ test('renders the section with radar axes and the exact-value summary', () => {
 test('shows the intentional empty state when nothing is solved yet', () => {
   const empty = [
     { category: 'Dynamic Programming', solved: 0, total: 6, percentage: 0 },
-    { category: 'Math', solved: 0, total: 0, percentage: 0 },
+    { category: 'Math', solved: 0, total: 3, percentage: 0 },
+    { category: 'Graph', solved: 0, total: 2, percentage: 0 },
   ];
   render(<ProblemSolvingProfile categories={empty} />);
 
   expect(screen.getByText(/no solved problems yet/i)).toBeInTheDocument();
 });
 
-test('renders 0 / 0 with an em dash and no radar axis for empty categories', () => {
+test('leaves categories with no problems out of the radar and the list', () => {
   const sparse = [
     { category: 'Constructive', solved: 0, total: 0, percentage: 0 },
     { category: 'Math', solved: 1, total: 2, percentage: 50 },
   ];
   render(<ProblemSolvingProfile categories={sparse} />);
 
-  // Summary keeps the category with an em dash (completion undefined).
   const summary = screen.getByRole('list', { name: 'Solved problems by category' });
-  const row = within(summary).getByText('Constructive').closest('li');
-  expect(row).toHaveTextContent('0 / 0');
-  expect(row).toHaveTextContent('—');
-  expect(row.textContent).not.toMatch(/NaN|Infinity|0%/);
-
-  // The radar itself only carries categories with problems: the chart data
-  // excludes total===0 rows (recharts renders no axis ticks under jsdom, so
-  // the filtering is verified through the summary's sibling behavior above).
+  expect(within(summary).queryByText('Constructive')).toBeNull();
+  expect(within(summary).getByText('Math').closest('li')).toHaveTextContent('1 / 2');
 });

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { PencilSimple } from '@phosphor-icons/react';
+import { Check, Circle, PencilSimple } from '@phosphor-icons/react';
 
 import ActivityHeatmap from '../../components/user/ActivityHeatmap';
 import ProblemSolvingProfile from '../../features/user/ProblemSolvingProfile';
 import LoadingPage from '../../components/shared/LoadingPage';
+import { ProgressBar } from '../../components/ui';
+import type { AchievementStats } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import userService from '../../services/userService';
 import {
@@ -32,13 +34,59 @@ const makeBarWidth = (counts: Record<string, number>) => {
   return (key: string): number => Math.round((counts[key] / max) * 100);
 };
 
-const verdictBarWidthFor = (counts: Record<string, number>) => makeBarWidth(counts);
-const languageBarWidthFor = (counts: Record<string, number>) => makeBarWidth(counts);
 
-const formatAcDate = (iso: string | null): string =>
-  iso
-    ? new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-    : '';
+
+/**
+ * Compact achievements: the next three locked ones by progress, then every
+ * unlocked one; "Show all" lists the whole catalog.
+ */
+function Achievements({ stats, unlockedIds }: { stats: AchievementStats; unlockedIds: Set<string> }) {
+  const [showAll, setShowAll] = useState(false);
+  const locked = ACHIEVEMENT_CATALOG
+    .filter((a) => !unlockedIds.has(a.id))
+    .map((a) => ({ achievement: a, fraction: progressFraction(a, stats) }))
+    .sort((x, y) => y.fraction - x.fraction);
+  const unlocked = ACHIEVEMENT_CATALOG.filter((a) => unlockedIds.has(a.id));
+  const shownLocked = showAll ? locked : locked.slice(0, 3);
+  return (
+    <section className={styles.section} aria-label="Achievements">
+      <div className={styles['section-head']}>
+        <h2>Achievements</h2>
+        <span>{`${unlocked.length} of ${ACHIEVEMENT_CATALOG.length} unlocked`}</span>
+        {locked.length > 3 && (
+          <button type="button" className={styles['show-all']} onClick={() => setShowAll((v) => !v)}>
+            {showAll ? 'Show fewer' : 'Show all'}
+          </button>
+        )}
+      </div>
+      <ul className={styles['achievement-list']}>
+        {shownLocked.map(({ achievement, fraction }) => (
+          <li key={achievement.id} data-state="locked" data-progress={fraction.toFixed(3)} className={styles['achievement-row']}>
+            <Circle size={14} aria-hidden="true" className={styles['achievement-mark']} />
+            <span className={styles['achievement-text']}>
+              <b>{achievement.name}</b>
+              <span>{achievement.description}</span>
+            </span>
+            <span className={styles['achievement-progress']}>
+              <ProgressBar value={Math.round(fraction * 100)} max={100} label={`${achievement.name} progress`} />
+              <span>{progressLabel(achievement, stats) ?? 'Not yet started'}</span>
+            </span>
+          </li>
+        ))}
+        {unlocked.map((achievement) => (
+          <li key={achievement.id} data-state="unlocked" className={styles['achievement-row']}>
+            <Check size={14} weight="bold" aria-hidden="true" className={styles['achievement-done']} />
+            <span className={styles['achievement-text']}>
+              <b>{achievement.name}</b>
+              <span>{achievement.description}</span>
+            </span>
+            <span className={styles['achievement-unlocked']}>Unlocked</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 const UserProfile = () => {
   const { username } = useParams<{ username: string }>();
@@ -94,9 +142,6 @@ const UserProfile = () => {
   if (!profile) return null;
 
   const isOwnProfile = user?.username === profile.username;
-  const solveRate = profile.problemsAttempted > 0
-    ? Math.round((profile.problemsSolved / profile.problemsAttempted) * 100)
-    : 0;
   const avatarVersion = profile.avatarUpdatedAt
     ? `?v=${new Date(profile.avatarUpdatedAt).getTime()}`
     : '';
@@ -144,34 +189,24 @@ const UserProfile = () => {
         </div>
         {profile.progression && (
           <div className={styles['progression']}>
-            <div className={styles['progression-tier']}>
-              <span className={styles['tier-badge']}>{profile.progression.tier}</span>
-              <span className={styles['tier-level']}>Level {profile.progression.level}</span>
-            </div>
-            <div className={styles['progression-xp']}>
-              <span className={styles['xp-total']}>{formatXp(profile.progression.totalXp)} XP</span>
-              <span
-                className={styles['xp-bar']}
-                role="progressbar"
-                aria-label={`XP to next level: ${profile.progression.levelProgress.remaining} XP remaining`}
-                aria-valuemin={0}
-                aria-valuemax={profile.progression.levelProgress.required}
-                aria-valuenow={profile.progression.levelProgress.current}
-              >
-                <span
-                  className={styles['xp-bar-fill']}
-                  style={{ width: `${profile.progression.levelProgress.percentage}%` }}
-                />
-              </span>
-              <span className={styles['xp-remaining']}>
-                {formatXp(profile.progression.levelProgress.remaining)} XP to Level {profile.progression.level + 1}
-              </span>
-            </div>
-            {profile.progression.globalRank !== null && (
-              <span className={styles['rank-badge']}>
-                Rank #{profile.progression.globalRank}
-              </span>
-            )}
+            <span className={styles['tier-level']}>{`${profile.progression.tier} · Lv ${profile.progression.level}`}</span>
+            <ProgressBar
+              value={profile.progression.levelProgress.current}
+              max={profile.progression.levelProgress.required}
+              label={`XP to next level: ${profile.progression.levelProgress.remaining} XP remaining`}
+            />
+            <span className={styles['xp-total']}>
+              {`${formatXp(profile.progression.levelProgress.current)} / ${formatXp(profile.progression.levelProgress.required)} XP`}
+            </span>
+            <span className={styles['xp-remaining']}>
+              {`${formatXp(profile.progression.levelProgress.remaining)} XP to Lv ${profile.progression.level + 1}`}
+            </span>
+          </div>
+        )}
+        {profile.progression?.globalRank != null && (
+          <div className={styles['rank']}>
+            <span>Global rank</span>
+            <b>{`#${profile.progression.globalRank}`}</b>
           </div>
         )}
         {isOwnProfile && (
@@ -185,124 +220,56 @@ const UserProfile = () => {
         )}
       </div>
 
-      <div className={styles['stats-grid']}>
-        <div className={styles['stat-card']}>
-          <span className={styles['stat-value']}>{profile.problemsSolved}</span>
-          <span className={styles['stat-label']}>Solved</span>
-        </div>
-        <div className={styles['stat-card']}>
-          <span className={styles['stat-value']}>{profile.problemsAttempted}</span>
-          <span className={styles['stat-label']}>Attempted</span>
-        </div>
-        <div className={styles['stat-card']}>
-          <span className={styles['stat-value']}>{profile.totalScore}</span>
-          <span className={styles['stat-label']}>Total score</span>
-        </div>
-        <div className={styles['stat-card']}>
-          <span className={styles['stat-value']}>{profile.submissionCount}</span>
-          <span className={styles['stat-label']}>Submissions</span>
-        </div>
-        <div className={styles['stat-card']}>
-          <span className={styles['stat-value']}>{solveRate}%</span>
-          <span className={styles['stat-label']}>Solve rate</span>
-        </div>
-      </div>
-
-      {profile.recentRewards?.length > 0 && (
-        <div className={styles.section}>
-          <h2>Recently Solved</h2>
-          <ul className={styles['recent-solved-list']}>
-            {profile.recentRewards.slice(0, 5).map((reward) => {
-              const band = difficultyBand(reward.difficultySnapshot);
-              return (
-                <li key={`${reward.problemId}-${reward.awardedAt}`} className={styles['recent-solved-row']}>
-                  <Link className={styles['recent-solved-title']} to={`/problems/${reward.problemId}`}>
-                    <span className={styles['recent-solved-name']}>
-                      {reward.problemTitle ?? reward.problemId}
-                    </span>
-                    <span className={styles['recent-solved-id']}>
-                      {reward.problemId}
-                    </span>
-                  </Link>
-                  {reward.difficultySnapshot !== null && band !== null && (
-                    <span className={styles[`difficulty-chip-${band}`]}>
-                      {reward.difficultySnapshot}
-                    </span>
-                  )}
-                  <span className={styles['recent-solved-gain']}>+{reward.xpAwarded} XP</span>
-                  <span className={styles['recent-solved-date']}>
-                    {formatRewardDate(reward.awardedAt)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+      <ul className={styles['stat-row']} aria-label="Stats">
+        <li><span>Solved</span><b>{profile.problemsSolved}</b></li>
+        <li><span>Attempted</span><b>{profile.problemsAttempted}</b></li>
+        <li><span>Submissions</span><b>{profile.submissionCount.toLocaleString()}</b></li>
+        <li><span>Current run</span><b>{`${profile.currentStreak} ${profile.currentStreak === 1 ? 'day' : 'days'}`}</b></li>
+        <li><span>Best run</span><b>{`${profile.longestStreak} ${profile.longestStreak === 1 ? 'day' : 'days'}`}</b></li>
+      </ul>
 
       <div className={styles.section}>
         <h2>Activity</h2>
         <ActivityHeatmap activity={profile.dailyActivity} />
       </div>
 
-      <div className={styles['streak-panel']}>
-        <span className={styles['streak-flame']} aria-hidden="true" />
-        <div className={styles['streak-body']}>
-          <span className={styles['streak-count']}>
-            {profile.currentStreak}
-          </span>
-          <span className={styles['streak-unit']}>
-            day streak
-            {profile.currentStreak > 0 && profile.lastAcDate && (
-              <span className={styles['streak-last']}> — last AC {formatAcDate(profile.lastAcDate)}</span>
-            )}
-          </span>
-        </div>
-        <span className={styles['streak-longest']}>
-          Longest streak: <strong>{profile.longestStreak}</strong> {profile.longestStreak === 1 ? 'day' : 'days'}
-        </span>
-      </div>
-
       <ProblemSolvingProfile categories={profile.categoryStats} />
 
-      <div className={styles.section}>
-        <h2>Achievements</h2>
-        <div className={styles['achievements-grid']}>
-          {ACHIEVEMENT_CATALOG.map((achievement) => {
-            const unlocked = unlockedIds.has(achievement.id);
-            const label = progressLabel(achievement, profile.achievements.stats);
-            const fraction = progressFraction(achievement, profile.achievements.stats);
-            return (
-              <div
-                key={achievement.id}
-                className={`${styles['achievement-card']} ${unlocked ? styles.unlocked : styles.locked}`}
-              >
-                <div className={styles['achievement-head']}>
-                  <span className={styles['achievement-icon']} aria-hidden="true" />
-                  {!unlocked && <span className={styles['achievement-lock']}>Locked</span>}
-                </div>
-                <span className={styles['achievement-name']}>{achievement.name}</span>
-                <span className={styles['achievement-description']}>{achievement.description}</span>
-                {!unlocked && (
-                  <>
-                    <span className={styles['achievement-progress']} aria-hidden="true">
-                      <span
-                        className={styles['achievement-progress-fill']}
-                        style={{ width: `${Math.round(fraction * 100)}%` }}
-                      />
-                    </span>
-                    <span className={styles['achievement-progress-label']}>
-                      {label ?? 'Not yet started'}
-                    </span>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       <div className={styles['two-col']}>
+        <div className={styles.column}>
+        {profile.recentRewards?.length > 0 && (
+          <div className={styles.section}>
+            <h2>Recently Solved</h2>
+            <ul className={styles['recent-solved-list']}>
+              {profile.recentRewards.slice(0, 5).map((reward) => {
+                const band = difficultyBand(reward.difficultySnapshot);
+                return (
+                  <li key={`${reward.problemId}-${reward.awardedAt}`} className={styles['recent-solved-row']}>
+                    <Link className={styles['recent-solved-title']} to={`/problems/${reward.problemId}`}>
+                      <span className={styles['recent-solved-name']}>
+                        {reward.problemTitle ?? reward.problemId}
+                      </span>
+                      <span className={styles['recent-solved-id']}>
+                        {reward.problemId}
+                      </span>
+                    </Link>
+                    {reward.difficultySnapshot !== null && band !== null && (
+                      <span className={styles[`difficulty-chip-${band}`]}>
+                        {reward.difficultySnapshot}
+                      </span>
+                    )}
+                    <span className={styles['recent-solved-gain']}>+{reward.xpAwarded} XP</span>
+                    <span className={styles['recent-solved-date']}>
+                      {formatRewardDate(reward.awardedAt)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        </div>
+        <div className={styles.column}>
         {Object.keys(profile.verdictCounts).length > 0 && (
           <div className={styles.section}>
             <h2>Verdicts</h2>
@@ -351,8 +318,10 @@ const UserProfile = () => {
             </ul>
           </div>
         )}
+        </div>
       </div>
 
+      <Achievements stats={profile.achievements.stats} unlockedIds={unlockedIds} />
     </div>
   );
 };
