@@ -1,5 +1,5 @@
-import { Link, Navigate } from 'react-router-dom';
-import { PageHeader, StatusBadge } from '../../components/ui';
+import { Navigate } from 'react-router-dom';
+import ContestRecap from '../../features/contest/ContestRecap';
 import ContestJoinGate from '../../features/contest/ContestJoinGate';
 import ContestLobby from '../../features/contest/ContestLobby';
 import { useContest } from '../../features/contest/ContestContext';
@@ -17,13 +17,7 @@ const ContestDetail = () => {
   if (contest.status === 'running' && !contest.is_participant) return <ContestJoinGate contest={contest} />;
   if (contest.status === 'running' || contest.status === 'finishing') return <Navigate to="problems" replace />;
 
-  return (
-    <PageHeader
-      breadcrumb={[{ label: 'Contests', to: '/contests' }, { label: contest.title }]}
-      title={<>{contest.title} <StatusBadge>FINAL</StatusBadge></>}
-      actions={<Link to="scoreboard">Scoreboard</Link>}
-    />
-  );
+  return <ContestRecap contest={contest} />;
 };
 
 export default ContestDetail;

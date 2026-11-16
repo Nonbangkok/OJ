@@ -198,10 +198,14 @@ export interface GlobalRanking {
   viewer: RankingRow | null;
 }
 
+/** One participant's result on one contest problem (B9). Snapshots from before B9 hold { score } or a bare number. */
 export interface ContestProblemScore {
   score: number;
-  attempts: number;
-  solved: boolean;
+  attempts?: number;
+  /** When the best score was first reached. */
+  best_at?: string;
+  /** Per-case statuses of that best submission. */
+  statuses?: string[];
 }
 
 export type ContestDetailedScore = Record<string, number | ContestProblemScore>;
@@ -213,11 +217,15 @@ export interface ContestScoreboardEntry {
   total_score: number;
   detailed_scores: ContestDetailedScore;
   last_score_improvement_time: string | null;
+  /** Competition rank (running, finishing, finished). */
+  rank?: number;
 }
 
 export interface ContestScoreboardPayload {
   scoreboard: ContestScoreboardEntry[];
   problems: ContestProblem[];
+  status?: ContestStatus;
+  start_time?: string;
 }
 
 export interface RegistrationSettings {
