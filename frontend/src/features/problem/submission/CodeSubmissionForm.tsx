@@ -67,20 +67,21 @@ const CodeSubmissionForm = ({ problemId, contestId = null, submissionFilename = 
             ))}
           </div>
         )}
+        <FileDrop
+          compact
+          label="Load a file"
+          hint={`${accept.join(', ')} · up to 256 KB`}
+          accept={accept}
+          maxBytes={MAX_SOURCE_BYTES}
+          disabled={isSubmitting}
+          onFiles={(files) => { if (files[0]) void loadFile(files[0]); }}
+        />
       </div>
       {submissionFilename && (
         <p className={styles.headerHelp}>
           Submit only {submissionFilename} {'—'} it is compiled with the grader&apos;s own main.cpp.
         </p>
       )}
-      <FileDrop
-        label="Load a file into the editor"
-        hint={`${accept.join(', ')} · up to 256 KB`}
-        accept={accept}
-        maxBytes={MAX_SOURCE_BYTES}
-        disabled={isSubmitting}
-        onFiles={(files) => { if (files[0]) void loadFile(files[0]); }}
-      />
       {error && <InlineError message={error} />}
       <form onSubmit={handleSubmit} className={styles.form}>
         <label htmlFor="code" className={styles.editorLabel}>

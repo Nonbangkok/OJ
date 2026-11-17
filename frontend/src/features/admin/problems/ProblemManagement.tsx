@@ -13,7 +13,7 @@ import type { AdminProblemsQuery } from '../../../types';
 import { ADMIN_PROBLEMS_PAGE } from '../../../config/constants';
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
-import { ActionMenu, Button, StatusBadge, StatusDot, PageHeader } from '../../../components/ui';
+import { DifficultyBadge, ActionMenu, Button, StatusBadge, StatusDot, PageHeader } from '../../../components/ui';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useInfiniteScroll } from '../../../hooks/useInfiniteScroll';
 import { buildAdminProblemListQuery, type AdminProblemListLoaderData } from '../../../routing/problemListLoaders';
@@ -594,7 +594,7 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
                   <span className={styles['problem-title']}>{problem.title}</span>
                   {problem.problem_type === 'header' && <StatusBadge>HEADER</StatusBadge>}
                 </td>
-                <td className={`${styles['col-right']} ${styles.mono}`}>{problem.difficulty ?? '—'}</td>
+                <td className={styles['col-right']}><DifficultyBadge difficulty={problem.difficulty} /></td>
                 <td className={`${styles['col-right']} ${styles.mono}`}>{problem.testcase_count ?? '—'}</td>
                 <td className={`${styles['col-left']} ${styles.mono}`}>
                   {problem.time_limit_ms ? `${problem.time_limit_ms} ms · ${problem.memory_limit_mb} MB` : '—'}

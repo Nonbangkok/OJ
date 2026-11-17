@@ -39,6 +39,18 @@ describe('CodeSubmissionForm', () => {
     expect(screen.queryByText('Choose a language to submit.')).toBeNull();
   });
 
+  it('the file loader sits on the language row, after the language buttons', () => {
+    render(
+      <BrowserRouter>
+        <CodeSubmissionForm problemId="aplusb" contestId={undefined} />
+      </BrowserRouter>
+    );
+    const languages = screen.getByRole('group', { name: 'Language' });
+    const loader = screen.getByRole('button', { name: /Load a file/ });
+    expect(languages.parentElement).toContainElement(loader);
+    expect(languages.compareDocumentPosition(loader) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('the submit shortcut reads Ctrl+↵ off Apple platforms', () => {
     render(
       <BrowserRouter>

@@ -2,7 +2,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 12px;
 }
 
@@ -10,9 +10,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  /* A 150px base decides wrapping; it grows to 260px when there is room, so a full bar stays on one line. */
-  flex: 1 1 150px;
-  min-width: 150px;
+  /* A 120px base decides wrapping; it grows to 260px when there is room, so a full bar stays on one line. */
+  flex: 1 1 120px;
+  min-width: 120px;
   max-width: 260px;
   padding: 0 10px;
   border: 1px solid var(--border-color);
@@ -43,7 +43,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
+  padding: 5px 9px;
   border-radius: var(--radius-md);
   background: var(--background-primary);
   font: inherit;
@@ -108,4 +108,63 @@
 .sheetLabel {
   font-size: 13.5px;
   color: var(--text-secondary);
+}
+
+/* Multi-select chip: the menu trigger and its clear button read as one chip. */
+.multi {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+}
+
+.multi .chipSet {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  max-width: 22rem;
+}
+
+.summary {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.clear {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border: 1px solid var(--border-color);
+  border-left: 0;
+  border-top-right-radius: var(--radius-md);
+  border-bottom-right-radius: var(--radius-md);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.clear:hover {
+  color: var(--text-primary);
+}
+
+.clear:focus-visible {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+.checkItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkBox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  color: var(--text-primary);
 }

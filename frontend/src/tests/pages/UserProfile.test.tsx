@@ -317,9 +317,9 @@ describe('User Profile Page', () => {
         // Muted problem ID as the secondary line under the title.
         expect(screen.getByText('bs-on-ans')).toBeInTheDocument();
 
-        // Difficulty chip: 1400 maps to band 2 and uses the band's chip style.
+        // Difficulty badge: 1400 maps to band 2 (the shared band colours).
         const chip = screen.getByText('1400');
-        expect(chip.className).toContain('difficulty-chip-2');
+        expect(chip).toHaveAttribute('data-band', '2');
 
         expect(screen.getByText('+46 XP')).toBeInTheDocument();
         expect(screen.getByText('Stock Span')).toBeInTheDocument();

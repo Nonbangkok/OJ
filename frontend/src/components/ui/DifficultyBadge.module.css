@@ -1,0 +1,24 @@
+/* The StatusBadge shape (4px corners, weight 500, hairline border) in the band's own tint:
+   band text on a pale band background, so it sits quietly in the neutral theme. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.band1 { background: var(--difficulty-band-1-bg); border-color: var(--difficulty-band-1-border); color: var(--difficulty-band-1-fg); }
+.band2 { background: var(--difficulty-band-2-bg); border-color: var(--difficulty-band-2-border); color: var(--difficulty-band-2-fg); }
+.band3 { background: var(--difficulty-band-3-bg); border-color: var(--difficulty-band-3-border); color: var(--difficulty-band-3-fg); }
+.band4 { background: var(--difficulty-band-4-bg); border-color: var(--difficulty-band-4-border); color: var(--difficulty-band-4-fg); }
+.band5 { background: var(--difficulty-band-5-bg); border-color: var(--difficulty-band-5-border); color: var(--difficulty-band-5-fg); }
+
+.unrated {
+  color: var(--text-muted);
+}

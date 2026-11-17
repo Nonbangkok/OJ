@@ -1,21 +1,11 @@
 import { useState } from 'react';
+import { DifficultyBadge } from '../../components/ui';
 import { difficultyBand } from '../../utils/constants';
 import styles from './ProblemCard.module.css';
 
 export const DifficultyChip = ({ difficulty }: { difficulty?: number | null }) => {
-    const band = difficultyBand(difficulty);
-    if (difficulty == null || band == null) return null;
-
-    return (
-        <span
-            data-testid="problem-difficulty"
-            data-band={band}
-            className={styles[`difficulty-chip-${band}`]}
-            title={`Difficulty ${difficulty}`}
-        >
-            {difficulty}
-        </span>
-    );
+    if (difficulty == null || difficultyBand(difficulty) == null) return null;
+    return <span data-testid="problem-difficulty"><DifficultyBadge difficulty={difficulty} /></span>;
 };
 
 interface ProblemCategoryRevealProps {

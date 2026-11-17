@@ -5,7 +5,7 @@ import CodeSubmissionForm from '../../features/problem/submission/CodeSubmission
 import Submissions from '../submission/Submissions';
 import problemService from '../../services/problemService';
 import { useProblemDetail } from '../../hooks/useProblemDetail';
-import { EmptyState, InlineNotice, PageHeader, ScoreCell, TestcaseStrip } from '../../components/ui';
+import { DifficultyBadge, EmptyState, InlineNotice, PageHeader, ScoreCell, TestcaseStrip } from '../../components/ui';
 import LoadingPage from '../../components/shared/LoadingPage';
 import type { ProblemDetail as ProblemDetailModel } from '../../types';
 import { useContest } from '../../features/contest/ContestContext';
@@ -20,7 +20,7 @@ const languagesLine = (problem: ProblemDetailModel) =>
     ? `C++ · submit ${problem.submission_filename}`
     : 'C++ · Python';
 
-/** Statement tab: the PDF at content width with a loading line. */
+/** Statement tab: the PDF in a centred frame (at most 960px wide) with a loading line. */
 function Statement({ problem, pdfUrl }: { problem: ProblemDetailModel; pdfUrl: string }) {
   const [loaded, setLoaded] = useState(false);
   if (!problem.has_pdf) {
@@ -111,6 +111,7 @@ const ProblemDetail = () => {
         meta={(
           <span className={styles.meta}>
             <span className={styles.mono}>{problem.id}</span>
+            {problem.difficulty != null && <DifficultyBadge difficulty={problem.difficulty} />}
             <span>{`${problem.time_limit_ms} ms · ${problem.memory_limit_mb} MB`}</span>
             <span>{languagesLine(problem)}</span>
             {problem.author && (

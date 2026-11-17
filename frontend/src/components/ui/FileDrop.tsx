@@ -10,6 +10,8 @@ export interface FileDropProps {
   multiple?: boolean;
   maxBytes?: number;
   disabled?: boolean;
+  /** One short line (icon, label, hint) that fits beside other controls instead of a full-width zone. */
+  compact?: boolean;
   onFiles: (files: File[]) => void;
 }
 
@@ -20,7 +22,7 @@ const formatBytes = (bytes: number) => {
 };
 
 /** Drop zone + picker that refuses wrong types, extra files and oversize files with a visible reason. */
-export function FileDrop({ label, hint, accept, multiple = false, maxBytes, disabled = false, onFiles }: FileDropProps) {
+export function FileDrop({ label, hint, accept, multiple = false, maxBytes, disabled = false, compact = false, onFiles }: FileDropProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState('');
@@ -54,7 +56,7 @@ export function FileDrop({ label, hint, accept, multiple = false, maxBytes, disa
   };
 
   return (
-    <div className={styles.wrap}>
+    <div className={`${styles.wrap} ${compact ? styles.compact : ''}`.trim()}>
       <div
         role="button"
         tabIndex={disabled ? -1 : 0}
@@ -66,7 +68,7 @@ export function FileDrop({ label, hint, accept, multiple = false, maxBytes, disa
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
       >
-        <UploadSimple size={20} aria-hidden="true" />
+        <UploadSimple size={compact ? 16 : 20} aria-hidden="true" />
         <span className={styles.text}>
           <span className={styles.label}>{label}</span>
           <span className={styles.hint}>{hint ?? 'Drop a file here or choose one'}</span>

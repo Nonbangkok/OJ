@@ -32,7 +32,7 @@ import {
   updateProblemVisibility,
   updateAdminProblemsVisibility,
 } from '../services/problemQueryService';
-import { USER_ROLES, type ProblemFileRole } from '../constants';
+import { USER_ROLES, type ProblemFileRole, type ProblemType } from '../constants';
 import * as db from '../db';
 import { sendStarterZip, getProblemFile, getProblemFiles, listProblemFiles, replaceProblemFiles } from '../services/problemFilesService';
 import { readFlatZip } from '../utils/headerProblemFiles';
@@ -110,9 +110,9 @@ router.get('/problems-with-stats', requirePublicAccess,
   // PRIVATE mode is still enforced by requirePublicAccess above.
   const userId = req.user?.id ?? null;
   // validateRequest writes Zod defaults/coercions back into req.query.
-  const { difficultyMin, difficultyMax, sort, order, search, category, author, collection, limit, cursor, status } = req.query as unknown as {
+  const { difficultyMin, difficultyMax, sort, order, search, category, author, collection, type, limit, cursor, status } = req.query as unknown as {
     difficultyMin?: number; difficultyMax?: number; sort?: 'difficulty'; order?: 'asc' | 'desc';
-    search?: string; category?: string; author?: string; collection?: number | 'none';
+    search?: string; category?: string; author?: string; collection?: number | 'none'; type?: ProblemType;
     limit?: number; cursor?: string; status?: ProblemStatusFilter;
   };
   // A status bucket is the viewer's own progress; guests have none.
@@ -129,6 +129,7 @@ router.get('/problems-with-stats', requirePublicAccess,
     ...(category !== undefined ? { category } : {}),
     ...(author !== undefined ? { author } : {}),
     ...(collection !== undefined ? { collection } : {}),
+    ...(type !== undefined ? { type } : {}),
     ...(limit !== undefined ? { limit } : {}),
     ...(cursor !== undefined ? { cursor } : {}),
   });
@@ -140,9 +141,9 @@ router.get('/problems-with-stats', requirePublicAccess,
 router.get('/problem-status-counts', requirePublicAccess,
   validateRequest({ query: problemStatusCountsQuerySchema }),
   asyncHandler(async (req: Request, res: Response) => {
-    const { difficultyMin, difficultyMax, search, category, author, collection } = req.query as unknown as {
+    const { difficultyMin, difficultyMax, search, category, author, collection, type } = req.query as unknown as {
       difficultyMin?: number; difficultyMax?: number; search?: string; category?: string;
-      author?: string; collection?: number | 'none';
+      author?: string; collection?: number | 'none'; type?: ProblemType;
     };
     res.json(await getProblemStatusCounts(req.user?.id ?? null, {
       ...(difficultyMin !== undefined ? { difficultyMin } : {}),
@@ -151,6 +152,7 @@ router.get('/problem-status-counts', requirePublicAccess,
       ...(category !== undefined ? { category } : {}),
       ...(author !== undefined ? { author } : {}),
       ...(collection !== undefined ? { collection } : {}),
+      ...(type !== undefined ? { type } : {}),
     }));
   }));
 

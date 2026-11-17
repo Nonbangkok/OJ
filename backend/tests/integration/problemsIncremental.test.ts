@@ -237,6 +237,36 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     });
   });
 
+  describe('problem type filter', () => {
+    beforeEach(async () => {
+      await insertProblem('plain-a', { categories: ['Graph'] });
+      await insertProblem('plain-b', { categories: ['Math'] });
+      await insertProblem('head-a', { categories: ['Graph'] });
+      await pool.query("UPDATE problems SET problem_type = 'header', submission_filename = 'student.h' WHERE id = 'head-a'");
+    });
+
+    it('type=header lists only header problems and type=standard only the others', async () => {
+      const header = await request(app).get('/problems-with-stats?type=header');
+      expect(header.status).toBe(200);
+      expect(header.body.problems.map((p: { id: string }) => p.id)).toEqual(['head-a']);
+      const standard = await request(app).get('/problems-with-stats?type=standard');
+      expect(standard.body.problems.map((p: { id: string }) => p.id).sort()).toEqual(['plain-a', 'plain-b']);
+    });
+
+    it('combines with several categories, and the status counts follow it', async () => {
+      const both = await request(app).get('/problems-with-stats?type=standard&category=Graph,Math');
+      expect(both.body.problems.map((p: { id: string }) => p.id).sort()).toEqual(['plain-a', 'plain-b']);
+      const counts = await request(app).get('/problem-status-counts?type=header');
+      expect(counts.status).toBe(200);
+      expect(counts.body.all).toBe(1);
+    });
+
+    it('rejects an unknown type', async () => {
+      expect((await request(app).get('/problems-with-stats?type=interactive')).status).toBe(400);
+      expect((await request(app).get('/problem-status-counts?type=interactive')).status).toBe(400);
+    });
+  });
+
   describe('visibility: hidden and contest problems never appear', () => {
     it('excludes hidden and contest-attached problems from every page', async () => {
       await insertContestProblem();

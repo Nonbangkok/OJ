@@ -88,6 +88,22 @@
   --difficulty-band-3: #bc4c00;
   --difficulty-band-4: #cf222e;
   --difficulty-band-5: #8250df;
+  /* Tinted difficulty badge (the StatusBadge pattern): band text on a pale band tint. */
+  --difficulty-band-1-bg: #dafbe1;
+  --difficulty-band-1-border: #aceebb;
+  --difficulty-band-1-fg: #1a7f37;
+  --difficulty-band-2-bg: #fff8c5;
+  --difficulty-band-2-border: #eac54f;
+  --difficulty-band-2-fg: #9a6700;
+  --difficulty-band-3-bg: #fff1e5;
+  --difficulty-band-3-border: #ffc680;
+  --difficulty-band-3-fg: #bc4c00;
+  --difficulty-band-4-bg: #ffebe9;
+  --difficulty-band-4-border: #ffb8b0;
+  --difficulty-band-4-fg: #cf222e;
+  --difficulty-band-5-bg: #fbefff;
+  --difficulty-band-5-border: #e0c3ff;
+  --difficulty-band-5-fg: #8250df;
 
   --action-primary-foreground: #ffffff;
   --action-primary-background: #18181b;
@@ -305,6 +321,22 @@
   --difficulty-band-3: #c2540a;
   --difficulty-band-4: #da3633;
   --difficulty-band-5: #8957e5;
+  /* Tinted difficulty badge on dark surfaces: a deep band tint with a lifted band text. */
+  --difficulty-band-1-bg: #0f2a18;
+  --difficulty-band-1-border: #1f5f30;
+  --difficulty-band-1-fg: #3fb950;
+  --difficulty-band-2-bg: #2b2111;
+  --difficulty-band-2-border: #5c4410;
+  --difficulty-band-2-fg: #d29922;
+  --difficulty-band-3-bg: #2d1a0e;
+  --difficulty-band-3-border: #6b3510;
+  --difficulty-band-3-fg: #db6d28;
+  --difficulty-band-4-bg: #2f1416;
+  --difficulty-band-4-border: #6e2228;
+  --difficulty-band-4-fg: #f85149;
+  --difficulty-band-5-bg: #24183a;
+  --difficulty-band-5-border: #4c2f7e;
+  --difficulty-band-5-fg: #a371f7;
 
   --action-primary-foreground: #0d1117;
   --action-primary-background: #e6edf3;

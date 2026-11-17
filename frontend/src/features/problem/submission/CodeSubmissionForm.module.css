@@ -51,10 +51,13 @@
   margin-bottom: 0; /* Remove bottom margin to align with buttons */
 }
 
+/* Language choice on the left, the file loader on the right; they stack on a narrow screen. */
 .formHeader {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 8px 12px;
 }
 
 .formHeader h2 {

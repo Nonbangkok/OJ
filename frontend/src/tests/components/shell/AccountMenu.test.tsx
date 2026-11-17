@@ -121,6 +121,14 @@ describe('AccountMenu', () => {
         expect(screen.getByRole('menuitem', { name: /settings/i })).toHaveAttribute('href', '/admin/settings');
     });
 
+    it('opens outside the sidebar (portaled to the page), so the sidebar never scrolls sideways', async () => {
+        const { container } = renderMenu();
+        fireEvent.click(screen.getByRole('button', { name: /open user menu/i }));
+        const menu = await screen.findByRole('menu');
+        expect(container).not.toContainElement(menu);
+        expect(document.body).toContainElement(menu);
+    });
+
     it('does not show menu items before clicking', () => {
         renderMenu();
         expect(screen.queryByRole('menuitem', { name: /log out/i })).not.toBeInTheDocument();
