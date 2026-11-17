@@ -47,9 +47,14 @@ const categoryCounts = {
 };
 
 const renderProblems = () => render(<BrowserRouter><Problems /></BrowserRouter>);
-/** Picks an option from a desktop filter chip (Base UI menu). */
+/** Picks an option from a desktop filter chip (Base UI menu); Category is a checkbox menu, closed afterwards. */
 const chooseChip = async (chip: string, option: string) => {
     fireEvent.click(screen.getByRole('button', { name: `Add filter: ${chip}` }));
+    if (chip === 'Category') {
+        fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: option }));
+        fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+        return;
+    }
     fireEvent.click(await screen.findByRole('menuitem', { name: option }));
 };
 const LocationProbe = () => <output data-testid="location">{useLocation().search}</output>;
@@ -207,17 +212,39 @@ describe('Problems Page', () => {
         it('category and collection chips set their params', async () => {
             renderProblems();
             await screen.findByText('Knapsack');
-            await chooseChip('Category', 'Greedy');
+            fireEvent.click(screen.getByRole('button', { name: 'Add filter: Category' }));
+            fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Greedy' }));
             await waitFor(() => expect(window.location.search).toContain('category=Greedy'));
+            fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
             await chooseChip('Collection', 'Practice');
             await waitFor(() => expect(window.location.search).toContain('collection=7'));
         });
 
-        it('a legacy multi-category URL shows the category chip as set', async () => {
+        it('several categories can be picked at once and stay in the URL', async () => {
+            renderProblems();
+            await screen.findByText('Knapsack');
+            fireEvent.click(screen.getByRole('button', { name: 'Add filter: Category' }));
+            fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Greedy' }));
+            fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Dynamic Programming' }));
+            await waitFor(() => expect(problemService.getProblemsPage).toHaveBeenLastCalledWith(expect.objectContaining({ category: 'Greedy,Dynamic Programming' })));
+            expect(new URLSearchParams(window.location.search).get('category')).toBe('Greedy,Dynamic Programming');
+        });
+
+        it('the Type chip lists standard and header problems', async () => {
+            renderProblems();
+            await screen.findByText('Knapsack');
+            await chooseChip('Type', 'Header');
+            await waitFor(() => expect(problemService.getProblemsPage).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'header' })));
+            expect(window.location.search).toContain('type=header');
+            expect(problemService.getStatusCounts).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'header' }));
+            expect(screen.getByRole('button', { name: 'Remove filter Type: Header' })).toBeInTheDocument();
+        });
+
+        it('a multi-category URL shows the category chip as set', async () => {
             window.history.replaceState({}, '', '/problems?category=Greedy,Dynamic%20Programming');
             renderProblems();
             await screen.findByText('Knapsack');
-            expect(screen.getByRole('button', { name: 'Remove filter Category: Greedy, Dynamic Programming' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Remove filter Category: Dynamic Programming, Greedy' })).toBeInTheDocument();
             expect(problemService.getProblemsPage).toHaveBeenCalledWith(expect.objectContaining({ category: 'Greedy,Dynamic Programming' }));
         });
 
@@ -227,6 +254,17 @@ describe('Problems Page', () => {
             await chooseChip('Author', 'Kru Somchai');
             await waitFor(() => expect(problemService.getProblemsPage).toHaveBeenLastCalledWith(expect.objectContaining({ author: 'Kru Somchai' })));
             expect(screen.getByRole('button', { name: 'Remove filter Author: Kru Somchai' })).toBeInTheDocument();
+        });
+
+        it('difficulty shows as a coloured badge, unrated as a dash', async () => {
+            (jest.mocked(problemService.getProblemsPage) as jest.Mock).mockResolvedValue({
+                ...firstPage,
+                problems: [{ ...firstPage.problems[0], difficulty: 1900 }, ...firstPage.problems.slice(1)],
+            });
+            renderProblems();
+            await screen.findByText('Knapsack');
+            expect(screen.getByText('1900')).toHaveAttribute('data-band', '3');
+            expect(screen.getAllByText('—').length).toBeGreaterThan(0);
         });
 
         it('each row reveals its own categories', async () => {

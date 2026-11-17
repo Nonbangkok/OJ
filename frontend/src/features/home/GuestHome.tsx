@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Countdown, DataTable, EmptyState, StatusBadge, type DataTableColumn } from '../../components/ui';
+import { DifficultyBadge, Countdown, DataTable, EmptyState, StatusBadge, type DataTableColumn } from '../../components/ui';
 import contestService from '../../services/contestService';
 import problemService from '../../services/problemService';
 import type { Contest, ProblemSummary } from '../../types';
@@ -32,7 +32,7 @@ export default function GuestHome() {
   const columns: DataTableColumn<ProblemSummary>[] = [
     { key: 'id', header: 'ID', mobile: 'meta', cell: (p) => <span className={styles.mono}>{p.id}</span> },
     { key: 'title', header: 'Title', mobile: 'primary', cell: (p) => p.title },
-    { key: 'difficulty', header: 'Difficulty', align: 'right', mobile: 'meta', cell: (p) => p.difficulty ?? '—' },
+    { key: 'difficulty', header: 'Difficulty', align: 'right', mobile: 'meta', cell: (p) => <DifficultyBadge difficulty={p.difficulty} /> },
   ];
 
   return (

@@ -5,7 +5,7 @@ import { Check, Circle, PencilSimple } from '@phosphor-icons/react';
 import ActivityHeatmap from '../../components/user/ActivityHeatmap';
 import ProblemSolvingProfile from '../../features/user/ProblemSolvingProfile';
 import LoadingPage from '../../components/shared/LoadingPage';
-import { ProgressBar } from '../../components/ui';
+import { DifficultyBadge, ProgressBar } from '../../components/ui';
 import type { AchievementStats } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import userService from '../../services/userService';
@@ -179,11 +179,9 @@ const UserProfile = () => {
                 </span>
               </Link>
               {/* An empty cell keeps the XP and date columns aligned when a problem is unrated. */}
-              {reward.difficultySnapshot !== null && band !== null ? (
-                <span className={styles[`difficulty-chip-${band}`]}>
-                  {reward.difficultySnapshot}
-                </span>
-              ) : <span aria-hidden="true" />}
+              {reward.difficultySnapshot !== null && band !== null
+                ? <span><DifficultyBadge difficulty={reward.difficultySnapshot} /></span>
+                : <span aria-hidden="true" />}
               <span className={styles['recent-solved-gain']}>+{reward.xpAwarded} XP</span>
               <span className={styles['recent-solved-date']}>
                 {formatRewardDate(reward.awardedAt)}

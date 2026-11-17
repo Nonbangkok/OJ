@@ -15,7 +15,7 @@ import {
   TestcaseView,
   TestcaseViewPart,
 } from '../types/service';
-import { ADMIN_PROBLEM_LIST_CONFIG, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CONFIG, SUBMISSION_QUERY_CONFIG, TESTCASE_VIEWER_CONFIG, type ProblemFileRole } from '../constants';
+import { ADMIN_PROBLEM_LIST_CONFIG, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CONFIG, SUBMISSION_QUERY_CONFIG, TESTCASE_VIEWER_CONFIG, type ProblemFileRole, type ProblemType } from '../constants';
 import { fullyPairedCaseNumbers, pairZippedTestcaseFiles } from './testcaseZipPairing';
 import { isUniqueViolation } from '../utils/dbErrors';
 import { AppError } from '../middleware/errorHandler';
@@ -73,6 +73,8 @@ export interface ProblemListOptions extends ProblemListDifficultyOptions {
   author?: string;
   /** Collection id, or 'none' for problems outside a collection. */
   collection?: number | 'none';
+  /** Only standard or only header problems. */
+  type?: ProblemType;
   /** The viewer's progress bucket (B2); requires a signed-in viewer. */
   status?: ProblemStatusFilter;
   /** Page size (1..MAX_LIMIT); defaults to PROBLEM_LIST_CONFIG.DEFAULT_LIMIT. */
@@ -174,7 +176,7 @@ export type ProblemListFilterOptions = Omit<ProblemListOptions, 'limit' | 'curso
 
 /**
  * Appends the shared filter clauses (difficulty, search, category, author,
- * collection) to `params` and returns them. `$1` must already be the viewer id.
+ * collection, type) to `params` and returns them. `$1` must already be the viewer id.
  */
 export const buildProblemListFilters = (options: ProblemListFilterOptions, params: unknown[]): string[] => {
   const filters: string[] = [];
@@ -218,6 +220,10 @@ export const buildProblemListFilters = (options: ProblemListFilterOptions, param
   } else if (options.collection !== undefined) {
     params.push(options.collection);
     filters.push(`p.collection_id = $${params.length}`);
+  }
+  if (options.type !== undefined) {
+    params.push(options.type);
+    filters.push(`p.problem_type = $${params.length}`);
   }
   return filters;
 };

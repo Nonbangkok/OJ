@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import styles from './Problems.module.css';
 import { useIncrementalProblems } from '../../hooks/useIncrementalProblems';
 import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
-import {
+import { DifficultyBadge,
   Button,
   DataTable,
   EmptyState,
@@ -36,6 +36,8 @@ import { ProblemCategoryReveal } from '../../features/problem/ProblemMetadata';
 
 const UNCATEGORIZED = 'Uncategorized';
 const DIFFICULTY_SORT_ASC = 'difficulty-asc';
+/** Standard problems take a whole program; header problems take a header the grader compiles. */
+const PROBLEM_TYPE_OPTIONS = [{ value: 'standard', label: 'Standard' }, { value: 'header', label: 'Header' }];
 const DIFFICULTY_SORT_DESC = 'difficulty-desc';
 const STATUSES = ['unsolved', 'attempted', 'solved'] as const;
 type StatusSegment = 'all' | typeof STATUSES[number];
@@ -67,6 +69,7 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
   const difficultySort = searchParams.get('sort') ?? DIFFICULTY_SORT_ASC;
   const urlAuthor = searchParams.get('author') || '';
   const collection = searchParams.get('collection') || '';
+  const problemType = searchParams.get('type') || '';
   const statusParam = searchParams.get('status') || '';
   const status: StatusSegment = !isGuest && (STATUSES as readonly string[]).includes(statusParam)
     ? statusParam as StatusSegment
@@ -116,10 +119,11 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
     category: categoryParam,
     author: urlAuthor,
     collection,
+    type: problemType,
     difficultyMin,
     difficultyMax,
     sort: difficultySort,
-  }), [status, debouncedSearch, categoryParam, urlAuthor, collection, difficultyMin, difficultyMax, difficultySort]);
+  }), [status, debouncedSearch, categoryParam, urlAuthor, collection, problemType, difficultyMin, difficultyMax, difficultySort]);
 
   const {
     problems,
@@ -197,6 +201,7 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
     || difficultyMax !== ''
     || urlAuthor.trim() !== ''
     || collection !== ''
+    || problemType !== ''
     || status !== 'all';
 
   const difficultyValue = difficultyMin || difficultyMax ? `${difficultyMin}-${difficultyMax}` : undefined;
@@ -221,11 +226,20 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
       },
     },
     {
+      // Any number of categories; a problem matching any of them is listed.
       key: 'category',
       label: 'Category',
-      value: categoryParam || undefined,
-      options: withCurrent(categoryOptions, categoryParam || undefined, () => selectedCategories.join(', ')),
-      onChange: (value) => updateUrl({ category: value ?? '' }),
+      multiple: true,
+      values: selectedCategories,
+      options: categoryOptions,
+      onChange: (values) => updateUrl({ category: values.join(',') }),
+    },
+    {
+      key: 'type',
+      label: 'Type',
+      value: problemType || undefined,
+      options: PROBLEM_TYPE_OPTIONS,
+      onChange: (value) => updateUrl({ type: value ?? '' }),
     },
     {
       key: 'collection',
@@ -278,7 +292,7 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
       header: 'Difficulty',
       align: 'right',
       sortable: true,
-      cell: (p) => (p.difficulty ?? '—'),
+      cell: (p) => <DifficultyBadge difficulty={p.difficulty} />,
       mobile: 'hidden',
     },
     {

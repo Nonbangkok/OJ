@@ -368,6 +368,8 @@ const problemListFilterShape = {
   category: problemCategoryFilter.optional(),
   author: z.string().trim().min(1).max(STRING_LIMITS.AUTHOR).optional(),
   collection: z.union([z.literal('none'), z.coerce.number().int().positive()]).optional(),
+  /** Standard problems or header problems (the student submits a header the grader compiles). */
+  type: z.enum(PROBLEM_TYPES).optional(),
 };
 const difficultyRangeOrdered = ({ difficultyMin, difficultyMax }: { difficultyMin?: number; difficultyMax?: number }) =>
   difficultyMin === undefined || difficultyMax === undefined || difficultyMin <= difficultyMax;
@@ -388,6 +390,7 @@ export const problemsWithStatsQuerySchema = z.object({
   category: problemCategoryFilter.optional(),
   author: z.string().trim().min(1).max(STRING_LIMITS.AUTHOR).optional(),
   collection: z.union([z.literal('none'), z.coerce.number().int().positive()]).optional(),
+  type: z.enum(PROBLEM_TYPES).optional(),
   limit: z.coerce.number().int().min(1).max(PROBLEM_LIST_CONFIG.MAX_LIMIT).optional(),
   cursor: z.string().min(1).max(2048).optional(),
 }).refine(

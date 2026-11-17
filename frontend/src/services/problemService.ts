@@ -33,6 +33,8 @@ export interface ProblemListQuery extends ProblemListDifficultyQuery {
   category?: string;
   author?: string;
   collection?: number | 'none';
+  /** Standard problems, or header problems (submit a header the grader compiles). */
+  type?: 'standard' | 'header';
   limit?: number;
   cursor?: string | null;
 }

@@ -50,3 +50,32 @@
 .picker.picker.picker {
   display: none;
 }
+
+/* Compact: a one-line chip-sized drop target for a toolbar row. */
+.compact {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 0;
+}
+
+.compact .zone {
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: var(--radius-md);
+}
+
+.compact .text {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.compact .label {
+  font-size: 13.5px;
+}
+
+.compact .hint {
+  font-size: 12px;
+}

@@ -25,6 +25,8 @@ export { Countdown, ProgressBar, StatusDot } from './Indicators';
 export { EmptyState, InlineError, InlineNotice } from './States';
 export { DataTable } from './DataTable';
 export type { DataTableColumn, DataTableProps } from './DataTable';
+export { DifficultyBadge } from './DifficultyBadge';
+export type { DifficultyBadgeProps } from './DifficultyBadge';
 export { FilterBar } from './FilterBar';
 export type { FilterBarProps, FilterChip } from './FilterBar';
 export { BulkBar } from './BulkBar';

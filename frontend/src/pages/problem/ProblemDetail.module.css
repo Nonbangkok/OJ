@@ -105,7 +105,10 @@
 .pdf {
   display: block;
   width: 100%;
-  height: min(80vh, 1100px);
+  /* The viewer fits the page to the frame's width; a narrower, centred frame shows more of the page's height. */
+  max-width: 960px;
+  margin-inline: auto;
+  height: min(85vh, 1200px);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--background-secondary);

@@ -28,6 +28,8 @@ export interface PublicProblemListFilters {
   category: string;
   author: string;
   collection: string;
+  /** 'standard' | 'header'; '' for both. */
+  type?: string;
   difficultyMin: string;
   difficultyMax: string;
   sort: string;
@@ -78,7 +80,7 @@ const isProblemStatus = (value: string | undefined): value is ProblemStatus =>
   (PROBLEM_STATUSES as readonly string[]).includes(value ?? '');
 
 export const buildPublicProblemListQuery = ({
-  status, search, category, author, collection, difficultyMin, difficultyMax, sort,
+  status, search, category, author, collection, type, difficultyMin, difficultyMax, sort,
 }: PublicProblemListFilters): ProblemListQuery => {
   const trimmedSearch = search.trim();
   const trimmedAuthor = author.trim();
@@ -88,6 +90,7 @@ export const buildPublicProblemListQuery = ({
     ...(category ? { category } : {}),
     ...(trimmedAuthor ? { author: trimmedAuthor } : {}),
     ...(collection ? { collection: collection === 'none' ? 'none' : Number(collection) } : {}),
+    ...(type === 'standard' || type === 'header' ? { type } : {}),
     // The API takes multiples of 100 only; round inward so an old link (…1599) still works.
     ...(difficultyMin !== '' && Number.isFinite(Number(difficultyMin)) ? { difficultyMin: Math.ceil(Number(difficultyMin) / 100) * 100 } : {}),
     ...(difficultyMax !== '' && Number.isFinite(Number(difficultyMax)) ? { difficultyMax: Math.floor(Number(difficultyMax) / 100) * 100 } : {}),
@@ -117,6 +120,7 @@ export const publicProblemListQueryFromUrl = (url: URL): ProblemListQuery => {
     category: params.get('category') || '',
     author: params.get('author') || '',
     collection: params.get('collection') || '',
+    type: params.get('type') || '',
     difficultyMin: params.get('difficultyMin') || '',
     difficultyMax: params.get('difficultyMax') || '',
     sort: params.get('sort') ?? 'difficulty-asc',
