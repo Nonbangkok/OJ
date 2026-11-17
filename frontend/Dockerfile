@@ -22,7 +22,9 @@ ARG REACT_APP_LARGE_UPLOAD_API_URL
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
 ENV REACT_APP_LARGE_UPLOAD_API_URL=$REACT_APP_LARGE_UPLOAD_API_URL
 # vite.config.mts maps these build args into the bundle; `npm run build` fails on inline scripts (CSP).
-RUN npm run build
+# The chmod makes every built file readable by nginx: a file checked out under a strict umask
+# (0600) keeps that mode through COPY, and nginx then answers 403 (as /favicon.svg once did).
+RUN npm run build && chmod -R a+rX build
 
 # Stage 2: Serve the application with Nginx
 FROM nginx:1.30-alpine

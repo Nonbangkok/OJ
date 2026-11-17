@@ -104,7 +104,7 @@ jobs:
         run: shellcheck scripts/cd-deploy.sh scripts/refresh-proxy.sh
 
       - name: Repo config tests (compose, Node and nginx versions, Postgres 18 guard, frontend caching, proxy healthcheck, proxy refresh, deploy workflow, CD deploy guards and rollback)
-        run: node --test tests/composeConfig.test.mjs tests/nodeVersion.test.mjs tests/nginxVersion.test.mjs tests/pg18Guard.test.mjs tests/frontendCaching.test.mjs tests/proxyHealthcheck.test.mjs tests/refreshProxy.test.mjs tests/deployWorkflow.test.mjs tests/cdDeployStructure.test.mjs tests/cdDeployGuards.test.mjs tests/cdDeployRollback.test.mjs
+        run: node --test tests/composeConfig.test.mjs tests/nodeVersion.test.mjs tests/nginxVersion.test.mjs tests/pg18Guard.test.mjs tests/frontendCaching.test.mjs tests/proxyHealthcheck.test.mjs tests/refreshProxy.test.mjs tests/deployWorkflow.test.mjs tests/cdDeployStructure.test.mjs tests/cdDeployGuards.test.mjs tests/cdDeployRollback.test.mjs tests/frontendPublicAssets.test.mjs
 
       - name: Build all images (local + production overlay)
         run: |
