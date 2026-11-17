@@ -88,7 +88,7 @@ const CodeSubmissionForm = ({ problemId, contestId = null, submissionFilename = 
           {submissionFilename ? `Your ${submissionFilename}` : 'Your code'}
         </label>
         {/* Click-to-focus is a mouse convenience; Tab reaches the textarea directly. */}
-        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
+        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
         <div className={editorStyles['editorWrapper']} ref={editorWrapperRef} onClick={handleWrapperClick} onKeyDown={onEditorKeyDown}>
           <div className={editorStyles['lineNumbersGutter']} ref={lineNumbersRef}>
             {Array.from({ length: lineCount }).map((_, i) => (

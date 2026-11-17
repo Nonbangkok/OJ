@@ -1052,3 +1052,63 @@
   font-weight: 500;
   color: var(--tint-danger-fg);
 }
+
+/* Inline visibility switch (Problems list). */
+.visibility-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.visibility-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.visibility-track {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background-color 0.15s ease;
+}
+
+.visibility-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--background-primary);
+  transition: transform 0.15s ease;
+}
+
+.visibility-switch input:checked + .visibility-track {
+  background: var(--tint-success-fg);
+}
+
+.visibility-switch input:checked + .visibility-track::after {
+  transform: translateX(12px);
+}
+
+.visibility-switch input:focus-visible + .visibility-track {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+.visibility-switch input:disabled + .visibility-track {
+  opacity: 0.5;
+}
+
+.visibility-text {
+  min-width: 3.5rem;
+}

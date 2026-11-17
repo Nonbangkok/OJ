@@ -5,6 +5,7 @@ import useProblemSelection from '../../../hooks/admin/useProblemSelection';
 import useRejudge from '../../../hooks/admin/useRejudge';
 import CreateProblemDialog from './CreateProblemDialog';
 import CollectionsDialog from './CollectionsDialog';
+import ProblemQuickLook, { acRateLabel } from './ProblemQuickLook';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import RejudgeFeedbackBox from '../shared/RejudgeFeedbackBox';
 import adminService from '../../../services/adminService';
@@ -16,7 +17,7 @@ import tableStyles from '../../../components/styles/Table.module.css';
 import { DifficultyBadge, ActionMenu, Button, FilterBar, SegmentedControl, StatusBadge, StatusDot, PageHeader, type FilterChip } from '../../../components/ui';
 import { CaretDown, CaretUp } from '@phosphor-icons/react';
 import { DIFFICULTY_BANDS } from '../../../config/constants';
-import { PROBLEM_CATEGORIES } from '../../../utils/constants';
+import { PROBLEM_CATEGORIES, PROBLEM_DIFFICULTY_OPTIONS } from '../../../utils/constants';
 import type { AdminProblem, AdminProblemSort, AdminProblemView } from '../../../types';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useInfiniteScroll } from '../../../hooks/useInfiniteScroll';
@@ -227,6 +228,10 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
   const [collectionConfirm, setCollectionConfirm] = useState<{ id: number; name: string; count: number; isVisible: boolean } | null>(null);
   const [moveConfirm, setMoveConfirm] = useState<{ collectionId: number | null; name: string } | null>(null);
   const [deleteSelectionConfirm, setDeleteSelectionConfirm] = useState(false);
+  /** The row whose quick look is open. */
+  const [quickLookId, setQuickLookId] = useState<string | null>(null);
+  const [metadataBusy, setMetadataBusy] = useState(false);
+  const [metadataError, setMetadataError] = useState('');
 
   const refreshCollections = () => {
     adminService.getCollections()
@@ -377,6 +382,24 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
     }
   };
 
+  /** Difficulty and categories for several problems in one server call, then the list refreshes. */
+  const applyMetadata = async (
+    ids: string[],
+    change: { difficulty?: number | null; addCategories?: string[]; removeCategories?: string[] },
+  ) => {
+    setMetadataBusy(true);
+    setMetadataError('');
+    try {
+      await adminService.updateProblemsMetadata(ids, change);
+      await fetchProblems();
+    } catch {
+      setMetadataError(`Couldn't update ${ids.length === 1 ? 'the problem' : `${ids.length} problems`}. Try again.`);
+    } finally {
+      setMetadataBusy(false);
+    }
+  };
+  const quickLookProblem = problems.find((p) => p.id === quickLookId) ?? null;
+
   const runDeleteSelection = async () => {
     const succeeded = await deleteSelectedProblems(selectedProblemIds);
     if (succeeded) clearSelection();
@@ -493,6 +516,48 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
                 ))}
               </select>
             </label>
+            <label className={styles['selection-move']}>
+              <span className={styles['filter-label']}>Difficulty</span>
+              <select
+                value=""
+                disabled={loading || metadataBusy}
+                aria-label="Set difficulty of the selected problems"
+                onChange={(event) => {
+                  const { value } = event.target;
+                  if (value === '') return;
+                  void applyMetadata(selectedProblemIds.map(String), { difficulty: value === 'unrated' ? null : Number(value) });
+                }}
+              >
+                <option value="">Set…</option>
+                <option value="unrated">Unrated</option>
+                {PROBLEM_DIFFICULTY_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </label>
+            <label className={styles['selection-move']}>
+              <span className={styles['filter-label']}>Category</span>
+              <select
+                value=""
+                disabled={loading || metadataBusy}
+                aria-label="Add a category to the selected problems"
+                onChange={(event) => {
+                  if (event.target.value) void applyMetadata(selectedProblemIds.map(String), { addCategories: [event.target.value] });
+                }}
+              >
+                <option value="">Add…</option>
+                {PROBLEM_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select
+                value=""
+                disabled={loading || metadataBusy}
+                aria-label="Remove a category from the selected problems"
+                onChange={(event) => {
+                  if (event.target.value) void applyMetadata(selectedProblemIds.map(String), { removeCategories: [event.target.value] });
+                }}
+              >
+                <option value="">Remove…</option>
+                {PROBLEM_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </label>
             {isAdmin && (
               <Button size="compact" variant="secondary" onClick={() => handleRejudgeClick({ kind: 'problems', ids: selectedProblemIds, title: `the ${selectedCount} selected problems` })} disabled={loading}>
                 Rejudge
@@ -545,6 +610,9 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
         </div>
       )}
 
+      {metadataError && (
+        <div className={styles['scope-bar']}><span className="error-message" role="alert">{metadataError}</span></div>
+      )}
       {(loading || error) && !batchUploadProgress.visible && (
         <div className={styles['scope-bar']}>
           {loading && <span role="status">Loading Problems...</span>}
@@ -587,13 +655,15 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
                   </button>
                 </th>
               ))}
+              <th className={styles['col-right']}>AC rate</th>
+              <th className={styles['col-right']}>Solvers</th>
               <th className={styles['col-left']}>Visibility</th>
               <th className={styles['col-center']}><span className={styles['sr-only']}>Actions</span></th>
             </tr>
           </thead>
           <tbody>
             {visibleProblems.length === 0 && !loading && !error && (
-              <tr><td colSpan={8}>No problems match the current filters.</td></tr>
+              <tr><td colSpan={10}>No problems match the current filters.</td></tr>
             )}
             {visibleProblems.map(problem => {
               const selected = isProblemSelected(problem.id);
@@ -608,9 +678,9 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
                 className={[rowClasses, styles['row-clickable']].filter(Boolean).join(' ')}
                 onPointerEnter={() => isDragging && handleDragOverRow(problem.id)}
                 onClick={(event) => {
-                  // Row click opens the editor (§7.8); links, buttons and checkboxes keep their own job.
-                  if ((event.target as HTMLElement).closest('a, button, input, [role="menuitem"]')) return;
-                  navigate(`/admin/problems/${encodeURIComponent(problem.id)}`);
+                  // Row click opens the quick look; links, buttons, switches and checkboxes keep their own job.
+                  if ((event.target as HTMLElement).closest('a, button, input, label, [role="menuitem"]')) return;
+                  setQuickLookId(problem.id);
                 }}
               >
                 <td
@@ -652,10 +722,25 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
                   })()}
                 </td>
                 <td className={`${styles['col-right']} ${styles.mono}`}>{problem.testcase_count ?? '—'}</td>
-                <td className={styles['col-center']}>
+                <td className={`${styles['col-right']} ${styles.mono}`}>{acRateLabel(problem) ?? <span className={styles['health-ok']}>—</span>}</td>
+                <td className={`${styles['col-right']} ${styles.mono}`}>{(problem.submission_count ?? 0) > 0 ? (problem.solver_count ?? 0) : <span className={styles['health-ok']}>—</span>}</td>
+                <td className={styles['col-left']}>
                   {problem.contest_id && (problem.contest_status === 'scheduled' || problem.contest_status === 'running')
                     ? <StatusDot tone="neutral" label="In contest" />
-                    : <StatusDot tone={problem.is_visible ? 'pass' : 'warn'} label={problem.is_visible ? 'Visible' : 'Hidden'} />}
+                    : (
+                      <label className={styles['visibility-switch']}>
+                        <input
+                          type="checkbox"
+                          role="switch"
+                          aria-label={`Visible: ${problem.id}`}
+                          checked={problem.is_visible}
+                          disabled={loading}
+                          onChange={() => handleToggleVisibility(problem.id, problem.is_visible)}
+                        />
+                        <span className={styles['visibility-track']} aria-hidden="true" />
+                        <span className={styles['visibility-text']}>{problem.is_visible ? 'Visible' : 'Hidden'}</span>
+                      </label>
+                    )}
                 </td>
                 <td className={styles['col-center']}>
                   <div className={styles['row-actions']}>
@@ -725,6 +810,13 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
         </div>
       )}
 
+      <ProblemQuickLook
+        problem={quickLookProblem}
+        issues={quickLookProblem ? healthIssues(quickLookProblem) : []}
+        busy={metadataBusy}
+        onClose={() => setQuickLookId(null)}
+        onSetDifficulty={(difficulty) => { if (quickLookProblem) void applyMetadata([quickLookProblem.id], { difficulty }); }}
+      />
       <CollectionsDialog
         open={collectionsOpen}
         onClose={() => setCollectionsOpen(false)}
