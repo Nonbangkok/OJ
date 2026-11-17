@@ -6,9 +6,9 @@ export interface DifficultyBadgeProps {
 }
 
 /**
- * A problem's difficulty as a pill in its heat-map band colour (800–1100 green,
- * 1200–1600 yellow, 1700–2100 orange, 2200–2700 red, 2800–3500 purple), the
- * same look the problem list had before the redesign. Unrated shows a muted dash.
+ * A problem's difficulty as a tinted badge in its band colour (800–1100 green,
+ * 1200–1600 yellow, 1700–2100 orange, 2200–2700 red, 2800–3500 purple), shaped
+ * like StatusBadge so it fits the neutral theme. Unrated shows a muted dash.
  */
 export function DifficultyBadge({ difficulty }: DifficultyBadgeProps) {
   const band = difficultyBand(difficulty);

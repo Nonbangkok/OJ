@@ -185,7 +185,6 @@ describe('theme-safe text', () => {
       [...readSource(file).matchAll(/([^{}]+)\{([^}]*)\}/g)]
         .filter(([, selector, body]) =>
           !/difficulty(-chip-|-preview-|Chip)/.test(selector) &&
-          !(file.endsWith('DifficultyBadge.module.css') && /^\s*\.badge\s*$/.test(selector.trim().split('\n').pop() ?? '')) &&
           /(^|[^-])(color|caret-color)\s*:\s*(white|#fff\b|#ffffff)/.test(body))
         .map(([, selector]) => `${file}: ${selector.trim().split('\n').pop()}`),
     );

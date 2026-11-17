@@ -71,4 +71,18 @@ describe('difficulty band tokens', () => {
       expect(contrastRatio(chipColor, background)).toBeGreaterThanOrEqual(1.5);
     }
   });
+
+  it.each([
+    ['light', light],
+    ['dark', dark],
+  ])('the tinted %s badge (band text on a band tint, like StatusBadge) reads at AA', (_theme, tokens) => {
+    const page = parseHex(resolveToken(tokens, 'background-primary'));
+    for (const band of [1, 2, 3, 4, 5]) {
+      const bg = parseHex(resolveToken(tokens, `difficulty-band-${band}-bg`));
+      const fg = parseHex(resolveToken(tokens, `difficulty-band-${band}-fg`));
+      expect(resolveToken(tokens, `difficulty-band-${band}-border`)).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(contrastRatio(fg, bg)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(fg, page)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
 });

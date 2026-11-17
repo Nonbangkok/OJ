@@ -126,39 +126,6 @@
   outline-offset: 1px;
 }
 
-/* Difficulty chip sits in the metadata row right after the ID: white text
-   on the band color passes WCAG AA in both themes; Unrated renders no chip. */
-[class*='difficulty-chip-'] {
-  display: inline-block;
-  padding: 0.08rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: #ffffff;
-  line-height: 1.5;
-}
-
-.difficulty-chip-1 {
-  background-color: var(--difficulty-band-1);
-}
-
-.difficulty-chip-2 {
-  background-color: var(--difficulty-band-2);
-}
-
-.difficulty-chip-3 {
-  background-color: var(--difficulty-band-3);
-}
-
-.difficulty-chip-4 {
-  background-color: var(--difficulty-band-4);
-}
-
-.difficulty-chip-5 {
-  background-color: var(--difficulty-band-5);
-}
-
 /* Attempt metadata: second muted line under the ID row, same rhythm for
    every attempted card. Hidden entirely for unattempted problems. */
 .submission-status-placeholder {
