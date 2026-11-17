@@ -15,7 +15,7 @@ import {
   TestcaseView,
   TestcaseViewPart,
 } from '../types/service';
-import { ADMIN_PROBLEM_LIST_CONFIG, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CONFIG, SUBMISSION_QUERY_CONFIG, TESTCASE_VIEWER_CONFIG, type ProblemFileRole, type ProblemType } from '../constants';
+import { ADMIN_PROBLEM_LIST_CONFIG, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CONFIG, SUBMISSION_QUERY_CONFIG, TESTCASE_VIEWER_CONFIG, type ProblemFileRole, type ProblemType, type AdminProblemView, type AdminProblemSort } from '../constants';
 import { fullyPairedCaseNumbers, pairZippedTestcaseFiles } from './testcaseZipPairing';
 import { isUniqueViolation } from '../utils/dbErrors';
 import { AppError } from '../middleware/errorHandler';
@@ -671,6 +671,13 @@ export interface AdminProblemFilters {
   visibility?: 'all' | 'visible' | 'hidden';
   /** Exact author match after trim, or 'none' (empty/NULL author), or 'all'. */
   author?: 'none' | 'all' | string;
+  /** Management tab; see ADMIN_VIEW_SQL. */
+  view?: AdminProblemView;
+  difficultyMin?: number;
+  difficultyMax?: number;
+  /** Comma-separated categories; any matches ('Uncategorized' = no categories). */
+  category?: string;
+  type?: ProblemType;
 }
 
 /** Full query surface of the paginated admin problem list. */
@@ -679,6 +686,9 @@ export interface AdminProblemListOptions extends AdminProblemFilters {
   limit?: number;
   /** Opaque next-page token from a previous response. */
   cursor?: string;
+  /** Sort column; id (default) pages by keyset, the others by position. */
+  sort?: AdminProblemSort;
+  order?: 'asc' | 'desc';
 }
 
 /**
@@ -698,6 +708,10 @@ export interface AdminProblemsPage {
   hasUnauthoredProblems: boolean;
   /** All matching standalone problems, independent of cursor/page size. */
   bulkEligibleCount: number;
+  /** Every problem matching the filters and the view, independent of paging. */
+  total: number;
+  /** Per-tab counts under the same filters (the view itself aside). */
+  viewCounts: Record<'all' | AdminProblemView, number>;
 }
 
 /** Author filter option: the trimmed author name ('' = "No author"). */
@@ -728,8 +742,29 @@ const decodeAdminCursor = (raw: string): string => {
  * Keep pagination cursor and limit out of this builder so all-matching
  * operations always use the entire matching set.
  */
-const buildAdminProblemFilter = (options: AdminProblemFilters, params: unknown[]): string[] => {
+/**
+ * A problem needs attention when students cannot be judged on it: no testcases,
+ * no statement PDF, or a header problem without a grader .cpp.
+ */
+const HAS_TESTCASES_SQL = 'EXISTS (SELECT 1 FROM testcases t WHERE t.problem_id = p.id)';
+const HAS_GRADER_SQL = "EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = p.id AND f.role = 'grader' AND lower(f.filename) LIKE '%.cpp')";
+const ADMIN_VIEW_SQL: Record<AdminProblemView, string> = {
+  attention: `(NOT ${HAS_TESTCASES_SQL} OR p.problem_pdf IS NULL OR (p.problem_type = 'header' AND NOT ${HAS_GRADER_SQL}))`,
+  hidden: '(p.is_visible = false AND p.contest_id IS NULL)',
+  in_contest: 'p.contest_id IS NOT NULL',
+  header: "p.problem_type = 'header'",
+};
+
+const buildAdminProblemFilter = (options: AdminProblemFilters, params: unknown[], { withView = true } = {}): string[] => {
   const filters: string[] = [];
+  if (withView && options.view !== undefined) filters.push(ADMIN_VIEW_SQL[options.view]);
+  // Difficulty band, categories and type share the public list's predicates.
+  filters.push(...buildProblemListFilters({
+    ...(options.difficultyMin !== undefined ? { difficultyMin: options.difficultyMin } : {}),
+    ...(options.difficultyMax !== undefined ? { difficultyMax: options.difficultyMax } : {}),
+    ...(options.category !== undefined ? { category: options.category } : {}),
+    ...(options.type !== undefined ? { type: options.type } : {}),
+  }, params));
   if (options.search !== undefined && options.search !== '') {
     params.push(`%${escapeLikePattern(options.search)}%`);
     filters.push(`(p.id ILIKE $${params.length} OR p.title ILIKE $${params.length})`);
@@ -780,7 +815,9 @@ const ADMIN_PROBLEM_FACTS_SQL = `
       GROUP BY problem_id
     )
     SELECT page.*, COALESCE(tc.n, 0) AS testcase_count, COALESCE(tc.bytes, 0)::float8 AS testcase_bytes,
-           COALESCE(subs.n, 0) AS submission_count, COALESCE(subs.n, 0) > 0 AS type_locked
+           COALESCE(subs.n, 0) AS submission_count, COALESCE(subs.n, 0) > 0 AS type_locked,
+           EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = page.id AND f.role = 'grader'
+                   AND lower(f.filename) LIKE '%.cpp') AS has_grader
     FROM page
     LEFT JOIN tc ON tc.problem_id = page.id
     LEFT JOIN subs ON subs.problem_id = page.id`;
@@ -805,6 +842,24 @@ export const getAdminProblemFacts = async (id: string): Promise<AdminProblemFact
   return row ? { collection_id: row.collection_id, testcase_count: row.testcase_count, testcase_bytes: Number(row.testcase_bytes), submission_count: row.submission_count, type_locked: row.type_locked } : null;
 };
 
+/** ORDER BY for each sort column; p.id breaks ties so the order is total. */
+const ADMIN_SORT_SQL: Record<Exclude<AdminProblemSort, 'id'>, (dir: 'ASC' | 'DESC') => string> = {
+  title: (dir) => `lower(p.title) ${dir}, p.id ASC`,
+  difficulty: (dir) => `p.difficulty ${dir} NULLS LAST, p.id ASC`,
+  tests: (dir) => `(SELECT COUNT(*) FROM testcases t WHERE t.problem_id = p.id) ${dir}, p.id ASC`,
+};
+
+/** Position cursor for the sorted (non-id) modes; tied to its sort so a stale cursor is refused. */
+const decodeOffsetCursor = (raw: string, sortKey: string): number => {
+  try {
+    const cursor = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as { o?: unknown; s?: unknown };
+    if (typeof cursor.o === 'number' && Number.isInteger(cursor.o) && cursor.o >= 0 && cursor.s === sortKey) return cursor.o;
+  } catch {
+    // fall through to the 400 below
+  }
+  throw new AppError('Invalid cursor', 400);
+};
+
 export const getAdminProblemsPage = async (
   options: AdminProblemListOptions = {},
 ): Promise<AdminProblemsPage> => {
@@ -812,37 +867,56 @@ export const getAdminProblemsPage = async (
   if (!Number.isInteger(limit) || limit < 1 || limit > ADMIN_PROBLEM_LIST_CONFIG.MAX_LIMIT) {
     throw new AppError(`limit must be an integer between 1 and ${ADMIN_PROBLEM_LIST_CONFIG.MAX_LIMIT}`, 400);
   }
-  const afterId = options.cursor !== undefined ? decodeAdminCursor(options.cursor) : null;
+  const sort = options.sort ?? 'id';
+  const dir = options.order === 'desc' ? 'DESC' : 'ASC';
+  const sortKey = `${sort}:${dir}`;
 
   const params: unknown[] = [];
   const filters = buildAdminProblemFilter(options, params);
-  if (afterId !== null) {
-    params.push(afterId);
-    filters.push(`p.id > $${params.length}`);
+  let orderBy: string;
+  let offset = 0;
+  if (sort === 'id') {
+    // Keyset on the unique id: pages can never overlap or skip.
+    orderBy = `p.id ${dir}`;
+    if (options.cursor !== undefined) {
+      params.push(decodeAdminCursor(options.cursor));
+      filters.push(`p.id ${dir === 'ASC' ? '>' : '<'} $${params.length}`);
+    }
+  } else {
+    // The admin pool is small (hundreds of rows); a position cursor keeps computed sorts simple.
+    orderBy = ADMIN_SORT_SQL[sort](dir);
+    if (options.cursor !== undefined) offset = decodeOffsetCursor(options.cursor, sortKey);
   }
 
   params.push(limit + 1);
   const fetchLimitParam = params.length;
+  params.push(offset);
+  const offsetParam = params.length;
 
   const query = `
     WITH page AS (
       SELECT p.id, p.title, p.author, p.categories, p.difficulty, p.collection_id,
              col.name AS collection_name, p.is_visible, p.contest_id, c.status AS contest_status,
-             p.problem_type, p.time_limit_ms, p.memory_limit_mb
+             p.problem_type, p.time_limit_ms, p.memory_limit_mb, (p.problem_pdf IS NOT NULL) AS has_pdf,
+             ROW_NUMBER() OVER (ORDER BY ${orderBy}) AS sort_rank
       FROM problems p
       LEFT JOIN contests c ON p.contest_id = c.id
       LEFT JOIN collections col ON p.collection_id = col.id
       ${filters.length ? `WHERE ${filters.join(' AND ')}` : ''}
-      ORDER BY p.id ASC
-      LIMIT $${fetchLimitParam}
+      ORDER BY ${orderBy}
+      LIMIT $${fetchLimitParam} OFFSET $${offsetParam}
     )
     ${ADMIN_PROBLEM_FACTS_SQL}
-    ORDER BY page.id ASC
+    ORDER BY page.sort_rank
   `;
-  const result = await db.query<AdminProblemRow>(query, params);
-  const hasMore = result.rows.length > limit;
-  const problems = hasMore ? result.rows.slice(0, limit) : result.rows;
+  const result = await db.query<AdminProblemRow & { sort_rank?: unknown }>(query, params);
+  const rows = result.rows.map(({ sort_rank: _rank, ...row }) => row as AdminProblemRow);
+  const hasMore = rows.length > limit;
+  const problems = hasMore ? rows.slice(0, limit) : rows;
   const last = problems[problems.length - 1];
+  const nextCursor = !hasMore || !last ? null : Buffer.from(JSON.stringify(
+    sort === 'id' ? { id: last.id } : { o: offset + limit, s: sortKey },
+  ), 'utf8').toString('base64url');
 
   // Author filter options come from the whole pool, not the current page —
   // one cheap aggregate per request (the admin list is orders of magnitude
@@ -865,16 +939,36 @@ export const getAdminProblemsPage = async (
     `SELECT COUNT(*) AS count FROM problems p WHERE ${countFilters.join(' AND ')}`,
     countParams,
   );
+  // The tabs' counts: every filter but the view, one pass over the pool.
+  const tabParams: unknown[] = [];
+  const tabFilters = buildAdminProblemFilter(options, tabParams, { withView: false });
+  const tabResult = await db.query<Record<'all' | AdminProblemView, string | number>>(
+    `SELECT COUNT(*) AS all,
+            COUNT(*) FILTER (WHERE ${ADMIN_VIEW_SQL.attention}) AS attention,
+            COUNT(*) FILTER (WHERE ${ADMIN_VIEW_SQL.hidden}) AS hidden,
+            COUNT(*) FILTER (WHERE ${ADMIN_VIEW_SQL.in_contest}) AS in_contest,
+            COUNT(*) FILTER (WHERE ${ADMIN_VIEW_SQL.header}) AS header
+     FROM problems p ${tabFilters.length ? `WHERE ${tabFilters.join(' AND ')}` : ''}`,
+    tabParams,
+  );
+  const tabs = tabResult.rows[0];
+  const viewCounts = {
+    all: Number(tabs?.all ?? 0),
+    attention: Number(tabs?.attention ?? 0),
+    hidden: Number(tabs?.hidden ?? 0),
+    in_contest: Number(tabs?.in_contest ?? 0),
+    header: Number(tabs?.header ?? 0),
+  };
 
   return {
     problems,
     hasMore,
-    nextCursor: hasMore && last
-      ? Buffer.from(JSON.stringify({ id: last.id }), 'utf8').toString('base64url')
-      : null,
+    nextCursor,
     authors: authorAggregate.rows.map(row => ({ name: row.name })),
     hasUnauthoredProblems: unauthoredResult.rows[0]?.exists === true,
     bulkEligibleCount: Number(countResult.rows[0]?.count ?? 0),
+    total: viewCounts[options.view ?? 'all'],
+    viewCounts,
   };
 };
 

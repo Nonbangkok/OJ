@@ -479,10 +479,10 @@ const manageUsers = [
 ];
 
 const manageProblems = [
-  { id: 'interval', title: 'Interval merge', author: 'Ada', categories: ['Sorting'], difficulty: 1400, collection_id: 2, collection_name: 'Sorting basics', is_visible: true, contest_id: null, contest_status: null, problem_type: 'standard', time_limit_ms: 1000, memory_limit_mb: 256, testcase_count: 10, testcase_bytes: 2_400_000, submission_count: 214, type_locked: true },
-  { id: 'hp_vec04_erase', title: 'Vector erase', author: 'Ada', categories: ['Implementation'], difficulty: 1200, collection_id: null, collection_name: null, is_visible: true, contest_id: null, contest_status: null, problem_type: 'header', time_limit_ms: 1000, memory_limit_mb: 256, testcase_count: 10, testcase_bytes: 51_200, submission_count: 38, type_locked: true },
-  { id: 'twosum', title: 'Two sums', author: 'kru.somchai', categories: ['Two Pointers'], difficulty: 1100, collection_id: 2, collection_name: 'Sorting basics', is_visible: false, contest_id: null, contest_status: null, problem_type: 'standard', time_limit_ms: 2000, memory_limit_mb: 128, testcase_count: 12, testcase_bytes: 880_000, submission_count: 0, type_locked: false },
-  { id: 'graphwalk', title: 'Graph walk', author: 'Ada', categories: ['Graphs'], difficulty: 1800, collection_id: null, collection_name: null, is_visible: false, contest_id: 7, contest_status: 'scheduled', problem_type: 'standard', time_limit_ms: 1500, memory_limit_mb: 256, testcase_count: 15, testcase_bytes: 4_100_000, submission_count: 0, type_locked: false },
+  { id: 'interval', title: 'Interval merge', author: 'Ada', categories: ['Sorting'], difficulty: 1400, collection_id: 2, collection_name: 'Sorting basics', is_visible: true, contest_id: null, contest_status: null, problem_type: 'standard', time_limit_ms: 1000, memory_limit_mb: 256, testcase_count: 10, testcase_bytes: 2_400_000, submission_count: 214, type_locked: true, has_pdf: true, has_grader: false },
+  { id: 'hp_vec04_erase', title: 'Vector erase', author: 'Ada', categories: ['Implementation'], difficulty: 1200, collection_id: null, collection_name: null, is_visible: true, contest_id: null, contest_status: null, problem_type: 'header', time_limit_ms: 1000, memory_limit_mb: 256, testcase_count: 10, testcase_bytes: 51_200, submission_count: 38, type_locked: true, has_pdf: true, has_grader: true },
+  { id: 'twosum', title: 'Two sums', author: 'kru.somchai', categories: ['Two Pointers'], difficulty: 1100, collection_id: 2, collection_name: 'Sorting basics', is_visible: false, contest_id: null, contest_status: null, problem_type: 'standard', time_limit_ms: 2000, memory_limit_mb: 128, testcase_count: 0, testcase_bytes: 0, submission_count: 0, type_locked: false, has_pdf: false, has_grader: false },
+  { id: 'graphwalk', title: 'Graph walk', author: 'Ada', categories: ['Graphs'], difficulty: 1800, collection_id: null, collection_name: null, is_visible: false, contest_id: 7, contest_status: 'scheduled', problem_type: 'standard', time_limit_ms: 1500, memory_limit_mb: 256, testcase_count: 15, testcase_bytes: 4_100_000, submission_count: 0, type_locked: false, has_pdf: true, has_grader: false },
 ];
 
 const manageContests = [
@@ -555,6 +555,7 @@ export async function mockManageApi(page: Page): Promise<void> {
   // Problems
   await page.route(/\/api\/admin\/problems(\?|$)/, (route) => route.fulfill(json({
     problems: manageProblems, nextCursor: null, hasMore: false, authors: [{ name: 'Ada' }, { name: 'kru.somchai' }],
+    total: 4, viewCounts: { all: 4, attention: 1, hidden: 1, in_contest: 1, header: 1 },
     hasUnauthoredProblems: false, bulkEligibleCount: 3,
   })));
   await page.route('**/api/admin/collections', (route) =>

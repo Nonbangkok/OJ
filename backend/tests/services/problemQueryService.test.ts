@@ -30,13 +30,19 @@ describe('problemQueryService difficulty handling', () => {
         .mockResolvedValueOnce({ rows: [{ id: 'p1', title: 'p1', author: 'A', categories: [], difficulty: null, collection_id: null, collection_name: null, is_visible: false, contest_id: null, contest_status: null }] })
         .mockResolvedValueOnce({ rows: [{ name: 'A' }] })
         .mockResolvedValueOnce({ rows: [{ exists: false }] })
-        .mockResolvedValueOnce({ rows: [{ count: '30' }] });
+        .mockResolvedValueOnce({ rows: [{ count: '30' }] })
+        .mockResolvedValueOnce({ rows: [{ all: '31', attention: '2', hidden: '1', in_contest: '1', header: '0' }] });
 
       const page = await getAdminProblemsPage({ search: '01_Expr', limit: 20 });
 
       expect(page.problems).toHaveLength(1);
       expect(page.bulkEligibleCount).toBe(30);
-      expect(query).toHaveBeenCalledTimes(4);
+      expect(page.total).toBe(31);
+      expect(page.viewCounts).toEqual({ all: 31, attention: 2, hidden: 1, in_contest: 1, header: 0 });
+      // Page, authors, unauthored flag, bulk-eligible count, then the tab counts.
+      expect(query).toHaveBeenCalledTimes(5);
+      expect(query.mock.calls[4][0]).toContain('FILTER (WHERE');
+      expect(query.mock.calls[4][1]).toEqual(['%01\\_Expr%']);
       expect(query.mock.calls[3][0]).toContain('p.contest_id IS NULL');
       expect(query.mock.calls[3][0]).toContain('p.id ILIKE');
       expect(query.mock.calls[3][1]).toEqual(['%01\\_Expr%']);

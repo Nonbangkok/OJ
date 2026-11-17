@@ -32,7 +32,7 @@ import {
   updateProblemVisibility,
   updateAdminProblemsVisibility,
 } from '../services/problemQueryService';
-import { USER_ROLES, type ProblemFileRole, type ProblemType } from '../constants';
+import { USER_ROLES, type ProblemFileRole, type ProblemType, type AdminProblemView, type AdminProblemSort } from '../constants';
 import * as db from '../db';
 import { sendStarterZip, getProblemFile, getProblemFiles, listProblemFiles, replaceProblemFiles } from '../services/problemFilesService';
 import { readFlatZip } from '../utils/headerProblemFiles';
@@ -374,13 +374,20 @@ router.get('/admin/problems', requireAuth, requireStaffOrAdmin,
   validateRequest({ query: adminProblemsQuerySchema }),
   asyncHandler(async (req: Request, res: Response) => {
   // validateRequest writes Zod defaults/coercions back into req.query.
-  const { search, collection, visibility, author, limit, cursor } = req.query as unknown as {
+  const { search, collection, visibility, author, limit, cursor, view, difficultyMin, difficultyMax, category, type, sort, order } = req.query as unknown as {
     search?: string;
     collection?: 'none' | 'all' | number;
     visibility?: 'all' | 'visible' | 'hidden';
     author?: string;
     limit?: number;
     cursor?: string;
+    view?: AdminProblemView;
+    difficultyMin?: number;
+    difficultyMax?: number;
+    category?: string;
+    type?: ProblemType;
+    sort?: AdminProblemSort;
+    order?: 'asc' | 'desc';
   };
   // Map the sentinel strings the frontend sends for "all" onto undefined so
   // the service sees a clean unfiltered query (its own 'all' handling is
@@ -390,6 +397,13 @@ router.get('/admin/problems', requireAuth, requireStaffOrAdmin,
     ...(collection !== undefined && collection !== 'all' ? { collection } : {}),
     ...(visibility !== undefined && visibility !== 'all' ? { visibility } : {}),
     ...(author !== undefined && author !== 'all' ? { author } : {}),
+    ...(view !== undefined ? { view } : {}),
+    ...(difficultyMin !== undefined ? { difficultyMin } : {}),
+    ...(difficultyMax !== undefined ? { difficultyMax } : {}),
+    ...(category !== undefined ? { category } : {}),
+    ...(type !== undefined ? { type } : {}),
+    ...(sort !== undefined ? { sort } : {}),
+    ...(order !== undefined ? { order } : {}),
     ...(limit !== undefined ? { limit } : {}),
     ...(cursor !== undefined ? { cursor } : {}),
   });

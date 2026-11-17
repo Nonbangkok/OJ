@@ -30,7 +30,7 @@ export const SCHEMA_MIGRATION_LOCK_ID = 734001;
 const DEADLOCK_DETECTED = '40P01';
 const CONCURRENT_ATTEMPTS = 5;
 const CONCURRENT_RETRY_MS = 200;
-const LOCK_POLL_MS = 500;
+const LOCK_POLL_MS = 100;
 
 /**
  * Takes the migration lock by polling, never by blocking in pg_advisory_lock: a session
