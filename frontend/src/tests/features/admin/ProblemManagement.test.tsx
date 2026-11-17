@@ -48,6 +48,23 @@ const renderProblemManagement = () => {
     );
 };
 
+/** Picks one option from a desktop filter chip (single-value Base UI menu). */
+const pickChip = async (chip: string, option: string) => {
+    const set = screen.queryByRole('button', { name: new RegExp(`^Remove filter ${chip}:`) });
+    if (set) fireEvent.click(set);
+    fireEvent.click(await screen.findByRole('button', { name: `Add filter: ${chip}` }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: option }));
+};
+const chipShows = (chip: string, label: string) => screen.getByRole('button', { name: `Remove filter ${chip}: ${label}` });
+const chipUnset = (chip: string) => screen.getByRole('button', { name: `Add filter: ${chip}` });
+/** The options a chip menu lists. */
+const chipOptions = async (chip: string) => {
+    fireEvent.click(screen.getByRole('button', { name: `Add filter: ${chip}` }));
+    const items = (await screen.findAllByRole('menuitem')).map((m) => m.textContent);
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    return items;
+};
+
 describe('ProblemManagement Component', () => {
     afterEach(() => restoreMockIntersectionObserver());
 
@@ -60,6 +77,79 @@ describe('ProblemManagement Component', () => {
         // the collections fetch the page performs on mount must be re-stubbed
         // every time — it defaults to an empty list.
         (jest.mocked(adminService.getCollections) as jest.Mock).mockResolvedValue([]);
+    });
+
+    describe('management views, chips, health and sorting', () => {
+        const counts = { all: 142, attention: 6, hidden: 9, in_contest: 4, header: 3 };
+        const rows = [
+            { id: 'ready', title: 'Ready One', author: 'admin', is_visible: true, contest_id: null, contest_status: null, collection_id: 7, collection_name: 'Graphs', difficulty: 1500, testcase_count: 6, has_pdf: true, has_grader: false, problem_type: 'standard' },
+            { id: 'bare', title: 'Bare One', author: 'admin', is_visible: true, contest_id: null, contest_status: null, collection_id: null, collection_name: null, difficulty: null, testcase_count: 0, has_pdf: false, has_grader: false, problem_type: 'standard' },
+            { id: 'head', title: 'Header One', author: 'admin', is_visible: true, contest_id: null, contest_status: null, collection_id: null, collection_name: null, difficulty: 1100, testcase_count: 5, has_pdf: true, has_grader: false, problem_type: 'header' },
+        ];
+        beforeEach(() => {
+            (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(makePage(rows, { total: 142, viewCounts: counts }));
+        });
+
+        it('shows the exact total and how many need attention', async () => {
+            renderProblemManagement();
+            expect(await screen.findByText('142 problems · 6 need attention')).toBeInTheDocument();
+        });
+
+        it('view tabs carry their counts and query the server', async () => {
+            renderProblemManagement();
+            await screen.findByText('Ready One');
+            const views = screen.getByRole('group', { name: 'Problem view' });
+            for (const label of ['All 142', 'Needs attention 6', 'Hidden 9', 'In contest 4', 'Header 3']) {
+                expect(within(views).getByRole('button', { name: label })).toBeInTheDocument();
+            }
+            fireEvent.click(within(views).getByRole('button', { name: 'Needs attention 6' }));
+            await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(expect.objectContaining({ view: 'attention' })));
+            expect(new URLSearchParams(window.location.search).get('view')).toBe('attention');
+        });
+
+        it('filter chips send difficulty, several categories and type', async () => {
+            renderProblemManagement();
+            await screen.findByText('Ready One');
+            fireEvent.click(screen.getByRole('button', { name: 'Add filter: Difficulty' }));
+            fireEvent.click(await screen.findByRole('menuitem', { name: '1200–1500' }));
+            await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(expect.objectContaining({ difficultyMin: 1200, difficultyMax: 1500 })));
+            fireEvent.click(screen.getByRole('button', { name: 'Add filter: Category' }));
+            fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Graph' }));
+            fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Math' }));
+            fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+            await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(expect.objectContaining({ category: 'Graph,Math' })));
+            fireEvent.click(screen.getByRole('button', { name: 'Add filter: Type' }));
+            fireEvent.click(await screen.findByRole('menuitem', { name: 'Header' }));
+            await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'header' })));
+        });
+
+        it('the Health column says what blocks judging', async () => {
+            renderProblemManagement();
+            const row = async (id: string) => (await screen.findByRole('link', { name: id })).closest('tr')!;
+            expect(within(await row('ready')).getByText('Ready')).toBeInTheDocument();
+            expect(within(await row('bare')).getByText('No PDF · No tests')).toBeInTheDocument();
+            expect(within(await row('head')).getByText('No grader')).toBeInTheDocument();
+        });
+
+        it('the collection sits under the title; the Limits and Collection columns are gone', async () => {
+            renderProblemManagement();
+            const ready = (await screen.findByRole('link', { name: 'ready' })).closest('tr')!;
+            expect(within(ready).getByText('Graphs')).toBeInTheDocument();
+            const headers = screen.getAllByRole('columnheader').map((th) => th.textContent?.trim());
+            expect(headers).not.toContain('Limits');
+            expect(headers).not.toContain('Collection');
+            expect(headers).toEqual(expect.arrayContaining(['Health']));
+        });
+
+        it('sortable headers toggle ascending and descending', async () => {
+            renderProblemManagement();
+            await screen.findByText('Ready One');
+            fireEvent.click(screen.getByRole('button', { name: /^Difficulty/ }));
+            await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'difficulty', order: 'asc' })));
+            fireEvent.click(screen.getByRole('button', { name: /^Difficulty/ }));
+            await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'difficulty', order: 'desc' })));
+            expect(screen.getByRole('columnheader', { name: /Difficulty/ })).toHaveAttribute('aria-sort', 'descending');
+        });
     });
 
     it('renders loading state initially', () => {
@@ -107,9 +197,9 @@ describe('ProblemManagement Component', () => {
 
         expect(screen.getByText('Admin Restore 49')).toBeInTheDocument();
         expect(screen.getByLabelText('Search problems')).toHaveValue('needle');
-        expect(screen.getByLabelText('Filter problems by collection')).toHaveValue('none');
-        expect(screen.getByLabelText('Filter problems by visibility')).toHaveValue('hidden');
-        expect(screen.getByLabelText('Filter problems by author')).toHaveValue('Alice');
+        expect(chipShows('Collection', 'No collection')).toBeInTheDocument();
+        expect(chipShows('Visibility', 'Hidden')).toBeInTheDocument();
+        expect(chipShows('Author', 'Alice')).toBeInTheDocument();
         expect(adminService.getProblems).not.toHaveBeenCalled();
         (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(makePage([{
             id: 'admin-restore-50', title: 'Admin Restore 50', author: 'Alice', is_visible: false,
@@ -146,11 +236,12 @@ describe('ProblemManagement Component', () => {
             window.dispatchEvent(new PopStateEvent('popstate'));
         });
         expect(screen.getByLabelText('Search problems')).toHaveValue('needle');
-        expect(screen.getByLabelText('Filter problems by visibility')).toHaveValue('hidden');
-        expect(screen.getByLabelText('Filter problems by collection')).toHaveValue('none');
+        expect(chipShows('Visibility', 'Hidden')).toBeInTheDocument();
+        expect(chipShows('Collection', 'No collection')).toBeInTheDocument();
+        // The search follows its debounce; leave room for a loaded test machine.
         await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(
             expect.objectContaining({ search: 'needle', visibility: 'hidden', collection: 'none' }),
-        ));
+        ), { timeout: 4000 });
         // Initial load, then the select filters apply at once and the search
         // follows after its debounce — same request count as before.
         expect(adminService.getProblems).toHaveBeenCalledTimes(3);
@@ -160,8 +251,8 @@ describe('ProblemManagement Component', () => {
             window.dispatchEvent(new PopStateEvent('popstate'));
         });
         expect(screen.getByLabelText('Search problems')).toHaveValue('');
-        expect(screen.getByLabelText('Filter problems by visibility')).toHaveValue('all');
-        expect(screen.getByLabelText('Filter problems by collection')).toHaveValue('all');
+        expect(chipUnset('Visibility')).toBeInTheDocument();
+        expect(chipUnset('Collection')).toBeInTheDocument();
     });
 
     it('shows chunk upload progress before SSE processing without replacing upload controls', async () => {
@@ -265,6 +356,17 @@ describe('ProblemManagement Component', () => {
             expect(screen.queryByText('1 selected')).not.toBeInTheDocument();
         });
         expect(screen.getByText('Problem 1')).toBeInTheDocument();
+    });
+
+    it('Hide all matching sends only the filters, never the sort (the server refuses sort keys there)', async () => {
+        (jest.mocked(adminService.setProblemsVisibility) as jest.Mock).mockResolvedValue({ updatedCount: 2 });
+        window.history.replaceState({}, '', '/admin/problems?view=attention&sort=difficulty&order=desc');
+        renderProblemManagement();
+        await waitFor(() => screen.getByText('Problem 1'));
+        fireEvent.click(screen.getByRole('button', { name: 'More problem actions' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: /^hide all \d+ matching$/i }));
+        fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
+        await waitFor(() => expect(adminService.setProblemsVisibility).toHaveBeenCalledWith({ view: 'attention' }, false));
     });
 
     it('retains the loaded rows and reports a bulk failure for retry', async () => {
@@ -562,16 +664,16 @@ describe('ProblemManagement Component', () => {
             fireEvent.click(getRowCheckbox('Echo 1'));
             expect(screen.getByText('1 selected')).toBeInTheDocument();
 
-            fireEvent.change(screen.getByLabelText('Filter problems by visibility'), { target: { value: 'hidden' } });
+            await pickChip('Visibility', 'Hidden');
             expect(screen.queryByText('1 selected')).not.toBeInTheDocument();
         });
 
-        it('changing the author filter clears the selection', async () => {
+        it('changing a filter chip clears the selection', async () => {
             await renderWithSearchProblems();
             fireEvent.click(getRowCheckbox('Echo 1'));
             expect(screen.getByText('1 selected')).toBeInTheDocument();
 
-            fireEvent.change(screen.getByLabelText('Filter problems by author'), { target: { value: 'admin' } });
+            await pickChip('Type', 'Header');
             expect(screen.queryByText('1 selected')).not.toBeInTheDocument();
         });
 
@@ -703,10 +805,8 @@ describe('ProblemManagement Component', () => {
         it('renders server-provided author options and groups unauthored rows', async () => {
             await renderWithAuthors();
 
-            const select = screen.getByLabelText('Filter problems by author');
-            const options = within(select).getAllByRole('option').map(o => o.textContent);
             // Server-provided list plus "No author" when unauthored rows exist.
-            expect(options).toEqual(['All Authors', 'Alice', 'Zed', 'No author']);
+            expect(await chipOptions('Author')).toEqual(['Alice', 'Zed', 'No author']);
         });
 
         it('omits the No author option when the server reports no unauthored problems', async () => {
@@ -716,8 +816,7 @@ describe('ProblemManagement Component', () => {
             renderProblemManagement();
             await waitFor(() => screen.getByRole('heading', { level: 1, name: 'Problems' }));
 
-            const select = screen.getByLabelText('Filter problems by author');
-            expect(within(select).queryByRole('option', { name: 'No author' })).not.toBeInTheDocument();
+            expect(await chipOptions('Author')).not.toContain('No author');
         });
 
         it('re-queries the server with the author filter when one is chosen', async () => {
@@ -726,7 +825,7 @@ describe('ProblemManagement Component', () => {
                 makePage([{ id: 'A3', title: 'Gamma', author: 'Alice', is_visible: true, contest_id: null, contest_status: null }]),
             );
 
-            fireEvent.change(screen.getByLabelText('Filter problems by author'), { target: { value: 'Alice' } });
+            await pickChip('Author', 'Alice');
 
             await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(
                 expect.objectContaining({ author: 'Alice', limit: 25 }),
@@ -742,9 +841,9 @@ describe('ProblemManagement Component', () => {
                 makePage([], { authors: [{ name: 'Alice' }], hasUnauthoredProblems: false }),
             );
 
-            fireEvent.change(screen.getByLabelText('Filter problems by author'), { target: { value: 'Zed' } });
-            // The phantom selection falls back to 'all' on the next render...
-            await waitFor(() => expect((screen.getByLabelText('Filter problems by author') as HTMLSelectElement).value).toBe('all'));
+            await pickChip('Author', 'Zed');
+            // The phantom selection falls back to every author on the next render...
+            await waitFor(() => expect(chipUnset('Author')).toBeInTheDocument());
             // ...and no author param is sent for the fallback query.
             await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(
                 expect.not.objectContaining({ author: expect.anything() }),
@@ -755,12 +854,12 @@ describe('ProblemManagement Component', () => {
             await renderWithAuthors();
             (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValueOnce(makePage([]));
 
-            fireEvent.change(screen.getByLabelText('Filter problems by author'), { target: { value: 'Alice' } });
+            await pickChip('Author', 'Alice');
             await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(
                 expect.objectContaining({ author: 'Alice' }),
             ));
 
-            fireEvent.change(screen.getByLabelText('Filter problems by visibility'), { target: { value: 'hidden' } });
+            await pickChip('Visibility', 'Hidden');
             await waitFor(() => expect(adminService.getProblems).toHaveBeenLastCalledWith(
                 expect.objectContaining({ author: 'Alice', visibility: 'hidden', limit: 25 }),
             ));
@@ -833,7 +932,7 @@ describe('ProblemManagement Component', () => {
             renderProblemManagement();
             await waitFor(() => screen.getByText('Problem 1'));
 
-            fireEvent.change(screen.getByLabelText('Filter problems by visibility'), { target: { value: 'hidden' } });
+            await pickChip('Visibility', 'Hidden');
             await waitFor(() => expect(screen.queryByText('Problem 1')).not.toBeInTheDocument());
             fireEvent.click(screen.getByRole('button', { name: 'Load All' }));
 
@@ -936,7 +1035,7 @@ describe('ProblemManagement Component', () => {
 
             // Changing the visibility filter restarts from the new query's
             // first batch — never appends across filter states.
-            fireEvent.change(screen.getByLabelText('Filter problems by visibility'), { target: { value: 'hidden' } });
+            await pickChip('Visibility', 'Hidden');
 
             expect(await screen.findByText('Problem 2')).toBeInTheDocument();
             expect(screen.queryByText('Problem 1')).not.toBeInTheDocument();
@@ -1016,14 +1115,13 @@ describe('ProblemManagement Component', () => {
             expect(screen.getByRole('menuitem', { name: 'Hide all 2 matching' })).toBeInTheDocument();
         });
 
-        it('columns: type tag, difficulty, tests, limits, collection, visibility dot', async () => {
+        it('columns: type tag, difficulty, health, tests, collection under the title, visibility dot', async () => {
             renderProblemManagement();
             await screen.findByText('Header one');
             const headers = within(screen.getByRole('table')).getAllByRole('columnheader').map((h) => h.textContent);
-            expect(headers).toEqual(expect.arrayContaining(['ID', 'Title', 'Difficulty', 'Tests', 'Limits', 'Collection', 'Visibility']));
+            expect(headers).toEqual(expect.arrayContaining(['ID', 'Title', 'Difficulty', 'Health', 'Tests', 'Visibility']));
             expect(within(rowOf('H1')).getByText('HEADER')).toBeInTheDocument();
             expect(within(rowOf('P1')).queryByText('STANDARD')).toBeNull();
-            expect(within(rowOf('P1')).getByText('1000 ms · 256 MB')).toBeInTheDocument();
             expect(within(rowOf('P1')).getByText('Sorting')).toBeInTheDocument();
             expect(within(rowOf('P1')).getByText('Visible')).toBeInTheDocument();
             expect(within(rowOf('H1')).getByText('Hidden')).toBeInTheDocument();

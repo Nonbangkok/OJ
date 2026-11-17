@@ -72,6 +72,8 @@ const useProblemManagement = (query: AdminProblemsQuery, initialPageSpan?: Probl
     authors: crud.authors,
     hasUnauthoredProblems: crud.hasUnauthoredProblems,
     bulkEligibleCount: crud.bulkEligibleCount,
+    total: crud.total,
+    viewCounts: crud.viewCounts,
     loadedQueryKey: crud.loadedQueryKey,
     loadMore: crud.loadMore,
     loadAll: crud.loadAll,

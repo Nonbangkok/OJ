@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import adminService from '../../services/adminService';
 import { ADMIN_PROBLEMS_PAGE } from '../../config/constants';
-import type { AdminProblem, AdminProblemsPageResponse, AdminProblemsQuery } from '../../types';
+import type { AdminProblem, AdminProblemsPageResponse, AdminProblemsQuery, AdminProblemViewCounts } from '../../types';
 import type { ProblemListSpan } from '../../routing/problemListLoaders';
 
 /**
@@ -42,6 +42,9 @@ export const useAdminProblemsPage = (
   const [authors, setAuthors] = useState<Array<{ name: string }>>(() => initialData?.pageMetadata?.authors ?? []);
   const [hasUnauthoredProblems, setHasUnauthoredProblems] = useState(() => initialData?.pageMetadata?.hasUnauthoredProblems ?? false);
   const [bulkEligibleCount, setBulkEligibleCount] = useState(() => initialData?.pageMetadata?.bulkEligibleCount ?? 0);
+  /** Exact match count and the per-tab counts (server-provided with every page). */
+  const [total, setTotal] = useState<number | null>(() => initialData?.pageMetadata?.total ?? null);
+  const [viewCounts, setViewCounts] = useState<AdminProblemViewCounts | null>(() => initialData?.pageMetadata?.viewCounts ?? null);
   // Identifies the filter scope for which the count/page response is current.
   // Consumers with scope-wide actions must not use a stale count while a new
   // query is waiting to fetch (or has failed).
@@ -85,6 +88,8 @@ export const useAdminProblemsPage = (
         setAuthors(page.authors);
         setHasUnauthoredProblems(page.hasUnauthoredProblems);
         setBulkEligibleCount(page.bulkEligibleCount);
+        setTotal(page.total ?? null);
+        setViewCounts(page.viewCounts ?? null);
         setLoadedQueryKey(JSON.stringify(requestQuery));
         nextCursorRef.current = page.nextCursor;
         loadedCountRef.current = page.problems.length;
@@ -157,6 +162,8 @@ export const useAdminProblemsPage = (
         setAuthors(page.authors);
         setHasUnauthoredProblems(page.hasUnauthoredProblems);
         setBulkEligibleCount(page.bulkEligibleCount);
+        setTotal(page.total ?? null);
+        setViewCounts(page.viewCounts ?? null);
         setLoadedQueryKey(JSON.stringify(requestQuery));
         nextCursorRef.current = page.nextCursor;
       })
@@ -210,6 +217,8 @@ export const useAdminProblemsPage = (
         setAuthors(page.authors);
         setHasUnauthoredProblems(page.hasUnauthoredProblems);
         setBulkEligibleCount(page.bulkEligibleCount);
+        setTotal(page.total ?? null);
+        setViewCounts(page.viewCounts ?? null);
         setLoadedQueryKey(JSON.stringify(requestQuery));
 
         if (!page.hasMore) {
@@ -292,6 +301,8 @@ export const useAdminProblemsPage = (
         setAuthors(page.authors);
         setHasUnauthoredProblems(page.hasUnauthoredProblems);
         setBulkEligibleCount(page.bulkEligibleCount);
+        setTotal(page.total ?? null);
+        setViewCounts(page.viewCounts ?? null);
         nextCursorRef.current = page.nextCursor;
         loadedCountRef.current = page.problems.length;
       })
@@ -325,6 +336,8 @@ export const useAdminProblemsPage = (
     authors,
     hasUnauthoredProblems,
     bulkEligibleCount,
+    total,
+    viewCounts,
     loadedQueryKey,
     loadMore,
     loadAll,

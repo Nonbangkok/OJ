@@ -40,7 +40,19 @@ export interface AdminProblemListFilters {
   collection: string;
   visibility: string;
   author: string;
+  /** 'attention' | 'hidden' | 'in_contest' | 'header'; '' or 'all' for every problem. */
+  view?: string;
+  /** A DIFFICULTY_BANDS value such as '1200-1500'. */
+  difficulty?: string;
+  /** Comma-separated categories. */
+  category?: string;
+  type?: string;
+  sort?: string;
+  order?: string;
 }
+
+const ADMIN_VIEWS = ['attention', 'hidden', 'in_contest', 'header'] as const;
+const ADMIN_SORTS = ['id', 'title', 'difficulty', 'tests'] as const;
 
 const requestedPages = (params: URLSearchParams): number => {
   const raw = Number(params.get('pages') || 1);
@@ -100,13 +112,23 @@ export const buildPublicProblemListQuery = ({
   };
 };
 
-export const buildAdminProblemListQuery = ({ search, collection, visibility, author }: AdminProblemListFilters): AdminProblemsQuery => {
+export const buildAdminProblemListQuery = ({
+  search, collection, visibility, author, view = '', difficulty = '', category = '', type = '', sort = '', order = '',
+}: AdminProblemListFilters): AdminProblemsQuery => {
   const trimmedSearch = search.trim();
+  const [min, max] = difficulty.split('-').map(Number);
+  const sortKey = (ADMIN_SORTS as readonly string[]).includes(sort) && sort !== 'id' ? sort as AdminProblemsQuery['sort'] : undefined;
   return {
     ...(trimmedSearch ? { search: trimmedSearch } : {}),
     ...(collection !== 'all' ? { collection: collection === 'none' ? 'none' : Number(collection) } : {}),
     ...(visibility === 'visible' || visibility === 'hidden' ? { visibility } : {}),
     ...(author !== 'all' ? { author } : {}),
+    ...((ADMIN_VIEWS as readonly string[]).includes(view) ? { view: view as AdminProblemsQuery['view'] } : {}),
+    // The API takes multiples of 100 only.
+    ...(Number.isFinite(min) && Number.isFinite(max) && min % 100 === 0 && max % 100 === 0 ? { difficultyMin: min, difficultyMax: max } : {}),
+    ...(category ? { category } : {}),
+    ...(type === 'standard' || type === 'header' ? { type } : {}),
+    ...(sortKey ? { sort: sortKey, order: order === 'desc' ? 'desc' as const : 'asc' as const } : {}),
   };
 };
 
@@ -134,6 +156,12 @@ export const adminProblemListQueryFromUrl = (url: URL): AdminProblemsQuery => {
     collection: params.get('collection') || 'all',
     visibility: params.get('visibility') || 'all',
     author: params.get('author') || 'all',
+    view: params.get('view') || '',
+    difficulty: params.get('difficulty') || '',
+    category: params.get('category') || '',
+    type: params.get('type') || '',
+    sort: params.get('sort') || '',
+    order: params.get('order') || '',
   });
 };
 
@@ -176,6 +204,8 @@ export const loadAdminProblemListSpan = async (url: URL): Promise<ProblemListSpa
         authors: page.authors,
         hasUnauthoredProblems: page.hasUnauthoredProblems,
         bulkEligibleCount: page.bulkEligibleCount,
+        ...(page.total !== undefined ? { total: page.total } : {}),
+        ...(page.viewCounts !== undefined ? { viewCounts: page.viewCounts } : {}),
       };
       hasMore = page.hasMore;
       if (!hasMore) {

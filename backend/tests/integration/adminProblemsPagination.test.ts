@@ -325,6 +325,92 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
       expect((await request(app).get('/admin/problems').set('x-test-role', 'staff')).status).toBe(200);
     });
   });
+
+  describe('management views, health, filters and sorting', () => {
+    const PDF = Buffer.from('%PDF-1.4 test');
+    /** ready: PDF + tests; bare: neither; header-nograder: header with tests and PDF but no grader .cpp */
+    const seed = async () => {
+      await insertContest();
+      await pool.query(`INSERT INTO problems (id, title, author, categories, difficulty, time_limit_ms, memory_limit_mb, is_visible, contest_id, problem_type, submission_filename, problem_pdf)
+        VALUES
+        ('a-ready', 'Zeta', 'A', '{Graph}', 1500, 1000, 256, true, NULL, 'standard', NULL, $1),
+        ('b-bare', 'Alpha', 'A', '{Math}', 900, 1000, 256, true, NULL, 'standard', NULL, NULL),
+        ('c-hidden', 'Gamma', 'A', '{Graph,Math}', 2400, 1000, 256, false, NULL, 'standard', NULL, $1),
+        ('d-contest', 'Delta', 'A', '{}', NULL, 1000, 256, false, 1, 'standard', NULL, $1),
+        ('e-header', 'Beta', 'A', '{}', 1100, 1000, 256, true, NULL, 'header', 'student.h', $1),
+        ('f-header-ok', 'Epsilon', 'A', '{}', 1200, 1000, 256, true, NULL, 'header', 'student.h', $1)`, [PDF]);
+      for (const id of ['a-ready', 'c-hidden', 'd-contest', 'e-header', 'f-header-ok']) {
+        await pool.query("INSERT INTO testcases (problem_id, case_number, input_data, output_data) VALUES ($1, 1, '1', '1'), ($1, 2, '2', '2')", [id]);
+      }
+      await pool.query("INSERT INTO testcases (problem_id, case_number, input_data, output_data) VALUES ('a-ready', 3, '3', '3')");
+      await pool.query("INSERT INTO problem_files (problem_id, role, filename, content) VALUES ('f-header-ok', 'grader', 'main.cpp', 'x'), ('e-header', 'starter', 'student.h', 'x')");
+    };
+    const ids = (page: AdminProblemsPage) => page.problems.map((p) => p.id);
+
+    it('each row carries its health facts', async () => {
+      await seed();
+      const page = await getAdminProblemsPage({ limit: 25 });
+      const row = (id: string) => page.problems.find((p) => p.id === id)!;
+      expect(row('a-ready')).toMatchObject({ has_pdf: true, testcase_count: 3, has_grader: false });
+      expect(row('b-bare')).toMatchObject({ has_pdf: false, testcase_count: 0 });
+      expect(row('f-header-ok')).toMatchObject({ has_grader: true });
+      expect(row('e-header')).toMatchObject({ has_grader: false });
+    });
+
+    it('views: needs attention, hidden, in contest, header', async () => {
+      await seed();
+      expect(ids(await getAdminProblemsPage({ view: 'attention' }))).toEqual(['b-bare', 'e-header']);
+      expect(ids(await getAdminProblemsPage({ view: 'hidden' }))).toEqual(['c-hidden']);
+      expect(ids(await getAdminProblemsPage({ view: 'in_contest' }))).toEqual(['d-contest']);
+      expect(ids(await getAdminProblemsPage({ view: 'header' }))).toEqual(['e-header', 'f-header-ok']);
+    });
+
+    it('carries the exact total and per-view counts under the other filters', async () => {
+      await seed();
+      const all = await getAdminProblemsPage({ limit: 2 });
+      expect(all.total).toBe(6);
+      expect(all.viewCounts).toEqual({ all: 6, attention: 2, hidden: 1, in_contest: 1, header: 2 });
+      const graph = await getAdminProblemsPage({ category: 'Graph', view: 'hidden' });
+      expect(graph.total).toBe(1);
+      expect(graph.viewCounts).toEqual({ all: 2, attention: 0, hidden: 1, in_contest: 0, header: 0 });
+    });
+
+    it('filters by difficulty band, categories (any) and type', async () => {
+      await seed();
+      expect(ids(await getAdminProblemsPage({ difficultyMin: 1100, difficultyMax: 1500 }))).toEqual(['a-ready', 'e-header', 'f-header-ok']);
+      expect(ids(await getAdminProblemsPage({ category: 'Math' }))).toEqual(['b-bare', 'c-hidden']);
+      expect(ids(await getAdminProblemsPage({ category: 'Uncategorized' }))).toEqual(['d-contest', 'e-header', 'f-header-ok']);
+      expect(ids(await getAdminProblemsPage({ type: 'header' }))).toEqual(['e-header', 'f-header-ok']);
+    });
+
+    it.each([
+      ['title', 'asc', ['b-bare', 'e-header', 'd-contest', 'f-header-ok', 'c-hidden', 'a-ready']],
+      ['difficulty', 'desc', ['c-hidden', 'a-ready', 'f-header-ok', 'e-header', 'b-bare', 'd-contest']],
+      ['tests', 'desc', ['a-ready', 'c-hidden', 'd-contest', 'e-header', 'f-header-ok', 'b-bare']],
+    ] as const)('sorts by %s %s and pages through it without gaps', async (sort, order, expected) => {
+      await seed();
+      const { ids: walked, pages } = await walkAll({ sort, order, limit: 2 });
+      expect(walked).toEqual(expected);
+      expect(pages).toBe(3);
+    });
+
+    it('validates view, sort and filters through the endpoint', async () => {
+      await seed();
+      const ok = await request(app).get('/admin/problems?view=attention&sort=difficulty&order=desc&type=header&category=Graph,Math&difficultyMin=800&difficultyMax=3500').set('x-test-role', 'admin');
+      expect(ok.status).toBe(200);
+      for (const bad of ['view=broken', 'sort=price', 'type=interactive', 'difficultyMin=850', 'category=Nonsense', 'order=desc']) {
+        expect((await request(app).get(`/admin/problems?${bad}`).set('x-test-role', 'admin')).status).toBe(400);
+      }
+    });
+
+    it('bulk visibility honours the same view and filters', async () => {
+      await seed();
+      const { updatedCount } = await updateAdminProblemsVisibility({ view: 'attention' }, false);
+      expect(updatedCount).toBe(2);
+      const hidden = (await pool.query('SELECT id FROM problems WHERE is_visible = false ORDER BY id')).rows.map((r) => r.id);
+      expect(hidden).toEqual(['b-bare', 'c-hidden', 'd-contest', 'e-header']);
+    });
+  });
 });
 
 // Keep the supertest/express imports meaningful even when the suite is skipped.

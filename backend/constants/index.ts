@@ -141,6 +141,13 @@ export const ADMIN_PROBLEM_LIST_CONFIG = {
     MAX_LIMIT: 100,
 } as const;
 
+/** Management tabs of the admin problem list (beside "all"). */
+export const ADMIN_PROBLEM_VIEWS = ['attention', 'hidden', 'in_contest', 'header'] as const;
+export type AdminProblemView = (typeof ADMIN_PROBLEM_VIEWS)[number];
+/** Sortable columns of the admin problem list; id is the default (keyset paging). */
+export const ADMIN_PROBLEM_SORTS = ['id', 'title', 'difficulty', 'tests'] as const;
+export type AdminProblemSort = (typeof ADMIN_PROBLEM_SORTS)[number];
+
 /**
  * Admin testcase viewer (GET /admin/problems/:id/testcases). The metadata
  * list stays cheap for any problem size (sizes computed in SQL, content

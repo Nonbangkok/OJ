@@ -116,13 +116,29 @@ export interface AdminProblemsPageResponse {
   hasUnauthoredProblems: boolean;
   /** All matching standalone problems, independent of cursor/page size. */
   bulkEligibleCount: number;
+  /** Every problem matching the filters and the view. */
+  total?: number;
+  /** Per-tab counts under the same filters. */
+  viewCounts?: AdminProblemViewCounts;
 }
+/** Management tabs of the admin problem list. */
+export type AdminProblemView = 'attention' | 'hidden' | 'in_contest' | 'header';
+export type AdminProblemViewCounts = Record<'all' | AdminProblemView, number>;
+export type AdminProblemSort = 'id' | 'title' | 'difficulty' | 'tests';
 /** Filter surface for the admin problem list (server-side pagination). */
 export interface AdminProblemsQuery {
   search?: string;
   collection?: 'none' | 'all' | number;
   visibility?: 'all' | 'visible' | 'hidden';
   author?: 'none' | 'all' | string;
+  view?: AdminProblemView;
+  difficultyMin?: number;
+  difficultyMax?: number;
+  /** Comma-separated categories; any matches. */
+  category?: string;
+  type?: 'standard' | 'header';
+  sort?: AdminProblemSort;
+  order?: 'asc' | 'desc';
   limit?: number;
   cursor?: string | null;
 }

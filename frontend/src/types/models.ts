@@ -276,6 +276,9 @@ export interface AdminProblem extends ProblemBase {
   testcase_count?: number;
   submission_count?: number;
   type_locked?: boolean;
+  /** Health: a statement PDF is stored; a header problem has a grader .cpp. */
+  has_pdf?: boolean;
+  has_grader?: boolean;
 }
 
 export interface UploadProgress {

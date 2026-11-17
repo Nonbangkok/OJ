@@ -55,6 +55,7 @@ describe('problem list route loaders', () => {
     const makePage = (problems: AdminProblem[], nextCursor: string | null, hasMore: boolean) => ({
       problems, nextCursor, hasMore, authors: [{ name: 'Alice' }],
       hasUnauthoredProblems: true, bulkEligibleCount: 314,
+      total: 320, viewCounts: { all: 900, attention: 12, hidden: 320, in_contest: 4, header: 3 },
     });
     jest.mocked(adminService.getProblems)
       .mockResolvedValueOnce(makePage(first, 'admin-cursor', true))
@@ -69,6 +70,7 @@ describe('problem list route loaders', () => {
     expect(span?.nextCursor).toBe('admin-next');
     expect(span?.pageMetadata).toEqual({
       authors: [{ name: 'Alice' }], hasUnauthoredProblems: true, bulkEligibleCount: 314,
+      total: 320, viewCounts: { all: 900, attention: 12, hidden: 320, in_contest: 4, header: 3 },
     });
     expect(adminService.getProblems).toHaveBeenNthCalledWith(1, {
       search: 'needle', collection: 7, visibility: 'hidden', author: 'Alice', limit: 100,

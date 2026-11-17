@@ -11,6 +11,8 @@ import {
   PROBLEM_LIST_CONFIG,
   PROBLEM_FILE_ROLES,
   PROBLEM_TYPES,
+  ADMIN_PROBLEM_VIEWS,
+  ADMIN_PROBLEM_SORTS,
   PROBLEM_VALIDATION,
   STATEMENT_ASSET,
   STRING_LIMITS,
@@ -192,6 +194,21 @@ export const adminUsersRoleBodySchema = z.object({
   role: z.enum([USER_ROLES.USER, USER_ROLES.STAFF, USER_ROLES.ADMIN]),
 }).strict();
 
+/** Difficulty bounds are multiples of 100 on the 800–3500 scale (shared by the public and admin lists). */
+const difficultyBound = z.coerce.number().int()
+  .min(PROBLEM_DIFFICULTY_MIN)
+  .max(PROBLEM_DIFFICULTY_MAX)
+  .refine((value) => value % PROBLEM_DIFFICULTY_STEP === 0, {
+    message: `difficulty bound must be a multiple of ${PROBLEM_DIFFICULTY_STEP}`,
+  });
+const problemCategoryFilter = z.string()
+  .transform(value => value.split(','))
+  .pipe(z.array(z.enum(['Uncategorized', ...PROBLEM_CATEGORIES] as [string, ...string[]]))
+    .min(1)
+    .max(PROBLEM_CATEGORIES.length + 1)
+    .refine(categories => new Set(categories).size === categories.length, 'categories must be unique'))
+  .transform(categories => categories.join(','));
+
 /**
  * Admin problem list (GET /admin/problems): keyset pagination plus the
  * filter-bar surface. `collection` accepts 'all' | 'none' | a numeric id;
@@ -204,12 +221,26 @@ export const adminProblemFiltersSchema = z.object({
   collection: z.union([z.literal('all'), z.literal('none'), z.coerce.number().int().positive()]).optional(),
   visibility: z.enum(['all', 'visible', 'hidden']).optional(),
   author: z.string().trim().max(STRING_LIMITS.AUTHOR).optional(),
+  /** Management view tab: needs attention, hidden (standalone), in a contest, header problems. */
+  view: z.enum(ADMIN_PROBLEM_VIEWS).optional(),
+  difficultyMin: difficultyBound.optional(),
+  difficultyMax: difficultyBound.optional(),
+  category: problemCategoryFilter.optional(),
+  type: z.enum(PROBLEM_TYPES).optional(),
 }).strict();
 
 export const adminProblemsQuerySchema = adminProblemFiltersSchema.extend({
+  sort: z.enum(ADMIN_PROBLEM_SORTS).optional(),
+  order: z.enum(['asc', 'desc']).optional(),
   limit: z.coerce.number().int().min(1).max(PROBLEM_LIST_CONFIG.MAX_LIMIT).optional(),
   cursor: z.string().min(1).max(2048).optional(),
-}).strict();
+}).strict().refine(
+  ({ sort, order }) => order === undefined || sort !== undefined,
+  { message: 'order requires sort' },
+).refine(
+  ({ difficultyMin, difficultyMax }) => difficultyMin === undefined || difficultyMax === undefined || difficultyMin <= difficultyMax,
+  { message: 'difficultyMin must not exceed difficultyMax' },
+);
 
 export const adminProblemsVisibilitySchema = z.object({
   isVisible: z.boolean(),
@@ -348,19 +379,6 @@ export const collectionVisibilityBodySchema = z.object({
  * next-page token returned by the previous response — it encodes the last
  * row's sort key and is only valid for the same sort/order.
  */
-const difficultyBound = z.coerce.number().int()
-  .min(PROBLEM_DIFFICULTY_MIN)
-  .max(PROBLEM_DIFFICULTY_MAX)
-  .refine((value) => value % PROBLEM_DIFFICULTY_STEP === 0, {
-    message: `difficulty bound must be a multiple of ${PROBLEM_DIFFICULTY_STEP}`,
-  });
-const problemCategoryFilter = z.string()
-  .transform(value => value.split(','))
-  .pipe(z.array(z.enum(['Uncategorized', ...PROBLEM_CATEGORIES] as [string, ...string[]]))
-    .min(1)
-    .max(PROBLEM_CATEGORIES.length + 1)
-    .refine(categories => new Set(categories).size === categories.length, 'categories must be unique'))
-  .transform(categories => categories.join(','));
 const problemListFilterShape = {
   difficultyMin: difficultyBound.optional(),
   difficultyMax: difficultyBound.optional(),

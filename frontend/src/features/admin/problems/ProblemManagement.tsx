@@ -13,7 +13,11 @@ import type { AdminProblemsQuery } from '../../../types';
 import { ADMIN_PROBLEMS_PAGE } from '../../../config/constants';
 import styles from '../shared/Management.module.css';
 import tableStyles from '../../../components/styles/Table.module.css';
-import { DifficultyBadge, ActionMenu, Button, StatusBadge, StatusDot, PageHeader } from '../../../components/ui';
+import { DifficultyBadge, ActionMenu, Button, FilterBar, SegmentedControl, StatusBadge, StatusDot, PageHeader, type FilterChip } from '../../../components/ui';
+import { CaretDown, CaretUp } from '@phosphor-icons/react';
+import { DIFFICULTY_BANDS } from '../../../config/constants';
+import { PROBLEM_CATEGORIES } from '../../../utils/constants';
+import type { AdminProblem, AdminProblemSort, AdminProblemView } from '../../../types';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useInfiniteScroll } from '../../../hooks/useInfiniteScroll';
 import { buildAdminProblemListQuery, type AdminProblemListLoaderData } from '../../../routing/problemListLoaders';
@@ -30,6 +34,28 @@ const COLLECTION_STATUS_LABEL: Record<CollectionWithStats['status'], string> = {
   mixed: 'Mixed',
 };
 
+type ViewKey = 'all' | AdminProblemView;
+const VIEW_TABS: Array<{ value: ViewKey; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'attention', label: 'Needs attention' },
+  { value: 'hidden', label: 'Hidden' },
+  { value: 'in_contest', label: 'In contest' },
+  { value: 'header', label: 'Header' },
+];
+const SORTABLE: Array<{ key: AdminProblemSort; label: string; align: 'left' | 'right' }> = [
+  { key: 'id', label: 'ID', align: 'left' },
+  { key: 'title', label: 'Title', align: 'left' },
+  { key: 'difficulty', label: 'Difficulty', align: 'right' },
+  { key: 'tests', label: 'Tests', align: 'right' },
+];
+
+/** What keeps students from being judged on this problem; empty when it is ready. */
+export const healthIssues = (problem: AdminProblem): string[] => [
+  ...(problem.has_pdf === false ? ['No PDF'] : []),
+  ...(problem.testcase_count === 0 ? ['No tests'] : []),
+  ...(problem.problem_type === 'header' && problem.has_grader === false ? ['No grader'] : []),
+];
+
 const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: ProblemManagementProps) => {
   const navigate = useNavigate();
   // Rejudge is admin-only on the server (POST /admin/rejudge/problem/:id).
@@ -37,53 +63,34 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
   const [createOpen, setCreateOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const urlSearch = searchParams.get('search') || '';
-  const urlCollection = searchParams.get('collection') || 'all';
+  // Every filter but the search box lives in the URL (shareable, and Back
+  // restores it); the search box keeps its own text and is debounced.
+  const collectionFilter = searchParams.get('collection') || 'all';
   const urlVisibility = searchParams.get('visibility');
-  const urlAuthor = searchParams.get('author') || 'all';
-  const validVisibility = urlVisibility === 'visible' || urlVisibility === 'hidden' ? urlVisibility : 'all';
+  const visibilityFilter = urlVisibility === 'visible' || urlVisibility === 'hidden' ? urlVisibility : 'all';
+  const authorFilter = searchParams.get('author') || 'all';
+  const viewParam = searchParams.get('view') || '';
+  const view: ViewKey = (VIEW_TABS.some((t) => t.value === viewParam) ? viewParam : 'all') as ViewKey;
+  const difficultyFilter = searchParams.get('difficulty') || '';
+  const categoryFilter = searchParams.get('category') || '';
+  const typeFilter = searchParams.get('type') || '';
+  const sortParam = searchParams.get('sort') || '';
+  const orderParam = searchParams.get('order') === 'desc' ? 'desc' : 'asc';
 
-  // --- Filters ------------------------------------------------------------
-  // All filters run server-side (SQL BEFORE pagination); changing any of
-  // them resets the paged list to the first batch of the new query. The
-  // search box is debounced so typing does not fire a request per key.
   const [search, setSearch] = useState(urlSearch);
   const debouncedSearch = useDebouncedValue(search, ADMIN_PROBLEMS_PAGE.SEARCH_DEBOUNCE_MS);
-  const [collectionFilter, setCollectionFilter] = useState<string>(urlCollection);
-  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'visible' | 'hidden'>(validVisibility);
-  const [authorFilter, setAuthorFilter] = useState<string>(urlAuthor);
-
-  // Keep admin list filters shareable and tied to this history entry. This
-  // also lets browser Back restore the same controls without a separate cache.
-  // Each control is re-synced only when its own URL value changes (adjusted
-  // during render rather than in an effect).
-  const [syncedUrlFilters, setSyncedUrlFilters] = useState({
-    search: urlSearch,
-    collection: urlCollection,
-    visibility: validVisibility,
-    author: urlAuthor,
-  });
-  if (
-    syncedUrlFilters.search !== urlSearch
-    || syncedUrlFilters.collection !== urlCollection
-    || syncedUrlFilters.visibility !== validVisibility
-    || syncedUrlFilters.author !== urlAuthor
-  ) {
-    if (syncedUrlFilters.search !== urlSearch) setSearch(urlSearch);
-    if (syncedUrlFilters.collection !== urlCollection) setCollectionFilter(urlCollection);
-    if (syncedUrlFilters.visibility !== validVisibility) setVisibilityFilter(validVisibility);
-    if (syncedUrlFilters.author !== urlAuthor) setAuthorFilter(urlAuthor);
-    setSyncedUrlFilters({
-      search: urlSearch,
-      collection: urlCollection,
-      visibility: validVisibility,
-      author: urlAuthor,
-    });
+  // Mirror an externally changed URL (Back/Forward) into the search box,
+  // adjusted during render so the box never shows a stale value.
+  const [syncedUrlSearch, setSyncedUrlSearch] = useState(urlSearch);
+  if (syncedUrlSearch !== urlSearch) {
+    setSyncedUrlSearch(urlSearch);
+    setSearch(urlSearch);
   }
 
   const updateUrlFilter = (key: string, value: string) => {
     setSearchParams(previous => {
       const next = new URLSearchParams(previous);
-      // 'all' is the "no filter" sentinel of the dropdowns; the free-text
+      // 'all' is the "no filter" sentinel of the chips; the free-text
       // search has no sentinel, so a search for the word "all" is kept.
       const isDefault = !value || (key !== 'search' && value === 'all');
       if (isDefault) next.delete(key);
@@ -101,8 +108,14 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
       collection: collectionFilter,
       visibility: visibilityFilter,
       author: authorFilter,
+      view,
+      difficulty: difficultyFilter,
+      category: categoryFilter,
+      type: typeFilter,
+      sort: sortParam,
+      order: orderParam,
     });
-  }, [debouncedSearch, collectionFilter, visibilityFilter, authorFilter]);
+  }, [debouncedSearch, collectionFilter, visibilityFilter, authorFilter, view, difficultyFilter, categoryFilter, typeFilter, sortParam, orderParam]);
 
   const {
     problems,
@@ -116,6 +129,8 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
     authors,
     hasUnauthoredProblems,
     bulkEligibleCount,
+    total,
+    viewCounts,
     loadedQueryKey,
     loadMore,
     loadAll,
@@ -198,14 +213,13 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
   // the control never shows (or queries by) a phantom selection. Skipped
   // while the options list is still empty (first page in flight). Adjusted
   // during render; the guard is false after the reset, so it runs once.
-  if (authorFilter !== 'all' && authorOptions.length > 0 && !authorOptions.includes(authorFilter)) {
-    setAuthorFilter('all');
-  }
-  // Display uses the sanitized value so the select never shows a phantom
-  // selection, even in the render pass that triggers the reset above.
-  const displayAuthorFilter = authorFilter !== 'all' && authorOptions.includes(authorFilter)
-    ? authorFilter
-    : 'all';
+  const phantomAuthor = authorFilter !== 'all' && authorOptions.length > 0 && !authorOptions.includes(authorFilter);
+  useEffect(() => {
+    if (phantomAuthor) updateUrlFilter('author', '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the selected author leaves the pool
+  }, [phantomAuthor]);
+  // Display uses the sanitized value so the chip never shows a phantom selection.
+  const displayAuthorFilter = phantomAuthor ? 'all' : authorFilter;
 
   // --- Collections --------------------------------------------------------
   const [collections, setCollections] = useState<CollectionWithStats[]>([]);
@@ -269,21 +283,78 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
     setSearch(value);
     updateUrlFilter('search', value);
   };
-  const changeCollectionFilter = (value: string) => {
+  /** Every URL-held filter: changing one clears the selection. */
+  const changeFilter = (key: string, value: string) => {
     clearSelection();
-    setCollectionFilter(value);
-    updateUrlFilter('collection', value);
+    updateUrlFilter(key, value);
   };
-  const changeVisibilityFilter = (value: 'all' | 'visible' | 'hidden') => {
+  const changeSort = (key: AdminProblemSort) => {
     clearSelection();
-    setVisibilityFilter(value);
-    updateUrlFilter('visibility', value);
+    const current = sortParam || 'id';
+    const nextOrder = current === key && orderParam === 'asc' ? 'desc' : 'asc';
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous);
+      if (key === 'id' && nextOrder === 'asc') { next.delete('sort'); next.delete('order'); }
+      else { next.set('sort', key); next.set('order', nextOrder); }
+      next.delete('pages');
+      return next;
+    }, { replace: true, preventScrollReset: true });
   };
-  const changeAuthorFilter = (value: string) => {
-    clearSelection();
-    setAuthorFilter(value);
-    updateUrlFilter('author', value);
+  const sortState = (key: AdminProblemSort): 'ascending' | 'descending' | undefined => {
+    const current = sortParam || 'id';
+    if (current !== key) return undefined;
+    return orderParam === 'desc' ? 'descending' : 'ascending';
   };
+
+  const filterChips: FilterChip[] = [
+    {
+      key: 'collection',
+      label: 'Collection',
+      value: collectionFilter === 'all' ? undefined : collectionFilter,
+      options: [{ value: 'none', label: 'No collection' }, ...collections.map((c) => ({ value: String(c.id), label: c.name }))],
+      onChange: (value) => changeFilter('collection', value ?? ''),
+    },
+    {
+      key: 'author',
+      label: 'Author',
+      value: displayAuthorFilter === 'all' ? undefined : displayAuthorFilter,
+      options: authorOptions.map((author) => ({ value: author, label: authorLabel(author) })),
+      onChange: (value) => changeFilter('author', value ?? ''),
+    },
+    {
+      key: 'difficulty',
+      label: 'Difficulty',
+      value: difficultyFilter || undefined,
+      options: DIFFICULTY_BANDS.map(({ value, label }) => ({ value, label })),
+      onChange: (value) => changeFilter('difficulty', value ?? ''),
+    },
+    {
+      key: 'category',
+      label: 'Category',
+      multiple: true,
+      values: categoryFilter ? categoryFilter.split(',') : [],
+      options: [...PROBLEM_CATEGORIES.map((name) => ({ value: name, label: name })), { value: 'Uncategorized', label: 'Uncategorized' }],
+      onChange: (values) => changeFilter('category', values.join(',')),
+    },
+    {
+      key: 'type',
+      label: 'Type',
+      value: typeFilter || undefined,
+      options: [{ value: 'standard', label: 'Standard' }, { value: 'header', label: 'Header' }],
+      onChange: (value) => changeFilter('type', value ?? ''),
+    },
+    {
+      // Old links may carry ?visibility=; the Hidden tab is the usual way in.
+      key: 'visibility',
+      label: 'Visibility',
+      value: visibilityFilter === 'all' ? undefined : visibilityFilter,
+      options: [{ value: 'visible', label: 'Visible' }, { value: 'hidden', label: 'Hidden' }],
+      onChange: (value) => changeFilter('visibility', value ?? ''),
+    },
+  ];
+  const countLabel = total !== null
+    ? `${total} ${total === 1 ? 'problem' : 'problems'}`
+    : `${visibleProblems.length}${hasMore ? '+' : ''} problems`;
 
   const runCollectionVisibility = async () => {
     if (!collectionConfirm) return;
@@ -333,6 +404,7 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
       <PageHeader
         breadcrumb={[{ label: 'Manage' }]}
         title="Problems"
+        meta={viewCounts ? `${viewCounts.all} problems · ${viewCounts.attention} need attention` : undefined}
         actions={(
           <>
             <Button variant="secondary" onClick={handleTriggerBatchUpload}>Import ZIP</Button>
@@ -349,59 +421,19 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
         )}
       />
 
-      {/* --- 2. Filter / scope bar ----------------------------------------- */}
-      <div className={styles['filter-bar']}>
-        <input
-          type="search"
-          className={styles['filter-search']}
-          placeholder="Search by ID or title…"
-          value={search}
-          onChange={(event) => changeSearch(event.target.value)}
-          aria-label="Search problems"
-        />
-        <label className={styles['filter-control']}>
-          <span className={styles['filter-label']}>Collection</span>
-          <select
-            value={collectionFilter}
-            onChange={(event) => changeCollectionFilter(event.target.value)}
-            aria-label="Filter problems by collection"
-          >
-            <option value="all">All Collections</option>
-            <option value="none">No Collection</option>
-            {collections.map(collection => (
-              <option key={collection.id} value={collection.id}>{collection.name}</option>
-            ))}
-          </select>
-        </label>
-        <label className={styles['filter-control']}>
-          <span className={styles['filter-label']}>Visibility</span>
-          <select
-            value={visibilityFilter}
-            onChange={(event) => changeVisibilityFilter(event.target.value as 'all' | 'visible' | 'hidden')}
-            aria-label="Filter problems by visibility"
-          >
-            <option value="all">All</option>
-            <option value="visible">Visible</option>
-            <option value="hidden">Hidden</option>
-          </select>
-        </label>
-        <label className={styles['filter-control']}>
-          <span className={styles['filter-label']}>Author</span>
-          <select
-            value={displayAuthorFilter}
-            onChange={(event) => changeAuthorFilter(event.target.value)}
-            aria-label="Filter problems by author"
-          >
-            <option value="all">All Authors</option>
-            {authorOptions.map(author => (
-              <option key={author} value={author}>{authorLabel(author)}</option>
-            ))}
-          </select>
-        </label>
-        <span className={styles['filter-count']} aria-live="polite">
-          {`${visibleProblems.length}${hasMore ? '+' : ''} ${visibleProblems.length === 1 && !hasMore ? 'problem' : 'problems'}`}
-        </span>
-      </div>
+      {/* --- 2. Views + filters --------------------------------------------- */}
+      <SegmentedControl<ViewKey>
+        aria-label="Problem view"
+        className={styles['view-tabs']}
+        value={view}
+        options={VIEW_TABS.map((tab) => ({ value: tab.value, label: viewCounts ? `${tab.label} ${viewCounts[tab.value]}` : tab.label }))}
+        onChange={(next) => changeFilter('view', next === 'all' ? '' : next)}
+      />
+      <FilterBar
+        search={{ value: search, onChange: changeSearch, placeholder: 'Search problems' }}
+        filters={filterChips}
+        resultCount={<span aria-live="polite">{countLabel}</span>}
+      />
 
       {/* --- 3a. Collection context (only with a specific collection) ----- */}
       {filteredCollection && (
@@ -536,19 +568,32 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
                   aria-label="Select all currently displayed problems"
                 />
               </th>
-              <th className={styles['col-left']}>ID</th>
-              <th className={styles['col-left']}>Title</th>
-              <th className={styles['col-right']}>Difficulty</th>
-              <th className={styles['col-right']}>Tests</th>
-              <th className={styles['col-left']}>Limits</th>
-              <th className={styles['col-left']}>Collection</th>
+              {SORTABLE.slice(0, 3).map(({ key, label, align }) => (
+                <th key={key} className={styles[`col-${align}`]} aria-sort={sortState(key)}>
+                  <button type="button" className={styles['sort-button']} onClick={() => changeSort(key)}>
+                    {label}
+                    {sortState(key) === 'ascending' && <CaretUp size={11} weight="bold" aria-hidden="true" />}
+                    {sortState(key) === 'descending' && <CaretDown size={11} weight="bold" aria-hidden="true" />}
+                  </button>
+                </th>
+              ))}
+              <th className={styles['col-left']}>Health</th>
+              {SORTABLE.slice(3).map(({ key, label, align }) => (
+                <th key={key} className={styles[`col-${align}`]} aria-sort={sortState(key)}>
+                  <button type="button" className={styles['sort-button']} onClick={() => changeSort(key)}>
+                    {label}
+                    {sortState(key) === 'ascending' && <CaretUp size={11} weight="bold" aria-hidden="true" />}
+                    {sortState(key) === 'descending' && <CaretDown size={11} weight="bold" aria-hidden="true" />}
+                  </button>
+                </th>
+              ))}
               <th className={styles['col-left']}>Visibility</th>
               <th className={styles['col-center']}><span className={styles['sr-only']}>Actions</span></th>
             </tr>
           </thead>
           <tbody>
             {visibleProblems.length === 0 && !loading && !error && (
-              <tr><td colSpan={9}>No problems match the current filters.</td></tr>
+              <tr><td colSpan={8}>No problems match the current filters.</td></tr>
             )}
             {visibleProblems.map(problem => {
               const selected = isProblemSelected(problem.id);
@@ -593,17 +638,20 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
                 <td className={`${styles['col-left']} ${styles['cell-wrap']}`}>
                   <span className={styles['problem-title']}>{problem.title}</span>
                   {problem.problem_type === 'header' && <StatusBadge>HEADER</StatusBadge>}
+                  {problem.collection_id !== null && problem.collection_name && (
+                    <span className={styles['problem-collection']}>{problem.collection_name}</span>
+                  )}
                 </td>
                 <td className={styles['col-right']}><DifficultyBadge difficulty={problem.difficulty} /></td>
+                <td className={styles['col-left']}>
+                  {(() => {
+                    const issues = healthIssues(problem);
+                    return issues.length > 0
+                      ? <span className={styles['health-bad']}>{issues.join(' · ')}</span>
+                      : <span className={styles['health-ok']}>Ready</span>;
+                  })()}
+                </td>
                 <td className={`${styles['col-right']} ${styles.mono}`}>{problem.testcase_count ?? '—'}</td>
-                <td className={`${styles['col-left']} ${styles.mono}`}>
-                  {problem.time_limit_ms ? `${problem.time_limit_ms} ms · ${problem.memory_limit_mb} MB` : '—'}
-                </td>
-                <td className={`${styles['col-left']} ${styles['cell-wrap']}`}>
-                  {problem.collection_id !== null
-                    ? <span title={problem.collection_name ?? undefined}>{problem.collection_name}</span>
-                    : null}
-                </td>
                 <td className={styles['col-center']}>
                   {problem.contest_id && (problem.contest_status === 'scheduled' || problem.contest_status === 'running')
                     ? <StatusDot tone="neutral" label="In contest" />
