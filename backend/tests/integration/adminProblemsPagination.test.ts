@@ -411,6 +411,62 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
       expect(hidden).toEqual(['b-bare', 'c-hidden', 'd-contest', 'e-header']);
     });
   });
+
+  describe('AC rate, solvers and bulk metadata', () => {
+    const seedSubs = async () => {
+      await insertProblem('s1', { title: 'S1' });
+      await insertProblem('s2', { title: 'S2' });
+      await pool.query(`INSERT INTO users (id, username, password_hash, role) VALUES (1, 'u1', 'x', 'user'), (2, 'u2', 'x', 'user'), (3, 'u3', 'x', 'user')
+        ON CONFLICT (id) DO NOTHING`);
+      // s1: four submissions, two Accepted by two different users (one user accepted twice counts once).
+      for (const [user, score] of [[1, 100], [1, 100], [2, 40], [3, 100]] as const) {
+        await pool.query(`INSERT INTO submissions (user_id, problem_id, code, language, overall_status, score, results)
+          VALUES ($1, 's1', 'x', 'cpp', $2, $3, '[]')`, [user, score === 100 ? 'Accepted' : 'Wrong Answer', score]);
+      }
+    };
+
+    it('rows carry accepted submissions and distinct solvers (practice submissions)', async () => {
+      await seedSubs();
+      const page = await getAdminProblemsPage({});
+      const row = (id: string) => page.problems.find((p) => p.id === id)!;
+      expect(row('s1')).toMatchObject({ submission_count: 4, accepted_count: 3, solver_count: 2 });
+      expect(row('s2')).toMatchObject({ submission_count: 0, accepted_count: 0, solver_count: 0 });
+    });
+
+    it('PUT /admin/problems/bulk-metadata sets difficulty and adds/removes categories in one call', async () => {
+      await insertProblem('m1');
+      await insertProblem('m2');
+      await pool.query("UPDATE problems SET categories = '{Graph,Math}' WHERE id = 'm1'");
+      const res = await request(app).put('/admin/problems/bulk-metadata').set('x-test-role', 'staff')
+        .send({ problemIds: ['m1', 'm2'], difficulty: 1300, addCategories: ['Greedy'], removeCategories: ['Math'] });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ updatedCount: 2 });
+      const rows = (await pool.query('SELECT id, difficulty, categories FROM problems WHERE id IN ($1, $2) ORDER BY id', ['m1', 'm2'])).rows;
+      expect(rows).toEqual([
+        { id: 'm1', difficulty: 1300, categories: ['Graph', 'Greedy'] },
+        { id: 'm2', difficulty: 1300, categories: ['Greedy'] },
+      ]);
+    });
+
+    it('difficulty null clears it; leaving difficulty out keeps it', async () => {
+      await insertProblem('k1');
+      await pool.query("UPDATE problems SET difficulty = 1500 WHERE id = 'k1'");
+      await request(app).put('/admin/problems/bulk-metadata').set('x-test-role', 'admin').send({ problemIds: ['k1'], addCategories: ['Math'] });
+      expect((await pool.query("SELECT difficulty FROM problems WHERE id = 'k1'")).rows[0].difficulty).toBe(1500);
+      await request(app).put('/admin/problems/bulk-metadata').set('x-test-role', 'admin').send({ problemIds: ['k1'], difficulty: null });
+      expect((await pool.query("SELECT difficulty FROM problems WHERE id = 'k1'")).rows[0].difficulty).toBeNull();
+    });
+
+    it('rejects an empty change, bad values, and non-staff', async () => {
+      await insertProblem('v1');
+      const put = (body: object, role = 'admin') => request(app).put('/admin/problems/bulk-metadata').set('x-test-role', role).send(body);
+      expect((await put({ problemIds: ['v1'] })).status).toBe(400);
+      expect((await put({ problemIds: ['v1'], difficulty: 1250 })).status).toBe(400);
+      expect((await put({ problemIds: ['v1'], addCategories: ['Nonsense'] })).status).toBe(400);
+      expect((await put({ problemIds: [], difficulty: 900 })).status).toBe(400);
+      expect((await put({ problemIds: ['v1'], difficulty: 900 }, 'user')).status).toBe(403);
+    });
+  });
 });
 
 // Keep the supertest/express imports meaningful even when the suite is skipped.

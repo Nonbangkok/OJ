@@ -140,6 +140,15 @@ const problemsAdminService = {
     return response.data;
   },
 
+  /** One change for every listed problem: set/clear the difficulty, add or remove categories. */
+  updateProblemsMetadata: async (
+    problemIds: string[],
+    change: { difficulty?: number | null; addCategories?: string[]; removeCategories?: string[] },
+  ): Promise<{ updatedCount: number }> => {
+    const response = await api.put<{ updatedCount: number }>('/admin/problems/bulk-metadata', { problemIds, ...change });
+    return response.data;
+  },
+
   exportProblems: async (problemIds: Array<string | number>): Promise<AxiosResponse<Blob>> => {
     return api.post<Blob>('/admin/problems/export', { problemIds }, { responseType: 'blob' });
   },

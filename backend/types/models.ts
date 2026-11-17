@@ -156,6 +156,9 @@ export interface AdminProblemRow extends Pick<
     /** Health: a statement PDF is stored; a header problem has a grader .cpp. */
     has_pdf: boolean;
     has_grader: boolean;
+    /** Practice submissions with a full score, and the distinct users behind them. */
+    accepted_count: number;
+    solver_count: number;
 }
 
 /** `testcases` table row. */

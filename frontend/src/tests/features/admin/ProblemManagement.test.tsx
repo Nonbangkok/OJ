@@ -152,6 +152,70 @@ describe('ProblemManagement Component', () => {
         });
     });
 
+    describe('AC rate, inline visibility, bulk metadata and the quick look', () => {
+        const rows = [
+            { id: 'P1', title: 'Problem 1', author: 'admin', is_visible: true, contest_id: null, contest_status: null, collection_id: null, collection_name: null, difficulty: 1200, categories: ['Graph'], testcase_count: 6, testcase_bytes: 2048, has_pdf: true, has_grader: false, problem_type: 'standard', time_limit_ms: 1000, memory_limit_mb: 256, submission_count: 4, accepted_count: 3, solver_count: 2 },
+            { id: 'P2', title: 'Problem 2', author: 'admin', is_visible: false, contest_id: null, contest_status: null, collection_id: null, collection_name: null, difficulty: null, categories: [], testcase_count: 3, has_pdf: true, has_grader: false, problem_type: 'standard', time_limit_ms: 2000, memory_limit_mb: 128, submission_count: 0, accepted_count: 0, solver_count: 0 },
+            { id: 'P3', title: 'Problem 3', author: 'admin', is_visible: true, contest_id: 1, contest_status: 'running', collection_id: null, collection_name: null, difficulty: 900, categories: [], testcase_count: 2, has_pdf: true, has_grader: false, problem_type: 'standard', time_limit_ms: 1000, memory_limit_mb: 256, submission_count: 0, accepted_count: 0, solver_count: 0 },
+        ];
+        const row = async (id: string) => (await screen.findByRole('link', { name: id })).closest('tr')!;
+        beforeEach(() => {
+            (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(makePage(rows));
+            (jest.mocked(adminService.updateProblemsMetadata) as jest.Mock).mockResolvedValue({ updatedCount: 2 });
+            (jest.mocked(adminService.updateProblemVisibility) as jest.Mock).mockResolvedValue({});
+        });
+
+        it('shows the AC rate and the solvers; no submissions reads as a dash', async () => {
+            renderProblemManagement();
+            const p1 = await row('P1');
+            expect(within(p1).getByText('75%')).toBeInTheDocument();
+            expect(within(p1).getByText('2')).toBeInTheDocument();
+            const headers = screen.getAllByRole('columnheader').map((th) => th.textContent?.trim());
+            expect(headers).toEqual(expect.arrayContaining(['AC rate', 'Solvers']));
+            expect(within(await row('P2')).getAllByText('—').length).toBeGreaterThan(0);
+        });
+
+        it('visibility switches in the row; a contest problem shows In contest instead', async () => {
+            renderProblemManagement();
+            const toggle = within(await row('P1')).getByRole('switch', { name: 'Visible: P1' });
+            expect(toggle).toBeChecked();
+            fireEvent.click(toggle);
+            await waitFor(() => expect(adminService.updateProblemVisibility).toHaveBeenCalledWith('P1', false));
+            expect(within(await row('P2')).getByRole('switch', { name: 'Visible: P2' })).not.toBeChecked();
+            expect(within(await row('P3')).queryByRole('switch')).toBeNull();
+            expect(within(await row('P3')).getByText('In contest')).toBeInTheDocument();
+        });
+
+        it('the selection bar sets difficulty and adds or removes a category for every selected problem', async () => {
+            renderProblemManagement();
+            await row('P1');
+            fireEvent.click(screen.getByRole('checkbox', { name: 'Select problem P1' }));
+            fireEvent.click(screen.getByRole('checkbox', { name: 'Select problem P2' }));
+            fireEvent.change(screen.getByLabelText('Set difficulty of the selected problems'), { target: { value: '1300' } });
+            await waitFor(() => expect(adminService.updateProblemsMetadata).toHaveBeenCalledWith(['P1', 'P2'], { difficulty: 1300 }));
+            fireEvent.change(screen.getByLabelText('Add a category to the selected problems'), { target: { value: 'Greedy' } });
+            await waitFor(() => expect(adminService.updateProblemsMetadata).toHaveBeenLastCalledWith(['P1', 'P2'], { addCategories: ['Greedy'] }));
+            fireEvent.change(screen.getByLabelText('Remove a category from the selected problems'), { target: { value: 'Graph' } });
+            await waitFor(() => expect(adminService.updateProblemsMetadata).toHaveBeenLastCalledWith(['P1', 'P2'], { removeCategories: ['Graph'] }));
+            fireEvent.change(screen.getByLabelText('Set difficulty of the selected problems'), { target: { value: 'unrated' } });
+            await waitFor(() => expect(adminService.updateProblemsMetadata).toHaveBeenLastCalledWith(['P1', 'P2'], { difficulty: null }));
+        });
+
+        it('clicking a row opens a quick look with the facts, links and a difficulty quick edit', async () => {
+            renderProblemManagement();
+            fireEvent.click(within(await row('P1')).getByText('Problem 1'));
+            const look = await screen.findByRole('dialog', { name: 'Problem 1' });
+            expect(within(look).getByText('1000 ms · 256 MB')).toBeInTheDocument();
+            expect(within(look).getByText('75% · 3 of 4')).toBeInTheDocument();
+            expect(within(look).getByText('Graph')).toBeInTheDocument();
+            expect(within(look).getByRole('link', { name: 'Open editor' })).toHaveAttribute('href', '/admin/problems/P1');
+            expect(within(look).getByRole('link', { name: 'Testcases' })).toHaveAttribute('href', '/admin/problems/P1/testcases');
+            expect(within(look).getByRole('link', { name: 'View as student' })).toHaveAttribute('href', '/problems/P1');
+            fireEvent.change(within(look).getByLabelText('Difficulty'), { target: { value: '1400' } });
+            await waitFor(() => expect(adminService.updateProblemsMetadata).toHaveBeenCalledWith(['P1'], { difficulty: 1400 }));
+        });
+    });
+
     it('renders loading state initially', () => {
         (jest.mocked(adminService.getProblems) as jest.Mock).mockReturnValue(new Promise(() => { }));
         renderProblemManagement();
@@ -1128,7 +1192,7 @@ describe('ProblemManagement Component', () => {
             expect(within(rowOf('C1')).getByText('In contest')).toBeInTheDocument();
         });
 
-        it('clicking a row opens the problem page; the menu carries Testcases, Copy link and a red Delete', async () => {
+        it('clicking a row opens its quick look; the menu carries Testcases, Copy link and a red Delete', async () => {
             renderProblemManagement();
             await screen.findByText('Problem 1');
             await userEvent.click(within(rowOf('P1')).getByRole('button', { name: 'Row actions for P1' }), { delay: 20 } as never);
@@ -1137,7 +1201,7 @@ describe('ProblemManagement Component', () => {
             await userEvent.click(screen.getByRole('menuitem', { name: 'Testcases' }), { delay: 20 } as never);
             expect(window.location.pathname).toBe('/admin/problems/P1/testcases');
             fireEvent.click(within(rowOf('H1')).getByText('Header one'));
-            expect(window.location.pathname).toBe('/admin/problems/H1');
+            expect(await screen.findByRole('dialog', { name: 'Header one' })).toBeInTheDocument();
         });
 
         it('New problem asks only for id and title, then opens the new problem page', async () => {

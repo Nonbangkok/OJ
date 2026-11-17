@@ -31,6 +31,7 @@ import {
   updateProblemPdf,
   updateProblemVisibility,
   updateAdminProblemsVisibility,
+  updateProblemsMetadata,
 } from '../services/problemQueryService';
 import { USER_ROLES, type ProblemFileRole, type ProblemType, type AdminProblemView, type AdminProblemSort } from '../constants';
 import * as db from '../db';
@@ -60,6 +61,7 @@ import { validateRequest } from '../middleware/validation';
 import {
   adminProblemsQuerySchema,
   adminProblemsVisibilitySchema,
+  adminProblemsBulkMetadataSchema,
   adminProblemsBulkDeleteSchema,
   createProblemSchema,
   problemIdParamSchema,
@@ -312,6 +314,21 @@ router.post('/admin/problems', requireAuth, requireStaffOrAdmin,
     throw new AppError(`Problem ID '${id}' already exists.`, 409);
   }
   res.status(201).json(createResult);
+}));
+
+// Registered before PUT /admin/problems/:id so 'bulk-metadata' is not read as an id.
+router.put('/admin/problems/bulk-metadata', requireAuth, requireStaffOrAdmin,
+  validateRequest({ body: adminProblemsBulkMetadataSchema }),
+  asyncHandler(async (req: Request, res: Response) => {
+  const { problemIds, difficulty, addCategories, removeCategories } = req.body as {
+    problemIds: string[]; difficulty?: number | null; addCategories?: string[]; removeCategories?: string[];
+  };
+  const { updatedCount } = await updateProblemsMetadata(problemIds, {
+    ...(difficulty !== undefined ? { difficulty } : {}),
+    ...(addCategories ? { addCategories } : {}),
+    ...(removeCategories ? { removeCategories } : {}),
+  });
+  res.json({ message: `${updatedCount} problem${updatedCount === 1 ? '' : 's'} updated`, updatedCount });
 }));
 
 router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,

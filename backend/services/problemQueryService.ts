@@ -813,14 +813,22 @@ const ADMIN_PROBLEM_FACTS_SQL = `
             UNION ALL
             SELECT problem_id FROM contest_submissions WHERE problem_id IN (SELECT id FROM page)) s
       GROUP BY problem_id
+    ),
+    -- Practice results for the AC rate and solver count (full-score submissions).
+    acc AS (
+      SELECT problem_id, COUNT(*)::int AS accepted, COUNT(DISTINCT user_id)::int AS solvers
+      FROM submissions WHERE problem_id IN (SELECT id FROM page) AND score >= 100
+      GROUP BY problem_id
     )
     SELECT page.*, COALESCE(tc.n, 0) AS testcase_count, COALESCE(tc.bytes, 0)::float8 AS testcase_bytes,
            COALESCE(subs.n, 0) AS submission_count, COALESCE(subs.n, 0) > 0 AS type_locked,
+           COALESCE(acc.accepted, 0) AS accepted_count, COALESCE(acc.solvers, 0) AS solver_count,
            EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = page.id AND f.role = 'grader'
                    AND lower(f.filename) LIKE '%.cpp') AS has_grader
     FROM page
     LEFT JOIN tc ON tc.problem_id = page.id
-    LEFT JOIN subs ON subs.problem_id = page.id`;
+    LEFT JOIN subs ON subs.problem_id = page.id
+    LEFT JOIN acc ON acc.problem_id = page.id`;
 
 export interface AdminProblemFacts {
   /** The editor's collection select; the shared detail query does not carry it. */
@@ -970,6 +978,29 @@ export const getAdminProblemsPage = async (
     total: viewCounts[options.view ?? 'all'],
     viewCounts,
   };
+};
+
+/**
+ * One UPDATE over the selected problems: set or clear the difficulty (when
+ * given) and add/remove categories. Categories stay deduplicated and sorted,
+ * the form every other write stores.
+ */
+export const updateProblemsMetadata = async (
+  problemIds: string[],
+  change: { difficulty?: number | null; addCategories?: string[]; removeCategories?: string[] },
+): Promise<{ updatedCount: number }> => {
+  const result = await db.query(
+    `UPDATE problems
+     SET difficulty = CASE WHEN $2::boolean THEN $3::int ELSE difficulty END,
+         categories = ARRAY(
+           SELECT DISTINCT c FROM unnest(categories || $4::text[]) AS c
+           WHERE NOT (c = ANY($5::text[])) ORDER BY c
+         )
+     WHERE id = ANY($1::text[])`,
+    [problemIds, change.difficulty !== undefined, change.difficulty ?? null,
+      change.addCategories ?? [], change.removeCategories ?? []],
+  );
+  return { updatedCount: result.rowCount ?? 0 };
 };
 
 /** One server-side UPDATE for every standalone problem matching the admin filters. */

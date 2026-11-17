@@ -247,6 +247,21 @@ export const adminProblemsVisibilitySchema = z.object({
   filters: adminProblemFiltersSchema.default({}),
 }).strict();
 
+/**
+ * One change applied to every selected problem: set (or clear, with null) the
+ * difficulty, and add or remove categories. At least one change is required.
+ */
+export const adminProblemsBulkMetadataSchema = z.object({
+  problemIds: z.array(nonEmptyString.max(50)).min(1).max(5000)
+    .refine((ids) => new Set(ids).size === ids.length, 'problemIds must not contain duplicates'),
+  difficulty: problemDifficulty,
+  addCategories: z.array(z.enum(PROBLEM_CATEGORIES)).max(PROBLEM_CATEGORIES.length).optional(),
+  removeCategories: z.array(z.enum(PROBLEM_CATEGORIES)).max(PROBLEM_CATEGORIES.length).optional(),
+}).strict().refine(
+  ({ difficulty, addCategories = [], removeCategories = [] }) => difficulty !== undefined || addCategories.length > 0 || removeCategories.length > 0,
+  { message: 'Choose a difficulty or a category to change' },
+);
+
 /** IDs selected from the currently loaded admin problem rows for bulk deletion. */
 export const adminProblemsBulkDeleteSchema = z.object({
   problemIds: z.array(nonEmptyString.max(50)).min(1).max(5000),
