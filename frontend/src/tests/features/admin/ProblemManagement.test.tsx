@@ -358,6 +358,17 @@ describe('ProblemManagement Component', () => {
         expect(screen.getByText('Problem 1')).toBeInTheDocument();
     });
 
+    it('Hide all matching sends only the filters, never the sort (the server refuses sort keys there)', async () => {
+        (jest.mocked(adminService.setProblemsVisibility) as jest.Mock).mockResolvedValue({ updatedCount: 2 });
+        window.history.replaceState({}, '', '/admin/problems?view=attention&sort=difficulty&order=desc');
+        renderProblemManagement();
+        await waitFor(() => screen.getByText('Problem 1'));
+        fireEvent.click(screen.getByRole('button', { name: 'More problem actions' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: /^hide all \d+ matching$/i }));
+        fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
+        await waitFor(() => expect(adminService.setProblemsVisibility).toHaveBeenCalledWith({ view: 'attention' }, false));
+    });
+
     it('retains the loaded rows and reports a bulk failure for retry', async () => {
         (jest.mocked(adminService.setProblemsVisibility) as jest.Mock).mockRejectedValueOnce(new Error('offline'));
         renderProblemManagement();

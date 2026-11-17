@@ -146,7 +146,9 @@ const useProblemCrud = ({ query, initialPageSpan }: UseProblemCrudArgs) => {
     try {
       setLoading(true);
       setError('');
-      await adminService.setProblemsVisibility(query, nextVisible);
+      // Only the filters scope the update; sort and order are list presentation the endpoint refuses.
+      const { sort: _sort, order: _order, limit: _limit, cursor: _cursor, ...filters } = query;
+      await adminService.setProblemsVisibility(filters, nextVisible);
       refreshFirstPage();
       return true;
     } catch (errorValue) {
