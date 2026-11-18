@@ -465,6 +465,9 @@ export async function mockContestApi(page: Page, state: ContestState): Promise<v
   await page.route('**/api/contests/1/problems/interval', (route) => route.fulfill(json({
     id: 'interval', title: 'Interval merge', author: 'Ada', time_limit_ms: 1000, memory_limit_mb: 256, has_pdf: false,
     problem_type: 'standard', submission_filename: null, has_starter_files: false,
+    // The viewer's own contest attempts, as the list shows them (A7-03).
+    viewerBest: { score: 60, caseStatuses: contestStatuses('PPPPPPFNNN').map(({ status }) => status) },
+    viewerSubmissionCount: 4,
   })));
 }
 
