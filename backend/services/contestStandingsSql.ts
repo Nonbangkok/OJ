@@ -9,6 +9,10 @@
  * moves it. Participants with no points have no tie-break time, so they all
  * share the last rank.
  *
+ * Only problems still in the contest count (A5-03): a problem staff withdraw
+ * mid-contest leaves the scoreboard columns, so its points leave the totals,
+ * the tie-break time and the final snapshot too (re-adding it restores them).
+ *
  * `withStatuses` adds the per-case statuses of each best submission. Only the
  * finish snapshot asks for them (the recap draws them): the live board would
  * otherwise show every contestant which cases the others fail, and pay to
@@ -21,6 +25,7 @@ export const contestStandingsCte = (contestIdParam: string, { withStatuses = fal
 WITH contest_subs AS (
   SELECT cs.id, cs.user_id, cs.problem_id, cs.score, cs.submitted_at, cs.results
   FROM contest_submissions cs
+  JOIN problems p ON p.id = cs.problem_id AND p.contest_id = ${contestIdParam}
   WHERE cs.contest_id = ${contestIdParam} AND cs.user_id IS NOT NULL
 ),
 problem_best AS (

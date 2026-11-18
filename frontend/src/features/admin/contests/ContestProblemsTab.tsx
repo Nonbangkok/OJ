@@ -212,7 +212,7 @@ export default function ContestProblemsTab({ contestId, status, problems, onProb
         open={removing !== null}
         tier="plain"
         title={`Remove ${removing?.title ?? ''}?`}
-        body="Removing it from this contest returns it to the practice set with the visibility it had before."
+        body="Removing it from this contest returns it to the practice set with the visibility it had before. Points scored on it stop counting in the standings."
         confirmLabel="Remove problem"
         busy={busy}
         onConfirm={() => { void remove(); }}
