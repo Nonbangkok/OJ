@@ -165,9 +165,11 @@ print("ok" if total == 6000 else "bad")
 `;
 
 /**
- * Python multiprocessing with the default start method (fork on Python 3.13):
- * pipes plus POSIX semaphores in /dev/shm, no SysV IPC. (forkserver needs a
- * socket, which the filter has always denied.)
+ * Python multiprocessing with the default start method (fork on Python 3.13).
+ * Judged programs are thread-only (A9-06, see judgeForkBan.test.ts), so the
+ * Pool cannot start its workers: the run must end as a plain failed verdict,
+ * never Accepted and never a judge error. (forkserver needs a socket, which
+ * the filter has always denied.)
  */
 const PY_MULTIPROCESSING = `import multiprocessing as mp
 def square(x): return x * x
@@ -341,11 +343,15 @@ function removeLeftovers(): void {
   it.each([
     ['C++ std::thread', 'cpp', CPP_THREADS],
     ['Python threading', 'python', PY_THREADS],
-    ['Python multiprocessing (Pool, Queue)', 'python', PY_MULTIPROCESSING],
   ] as const)('%s still runs under the filter', async (_name, language, code) => {
     const row = await judge('scratch-tmpdir', language, code);
     expect({ status: row.overall_status, results: row.overall_status === SUBMISSION_STATUS.ACCEPTED ? undefined : row.results })
       .toEqual({ status: SUBMISSION_STATUS.ACCEPTED, results: undefined });
+  });
+
+  it('Python multiprocessing cannot start worker processes (thread-only) and fails as a normal verdict', async () => {
+    const row = await judge('scratch-tmpdir', 'python', PY_MULTIPROCESSING);
+    expect(row.overall_status).toBe(SUBMISSION_STATUS.RUNTIME_ERROR);
   });
 
   it('glibc tmpfile() and a hard-coded /tmp path fail for judged code (documented)', async () => {

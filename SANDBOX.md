@@ -302,9 +302,10 @@ process with euid X renice the helper or set it to `SCHED_IDLE`
 wins that race can only slow the sweep down, not stop it: the first
 `kill(-1)` still kills every process of X. A sweep that runs past
 `SANDBOX_SWEEP_TIMEOUT_MS` counts as failed (the helper cannot be killed by
-root either, so it finishes on its own). Memory is still accounted per
-process (`RLIMIT_AS`, `wait4` peak RSS), so forked workers can together use
-more than the limit (A9-06, open by owner decision).
+root either, so it finishes on its own). Memory is accounted per process
+(`RLIMIT_AS`, `wait4` peak RSS), which is why judged programs are thread-only
+(section 8): forked workers could otherwise each take a fresh allowance
+(A9-06).
 
 ### 8. seccomp socket-deny in time_wrapper (RUNNER-002, partial)
 `time_wrapper.c` now installs a seccomp filter (recipe copied from
@@ -313,12 +314,20 @@ more than the limit (A9-06, open by owner decision).
 can no longer TCP-connect to the database or any in-stack service from inside
 the backend container, and cannot escape its identity through namespaces.
 It also denies `shmget`, `semget` and `msgget` (`EPERM`), so a judged program
-cannot create SysV IPC objects that would outlive it (section 6). Threads
-(C++ `std::thread`, Python `threading`) and Python `multiprocessing` with the
-default `fork` start method (pipes plus POSIX semaphores in `/dev/shm`) are
-unaffected; the `forkserver` start method already failed because it needs a
-socket. The filter binds the run only: the compile step runs no submitted
-code.
+cannot create SysV IPC objects that would outlive it (section 6).
+Judged programs are **thread-only** (A9-06, owner decision 2026-11-18):
+`fork`, `vfork` and `clone` without `CLONE_THREAD` get `EPERM`, and `clone3`
+answers `ENOSYS` so glibc falls back to the `clone` syscall whose flags the
+filter can read. `RLIMIT_AS` and the `wait4` peak are per process, so forked
+workers could otherwise each use a fresh memory (and CPU) allowance and hold
+several times the limit while still being Accepted. Threads (C++
+`std::thread`, Python `threading`) share the one limited address space and
+keep working. Python `multiprocessing`, `subprocess`, `os.fork` and C++
+`fork`/`system` now fail (`PermissionError` / `-1` with `EPERM`), which
+competitive programs do not need (`judgeForkBan.test.ts`,
+`sandboxScratchIsolation.test.ts`). The filter binds the run only: the
+compile step (g++ forks cc1plus, as and ld) runs no submitted code and is
+not filtered.
 **Container-level follow-up (still open):** the seccomp layer denies socket
 creation but not other network-adjacent behaviour (e.g. inherited fds), and it
 does not bind the *compile* step. The full fix remains the dedicated

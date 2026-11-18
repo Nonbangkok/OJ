@@ -26,6 +26,9 @@
 #include <linux/filter.h>
 #include <linux/seccomp.h>
 #include <sys/syscall.h>
+#ifndef CLONE_THREAD
+#define CLONE_THREAD 0x00010000 /* <linux/sched.h>; not pulled in without _GNU_SOURCE */
+#endif
 #endif
 
 /*
@@ -46,8 +49,9 @@
  *     disk writes and file descriptors of untrusted user code;
  *   - installs a seccomp filter denying socket/socketpair (and other
  *     namespace/escape syscalls) so the submission cannot reach the network,
- *     and shmget/semget/msgget so it cannot leave SysV IPC objects behind
- *     (see restrict_sandbox_syscalls below); and
+ *     shmget/semget/msgget so it cannot leave SysV IPC objects behind, and
+ *     every process-creating clone so the program is thread-only (see
+ *     restrict_sandbox_syscalls below); and
  *   - if currently running as root, drops to an unprivileged identity (the
  *     per-submission sandbox uid/gid passed as argv[4], default nobody) via
  *     setgid() then setuid() so the submitted binary cannot act with root
@@ -137,6 +141,28 @@ static int restrict_sandbox_syscalls(void) {
         DENY(__NR_unshare), DENY(__NR_setns),
         DENY(__NR_ptrace), DENY(__NR_mount),
         DENY(__NR_shmget), DENY(__NR_semget), DENY(__NR_msgget),
+        /* Thread-only (A9-06): RLIMIT_AS and the wait4() peak are per
+         * process, so forked workers could each take a fresh memory (and
+         * CPU) allowance. fork/vfork and clone without CLONE_THREAD get
+         * EPERM; clone3 answers ENOSYS so glibc falls back to the clone
+         * syscall whose flags this filter can inspect. Threads share the
+         * one limited address space and keep working. Mirrors the
+         * authoring sandbox's solution filter. */
+#ifdef __NR_clone3
+        BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, __NR_clone3, 0, 1),
+        BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_ERRNO|(ENOSYS & SECCOMP_RET_DATA)),
+#endif
+#ifdef __NR_fork
+        DENY(__NR_fork),
+#endif
+#ifdef __NR_vfork
+        DENY(__NR_vfork),
+#endif
+        /* Last check: it replaces the syscall number with clone's flags. */
+        BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, __NR_clone, 0, 3),
+        BPF_STMT(BPF_LD|BPF_W|BPF_ABS, offsetof(struct seccomp_data, args[0])),
+        BPF_JUMP(BPF_JMP|BPF_JSET|BPF_K, CLONE_THREAD, 1, 0),
+        BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_ERRNO|(EPERM & SECCOMP_RET_DATA)),
         BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_ALLOW),
     };
     struct sock_fprog program = { .len = sizeof(rules)/sizeof(rules[0]), .filter = rules };
