@@ -10,7 +10,8 @@ import { logger } from '../utils/logger';
 import { ContestRow } from '../types/models';
 import { solveRewardXpSql } from './progressionService';
 import { publishRealtime } from './realtimeHub';
-import { waitForContestJudgesToDrain } from './judgeQueue';
+import { enqueueTrackedJudgeTask, getContestInFlightCount, waitForContestJudgesToDrain } from './judgeQueue';
+import { processSubmission } from './submissionService';
 import {
   AvailableContestProblemRow,
   ContestMigrationResult,
@@ -111,13 +112,20 @@ export const moveProblemsToContest = async (contestId: number, problemIds: strin
  * Move problems from contest back to main system
  * @param contestId - The contest ID to move problems from
  * @param problemIds - Optional array of problem IDs to move. If null, all problems are moved.
+ * @param outerClient - Run inside the caller's open transaction instead of a
+ *   transaction of its own (the contest-end migration passes its client, so
+ *   the move commits or rolls back together with the rest of the finish).
  * @returns Result object with success status and details
  */
-export const moveProblemsBackToMain = async (contestId: number, problemIds: string[] | null = null): Promise<ProblemMoveResult> => {
-  const client: PoolClient = await db.pool.connect();
+export const moveProblemsBackToMain = async (
+  contestId: number,
+  problemIds: string[] | null = null,
+  outerClient?: PoolClient,
+): Promise<ProblemMoveResult> => {
+  const client: PoolClient = outerClient ?? await db.pool.connect();
 
   try {
-    await client.query('BEGIN');
+    if (!outerClient) await client.query('BEGIN');
 
     // Check if contest exists
     const contestResult = await client.query<ContestStatusRow>(
@@ -150,7 +158,7 @@ export const moveProblemsBackToMain = async (contestId: number, problemIds: stri
 
     const updateResult = await client.query<ProblemIdentityRow>(queryText, queryParams);
 
-    await client.query('COMMIT');
+    if (!outerClient) await client.query('COMMIT');
 
     return {
       success: true,
@@ -159,20 +167,68 @@ export const moveProblemsBackToMain = async (contestId: number, problemIds: stri
     };
 
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (!outerClient) await client.query('ROLLBACK');
     logger.error('failed to move problems back to main', { err: error });
     throw error;
   } finally {
-    client.release();
+    if (!outerClient) client.release();
   }
 };
+
+export interface MigrateContestOptions {
+  /**
+   * Finish even though the contest's judges have not drained (the
+   * scheduler's last resort once its deferral budget is spent). Every
+   * migrated row that is not yet judged is re-judged in the practice pool.
+   */
+  proceedWithJudgesInFlight?: boolean;
+}
 
 /**
  * Migrate all contest submissions to main submissions table and generate final scoreboard
  * @param contestId - The contest ID to migrate submissions from
- * @returns Result object with migration details
+ * @returns Result object with migration details. `deferred: true` means the
+ *   contest's judges had not drained, nothing was written and the contest
+ *   stays 'finishing' for a later attempt.
  */
-export const migrateSubmissionsAfterContest = async (contestId: number): Promise<ContestMigrationResult> => {
+export const migrateSubmissionsAfterContest = async (
+  contestId: number,
+  { proceedWithJudgesInFlight = false }: MigrateContestOptions = {},
+): Promise<ContestMigrationResult> => {
+  // JUDGE-005 / XSYS-001/002 / A5-02: contest_submissions rows are DELETED
+  // below. A judge still queued or running for this contest would then find
+  // no row (or its final UPDATE would hit zero rows) and the verdict would be
+  // lost: the migrated copy in `submissions` would stay pre-verdict and the
+  // frozen final scoreboard would count it as 0. So drain the contest's
+  // judges first, bounded by CONTEST_MIGRATION_DRAIN_TIMEOUT_MS so a tick
+  // never hangs. Not drained: write nothing and report `deferred` — the
+  // contest stays 'finishing' (submissions are already closed by the
+  // wall-clock gate) and the scheduler tries again next tick. The drain runs
+  // before a pool client is taken, so no transaction idles while waiting.
+  const drained = await waitForContestJudgesToDrain(
+    contestId,
+    JUDGE_CONFIG.CONTEST_MIGRATION_DRAIN_TIMEOUT_MS
+  );
+  if (!drained && !proceedWithJudgesInFlight) {
+    logger.warn('contest migration deferred - contest judges still in flight', {
+      contestId,
+      inFlight: getContestInFlightCount(contestId),
+    });
+    return {
+      success: false,
+      deferred: true,
+      message: 'Contest judges are still running; migration deferred',
+      migratedSubmissions: 0,
+      finalScoreboard: 0,
+    };
+  }
+  if (!drained) {
+    logger.warn('contest migration proceeding with judges still in flight - unjudged submissions will be re-judged after the move', {
+      contestId,
+      inFlight: getContestInFlightCount(contestId),
+    });
+  }
+
   const client: PoolClient = await db.pool.connect();
 
   try {
@@ -192,29 +248,6 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
     if (contest.status !== CONTEST_STATUS.FINISHING) {
       throw new Error('Contest must be in finishing status to migrate submissions');
     }
-
-    // JUDGE-005 / XSYS-001/002: contest_submissions rows are DELETED below.
-    // If a judge is still in flight for this contest, its final UPDATE would
-    // hit zero rows and the verdict would be lost forever (the migrated copy
-    // in `submissions` would stay pre-verdict). Drain in-flight judges FIRST
-    // — bounded by CONTEST_MIGRATION_DRAIN_TIMEOUT_MS so a stuck judge can
-    // never hang the scheduler tick. On timeout the migration proceeds
-    // (status must still advance); the straggler's verdict is discarded by
-    // the pipeline's conditional final UPDATE (rowCount 0 → stale).
-    // Note: the drain runs BEFORE the transaction opens so the pool client
-    // is not held while waiting.
-    const drained = await waitForContestJudgesToDrain(
-      contestId,
-      JUDGE_CONFIG.CONTEST_MIGRATION_DRAIN_TIMEOUT_MS
-    );
-    if (!drained) {
-      logger.warn('contest migration proceeding with judges still in flight — their verdicts will be discarded', {
-        contestId,
-        inFlight: true,
-      });
-    }
-
-
 
     // First, save the problems snapshot for this contest
     await client.query(`
@@ -242,14 +275,23 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
       RETURNING *
     `, [contestId]);
 
-    // Migrate all contest submissions to main submissions table
-    const migrationResult = await client.query(`
+    // Migrate all contest submissions to main submissions table. A row
+    // that is not judged yet (only possible when finishing with judges in
+    // flight) lands as Pending, so it is re-judged below and a restart's
+    // sweep re-enqueues it instead of marking it System Error.
+    const migrationResult = await client.query<{ id: number; overall_status: string }>(`
       INSERT INTO submissions (user_id, problem_id, code, language, overall_status, score, results, max_time_ms, max_memory_kb, submitted_at)
-      SELECT user_id, problem_id, code, language, overall_status, score, results, max_time_ms, max_memory_kb, submitted_at
+      SELECT user_id, problem_id, code, language,
+             CASE WHEN overall_status IN ($2, $3) THEN $4 ELSE overall_status END,
+             score, results, max_time_ms, max_memory_kb, submitted_at
       FROM contest_submissions
       WHERE contest_id = $1
-      RETURNING id
-    `, [contestId]);
+      RETURNING id, overall_status
+    `, [contestId, SUBMISSION_STATUS.COMPILING, SUBMISSION_STATUS.RUNNING, SUBMISSION_STATUS.PENDING]);
+    // Migrated rows that still need a verdict, re-enqueued after COMMIT.
+    const unjudgedIds = migrationResult.rows
+      .filter((row) => row.overall_status === SUBMISSION_STATUS.PENDING)
+      .map((row) => row.id);
 
     // SCORE-002/DB-03: award XP for the migrated Accepted solves, inside the
     // same transaction. Idempotent like awardSolveReward (unique constraint
@@ -279,8 +321,8 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
       [contestId]
     );
 
-    // Move problems back to main system
-    await moveProblemsBackToMain(contestId);
+    // Move problems back to main system, in this same transaction
+    await moveProblemsBackToMain(contestId, null, client);
 
     // Update contest status to finished
     await client.query(
@@ -289,6 +331,20 @@ export const migrateSubmissionsAfterContest = async (contestId: number): Promise
     );
 
     await client.query('COMMIT');
+
+    // A5-02: nothing migrated may stay unjudged. The contest judge of such a
+    // row (if any is still alive) finds its contest_submissions row gone and
+    // steps aside; the practice-pool copy gets its verdict here instead. The
+    // frozen final scoreboard above keeps the score the row had at finish.
+    for (const submissionId of unjudgedIds) {
+      enqueueTrackedJudgeTask(() => processSubmission(submissionId), { table: 'submissions', submissionId });
+    }
+    if (unjudgedIds.length > 0) {
+      logger.warn('re-queued unjudged contest submissions after migration', {
+        contestId,
+        count: unjudgedIds.length,
+      });
+    }
 
     // The final scoreboard rewrite is visible to connected clients — ping
     // them to refetch (publishRealtime never throws).

@@ -24,6 +24,15 @@ export const cronLogger = {
 /** XSYS-006: how many consecutive ticks a failing migration is retried before giving up. */
 const MIGRATION_MAX_RETRIES = 5;
 
+/**
+ * A5-02: how many ticks a migration may be deferred because the contest's
+ * judges have not drained yet (about half an hour at one tick a minute). A
+ * judge backlog is not a failure, so deferrals never use up
+ * MIGRATION_MAX_RETRIES. Once this budget is spent the contest finishes
+ * anyway and its unjudged submissions are re-judged in the practice pool.
+ */
+const MIGRATION_MAX_DRAIN_DEFERRALS = 30;
+
 class ContestScheduler {
   private isRunning: boolean;
   private checkInterval: ScheduledTask | null;
@@ -40,6 +49,9 @@ class ContestScheduler {
   // later ticks until MIGRATION_MAX_RETRIES is exhausted (then it stops
   // auto-retrying and needs manual intervention).
   private migrationFailures: Map<number, number>;
+  // A5-02: consecutive ticks whose migration was deferred because the
+  // contest's judges were still in flight (see MIGRATION_MAX_DRAIN_DEFERRALS).
+  private drainDeferrals: Map<number, number>;
 
   constructor() {
     this.isRunning = false;
@@ -47,6 +59,7 @@ class ContestScheduler {
     this.tickInProgress = false;
     this.paused = false;
     this.migrationFailures = new Map();
+    this.drainDeferrals = new Map();
   }
 
   // Start the scheduler
@@ -186,20 +199,45 @@ class ContestScheduler {
 
           logger.info('contest status updated', { contestId: contest.id, status: CONTEST_STATUS.FINISHING });
         } else {
-          // A previous tick's migration failed; this tick is the retry.
+          // A previous tick's migration failed or was deferred; this tick is the retry.
           const failures = this.migrationFailures.get(contest.id) ?? 0;
           if (failures >= MIGRATION_MAX_RETRIES) {
             logger.debug('contest migration retries exhausted - skipping tick', { contestId: contest.id });
             continue;
           }
-          logger.warn('retrying failed contest migration', { contestId: contest.id, attempt: failures + 1 });
+          const deferrals = this.drainDeferrals.get(contest.id) ?? 0;
+          if (failures === 0 && deferrals > 0) {
+            logger.info('retrying deferred contest migration', { contestId: contest.id, deferrals });
+          } else {
+            logger.warn('retrying failed contest migration', { contestId: contest.id, attempt: failures + 1 });
+          }
         }
 
         // Migrate submissions and finalize contest (this may take time)
         try {
           logger.info('migrating submissions after contest', { contestId: contest.id });
-          await migrateSubmissionsAfterContest(contest.id);
+          const deferrals = this.drainDeferrals.get(contest.id) ?? 0;
+          const proceedWithJudgesInFlight = deferrals >= MIGRATION_MAX_DRAIN_DEFERRALS;
+          if (proceedWithJudgesInFlight) {
+            logger.error('contest judges did not drain within the deferral budget - finishing anyway, unjudged submissions are re-judged after the move', {
+              contestId: contest.id,
+              deferrals,
+            });
+          }
+          const result = await migrateSubmissionsAfterContest(contest.id, { proceedWithJudgesInFlight });
+          if (result?.deferred) {
+            // Judges still in flight: nothing was written, the contest stays
+            // 'finishing' and the next tick tries again.
+            this.drainDeferrals.set(contest.id, deferrals + 1);
+            logger.warn('contest migration deferred - judges still in flight, will retry on next tick', {
+              contestId: contest.id,
+              deferral: deferrals + 1,
+              maxDeferrals: MIGRATION_MAX_DRAIN_DEFERRALS,
+            });
+            continue;
+          }
           this.migrationFailures.delete(contest.id);
+          this.drainDeferrals.delete(contest.id);
           logger.info('contest migration completed', { contestId: contest.id });
         } catch (migrationError) {
           const failures = (this.migrationFailures.get(contest.id) ?? 0) + 1;

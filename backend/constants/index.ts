@@ -233,10 +233,10 @@ export const JUDGE_CONFIG = {
     // Poll interval for the contest-end judge drain (JUDGE-005): how often
     // the migration re-checks the per-contest in-flight judge count.
     DRAIN_POLL_INTERVAL_MS: 100,
-    // How long contest-end migration waits for in-flight contest judges to
-    // finish before proceeding anyway (JUDGE-005). Bounded so the scheduler
-    // tick can never hang on a stuck judge; a judge still running after this
-    // is treated as lost (its verdict cannot be saved into the migrated rows).
+    // How long one contest-end migration attempt waits for in-flight contest
+    // judges to finish (JUDGE-005). Bounded so the scheduler tick can never
+    // hang on a stuck judge; not drained by then, the migration is deferred
+    // to the next tick (contestScheduler caps the deferrals).
     CONTEST_MIGRATION_DRAIN_TIMEOUT_MS: 30_000,
     // --- Sandbox identities (RUNNER-003 / RUNNER-006) ---
     // Compiles and testcase runs of one submission share an identity (uid and

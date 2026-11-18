@@ -6,13 +6,19 @@ import {
 } from '../../services/problemMigration';
 import * as db from '../../db';
 import { publishRealtime } from '../../services/realtimeHub';
-import { waitForContestJudgesToDrain } from '../../services/judgeQueue';
+import { enqueueTrackedJudgeTask, waitForContestJudgesToDrain } from '../../services/judgeQueue';
+import { processSubmission } from '../../services/submissionService';
 
 jest.mock('../../services/realtimeHub', () => ({
     publishRealtime: jest.fn(),
 }));
 jest.mock('../../services/judgeQueue', () => ({
     waitForContestJudgesToDrain: jest.fn().mockResolvedValue(true),
+    getContestInFlightCount: jest.fn(() => 0),
+    enqueueTrackedJudgeTask: jest.fn(),
+}));
+jest.mock('../../services/submissionService', () => ({
+    processSubmission: jest.fn(),
 }));
 
 // Mock db.pool.connect
@@ -167,26 +173,78 @@ describe('Problem Migration Service', () => {
 
             await migrateSubmissionsAfterContest(1);
 
-            // The drain completed before any client (transaction) query ran.
+            // The drain completed before a pool client (transaction) was taken.
             expect(waitForContestJudgesToDrain).toHaveBeenCalledWith(1, expect.any(Number));
             expect(queryOrder.length).toBeGreaterThan(0);
+            const drainOrder = (waitForContestJudgesToDrain as jest.Mock).mock.invocationCallOrder[0];
+            const connectOrder = (db.pool.connect as jest.Mock).mock.invocationCallOrder[0];
+            expect(drainOrder).toBeLessThan(connectOrder);
         });
 
-        it('JUDGE-005: proceeds (with a warning) when the drain times out with judges still in flight', async () => {
+        it('A5-02: defers without writing anything when the drain times out with judges still in flight', async () => {
+            (waitForContestJudgesToDrain as jest.Mock).mockResolvedValueOnce(false);
+
+            const result = await migrateSubmissionsAfterContest(1);
+
+            expect(result).toMatchObject({ success: false, deferred: true, migratedSubmissions: 0 });
+            expect(db.pool.connect).not.toHaveBeenCalled();
+            expect(mockClient.query).not.toHaveBeenCalled();
+            expect(publishRealtime).not.toHaveBeenCalled();
+        });
+
+        it('A5-02: when told to finish with judges in flight, re-judges every migrated row that has no verdict yet', async () => {
             (waitForContestJudgesToDrain as jest.Mock).mockResolvedValueOnce(false);
             (mockClient.query as jest.Mock).mockImplementation(async (text: string) => {
                 if (String(text).includes('SELECT id, status FROM contests')) {
                     return { rows: [{ id: 1, status: 'finishing' }] };
                 }
                 if (String(text).includes('INSERT INTO submissions')) {
-                    return { rows: [{ id: 10 }] };
+                    return { rows: [{ id: 10, overall_status: 'Pending' }, { id: 11, overall_status: 'Accepted' }, { id: 12, overall_status: 'Pending' }] };
                 }
                 return { rows: [] };
             });
 
-            const result = await migrateSubmissionsAfterContest(1);
+            const result = await migrateSubmissionsAfterContest(1, { proceedWithJudgesInFlight: true });
 
             expect(result.success).toBe(true);
+            expect(result.deferred).toBeUndefined();
+            // Rows caught mid-judge are copied as Pending so they are re-judged.
+            const insertCall = (mockClient.query as jest.Mock).mock.calls
+                .find(([text]) => String(text).includes('INSERT INTO submissions')) as [string, unknown[]];
+            expect(insertCall[0]).toContain('CASE WHEN overall_status IN ($2, $3) THEN $4 ELSE overall_status END');
+            expect(insertCall[1]).toEqual([1, 'Compiling', 'Running', 'Pending']);
+            // Enqueued only after COMMIT, one tracked practice-pool judge per unjudged row.
+            expect(enqueueTrackedJudgeTask).toHaveBeenCalledTimes(2);
+            expect((enqueueTrackedJudgeTask as jest.Mock).mock.calls.map((c) => c[1])).toEqual([
+                { table: 'submissions', submissionId: 10 },
+                { table: 'submissions', submissionId: 12 },
+            ]);
+            const commitOrder = (mockClient.query as jest.Mock).mock.invocationCallOrder[
+                (mockClient.query as jest.Mock).mock.calls.findIndex(([text]) => text === 'COMMIT')
+            ];
+            expect(commitOrder).toBeLessThan((enqueueTrackedJudgeTask as jest.Mock).mock.invocationCallOrder[0]);
+            await (enqueueTrackedJudgeTask as jest.Mock).mock.calls[0][0]();
+            expect(processSubmission).toHaveBeenCalledWith(10);
+        });
+
+        it('moves the problems back inside the migration transaction (one client, one COMMIT)', async () => {
+            (mockClient.query as jest.Mock).mockImplementation(async (text: string) => {
+                if (String(text).includes('SELECT id, status FROM contests')) {
+                    return { rows: [{ id: 1, status: 'finishing' }] };
+                }
+                return { rows: [] };
+            });
+
+            await migrateSubmissionsAfterContest(1);
+
+            expect(db.pool.connect).toHaveBeenCalledTimes(1);
+            const statements = (mockClient.query as jest.Mock).mock.calls.map(([text]) => String(text));
+            expect(statements.filter((t) => t === 'BEGIN')).toHaveLength(1);
+            expect(statements.filter((t) => t === 'COMMIT')).toHaveLength(1);
+            const moveBack = statements.findIndex((t) => t.includes('SET contest_id = NULL'));
+            expect(moveBack).toBeGreaterThan(-1);
+            expect(moveBack).toBeLessThan(statements.indexOf('COMMIT'));
+            expect(enqueueTrackedJudgeTask).not.toHaveBeenCalled();
         });
 
         it('should publish a scoreboard_update after the final scoreboard is written', async () => {

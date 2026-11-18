@@ -19,6 +19,7 @@ describe('Contest Scheduler Service', () => {
         (contestScheduler as any).isRunning = false;
         (contestScheduler as any).checkInterval = null;
         (contestScheduler as any).migrationFailures = new Map();
+        (contestScheduler as any).drainDeferrals = new Map();
         // Default: no contests to process (individual tests override with
         // mockResolvedValueOnce chains).
         (db.query as jest.Mock).mockResolvedValue({ rows: [] });
@@ -108,7 +109,7 @@ describe('Contest Scheduler Service', () => {
             await contestScheduler.checkContestStatus();
 
             expect(db.query).toHaveBeenNthCalledWith(3, expect.stringMatching(/UPDATE contests\s+SET status = 'finishing'/), [2]);
-            expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(2);
+            expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(2, { proceedWithJudgesInFlight: false });
 
             jest.useRealTimers();
         });
@@ -154,7 +155,7 @@ describe('Contest Scheduler Service', () => {
 
             await contestScheduler.checkContestStatus();
 
-            expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(3);
+            expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(3, { proceedWithJudgesInFlight: false });
             // A finishing contest is not re-flipped to finishing.
             const updateCalls = (db.query as jest.Mock).mock.calls
                 .map((c) => String(c[0]))
@@ -236,10 +237,54 @@ describe('Contest Scheduler Service', () => {
             // may have been added by the skipped tick.
             releaseFirstTick();
             await firstTick;
-            expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(7);
+            expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(7, { proceedWithJudgesInFlight: false });
             expect(db.query).toHaveBeenCalledTimes(3);
 
             jest.useRealTimers();
+        });
+
+        describe('A5-02: judges still in flight at contest end', () => {
+            const finishingTick = async (contestId: number, result: unknown, first = false) => {
+                (db.query as jest.Mock).mockReset();
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce({ rows: [] }) // start scheduled (none)
+                    .mockResolvedValueOnce({ rows: [{ id: contestId, title: 'Rush', status: first ? 'running' : 'finishing' }] })
+                    .mockResolvedValueOnce({}); // UPDATE to finishing (first tick only)
+                (migrateSubmissionsAfterContest as jest.Mock).mockReset();
+                (migrateSubmissionsAfterContest as jest.Mock).mockResolvedValueOnce(result);
+                await contestScheduler.checkContestStatus();
+            };
+            const deferred = { success: false, deferred: true, message: 'deferred', migratedSubmissions: 0, finalScoreboard: 0 };
+
+            it('a deferred migration keeps the contest finishing without using up the failure retries', async () => {
+                // Far more deferrals than MIGRATION_MAX_RETRIES (5): every tick still tries.
+                for (let tick = 0; tick < 10; tick += 1) {
+                    await finishingTick(5, deferred, tick === 0);
+                    expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(5, { proceedWithJudgesInFlight: false });
+                }
+                expect((contestScheduler as any).migrationFailures.get(5)).toBeUndefined();
+                expect((contestScheduler as any).drainDeferrals.get(5)).toBe(10);
+                const allSql = (db.query as jest.Mock).mock.calls.map((c) => String(c[0]));
+                expect(allSql.some((sql) => sql.includes("'finished'"))).toBe(false);
+
+                // Judges drained: the next tick finishes and forgets the deferrals.
+                await finishingTick(5, { success: true });
+                expect((contestScheduler as any).drainDeferrals.has(5)).toBe(false);
+            });
+
+            it('after the deferral budget, finishes anyway with judges in flight', async () => {
+                for (let tick = 0; tick < 30; tick += 1) {
+                    await finishingTick(6, deferred, tick === 0);
+                }
+                expect(migrateSubmissionsAfterContest).toHaveBeenLastCalledWith(6, { proceedWithJudgesInFlight: false });
+
+                await finishingTick(6, { success: true });
+                expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(6, { proceedWithJudgesInFlight: true });
+                expect(console.error).toHaveBeenCalledWith(
+                    expect.stringMatching(/contest judges did not drain within the deferral budget.*contestId=6 .*deferrals=30/),
+                );
+                expect((contestScheduler as any).drainDeferrals.has(6)).toBe(false);
+            });
         });
     });
 });

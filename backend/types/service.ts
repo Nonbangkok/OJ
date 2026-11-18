@@ -121,6 +121,8 @@ export interface ContestMigrationResult {
   message: string;
   migratedSubmissions: number;
   finalScoreboard: number;
+  /** Contest judges had not drained: nothing was written, retry later (A5-02). */
+  deferred?: boolean;
 }
 
 export interface AvailableContestProblemRow extends Pick<ProblemRow, 'id' | 'title' | 'author' | 'is_visible'> {}
