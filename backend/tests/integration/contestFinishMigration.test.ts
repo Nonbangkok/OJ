@@ -178,6 +178,9 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     // The frozen final board keeps the scores the rows had at finish.
     const finalBoard = await pool.query('SELECT total_score FROM contest_scoreboards WHERE contest_id = 1 AND user_id = 1');
     expect(finalBoard.rows).toEqual([{ total_score: 100 }]);
+    // A5-04: the re-judged copies stay linked to their contest.
+    const linked = await pool.query('SELECT contest_id FROM submissions');
+    expect(linked.rows).toEqual([{ contest_id: 1 }, { contest_id: 1 }, { contest_id: 1 }]);
   });
 
   it('rolls back as one unit: a failure after the problems move back leaves them in the contest', async () => {

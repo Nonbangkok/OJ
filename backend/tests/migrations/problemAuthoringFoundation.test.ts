@@ -39,6 +39,7 @@ describe('problem authoring foundation migration', () => {
       '0026_contest_problem_position',
       '0027_user_last_login',
       '0028_authoring_jobs_draft_type_index',
+      '0029_submissions_contest_id',
     ]);
   });
 

@@ -6,7 +6,7 @@
 
 The database contains **25 tables**. The 11 legacy application tables are bootstrapped by `backend/scripts/init_db.ts` (and `migrations/0001CoreSchema.ts`); `schema_migrations` and the remaining tables are managed by the non-destructive migration runner in `backend/migrations/`. There is no ORM — all schema is defined as raw SQL DDL.
 
-Schema status for this revision (migrations 0001–0024):
+Schema status for this revision (migrations 0001–0029):
 - Migration `0002_problem_authoring_foundation` adds `author_profiles`, `problem_drafts`, `problem_draft_assets`, `problem_draft_testcases`, and `authoring_jobs`.
 - Migration `0003_authoring_job_delivery` adds durable request JSON and the partial unique active-job-per-draft index.
 - Migration `0004_authoring_job_inputs` adds immutable input snapshots for output-generation jobs.
@@ -27,6 +27,7 @@ Schema status for this revision (migrations 0001–0024):
 - Migration `0019_password_change_enabled` inserts `system_settings.password_change_enabled` (default `'true'`).
 - Migration `0020_contest_visibility` adds `contests.is_visible BOOLEAN NOT NULL DEFAULT TRUE`.
 - Migration `0024_header_problems` adds `problems.problem_type` / `problems.submission_filename` (guarded CHECKs) and the `problem_files` table.
+- Migration `0029_submissions_contest_id` adds nullable `submissions.contest_id` (FK → `contests(id)` ON DELETE SET NULL, added NOT VALID then validated) and the partial index `idx_submissions_contest_id` (built CONCURRENTLY). No backfill.
 - `schema_migrations` serializes and records applied migrations.
 - Backend typing around the schema includes:
   - DB row interfaces remain in `backend/types/models.ts`.
@@ -127,6 +128,7 @@ erDiagram
         INT max_time_ms
         INT max_memory_kb
         TIMESTAMPTZ submitted_at
+        INT contest_id FK "ON DELETE SET NULL, nullable"
     }
 
     user_problem_rewards {
@@ -293,7 +295,7 @@ Input/output pairs for judging.
 Submissions to a problem with zero testcases are rejected with 400 at submit time.
 
 ### `submissions`
-Global (non-contest) code submissions.
+Global (practice-pool) code submissions, including the submissions of finished contests (moved here at contest finish).
 
 | Column | Type | Constraints |
 |---|---|---|
@@ -308,8 +310,11 @@ Global (non-contest) code submissions.
 | `max_time_ms` | `INT` | Maximum time across all test cases |
 | `max_memory_kb` | `INT` | Maximum memory across all test cases |
 | `submitted_at` | `TIMESTAMPTZ` | DEFAULT `NOW()` |
+| `contest_id` | `INT` | NULLABLE, FK → `contests(id)` ON DELETE SET NULL (migration 0029) — the contest the row was submitted in; NULL for practice submissions |
 
-Indexed on `user_id`, `problem_id`, `submitted_at DESC` (migration 0010).
+Indexed on `user_id`, `problem_id`, `submitted_at DESC` (migration 0010), and `contest_id` where not NULL (migration 0029).
+
+`contest_id` is written only by the contest-finish migration (`migrateSubmissionsAfterContest`), which copies the contest's `contest_submissions` here with their contest and deletes the originals in the same transaction. A contest's submissions therefore live in exactly one table at a time: `contest_submissions` while it is `running`/`finishing`, `submissions WHERE contest_id = …` once `finished`. Cheat detection and contest analytics read both in one statement (`services/contestSubmissionsSql.ts`), and the readers that `UNION ALL` the two pools (analytics, profile, progression) still count each row once. **Contests that finished before migration 0029 have NULL here** (no backfill — practice submissions inside the contest window cannot be told apart), so their similarity check and contest analytics submission figures stay empty. Deleting a contest keeps its migrated submissions in the practice pool and only clears the link.
 
 ### `user_problem_rewards`
 XP progression: one reward row per unique (user, problem) first solve. The `UNIQUE (user_id, problem_id)` constraint is the double-award guard — concurrent judge completions, rejudges, or replayed pipelines can never create a second reward for the same pair.
@@ -515,7 +520,8 @@ three-table write. See `AUTHORING_PUBLISH.md`.
 | Problem → Contest | N : 1 (nullable) | `problems.contest_id` — marks problem as part of active contest |
 | Problem → Collection | N : 0..1 | `problems.collection_id` — organizational grouping only |
 | Contest → Contest Problems | 1 : N | **Snapshot** — data is copied, not referenced |
-| Contest → Contest Submissions | 1 : N | Separate from global submissions |
+| Contest → Contest Submissions | 1 : N | Separate from global submissions; moved to `submissions` (with `contest_id`) at finish |
+| Contest → Submissions | 1 : N (nullable) | `submissions.contest_id` ON DELETE SET NULL — a finished contest's migrated submissions (migration 0029) |
 | Contest → Contest Scoreboards | 1 : N | One row per (contest, user) pair; frozen at contest end |
 | Contest → Contest Participants | 1 : N | Tracks join time |
 | User → Author Profile | 1 : 0..1 | Optional account link; profile may exist without an account |
@@ -568,6 +574,7 @@ Maps `problem_id` to the user's best score for that problem in the contest (the 
 | `users_username_lower_unique` | `users` | `LOWER(username)` | Case-insensitive username uniqueness (migration 0018) |
 | `idx_submissions_user` / `idx_submissions_problem` / `idx_submissions_submitted_at` | `submissions` | `user_id` / `problem_id` / `submitted_at DESC` | Analytics/profile/scoreboard queries (migration 0010) |
 | `idx_contest_submissions_user` / `_problem` / `_submitted_at` / `_contest` | `contest_submissions` | same pattern | Same, contest pool |
+| `idx_submissions_contest_id` | `submissions` | `contest_id` WHERE `contest_id IS NOT NULL` | A finished contest's migrated submissions (migration 0029) |
 | `idx_problems_contest_id` | `problems` | `contest_id` | Fast lookup of contest-assigned problems |
 | `idx_problems_collection_id` | `problems` | `collection_id` | Collection grouping (migration 0014) |
 | `idx_contest_submissions_contest_user` | `contest_submissions` | `contest_id, user_id` | Efficient per-user contest submission queries |

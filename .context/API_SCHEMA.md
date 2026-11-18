@@ -368,6 +368,7 @@
 - Purpose: contest cheat detection — คู่ user ต่างคนที่ submission ล่าสุดของโจทย์เดียวกันคล้ายกันหลัง normalize
 - Query (optional): `threshold` (0, 1] — default 0.6
 - Response 200: `{ contestId, pairs: [...] }`
+- ทุก status ของ contest: running/finishing อ่าน `contest_submissions`; finished อ่าน submission ที่ถูกย้ายไป `submissions` (`contest_id` = contest นี้, migration 0029) — `submissionIdA/B` ของ contest ที่ finished จึงเป็น id ใน practice pool. contest ที่ finish ก่อน 0029 ไม่มีแถวที่ผูกไว้ → `pairs: []`
 
 ---
 
@@ -656,6 +657,7 @@
 
 ### 82. `GET /analytics/contests/:contestId`
 - Response 200: per-contest analytics / 404
+- ตัวเลข submission (KPIs, timeline, problemStats, `solved`) ของ contest ที่ finished มาจาก `submissions WHERE contest_id` (migration 0029); running/finishing มาจาก `contest_submissions`. submission ฝึกหลัง contest (`contest_id` NULL) ไม่ถูกนับ. contest ที่ finish ก่อน 0029 ยังว่าง
 
 ### 83. `GET /analytics/problems/:problemId`
 - Response 200: per-problem analytics / 404

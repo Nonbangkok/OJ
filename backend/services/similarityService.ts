@@ -1,5 +1,6 @@
 import { query } from '../db';
 import { isTooShortForComparison, normalizeSource, similarity } from '../utils/codeSimilarity';
+import { contestSubmissionsSql } from './contestSubmissionsSql';
 
 /** Default similarity cutoff reported to staff (tunable per request). */
 export const SIMILARITY_THRESHOLD = 0.6;
@@ -40,7 +41,8 @@ export const findSimilarContestPairs = async (
     threshold: number = SIMILARITY_THRESHOLD,
 ): Promise<SimilarPair[]> => {
     // Latest submission per (user, problem) — one program per student per
-    // problem keeps the pair count linear in participants.
+    // problem keeps the pair count linear in participants. A5-04: a finished
+    // contest's submissions are its migrated rows in `submissions`.
     const rows = await query<SubmissionRow & { problem_id: string }>(`
         SELECT DISTINCT ON (cs.user_id, cs.problem_id)
             cs.id,
@@ -48,10 +50,10 @@ export const findSimilarContestPairs = async (
             cs.problem_id,
             u.username,
             cs.code
-        FROM contest_submissions cs
+        FROM ${contestSubmissionsSql('$1', 'id, contest_id, user_id, problem_id, code, submitted_at')} cs
         JOIN users u ON u.id = cs.user_id
         WHERE cs.contest_id = $1
-        ORDER BY cs.user_id, cs.problem_id, cs.submitted_at DESC
+        ORDER BY cs.user_id, cs.problem_id, cs.submitted_at DESC, cs.id DESC
     `, [contestId]);
 
     const grouped = new Map<string, Array<SubmissionRow & { problem_id: string }>>();

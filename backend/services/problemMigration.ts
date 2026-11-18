@@ -313,9 +313,15 @@ export const migrateSubmissionsAfterContest = async (
     // that is not judged yet (only possible when finishing with judges in
     // flight) lands as Pending, so it is re-judged below and a restart's
     // sweep re-enqueues it instead of marking it System Error.
+    //
+    // A5-04: each copy records its contest (submissions.contest_id), so
+    // cheat detection and contest analytics of the finished contest read
+    // these rows. The originals are still deleted below: every submission
+    // lives in exactly one of the two tables, so the readers that UNION ALL
+    // them keep counting it once.
     const migrationResult = await client.query<{ id: number; overall_status: string }>(`
-      INSERT INTO submissions (user_id, problem_id, code, language, overall_status, score, results, max_time_ms, max_memory_kb, submitted_at)
-      SELECT user_id, problem_id, code, language,
+      INSERT INTO submissions (contest_id, user_id, problem_id, code, language, overall_status, score, results, max_time_ms, max_memory_kb, submitted_at)
+      SELECT contest_id, user_id, problem_id, code, language,
              CASE WHEN overall_status IN ($2, $3) THEN $4 ELSE overall_status END,
              score, results, max_time_ms, max_memory_kb, submitted_at
       FROM contest_submissions
@@ -349,7 +355,9 @@ export const migrateSubmissionsAfterContest = async (
       ON CONFLICT (user_id, problem_id) DO NOTHING
     `, [contestId, SUBMISSION_STATUS.ACCEPTED, SUBMISSION_QUERY_CONFIG.FULL_PROBLEM_SCORE]);
 
-    // Clean up contest submissions (optional - could keep for historical data)
+    // Delete the originals: the copies above keep the history (with their
+    // contest), and keeping both would count every contest submission twice
+    // in the readers that UNION ALL submissions with contest_submissions.
     await client.query(
       'DELETE FROM contest_submissions WHERE contest_id = $1',
       [contestId]
