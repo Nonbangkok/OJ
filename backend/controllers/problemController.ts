@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import multer from 'multer';
 import { requireAuth, requireStaffOrAdmin } from '../middleware/auth';
 import { requirePublicAccess } from '../middleware/siteAccess';
-import { chunkDiskUpload, diskUpload, memoryUpload } from '../middleware/upload';
+import { chunkDiskUpload, diskUpload, problemFilesZipUpload, problemSingleRequestUpload } from '../middleware/upload';
 import { ZipArchive } from 'archiver';
 import { processBatchUpload } from '../services/batchUploadService';
 import { registerProgressClient, streamBatchUpload } from '../services/batchUploadProgress';
@@ -33,7 +33,7 @@ import {
   updateAdminProblemsVisibility,
   updateProblemsMetadata,
 } from '../services/problemQueryService';
-import { USER_ROLES, type ProblemFileRole, type ProblemType, type AdminProblemView, type AdminProblemSort } from '../constants';
+import { PROBLEM_UPLOAD_LIMITS, USER_ROLES, type ProblemFileRole, type ProblemType, type AdminProblemView, type AdminProblemSort } from '../constants';
 import * as db from '../db';
 import { sendStarterZip, getProblemFile, getProblemFiles, listProblemFiles, replaceProblemFiles } from '../services/problemFilesService';
 import { readFlatZip } from '../utils/headerProblemFiles';
@@ -285,7 +285,7 @@ router.get('/admin/problems/:id/files/:role/:filename', requireAuth, requireStaf
 
 router.put('/admin/problems/:id/files/:role', requireAuth, requireStaffOrAdmin,
   validateRequest({ params: problemFileRoleParamSchema }),
-  memoryUpload.single('filesZip'),
+  problemFilesZipUpload.single(PROBLEM_UPLOAD_LIMITS.FILES_ZIP_FIELD_NAME),
   asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const role = req.params.role as ProblemFileRole;
@@ -669,9 +669,9 @@ router.get('/admin/problems/batch-upload-progress/:progressId', requireAuth, req
 
 router.post('/admin/problems/:id/upload', requireAuth, requireStaffOrAdmin,
   validateRequest({ params: problemIdParamSchema }),
-  memoryUpload.fields([
-  { name: 'problemPdf', maxCount: 1 },
-  { name: 'testcasesZip', maxCount: 1 }
+  problemSingleRequestUpload.fields([
+  { name: PROBLEM_UPLOAD_LIMITS.PDF_FIELD_NAME, maxCount: 1 },
+  { name: PROBLEM_UPLOAD_LIMITS.TESTCASES_ZIP_FIELD_NAME, maxCount: 1 }
 ]), asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const files = (req.files ?? {}) as { [fieldname: string]: Express.Multer.File[] };

@@ -553,6 +553,27 @@ export const STRING_LIMITS = {
     COLLECTION_NAME: 100,
 } as const;
 
+// In-memory multipart caps for the staff problem routes that buffer an upload
+// in RAM (the backend container is capped at 1 GiB); per file, checked by
+// multer while the body streams in. Larger testcase ZIPs use the chunked,
+// disk-backed upload instead.
+const PROBLEM_FILES_ZIP_MAX_MIB = 25;
+const PROBLEM_SINGLE_UPLOAD_MAX_MIB = 64;
+
+export const PROBLEM_UPLOAD_LIMITS = {
+    // PUT /admin/problems/:id/files/:role: a role holds at most
+    // HEADER_PROBLEM_LIMITS.MAX_FILES_PER_ROLE x MAX_FILE_BYTES (20 MiB) + ZIP overhead.
+    FILES_ZIP_FIELD_NAME: 'filesZip',
+    FILES_ZIP_MAX_MIB: PROBLEM_FILES_ZIP_MAX_MIB,
+    FILES_ZIP_MAX_BYTES: PROBLEM_FILES_ZIP_MAX_MIB * 1024 * 1024,
+    // POST /admin/problems/:id/upload: above the frontend's 50 MiB
+    // single-request threshold (frontend/src/config/upload.ts).
+    PDF_FIELD_NAME: 'problemPdf',
+    TESTCASES_ZIP_FIELD_NAME: 'testcasesZip',
+    SINGLE_REQUEST_MAX_MIB: PROBLEM_SINGLE_UPLOAD_MAX_MIB,
+    SINGLE_REQUEST_MAX_BYTES: PROBLEM_SINGLE_UPLOAD_MAX_MIB * 1024 * 1024,
+} as const;
+
 
 export const FILE_CONFIG = {
     CLEANUP_DELAY_MS: 200,

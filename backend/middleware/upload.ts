@@ -3,12 +3,26 @@ import path from 'path';
 import fs from 'fs';
 import { AUTHOR_PROFILE_IMAGE, FILE_CONFIG, STATEMENT_ASSET, USER_AVATAR } from '../constants';
 import { AppError } from './errorHandler';
+import { PROBLEM_UPLOAD_LIMITS } from '../constants';
 import { CHUNKED_BATCH_UPLOAD_MULTER_FILE_SIZE_BYTES } from '../services/chunkedBatchUploadService';
 
 // Multer configuration for single file uploads (in memory)
 export const memoryUpload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: FILE_CONFIG.MAX_UPLOAD_SIZE_BYTES },
+});
+
+// The staff problem routes buffer uploads in RAM, so each gets its own cap
+// instead of the 2 GiB disk-upload ceiling (errorHandler maps the multer
+// LIMIT_FILE_SIZE error to a 413 naming the cap). No text fields are expected.
+export const problemFilesZipUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: PROBLEM_UPLOAD_LIMITS.FILES_ZIP_MAX_BYTES, files: 1, fields: 0 },
+});
+
+export const problemSingleRequestUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: PROBLEM_UPLOAD_LIMITS.SINGLE_REQUEST_MAX_BYTES, files: 2, fields: 0 },
 });
 
 export const authorProfileImageUpload = multer({
