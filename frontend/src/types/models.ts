@@ -58,6 +58,8 @@ export interface ContestProblem extends ProblemBase {
 }
 
 export interface ProblemSummary extends ProblemBase {
+  /** Header problems are marked in the public list. */
+  problem_type?: 'standard' | 'header';
   best_score?: number | null;
   submission_count?: string | null;
   latest_submission_at?: string | null;

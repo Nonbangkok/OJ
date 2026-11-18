@@ -312,7 +312,7 @@ export const getProblemsWithStatsForUser = async (
 
   const query = `
       WITH batch AS (
-        SELECT p.id, p.title, p.author, p.categories, p.difficulty
+        SELECT p.id, p.title, p.author, p.categories, p.difficulty, p.problem_type
         FROM problems p
         WHERE p.is_visible = true AND p.contest_id IS NULL
         ${filters.length ? `AND ${filters.join(' AND ')}` : ''}
@@ -348,6 +348,7 @@ export const getProblemsWithStatsForUser = async (
         b.author,
         b.categories,
         b.difficulty,
+        b.problem_type,
         ups.best_score,
         ups.submission_count,
         latest.submitted_at AS latest_submission_at,

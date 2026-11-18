@@ -382,6 +382,7 @@
   - `cursor: string` (opaque token จากหน้าก่อน)
 - Response 200:
   - `{ problems: [...], nextCursor: string | null, hasMore: boolean }`
+  - แต่ละ row: `id, title, author, categories, difficulty, problem_type` (`'standard'|'header'` — หน้า Problems แสดง badge "Header") + personal stats ของ viewer (`best_score`, `submission_count`, `latest_submission_*`, `best_submission_*`; null สำหรับ guest)
 - ลำดับ default: by id; sort by difficulty ใช้ id เป็น tiebreaker
 
 ### 44. `GET /problems/categories`

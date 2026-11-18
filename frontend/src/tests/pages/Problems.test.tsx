@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { BrowserRouter, MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Problems from '../../pages/problem/Problems';
 import problemService from '../../services/problemService';
+import { PHONE_TABLE_QUERY } from '../../components/ui/DataTable';
 import { installMockIntersectionObserver, restoreMockIntersectionObserver, triggerIntersectionObservers } from '../utils/mockIntersectionObserver';
 
 jest.mock('../../services/problemService');
@@ -291,6 +292,33 @@ describe('Problems Page', () => {
             expect(await screen.findByRole('link', { name: 'vector::erase' })).toHaveAttribute('href', '/problems/vec');
             expect(screen.getByRole('img', { name: '1 of 2 test cases passed' })).toBeInTheDocument();
             expect(screen.getByText('60')).toBeInTheDocument();
+        });
+
+        it('a header problem carries a Header badge next to its title, on desktop and on phones', async () => {
+            (jest.mocked(problemService.getProblemsPage) as jest.Mock).mockResolvedValue({
+                problems: [{ ...problem('q', 'Queue rotate'), problem_type: 'header' }, { ...problem('s', 'Two sum'), problem_type: 'standard' }],
+                nextCursor: null, hasMore: false,
+            });
+            const desktop = renderProblems();
+            const headerRow = await screen.findByRole('link', { name: 'Queue rotate Header' });
+            expect(headerRow.closest('tr')).not.toBeNull();
+            expect(within(headerRow).getByText('Header')).toBeInTheDocument();
+            expect(within(screen.getByRole('link', { name: 'Two sum' })).queryByText('Header')).toBeNull();
+            desktop.unmount();
+
+            const original = window.matchMedia;
+            window.matchMedia = jest.fn().mockImplementation((query: string) => ({
+                matches: query === PHONE_TABLE_QUERY, media: query, addEventListener: jest.fn(), removeEventListener: jest.fn(),
+            })) as unknown as typeof window.matchMedia;
+            try {
+                renderProblems();
+                const headerItem = await screen.findByRole('link', { name: 'Queue rotate Header' });
+                expect(headerItem.closest('li')).not.toBeNull();
+                expect(within(headerItem).getByText('Header')).toBeInTheDocument();
+                expect(within(screen.getByRole('link', { name: 'Two sum' })).queryByText('Header')).toBeNull();
+            } finally {
+                window.matchMedia = original;
+            }
         });
     });
 
