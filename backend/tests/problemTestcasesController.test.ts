@@ -20,8 +20,10 @@ jest.mock('archiver', () => ({}));
 jest.mock('../middleware/upload', () => ({
     chunkDiskUpload: { single: () => (_req: express.Request, _res: express.Response, next: express.NextFunction) => next() },
     diskUpload: { single: () => (_req: express.Request, _res: express.Response, next: express.NextFunction) => next() },
-    memoryUpload: {
+    problemSingleRequestUpload: {
         fields: () => (_req: express.Request, _res: express.Response, next: express.NextFunction) => next(),
+    },
+    problemFilesZipUpload: {
         single: () => (_req: express.Request, _res: express.Response, next: express.NextFunction) => next(),
     },
 }));

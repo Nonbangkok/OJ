@@ -1,5 +1,6 @@
-import { memoryUpload, diskUpload } from '../../middleware/upload';
+import { diskUpload, submissionFormUpload, userAvatarUpload } from '../../middleware/upload';
 import { privateTempDir } from '../../utils/privateTemp';
+import { SUBMISSION_VALIDATION, USER_AVATAR } from '../../constants';
 import { Request } from 'express';
 
 // Disk uploads are staged in a private directory of the backend work root.
@@ -19,11 +20,28 @@ describe('Upload Middleware', () => {
         jest.clearAllMocks();
     });
 
-    describe('memoryUpload', () => {
-        it('should use memory storage', () => {
-            // Memory storage is mostly opaque, but we can verify it was created
-            expect((memoryUpload as any).storage).toBeDefined();
-            expect((memoryUpload as any).storage.constructor.name).toBe('MemoryStorage');
+    // The two in-memory instances a regular user account reaches. Busboy
+    // holds text fields in RAM, so neither may keep multer's defaults
+    // (unlimited fields of up to 1 MB each).
+    describe('user-reachable in-memory uploads', () => {
+        it('caps the submission form to the schema fields, no files, and the code byte cap', () => {
+            expect((submissionFormUpload as any).storage.constructor.name).toBe('MemoryStorage');
+            expect((submissionFormUpload as any).limits).toEqual({
+                files: 0,
+                fields: 4,
+                parts: 4,
+                fieldSize: 3 * SUBMISSION_VALIDATION.MAX_CODE_LENGTH,
+            });
+        });
+
+        it('caps the avatar upload to one image file and no text fields', () => {
+            expect((userAvatarUpload as any).storage.constructor.name).toBe('MemoryStorage');
+            expect((userAvatarUpload as any).limits).toEqual({
+                fileSize: USER_AVATAR.MAX_UPLOAD_BYTES,
+                files: 1,
+                fields: 0,
+                parts: 1,
+            });
         });
     });
 

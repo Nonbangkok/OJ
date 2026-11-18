@@ -372,6 +372,21 @@ export const SUBMISSION_VALIDATION = {
     MAX_CODE_LENGTH: 65536, // 64 KiB
 } as const;
 
+const SUBMISSION_FORM_FIELD_NAMES = ['problemId', 'language', 'code', 'contestId'] as const;
+
+/**
+ * Multipart POST /submit (any logged-in account): busboy holds every text
+ * field in RAM before zod runs, so the form is capped to submitSchema's own
+ * fields, no files, and a per-field byte cap. A UTF-16 code unit (what the
+ * schema's max counts) is at most 3 UTF-8 bytes, so 3 x MAX_CODE_LENGTH bytes
+ * hold any code the schema accepts.
+ */
+export const SUBMISSION_FORM_LIMITS = {
+    FIELD_NAMES: SUBMISSION_FORM_FIELD_NAMES,
+    MAX_FIELDS: SUBMISSION_FORM_FIELD_NAMES.length,
+    MAX_FIELD_BYTES: 3 * SUBMISSION_VALIDATION.MAX_CODE_LENGTH,
+} as const;
+
 export const AUTHORING_VALIDATION = {
     MAX_PROBLEM_ID_LENGTH: 50,
     MAX_TITLE_LENGTH: 255,
@@ -551,6 +566,40 @@ export const STRING_LIMITS = {
     AUTHOR: 256,
     // Must match collections.name VARCHAR(100) (migrations/0014ProblemCollections.ts).
     COLLECTION_NAME: 100,
+} as const;
+
+// In-memory multipart caps for the staff problem routes that buffer an upload
+// in RAM (the backend container is capped at 1 GiB); per file, checked by
+// multer while the body streams in. Larger testcase ZIPs use the chunked,
+// disk-backed upload instead.
+const PROBLEM_FILES_ZIP_MAX_MIB = 25;
+const PROBLEM_SINGLE_UPLOAD_MAX_MIB = 64;
+// Both single-problem testcase ZIP routes (one request, and the chunked,
+// disk-backed one) read every paired entry into RAM before the INSERTs, and
+// pg copies each pair two to three more times while serialising it, so the
+// in-memory caps sit far below the 1 GiB container and the 500 MB
+// ARCHIVE_LIMITS cap that disk extraction uses. The per-file cap is the
+// authoring testcase one (authoring/testcases.ts TESTCASE_LIMITS).
+const TESTCASES_ZIP_MAX_UNCOMPRESSED_MIB = 256;
+const TESTCASES_ZIP_MAX_FILE_MIB = 64;
+
+export const PROBLEM_UPLOAD_LIMITS = {
+    // PUT /admin/problems/:id/files/:role: a role holds at most
+    // HEADER_PROBLEM_LIMITS.MAX_FILES_PER_ROLE x MAX_FILE_BYTES (20 MiB) + ZIP overhead.
+    FILES_ZIP_FIELD_NAME: 'filesZip',
+    FILES_ZIP_MAX_MIB: PROBLEM_FILES_ZIP_MAX_MIB,
+    FILES_ZIP_MAX_BYTES: PROBLEM_FILES_ZIP_MAX_MIB * 1024 * 1024,
+    // POST /admin/problems/:id/upload: above the frontend's 50 MiB
+    // single-request threshold (frontend/src/config/upload.ts).
+    PDF_FIELD_NAME: 'problemPdf',
+    TESTCASES_ZIP_FIELD_NAME: 'testcasesZip',
+    SINGLE_REQUEST_MAX_MIB: PROBLEM_SINGLE_UPLOAD_MAX_MIB,
+    SINGLE_REQUEST_MAX_BYTES: PROBLEM_SINGLE_UPLOAD_MAX_MIB * 1024 * 1024,
+    // Real inflated bytes of the paired testcase files, in all and per file.
+    TESTCASES_ZIP_MAX_UNCOMPRESSED_MIB,
+    TESTCASES_ZIP_MAX_UNCOMPRESSED_BYTES: TESTCASES_ZIP_MAX_UNCOMPRESSED_MIB * 1024 * 1024,
+    TESTCASES_ZIP_MAX_FILE_MIB,
+    TESTCASES_ZIP_MAX_FILE_BYTES: TESTCASES_ZIP_MAX_FILE_MIB * 1024 * 1024,
 } as const;
 
 

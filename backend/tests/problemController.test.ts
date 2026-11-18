@@ -47,8 +47,10 @@ jest.mock('../middleware/upload', () => ({
             next();
         }
     },
-    memoryUpload: {
+    problemSingleRequestUpload: {
         fields: () => (req: Request, res: Response, next: NextFunction) => next(),
+    },
+    problemFilesZipUpload: {
         single: () => (req: Request, _res: Response, next: NextFunction) => {
             if (req.headers['x-test-has-file'] === '1') {
                 req.file = { buffer: Buffer.from('zip-bytes') } as Express.Multer.File;

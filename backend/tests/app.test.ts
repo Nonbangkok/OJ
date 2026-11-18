@@ -86,7 +86,7 @@ describe('HTTP runtime configuration', () => {
     expect(response.headers['access-control-allow-methods']).toContain('PATCH');
   });
 
-  it('parses authoring JSON payloads above the Express default before authorization', async () => {
+  it('refuses an anonymous authoring payload above the Express default with 401, before parsing it', async () => {
     const createApp = loadCreateApp();
     const app = createApp({
       runtimeEnv: parseRuntimeEnv({ ...baseEnv }),

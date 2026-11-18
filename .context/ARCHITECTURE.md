@@ -92,7 +92,7 @@ OJ/
 │   │   ├── siteAccess.ts   # requirePublicAccess (PUBLIC/PRIVATE mode gate)
 │   │   ├── validation.ts   # zod runtime request validation middleware
 │   │   ├── errorHandler.ts # asyncHandler + AppError + global error middleware
-│   │   └── upload.ts       # Multer configuration (2 GiB general, 10 MiB images)
+│   │   └── upload.ts       # Multer configuration (2 GiB disk, 25/64 MiB problem-route memory caps, 10 MiB images)
 │   ├── schemas/
 │   │   └── requestSchemas.ts # Shared z.object request schemas (all controllers)
 │   ├── utils/
@@ -223,13 +223,13 @@ graph LR
 Nginx strips the `/api` prefix before forwarding to the backend, and overwrites `X-Real-IP`/`X-Forwarded-For` with `$remote_addr` on every `/api/` request so the backend's rate limiters key on a proxy-vouched client IP (client-supplied XFF is untrusted). The frontend is a static React build served by its own Nginx instance inside the container. A separate authoring-runner container shares only the `authoring-jobs` spool volume and has no network.
 
 Backend runtime request pipeline (high-level, in `app.ts` mount order):
-1. JSON body parsing (larger limit for authoring draft routes).
-2. Health checks (`/health/*`) — before sessions and the maintenance gate, so liveness never depends on the DB.
-3. `maintenanceGate` — 503 for everything (except health/import-progress) while a database import runs.
-4. `express-session` resolves session state from `user_sessions` (skipped for the token-authenticated import-progress path).
-5. `revalidateSessionUser` re-syncs the session's username/role/existence from the live `users` row — deleted user → request proceeds unauthenticated; role changes take effect on the next request.
-6. `attachRequestUser` maps session into typed `req.user` (controllers read `req.user` only, never `req.session`).
-7. `generalApiLimiter` (1000/15min, proxy-vouched IP key; authoring/realtime paths excluded).
+1. Health checks (`/health/*`) — before sessions and the maintenance gate, so liveness never depends on the DB.
+2. `maintenanceGate` — 503 for everything (except health/import-progress) while a database import runs.
+3. `express-session` resolves session state from `user_sessions` (skipped for the token-authenticated import-progress path).
+4. `revalidateSessionUser` re-syncs the session's username/role/existence from the live `users` row — deleted user → request proceeds unauthenticated; role changes take effect on the next request.
+5. `attachRequestUser` maps session into typed `req.user` (controllers read `req.user` only, never `req.session`).
+6. `generalApiLimiter` (1000/15min, proxy-vouched IP key; staff/admin sessions exempt; only a bodiless `GET /realtime/submissions` or `GET /realtime/contests/:id` is skipped, every other method/path under `/realtime/` is counted).
+7. JSON body parsing — `/admin/authoring/drafts*` runs `requireAuth` + `requireStaffOrAdmin` first, then the 7 MiB authoring parser; every other request gets the 100 KB default.
 8. Route-level middleware (`requirePublicAccess` / `requireAuth` / `requireStaffOrAdmin` / `requireAdmin`) and payload validation (`zod` via shared schemas + `validateRequest`).
 9. Controllers call services for DB-heavy logic.
 10. Errors propagate via `asyncHandler` to centralized `errorHandler`.
