@@ -174,10 +174,20 @@ when `pg_dump` fails) and authoring testcase uploads. Directory roots passed
 explicitly (chunked uploads) are verified the same way; a root another uid
 created first, or a chmod failure, is an error, never skipped.
 
-Batch extraction streams each entry into the private directory and counts
-the bytes actually inflated: an entry may not exceed (or fall short of) the
+Batch import reads every archive entry it inflates through one counting
+helper (`inflateEntryBounded` in `batchUploadService.ts`) that counts the
+bytes actually inflated: an entry may not exceed (or fall short of) the
 `uncompressedSize` it declares, and the archive may not exceed
-`ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES`, so a lying size cannot fill the disk.
+`ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES`, so a lying size cannot make it
+inflate more than that cap, on disk or in memory. That covers the batch ZIP itself, an inner testcase ZIP
+with the `input/`/`output/` layout (extracted into a private directory), and
+a flat-layout inner testcase ZIP (`1.in`/`1.out` at its root, which is never
+extracted: `assertSafeArchive` runs first, then each paired entry is read into
+memory through the same helper). An `input\output` layout written with
+backslash separators is detected as flat and handled the same way. A testcase
+ZIP rejected part-way is rolled back to a savepoint, so the problem keeps no
+partial testcase set. Other archive readers (the admin testcase-ZIP
+replacement and header grader/starter ZIPs) do not go through this helper.
 
 ### Why the backend container still runs as root
 See the long comment in `backend/Dockerfile`. In short: the per-submission

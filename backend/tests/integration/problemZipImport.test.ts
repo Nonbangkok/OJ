@@ -12,6 +12,7 @@ import problemRoutes from '../../controllers/problemController';
 import { errorHandler } from '../../middleware/errorHandler';
 import { runMigrationsFromPool } from '../../scripts/migrate';
 import { processBatchUpload } from '../../services/batchUploadService';
+import { withDeclaredSize } from '../fixtures/zipPatch';
 
 jest.unmock('pg');
 jest.mock('../../middleware/auth', () => ({
@@ -335,6 +336,33 @@ type CollectionRow = { id: number; name: string };
     expect(files.rows[2].content.equals(starter)).toBe(true);
     const cases = await pool.query('SELECT input_data, output_data FROM testcases WHERE problem_id = $1', ['hdr']);
     expect(cases.rows).toEqual([{ input_data: '1\n', output_data: '2\n' }]);
+  });
+
+  it('imports a flat testcase ZIP whole, and one rejected part-way not at all', async () => {
+    const zipBytes = async (entries: Record<string, string | Buffer>): Promise<Buffer> =>
+      realFs.readFile(await makeZip(entries));
+    const cases = { '1.in': '1 2\n', '1.out': '3\n', '2.in': '4 5\n', '2.out': '9\n' };
+    const good = await zipBytes(cases);
+    // Pair 1 is honest; 2.in ends short of the size it declares, so the
+    // archive is rejected only after pair 1 was already inserted.
+    const bad = withDeclaredSize(await zipBytes(cases), '2.in', 100);
+    const zipPath = await makeZip({
+      'good/config.json': configJson({ ...baseConfig, id: 'flat-good' }),
+      'good/tests.zip': good,
+      'bad/config.json': configJson({ ...baseConfig, id: 'flat-bad' }),
+      'bad/tests.zip': bad,
+    });
+
+    const results = await processBatchUpload(zipPath);
+
+    expect(results.errors).toEqual([]);
+    expect(results.added.sort()).toEqual(['flat-bad', 'flat-good']);
+    const rows = await pool.query(
+      'SELECT problem_id, case_number, input_data, output_data FROM testcases ORDER BY problem_id, case_number');
+    expect(rows.rows).toEqual([
+      { problem_id: 'flat-good', case_number: 1, input_data: '1 2\n', output_data: '3\n' },
+      { problem_id: 'flat-good', case_number: 2, input_data: '4 5\n', output_data: '9\n' },
+    ]);
   });
 
   it('a header problem without grader .cpp is reported and leaves no problem row', async () => {

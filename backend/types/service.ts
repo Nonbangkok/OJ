@@ -1,5 +1,4 @@
 import type { UserProgression } from '../services/progressionService';
-import { Readable } from 'stream';
 import { UPLOAD_STATUS, type ProblemFileRole, type ProblemType } from '../constants';
 import type { ProblemFileInput } from '../utils/headerProblemFiles';
 import { ContestRow, ContestStatus, ProblemRow, SystemSettingRow, TestcaseRow, UserRow } from './models';
@@ -30,8 +29,6 @@ export interface BatchUploadResult {
   skipped: string[];
   errors: Array<{ directory: string; message: string }>;
 }
-
-export type BufferedContent = Buffer | Readable;
 
 export interface TestcasePair<TSource> {
   in?: TSource;

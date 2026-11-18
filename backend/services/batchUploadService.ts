@@ -2,7 +2,7 @@ import fs from 'fs';
 const fsPromises = fs.promises;
 import path from 'path';
 import * as unzipper from 'unzipper';
-import { Readable, Transform } from 'stream';
+import { Transform, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 import type { PoolClient } from 'pg';
 import * as db from '../db';
@@ -10,7 +10,6 @@ import { UPLOAD_STATUS, FILE_CONFIG, DEFAULT_SUBMISSION_FILENAME, ARCHIVE_LIMITS
 import { BatchUploadProgressData } from '../types/api';
 import {
   BatchUploadResult,
-  BufferedContent,
   ProblemProcessResult,
   TestcasePairMap,
 } from '../types/service';
@@ -40,19 +39,68 @@ function getErrorMessage(error: unknown): string {
   return 'Unknown error';
 }
 
+/** Bytes inflated so far from one archive, shared by all of its entries. */
+interface InflateBudget {
+  total: number;
+}
+
+/**
+ * Inflate one archive entry into `sink`, counting the bytes it actually
+ * produces. The entry may not produce more than the uncompressedSize its
+ * central directory declares (which assertSafeArchive summed against the cap),
+ * so a lying size aborts the inflate at once instead of filling the disk or
+ * the heap; it may not end short of it either; and the archive's running total
+ * may not pass ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES. Every read of an archive
+ * entry goes through here: extraction to disk and in-memory reads alike.
+ */
+async function inflateEntryBounded(entry: unzipper.File, budget: InflateBudget, sink: Writable): Promise<void> {
+  const declared = entry.uncompressedSize;
+  if (!Number.isSafeInteger(declared) || declared < 0) {
+    throw new Error(`Archive rejected: entry "${entry.path}" has no valid declared size.`);
+  }
+  let size = 0;
+  const counter = new Transform({
+    transform(chunk: Buffer, _encoding, done) {
+      size += chunk.length;
+      budget.total += chunk.length;
+      if (size > declared) {
+        done(new Error(`Archive rejected: entry "${entry.path}" inflates past its declared size of ${declared} bytes.`));
+        return;
+      }
+      if (budget.total > ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES) {
+        done(new Error(`Archive rejected: uncompressed size exceeds ${ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES} bytes (decompression bomb).`));
+        return;
+      }
+      done(null, chunk);
+    },
+  });
+  await pipeline(entry.stream(), counter, sink);
+  if (size !== declared) {
+    throw new Error(`Archive rejected: entry "${entry.path}" holds ${size} bytes but declares ${declared}.`);
+  }
+}
+
+/** Read one archive entry into memory through inflateEntryBounded. */
+async function readEntryBounded(entry: unzipper.File, budget: InflateBudget): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  await inflateEntryBounded(entry, budget, new Writable({
+    write(chunk: Buffer, _encoding, done) {
+      chunks.push(chunk);
+      done();
+    },
+  }));
+  return Buffer.concat(chunks);
+}
+
 /**
  * Extract an archive entry by entry into `destination` (a private temp dir),
- * counting the bytes actually inflated. No entry may produce more than the
- * uncompressedSize its central directory declares (which assertSafeArchive
- * summed against the cap), so a lying size aborts the inflate at once instead
- * of filling the disk; an entry that ends short of it is rejected too, and so
- * is an archive whose real total passes ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES.
- * Directories are 0700 and files 0600. Call assertSafeArchive first; paths are
- * re-checked here so nothing lands outside `destination`.
+ * each entry through inflateEntryBounded. Directories are 0700 and files
+ * 0600. Call assertSafeArchive first; paths are re-checked here so nothing
+ * lands outside `destination`, and a duplicate entry is rejected.
  */
 async function extractArchiveBounded(entries: unzipper.File[], destination: string): Promise<void> {
   const root = path.resolve(destination);
-  let total = 0;
+  const budget: InflateBudget = { total: 0 };
   for (const entry of entries) {
     const target = path.resolve(root, entry.path.replace(/\\/g, '/'));
     const relative = path.relative(root, target);
@@ -66,38 +114,36 @@ async function extractArchiveBounded(entries: unzipper.File[], destination: stri
     }
     await fsPromises.mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
 
-    const declared = entry.uncompressedSize;
-    let size = 0;
-    const counter = new Transform({
-      transform(chunk: Buffer, _encoding, done) {
-        size += chunk.length;
-        total += chunk.length;
-        if (size > declared) {
-          done(new Error(`Archive rejected: entry "${entry.path}" inflates past its declared size of ${declared} bytes.`));
-          return;
-        }
-        if (total > ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES) {
-          done(new Error(`Archive rejected: uncompressed size exceeds ${ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES} bytes (decompression bomb).`));
-          return;
-        }
-        done(null, chunk);
-      },
-    });
     try {
-      await pipeline(entry.stream(), counter, fs.createWriteStream(target, { flags: 'wx', mode: 0o600 }));
+      await inflateEntryBounded(entry, budget, fs.createWriteStream(target, { flags: 'wx', mode: 0o600 }));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
         throw new Error(`Archive rejected: duplicate entry "${entry.path}".`);
       }
       throw error;
     }
-    if (size !== declared) {
-      throw new Error(`Archive rejected: entry "${entry.path}" holds ${size} bytes but declares ${declared}.`);
-    }
   }
 }
 
+/**
+ * Import a problem's testcase ZIP whole or not at all. The flat layout inserts
+ * pair by pair as it reads, so an entry rejected part-way (lying or short
+ * size, over the cap) or a failed insert rolls back to the savepoint, leaving
+ * the problem with no testcases rather than a partial set.
+ */
 async function processTestcasesFromZip(client: PoolClient, problemId: string, zipPath: string, log: string[]): Promise<number> {
+  await client.query('SAVEPOINT testcase_zip');
+  try {
+    const count = await insertTestcasesFromZip(client, problemId, zipPath, log);
+    await client.query('RELEASE SAVEPOINT testcase_zip');
+    return count;
+  } catch (error) {
+    await client.query('ROLLBACK TO SAVEPOINT testcase_zip');
+    throw error;
+  }
+}
+
+async function insertTestcasesFromZip(client: PoolClient, problemId: string, zipPath: string, log: string[]): Promise<number> {
   const zip = await unzipper.Open.file(zipPath);
 
   // Check for input/output directory structure within the zip
@@ -136,9 +182,13 @@ async function processTestcasesFromZip(client: PoolClient, problemId: string, zi
 
   } else {
     // --- Fallback to original logic for flat zip files ---
+    // Nothing is extracted here: the paired entries are read into memory, so
+    // validate the whole archive first and read each one bounded by real size.
     log.push('Detected flat file structure inside zip.');
+    assertSafeArchive(zip.files as unknown as ArchiveEntryLike[]);
     const testcaseFiles = pairZippedTestcaseFiles(zip.files);
-    return processPairedFiles(client, problemId, testcaseFiles, (file) => Promise.resolve(file.stream()), log);
+    const budget: InflateBudget = { total: 0 };
+    return processPairedFiles(client, problemId, testcaseFiles, (file) => readEntryBounded(file, budget), log);
   }
 }
 
@@ -178,20 +228,11 @@ async function processTestcasesFromFlatDir(client: PoolClient, problemId: string
   return processPairedFiles(client, problemId, testcaseFiles, (filePath: string) => fsPromises.readFile(filePath), log);
 }
 
-async function streamToBuffer(stream: Readable): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    stream.on('data', (chunk: Buffer) => chunks.push(chunk));
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-    stream.on('error', reject);
-  });
-}
-
 async function processPairedFiles<TSource>(
   client: PoolClient,
   problemId: string,
   pairedFiles: TestcasePairMap<TSource>,
-  readFileFunc: (source: TSource) => Promise<BufferedContent>,
+  readFileFunc: (source: TSource) => Promise<Buffer>,
   log: string[],
 ): Promise<number> {
   const keys = Object.keys(pairedFiles).map(Number).sort((a, b) => a - b);
@@ -206,11 +247,8 @@ async function processPairedFiles<TSource>(
   for (const key of keys) {
     const pair = pairedFiles[key];
     if (pair && pair.in && pair.out) {
-      const inputContent = await readFileFunc(pair.in);
-      const outputContent = await readFileFunc(pair.out);
-
-      const inputData = inputContent instanceof Readable ? await streamToBuffer(inputContent) : inputContent;
-      const outputData = outputContent instanceof Readable ? await streamToBuffer(outputContent) : outputContent;
+      const inputData = await readFileFunc(pair.in);
+      const outputData = await readFileFunc(pair.out);
 
       await client.query(
         'INSERT INTO testcases (problem_id, case_number, input_data, output_data) VALUES ($1, $2, $3, $4)',

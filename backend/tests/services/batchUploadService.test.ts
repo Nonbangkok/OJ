@@ -3,6 +3,7 @@ import * as db from '../../db';
 import { promises as fsPromises } from 'fs';
 import fs from 'fs';
 import unzipper from 'unzipper';
+import { Readable } from 'stream';
 jest.mock('unzipper');
 jest.mock('child_process', () => ({
     exec: jest.fn((cmd, cb) => cb && cb(null, { stdout: '', stderr: '' }))
@@ -118,11 +119,12 @@ describe('Batch Upload Service', () => {
 
             stubDb({ problemInsertRowCount: 1 });
 
-            // Mock unzipper for the testcases zip
+            // Mock unzipper for the testcases zip (flat layout: entries are
+            // read in memory, bounded by their declared uncompressedSize)
             (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({
                 files: [
-                    { path: '1.in', stream: () => Buffer.from('in'), type: 'File' },
-                    { path: '1.out', stream: () => Buffer.from('out'), type: 'File' }
+                    { path: '1.in', stream: () => Readable.from([Buffer.from('in')]), uncompressedSize: 2, type: 'File' },
+                    { path: '1.out', stream: () => Readable.from([Buffer.from('out')]), uncompressedSize: 3, type: 'File' }
                 ]
             });
 
@@ -139,6 +141,10 @@ describe('Batch Upload Service', () => {
             expect(dbQuery).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO problems'),
                 ['P1', 'Problem 1', 'Admin', 1000, 256, [], null, null, 'standard', null]
+            );
+            expect(dbQuery).toHaveBeenCalledWith(
+                expect.stringContaining('INSERT INTO testcases'),
+                ['P1', 1, 'in', 'out']
             );
             expect(fsPromises.unlink).toHaveBeenCalledWith('/tmp/test.zip');
         });

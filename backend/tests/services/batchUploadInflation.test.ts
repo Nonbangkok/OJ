@@ -5,6 +5,7 @@ import { ZipArchive } from 'archiver';
 import * as db from '../../db';
 import { backendWorkRoot } from '../../utils/privateTemp';
 import { countInflatedBytes, lyingZip } from '../fixtures/lyingZip';
+import { withBackslashNames, withDeclaredSize } from '../fixtures/zipPatch';
 
 // A9-08 (batch part): processBatchUpload validates the archive with
 // assertSafeArchive, which sums the central directory's *declared*
@@ -40,20 +41,6 @@ async function zipOf(entries: Array<[string, string | Buffer, { store?: boolean 
   await archive.finalize();
   await done;
   return Buffer.concat(chunks);
-}
-
-/** Rewrite the central-directory uncompressedSize of `name` (what unzipper's Open trusts). */
-function withDeclaredSize(zip: Buffer, name: string, declared: number): Buffer {
-  const patched = Buffer.from(zip);
-  for (let offset = patched.length - 46; offset >= 0; offset--) {
-    if (patched.readUInt32LE(offset) !== 0x02014b50) continue;
-    const nameLength = patched.readUInt16LE(offset + 28);
-    if (patched.subarray(offset + 46, offset + 46 + nameLength).toString('utf8') === name) {
-      patched.writeUInt32LE(declared, offset + 24);
-      return patched;
-    }
-  }
-  throw new Error(`entry ${name} not found`);
 }
 
 describe('processBatchUpload extraction is bounded by the real inflated size', () => {
@@ -122,6 +109,85 @@ describe('processBatchUpload extraction is bounded by the real inflated size', (
     expect(results).toMatchObject({ added: ['p1'], errors: [] });
     const sql = (db.pool.query as jest.Mock).mock.calls.map(([text]) => String(text));
     expect(sql.some((text) => text.includes('INSERT INTO testcases'))).toBe(false);
+  });
+
+  // The flat layout (1.in / 1.out at the inner ZIP root) is never extracted:
+  // its paired entries are read straight into memory, so the bound has to
+  // hold there too. A ZIP with an input\output layout written with backslash
+  // separators is not detected as input/output and lands in this branch.
+  const problemConfig = JSON.stringify({ id: 'p1', title: 'P1', author: 'A', time_limit_ms: 1000, memory_limit_mb: 256 });
+  const batchWithTestcaseZip = async (inner: Buffer): Promise<string> =>
+    write('flat.zip', await zipOf([['p1/config.json', problemConfig], ['p1/tests.zip', inner]]));
+  const testcaseInserts = (): unknown[][] => (db.pool.query as jest.Mock).mock.calls
+    .filter(([text]) => String(text).includes('INSERT INTO testcases'))
+    .map(([, values]) => values as unknown[]);
+
+  it.each([
+    ['flat', '1.in', '1.out'],
+    ['backslash input\\output', 'cases/input/1.in', 'cases/output/1.out'],
+  ])('bounds a %s-layout testcase ZIP the same way', async (layout, inName, outName) => {
+    const lying = withDeclaredSize(await zipOf([
+      [inName, Buffer.alloc(32 * MiB, 0x61)],
+      [outName, '1\n'],
+    ]), inName, 100);
+    const inner = layout === 'flat' ? lying : withBackslashNames(lying);
+    const zipPath = await batchWithTestcaseZip(inner);
+
+    let results: Awaited<ReturnType<typeof processBatchUpload>> | undefined;
+    const { bytes, error } = await countInflatedBytes(async () => {
+      results = await processBatchUpload(zipPath);
+    });
+
+    expect(error).toBeNull();
+    expect(bytes).toBeLessThan(ARCHIVE_CAP + 2 * MiB);
+    expect(results).toMatchObject({ added: ['p1'], errors: [] });
+    expect(testcaseInserts()).toEqual([]);
+  });
+
+  it('rejects a flat-layout testcase ZIP that honestly declares more than the cap before reading it', async () => {
+    const zipPath = await batchWithTestcaseZip(await zipOf([
+      ['1.in', Buffer.alloc(32 * MiB, 0x61)],
+      ['1.out', '1\n'],
+    ]));
+
+    let results: Awaited<ReturnType<typeof processBatchUpload>> | undefined;
+    const { bytes, error } = await countInflatedBytes(async () => {
+      results = await processBatchUpload(zipPath);
+    });
+
+    expect(error).toBeNull();
+    expect(bytes).toBeLessThan(ARCHIVE_CAP + 2 * MiB);
+    expect(results).toMatchObject({ added: ['p1'], errors: [] });
+    expect(testcaseInserts()).toEqual([]);
+  });
+
+  it('rejects a flat-layout entry that ends short of its declared size', async () => {
+    const zipPath = await batchWithTestcaseZip(withDeclaredSize(await zipOf([
+      ['1.in', '1 2\n'],
+      ['1.out', '3\n'],
+    ]), '1.in', 100));
+
+    const results = await processBatchUpload(zipPath);
+
+    expect(results).toMatchObject({ added: ['p1'], errors: [] });
+    expect(testcaseInserts()).toEqual([]);
+  });
+
+  it('still imports an honest flat-layout testcase ZIP (stored and deflated entries) byte for byte', async () => {
+    const zipPath = await batchWithTestcaseZip(await zipOf([
+      ['1.in', '1 2\n', { store: true }],
+      ['1.out', '3\n'],
+      ['2.in', ''],
+      ['2.out', 'x'.repeat(4096)],
+    ]));
+
+    const results = await processBatchUpload(zipPath);
+
+    expect(results).toMatchObject({ added: ['p1'], errors: [] });
+    expect(testcaseInserts()).toEqual([
+      ['p1', 1, '1 2\n', '3\n'],
+      ['p1', 2, '', 'x'.repeat(4096)],
+    ]);
   });
 
   it('extracts an honest archive (directory, stored, empty and deflated entries) into 0700/0600 paths', async () => {
