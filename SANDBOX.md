@@ -235,10 +235,10 @@ an accepted limit:
   undecodable escapes and an unterminated comment or literal at the end of
   the file); includes only as `<header>` (no `..`, `\`, leading `/`) or
   `"name"` naming one of the problem's public starter headers, no computed
-  includes, no `#embed`; no
-  `#define`/`#undef` of a C++ keyword or alternative token or of any
-  identifier the grader uses (a student macro could otherwise stringize the
-  grader's own code into a `static_assert` diagnostic); no function-like or
+  includes, no `#embed`; no `#define`/`#undef` of a C++ keyword or
+  alternative token or of any identifier the grader uses (a student macro
+  could otherwise stringize the grader's own code into a `static_assert`
+  diagnostic); no function-like or
   non-empty `#define` of a reserved name; no `asm`, `section`/`weakref`/
   `symver` attributes, `#ident`/`#sccs`, `##` pasting, or `incbin`/`.include`
   in a string after concatenation and escape decoding. Rejection messages
