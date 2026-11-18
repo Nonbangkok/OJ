@@ -2,10 +2,11 @@ import fs from 'fs';
 const fsPromises = fs.promises;
 import path from 'path';
 import * as unzipper from 'unzipper';
-import { Readable } from 'stream';
+import { Readable, Transform } from 'stream';
+import { pipeline } from 'stream/promises';
 import type { PoolClient } from 'pg';
 import * as db from '../db';
-import { UPLOAD_STATUS, FILE_CONFIG, DEFAULT_SUBMISSION_FILENAME, type ProblemFileRole } from '../constants';
+import { UPLOAD_STATUS, FILE_CONFIG, DEFAULT_SUBMISSION_FILENAME, ARCHIVE_LIMITS, type ProblemFileRole } from '../constants';
 import { BatchUploadProgressData } from '../types/api';
 import {
   BatchUploadResult,
@@ -39,6 +40,63 @@ function getErrorMessage(error: unknown): string {
   return 'Unknown error';
 }
 
+/**
+ * Extract an archive entry by entry into `destination` (a private temp dir),
+ * counting the bytes actually inflated. No entry may produce more than the
+ * uncompressedSize its central directory declares (which assertSafeArchive
+ * summed against the cap), so a lying size aborts the inflate at once instead
+ * of filling the disk; an entry that ends short of it is rejected too, and so
+ * is an archive whose real total passes ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES.
+ * Directories are 0700 and files 0600. Call assertSafeArchive first; paths are
+ * re-checked here so nothing lands outside `destination`.
+ */
+async function extractArchiveBounded(entries: unzipper.File[], destination: string): Promise<void> {
+  const root = path.resolve(destination);
+  let total = 0;
+  for (const entry of entries) {
+    const target = path.resolve(root, entry.path.replace(/\\/g, '/'));
+    const relative = path.relative(root, target);
+    if (relative === '') continue;
+    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+      throw new Error(`Archive rejected: path traversal in entry "${entry.path}".`);
+    }
+    if (entry.type === 'Directory') {
+      await fsPromises.mkdir(target, { recursive: true, mode: 0o700 });
+      continue;
+    }
+    await fsPromises.mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
+
+    const declared = entry.uncompressedSize;
+    let size = 0;
+    const counter = new Transform({
+      transform(chunk: Buffer, _encoding, done) {
+        size += chunk.length;
+        total += chunk.length;
+        if (size > declared) {
+          done(new Error(`Archive rejected: entry "${entry.path}" inflates past its declared size of ${declared} bytes.`));
+          return;
+        }
+        if (total > ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES) {
+          done(new Error(`Archive rejected: uncompressed size exceeds ${ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES} bytes (decompression bomb).`));
+          return;
+        }
+        done(null, chunk);
+      },
+    });
+    try {
+      await pipeline(entry.stream(), counter, fs.createWriteStream(target, { flags: 'wx', mode: 0o600 }));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+        throw new Error(`Archive rejected: duplicate entry "${entry.path}".`);
+      }
+      throw error;
+    }
+    if (size !== declared) {
+      throw new Error(`Archive rejected: entry "${entry.path}" holds ${size} bytes but declares ${declared}.`);
+    }
+  }
+}
+
 async function processTestcasesFromZip(client: PoolClient, problemId: string, zipPath: string, log: string[]): Promise<number> {
   const zip = await unzipper.Open.file(zipPath);
 
@@ -59,9 +117,9 @@ async function processTestcasesFromZip(client: PoolClient, problemId: string, zi
       // Validate entries (zip-slip / zip-bomb) before extracting to disk.
       assertSafeArchive(zip.files as unknown as ArchiveEntryLike[]);
 
-      // Extract the entire zip into a private directory.
+      // Extract the entire zip into a private directory, bounded by real size.
       tempExtractDir = await privateTempDir('inner-zip-');
-      await zip.extract({ path: tempExtractDir });
+      await extractArchiveBounded(zip.files, tempExtractDir);
 
       // Find the common base path of the input/output directories.
       const basePathInZip = path.dirname(firstInputFile.path).split('/input')[0];
@@ -401,7 +459,7 @@ export async function processBatchUpload(
     // Graders and hidden testcases: extract only into a private 0700
     // directory, never a predictable /tmp path judged programs can read.
     tempDir = await privateTempDir('batch-');
-    await directory.extract({ path: tempDir });
+    await extractArchiveBounded(directory.files, tempDir);
 
     const junkDirs = new Set(['__MACOSX', '.vscode']);
     const topLevelItems = await fsPromises.readdir(tempDir, { withFileTypes: true });

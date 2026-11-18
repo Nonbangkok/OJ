@@ -174,6 +174,11 @@ when `pg_dump` fails) and authoring testcase uploads. Directory roots passed
 explicitly (chunked uploads) are verified the same way; a root another uid
 created first, or a chmod failure, is an error, never skipped.
 
+Batch extraction streams each entry into the private directory and counts
+the bytes actually inflated: an entry may not exceed (or fall short of) the
+`uncompressedSize` it declares, and the archive may not exceed
+`ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES`, so a lying size cannot fill the disk.
+
 ### Why the backend container still runs as root
 See the long comment in `backend/Dockerfile`. In short: the per-submission
 privilege drop in `time_wrapper.c` (root → nobody) only works if the parent

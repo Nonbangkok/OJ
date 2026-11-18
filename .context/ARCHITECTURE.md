@@ -380,7 +380,7 @@ Key judging properties:
 
 ### Backend Temp Files
 
-Judged programs share the backend container's `/tmp`, so every backend temp file (multer disk uploads, batch and testcase-ZIP extraction, chunked-upload sessions, DB export dumps, authoring testcase uploads) lives in a `mkdtemp` directory under a private 0700 per-process work root (`utils/privateTemp.ts`, created at boot under `OJ_WORK_DIR` or `os.tmpdir()`; the server refuses to start if `OJ_WORK_DIR` is not a real 0700 directory it owns). See `SANDBOX.md` §9.
+Judged programs share the backend container's `/tmp`, so every backend temp file (multer disk uploads, batch and testcase-ZIP extraction, chunked-upload sessions, DB export dumps, authoring testcase uploads) lives in a `mkdtemp` directory under a private 0700 per-process work root (`utils/privateTemp.ts`, created at boot under `OJ_WORK_DIR` or `os.tmpdir()`; the server refuses to start if `OJ_WORK_DIR` is not a real 0700 directory it owns). Batch extraction counts the bytes it actually inflates and rejects entries whose real size differs from the declared one. See `SANDBOX.md` §9.
 
 ### Database Import / Maintenance Mode
 
