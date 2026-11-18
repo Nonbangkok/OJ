@@ -9,6 +9,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <grp.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <signal.h>
 #include <sys/wait.h>
 #include <sys/resource.h>
 #include <sys/types.h>
@@ -30,12 +33,14 @@
  *
  * Usage:
  *   time_wrapper <executable> [mem_mb] [cpu_seconds] [uid] [exec_args...]
+ *   time_wrapper --kill-uid <uid>
  *
  * Backwards compatible: if mem_mb / cpu_seconds are omitted (legacy 1-arg
  * invocation), no resource limits are applied and the program runs as before.
- * judgeService.ts now always passes mem_mb, cpu_seconds and uid.
+ * judgeService.ts always passes mem_mb, cpu_seconds and uid.
  *
  * In the child (after fork, before execv) this wrapper:
+ *   - closes the telemetry fd (below), so the program can never write to it;
  *   - applies setrlimit() for RLIMIT_AS, RLIMIT_CPU, RLIMIT_NPROC,
  *     RLIMIT_FSIZE and RLIMIT_NOFILE to bound memory, CPU, fork-bombs,
  *     disk writes and file descriptors of untrusted user code;
@@ -47,9 +52,24 @@
  *     setgid() then setuid() so the submitted binary cannot act with root
  *     privileges.
  *
- * The parent still measures CPU time / peak RSS via wait4() and emits the
- * exact same stderr line the judge parser expects:
+ * The parent measures CPU time / peak RSS via wait4() and reports
  *     TIME_USED:<user>+<sys> MEM_USED:<maxrss_kb>
+ * on fd 3 (TELEMETRY_FD) when the caller opened it (the judge always does),
+ * otherwise on stderr for manual runs. The judge reads the figures ONLY from
+ * fd 3: the program shares stderr with the wrapper, so anything on stderr is
+ * attacker-controlled (a program printing a fake MEM_USED:1 line first used
+ * to dodge Memory Limit Exceeded, audit A4-04). A missing report means the
+ * wrapper itself was killed, which the judge treats as timeout evidence.
+ *
+ * --kill-uid <uid> (audit A4-02): SIGKILL every process of a sandbox uid and
+ * wait until none is left. Root in the production container has no CAP_KILL,
+ * so it cannot signal sandbox processes; instead this mode drops to the uid
+ * and calls kill(-1, SIGKILL), which from uid X reaches exactly X's
+ * processes and needs no capability. It repeats until /proc shows no live
+ * (non-zombie) process with that uid, for a bounded number of rounds.
+ * Exit status: 0 = none left, 3 = processes survived, 2 = usage/setup error
+ * (including "not started as root", so a dev run can never turn this into a
+ * kill of the developer's own processes).
  */
 
 /* Default unprivileged identity to drop to when started as root. 65534 is the
@@ -58,6 +78,14 @@
  * submissions do not share an RLIMIT_NPROC budget. */
 #define SANDBOX_UID 65534
 #define SANDBOX_GID 65534
+
+/* The judge passes a fourth pipe for the wrapper's telemetry line. */
+#define TELEMETRY_FD 3
+
+/* --kill-uid bounds: about a second in all, which a SIGKILLed process tree
+ * (even one freeing a large heap) needs far less than. */
+#define SWEEP_MAX_ROUNDS 400
+#define SWEEP_ROUND_SLEEP_US 2500
 
 #ifdef __linux__
 #if defined(__x86_64__)
@@ -119,7 +147,105 @@ static void set_limit(int resource, rlim_t value, const char *name) {
     }
 }
 
+/* Live processes (other than `self`) any of whose real/effective/saved/fs
+ * uids is `uid`; zombies and dead tasks do not count. Reads the Uid: line of
+ * /proc/<pid>/status rather than the owner of /proc/<pid>, which a process
+ * can turn into root by making itself non-dumpable. A zombie whose Threads:
+ * count is above 1 is a process whose main thread exited while other threads
+ * still run, so it counts as live. A status file that exists but cannot be
+ * read counts as a live process (fail closed). Returns -1 when /proc itself
+ * cannot be read. */
+static int count_uid_processes(uid_t uid, pid_t self) {
+    DIR *proc = opendir("/proc");
+    if (proc == NULL) return -1;
+    int count = 0;
+    struct dirent *entry;
+    while ((entry = readdir(proc)) != NULL) {
+        char *end = NULL;
+        long pid = strtol(entry->d_name, &end, 10);
+        if (end == entry->d_name || *end != '\0' || pid <= 0 || (pid_t)pid == self) continue;
+
+        char path[64];
+        snprintf(path, sizeof(path), "/proc/%ld/status", pid);
+        FILE *status = fopen(path, "re");
+        if (status == NULL) {
+            if (errno != ENOENT && errno != ESRCH) count++;
+            continue;
+        }
+        char line[256];
+        char state = '?';
+        int owned = 0;
+        long threads = 0;
+        while (fgets(line, sizeof(line), status) != NULL) {
+            if (strncmp(line, "State:", 6) == 0) {
+                sscanf(line + 6, " %c", &state);
+            } else if (strncmp(line, "Uid:", 4) == 0) {
+                unsigned long ids[4];
+                if (sscanf(line + 4, "%lu %lu %lu %lu", &ids[0], &ids[1], &ids[2], &ids[3]) == 4) {
+                    for (int i = 0; i < 4; i++) {
+                        if (ids[i] == (unsigned long)uid) owned = 1;
+                    }
+                }
+            } else if (strncmp(line, "Threads:", 8) == 0) {
+                sscanf(line + 8, " %ld", &threads);
+                break; /* State: and Uid: precede Threads: */
+            }
+        }
+        fclose(status);
+        int dead = (state == 'Z' || state == 'X') && threads <= 1;
+        if (owned && !dead) count++;
+    }
+    closedir(proc);
+    return count;
+}
+
+static int kill_uid_mode(const char *arg) {
+    char *end = NULL;
+    errno = 0;
+    long uid = strtol(arg, &end, 10);
+    if (errno != 0 || end == arg || *end != '\0' || uid <= 0 || uid > 2147483647L) {
+        fprintf(stderr, "error: --kill-uid needs a positive uid\n");
+        return 2;
+    }
+    if (getuid() != 0 || geteuid() != 0) {
+        fprintf(stderr, "error: --kill-uid must be started as root\n");
+        return 2;
+    }
+    if (setgroups(0, NULL) != 0 || setgid((gid_t)uid) != 0 || setuid((uid_t)uid) != 0
+        || getuid() != (uid_t)uid || geteuid() != (uid_t)uid) {
+        fprintf(stderr, "error: cannot become uid %ld: %s\n", uid, strerror(errno));
+        return 2;
+    }
+
+    pid_t self = getpid();
+    for (int round = 0; round < SWEEP_MAX_ROUNDS; round++) {
+        /* ESRCH = nothing of ours left to signal. kill(-1) never signals the
+         * caller itself or pid 1. */
+        if (kill(-1, SIGKILL) != 0 && errno != ESRCH) {
+            fprintf(stderr, "error: kill(-1) as uid %ld failed: %s\n", uid, strerror(errno));
+            return 2;
+        }
+        int remaining = count_uid_processes((uid_t)uid, self);
+        if (remaining < 0) {
+            fprintf(stderr, "error: cannot read /proc: %s\n", strerror(errno));
+            return 2;
+        }
+        if (remaining == 0) return 0;
+        usleep(SWEEP_ROUND_SLEEP_US);
+    }
+    fprintf(stderr, "error: processes of uid %ld survived the sweep\n", uid);
+    return 3;
+}
+
 int main(int argc, char *argv[]) {
+    if (argc >= 2 && strcmp(argv[1], "--kill-uid") == 0) {
+        if (argc != 3) {
+            fprintf(stderr, "Usage: %s --kill-uid <uid>\n", argv[0]);
+            return 2;
+        }
+        return kill_uid_mode(argv[2]);
+    }
+
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <executable> [mem_mb] [cpu_seconds] [args...]\n", argv[0]);
         return 1;
@@ -134,6 +260,18 @@ int main(int argc, char *argv[]) {
     long cpu_seconds = (argc >= 4) ? strtol(argv[3], NULL, 10) : 0;
     long drop_uid = (argc >= 5) ? strtol(argv[4], NULL, 10) : 0;
 
+    /* Telemetry channel: fd 3 when the caller opened it, stderr otherwise.
+     * Close-on-exec as well as the explicit close in the child below, so no
+     * exec'd program can ever hold it. */
+    int report_fd = STDERR_FILENO;
+    if (fcntl(TELEMETRY_FD, F_GETFD) != -1) {
+        report_fd = TELEMETRY_FD;
+        if (fcntl(TELEMETRY_FD, F_SETFD, FD_CLOEXEC) != 0) {
+            perror("fcntl(telemetry fd)");
+            return 1;
+        }
+    }
+
     pid_t pid = fork();
 
     if (pid < 0) {
@@ -143,6 +281,12 @@ int main(int argc, char *argv[]) {
 
     if (pid == 0) {
         /* ---- Child: lock down, then exec the untrusted program. ---- */
+
+        /* The program must not be able to write (forge) the telemetry. */
+        if (report_fd == TELEMETRY_FD && close(TELEMETRY_FD) != 0) {
+            fprintf(stderr, "error: cannot close the telemetry fd: %s\n", strerror(errno));
+            _exit(127);
+        }
 
         /* Address space (virtual memory). This is the primary memory cap; the
          * judge reports MLE from peak RSS, but RLIMIT_AS prevents a runaway
@@ -230,7 +374,7 @@ int main(int argc, char *argv[]) {
         perror("execv");
         _exit(127);
     } else {
-        /* ---- Parent: wait and collect stats (unchanged output format). ---- */
+        /* ---- Parent: wait and collect stats. ---- */
         int status;
         struct rusage usage;
 
@@ -244,7 +388,7 @@ int main(int argc, char *argv[]) {
 
         long max_rss = usage.ru_maxrss; /* KB on Linux */
 
-        fprintf(stderr, "TIME_USED:%.3f+%.3f MEM_USED:%ld\n", user_time, sys_time, max_rss);
+        dprintf(report_fd, "TIME_USED:%.3f+%.3f MEM_USED:%ld\n", user_time, sys_time, max_rss);
 
         if (WIFEXITED(status)) {
             return WEXITSTATUS(status);
