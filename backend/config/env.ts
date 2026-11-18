@@ -26,6 +26,7 @@ const baseEnvSchema = z.object({
   AUTHORING_JOBS_DIR: z.string().default('').refine(value => value === ''
     || (path.isAbsolute(value) && path.resolve(value) !== path.parse(value).root)),
   // Private work root for backend temp files (utils/privateTemp); '' = os.tmpdir().
+  // docker-compose.yml does not pass it: add it to the backend environment to use it.
   OJ_WORK_DIR: z.string().default('').refine(value => value === ''
     || (path.isAbsolute(value) && path.resolve(value) !== path.parse(value).root)),
 });

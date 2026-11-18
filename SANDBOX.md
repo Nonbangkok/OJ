@@ -163,16 +163,28 @@ filesystem confinement, so the backend never stages anything there at a
 predictable path or in a listable directory. `backend/utils/privateTemp.ts`
 creates one per-process root at boot (`server.ts`, before listening):
 `oj-work-<pid>-XXXXXX` via `mkdtemp`, mode 0700, owned by the backend uid,
-under `OJ_WORK_DIR` when set and `os.tmpdir()` otherwise. `OJ_WORK_DIR` must
-be a real directory (not a symlink) owned by the backend uid with mode 0700,
-or the backend refuses to start. Roots of earlier processes are removed at
-boot (our prefix, our uid, pid gone or reused). Everything temporary lives in
-a fresh `mkdtemp` directory inside it: multer disk uploads (batch ZIPs, chunk
-parts, DB dumps), batch and inner testcase-ZIP extraction, chunked-upload
+under `OJ_WORK_DIR` when set and `os.tmpdir()` otherwise. Roots of earlier
+processes are removed at boot (our prefix, our uid, pid gone or reused).
+Everything temporary lives in a fresh `mkdtemp` directory inside it: multer
+disk uploads (batch ZIPs, chunk parts, DB dumps), batch and inner
+testcase-ZIP extraction, chunked-upload
 sessions and assembled ZIPs, DB export dumps (removed after the download and
 when `pg_dump` fails) and authoring testcase uploads. Directory roots passed
 explicitly (chunked uploads) are verified the same way; a root another uid
 created first, or a chmod failure, is an error, never skipped.
+
+`OJ_WORK_DIR` is optional, and `docker-compose.yml` does not pass it: the
+backend's `environment` lists its keys explicitly, so setting it in `.env`
+alone changes nothing and the work root stays under the container's `/tmp`.
+To move the root (for example onto a dedicated volume), add `OJ_WORK_DIR`
+to the backend environment in compose. It must be a real directory (not a
+symlink) owned by the backend uid, which is root in the container. A missing
+one is created 0700; an existing one with any other mode is tightened to 0700
+at boot (through an `O_NOFOLLOW` descriptor), so a fresh named volume mounted
+there works as is (its mountpoint is normally `root:root` 0755). A symlink,
+a file, or a directory owned by another uid (a bind mount of a host directory
+owned by a host user, say) is left untouched and the backend refuses to
+start.
 
 Batch import reads every archive entry it inflates through one counting
 helper (`inflateEntryBounded` in `batchUploadService.ts`) that counts the

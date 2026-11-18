@@ -15,8 +15,9 @@ import { logger } from './logger';
  * directory they can list. All of it lives below one per-process root
  * (`oj-work-<pid>-XXXXXX`, made by mkdtemp, mode 0700, owned by the backend
  * uid) under OJ_WORK_DIR when set, else under os.tmpdir(). OJ_WORK_DIR itself
- * must be a real directory owned by the backend uid with mode 0700; boot
- * fails otherwise.
+ * must be a real directory owned by the backend uid; a looser mode is
+ * tightened to 0700 at boot, and a symlink, a file or a directory another uid
+ * owns fails boot.
  */
 
 const PRIVATE_DIR_MODE = 0o700;
@@ -57,13 +58,17 @@ export function assertPrivateDirectory(dir: string, label = 'Temporary directory
  */
 export async function ensurePrivateDirectory(dir: string, label?: string): Promise<void> {
   await mkdir(dir, { recursive: true, mode: PRIVATE_DIR_MODE });
-  const stats = await lstat(dir);
-  const uid = currentUid();
-  if (stats.isDirectory() && !stats.isSymbolicLink() && (uid === undefined || stats.uid === uid)
-    && (stats.mode & 0o777) !== PRIVATE_DIR_MODE) {
+  if (needsTightening(await lstat(dir))) {
     await chmod(dir, PRIVATE_DIR_MODE);
   }
   assertPrivateDirectory(dir, label);
+}
+
+/** A real directory this uid owns whose mode is looser (or stricter) than 0700. */
+function needsTightening(stats: fs.Stats): boolean {
+  const uid = currentUid();
+  return stats.isDirectory() && !stats.isSymbolicLink() && (uid === undefined || stats.uid === uid)
+    && (stats.mode & 0o777) !== PRIVATE_DIR_MODE;
 }
 
 function isProcessAlive(pid: number): boolean {
@@ -113,7 +118,34 @@ export interface InitBackendWorkRootOptions {
   removeStaleOwnPid?: boolean;
 }
 
-/** Base directory the per-process root is created in; OJ_WORK_DIR is verified strictly. */
+/**
+ * Tighten an existing OJ_WORK_DIR to 0700 when it is a real directory this
+ * uid owns (a fresh Docker volume mountpoint is root:root 0755), as
+ * ensurePrivateDirectory does. The chmod goes through a descriptor opened
+ * with O_NOFOLLOW and checked to be the directory lstat saw, so a path
+ * swapped for a symlink in between is never followed. A symlink, a file or a
+ * directory another uid owns is left untouched for assertPrivateDirectory to
+ * refuse.
+ */
+function tightenOwnDirectorySync(dir: string): void {
+  const stats = fs.lstatSync(dir);
+  if (!needsTightening(stats)) return;
+  const fd = fs.openSync(dir, fs.constants.O_RDONLY | (fs.constants.O_DIRECTORY ?? 0) | (fs.constants.O_NOFOLLOW ?? 0));
+  try {
+    const opened = fs.fstatSync(fd);
+    if (opened.dev !== stats.dev || opened.ino !== stats.ino) return;
+    fs.fchmodSync(fd, PRIVATE_DIR_MODE);
+  } finally {
+    fs.closeSync(fd);
+  }
+  logger.warn('tightened OJ_WORK_DIR to 0700', { path: dir, previousMode: (stats.mode & 0o777).toString(8).padStart(4, '0') });
+}
+
+/**
+ * Base directory the per-process root is created in. OJ_WORK_DIR is created
+ * as 0700 when missing, tightened to 0700 when this uid owns it, then
+ * verified strictly.
+ */
 function resolveBase(configuredDir: string): string {
   if (!configuredDir) return os.tmpdir();
   const base = path.resolve(configuredDir);
@@ -122,6 +154,7 @@ function resolveBase(configuredDir: string): string {
   } catch (error) {
     if (errorCode(error) !== 'EEXIST') throw error;
   }
+  tightenOwnDirectorySync(base);
   assertPrivateDirectory(base, 'OJ_WORK_DIR');
   return base;
 }

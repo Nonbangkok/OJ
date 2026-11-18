@@ -84,29 +84,50 @@ describe('privateTemp', () => {
       expect(mode(root)).toBe(0o700);
     });
 
-    it('refuses a directory other users can reach', () => {
-      const configuredDir = path.join(scratch, 'open');
+    it('tightens an existing directory this uid owns to 0700 (a fresh volume mountpoint is 0755)', () => {
+      const configuredDir = path.join(scratch, 'volume');
       fs.mkdirSync(configuredDir);
       fs.chmodSync(configuredDir, 0o755);
-      expect(() => initBackendWorkRoot({ configuredDir })).toThrow(/mode 0755, expected 0700/);
-      expect(fs.readdirSync(configuredDir)).toEqual([]);
+      const root = initBackendWorkRoot({ configuredDir });
+      expect(mode(configuredDir)).toBe(0o700);
+      expect(path.dirname(root)).toBe(configuredDir);
+      expect(mode(root)).toBe(0o700);
     });
 
-    it('refuses a symlink, even to a private directory', () => {
+    it('refuses a symlink, even to a private directory, and never changes its target', () => {
       const real = path.join(scratch, 'real');
       fs.mkdirSync(real, { mode: 0o700 });
       const link = path.join(scratch, 'link');
       fs.symlinkSync(real, link);
       expect(() => initBackendWorkRoot({ configuredDir: link })).toThrow(/must be a real directory/);
       expect(fs.readdirSync(real)).toEqual([]);
+
+      const open = path.join(scratch, 'open');
+      fs.mkdirSync(open);
+      fs.chmodSync(open, 0o755);
+      const openLink = path.join(scratch, 'open-link');
+      fs.symlinkSync(open, openLink);
+      expect(() => initBackendWorkRoot({ configuredDir: openLink })).toThrow(/must be a real directory/);
+      expect(mode(open)).toBe(0o755);
+      expect(fs.readdirSync(open)).toEqual([]);
     });
 
-    it('refuses a directory owned by another uid (e.g. pre-created by a judged program)', () => {
+    it('refuses a directory owned by another uid (e.g. pre-created by a judged program) and leaves its mode alone', () => {
       const configuredDir = path.join(scratch, 'claimed');
-      fs.mkdirSync(configuredDir, { mode: 0o700 });
+      fs.mkdirSync(configuredDir);
+      fs.chmodSync(configuredDir, 0o755);
       const realUid = process.getuid!();
       jest.spyOn(process, 'getuid').mockReturnValue(realUid + 1);
       expect(() => initBackendWorkRoot({ configuredDir })).toThrow(new RegExp(`owned by uid ${realUid}, expected ${realUid + 1}`));
+      expect(mode(configuredDir)).toBe(0o755);
+      expect(fs.readdirSync(configuredDir)).toEqual([]);
+    });
+
+    it('refuses a file', () => {
+      const configuredDir = path.join(scratch, 'file');
+      fs.writeFileSync(configuredDir, '', { mode: 0o644 });
+      expect(() => initBackendWorkRoot({ configuredDir })).toThrow(/must be a real directory/);
+      expect(mode(configuredDir)).toBe(0o644);
     });
 
     it('refuses a missing directory whose parent does not exist', () => {

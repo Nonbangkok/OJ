@@ -7,8 +7,9 @@ import { logger } from './utils/logger';
 import { initBackendWorkRoot } from './utils/privateTemp';
 
 // Every backend temp file lives under a private 0700 work root (judged
-// programs share this container's /tmp). Refuse to start if OJ_WORK_DIR is
-// not a real directory owned by this uid with mode 0700.
+// programs share this container's /tmp). Refuse to start if OJ_WORK_DIR is a
+// symlink, a file or owned by another uid (one this uid owns is tightened to
+// 0700 first).
 try {
   const workRoot = initBackendWorkRoot({ removeStaleOwnPid: true });
   logger.info('backend work root ready', { workRoot });
