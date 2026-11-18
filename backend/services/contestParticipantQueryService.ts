@@ -25,7 +25,21 @@ import { contestProblemOrderSql } from './contestProblemOrder';
  * -> contest is active -> read from `problems` (running) or the
  * `contest_problems` snapshot (finished). The shared lookups live in
  * contestAccess.
+ *
+ * The finish snapshot keeps titles, authors and limits only. The statement
+ * PDF and the starter files of a finished contest come from the live
+ * `problems` row, so they follow the problem's current gate: once the problem
+ * has been attached to another contest, non-staff viewers of the old contest
+ * no longer get them (that contest's own routes serve them).
  */
+
+/**
+ * SQL predicate: the live problem row behind a finished contest's snapshot may
+ * be served to this viewer. `manageParam` is a boolean bind parameter (true for
+ * contest staff).
+ */
+const liveProblemServableSql = (alias: string, manageParam: string): string =>
+    `(${alias}.contest_id IS NULL OR ${manageParam}::boolean)`;
 
 export const getContestProblemsForParticipant = async (
     contestId: string,
@@ -137,9 +151,20 @@ export const getContestProblemDetailForParticipant = async (
     }
 
     if (contestStatus === CONTEST_STATUS.FINISHED) {
+        // A5-01: contest_problems has no PDF column; has_pdf (like the
+        // starter flag) is read from the live row and gated like the routes
+        // that serve those files.
+        const servable = liveProblemServableSql('p', '$3');
         const result = await db.query<ContestProblemDetailRow>(
-            'SELECT cp.problem_id AS id, cp.title, cp.author, cp.time_limit_ms, cp.memory_limit_mb, (cp.problem_pdf IS NOT NULL) AS has_pdf, COALESCE(p.problem_type, \'standard\') AS problem_type, p.submission_filename, (COALESCE(p.problem_type, \'standard\') = \'header\' AND EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = cp.problem_id AND f.role = \'starter\')) AS has_starter_files FROM contest_problems cp LEFT JOIN problems p ON p.id = cp.problem_id WHERE cp.contest_id = $1 AND cp.problem_id = $2',
-            [contestId, problemId],
+            `SELECT cp.problem_id AS id, cp.title, cp.author, cp.time_limit_ms, cp.memory_limit_mb,
+                    (p.problem_pdf IS NOT NULL AND ${servable}) AS has_pdf,
+                    COALESCE(p.problem_type, 'standard') AS problem_type, p.submission_filename,
+                    (COALESCE(p.problem_type, 'standard') = 'header' AND ${servable}
+                      AND EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = cp.problem_id AND f.role = 'starter')) AS has_starter_files
+             FROM contest_problems cp
+             LEFT JOIN problems p ON p.id = cp.problem_id
+             WHERE cp.contest_id = $1 AND cp.problem_id = $2`,
+            [contestId, problemId, isContestManagementRole(viewer)],
         );
         if (!result.rows[0]) {
             return { kind: 'not_found_problem' };
@@ -178,14 +203,16 @@ export const getContestProblemPdfForParticipant = async (
         return { kind: 'not_participant' };
     }
 
-    const queryText = contestStatus === CONTEST_STATUS.FINISHED
-        ? 'SELECT problem_pdf FROM contest_problems WHERE contest_id = $1 AND problem_id = $2'
-        : 'SELECT problem_pdf FROM problems WHERE id = $1 AND contest_id = $2';
-    const queryParams = contestStatus === CONTEST_STATUS.FINISHED
-        ? [contestId, problemId]
-        : [problemId, contestId];
-
-    const result = await db.query<{ problem_pdf: Buffer | null }>(queryText, queryParams);
+    // A5-01: a finished contest serves the live problem's PDF (the snapshot
+    // keeps no PDF), unless the problem now belongs to another contest.
+    const finished = contestStatus === CONTEST_STATUS.FINISHED;
+    const result = await db.query<{ problem_pdf: Buffer | null }>(
+        finished
+            ? `SELECT p.problem_pdf FROM contest_problems cp JOIN problems p ON p.id = cp.problem_id
+               WHERE cp.contest_id = $1 AND cp.problem_id = $2 AND ${liveProblemServableSql('p', '$3')}`
+            : 'SELECT problem_pdf FROM problems WHERE id = $1 AND contest_id = $2',
+        finished ? [contestId, problemId, isContestManagementRole(viewer)] : [problemId, contestId],
+    );
     const pdf = result.rows[0]?.problem_pdf ?? null;
     if (!pdf) {
         return { kind: 'not_found_pdf' };
@@ -214,12 +241,18 @@ export const getContestProblemStarterForParticipant = async (
         return { kind: 'not_participant' };
     }
 
+    // A5-06: a finished contest streams the LIVE starter files, so a problem
+    // now attached to another contest is not served to non-staff here (the
+    // standalone route 404s it too, and the new contest's route is
+    // participant-only). A problem hidden after the finish stays available
+    // to the old contest's participants for upsolving.
     const finished = contestStatus === CONTEST_STATUS.FINISHED;
     const result = await db.query<{ problem_type: string }>(
         finished
-            ? 'SELECT p.problem_type FROM contest_problems cp JOIN problems p ON p.id = cp.problem_id WHERE cp.contest_id = $1 AND cp.problem_id = $2'
+            ? `SELECT p.problem_type FROM contest_problems cp JOIN problems p ON p.id = cp.problem_id
+               WHERE cp.contest_id = $1 AND cp.problem_id = $2 AND ${liveProblemServableSql('p', '$3')}`
             : 'SELECT problem_type FROM problems WHERE id = $1 AND contest_id = $2',
-        finished ? [contestId, problemId] : [problemId, contestId],
+        finished ? [contestId, problemId, isContestManagementRole(viewer)] : [problemId, contestId],
     );
     if (result.rows[0]?.problem_type !== 'header') {
         return { kind: 'not_found_starter' };
