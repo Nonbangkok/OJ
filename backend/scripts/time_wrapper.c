@@ -45,8 +45,9 @@
  *     RLIMIT_FSIZE and RLIMIT_NOFILE to bound memory, CPU, fork-bombs,
  *     disk writes and file descriptors of untrusted user code;
  *   - installs a seccomp filter denying socket/socketpair (and other
- *     namespace/escape syscalls) so the submission cannot reach the network
- *     (see restrict_network below); and
+ *     namespace/escape syscalls) so the submission cannot reach the network,
+ *     and shmget/semget/msgget so it cannot leave SysV IPC objects behind
+ *     (see restrict_sandbox_syscalls below); and
  *   - if currently running as root, drops to an unprivileged identity (the
  *     per-submission sandbox uid/gid passed as argv[4], default nobody) via
  *     setgid() then setuid() so the submitted binary cannot act with root
@@ -115,7 +116,11 @@
 /* Deny networking and namespace/escape syscalls for the untrusted program
  * (RUNNER-002). Mirrors the authoring sandbox (`backend/authoring/sandbox.c`):
  * a submission must not be able to open sockets to the database or other
- * in-stack services, nor escape its identity via namespaces/ptrace. Failures
+ * in-stack services, nor escape its identity via namespaces/ptrace. It must
+ * not create SysV IPC objects either: they live in the kernel, not in a
+ * directory, so they outlive the submission (and a shm segment stays charged
+ * to the backend's memory cgroup) where the per-uid cleanup cannot see them.
+ * POSIX shm/semaphores (/dev/shm) are files the cleanup removes. Failures
  * installing the filter abort the child — never run unfiltered by accident. */
 static int restrict_sandbox_syscalls(void) {
     struct sock_filter rules[] = {
@@ -131,6 +136,7 @@ static int restrict_sandbox_syscalls(void) {
         DENY(__NR_socket), DENY(__NR_socketpair),
         DENY(__NR_unshare), DENY(__NR_setns),
         DENY(__NR_ptrace), DENY(__NR_mount),
+        DENY(__NR_shmget), DENY(__NR_semget), DENY(__NR_msgget),
         BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_ALLOW),
     };
     struct sock_fprog program = { .len = sizeof(rules)/sizeof(rules[0]), .filter = rules };

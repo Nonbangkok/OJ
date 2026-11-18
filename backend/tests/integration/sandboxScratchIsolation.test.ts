@@ -113,6 +113,108 @@ with tempfile.NamedTemporaryFile() as f:
     print("ok" if d and os.path.dirname(f.name) == d and os.path.realpath(d) == here else "bad")
 `;
 
+/**
+ * SysV IPC objects live in the kernel, not in a directory, so nothing the
+ * cleanup removes can reach them: a shmget segment outlived its submission and
+ * stayed charged to the backend's memory cgroup. The run's seccomp filter
+ * denies creating them (EPERM). Prints what each call did.
+ */
+const SYSV_PROBE = `#include <cerrno>
+#include <cstdio>
+#include <cstring>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <sys/sem.h>
+#include <sys/shm.h>
+static const char* outcome(int id) { return id >= 0 ? "created" : errno == EPERM ? "EPERM" : std::strerror(errno); }
+int main() {
+  const char* shm = outcome(shmget(IPC_PRIVATE, 1 << 20, IPC_CREAT | 0600));
+  const char* sem = outcome(semget(IPC_PRIVATE, 1, IPC_CREAT | 0600));
+  const char* msg = outcome(msgget(IPC_PRIVATE, IPC_CREAT | 0600));
+  std::printf("shm=%s sem=%s msg=%s\\n", shm, sem, msg);
+}
+`;
+
+/** Ordinary concurrency keeps working under the filter: C++ threads. */
+const CPP_THREADS = `#include <atomic>
+#include <iostream>
+#include <thread>
+#include <vector>
+int main() {
+  std::atomic<long long> sum{0};
+  std::vector<std::thread> workers;
+  for (int t = 0; t < 4; t++) workers.emplace_back([&sum, t] { for (int i = 0; i < 1000; i++) sum += t; });
+  for (auto& w : workers) w.join();
+  std::cout << (sum == 6000 ? "ok" : "bad") << std::endl;
+}
+`;
+
+/** Python threading (futexes; no SysV IPC). */
+const PY_THREADS = `import threading
+total = 0
+lock = threading.Lock()
+def work(k):
+    global total
+    for _ in range(1000):
+        with lock:
+            total += k
+threads = [threading.Thread(target=work, args=(k,)) for k in range(4)]
+for t in threads: t.start()
+for t in threads: t.join()
+print("ok" if total == 6000 else "bad")
+`;
+
+/**
+ * Python multiprocessing with the default start method (fork on Python 3.13):
+ * pipes plus POSIX semaphores in /dev/shm, no SysV IPC. (forkserver needs a
+ * socket, which the filter has always denied.)
+ */
+const PY_MULTIPROCESSING = `import multiprocessing as mp
+def square(x): return x * x
+if __name__ == "__main__":
+    with mp.Pool(2) as pool:
+        total = sum(pool.map(square, range(100)))
+    queue = mp.Queue()
+    queue.put(total)
+    print("ok" if queue.get() == 328350 else "bad")
+`;
+
+/**
+ * glibc tmpfile() ignores TMPDIR and opens in /tmp, which judged code cannot
+ * write (1755); a hard-coded /tmp path fails the same way. Documented in
+ * SANDBOX.md; pinned here so the documentation cannot drift.
+ */
+const CPP_TMPFILE = `#include <cstdio>
+int main() {
+  std::FILE* anonymous = std::tmpfile();
+  std::FILE* fixed = std::fopen("/tmp/${TOKEN}_fixed", "w");
+  std::printf("tmpfile=%s fixed=%s\\n", anonymous ? "ok" : "denied", fixed ? "ok" : "denied");
+}
+`;
+
+/** SysV IPC objects (shm, sem, msg) owned or created by a pool uid, from /proc/sysvipc. */
+function poolSysvObjects(): Array<{ kind: string; id: number; uid: number }> {
+  const found: Array<{ kind: string; id: number; uid: number }> = [];
+  for (const kind of ['shm', 'sem', 'msg']) {
+    let table = '';
+    try {
+      table = fs.readFileSync(`/proc/sysvipc/${kind}`, 'utf8');
+    } catch {
+      continue;
+    }
+    const [header, ...rows] = table.trim().split('\n');
+    const columns = header.trim().split(/\s+/);
+    for (const row of rows) {
+      const fields = row.trim().split(/\s+/);
+      const id = Number(fields[columns.indexOf(kind === 'msg' ? 'msqid' : kind === 'sem' ? 'semid' : 'shmid')]);
+      const uid = Number(fields[columns.indexOf('uid')]);
+      const creator = Number(fields[columns.indexOf('cuid')]);
+      if (POOL_UIDS.includes(uid) || POOL_UIDS.includes(creator)) found.push({ kind, id, uid });
+    }
+  }
+  return found;
+}
+
 /** Test hygiene: remove whatever a probe left behind, as its owner (root has no CAP_FOWNER here). */
 function removeLeftovers(): void {
   for (const target of PROBE_TARGETS) {
@@ -125,6 +227,11 @@ function removeLeftovers(): void {
     if (POOL_UIDS.includes(owner)) {
       spawnSync('/usr/bin/rm', ['-rf', '--', target], { uid: owner, gid: owner, stdio: 'ignore', timeout: 5000 });
     }
+  }
+  // The owner may remove its own SysV objects.
+  for (const object of poolSysvObjects()) {
+    const flag = { shm: '-m', sem: '-s', msg: '-q' }[object.kind]!;
+    spawnSync('/usr/bin/ipcrm', [flag, String(object.id)], { uid: object.uid, gid: object.uid, stdio: 'ignore', timeout: 5000 });
   }
 }
 
@@ -158,7 +265,12 @@ function removeLeftovers(): void {
     userId = (await pool.query(
       `INSERT INTO users (username, password_hash, role) VALUES ('scratch-tester', 'x', 'user') RETURNING id`,
     )).rows[0].id;
-    for (const [id, expected] of [['scratch-write', 'done'], ['scratch-tmpdir', 'ok']]) {
+    for (const [id, expected] of [
+      ['scratch-write', 'done'],
+      ['scratch-tmpdir', 'ok'],
+      ['scratch-sysv', 'shm=EPERM sem=EPERM msg=EPERM'],
+      ['scratch-tmpfile', 'tmpfile=denied fixed=denied'],
+    ]) {
       await pool.query(
         'INSERT INTO problems (id, title, time_limit_ms, memory_limit_mb, is_visible) VALUES ($1, $1, 4000, 256, true)',
         [id],
@@ -216,6 +328,30 @@ function removeLeftovers(): void {
       }
     });
     expect(survivors).toEqual([]);
+  });
+
+  it('a judged program cannot create SysV IPC objects (shmget, semget and msgget fail with EPERM)', async () => {
+    const row = await judge('scratch-sysv', 'cpp', SYSV_PROBE);
+    expect({ status: row.overall_status, results: row.overall_status === SUBMISSION_STATUS.ACCEPTED ? undefined : row.results })
+      .toEqual({ status: SUBMISSION_STATUS.ACCEPTED, results: undefined });
+    // ...so none outlives the submission.
+    expect(poolSysvObjects()).toEqual([]);
+  });
+
+  it.each([
+    ['C++ std::thread', 'cpp', CPP_THREADS],
+    ['Python threading', 'python', PY_THREADS],
+    ['Python multiprocessing (Pool, Queue)', 'python', PY_MULTIPROCESSING],
+  ] as const)('%s still runs under the filter', async (_name, language, code) => {
+    const row = await judge('scratch-tmpdir', language, code);
+    expect({ status: row.overall_status, results: row.overall_status === SUBMISSION_STATUS.ACCEPTED ? undefined : row.results })
+      .toEqual({ status: SUBMISSION_STATUS.ACCEPTED, results: undefined });
+  });
+
+  it('glibc tmpfile() and a hard-coded /tmp path fail for judged code (documented)', async () => {
+    const row = await judge('scratch-tmpfile', 'cpp', CPP_TMPFILE);
+    expect({ status: row.overall_status, results: row.overall_status === SUBMISSION_STATUS.ACCEPTED ? undefined : row.results })
+      .toEqual({ status: SUBMISSION_STATUS.ACCEPTED, results: undefined });
   });
 
   it.each([
