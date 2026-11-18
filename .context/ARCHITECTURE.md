@@ -228,7 +228,7 @@ Backend runtime request pipeline (high-level, in `app.ts` mount order):
 3. `express-session` resolves session state from `user_sessions` (skipped for the token-authenticated import-progress path).
 4. `revalidateSessionUser` re-syncs the session's username/role/existence from the live `users` row — deleted user → request proceeds unauthenticated; role changes take effect on the next request.
 5. `attachRequestUser` maps session into typed `req.user` (controllers read `req.user` only, never `req.session`).
-6. `generalApiLimiter` (1000/15min, proxy-vouched IP key; staff/admin sessions exempt, `/realtime/` excluded).
+6. `generalApiLimiter` (1000/15min, proxy-vouched IP key; staff/admin sessions exempt; only a bodiless `GET /realtime/submissions` or `GET /realtime/contests/:id` is skipped, every other method/path under `/realtime/` is counted).
 7. JSON body parsing — `/admin/authoring/drafts*` runs `requireAuth` + `requireStaffOrAdmin` first, then the 7 MiB authoring parser; every other request gets the 100 KB default.
 8. Route-level middleware (`requirePublicAccess` / `requireAuth` / `requireStaffOrAdmin` / `requireAdmin`) and payload validation (`zod` via shared schemas + `validateRequest`).
 9. Controllers call services for DB-heavy logic.
