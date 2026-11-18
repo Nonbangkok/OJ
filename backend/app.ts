@@ -4,7 +4,7 @@ import session from 'express-session';
 import pgSession from 'connect-pg-simple';
 import { pool } from './db';
 import { env, parseRuntimeEnv } from './config/env';
-import { AUTHORING_VALIDATION, SECURITY_CONFIG } from './constants';
+import { SECURITY_CONFIG } from './constants';
 import { attachRequestUser, revalidateSessionUser } from './middleware/requestContext';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { generalApiLimiter } from './middleware/rateLimit';
@@ -17,7 +17,10 @@ import submissionRoutes from './controllers/submissionController';
 import contestRoutes from './controllers/contestController';
 import realtimeRoutes from './controllers/realtimeController';
 import healthRoutes from './controllers/healthController';
-import authoringDraftRoutes from './controllers/authoringDraftController';
+import authoringDraftRoutes, {
+  AUTHORING_DRAFTS_PATH,
+  authoringDraftsBodyParser,
+} from './controllers/authoringDraftController';
 import authorProfileRoutes from './controllers/authorProfileController';
 import userProfileRoutes from './controllers/userProfileController';
 import homeRoutes from './controllers/homeController';
@@ -40,14 +43,6 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
   const app = express();
 
   app.set('trust proxy', runtimeEnv.TRUST_PROXY);
-  const defaultJsonParser = express.json();
-  const authoringJsonParser = express.json({ limit: AUTHORING_VALIDATION.MAX_JSON_BODY_BYTES });
-  app.use((req, res, next) => {
-    const parser = req.path.startsWith('/admin/authoring/drafts')
-      ? authoringJsonParser
-      : defaultJsonParser;
-    parser(req, res, next);
-  });
 
   if (runtimeEnv.CORS_ORIGINS.length > 0) {
     app.use(cors({
@@ -103,6 +98,14 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
   app.use(revalidateSessionUser);
   app.use(attachRequestUser);
   app.use(generalApiLimiter);
+
+  // JSON bodies are parsed only once the session user is known and the
+  // general limiter has run. The 7 MiB authoring parser sits behind
+  // requireAuth + requireStaffOrAdmin, so anonymous and user-role callers on
+  // /admin/authoring/drafts are refused before their body is read; every
+  // other request gets the 100 KB default (a no-op once a body was parsed).
+  app.use(AUTHORING_DRAFTS_PATH, ...authoringDraftsBodyParser);
+  app.use(express.json());
 
   // Router mount order matters: within each router, static segments must be
   // registered before parameterised ones on the same path (e.g. problemRoutes

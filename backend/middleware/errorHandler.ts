@@ -25,6 +25,14 @@ export const asyncHandler = <
     };
 };
 
+/** body-parser's client errors (malformed JSON, unsupported encoding, ...). */
+const isBodyParserClientError = (err: unknown): err is { type: string; status: number; message: string } => {
+    if (typeof err !== 'object' || err === null) return false;
+    const { type, status, expose } = err as { type?: unknown; status?: unknown; expose?: unknown };
+    return typeof type === 'string' && expose === true
+        && typeof status === 'number' && status >= 400 && status < 500;
+};
+
 export const notFoundHandler = (req: Request, res: Response): void => {
     res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });
 };
@@ -42,6 +50,13 @@ export const errorHandler = (
         && err.type === 'entity.too.large'
     ) {
         res.status(413).json({ message: 'JSON request body is too large' });
+        return;
+    }
+
+    if (isBodyParserClientError(err)) {
+        res.status(err.status).json({
+            message: err.type === 'entity.parse.failed' ? 'Malformed JSON request body' : err.message,
+        });
         return;
     }
 

@@ -82,6 +82,22 @@ describe('compressed request body with trailing bytes (GHSA-27r3-jxmh-p828)', ()
     }
   });
 
+  it('answers an unsupported Content-Encoding with 415 instead of a 500', async () => {
+    const app = loadCreateApp()({
+      runtimeEnv: parseRuntimeEnv({ ...baseEnv }),
+      sessionStore: new session.MemoryStore(),
+    });
+
+    const res = await request(app)
+      .post('/login')
+      .set('Content-Type', 'application/json')
+      .set('Content-Encoding', 'compress')
+      .send('{"username":"a","password":"b"}');
+
+    expect(res.status).toBe(415);
+    expect(res.body).toEqual({ message: 'unsupported content encoding "compress"' });
+  });
+
   it('runs a body-parser release that carries the trailing-bytes fix (>= 2.4.0)', () => {
     const { version } = require('body-parser/package.json') as { version: string };
     const [major, minor] = version.split('.').map(Number);

@@ -70,25 +70,21 @@ export const generalApiKey = (req: Request): string => {
 
 /**
  * General API limiter — applied to every request before routing.
- * Read-heavy authoring workspace traffic (draft/job polling and the debounced
- * statement preview) is excluded: a single editing session legitimately issues
- * several requests per second, far above a general browsing budget, and each
- * excluded route is an authenticated admin endpoint with its own bounded cost.
- * SSE realtime streams are excluded too — each is one long-lived request per
- * open page, not a request budget item.
  * Authenticated staff/admin sessions are exempt entirely (see
- * isPrivilegedUser) — batch tooling and authoring workflows legitimately
- * exceed a browsing budget.
+ * isPrivilegedUser) — batch tooling and the authoring workspace (draft/job
+ * polling, PATCH saves, debounced statement previews) legitimately issue
+ * several requests per second, far above a general browsing budget.
+ * The authoring routes are staff-only, so they get no path-based skip: a
+ * path skip there would only ever exempt anonymous and user-role callers,
+ * who are refused by those routes anyway.
+ * SSE realtime streams are excluded for everyone — each is one long-lived
+ * request per open page, not a request budget item.
  */
 const GENERAL_LIMIT_SKIP_PATHS = [
-  '/admin/authoring/drafts/', // GET polling + PATCH saves + preview renders
-  '/admin/authoring/jobs/', // job status polls
-  '/admin/authoring/profile-syncs', // sync run cascade view (list + detail polls)
-  '/admin/author-profiles', // profile list/images — loaded alongside the workspace
   '/realtime/', // SSE streams — one request per page view, held open indefinitely
 ] as const;
 
-/** Exported for tests: pins the workspace routes excluded from the general limiter. */
+/** Exported for tests: pins who and which routes are excluded from the general limiter. */
 export const skipGeneralLimit = (req: Request): boolean => {
   if (isTestEnv(req)) return true;
   if (isPrivilegedUser(req)) return true;

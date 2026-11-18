@@ -1,6 +1,7 @@
-// The general API limiter skips read-heavy authoring workspace routes.
-// These guards pin the skip list so new authoring endpoints don't regress
-// into 429s during normal admin sessions (as happened with profile-syncs).
+// The general API limiter exempts staff/admin sessions everywhere (that is
+// what keeps the authoring workspace's polling out of 429s) and skips SSE
+// streams for everyone. Staff-only authoring paths get no path-based skip:
+// it would only exempt anonymous and user-role callers.
 
 type SkipRequest = Parameters<typeof import('../../middleware/rateLimit').skipGeneralLimit>[0];
 
@@ -12,14 +13,14 @@ describe('general API limiter skip paths', () => {
     jest.resetModules();
   });
 
-  const skipped = (path: string): boolean => {
+  const skipped = (path: string, role?: string): boolean => {
     jest.resetModules();
     process.env.NODE_ENV = 'production';
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { skipGeneralLimit } = require('../../middleware/rateLimit') as {
       skipGeneralLimit: (req: SkipRequest) => boolean;
     };
-    return skipGeneralLimit({ path } as SkipRequest);
+    return skipGeneralLimit({ path, ...(role ? { user: { role } } : {}) } as SkipRequest);
   };
 
   it('skips a route-agnostic request when the session is staff/admin (revalidated req.user role)', () => {
@@ -39,13 +40,27 @@ describe('general API limiter skip paths', () => {
   });
 
 
-  it('skips draft, job, profile, and profile-sync workspace traffic', () => {
-    expect(skipped('/admin/authoring/drafts/abc')).toBe(true);
-    expect(skipped('/admin/authoring/jobs/abc')).toBe(true);
-    expect(skipped('/admin/authoring/profile-syncs')).toBe(true);
-    expect(skipped('/admin/authoring/profile-syncs/abc')).toBe(true);
-    expect(skipped('/admin/author-profiles')).toBe(true);
-    expect(skipped('/admin/author-profiles/abc/image')).toBe(true);
+  const workspacePaths = [
+    '/admin/authoring/drafts/abc',
+    '/admin/authoring/jobs/abc',
+    '/admin/authoring/profile-syncs',
+    '/admin/authoring/profile-syncs/abc',
+    '/admin/author-profiles',
+    '/admin/author-profiles/abc/image',
+  ];
+
+  it('skips draft, job, profile, and profile-sync workspace traffic for staff and admin sessions', () => {
+    for (const path of workspacePaths) {
+      expect(skipped(path, 'staff')).toBe(true);
+      expect(skipped(path, 'admin')).toBe(true);
+    }
+  });
+
+  it('keeps anonymous and user-role callers limited on the staff-only workspace paths', () => {
+    for (const path of workspacePaths) {
+      expect(skipped(path)).toBe(false);
+      expect(skipped(path, 'user')).toBe(false);
+    }
   });
 
   it('skips SSE realtime streams', () => {

@@ -1,5 +1,5 @@
-import express, { Request, Response, Router } from 'express';
-import { STATEMENT_ASSET } from '../constants';
+import express, { Request, RequestHandler, Response, Router } from 'express';
+import { AUTHORING_VALIDATION, STATEMENT_ASSET } from '../constants';
 import { requireAuth, requireStaffOrAdmin } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { statementAssetUpload } from '../middleware/upload';
@@ -157,7 +157,23 @@ const resolveCreateAuthorSnapshot = async (
   });
 };
 
-router.use('/admin/authoring/drafts', requireAuth, requireStaffOrAdmin);
+export const AUTHORING_DRAFTS_PATH = '/admin/authoring/drafts';
+
+/**
+ * JSON body parsing for everything under /admin/authoring/drafts: the draft
+ * routes below plus the preview, job and testcase routes that other authoring
+ * routers register under the same prefix. Authorization runs first, so the
+ * 7 MiB authoring ceiling (and its inflate + JSON.parse cost) is only spent
+ * on staff/admin sessions; anonymous and user-role callers get 401/403
+ * before their body is read. app.ts mounts this ahead of every router.
+ */
+export const authoringDraftsBodyParser: RequestHandler[] = [
+  requireAuth,
+  requireStaffOrAdmin,
+  express.json({ limit: AUTHORING_VALIDATION.MAX_JSON_BODY_BYTES }),
+];
+
+router.use(AUTHORING_DRAFTS_PATH, requireAuth, requireStaffOrAdmin);
 
 /**
  * Shared result-kind → response mapping for draft mutations. Each entry maps a
