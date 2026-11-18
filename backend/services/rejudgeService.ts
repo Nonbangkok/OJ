@@ -35,6 +35,8 @@ interface PoolOutcome {
     /** Reset rows: id, plus contest_id for contest-pool rows (else null). */
     rows: { id: number; contest_id: number | null }[];
     skipped: number;
+    /** Judgeable rows left untouched because their judge is still in flight. */
+    busy: number;
 }
 
 /**
@@ -58,21 +60,41 @@ const withRejudgeLock = async <T>(scopeKey: string, work: () => Promise<T>): Pro
     }
 };
 
-/** Reset one pool's judgeable rows to Pending and enqueue them through the
- *  same judge-queue path a fresh submission takes. Rows with empty stored
- *  code are counted as skipped and left untouched. */
+/** Reset one pool's judgeable, idle rows to Pending so they can be enqueued
+ *  through the same judge-queue path a fresh submission takes. Rows with
+ *  empty stored code are counted as skipped, and rows whose judge is still in
+ *  flight as busy; both are left untouched. */
 const rejudgePool = async (plan: PoolPlan): Promise<PoolOutcome> => {
     // contest_id is returned alongside the id so contest-pool rows can be
     // tracked under their contest in the judge queue's in-flight accounting
     // (JUDGE-005); the standalone pool has no contest_id column, hence the
     // NULL-typed union instead of SELECT *.
-    const resetResult = await db.query<{ id: number; contest_id: number | null }>(
-        `UPDATE ${plan.table}
-         SET overall_status = $1, results = NULL
-         WHERE ${plan.filterColumn} = $2 AND ${JUDGEABLE_CODE_CONDITION}
-         RETURNING id${plan.table === 'contest_submissions' ? ', contest_id' : ', NULL::integer AS contest_id'}`,
-        [SUBMISSION_STATUS.PENDING, plan.filterValue]
+    const contestIdColumn = plan.table === 'contest_submissions' ? 'contest_id' : 'NULL::integer AS contest_id';
+    const candidates = await db.query<{ id: number; contest_id: number | null }>(
+        `SELECT id, ${contestIdColumn} FROM ${plan.table}
+         WHERE ${plan.filterColumn} = $1 AND ${JUDGEABLE_CODE_CONDITION}`,
+        [plan.filterValue]
     );
+
+    // In-flight guard (JUDGE-004): a running pipeline (including one that has
+    // written its verdict but not yet released its in-flight key) owns its
+    // row. Resetting it would either race two judges or wipe a fresh verdict
+    // that nothing re-queues. The check and the UPDATE dispatch below run in
+    // the same synchronous turn, so the registry cannot gain a row in between.
+    const idleIds = candidates.rows
+        .filter((row) => !isSubmissionInFlight({ table: plan.table, submissionId: row.id }))
+        .map((row) => row.id);
+    const busy = candidates.rows.length - idleIds.length;
+
+    const resetResult = idleIds.length === 0
+        ? { rows: [] as { id: number; contest_id: number | null }[] }
+        : await db.query<{ id: number; contest_id: number | null }>(
+            `UPDATE ${plan.table}
+             SET overall_status = $1, results = NULL
+             WHERE id = ANY($2::int[]) AND ${JUDGEABLE_CODE_CONDITION}
+             RETURNING id, ${contestIdColumn}`,
+            [SUBMISSION_STATUS.PENDING, idleIds]
+        );
 
     const skipResult = await db.query<{ count: string }>(
         `SELECT COUNT(*) AS count FROM ${plan.table}
@@ -83,13 +105,13 @@ const rejudgePool = async (plan: PoolPlan): Promise<PoolOutcome> => {
     return {
         rows: resetResult.rows,
         skipped: Number(skipResult.rows[0]?.count ?? 0),
+        busy,
     };
 };
 
-/** Shared driver: reset every pool, enqueue the survivors, log the outcome.
- *  Rows whose judge is already in flight are left untouched and counted as
- *  `busy` — resetting them would race two judges over one row and the last
- *  writer would silently win (JUDGE-004). */
+/** Shared driver: reset every pool, enqueue the reset rows, log the outcome.
+ *  Rows whose judge is already in flight are neither reset nor enqueued and
+ *  are counted as `busy` (JUDGE-004). */
 const runRejudge = async (
     scope: JudgeScope,
     target: { problemId?: string; contestId?: number },
@@ -105,15 +127,9 @@ const runRejudge = async (
         for (const pool of pools) {
             const outcome = await rejudgePool(pool);
             skipped += outcome.skipped;
+            busy += outcome.busy;
             for (const row of outcome.rows) {
                 const isContestPool = pool.table === 'contest_submissions';
-                // In-flight guard (JUDGE-004): skip rows the judge is already
-                // processing — their running pipeline will deliver a verdict
-                // against the same current testcases/limits anyway.
-                if (isSubmissionInFlight({ table: pool.table, submissionId: row.id })) {
-                    busy += 1;
-                    continue;
-                }
                 queued += 1;
                 // The identical dispatch the submission controller performs: the
                 // judge queue's MAX_CONCURRENT_JUDGES gate bounds this burst.
