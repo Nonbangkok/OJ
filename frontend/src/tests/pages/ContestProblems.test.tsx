@@ -54,6 +54,18 @@ describe('ContestProblems', () => {
     expect(within(c).getAllByText('—')).toHaveLength(3);
   });
 
+  it('marks header problems with a Header badge next to the title (A7-06)', async () => {
+    jest.mocked(contestService.getProblems).mockResolvedValue(problems.map((p) =>
+      ({ ...p, problem_type: p.id === 'interval' ? 'header' : 'standard' })) as never);
+    renderAt(contest());
+    const table = await screen.findByRole('table', { name: 'Problems' });
+    const [, a, b, c] = within(table).getAllByRole('row');
+    expect(within(b).getByText('HEADER')).toBeInTheDocument();
+    expect(within(b).getByRole('link', { name: 'Interval merge' })).toBeInTheDocument();
+    expect(within(a).queryByText('HEADER')).toBeNull();
+    expect(within(c).queryByText('HEADER')).toBeNull();
+  });
+
   it('header meta shows the contest and points of max', async () => {
     renderAt(contest());
     expect(await screen.findByText('Mid-term practice · 160 / 300 points')).toBeInTheDocument();
@@ -76,5 +88,17 @@ describe('ContestProblems', () => {
     expect(within(table).getByRole('link', { name: 'Interval merge' })).toHaveAttribute('href', '/contests/3/problems/interval');
     expect(within(table).queryByRole('columnheader', { name: 'Score' })).toBeNull();
     expect(contestService.getProblems).not.toHaveBeenCalled();
+  });
+
+  it('staff watching see the Header badge too', async () => {
+    jest.mocked(useAuth).mockReturnValue({ user: { id: 9, username: 'staffer', role: 'staff' } } as ReturnType<typeof useAuth>);
+    renderAt(contest({ is_participant: false, problems: [
+      { id: 'sum_digits', title: 'Sum of digits', problem_type: 'standard' },
+      { id: 'interval', title: 'Interval merge', problem_type: 'header' },
+    ] } as Partial<Contest>));
+    const table = await screen.findByRole('table', { name: 'Problems' });
+    const [, a, b] = within(table).getAllByRole('row');
+    expect(within(b).getByText('HEADER')).toBeInTheDocument();
+    expect(within(a).queryByText('HEADER')).toBeNull();
   });
 });

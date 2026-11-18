@@ -151,8 +151,9 @@ export const getContestDetail = async (
             );
             problems = problemsResult.rows;
         } else if (isStaffOrAdmin || isParticipant) {
+            // problem_type: the staff watching view marks header problems (A7-06).
             const problemsResult = await db.query<ContestProblemsSummaryRow>(
-                `SELECT id, title, author
+                `SELECT id, title, author, problem_type
                  FROM problems
                  WHERE contest_id = $1
                  ORDER BY ${contestProblemOrderSql('problems', 'contest_position')}`,

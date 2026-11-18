@@ -9,6 +9,7 @@ import { SubmissionListQuery, SubmitRequestBody } from '../types/api';
 import { AppError } from '../middleware/errorHandler';
 import { hasGraderSource } from './problemFilesService';
 import { isContestManagementRole, isContestParticipant } from './contestAccess';
+import { contestSubmissionsSql } from './contestSubmissionsSql';
 import {
     ExistsRow,
     IdTitlePair,
@@ -60,8 +61,8 @@ export const validateAndQueueSubmission = async (
     }
 
     if (contestId) {
-        const contestResult = await db.query<ContestRuntimeRow>(
-            'SELECT id, status, start_time, end_time FROM contests WHERE id = $1',
+        const contestResult = await db.query<ContestRuntimeRow & { is_visible: boolean }>(
+            'SELECT id, status, start_time, end_time, is_visible FROM contests WHERE id = $1',
             [contestId],
         );
         if (contestResult.rows.length === 0) {
@@ -69,6 +70,13 @@ export const validateAndQueueSubmission = async (
         }
 
         const contest = contestResult.rows[0];
+        // A5-08: a hidden contest reads as nonexistent on every surface for
+        // non-staff, so it takes no submissions either, even from users who
+        // joined before it was hidden. Checked before the time/status gates
+        // so the answer never reveals more than "not found".
+        if (!contest.is_visible && !isContestManagementRole({ role })) {
+            throw new AppError('Contest not found.', 404);
+        }
         // Wall-clock gate (XSYS-003 / CONTEST-001): the scheduler-updated
         // status is the display/backstop, not the authority — it only ticks
         // once a minute, so between end_time and the next tick (or worse,
@@ -134,6 +142,16 @@ export const validateAndQueueSubmission = async (
     };
 };
 
+/**
+ * Every column of a contest_submissions row (all present in `submissions`
+ * too): a contest's rows are read from both tables, see contestSubmissionsSql.
+ */
+const CONTEST_SUBMISSION_COLUMNS =
+    'id, contest_id, user_id, problem_id, code, language, overall_status, score, results, max_time_ms, max_memory_kb, submitted_at';
+/** The contest feed's row source: no code (results only feed the per-case status list). */
+const CONTEST_FEED_COLUMNS =
+    'id, contest_id, user_id, problem_id, language, overall_status, score, results, max_time_ms, max_memory_kb, submitted_at';
+
 export const getSubmissions = async (
     queryInput: SubmissionListQuery,
     /** Submitting user; 0 for unauthenticated guests (public feed only). */
@@ -179,19 +197,34 @@ export const getSubmissions = async (
             throw new AppError('You must join this contest to view its submissions.', 403);
         }
 
+        // A finished contest's submissions are its moved `submissions` rows
+        // (contest_id, migration 0029), the rows the contest problem page
+        // counts; contest_submissions while it runs or finishes.
+        params.push(contestId);
+        const contestParam = `$${params.length}`;
+
+        let caseStatusesSql = `COALESCE((SELECT jsonb_agg(r->>'status') FROM jsonb_array_elements(
+                CASE WHEN jsonb_typeof(cs.results) = 'array' THEN cs.results ELSE '[]'::jsonb END) r), '[]'::jsonb)`;
+        // A5-09: until the contest finishes, per-case verdicts are private to
+        // their submitter (the live scoreboard withholds them for the same
+        // reason). Rivals' rows keep their overall verdict and score, with an
+        // empty case strip; staff see everything.
+        if (!isStaffOrAdmin && contestResult.rows[0].status !== CONTEST_STATUS.FINISHED) {
+            params.push(userId);
+            caseStatusesSql = `CASE WHEN cs.user_id = $${params.length} THEN ${caseStatusesSql} ELSE '[]'::jsonb END`;
+        }
+
         queryText = `
             SELECT
               cs.id, u.username, cs.problem_id, p.title AS problem_title,
               cs.overall_status, cs.score, cs.language, cs.submitted_at,
-              COALESCE((SELECT jsonb_agg(r->>'status') FROM jsonb_array_elements(
-                CASE WHEN jsonb_typeof(cs.results) = 'array' THEN cs.results ELSE '[]'::jsonb END) r), '[]'::jsonb) AS case_statuses,
+              ${caseStatusesSql} AS case_statuses,
               cs.max_time_ms, cs.max_memory_kb
-            FROM contest_submissions cs
+            FROM ${contestSubmissionsSql(contestParam, CONTEST_FEED_COLUMNS)} cs
             JOIN users u ON cs.user_id = u.id
             JOIN problems p ON cs.problem_id = p.id
         `;
-        params.push(contestId);
-        conditions.push(`cs.contest_id = $${params.length}`);
+        conditions.push(`cs.contest_id = ${contestParam}`);
     } else {
         queryText = `
             SELECT
@@ -361,10 +394,14 @@ export const getSubmissionDetail = async (
     contestId?: string,
 ): Promise<SubmissionDetailRow | ContestSubmissionDetailRow | null> => {
     if (contestId) {
-        // For contest submissions, we join with contest_problems (the snapshot)
+        // For contest submissions, we join with contest_problems (the snapshot).
+        // A finished contest's rows are its moved `submissions` rows, which
+        // have new ids: the lookup is by id AND contest, so an unrelated
+        // practice submission that carries the id is never returned here.
         const result = await db.query<ContestSubmissionDetailRow>(
-            `SELECT cs.*, u.username, cp.title AS problem_name, p.time_limit_ms, p.memory_limit_mb
-             FROM contest_submissions cs
+            `SELECT cs.*, u.username, cp.title AS problem_name, p.time_limit_ms, p.memory_limit_mb,
+                    p.problem_type, p.submission_filename
+             FROM ${contestSubmissionsSql('$2', CONTEST_SUBMISSION_COLUMNS)} cs
              LEFT JOIN users u ON cs.user_id = u.id
              LEFT JOIN contest_problems cp ON cs.problem_id = cp.problem_id AND cs.contest_id = cp.contest_id
              LEFT JOIN problems p ON cs.problem_id = p.id

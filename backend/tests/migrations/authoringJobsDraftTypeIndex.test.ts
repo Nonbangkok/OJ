@@ -2,8 +2,9 @@ import { migrations } from '../../migrations';
 import { authoringJobsDraftTypeIndexSql } from '../../migrations/0028AuthoringJobsDraftTypeIndex';
 
 describe('authoring jobs (draft, type, created) index migration', () => {
-  it('is the latest migration', () => {
-    expect(migrations[migrations.length - 1].version).toBe('0028_authoring_jobs_draft_type_index');
+  it('runs after the user last-login migration', () => {
+    const versions = migrations.map((migration) => migration.version);
+    expect(versions.indexOf('0028_authoring_jobs_draft_type_index')).toBe(versions.indexOf('0027_user_last_login') + 1);
   });
 
   it("serves the draft list's newest-job-per-type lookup (B7) without a sort", () => {

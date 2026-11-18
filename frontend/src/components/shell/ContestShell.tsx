@@ -7,6 +7,7 @@ import { MOBILE_QUERY, useMediaQuery } from '../../hooks/useMediaQuery';
 import type { Contest, ProblemSummary } from '../../types';
 import { useContest } from '../../features/contest/ContestContext';
 import { problemLetter } from '../../features/contest/letters';
+import { HeaderProblemBadge } from '../../features/contest/HeaderProblemBadge';
 import { useCountdown } from './useCountdown';
 import AccountMenu from './AccountMenu';
 import styles from './ContestShell.module.css';
@@ -43,7 +44,10 @@ function ProblemRow({ contestId, problem, index }: { contestId: string; problem:
     <NavLink to={`/contests/${contestId}/problems/${problem.id}`} className={styles.problem}>
       <span className={styles.letter}>{problemLetter(index)}</span>
       <Icon size={14} weight={status === 'none' ? 'regular' : 'bold'} className={styles[status]} aria-hidden="true" />
-      <span className={styles.problemTitle}>{problem.title}</span>
+      <span className={styles.problemName}>
+        <span className={styles.problemTitle}>{problem.title}</span>
+        <HeaderProblemBadge problem={problem} compact />
+      </span>
       {attempted && <span className={styles.score}>{best}</span>}
     </NavLink>
   );

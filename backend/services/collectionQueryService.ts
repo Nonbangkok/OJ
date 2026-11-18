@@ -137,14 +137,18 @@ export const deleteCollection = async (id: number): Promise<boolean> => {
  * Flip the existing is_visible state of every problem in a collection, in one
  * transaction — the same column (and therefore the same visibility system)
  * the individual and global toggles write to.
- * Returns the number of problems updated, or null when the collection itself
- * does not exist (mirrors updateCollection/deleteCollection so the route can
- * 404 instead of reporting a bogus "0 problems" success — PROBLEM-005).
+ * A6-01: members attached to a contest are skipped, like the filter-wide bulk
+ * toggle does — the contest keeps them hidden and restores their pre-contest
+ * visibility when it finishes.
+ * Returns how many problems were updated and how many were skipped, or null
+ * when the collection itself does not exist (mirrors
+ * updateCollection/deleteCollection so the route can 404 instead of reporting
+ * a bogus "0 problems" success — PROBLEM-005).
  */
 export const setCollectionVisibility = async (
   collectionId: number,
   isVisible: boolean,
-): Promise<number | null> => {
+): Promise<{ updated: number; skipped: number } | null> => {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
@@ -157,11 +161,15 @@ export const setCollectionVisibility = async (
       return null;
     }
     const result = await client.query(
-      'UPDATE problems SET is_visible = $2 WHERE collection_id = $1',
+      'UPDATE problems SET is_visible = $2 WHERE collection_id = $1 AND contest_id IS NULL',
       [collectionId, isVisible],
     );
+    const skippedResult = await client.query<{ count: string }>(
+      'SELECT COUNT(*) AS count FROM problems WHERE collection_id = $1 AND contest_id IS NOT NULL',
+      [collectionId],
+    );
     await client.query('COMMIT');
-    return result.rowCount ?? 0;
+    return { updated: result.rowCount ?? 0, skipped: Number(skippedResult.rows?.[0]?.count ?? 0) };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

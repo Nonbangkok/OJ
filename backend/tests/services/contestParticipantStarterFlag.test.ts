@@ -18,9 +18,10 @@ const { getContestById, isContestParticipant } = jest.requireMock('../../service
  * `has_starter_files` is a HEADER-only flag: the public starter-ZIP route 404s
  * standard problems, so a standard problem that still carries starter files
  * (the switch header -> standard deliberately keeps them) must not advertise a
- * download. The finished-contest branch reads the `contest_problems` snapshot,
- * which cannot be driven end-to-end today — it selects `cp.problem_pdf`, a
- * column no migration creates — so the filter is asserted on the SQL itself.
+ * download. The filter is asserted on the SQL of both branches; the finished
+ * branch also runs end-to-end in
+ * tests/integration/finishedContestProblemDetail.test.ts. In the finished
+ * branch the live-problem gate (A5-06) may sit between the two.
  */
 describe('contest problem detail starter flag is header-only', () => {
   beforeEach(() => {
@@ -37,10 +38,10 @@ describe('contest problem detail starter flag is header-only', () => {
 
     await getContestProblemDetailForParticipant('1', 'P1', 7);
 
-    const sql = String(query.mock.calls.at(-1)![0]);
+    // The detail row's query (the viewer's stats are read separately, A7-03).
+    const sql = query.mock.calls.map((call) => String(call[0])).find((text) => text.includes('AS has_starter_files')) ?? '';
     expect(sql).toContain(fromClause);
-    expect(sql).toContain("AS has_starter_files");
     // The EXISTS must be conjoined with a header check, never stand alone.
-    expect(sql).toMatch(/problem_type(?:,\s*'standard'\))?\s*=\s*'header'\s+AND\s+EXISTS \(SELECT 1 FROM problem_files/);
+    expect(sql).toMatch(/problem_type(?:,\s*'standard'\))?\s*=\s*'header'\s+AND\s+(?:\(p\.contest_id IS NULL OR \$3::boolean\)\s+AND\s+)?EXISTS \(SELECT 1 FROM problem_files/);
   });
 });

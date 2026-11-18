@@ -4,6 +4,7 @@ import {
   normalizeSource,
   similarity,
   stripComments,
+  templateShingles,
 } from '../../utils/codeSimilarity';
 
 describe('codeSimilarity', () => {
@@ -113,6 +114,44 @@ describe('codeSimilarity', () => {
 
     it('returns 0 when either source is too short', () => {
       expect(similarity('int x;', 'int main() { return 0; }')).toBe(0);
+    });
+  });
+
+  describe('similarity against a shared template (A5-05)', () => {
+    const template = `
+      struct Pair { int first, second; bool less(const Pair &o) const; void keepMin(const Pair &o); };
+      bool Pair::less(const Pair &o) const {
+        // Your code here
+        return false;
+      }
+      void Pair::keepMin(const Pair &o) { if (o.less(*this)) { first = o.first; second = o.second; } }
+    `;
+    const fill = (body: string) => template.replace('return false;', body);
+    const stepwise = fill('if (first < o.first) return true; if (o.first < first) return false; return second < o.second;');
+    const oneLine = fill('return first < o.first || (!(o.first < first) && second < o.second);');
+
+    it('compares only what each source adds to the template', () => {
+      // Most of two independent fills' score is the template they share...
+      expect(similarity(stepwise, oneLine)).toBeGreaterThan(0.5);
+      // ...and nothing of it is left once the template's shingles are set aside.
+      expect(similarity(stepwise, oneLine, templateShingles([template]))).toBeLessThan(0.3);
+    });
+
+    it('still scores a copied fill as identical', () => {
+      const copied = fill('if (first < o.first)\n return true;\n if (o.first < first) return false; /* same */ return second<o.second;');
+      expect(similarity(stepwise, copied, templateShingles([template]))).toBe(1);
+    });
+
+    it('scores 0 when a source adds nothing to the template', () => {
+      expect(similarity(template, template, templateShingles([template]))).toBe(0);
+      expect(similarity(template, stepwise, templateShingles([template]))).toBe(0);
+    });
+
+    it('collects the shingles of every template file', () => {
+      const other = 'int main() { Pair a{1, 2}, b{1, 3}; return a.less(b) ? 0 : 1; }';
+      const shingles = templateShingles([template, other]);
+      for (const shingle of buildShingles(normalizeSource(other))) expect(shingles.has(shingle)).toBe(true);
+      expect(shingles.size).toBeGreaterThan(buildShingles(normalizeSource(template)).size);
     });
   });
 });

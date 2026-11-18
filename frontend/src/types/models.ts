@@ -51,6 +51,8 @@ export interface ProblemBase {
   categories?: readonly string[];
   /** Codeforces-like rating (800–3500 step 100); null/absent = Unrated. */
   difficulty?: number | null;
+  /** 'header' problems take a single header file; lists mark them (absent = not sent by that list). */
+  problem_type?: 'standard' | 'header';
 }
 
 export interface ContestProblem extends ProblemBase {

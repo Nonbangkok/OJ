@@ -118,6 +118,8 @@ export interface ContestMigrationResult {
   message: string;
   migratedSubmissions: number;
   finalScoreboard: number;
+  /** Contest judges had not drained: nothing was written, retry later (A5-02). */
+  deferred?: boolean;
 }
 
 export interface AvailableContestProblemRow extends Pick<ProblemRow, 'id' | 'title' | 'author' | 'is_visible'> {}
@@ -432,6 +434,8 @@ export interface ContestListRow {
 
 export interface ContestProblemsSummaryRow extends IdTitlePair {
   author: string | null;
+  /** The contest problem lists mark header problems (A7-06); absent from the finished snapshot list. */
+  problem_type?: ProblemType;
 }
 
 export interface ContestScoreboardRow {
@@ -488,6 +492,9 @@ export interface ContestProblemDetailRow extends ContestProblemsSummaryRow {
   problem_type: ProblemType;
   submission_filename: string | null;
   has_starter_files: boolean;
+  /** A7-03: the viewer's own contest submissions on this problem (as GET /problems/:id sends them). */
+  viewerBest: { score: number; caseStatuses: string[] } | null;
+  viewerSubmissionCount: number;
 }
 
 export type ContestProblemsForParticipantResult =

@@ -183,6 +183,12 @@ export interface SubmissionRow {
     max_time_ms: number | null;
     max_memory_kb: number | null;
     submitted_at: Date;
+    /**
+     * The contest this row was submitted in, set when the contest's finish
+     * moved it here from contest_submissions (migration 0029); NULL for
+     * practice submissions and for contests that finished before 0029.
+     */
+    contest_id: number | null;
 }
 
 

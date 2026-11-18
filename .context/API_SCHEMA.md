@@ -280,7 +280,7 @@
 - Auth: `requirePublicAccess`
 - Purpose: ดูรายละเอียด contest
 - Params: `id`
-- Response 200: contest detail + problem metadata
+- Response 200: contest detail + problem metadata (`problems` ของ contest ที่ running มี `problem_type` ด้วย — มุมมอง staff watching แสดง badge HEADER)
 - Errors: 404 contest ไม่พบ **หรือ hidden สำหรับ non-staff** (hidden = nonexistent, ไม่มี oracle)
 
 ### 30. `POST /contests/:id/join`
@@ -342,23 +342,28 @@
   - `action: 'move_to_contest' | 'move_to_main'`
 - Response 200: migration result
 - ย้ายเข้า contest: snapshot `is_visible_before_contest` — ทุก exit path (bulk/single move-back, contest delete, post-contest migration) คืนค่าเดิม
+- Errors (`move_to_contest`): 404 ไม่พบ contest หรือบางโจทย์; 409 เมื่อ contest ไม่ได้ scheduled/running หรือโจทย์ใดอยู่ใน contest อื่นแล้ว — แถวโจทย์ถูก lock (`FOR UPDATE`) ระหว่างย้าย ดังนั้นการเพิ่มโจทย์เดียวกันพร้อมกันเข้าสอง contest สำเร็จได้แค่ครั้งเดียว อีกครั้งได้ 409 และไม่มีโจทย์ใดในคำขอนั้นถูกย้าย (A5-10)
+- Errors (`move_to_main`): 404 ไม่พบ contest; 409 เมื่อ contest จบแล้ว (`finishing`/`finished` หรือเลย `end_time` แล้วแต่ scheduler ยังไม่เปลี่ยนสถานะ) เพราะ standings และ final snapshot นับเฉพาะโจทย์ที่ยังอยู่ใน contest
 
 ### 38. `DELETE /admin/contests/:id/problems/:problemId`
 - Auth: `staff|admin`
 - Purpose: ย้ายโจทย์เดี่ยวกลับระบบหลัก
 - Response 200: `{ message, problem }`
 - Errors: 400/404
+- คะแนนของโจทย์ที่ถอนออกระหว่าง contest running ไม่นับใน standings อีก (ทั้ง live และ final snapshot)
 
 ### 39. `GET /contests/:id/problems`
 - Auth: required
 - Purpose: list problems สำหรับ participant (ต้องเป็น participant; hidden contest = 404)
 - Response 200: list problems หรือ `[]` ถ้า contest ยังไม่ active
+- `best_score` / `submission_count` / latest / best ของ viewer มาจาก contest submissions ของตัวเอง — contest ที่ finished อ่านแถวที่ย้ายไป `submissions` (`contest_id`)
+- แต่ละแถวมี `problem_type` (`standard`/`header`; contest ที่ finished อ่านจากแถว `problems` ปัจจุบัน) — หน้า contest problems และ sidebar ของ ContestShell แสดง badge HEADER / `.h` (A7-06)
 - Errors: 403 ไม่ได้ join, 404 ไม่พบ/hidden
 
 ### 40. `GET /contests/:id/problems/:problemId`
 - Auth: required
 - Purpose: problem detail ใน contest (participant เท่านั้น)
-- Response 200: problem detail
+- Response 200: problem detail + `viewerBest: { score, caseStatuses } | null`, `viewerSubmissionCount` (เหมือน #46 `GET /problems/:id`) จาก contest submissions ของ viewer เอง: `contest_submissions` ตอน running/finishing, `submissions WHERE contest_id` เมื่อ finished (A7-03; contest ที่ finish ก่อน migration 0029 ได้ 0/null). staff ที่ดูโดยไม่ได้ join ได้ 0/null
 - Errors: 403/404
 
 ### 41. `GET /contests/:id/problems/:problemId/pdf`
@@ -366,12 +371,15 @@
 - Purpose: โหลด PDF ของโจทย์ใน contest (participant เท่านั้น)
 - Response 200: `application/pdf`
 - Errors: 403/404
+- contest ที่ finished: PDF (และ starter, `has_pdf`, `has_starter_files` ของ #40) อ่านจากแถว `problems` ปัจจุบัน; ถ้าโจทย์อยู่ใน contest อื่นแล้ว non-staff ได้ 404 / flag เป็น false
 
 ### 42. `GET /admin/contests/:id/similarity`
 - Auth: `staff|admin`
 - Purpose: contest cheat detection — คู่ user ต่างคนที่ submission ล่าสุดของโจทย์เดียวกันคล้ายกันหลัง normalize
 - Query (optional): `threshold` (0, 1] — default 0.6
 - Response 200: `{ contestId, pairs: [...] }`
+- header problem: ตัด shingle ของ starter files (`problem_files` role `starter`) ออกจากทั้งสองฝั่งก่อนคำนวณ Jaccard — เทียบเฉพาะส่วนที่นักเรียนเขียนเพิ่มจาก template; ส่ง starter มาเปล่า ๆ ได้ 0
+- ทุก status ของ contest: running/finishing อ่าน `contest_submissions`; finished อ่าน submission ที่ถูกย้ายไป `submissions` (`contest_id` = contest นี้, migration 0029) — `submissionIdA/B` ของ contest ที่ finished จึงเป็น id ใน practice pool. contest ที่ finish ก่อน 0029 ไม่มีแถวที่ผูกไว้ → `pairs: []`
 
 ---
 
@@ -409,7 +417,7 @@
   - regular user จะไม่เห็น `is_visible`
   - staff/admin เห็นข้อมูลเต็ม
 - Errors:
-  - 404 not found **หรือ hidden สำหรับ non-staff** (PROBLEM-002: hidden = nonexistent, ไม่มี title oracle)
+  - 404 not found **หรือ hidden หรืออยู่ใน contest (`contest_id` ไม่เป็น NULL) สำหรับ non-staff** (PROBLEM-002: hidden = nonexistent, ไม่มี title oracle)
 
 ### 47. `GET /admin/problems/:id`
 - Auth: `staff|admin`
@@ -461,7 +469,7 @@
 - Auth: `staff|admin`
 - Body: `{ isVisible: boolean }`
 - Response 200: `{ message, problem: { id, title, is_visible } }`
-- Error 404
+- Errors: 404, 409 ถ้าโจทย์อยู่ใน contest (contest เป็นเจ้าของ visibility จนจบ contest)
 
 ### 54. `GET /admin/problems/:id/testcases`
 - Auth: `staff|admin`
@@ -495,9 +503,9 @@
 
 ### 59. `PUT /admin/collections/:id/visibility`
 - Auth: `staff|admin`
-- Purpose: toggle visibility ทั้ง collection — เขียน `is_visible` ของโจทย์ทุกตัวใน collection ใน transaction เดียว
+- Purpose: toggle visibility ทั้ง collection — เขียน `is_visible` ของโจทย์ทุกตัวใน collection ใน transaction เดียว (ข้ามโจทย์ที่อยู่ใน contest)
 - Body: `{ isVisible: boolean }`
-- Response 200: `{ message, updated }`
+- Response 200: `{ message, updated, skipped }` — `skipped` = จำนวนโจทย์ใน contest ที่ข้ามไป
 - Error 404
 
 ### 60. `POST /admin/problems/batch-upload`
@@ -551,7 +559,7 @@
   - 400 language/problem invalid / โจทย์ไม่มี testcase เลย (DB-06) / multipart มี field เกิน 4 หรือมีไฟล์
   - 413 multipart field ใหญ่เกิน 3 × 65536 bytes
   - 403 ไม่ได้ join contest
-  - 404 contest not found
+  - 404 contest not found หรือ hidden (non-staff; ตรวจก่อนเวลา/สถานะ)
 - Contest submission: ตรวจ wall-clock `start_time`/`end_time` ตรง ๆ (ไม่พึ่ง scheduler status เพียงอย่างเดียว)
 
 ### 65. `GET /submissions`
@@ -560,7 +568,8 @@
   - `filter`, `problemId`, `contestId`, `filterProblemId`, `filterUserId`
   - `page: number` (default 1, max 500; หน้าละ 200 แถว — SUB-004)
 - Response 200: submissions list
-- การ gate: feed สาธารณะไม่รวมโจทย์ hidden/contest สำหรับ non-staff; feed ต่อ contest (`?contestId=`) ต้องเป็น participant/staff และ contest ต้อง visible
+- การ gate: feed สาธารณะไม่รวมโจทย์ hidden/contest สำหรับ non-staff; feed ต่อ contest (`?contestId=`) ต้องเป็น participant/staff และ contest ต้อง visible; ก่อน contest finished non-staff เห็น `case_statuses` เฉพาะ submission ของตัวเอง (ของคนอื่นเป็น `[]`, verdict/score ยังเห็น)
+- feed ต่อ contest อ่าน `contest_submissions` ตอน running/finishing และ submission ที่ย้ายไป `submissions WHERE contest_id` เมื่อ finished (migration 0029) — แถวเดียวกับที่หน้าโจทย์ contest นับเป็น "Submissions N"; id ของ contest ที่ finished เป็น id ใน practice pool (เปลี่ยนตอน finish — ลิงก์ id เดิมจากช่วงแข่งใช้ไม่ได้แล้ว). contest ที่ finish ก่อน 0029 ได้ `[]`
 
 ### 66. `GET /search/problems`
 - Auth: required
@@ -582,6 +591,7 @@
 - Errors:
   - 404 not found (id ต้องเป็นตัวเลข — ไม่ใช่ตอบ 500)
   - 403 ไม่มีสิทธิ์ดู
+- `?contestId=`: หาแถวด้วย id **และ** contest — `contest_submissions` ตอน running/finishing, แถวที่ย้ายไป `submissions` (`contest_id`) เมื่อ finished; submission ฝึกที่บังเอิญมี id เดียวกันไม่มีวันถูกคืนผ่าน route นี้ (404). สิทธิ์เหมือนเดิม: เจ้าของหรือ staff
 
 ### 69. `GET /scoreboard`
 - Auth: `requirePublicAccess` (PUBLIC mode guest อ่านได้)
@@ -665,6 +675,7 @@
 
 ### 82. `GET /analytics/contests/:contestId`
 - Response 200: per-contest analytics / 404
+- ตัวเลข submission (KPIs, timeline, problemStats, `solved`) ของ contest ที่ finished มาจาก `submissions WHERE contest_id` (migration 0029); running/finishing มาจาก `contest_submissions`. submission ฝึกหลัง contest (`contest_id` NULL) ไม่ถูกนับ. contest ที่ finish ก่อน 0029 ยังว่าง
 
 ### 83. `GET /analytics/problems/:problemId`
 - Response 200: per-problem analytics / 404

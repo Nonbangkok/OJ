@@ -19,6 +19,7 @@ import {
 import { ADMIN_PROBLEM_LIST_CONFIG, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CONFIG, PROBLEM_UPLOAD_LIMITS, SUBMISSION_QUERY_CONFIG, TESTCASE_VIEWER_CONFIG, type ProblemFileRole, type ProblemType, type AdminProblemView, type AdminProblemSort } from '../constants';
 import { fullyPairedCaseNumbers, pairZippedTestcaseFiles } from './testcaseZipPairing';
 import { isUniqueViolation } from '../utils/dbErrors';
+import { ProblemViewerStats, ProblemViewerStatsRow, toProblemViewerStats } from './problemViewerStats';
 import { AppError } from '../middleware/errorHandler';
 import { getProblemFiles } from './problemFilesService';
 import { validateProblemFileSet } from '../utils/headerProblemFiles';
@@ -459,10 +460,8 @@ export const getProblemDetail = async (problemId: string): Promise<ProblemDetail
 };
 
 /** The problem page's per-viewer context: collection, the viewer's best submission, attempt count. */
-export interface ProblemViewerContext {
+export interface ProblemViewerContext extends ProblemViewerStats {
   collection: { id: number; name: string } | null;
-  viewerBest: { score: number; caseStatuses: string[] } | null;
-  viewerSubmissionCount: number;
 }
 
 export const getProblemViewerContext = async (
@@ -471,8 +470,7 @@ export const getProblemViewerContext = async (
 ): Promise<ProblemViewerContext> => {
   const result = await db.query<{
     collection_id: number | null; collection_name: string | null;
-    best_score: number | null; best_results: unknown; submission_count: number;
-  }>(`
+  } & ProblemViewerStatsRow>(`
     SELECT c.id AS collection_id, c.name AS collection_name,
       best.score AS best_score, best.results AS best_results,
       (SELECT COUNT(*)::int FROM submissions s WHERE s.user_id = $2 AND s.problem_id = p.id) AS submission_count
@@ -486,13 +484,9 @@ export const getProblemViewerContext = async (
     WHERE p.id = $1
   `, [problemId, userId]);
   const row = result.rows[0];
-  const caseStatuses = Array.isArray(row?.best_results)
-    ? (row!.best_results as { status?: unknown }[]).map((r) => String(r?.status ?? ''))
-    : [];
   return {
     collection: row?.collection_id != null ? { id: row.collection_id, name: row.collection_name ?? '' } : null,
-    viewerBest: row?.best_score != null ? { score: Number(row.best_score), caseStatuses } : null,
-    viewerSubmissionCount: Number(row?.submission_count ?? 0),
+    ...toProblemViewerStats(row),
   };
 };
 
@@ -1019,15 +1013,31 @@ export const updateAdminProblemsVisibility = async (
   return { updatedCount: result.rowCount ?? 0 };
 };
 
+export type UpdateProblemVisibilityResult =
+  | { kind: 'ok'; problem: Pick<ProblemRow, 'id' | 'title' | 'is_visible'> }
+  | { kind: 'not_found' }
+  | { kind: 'in_contest' };
+
+/**
+ * Single-problem visibility toggle. A6-01: a problem attached to a contest is
+ * refused (`in_contest`), like the filter-wide bulk path skips it — the
+ * contest keeps it hidden and restores its pre-contest visibility at the end,
+ * so a write here would either leak it or be silently undone.
+ */
 export const updateProblemVisibility = async (
   problemId: string,
   isVisible: boolean,
-): Promise<Pick<ProblemRow, 'id' | 'title' | 'is_visible'> | null> => {
+): Promise<UpdateProblemVisibilityResult> => {
   const result = await db.query<Pick<ProblemRow, 'id' | 'title' | 'is_visible'>>(
-    'UPDATE problems SET is_visible = $1 WHERE id = $2 RETURNING id, title, is_visible',
+    'UPDATE problems SET is_visible = $1 WHERE id = $2 AND contest_id IS NULL RETURNING id, title, is_visible',
     [isVisible, problemId]
   );
-  return result.rows[0] ?? null;
+  if (result.rows[0]) return { kind: 'ok', problem: result.rows[0] };
+  const existing = await db.query<Pick<ProblemRow, 'contest_id'>>(
+    'SELECT contest_id FROM problems WHERE id = $1',
+    [problemId],
+  );
+  return existing.rows[0] ? { kind: 'in_contest' } : { kind: 'not_found' };
 };
 
 export const updateProblemPdf = async (

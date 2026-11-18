@@ -1,5 +1,6 @@
 import { query } from '../db';
 import { ANALYTICS_TIMEZONE, SUBMISSION_STATUS } from '../constants';
+import { contestSubmissionsSql } from './contestSubmissionsSql';
 
 export interface OverviewKpi {
   current: number;
@@ -760,6 +761,11 @@ export const getContestAnalytics = async (contestId: number): Promise<ContestAna
   const contest = firstRow(contestResult.rows);
   if (!contest) return null;
 
+  // A5-04: the contest's submissions in every status — contest_submissions
+  // while it runs or finishes, its migrated `submissions` rows once finished
+  // (contest_problems and contest_scoreboards exist only after the finish).
+  const contestRows = contestSubmissionsSql('$1', 'id, contest_id, user_id, problem_id, overall_status, submitted_at');
+
   const kpiResult = await query<ContestKpiRow>(`
     SELECT
       (SELECT COUNT(*) FROM contest_scoreboards WHERE contest_id = $1) AS participants,
@@ -768,7 +774,7 @@ export const getContestAnalytics = async (contestId: number): Promise<ContestAna
       COUNT(*) FILTER (WHERE cs.overall_status = '${SUBMISSION_STATUS.ACCEPTED}') AS accepted,
       (SELECT AVG(total_score) FROM contest_scoreboards WHERE contest_id = $1) AS avg_score,
       (SELECT COALESCE(MAX(total_score), 0) FROM contest_scoreboards WHERE contest_id = $1) AS max_score
-    FROM contest_submissions cs
+    FROM ${contestRows} cs
     WHERE cs.contest_id = $1`,
     [contestId]);
 
@@ -776,7 +782,7 @@ export const getContestAnalytics = async (contestId: number): Promise<ContestAna
     SELECT
       'H' || (FLOOR(EXTRACT(EPOCH FROM (submitted_at - c.start_time)) / 3600)::int)::text AS bucket,
       COUNT(*) AS count
-    FROM contest_submissions cs
+    FROM ${contestRows} cs
     JOIN contests c ON c.id = cs.contest_id
     WHERE cs.contest_id = $1
     GROUP BY 1
@@ -797,7 +803,7 @@ export const getContestAnalytics = async (contestId: number): Promise<ContestAna
       ) AS ac_rate,
       COUNT(DISTINCT cs.user_id) FILTER (WHERE cs.overall_status = '${SUBMISSION_STATUS.ACCEPTED}') AS solvers
     FROM contest_problems cp
-    LEFT JOIN contest_submissions cs ON cs.contest_id = cp.contest_id AND cs.problem_id = cp.problem_id
+    LEFT JOIN ${contestRows} cs ON cs.contest_id = cp.contest_id AND cs.problem_id = cp.problem_id
     WHERE cp.contest_id = $1
     GROUP BY cp.problem_id, cp.title
     ORDER BY cp.problem_id`,
@@ -810,7 +816,7 @@ export const getContestAnalytics = async (contestId: number): Promise<ContestAna
       COUNT(DISTINCT cs.problem_id) FILTER (WHERE cs.overall_status = '${SUBMISSION_STATUS.ACCEPTED}') AS solved
     FROM contest_scoreboards sb
     JOIN users u ON u.id = sb.user_id
-    LEFT JOIN contest_submissions cs ON cs.contest_id = sb.contest_id AND cs.user_id = sb.user_id
+    LEFT JOIN ${contestRows} cs ON cs.contest_id = sb.contest_id AND cs.user_id = sb.user_id
     WHERE sb.contest_id = $1
     GROUP BY u.username, sb.total_score
     ORDER BY sb.total_score DESC, u.username`,

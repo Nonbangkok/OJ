@@ -3,6 +3,7 @@ import * as db from '../../db';
 import { migrateSubmissionsAfterContest } from '../../services/problemMigration';
 import cron from 'node-cron';
 import { logger } from '../../utils/logger';
+import { JUDGE_CONFIG } from '../../constants';
 
 jest.mock('../../db');
 jest.mock('../../services/problemMigration');
@@ -10,6 +11,11 @@ jest.mock('node-cron', () => ({
     schedule: jest.fn(() => ({ stop: jest.fn() })),
     setLogger: jest.fn(),
 }));
+
+// The attempt on the tick a contest ends waits up to the full drain timeout;
+// every later attempt (a retry of a deferred or failed migration) only briefly.
+const FULL_DRAIN = JUDGE_CONFIG.CONTEST_MIGRATION_DRAIN_TIMEOUT_MS;
+const RETRY_DRAIN = JUDGE_CONFIG.CONTEST_MIGRATION_RETRY_DRAIN_TIMEOUT_MS;
 
 describe('Contest Scheduler Service', () => {
     beforeEach(() => {
@@ -19,6 +25,7 @@ describe('Contest Scheduler Service', () => {
         (contestScheduler as any).isRunning = false;
         (contestScheduler as any).checkInterval = null;
         (contestScheduler as any).migrationFailures = new Map();
+        (contestScheduler as any).drainDeferrals = new Map();
         // Default: no contests to process (individual tests override with
         // mockResolvedValueOnce chains).
         (db.query as jest.Mock).mockResolvedValue({ rows: [] });
@@ -108,7 +115,7 @@ describe('Contest Scheduler Service', () => {
             await contestScheduler.checkContestStatus();
 
             expect(db.query).toHaveBeenNthCalledWith(3, expect.stringMatching(/UPDATE contests\s+SET status = 'finishing'/), [2]);
-            expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(2);
+            expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(2, { proceedWithJudgesInFlight: false, drainTimeoutMs: FULL_DRAIN });
 
             jest.useRealTimers();
         });
@@ -154,7 +161,7 @@ describe('Contest Scheduler Service', () => {
 
             await contestScheduler.checkContestStatus();
 
-            expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(3);
+            expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(3, { proceedWithJudgesInFlight: false, drainTimeoutMs: RETRY_DRAIN });
             // A finishing contest is not re-flipped to finishing.
             const updateCalls = (db.query as jest.Mock).mock.calls
                 .map((c) => String(c[0]))
@@ -236,10 +243,113 @@ describe('Contest Scheduler Service', () => {
             // may have been added by the skipped tick.
             releaseFirstTick();
             await firstTick;
-            expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(7);
+            expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(7, { proceedWithJudgesInFlight: false, drainTimeoutMs: FULL_DRAIN });
             expect(db.query).toHaveBeenCalledTimes(3);
 
             jest.useRealTimers();
+        });
+
+        describe('fairness: deferring contests never hold up other contests', () => {
+            it('flips every due contest (scheduled -> running, running -> finishing) before any finish migration', async () => {
+                jest.useFakeTimers().setSystemTime(new Date('2025-01-01T15:00:00Z'));
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce({ rows: [{ id: 10, title: 'Starts now' }] }) // start scheduled
+                    .mockResolvedValueOnce({}) // UPDATE 10 to running
+                    .mockResolvedValueOnce({ rows: [
+                        { id: 11, title: 'Deferred earlier', status: 'finishing' },
+                        { id: 12, title: 'Ends now', status: 'running' },
+                        { id: 13, title: 'Ends now too', status: 'running' },
+                    ] })
+                    .mockResolvedValue({}); // UPDATEs to finishing
+                (migrateSubmissionsAfterContest as jest.Mock).mockResolvedValue({ success: true });
+
+                await contestScheduler.checkContestStatus();
+
+                const calls = (db.query as jest.Mock).mock.calls;
+                const updates = calls
+                    .map(([sql, values], i) => ({ sql: String(sql), values, order: (db.query as jest.Mock).mock.invocationCallOrder[i] }))
+                    .filter((c) => c.sql.includes('UPDATE contests'));
+                expect(updates.map((u) => [u.sql.match(/status = '(\w+)'/)?.[1], u.values])).toEqual([
+                    ['running', [10]],
+                    ['finishing', [12]],
+                    ['finishing', [13]],
+                ]);
+                const firstMigration = Math.min(...(migrateSubmissionsAfterContest as jest.Mock).mock.invocationCallOrder);
+                expect(Math.max(...updates.map((u) => u.order))).toBeLessThan(firstMigration);
+                expect((migrateSubmissionsAfterContest as jest.Mock).mock.calls.map((c) => c[0])).toEqual([11, 12, 13]);
+
+                jest.useRealTimers();
+            });
+
+            it('waits the full drain on the tick a contest ends and only a few seconds on every retry', async () => {
+                expect(typeof RETRY_DRAIN).toBe('number');
+                expect(RETRY_DRAIN).toBeGreaterThan(0);
+                expect(RETRY_DRAIN).toBeLessThanOrEqual(5_000);
+                expect(RETRY_DRAIN).toBeLessThan(FULL_DRAIN);
+
+                const deferred = { success: false, deferred: true, message: 'deferred', migratedSubmissions: 0, finalScoreboard: 0 };
+                // Tick 1: the contest ends; its first attempt may wait the full drain.
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce({ rows: [] })
+                    .mockResolvedValueOnce({ rows: [{ id: 20, title: 'Rush', status: 'running' }] })
+                    .mockResolvedValueOnce({});
+                (migrateSubmissionsAfterContest as jest.Mock).mockResolvedValueOnce(deferred);
+                await contestScheduler.checkContestStatus();
+                expect(migrateSubmissionsAfterContest).toHaveBeenLastCalledWith(20, { proceedWithJudgesInFlight: false, drainTimeoutMs: FULL_DRAIN });
+
+                // Tick 2: deferred retry — a short wait, so the tick stays short.
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce({ rows: [] })
+                    .mockResolvedValueOnce({ rows: [{ id: 20, title: 'Rush', status: 'finishing' }] });
+                (migrateSubmissionsAfterContest as jest.Mock).mockResolvedValueOnce(deferred);
+                await contestScheduler.checkContestStatus();
+                expect(migrateSubmissionsAfterContest).toHaveBeenLastCalledWith(20, { proceedWithJudgesInFlight: false, drainTimeoutMs: RETRY_DRAIN });
+                expect((contestScheduler as any).drainDeferrals.get(20)).toBe(2);
+            });
+        });
+
+        describe('A5-02: judges still in flight at contest end', () => {
+            const finishingTick = async (contestId: number, result: unknown, first = false) => {
+                (db.query as jest.Mock).mockReset();
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce({ rows: [] }) // start scheduled (none)
+                    .mockResolvedValueOnce({ rows: [{ id: contestId, title: 'Rush', status: first ? 'running' : 'finishing' }] })
+                    .mockResolvedValueOnce({}); // UPDATE to finishing (first tick only)
+                (migrateSubmissionsAfterContest as jest.Mock).mockReset();
+                (migrateSubmissionsAfterContest as jest.Mock).mockResolvedValueOnce(result);
+                await contestScheduler.checkContestStatus();
+            };
+            const deferred = { success: false, deferred: true, message: 'deferred', migratedSubmissions: 0, finalScoreboard: 0 };
+
+            it('a deferred migration keeps the contest finishing without using up the failure retries', async () => {
+                // Far more deferrals than MIGRATION_MAX_RETRIES (5): every tick still tries.
+                for (let tick = 0; tick < 10; tick += 1) {
+                    await finishingTick(5, deferred, tick === 0);
+                    expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(5, expect.objectContaining({ proceedWithJudgesInFlight: false }));
+                }
+                expect((contestScheduler as any).migrationFailures.get(5)).toBeUndefined();
+                expect((contestScheduler as any).drainDeferrals.get(5)).toBe(10);
+                const allSql = (db.query as jest.Mock).mock.calls.map((c) => String(c[0]));
+                expect(allSql.some((sql) => sql.includes("'finished'"))).toBe(false);
+
+                // Judges drained: the next tick finishes and forgets the deferrals.
+                await finishingTick(5, { success: true });
+                expect((contestScheduler as any).drainDeferrals.has(5)).toBe(false);
+            });
+
+            it('after the deferral budget, finishes anyway with judges in flight', async () => {
+                for (let tick = 0; tick < 30; tick += 1) {
+                    await finishingTick(6, deferred, tick === 0);
+                }
+                expect(migrateSubmissionsAfterContest).toHaveBeenLastCalledWith(6, { proceedWithJudgesInFlight: false, drainTimeoutMs: RETRY_DRAIN });
+
+                await finishingTick(6, { success: true });
+                expect(migrateSubmissionsAfterContest).toHaveBeenCalledWith(6, { proceedWithJudgesInFlight: true, drainTimeoutMs: RETRY_DRAIN });
+                expect(console.error).toHaveBeenCalledWith(
+                    expect.stringMatching(/contest judges did not drain within the deferral budget.*contestId=6 .*deferrals=30/),
+                );
+                expect((contestScheduler as any).drainDeferrals.has(6)).toBe(false);
+            });
         });
     });
 

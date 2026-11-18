@@ -201,6 +201,38 @@ describe('ProblemManagement Component', () => {
             await waitFor(() => expect(adminService.updateProblemsMetadata).toHaveBeenLastCalledWith(['P1', 'P2'], { difficulty: null }));
         });
 
+        it('selection Show skips problems in a contest and says how many it skipped', async () => {
+            renderProblemManagement();
+            await row('P1');
+            fireEvent.click(screen.getByRole('checkbox', { name: 'Select problem P2' }));
+            fireEvent.click(screen.getByRole('checkbox', { name: 'Select problem P3' }));
+            fireEvent.click(within(screen.getByText('2 selected').closest('[role="status"]') as HTMLElement).getByRole('button', { name: 'Show' }));
+            await waitFor(() => expect(adminService.updateProblemVisibility).toHaveBeenCalledWith('P2', true));
+            expect(adminService.updateProblemVisibility).toHaveBeenCalledTimes(1);
+            expect(screen.getByText('1 problem in a contest was skipped.')).toBeInTheDocument();
+        });
+
+        it('a contest problem whose contest is finishing still shows In contest (its visibility is locked)', async () => {
+            (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(makePage([
+                { ...rows[2], contest_status: 'finishing' },
+            ]));
+            renderProblemManagement();
+            expect(within(await row('P3')).queryByRole('switch')).toBeNull();
+            expect(within(await row('P3')).getByText('In contest')).toBeInTheDocument();
+        });
+
+        it.each(['scheduled', 'running', 'finishing'])('the quick look of a problem in a %s contest says In contest, like its row', async (contestStatus) => {
+            (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(makePage([
+                { ...rows[2], is_visible: false, contest_status: contestStatus },
+            ]));
+            renderProblemManagement();
+            expect(within(await row('P3')).getByText('In contest')).toBeInTheDocument();
+            fireEvent.click(within(await row('P3')).getByText('Problem 3'));
+            const look = await screen.findByRole('dialog', { name: 'Problem 3' });
+            expect(within(look).getByText('In contest')).toBeInTheDocument();
+            expect(within(look).queryByText('Hidden')).toBeNull();
+        });
+
         it('clicking a row opens a quick look with the facts, links and a difficulty quick edit', async () => {
             renderProblemManagement();
             fireEvent.click(within(await row('P1')).getByText('Problem 1'));
@@ -371,6 +403,22 @@ describe('ProblemManagement Component', () => {
         expect(screen.getByText('33%')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Import ZIP' })).toBeInTheDocument();
         expect(container.querySelector('input[type="file"][accept=".zip"]')).toBe(fileInput);
+    });
+
+    it('Show Collection says contest problems are excluded and reports how many were skipped', async () => {
+        (jest.mocked(adminService.getCollections) as jest.Mock).mockResolvedValue([
+            { id: 7, name: 'Week 3', problem_count: 3, status: 'mixed', created_at: '', updated_at: '' },
+        ]);
+        (jest.mocked(adminService.setCollectionVisibility) as jest.Mock).mockResolvedValue({ message: '2 problems shown; 1 in a contest skipped', updated: 2, skipped: 1 });
+        window.history.replaceState({}, '', '/admin/problems?collection=7');
+        renderProblemManagement();
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Show Collection' }));
+        expect(screen.getByText(/show all 3 problems in "Week 3"\? \(Excluding those in contests\)/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
+
+        await waitFor(() => expect(adminService.setCollectionVisibility).toHaveBeenCalledWith(7, true));
+        expect(await screen.findByText('1 problem in a contest was skipped.')).toBeInTheDocument();
     });
 
     it('handles visibility toggle', async () => {

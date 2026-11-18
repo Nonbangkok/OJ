@@ -60,6 +60,17 @@ describe('ProblemDetail inside a contest', () => {
     expect(submissionService.submit).not.toHaveBeenCalled();
   });
 
+  it("shows the viewer's contest attempt count and best result the contest detail sends (A7-03)", async () => {
+    jest.mocked(problemService.getContestProblemDetails).mockResolvedValue({
+      id: 'interval', title: 'Interval merge', time_limit_ms: 1000, memory_limit_mb: 256, has_pdf: false, problem_type: 'standard',
+      viewerBest: { score: 60, caseStatuses: ['Accepted', 'Accepted', 'Wrong Answer'] },
+      viewerSubmissionCount: 3,
+    } as never);
+    renderAt(contest());
+    expect(await screen.findByRole('tab', { name: 'Submissions 3' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '2 of 3 test cases passed' })).toBeInTheDocument();
+  });
+
   it('finishing shows the same closed notice', async () => {
     renderAt(contest({ status: 'finishing', end_time: new Date(Date.now() - 1000).toISOString() }));
     expect(await screen.findByText(/Contest ended — submissions closed\./)).toBeInTheDocument();

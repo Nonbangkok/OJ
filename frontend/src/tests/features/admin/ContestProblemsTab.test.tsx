@@ -95,6 +95,7 @@ describe('ContestProblemsTab', () => {
     fireEvent.click(within(rows()[1]).getByRole('button', { name: 'Remove P2' }));
     const dialog = await screen.findByRole('dialog', { name: 'Remove Two sums?' });
     expect(dialog).toHaveTextContent('returns it to the practice set');
+    expect(dialog).toHaveTextContent('Points scored on it stop counting in the standings.');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove problem' }));
     await waitFor(() => expect(adminService.removeContestProblem).toHaveBeenCalledWith(7, 'P2'));
     await waitFor(() => expect(rows()).toHaveLength(2));

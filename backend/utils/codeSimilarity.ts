@@ -127,23 +127,43 @@ export const buildShingles = (normalized: string, k = SHINGLE_SIZE): Set<string>
   return shingles;
 };
 
+const withoutShingles = (shingles: Set<string>, ignore?: ReadonlySet<string>): Set<string> =>
+  ignore && ignore.size > 0 ? new Set([...shingles].filter((shingle) => !ignore.has(shingle))) : shingles;
+
 /** True when a source is too short to produce a meaningful comparison. */
 export const isTooShortForComparison = (normalized: string): boolean =>
   normalized.split(' ').length <= SHINGLE_SIZE;
 
 /**
+ * Every shingle of the given template sources (e.g. a header problem's
+ * starter files), for `similarity`'s `ignore` set.
+ */
+export const templateShingles = (sources: readonly string[]): Set<string> => {
+  const shingles = new Set<string>();
+  for (const source of sources) {
+    for (const shingle of buildShingles(normalizeSource(source))) shingles.add(shingle);
+  }
+  return shingles;
+};
+
+/**
  * Jaccard similarity of the two sources' shingle sets, in [0, 1].
  * Returns 0 when either side is too short to compare.
+ *
+ * `ignore` (A5-05): shingles both sides were given to start from, such as a
+ * header problem's starter files. They are removed from both sets first, so
+ * only what each author wrote is compared; a source that adds nothing to the
+ * template scores 0 against anything.
  */
-export const similarity = (codeA: string, codeB: string): number => {
+export const similarity = (codeA: string, codeB: string, ignore?: ReadonlySet<string>): number => {
   const normA = normalizeSource(codeA);
   const normB = normalizeSource(codeB);
   if (isTooShortForComparison(normA) || isTooShortForComparison(normB)) {
     return 0;
   }
 
-  const shinglesA = buildShingles(normA);
-  const shinglesB = buildShingles(normB);
+  const shinglesA = withoutShingles(buildShingles(normA), ignore);
+  const shinglesB = withoutShingles(buildShingles(normB), ignore);
 
   let intersection = 0;
   for (const shingle of shinglesA) {

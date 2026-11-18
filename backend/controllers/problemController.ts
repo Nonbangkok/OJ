@@ -189,10 +189,12 @@ router.get('/problems/:id',
 
   const isStaffOrAdmin = req.user?.role === USER_ROLES.ADMIN || req.user?.role === USER_ROLES.STAFF;
 
-  if (!problemDetail.is_visible && !isStaffOrAdmin) {
+  if ((!problemDetail.is_visible || problemDetail.contest_id !== null) && !isStaffOrAdmin) {
     // Hidden problems are indistinguishable from nonexistent ones for
     // non-staff callers: a 403 with the title in the body was an enumeration
-    // oracle (PROBLEM-002). Staff still get the full detail below.
+    // oracle (PROBLEM-002). Staff still get the full detail below. A problem
+    // attached to a contest is never a public standalone problem, whatever
+    // its is_visible says (A6-01) — the same rule as the PDF and starter routes.
     throw new AppError('Problem not found', 404);
   }
 
@@ -433,13 +435,18 @@ router.put('/admin/problems/:id/visibility', requireAuth, requireStaffOrAdmin,
   const id = String(req.params.id);
   const { isVisible } = req.body as UpdateProblemVisibilityRequestBody;
 
-  const updatedProblem = await updateProblemVisibility(id, isVisible);
-  if (!updatedProblem) {
+  const result = await updateProblemVisibility(id, isVisible);
+  if (result.kind === 'not_found') {
     throw new AppError('Problem not found', 404);
+  }
+  if (result.kind === 'in_contest') {
+    // A6-01: a contest problem stays hidden while the contest owns it and gets
+    // its pre-contest visibility back when the contest finishes.
+    throw new AppError('This problem is in a contest. Its visibility can change once the contest finishes or the problem is removed from it.', 409);
   }
   res.json({
     message: `Problem ${id} visibility updated successfully`,
-    problem: updatedProblem
+    problem: result.problem
   });
 }));
 
@@ -517,13 +524,17 @@ router.put('/admin/collections/:id/visibility', requireAuth, requireStaffOrAdmin
   validateRequest({ params: collectionIdParamSchema, body: collectionVisibilityBodySchema }),
   asyncHandler(async (req: Request, res: Response) => {
     const { isVisible } = req.body as { isVisible: boolean };
-    const updated = await setCollectionVisibility(Number(req.params.id), isVisible);
-    if (updated === null) {
+    const result = await setCollectionVisibility(Number(req.params.id), isVisible);
+    if (result === null) {
       throw new AppError('Collection not found', 404);
     }
+    const { updated, skipped } = result;
+    // A6-01: members attached to a contest are skipped and reported.
+    const skippedNote = skipped > 0 ? `; ${skipped} in a contest skipped` : '';
     res.json({
-      message: `${updated} problem${updated === 1 ? '' : 's'} ${isVisible ? 'shown' : 'hidden'}`,
+      message: `${updated} problem${updated === 1 ? '' : 's'} ${isVisible ? 'shown' : 'hidden'}${skippedNote}`,
       updated,
+      skipped,
     });
   }));
 

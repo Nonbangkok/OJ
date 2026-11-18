@@ -78,10 +78,8 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     });
 
     // The running-contest detail reads `problems` directly. (The finished
-    // contest reads the `contest_problems` snapshot instead; that query is
-    // covered by tests/services/contestParticipantStarterFlag.test.ts, because
-    // it selects cp.problem_pdf, a column no migration creates — a
-    // pre-existing defect, unrelated to this flag.)
+    // contest reads the `contest_problems` snapshot instead; see
+    // tests/integration/finishedContestProblemDetail.test.ts.)
     it('is false for a standard contest problem that still has starter files', async () => {
       const user = await pool.query(
         `INSERT INTO users (username, password_hash, role) VALUES ('hpf-user', 'x', 'user') RETURNING id`,
