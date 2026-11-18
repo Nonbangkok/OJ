@@ -77,18 +77,29 @@ export const generalApiKey = (req: Request): string => {
  * The authoring routes are staff-only, so they get no path-based skip: a
  * path skip there would only ever exempt anonymous and user-role callers,
  * who are refused by those routes anyway.
- * SSE realtime streams are excluded for everyone — each is one long-lived
- * request per open page, not a request budget item.
+ * The SSE realtime streams are excluded for everyone: each is one long-lived
+ * request per open page, not a request budget item. Only the bodiless GET an
+ * EventSource sends to one of the two stream routes is skipped. The JSON
+ * parser runs after this limiter and before routing, so skipping any other
+ * request under /realtime/ (another method, another path, a GET with a body)
+ * would hand anonymous callers an unthrottled inflate + JSON.parse.
  */
-const GENERAL_LIMIT_SKIP_PATHS = [
-  '/realtime/', // SSE streams — one request per page view, held open indefinitely
-] as const;
+const SSE_STREAM_PATHS: readonly RegExp[] = [
+  /^\/realtime\/submissions$/,
+  /^\/realtime\/contests\/[^/]+$/,
+];
+
+const hasRequestBody = (req: Request): boolean =>
+  req.headers['transfer-encoding'] !== undefined || Number(req.headers['content-length'] ?? 0) > 0;
+
+const isSseStreamRequest = (req: Request): boolean =>
+  req.method === 'GET' && !hasRequestBody(req) && SSE_STREAM_PATHS.some((pattern) => pattern.test(req.path));
 
 /** Exported for tests: pins who and which routes are excluded from the general limiter. */
 export const skipGeneralLimit = (req: Request): boolean => {
   if (isTestEnv(req)) return true;
   if (isPrivilegedUser(req)) return true;
-  return GENERAL_LIMIT_SKIP_PATHS.some((prefix) => req.path.startsWith(prefix));
+  return isSseStreamRequest(req);
 };
 
 export const generalApiLimiter: RateLimitRequestHandler = rateLimit({

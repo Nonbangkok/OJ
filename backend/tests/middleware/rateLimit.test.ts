@@ -13,14 +13,18 @@ describe('general API limiter skip paths', () => {
     jest.resetModules();
   });
 
-  const skipped = (path: string, role?: string): boolean => {
+  const skipped = (
+    path: string,
+    role?: string,
+    { method = 'GET', headers = {} }: { method?: string; headers?: Record<string, string> } = {},
+  ): boolean => {
     jest.resetModules();
     process.env.NODE_ENV = 'production';
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { skipGeneralLimit } = require('../../middleware/rateLimit') as {
       skipGeneralLimit: (req: SkipRequest) => boolean;
     };
-    return skipGeneralLimit({ path, ...(role ? { user: { role } } : {}) } as SkipRequest);
+    return skipGeneralLimit({ path, method, headers, ...(role ? { user: { role } } : {}) } as SkipRequest);
   };
 
   it('skips a route-agnostic request when the session is staff/admin (revalidated req.user role)', () => {
@@ -66,6 +70,31 @@ describe('general API limiter skip paths', () => {
   it('skips SSE realtime streams', () => {
     expect(skipped('/realtime/submissions')).toBe(true);
     expect(skipped('/realtime/contests/5')).toBe(true);
+    expect(skipped('/realtime/contests/5', 'user')).toBe(true);
+  });
+
+  // The JSON parser runs after the limiter and before routing, so a skipped
+  // request with a body is an unthrottled inflate + JSON.parse for anyone.
+  // Only the bodiless GET an EventSource sends to a stream route is skipped.
+  it('counts any other method under /realtime/', () => {
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+      expect(skipped('/realtime/submissions', undefined, { method })).toBe(false);
+      expect(skipped('/realtime/contests/5', undefined, { method })).toBe(false);
+      expect(skipped('/realtime/anything', undefined, { method })).toBe(false);
+    }
+  });
+
+  it('counts GETs under /realtime/ that are not one of the two stream routes', () => {
+    expect(skipped('/realtime/anything')).toBe(false);
+    expect(skipped('/realtime/contests')).toBe(false);
+    expect(skipped('/realtime/contests/5/extra')).toBe(false);
+    expect(skipped('/realtime/submissions/extra')).toBe(false);
+  });
+
+  it('counts a stream GET that carries a body', () => {
+    expect(skipped('/realtime/submissions', undefined, { headers: { 'content-length': '140' } })).toBe(false);
+    expect(skipped('/realtime/contests/5', undefined, { headers: { 'transfer-encoding': 'chunked' } })).toBe(false);
+    expect(skipped('/realtime/submissions', undefined, { headers: { 'content-length': '0' } })).toBe(true);
   });
 
   it('does not skip unrelated routes', () => {
