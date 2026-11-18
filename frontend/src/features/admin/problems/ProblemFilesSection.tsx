@@ -24,7 +24,7 @@ const ROLES: Array<{ role: ProblemFileRole; name: string; note: string; rule: st
     role: 'starter',
     name: 'Starter files',
     note: 'What students download from the problem page to work from.',
-    rule: 'Flat ZIP, up to 20 files, 1 MiB each.',
+    rule: 'Flat ZIP, up to 20 files, 1 MiB each. Any header students #include by name must be in this set.',
   },
 ];
 
