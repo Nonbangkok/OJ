@@ -380,7 +380,15 @@ Key judging properties:
 
 ### Database Import / Maintenance Mode
 
-Admin database import runs `DROP SCHEMA public CASCADE` + `pg_restore` as a background job. While it runs, `services/maintenanceMode.ts` activates a global gate: every request except health checks and the token-authenticated import-progress endpoint answers 503, and the contest scheduler skips ticks. Imports are single-flight (a second concurrent import gets 409). Exports use `pg_dump --exclude-table=user_sessions` (sessions are runtime state).
+Admin database import (`services/adminDatabaseService.ts`) first validates the upload, before maintenance mode starts: a `.dump`/`.tar` must pass `pg_restore --list`; a `.sql` must be plain pg_dump output (header, "dump complete" footer, and no line starting with a backslash outside COPY data except pg_dump 18's own `\restrict`/`\unrestrict`). Anything else gets a 400 and nothing is touched. The background job then:
+
+1. Quiesces background work: it awaits a running contest-scheduler tick, pauses the judge queue and waits for running judge tasks, and waits for a running authoring reconcile pass. The coordinator skips ticks while maintenance is active. Each wait is bounded (`DATABASE_IMPORT.QUIESCE_TIMEOUT_MS`), and a timeout fails the import with nothing dropped.
+2. Takes a safety copy (`pg_dump -Fc`, sessions included) into a private 0700 `fs.mkdtemp` directory.
+3. Runs `DROP SCHEMA public CASCADE`, then restores the upload as a single transaction. Archives use `pg_restore --no-owner --no-privileges --single-transaction --exit-on-error`. A `.sql` goes to `psql -X -v ON_ERROR_STOP=1 --single-transaction -f -` on stdin, behind a `\restrict` with a fresh random key, so psql refuses every meta-command in the file. The job then ensures `user_sessions` exists and runs the migrations.
+4. On any failure it drops the schema again and restores the safety copy. If that restore fails too, the copy is kept and its path is reported.
+5. On success it discards the stale pre-import judge queue and its in-flight registry, runs `sweepOrphanedSubmissions()` as a boot would, removes the copy, and ends maintenance.
+
+While it runs, `services/maintenanceMode.ts` activates a global gate: every request except health checks and the token-authenticated import-progress endpoint answers 503. Imports are single-flight (a second concurrent import gets 409). pg client tools (`utils/runCommand.ts`) get only PATH plus `PGPASSWORD`, never the backend's environment. Exports use `pg_dump --exclude-table=user_sessions` (sessions are runtime state). The restore still connects as the database superuser, so an admin upload can run server-side SQL such as `COPY ... PROGRAM`; that remains part of the admin trust boundary.
 
 ### Contest Lifecycle
 
