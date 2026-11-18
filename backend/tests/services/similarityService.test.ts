@@ -23,6 +23,8 @@ const rows = (...submissions: Array<{ id: number; user_id: number; username: str
 describe('similarityService.findSimilarContestPairs', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // The header-problem starter lookup (none of these problems has starter files).
+    mockQuery.mockResolvedValue({ rows: [] } as never);
   });
 
   it('reports renamed-copy pairs above the threshold', async () => {
@@ -86,6 +88,29 @@ describe('similarityService.findSimilarContestPairs', () => {
     const pairs = await findSimilarContestPairs(5, 1.1); // impossible threshold
 
     expect(pairs).toHaveLength(0);
+  });
+
+  it('sets aside the starter files of the header problems it compares (A5-05)', async () => {
+    const template = `#include "pair.h"
+bool CP::pair::operator<(const CP::pair &other) const {
+  // Your code here
+  return false;
+}
+void CP::pair::make_min(const CP::pair &other) { if (other < *this) { first = other.first; second = other.second; } }`;
+    mockQuery
+      .mockResolvedValueOnce(rows(
+        { id: 1, user_id: 1, username: 'alice', problem_id: 'hp', code: template.replace('return false;', 'if (first < other.first) return true; if (other.first < first) return false; return second < other.second;') },
+        { id: 2, user_id: 2, username: 'bob', problem_id: 'hp', code: template.replace('return false;', 'return first < other.first || (!(other.first < first) && second < other.second);') },
+      ) as never)
+      .mockResolvedValueOnce({ rows: [{ problem_id: 'hp', content: Buffer.from(template) }] } as never);
+
+    const pairs = await findSimilarContestPairs(5, 0.3);
+
+    expect(pairs).toHaveLength(0);
+    const starterSql = String(mockQuery.mock.calls[1][0]);
+    expect(starterSql).toContain("f.role = 'starter'");
+    expect(starterSql).toContain("p.problem_type = 'header'");
+    expect(mockQuery.mock.calls[1][1]).toEqual([['hp']]);
   });
 
   it('queries by contest id with latest-per-user-problem ordering', async () => {

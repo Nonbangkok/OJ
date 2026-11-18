@@ -1,5 +1,5 @@
 import { query } from '../db';
-import { isTooShortForComparison, normalizeSource, similarity } from '../utils/codeSimilarity';
+import { isTooShortForComparison, normalizeSource, similarity, templateShingles } from '../utils/codeSimilarity';
 import { contestSubmissionsSql } from './contestSubmissionsSql';
 
 /** Default similarity cutoff reported to staff (tunable per request). */
@@ -31,10 +31,36 @@ interface SubmissionRow {
 }
 
 /**
+ * A5-05: on a header problem every student starts from the same starter
+ * files (the student.h template, main.cpp, the data-structure header), so
+ * two independent solutions share most of their tokens. Their shingles are
+ * set aside before comparing, per header problem.
+ */
+const loadHeaderStarterShingles = async (problemIds: string[]): Promise<Map<string, Set<string>>> => {
+    const starters = new Map<string, Set<string>>();
+    if (problemIds.length === 0) return starters;
+    const files = await query<{ problem_id: string; content: Buffer }>(`
+        SELECT f.problem_id, f.content
+        FROM problem_files f
+        JOIN problems p ON p.id = f.problem_id
+        WHERE f.problem_id = ANY($1::text[]) AND f.role = 'starter' AND p.problem_type = 'header'
+    `, [problemIds]);
+    const sources = new Map<string, string[]>();
+    for (const file of files.rows) {
+        const list = sources.get(file.problem_id) ?? [];
+        list.push(Buffer.from(file.content).toString('utf8'));
+        sources.set(file.problem_id, list);
+    }
+    for (const [problemId, list] of sources) starters.set(problemId, templateShingles(list));
+    return starters;
+};
+
+/**
  * Pairwise similarity between different users' contest submissions for the
  * same problem. Staff-facing cheat detection: reports pairs at or above
  * SIMILARITY_THRESHOLD. Skips trivially short sources (nothing to compare)
- * and self-comparisons.
+ * and self-comparisons. On header problems only what each student added to
+ * the starter files is compared.
  */
 export const findSimilarContestPairs = async (
     contestId: number,
@@ -64,9 +90,12 @@ export const findSimilarContestPairs = async (
         grouped.set(row.problem_id, list);
     }
 
+    const starters = await loadHeaderStarterShingles([...grouped.keys()]);
+
     const pairs: SimilarPair[] = [];
     for (const [problemId, submissions] of grouped) {
         const bounded = submissions.slice(0, MAX_SUBMISSIONS_PER_PROBLEM);
+        const ignore = starters.get(problemId);
         // Pre-normalise once; similarity of raw code would re-normalise twice.
         const normalized = new Map<number, string>();
         for (const submission of bounded) {
@@ -83,7 +112,7 @@ export const findSimilarContestPairs = async (
                 if (!normA || !normB || isTooShortForComparison(normA) || isTooShortForComparison(normB)) {
                     continue;
                 }
-                const score = similarity(a.code, b.code);
+                const score = similarity(a.code, b.code, ignore);
                 if (score >= threshold) {
                     pairs.push({
                         problemId,

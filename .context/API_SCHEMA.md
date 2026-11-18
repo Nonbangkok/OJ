@@ -368,6 +368,7 @@
 - Purpose: contest cheat detection — คู่ user ต่างคนที่ submission ล่าสุดของโจทย์เดียวกันคล้ายกันหลัง normalize
 - Query (optional): `threshold` (0, 1] — default 0.6
 - Response 200: `{ contestId, pairs: [...] }`
+- header problem: ตัด shingle ของ starter files (`problem_files` role `starter`) ออกจากทั้งสองฝั่งก่อนคำนวณ Jaccard — เทียบเฉพาะส่วนที่นักเรียนเขียนเพิ่มจาก template; ส่ง starter มาเปล่า ๆ ได้ 0
 - ทุก status ของ contest: running/finishing อ่าน `contest_submissions`; finished อ่าน submission ที่ถูกย้ายไป `submissions` (`contest_id` = contest นี้, migration 0029) — `submissionIdA/B` ของ contest ที่ finished จึงเป็น id ใน practice pool. contest ที่ finish ก่อน 0029 ไม่มีแถวที่ผูกไว้ → `pairs: []`
 
 ---
