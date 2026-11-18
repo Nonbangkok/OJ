@@ -60,8 +60,8 @@ export const validateAndQueueSubmission = async (
     }
 
     if (contestId) {
-        const contestResult = await db.query<ContestRuntimeRow>(
-            'SELECT id, status, start_time, end_time FROM contests WHERE id = $1',
+        const contestResult = await db.query<ContestRuntimeRow & { is_visible: boolean }>(
+            'SELECT id, status, start_time, end_time, is_visible FROM contests WHERE id = $1',
             [contestId],
         );
         if (contestResult.rows.length === 0) {
@@ -69,6 +69,13 @@ export const validateAndQueueSubmission = async (
         }
 
         const contest = contestResult.rows[0];
+        // A5-08: a hidden contest reads as nonexistent on every surface for
+        // non-staff, so it takes no submissions either, even from users who
+        // joined before it was hidden. Checked before the time/status gates
+        // so the answer never reveals more than "not found".
+        if (!contest.is_visible && !isContestManagementRole({ role })) {
+            throw new AppError('Contest not found.', 404);
+        }
         // Wall-clock gate (XSYS-003 / CONTEST-001): the scheduler-updated
         // status is the display/backstop, not the authority — it only ticks
         // once a minute, so between end_time and the next tick (or worse,
@@ -179,12 +186,22 @@ export const getSubmissions = async (
             throw new AppError('You must join this contest to view its submissions.', 403);
         }
 
+        let caseStatusesSql = `COALESCE((SELECT jsonb_agg(r->>'status') FROM jsonb_array_elements(
+                CASE WHEN jsonb_typeof(cs.results) = 'array' THEN cs.results ELSE '[]'::jsonb END) r), '[]'::jsonb)`;
+        // A5-09: until the contest finishes, per-case verdicts are private to
+        // their submitter (the live scoreboard withholds them for the same
+        // reason). Rivals' rows keep their overall verdict and score, with an
+        // empty case strip; staff see everything.
+        if (!isStaffOrAdmin && contestResult.rows[0].status !== CONTEST_STATUS.FINISHED) {
+            params.push(userId);
+            caseStatusesSql = `CASE WHEN cs.user_id = $${params.length} THEN ${caseStatusesSql} ELSE '[]'::jsonb END`;
+        }
+
         queryText = `
             SELECT
               cs.id, u.username, cs.problem_id, p.title AS problem_title,
               cs.overall_status, cs.score, cs.language, cs.submitted_at,
-              COALESCE((SELECT jsonb_agg(r->>'status') FROM jsonb_array_elements(
-                CASE WHEN jsonb_typeof(cs.results) = 'array' THEN cs.results ELSE '[]'::jsonb END) r), '[]'::jsonb) AS case_statuses,
+              ${caseStatusesSql} AS case_statuses,
               cs.max_time_ms, cs.max_memory_kb
             FROM contest_submissions cs
             JOIN users u ON cs.user_id = u.id

@@ -149,7 +149,7 @@ describe('Submission Controller', () => {
             (db.query as jest.Mock)
                 .mockResolvedValueOnce({ rows: [{ 1: 1 }] }) // testcase exists check (DB-06)
                 .mockResolvedValueOnce({
-                    rows: [{ id: 1, status: 'running', start_time: new Date(Date.now() - 3600_000), end_time: new Date(Date.now() + 3600_000) }]
+                    rows: [{ id: 1, status: 'running', start_time: new Date(Date.now() - 3600_000), end_time: new Date(Date.now() + 3600_000), is_visible: true }]
                 }) // contest exists + running
                 .mockResolvedValueOnce({ rows: [{ exists: 1 }] }) // participant check
                 .mockResolvedValueOnce({ rows: [{ exists: 1 }] }) // problem in contest
@@ -170,7 +170,7 @@ describe('Submission Controller', () => {
             (db.query as jest.Mock)
                 .mockResolvedValueOnce({ rows: [{ 1: 1 }] }) // testcase exists check (DB-06)
                 .mockResolvedValueOnce({
-                    rows: [{ id: 1, status: 'running', start_time: new Date(Date.now() - 3600_000), end_time: new Date(Date.now() + 3600_000) }]
+                    rows: [{ id: 1, status: 'running', start_time: new Date(Date.now() - 3600_000), end_time: new Date(Date.now() + 3600_000), is_visible: true }]
                 })
                 .mockResolvedValueOnce({ rows: [] }); // participant check
 
@@ -186,7 +186,7 @@ describe('Submission Controller', () => {
             (db.query as jest.Mock)
                 .mockResolvedValueOnce({ rows: [{ 1: 1 }] }) // testcase exists check (DB-06)
                 .mockResolvedValueOnce({
-                    rows: [{ id: 1, status: 'scheduled', start_time: new Date(Date.now() - 3600_000), end_time: new Date(Date.now() + 3600_000) }]
+                    rows: [{ id: 1, status: 'scheduled', start_time: new Date(Date.now() - 3600_000), end_time: new Date(Date.now() + 3600_000), is_visible: true }]
                 });
 
             const res = await request(app)

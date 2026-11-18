@@ -236,7 +236,7 @@ describe('submissionQueryService visibility (PROBLEM-001 / SUB-001 / SUB-002)', 
             contestId: '1',
         };
         const contestRow = (start: Date, end: Date) => ({
-            id: 1, status: 'running', start_time: start, end_time: end,
+            id: 1, status: 'running', start_time: start, end_time: end, is_visible: true,
         });
 
         it('accepts a submission while the contest is genuinely inside its window', async () => {
