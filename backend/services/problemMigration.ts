@@ -7,6 +7,7 @@ import {
   SUBMISSION_STATUS,
 } from '../constants';
 import { logger } from '../utils/logger';
+import { AppError } from '../middleware/errorHandler';
 import { ContestRow } from '../types/models';
 import { solveRewardXpSql } from './progressionService';
 import { publishRealtime } from './realtimeHub';
@@ -115,7 +116,10 @@ export const moveProblemsToContest = async (contestId: number, problemIds: strin
  * @param outerClient - Run inside the caller's open transaction instead of a
  *   transaction of its own (the contest-end migration passes its client, so
  *   the move commits or rolls back together with the rest of the finish).
+ *   The caller has already checked the contest, so no status guard runs.
  * @returns Result object with success status and details
+ * @throws AppError 404 for an unknown contest; 409 (standalone call only) once
+ *   the contest has ended, see the guard below.
  */
 export const moveProblemsBackToMain = async (
   contestId: number,
@@ -125,16 +129,36 @@ export const moveProblemsBackToMain = async (
   const client: PoolClient = outerClient ?? await db.pool.connect();
 
   try {
-    if (!outerClient) await client.query('BEGIN');
+    if (!outerClient) {
+      await client.query('BEGIN');
 
-    // Check if contest exists
-    const contestResult = await client.query<ContestStatusRow>(
-      'SELECT id, status FROM contests WHERE id = $1',
-      [contestId]
-    );
-
-    if (contestResult.rows.length === 0) {
-      throw new Error('Contest not found');
+      // The standings, live and in the finish snapshot, count only problems
+      // whose contest_id is this contest (A5-03). Moving them out after the
+      // contest has ended would rewrite the final result: during 'finishing'
+      // (which lasts while the judges drain) the snapshot would lose every
+      // score. So the admin route may only move problems back while the
+      // contest is scheduled or running AND before its end time (a contest
+      // past end_time is over; the scheduler just has not flipped it yet).
+      // FOR UPDATE makes the scheduler's flip to 'finishing' wait for this
+      // transaction, so a move that passed the check is committed before the
+      // finish snapshot is taken.
+      const contestResult = await client.query<ContestStatusRow & { ended: boolean }>(
+        'SELECT id, status, end_time <= NOW() AS ended FROM contests WHERE id = $1 FOR UPDATE',
+        [contestId]
+      );
+      const contest = contestResult.rows[0];
+      if (!contest) {
+        throw new AppError('Contest not found', 404);
+      }
+      const beforeEnd = (contest.status === CONTEST_STATUS.SCHEDULED || contest.status === CONTEST_STATUS.RUNNING)
+        && !contest.ended;
+      if (!beforeEnd) {
+        throw new AppError(
+          'Problems can only be moved back to the main system before the contest ends; '
+          + 'its final standings are taken from the problems still in it',
+          409,
+        );
+      }
     }
 
     // Build query dynamically. XSYS-004: restore the pre-contest visibility
@@ -168,7 +192,10 @@ export const moveProblemsBackToMain = async (
 
   } catch (error) {
     if (!outerClient) await client.query('ROLLBACK');
-    logger.error('failed to move problems back to main', { err: error });
+    // A refusal (404/409) is the caller's answer, not a server fault.
+    if (!(error instanceof AppError)) {
+      logger.error('failed to move problems back to main', { err: error });
+    }
     throw error;
   } finally {
     if (!outerClient) client.release();

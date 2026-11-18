@@ -100,7 +100,7 @@ describe('Problem Migration Service', () => {
         it('should successfully move specific problems back to main', async () => {
             (mockClient.query as jest.Mock)
                 .mockResolvedValueOnce(undefined) // BEGIN
-                .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // check contest
+                .mockResolvedValueOnce({ rows: [{ id: 1, status: 'running', ended: false }] }) // check contest
                 .mockResolvedValueOnce({ rows: [{ id: 'P1' }] }) // UPDATE
                 .mockResolvedValueOnce(undefined); // COMMIT
 
@@ -117,7 +117,7 @@ describe('Problem Migration Service', () => {
         it('should move all problems if no specific problemIds are provided', async () => {
             (mockClient.query as jest.Mock)
                 .mockResolvedValueOnce(undefined) // BEGIN
-                .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // check contest
+                .mockResolvedValueOnce({ rows: [{ id: 1, status: 'running', ended: false }] }) // check contest
                 .mockResolvedValueOnce({ rows: [{ id: 'P1' }, { id: 'P2' }] }) // UPDATE
                 .mockResolvedValueOnce(undefined); // COMMIT
 
@@ -134,7 +134,7 @@ describe('Problem Migration Service', () => {
         it('bulk move-back no longer force-publishes hidden problems (XSYS-004/CONTEST-006)', async () => {
             (mockClient.query as jest.Mock)
                 .mockResolvedValueOnce(undefined) // BEGIN
-                .mockResolvedValueOnce({ rows: [{ id: 1 }] })
+                .mockResolvedValueOnce({ rows: [{ id: 1, status: 'running', ended: false }] })
                 .mockResolvedValueOnce({ rows: [] })
                 .mockResolvedValueOnce(undefined); // COMMIT
 
@@ -145,6 +145,61 @@ describe('Problem Migration Service', () => {
             expect(updateSql).not.toContain('is_visible = TRUE');
             // Legacy rows without a snapshot keep the old (visible) behavior.
             expect(updateSql).toContain('COALESCE(is_visible_before_contest, TRUE)');
+        });
+
+        it('locks the contest row, so the scheduler cannot end the contest mid-move', async () => {
+            (mockClient.query as jest.Mock)
+                .mockResolvedValueOnce(undefined) // BEGIN
+                .mockResolvedValueOnce({ rows: [{ id: 1, status: 'running', ended: false }] })
+                .mockResolvedValueOnce({ rows: [] })
+                .mockResolvedValueOnce(undefined); // COMMIT
+
+            await moveProblemsBackToMain(1, ['P1']);
+
+            const lookupSql = String((mockClient.query as jest.Mock).mock.calls[1][0]);
+            expect(lookupSql).toMatch(/FROM contests WHERE id = \$1 FOR UPDATE/);
+        });
+
+        it.each([
+            ['finishing', true],
+            ['finished', true],
+            ['running', true], // past its end time, the scheduler has not flipped it yet
+        ])('refuses a %s contest (ended: %s) with 409 and moves nothing', async (status, ended) => {
+            (mockClient.query as jest.Mock)
+                .mockResolvedValueOnce(undefined) // BEGIN
+                .mockResolvedValueOnce({ rows: [{ id: 1, status, ended }] })
+                .mockResolvedValueOnce(undefined); // ROLLBACK
+
+            await expect(moveProblemsBackToMain(1, ['P1'])).rejects.toMatchObject({
+                statusCode: 409,
+                message: expect.stringMatching(/before the contest ends/i),
+            });
+            const statements = (mockClient.query as jest.Mock).mock.calls.map(([text]) => String(text));
+            expect(statements.some((t) => t.includes('SET contest_id = NULL'))).toBe(false);
+            expect(statements).toContain('ROLLBACK');
+            expect(mockClient.release).toHaveBeenCalled();
+        });
+
+        it('answers 404 for an unknown contest', async () => {
+            (mockClient.query as jest.Mock)
+                .mockResolvedValueOnce(undefined) // BEGIN
+                .mockResolvedValueOnce({ rows: [] })
+                .mockResolvedValueOnce(undefined); // ROLLBACK
+
+            await expect(moveProblemsBackToMain(99, ['P1'])).rejects.toMatchObject({ statusCode: 404, message: 'Contest not found' });
+        });
+
+        it("inside the finish migration's transaction it trusts the caller's status check", async () => {
+            (mockClient.query as jest.Mock).mockResolvedValueOnce({ rows: [{ id: 'P1' }] }); // UPDATE
+
+            const result = await moveProblemsBackToMain(1, null, mockClient as never);
+
+            expect(result.movedProblems).toHaveLength(1);
+            const statements = (mockClient.query as jest.Mock).mock.calls.map(([text]) => String(text));
+            expect(statements).toHaveLength(1);
+            expect(statements[0]).toContain('SET contest_id = NULL');
+            expect(db.pool.connect).not.toHaveBeenCalled();
+            expect(mockClient.release).not.toHaveBeenCalled();
         });
     });
 
