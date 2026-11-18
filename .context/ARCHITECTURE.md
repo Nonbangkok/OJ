@@ -97,7 +97,7 @@ OJ/
 │   │   └── requestSchemas.ts # Shared z.object request schemas (all controllers)
 │   ├── utils/
 │   │   ├── sandboxProcess.ts  # Shell-less bounded child runner + sandbox identities
-│   │   ├── compileGuard.ts    # Forbidden #include detection (incl. macro includes)
+│   │   ├── compileGuard.ts    # Pre-compile guards on a pp-token lexer: forbidden includes; header-problem source rules
 │   │   ├── dbErrors.ts        # isUniqueViolation (Postgres 23505 -> 409)
 │   │   ├── csv.ts             # RFC 4180 serialisation + formula-injection guard
 │   │   ├── errorMessage.ts    # Unknown->message error normalization helper
@@ -370,13 +370,14 @@ Key judging properties:
 - **Verdicts are evidence-based** (JUDGE-001/002/008): exit code 124 = TLE; SIGKILL with measured memory over the limit = MLE; SIGSEGV and other signals = Runtime Error. No stderr-keyword heuristics. Runtime Error output is sanitized — server paths and wrapper telemetry (`TIME_USED:`/`MEM_USED:` tokens) never reach the submitter.
 - **Crash-safety** — the judge queue keeps an in-flight registry; the final verdict UPDATE only lands while the row is still in a non-terminal judgeable state (a stale judge from a rejudge or contest-end migration cannot overwrite a newer verdict). On boot, `sweepOrphanedSubmissions` re-enqueues `Pending` rows and marks `Compiling`/`Running` rows as System Error ("interrupted by server restart").
 - **Rejudge** (`/admin/rejudge/*`) resets and re-enqueues judgeable submissions; rows with a judge already in flight are reported as `busy` (never double-judged), and a second identical rejudge gets 409.
-- **Header problems take the same path with a different prepare plan** (migration 0024). For `problems.problem_type = 'header'` the submission is not a whole program but one header (`submission_filename`, default `student.h`): the pipeline writes the problem's secret `grader` files from `problem_files` into the workspace **byte-for-byte** (never through a UTF-8 string — a TIS-620 grader must survive), writes the submission beside them, and compiles every grader `.cpp` with the normal C++ flags plus `-fno-diagnostics-show-caret`. The standard path is unchanged; both are expressed as a `PreparePlan` rather than branches scattered through the pipeline.
+- **Header problems take the same path with a different prepare plan** (migration 0024). For `problems.problem_type = 'header'` the submission is not a whole program but one header (`submission_filename`, default `student.h`): the pipeline writes the problem's secret `grader` files from `problem_files` into the workspace **byte-for-byte** (never through a UTF-8 string — a TIS-620 grader must survive), writes the submission beside them, and builds the grader sources (exact lowercase `.cpp`/`.cc`/`.cxx`) with the normal C++ flags plus `-fno-diagnostics-show-caret -fmax-errors=10`. The standard path is unchanged; both are expressed as a `PreparePlan` (an ordered list of compile and remove steps) rather than branches scattered through the pipeline.
 
-  Two properties carry the secrecy guarantee, and both fail closed:
-  - **Scrub before run** — after a successful compile, every grader source and the submitted header are removed from the workspace (`removeSandboxFiles`, uid-dropped `rm`) *before* `judge()` starts. It throws on failure, so a failed scrub becomes a System Error instead of running untrusted code next to the grader sources.
-  - **Diagnostics** — `sanitizeCompilerStderr` keeps the real `student.h` name (so line numbers mean something to the student) while stripping workspace paths; caret display is off so no grader source line is echoed. Grader *file names* and identifiers can still appear in diagnostics — an accepted trade-off, documented in the design.
+  Three layers carry the secrecy guarantee (the removals fail closed):
+  - **Two-step build** — `g++ -S` with every file present, then every grader file and the submitted header are removed (`removeSandboxFiles`, uid-dropped `rm`), then the `.s` files are assembled and linked (`-s`), then the `.s` files are removed — all before `judge()` starts. The assembler never runs while a grader source exists, so an `.incbin "main.cpp"` smuggled into the assembly is a Compilation Error ("file not found"). A failed removal throws and becomes a System Error.
+  - **Source rules** — `findHeaderSourceRejection` (`utils/compileGuard.ts`, a real preprocessing-token lexer) whitelists includes (`<header>` or a public starter header by name), rejects `#define`/`#undef` of C++ keywords and of grader identifiers (student macros cannot stringize grader code into a diagnostic), and rejects `asm`, section-style attributes, `#ident`, `##` and `incbin`/`.include`. Defence in depth over the two-step build; messages never quote grader content.
+  - **Diagnostics** — `sanitizeCompilerStderr` keeps the real `student.h` name (so line numbers mean something to the student) while stripping workspace paths; caret display is off so no grader source line is echoed. Grader *file names*, identifiers, types and line numbers can still appear in diagnostics — an accepted trade-off.
 
-  Secrecy is "no casual source-text leak", the same level standard problems already give (a program can print its own testcase input and read it back from a Runtime Error). `findForbiddenAsm` rejects `asm`/`incbin`/`.include` to close the assembler file-embed channel; the unprivileged compile remains the real boundary.
+  The compiled grader runs inside the student's process, so its code and literals are readable at run time: graders must not embed answers or secrets. See `SANDBOX.md` § Header problems.
 
 ### Database Import / Maintenance Mode
 

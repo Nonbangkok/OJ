@@ -82,7 +82,11 @@ and output cap that SIGKILL the whole process group. A macro-include of
 files, and no secrets are in its environment to begin with. The include guard
 (`compileGuard.ts`) is hardened as a second layer — it now rejects macro
 includes (`#define E "/proc/1/environ"` + `#include E`), string-concatenated
-paths, and backslash-newline-continuation-hidden paths.
+paths, and backslash-newline-continuation-hidden paths, for the whole include
+family (`#include`, `#include_next`, `#import`, `#embed`, `__has_include`),
+on a real preprocessing-token lexer (comments, splices, raw strings, `%:`)
+that stays linear on hostile input. It runs on C++ submissions only: Python
+has no preprocessor, and its `#` lines are comments.
 
 ### 6. Per-submission workspaces (RUNNER-003 / RUNNER-006) — ownership BY CONSTRUCTION
 Every submission gets a private workspace under
@@ -166,6 +170,52 @@ privilege drop (CAP_SETUID is dropped) and break the compile/chmod chain.
 Running each submission as `nobody` via the wrapper gives most of the benefit
 without that breakage. Full `USER node` becomes safe once judging is isolated
 (below).
+
+## Header problems
+
+A header problem's submission (`student.h`) is compiled in the same
+translation unit as the problem's SECRET grader files (`problem_files`, role
+`grader`), as the submission's sandbox uid. What is guaranteed, and what is
+an accepted limit:
+
+- **Grader sources are never readable by student code at assemble or run
+  time.** The build has two steps (`HEADER_CPP_PREPARE`, `headerPreparePlan`
+  in `submissionService.ts`): `g++ -S` compiles the grader sources with every
+  file present; every grader file and the submitted header are then removed
+  (as their owner — a failed removal is a System Error, never a run); only
+  then are the `.s` files assembled and linked, and the `.s` files are removed
+  before any testcase runs. Whatever a submission smuggles into the assembly
+  (`.incbin "main.cpp"`, `.include`, through `asm`, a section attribute or
+  anything else) has nothing to read and fails as a Compilation Error ("file
+  not found"); the only workspace files left for it are the grader's own
+  `.s`, i.e. its compiled form, which ends up in the binary anyway (see
+  below). The compile proper (cc1plus) is the only step that reads the
+  grader sources. Re-check this before a GCC 15 upgrade: `#embed` would read
+  bytes at that step (the source rules below reject it).
+- **Source rules, defence in depth** (`findHeaderSourceRejection` in
+  `compileGuard.ts`, on a real preprocessing-token lexer): includes only as
+  `<header>` (no `..`, `\`, leading `/`) or `"name"` naming one of the
+  problem's public starter headers, no computed includes, no `#embed`; no
+  `#define`/`#undef` of a C++ keyword or alternative token or of any
+  identifier the grader uses (a student macro could otherwise stringize the
+  grader's own code into a `static_assert` diagnostic); no function-like or
+  non-empty `#define` of a reserved name; no `asm`, `section`/`weakref`/
+  `symver` attributes, `#ident`/`#sccs`, `##` pasting, or `incbin`/`.include`
+  in a string after concatenation and escape decoding. Rejection messages
+  quote only the submission's own text.
+- **The compiled grader runs inside the student's process.** Its machine
+  code, data and string literals are in memory and in the binary the program
+  can read (`/proc/self/exe`); `-s` only strips the symbol table. Graders
+  must therefore not embed expected answers or secrets — expected outputs
+  never enter the sandbox, which is what keeps verdicts trustworthy.
+- **Diagnostics disclose grader file names and may disclose identifiers,
+  types and line numbers** (accepted trade-off). `-fno-diagnostics-show-caret`
+  stops g++ echoing source lines and `-fmax-errors=10` bounds the log, but a
+  submission can still name grader declarations and read their types (and
+  constants that appear in them) back from an error.
+- **Runtime Error output** for header problems is a neutral description of
+  the crash rather than the program's own stderr, so a program cannot print
+  grader memory back through its verdict.
 
 ## Stretch / recommended next step: a dedicated `judge` container
 
