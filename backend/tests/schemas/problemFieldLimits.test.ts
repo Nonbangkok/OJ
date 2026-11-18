@@ -42,3 +42,14 @@ describe('problem field limits match the column widths', () => {
     });
   });
 });
+
+describe('partial problem updates', () => {
+  it('accepts a collection-only update, which the bulk "Move to collection" sends (A6-04)', () => {
+    expect(updateProblemSchema.safeParse({ id: 'p1', collection_id: 3 }).success).toBe(true);
+    expect(updateProblemSchema.safeParse({ id: 'p1', collection_id: null }).success).toBe(true);
+  });
+
+  it('still rejects an empty author when one is sent', () => {
+    expect(updateProblemSchema.safeParse({ id: 'p1', author: '' }).success).toBe(false);
+  });
+});

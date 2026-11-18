@@ -187,20 +187,11 @@ const useProblemCrud = ({ query, initialPageSpan }: UseProblemCrudArgs) => {
   const moveSelectionToCollection = async (problemIds: Array<string | number>, collectionId: number | null) => {
     try {
       setLoading(true);
+      // Send only the collection: the server keeps every omitted field
+      // (COALESCE), so a problem with no author is not rejected by the
+      // update schema and no detail fetch per row is needed (A6-04).
       await Promise.all(
-        problemIds.map(async (id) => {
-          const detail = await adminService.getProblemDetail(String(id));
-          await adminService.updateProblem(String(id), {
-            id: detail.id,
-            title: detail.title,
-            author: detail.author,
-            categories: detail.categories as never,
-            difficulty: detail.difficulty,
-            collection_id: collectionId,
-            time_limit_ms: detail.time_limit_ms,
-            memory_limit_mb: detail.memory_limit_mb,
-          });
-        }),
+        problemIds.map((id) => adminService.updateProblem(String(id), { id: String(id), collection_id: collectionId })),
       );
       await fetchProblems();
     } catch (errorValue) {
