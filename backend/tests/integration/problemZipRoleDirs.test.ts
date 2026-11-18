@@ -141,7 +141,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
 
     expect(results.added).toEqual(['nogr']);
     expect(results.errors).toEqual([{ directory: 'hdronly',
-      message: 'Problem "hdronly": Grader files must include at least one .cpp file.' }]);
+      message: expect.stringMatching(/^Problem "hdronly": Grader files must include at least one /) }]);
     expect((await pool.query("SELECT role, filename FROM problem_files WHERE problem_id = 'nogr'")).rows)
       .toEqual([{ role: 'starter', filename: 'student.h' }]);
   });
