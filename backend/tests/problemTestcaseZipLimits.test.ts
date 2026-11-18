@@ -111,6 +111,42 @@ describe('single-problem testcase ZIPs on real archives', () => {
     expect(db.pool.connect).not.toHaveBeenCalled();
   });
 
+  /** Refused the same way from both routes, before reading, leaving no descriptor open. */
+  const expectRefusedBeforeReading = async (zip: Buffer, message: string) => {
+    const zipPath = path.join(dir, 'testcases.zip');
+    fs.writeFileSync(zipPath, zip);
+
+    await expect(replaceProblemTestcasesFromZip('P1', zip)).rejects.toMatchObject({ statusCode: 400, message });
+    await expect(replaceProblemTestcasesFromZipFile('P1', zipPath)).rejects.toMatchObject({ statusCode: 400, message });
+    expect(openDescriptorsOn(zipPath)).toBe(0);
+    expect(db.query).not.toHaveBeenCalled();
+    expect(db.pool.connect).not.toHaveBeenCalled();
+  };
+
+  it('refuses an archive whose testcase files declare more than 256 MiB in all', async () => {
+    const entries: StoredEntry[] = [];
+    for (let i = 1; i <= 3; i += 1) {
+      entries.push(
+        { name: `input${i}.in`, data: Buffer.from('1\n'), declared: 43 * MiB },
+        { name: `output${i}.out`, data: Buffer.from('1\n'), declared: 43 * MiB },
+      );
+    }
+    await expectRefusedBeforeReading(
+      storedZip(entries),
+      'Testcase ZIP rejected: its testcase files total more than 256 MiB uncompressed.',
+    );
+  });
+
+  it('refuses an archive with a testcase file declaring more than 64 MiB', async () => {
+    await expectRefusedBeforeReading(
+      storedZip([
+        { name: 'input1.in', data: Buffer.from('1\n') },
+        { name: 'output1.out', data: Buffer.from('1\n'), declared: 64 * MiB + 1 },
+      ]),
+      'Testcase ZIP rejected: "output1.out" is larger than 64 MiB uncompressed.',
+    );
+  });
+
   it('still imports an honest disk-backed archive and closes the file', async () => {
     const zipPath = path.join(dir, 'testcases.zip');
     const input = Buffer.alloc(2 * MiB, 0x32);

@@ -15,7 +15,7 @@ import {
   TestcaseView,
   TestcaseViewPart,
 } from '../types/service';
-import { ADMIN_PROBLEM_LIST_CONFIG, ARCHIVE_LIMITS, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CONFIG, SUBMISSION_QUERY_CONFIG, TESTCASE_VIEWER_CONFIG, type ProblemFileRole, type ProblemType, type AdminProblemView, type AdminProblemSort } from '../constants';
+import { ADMIN_PROBLEM_LIST_CONFIG, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CONFIG, PROBLEM_UPLOAD_LIMITS, SUBMISSION_QUERY_CONFIG, TESTCASE_VIEWER_CONFIG, type ProblemFileRole, type ProblemType, type AdminProblemView, type AdminProblemSort } from '../constants';
 import { fullyPairedCaseNumbers, pairZippedTestcaseFiles } from './testcaseZipPairing';
 import { isUniqueViolation } from '../utils/dbErrors';
 import { AppError } from '../middleware/errorHandler';
@@ -1060,24 +1060,39 @@ const replaceProblemTestcasesFromOpenedZip = async (
 
   // Read all pair buffers *before* opening the transaction so a corrupt zip
   // entry fails without touching existing testcases; the DELETE + INSERTs
-  // then run atomically. The archive's declared sizes are checked first and
-  // the real ones are counted while inflating, so a ZIP that lies about its
-  // sizes cannot inflate past the archive cap in memory.
-  const maxBytes = ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES;
-  const tooLarge = `Archive rejected: uncompressed size exceeds ${maxBytes} bytes (decompression bomb).`;
-  const declaredBytes = pairedCases.reduce(
-    (total, key) => total + testcaseFiles[key].in!.uncompressedSize + testcaseFiles[key].out!.uncompressedSize,
-    0,
-  );
-  if (declaredBytes > maxBytes) throw new AppError(tooLarge, 400);
-  const budget = createInflateBudget(maxBytes);
+  // then run atomically. Every pair stays in RAM until the INSERTs, so the
+  // declared sizes are held to the in-memory caps first and the real ones are
+  // counted while inflating: a ZIP that lies about its sizes cannot inflate
+  // past them either.
+  const {
+    TESTCASES_ZIP_MAX_UNCOMPRESSED_BYTES: maxTotalBytes,
+    TESTCASES_ZIP_MAX_UNCOMPRESSED_MIB: maxTotalMib,
+    TESTCASES_ZIP_MAX_FILE_BYTES: maxFileBytes,
+    TESTCASES_ZIP_MAX_FILE_MIB: maxFileMib,
+  } = PROBLEM_UPLOAD_LIMITS;
+  let declaredBytes = 0;
+  for (const key of pairedCases) {
+    for (const file of [testcaseFiles[key].in!, testcaseFiles[key].out!]) {
+      if (file.uncompressedSize > maxFileBytes) {
+        throw new AppError(`Testcase ZIP rejected: "${file.path}" is larger than ${maxFileMib} MiB uncompressed.`, 400);
+      }
+      declaredBytes += file.uncompressedSize;
+    }
+  }
+  if (declaredBytes > maxTotalBytes) {
+    throw new AppError(
+      `Testcase ZIP rejected: its testcase files total more than ${maxTotalMib} MiB uncompressed.`,
+      400,
+    );
+  }
+  const budget = createInflateBudget(maxTotalBytes);
   const pairBuffers: Array<{ input: Buffer; output: Buffer }> = [];
   try {
     for (const key of pairedCases) {
       const pair = testcaseFiles[key];
       pairBuffers.push({
-        input: await readZipEntryBounded(pair.in!, maxBytes, budget),
-        output: await readZipEntryBounded(pair.out!, maxBytes, budget),
+        input: await readZipEntryBounded(pair.in!, maxFileBytes, budget),
+        output: await readZipEntryBounded(pair.out!, maxFileBytes, budget),
       });
     }
   } catch (error) {
@@ -1098,17 +1113,25 @@ const replaceProblemTestcasesFromOpenedZip = async (
   return withTransaction(async (client) => {
     await client.query('DELETE FROM testcases WHERE problem_id = $1', [problemId]);
 
-    let caseNumber = 1;
-    for (const { input, output } of pairBuffers) {
+    // pg copies each text parameter again while serialising the INSERT, so a
+    // pair leaves pairBuffers as soon as its text is made: its buffers can be
+    // collected meanwhile instead of living until the transaction ends.
+    for (let caseNumber = 1; pairBuffers.length > 0; caseNumber += 1) {
+      const [inputText, outputText] = takeNextPairText(pairBuffers);
       await client.query(
         'INSERT INTO testcases (problem_id, case_number, input_data, output_data) VALUES ($1, $2, $3, $4)',
-        [problemId, caseNumber, input.toString('utf-8'), output.toString('utf-8')]
+        [problemId, caseNumber, inputText, outputText]
       );
-      caseNumber += 1;
     }
 
     return { kind: 'ok', insertedCount: pairedCases.length };
   });
+};
+
+/** Removes the first pair and returns its text, leaving no reference to its buffers. */
+const takeNextPairText = (pairs: Array<{ input: Buffer; output: Buffer }>): [string, string] => {
+  const { input, output } = pairs.shift()!;
+  return [input.toString('utf-8'), output.toString('utf-8')];
 };
 
 export const replaceProblemTestcasesFromZip = async (

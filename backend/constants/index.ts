@@ -559,6 +559,14 @@ export const STRING_LIMITS = {
 // disk-backed upload instead.
 const PROBLEM_FILES_ZIP_MAX_MIB = 25;
 const PROBLEM_SINGLE_UPLOAD_MAX_MIB = 64;
+// Both single-problem testcase ZIP routes (one request, and the chunked,
+// disk-backed one) read every paired entry into RAM before the INSERTs, and
+// pg copies each pair two to three more times while serialising it, so the
+// in-memory caps sit far below the 1 GiB container and the 500 MB
+// ARCHIVE_LIMITS cap that disk extraction uses. The per-file cap is the
+// authoring testcase one (authoring/testcases.ts TESTCASE_LIMITS).
+const TESTCASES_ZIP_MAX_UNCOMPRESSED_MIB = 256;
+const TESTCASES_ZIP_MAX_FILE_MIB = 64;
 
 export const PROBLEM_UPLOAD_LIMITS = {
     // PUT /admin/problems/:id/files/:role: a role holds at most
@@ -572,6 +580,11 @@ export const PROBLEM_UPLOAD_LIMITS = {
     TESTCASES_ZIP_FIELD_NAME: 'testcasesZip',
     SINGLE_REQUEST_MAX_MIB: PROBLEM_SINGLE_UPLOAD_MAX_MIB,
     SINGLE_REQUEST_MAX_BYTES: PROBLEM_SINGLE_UPLOAD_MAX_MIB * 1024 * 1024,
+    // Real inflated bytes of the paired testcase files, in all and per file.
+    TESTCASES_ZIP_MAX_UNCOMPRESSED_MIB,
+    TESTCASES_ZIP_MAX_UNCOMPRESSED_BYTES: TESTCASES_ZIP_MAX_UNCOMPRESSED_MIB * 1024 * 1024,
+    TESTCASES_ZIP_MAX_FILE_MIB,
+    TESTCASES_ZIP_MAX_FILE_BYTES: TESTCASES_ZIP_MAX_FILE_MIB * 1024 * 1024,
 } as const;
 
 
