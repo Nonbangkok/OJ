@@ -106,6 +106,22 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     expect(await getProfileSyncImpact(id, database)).toEqual({ affectedDrafts: 2, affectedPublishedProblems: 1 });
   });
 
+  it('does not count a draft reopened for revision as a published problem the sync will change', async () => {
+    const id = await createProfile();
+    await linkedDraft('IMPL1', id, { published: true });
+    const reopened = await linkedDraft('IMPR1', id, { published: true });
+    const generated = await linkedDraft('IMPR2', id, { published: true });
+    expect((await startProblemDraftRevision(reopened.id, database)).kind).toBe('updated');
+    expect((await startProblemDraftRevision(generated.id, database)).kind).toBe('updated');
+    await pool.query(`UPDATE problem_drafts SET status='generated' WHERE id=$1`, [generated.id]);
+
+    // All three keep published_at and a live problem, but only the draft that is
+    // still 'published' gets its live problem republished by the sync.
+    expect((await pool.query(`SELECT COUNT(*)::int AS n FROM problem_drafts
+      WHERE author_profile_id=$1 AND published_at IS NOT NULL`, [id])).rows[0].n).toBe(3);
+    expect(await getProfileSyncImpact(id, database)).toEqual({ affectedDrafts: 3, affectedPublishedProblems: 1 });
+  });
+
   it('updates a draft snapshot, rebuilds the PDF, and republishes a published problem', async () => {
     const id = await createProfile(profileId(), 'New Aka');
     const d = await linkedDraft('SYNC1', id, { published: true });

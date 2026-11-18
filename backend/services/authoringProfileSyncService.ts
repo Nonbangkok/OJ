@@ -21,11 +21,16 @@ export type ProfileSyncImpact = {
   affectedPublishedProblems: number;
 };
 
-/** Counts the drafts and published problems that a profile edit would cascade to. */
+/**
+ * Counts the drafts and published problems that a profile edit would cascade to.
+ * Only a draft whose status is 'published' gets its live problem republished
+ * (see startProfileSyncItem); a draft reopened for revision keeps its live
+ * problem's old author until its next Verify + Publish, so it is not counted.
+ */
 export async function getProfileSyncImpact(profileId: string, database: ProfileSyncDatabase = db): Promise<ProfileSyncImpact> {
   const drafts = (await database.query<{ count: number; published: number }>(`
     SELECT COUNT(*)::int AS count,
-      COUNT(*) FILTER (WHERE published_at IS NOT NULL)::int AS published
+      COUNT(*) FILTER (WHERE status = 'published')::int AS published
     FROM problem_drafts WHERE author_profile_id=$1
   `, [profileId])).rows[0];
   return { affectedDrafts: drafts?.count ?? 0, affectedPublishedProblems: drafts?.published ?? 0 };

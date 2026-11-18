@@ -104,7 +104,9 @@ is `published` when their sync item starts; the decision is recorded on the
 `sync_pdf` job as `result_summary.republish`. A draft in a revision cycle gets the
 new author snapshot and keeps its status, and its legacy problem keeps the old
 author until the next Verify and Publish. Because the sync clears the verified
-revision, a `ready` draft drops to `generated`.
+revision, a `ready` draft drops to `generated`. The confirmation gate's
+`affectedPublishedProblems` counts the same set: linked drafts whose status is
+`published`, not every draft that has ever been published.
 
 ## Verification
 
