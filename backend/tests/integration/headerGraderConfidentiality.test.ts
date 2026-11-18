@@ -103,6 +103,18 @@ const STUDENT_A8_03 =
   '#define if(...) static_assert(false, #__VA_ARGS__);\n' +
   STUDENT_OK;
 
+/**
+ * A8-03 hidden from a guard that does not lex like GCC (review PoC): GCC
+ * turns the rest of an unterminated-quote line into one token, so `/*`
+ * opens no comment and the `#define for` between the two `#if 0` blocks is
+ * live.
+ */
+const STUDENT_A8_03_HIDDEN =
+  "#if 0\n' /*\n#endif\n" +
+  '#define for(...) static_assert(false, #__VA_ARGS__);\n' +
+  '#if 0\n*/\n#endif\n' +
+  STUDENT_OK;
+
 /** A8-03 through a grader function name instead of a keyword. */
 const STUDENT_A8_03_CALL =
   '#define scanf(...) static_assert(false, #__VA_ARGS__)\n' +
@@ -264,7 +276,7 @@ const STUDENT_MANY_ERRORS = Array.from({ length: 15 }, (_, i) => `int e${i} = un
     });
 
     it('A8-03: rejects keyword and grader-name macros, so the compile log never quotes the grader', async () => {
-      for (const attempt of [STUDENT_A8_03, STUDENT_A8_03_CALL]) {
+      for (const attempt of [STUDENT_A8_03, STUDENT_A8_03_CALL, STUDENT_A8_03_HIDDEN]) {
         const row = await judgeOnce(attempt);
         expect(row.overall_status).toBe(SUBMISSION_STATUS.COMPILATION_ERROR);
         expect(String(row.results?.[0]?.output)).toMatch(/keyword|the grader uses that name/);

@@ -927,6 +927,19 @@ describe('Submission Service', () => {
                 expect(cp.spawn).not.toHaveBeenCalled();
             });
 
+            it('names the submitted header in a lexical rejection', async () => {
+                (getHeaderJudgeSpec as jest.Mock).mockResolvedValue(HEADER_SPEC);
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce(mockRow('int a;\nconst char* s = "x"R"y(z)y";\n'))
+                    .mockResolvedValueOnce({}) // UPDATE Compiling
+                    .mockResolvedValueOnce({}); // UPDATE Compilation Error
+
+                await processSubmission(1);
+
+                expect(compilationErrorOutput(2)).toMatch(/^Compilation rejected \(student\.h:2\): /);
+                expect(cp.spawn).not.toHaveBeenCalled();
+            });
+
             it('rejects redefining a name the grader uses, without quoting the grader', async () => {
                 // queue.h (a grader file) includes student.h; `main` is a
                 // grader identifier, so a student macro may not rewrite it.

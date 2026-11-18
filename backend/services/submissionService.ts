@@ -15,7 +15,7 @@ import {
   SUBMISSION_STATUS,
   SubmissionLanguage,
 } from '../constants';
-import { findForbiddenInclude, findHeaderSourceRejection } from '../utils/compileGuard';
+import { findHeaderSourceRejection, findIncludeRejection } from '../utils/compileGuard';
 import { isGraderSourceFilename } from '../utils/problemFilename';
 import { logger } from '../utils/logger';
 import { publishRealtime } from './realtimeHub';
@@ -127,17 +127,15 @@ export function sanitizeCompilerStderr(
   );
 }
 
-const FORBIDDEN_INCLUDE_MESSAGE = (target: string): string =>
-  `Compilation rejected: #include of a non-permitted path ("${target}") is not allowed. ` +
-  `Use standard library headers (e.g. <bits/stdc++.h>) only.`;
-
 const HEADER_CPP_ONLY_MESSAGE = 'This problem accepts C++ only.';
 
 /**
- * Pre-compile source guard. The `#include` check protects every C++
- * submission (compile-time arbitrary file read, RUNNER-001); Python never
- * goes through a preprocessor, so its `#` comments (`# import (x) ...`) are
- * not directives to inspect. The header rules (include whitelist, no
+ * Pre-compile source guard. The include check (absolute or `..` paths in the
+ * include family, `#line` and computed includes, plus lexical constructs it
+ * cannot read the way GCC would) protects every C++ submission
+ * (compile-time arbitrary file read, RUNNER-001); Python never goes through
+ * a preprocessor, so its `#` comments (`# import (x) ...`) are not
+ * directives to inspect. The header rules (include whitelist, no
  * redefinition of keywords or grader names, no assembler embedding) only
  * apply when secret grader files share the translation unit; they are
  * defence in depth over the two-step header build. Returns the
@@ -149,13 +147,12 @@ function findSourceRejection(
   headerSpec: HeaderJudgeSpec | null,
 ): string | null {
   if (language !== 'cpp') return null;
-  const forbiddenInclude = findForbiddenInclude(code);
-  if (forbiddenInclude) {
-    return FORBIDDEN_INCLUDE_MESSAGE(forbiddenInclude);
-  }
-  if (headerSpec) {
+  const submissionFilename = headerSpec ? headerSpec.submissionFilename ?? DEFAULT_SUBMISSION_FILENAME : undefined;
+  const includeRejection = findIncludeRejection(code, submissionFilename);
+  if (includeRejection) return includeRejection;
+  if (headerSpec && submissionFilename) {
     return findHeaderSourceRejection(code, {
-      submissionFilename: headerSpec.submissionFilename ?? DEFAULT_SUBMISSION_FILENAME,
+      submissionFilename,
       graderFiles: headerSpec.graderFiles,
       starterFilenames: headerSpec.starterFilenames ?? [],
     });

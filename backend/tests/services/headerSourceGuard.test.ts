@@ -199,6 +199,38 @@ describe('findHeaderSourceRejection', () => {
     it('treats a lone CR as a line break, as GCC does', () => {
       expect(reject('int x; // comment\r#define for(...) x\n')).toContain('"for"');
     });
+
+    it('sees a directive hidden behind an unterminated quote (review PoC: A8-03 through `\' /*`)', () => {
+      // GCC: `' /*` is one opaque token, so `#define for` is live and would
+      // stringize the grader's loop into a static_assert diagnostic.
+      const poc = "#if 0\n' /*\n#endif\n#define for(...) static_assert(false, #__VA_ARGS__);\n#if 0\n*/\n#endif\n"
+        + 'long long student_val(int i) { return i; }\n';
+      expect(reject(poc)).toContain('C++ keyword "for"');
+      expect(reject(poc.replace("' /*", '" /*'))).toContain('C++ keyword "for"');
+      // ... and behind an include line's extra header name.
+      expect(reject('#include <vector> <x /* y>\n#define for(...) x\n// */\n')).toContain('"for"');
+    });
+
+    it('rejects a lexical problem a guard cannot read unambiguously, with a neutral message', () => {
+      const cases: Array<[string, string]> = [
+        ['int x;\n/* never closed\n#define for(...) x\n', 'student.h:2'],
+        ['int x;\nconst char* s = "never closed', 'student.h:2'],
+        ['const char* s = R"$(x)$";\n', 'raw string'],
+        ['#if __has_include <x /* y>\n#endif\n', 'student.h:1'],
+        ["int x = 1'$/*';\n#define for(...) x\n// */\n", '"for"'],
+      ];
+      for (const [code, expected] of cases) {
+        const message = reject(code) ?? '';
+        expect({ code, message }).toEqual({ code, message: expect.stringContaining(expected) });
+        expect(message).not.toContain(GRADER_SECRET_COMMENT);
+      }
+    });
+
+    it('keeps accepting ordinary headers with apostrophes in comments and #if 0 blocks', () => {
+      const code = `${STUDENT_OK}// don't worry, it's fine\n/* the grader's main calls this */\n`
+        + "#if 0\nThis doesn't compile yet; it's a draft.\n#endif\nconst long long big = 1'000'000;\nconst char q = '\\'';\n";
+      expect(reject(code)).toBeNull();
+    });
   });
 });
 
