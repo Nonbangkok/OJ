@@ -50,6 +50,107 @@ export function nextSandboxIdentity(): SandboxIdentity {
   return { uid, gid: uid };
 }
 
+// ---------------------------------------------------------------------------
+// Process lifetime: per-uid sweep and identity hand-out (audit A4-02)
+// ---------------------------------------------------------------------------
+
+/** A sandbox identity could not be proven free of processes. */
+export class SandboxSweepError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SandboxSweepError';
+  }
+}
+
+/**
+ * SIGKILL every process of a sandbox identity and wait until none is left
+ * (`time_wrapper --kill-uid`). Root in the production container has no
+ * CAP_KILL, so neither `timeout` nor Node can signal a sandbox process: a
+ * sleeping TLE program, or a setsid'd daemon, used to outlive its submission
+ * and come back with the uid 16 pipelines later, able to read and tamper with
+ * that later submission's workspace. The helper drops to the uid and calls
+ * kill(-1), which reaches exactly that uid's processes and needs no
+ * capability, then checks /proc.
+ *
+ * Throws {@link SandboxSweepError} when the helper cannot run or processes
+ * survive; callers fail closed (System Error, uid quarantined). Only call it
+ * when {@link canDropPrivileges} is true: the helper refuses to run unless
+ * started as root.
+ */
+export async function killSandboxProcesses(sandbox: SandboxIdentity): Promise<void> {
+  const result = await runSandboxProcess(
+    path.resolve(JUDGE_CONFIG.TIME_WRAPPER_PATH),
+    ['--kill-uid', String(sandbox.uid)],
+    {
+      env: { PATH: JUDGE_CONFIG.SANDBOX_PATH } as unknown as NodeJS.ProcessEnv,
+      timeoutMs: JUDGE_CONFIG.SANDBOX_SWEEP_TIMEOUT_MS,
+      maxBufferBytes: JUDGE_CONFIG.WORKSPACE_OP_MAX_BUFFER,
+    }
+  );
+  if (result.exitCode !== 0 || result.spawnError || result.timedOut) {
+    throw new SandboxSweepError(
+      `process sweep of sandbox uid ${sandbox.uid} failed (exit=${result.exitCode} spawnError=${result.spawnError} timedOut=${result.timedOut}): ${result.stderr.trim()}`
+    );
+  }
+}
+
+/** Identities a live pipeline holds; never handed out twice. */
+const heldSandboxUids = new Set<number>();
+/** Identities whose last sweep failed; used again only once a sweep passes. */
+const quarantinedSandboxUids = new Set<number>();
+
+/**
+ * Hand out a sandbox identity for one submission pipeline. Unlike the bare
+ * round-robin of {@link nextSandboxIdentity}, it never returns an identity
+ * another pipeline still holds, and with `sweep` (production) it first
+ * kills anything left running under the uid. A failed sweep quarantines the
+ * uid and throws, so the submission becomes a System Error and the uid is
+ * not used. Quarantined uids are tried again only when no clean one is free.
+ * Every acquired identity must be given back with
+ * {@link releaseSandboxIdentity}.
+ */
+export async function acquireSandboxIdentity(options: { sweep: boolean }): Promise<SandboxIdentity> {
+  const poolSize = JUDGE_CONFIG.SANDBOX_UID_POOL_SIZE;
+  let free: number | null = null;
+  let quarantined: number | null = null;
+  for (let step = 0; step < poolSize && free === null; step++) {
+    const uid = JUDGE_CONFIG.SANDBOX_UID_BASE + ((sandboxUidCursor + step) % poolSize);
+    if (heldSandboxUids.has(uid)) continue;
+    if (quarantinedSandboxUids.has(uid)) {
+      quarantined ??= uid;
+      continue;
+    }
+    free = uid;
+  }
+  const uid = free ?? quarantined;
+  if (uid === null) {
+    throw new SandboxSweepError('every sandbox identity is in use');
+  }
+  sandboxUidCursor = (uid - JUDGE_CONFIG.SANDBOX_UID_BASE + 1) % poolSize;
+  heldSandboxUids.add(uid);
+  const identity = { uid, gid: uid };
+  if (options.sweep) {
+    try {
+      await killSandboxProcesses(identity);
+    } catch (error) {
+      heldSandboxUids.delete(uid);
+      quarantinedSandboxUids.add(uid);
+      throw error;
+    }
+  }
+  quarantinedSandboxUids.delete(uid);
+  return identity;
+}
+
+/**
+ * Give an identity back after its pipeline's final sweep. `quarantine` (the
+ * sweep failed) keeps it out of circulation until a later sweep passes.
+ */
+export function releaseSandboxIdentity(identity: SandboxIdentity, options: { quarantine?: boolean } = {}): void {
+  heldSandboxUids.delete(identity.uid);
+  if (options.quarantine) quarantinedSandboxUids.add(identity.uid);
+}
+
 /** Whether `prlimit` (util-linux) is available to bound compiler processes. */
 export function prlimitAvailable(): boolean {
   return existsSync(JUDGE_CONFIG.PRLIMIT_PATH);
@@ -313,6 +414,14 @@ async function runAsSandbox(
 export async function ensureSandboxSubmissionsRoot(): Promise<string> {
   const root = sandboxSubmissionsRoot();
   await fsp.mkdir(root, { recursive: true });
+  // A root that already exists must be ours. A sandbox uid that created it
+  // first (possible while /tmp was world-writable) would own the parent of
+  // every later workspace, so refuse it rather than judge inside it.
+  const stat = await fsp.lstat(root);
+  const self = process.getuid?.();
+  if (!stat.isDirectory() || (self !== undefined && stat.uid !== self)) {
+    throw new Error(`refusing to use ${root}: not a directory owned by uid ${self}`);
+  }
   try {
     await fsp.chmod(root, JUDGE_CONFIG.SANDBOX_PARENT_DIR_MODE);
   } catch {
@@ -448,4 +557,55 @@ export async function removeSandboxWorkspace(
       err: String(error),
     });
   }
+}
+
+/**
+ * Remove everything a sandbox identity left OUTSIDE its workspace (A9-05):
+ * every top-level entry it owns in the submissions root (1733, so it can
+ * create siblings of its workspace there) and in the shared scratch dirs it
+ * can still write to (`JUDGE_CONFIG.SANDBOX_SHARED_SCRATCH_DIRS`). Root lists
+ * the directories (sandbox uids cannot list the 1733 root); the removal runs
+ * as the uid, in batches, because root has no CAP_FOWNER over uid-owned
+ * files. Run it after the uid's processes are dead, or they could recreate
+ * what was removed. Never throws: a failure is logged.
+ */
+export async function removeSandboxStrays(
+  sandbox: SandboxIdentity,
+  options: { context?: string } = {}
+): Promise<void> {
+  const roots = [...new Set([sandboxSubmissionsRoot(), ...JUDGE_CONFIG.SANDBOX_SHARED_SCRATCH_DIRS])];
+  let batch: string[] = [];
+  const flush = async (): Promise<void> => {
+    if (batch.length === 0) return;
+    const targets = batch;
+    batch = [];
+    const result = await runAsSandbox(sandbox, 'rm', ['-rf', '--', ...targets]);
+    if (result.exitCode !== 0 || result.spawnError) {
+      logger.warn('failed to remove files a sandbox identity left behind', {
+        context: options.context, uid: sandbox.uid, err: result.stderr.trim(),
+      });
+    }
+  };
+  for (const root of roots) {
+    try {
+      const dir = await fsp.opendir(root);
+      for await (const entry of dir) {
+        const target = path.join(root, entry.name);
+        try {
+          if ((await fsp.lstat(target)).uid !== sandbox.uid) continue;
+        } catch {
+          continue; // removed meanwhile
+        }
+        batch.push(target);
+        if (batch.length >= JUDGE_CONFIG.SANDBOX_STRAY_REMOVE_BATCH) await flush();
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        logger.warn('failed to scan for files a sandbox identity left behind', {
+          context: options.context, uid: sandbox.uid, root, err: String(error),
+        });
+      }
+    }
+  }
+  await flush();
 }

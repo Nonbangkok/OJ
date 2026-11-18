@@ -1,5 +1,7 @@
+import { promises as fsp } from 'fs';
 import {
   canDropPrivileges,
+  ensureSandboxSubmissionsRoot,
   nextSandboxIdentity,
   prlimitAvailable,
   prlimitWrap,
@@ -20,6 +22,7 @@ import { JUDGE_CONFIG } from '../../constants';
 jest.mock('fs', () => ({
   existsSync: jest.fn(() => true),
   realpathSync: jest.fn(() => '/tmp'),
+  promises: { mkdir: jest.fn(), lstat: jest.fn(), chmod: jest.fn() },
 }));
 
 describe('sandboxProcess', () => {
@@ -273,6 +276,29 @@ describe('sandboxProcess', () => {
       expect(JUDGE_CONFIG.WORKSPACE_OP_MAX_BUFFER).toBeLessThanOrEqual(64 * 1024);
       // Parent dir: sticky + writable by sandbox uids, unreadable by others.
       expect(JUDGE_CONFIG.SANDBOX_PARENT_DIR_MODE).toBe(0o1733);
+    });
+
+    it('re-asserts 1733 on a submissions root the backend owns', async () => {
+      (fsp.lstat as jest.Mock).mockResolvedValueOnce({ isDirectory: () => true, uid: process.getuid?.() });
+
+      await expect(ensureSandboxSubmissionsRoot()).resolves.toBe('/tmp/oj-submissions');
+
+      expect(fsp.chmod).toHaveBeenCalledWith('/tmp/oj-submissions', 0o1733);
+    });
+
+    it('refuses a submissions root a sandbox uid created first (it would own every workspace\'s parent)', async () => {
+      (fsp.lstat as jest.Mock).mockResolvedValueOnce({ isDirectory: () => true, uid: JUDGE_CONFIG.SANDBOX_UID_BASE + 7 });
+      (fsp.chmod as jest.Mock).mockClear();
+
+      await expect(ensureSandboxSubmissionsRoot()).rejects.toThrow(/refusing to use \/tmp\/oj-submissions/);
+
+      expect(fsp.chmod).not.toHaveBeenCalled();
+    });
+
+    it('refuses a submissions root that is a symlink', async () => {
+      (fsp.lstat as jest.Mock).mockResolvedValueOnce({ isDirectory: () => false, uid: process.getuid?.() });
+
+      await expect(ensureSandboxSubmissionsRoot()).rejects.toThrow(/refusing/);
     });
   });
 });

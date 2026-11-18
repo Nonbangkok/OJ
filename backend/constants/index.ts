@@ -212,6 +212,8 @@ export const JUDGE_CONFIG = {
     WRAPPER_TIME_REPORT: /TIME_USED:([0-9.+]+)/,
     WRAPPER_MEM_REPORT: /MEM_USED:(\d+)/,
     WRAPPER_TELEMETRY_STRIP: /\s*TIME_USED:[0-9.+]+\s*MEM_USED:\d+\s*|\s*(?:TIME_USED:[0-9.+]+|MEM_USED:\d+)\s*/g,
+    // The judge's wrapper (also the per-uid sweep helper, `--kill-uid`).
+    TIME_WRAPPER_PATH: './scripts/time_wrapper',
     // CPU-time slack (seconds) added on top of the wall-clock limit before the
     // in-process RLIMIT_CPU hard-kills the program. The `timeout` command still
     // owns wall-clock TLE detection; this is a defence-in-depth backstop against
@@ -262,6 +264,18 @@ export const JUDGE_CONFIG = {
     // Wall-clock/output caps for the uid-dropped workspace helper spawns.
     WORKSPACE_OP_TIMEOUT_MS: 5000,
     WORKSPACE_OP_MAX_BUFFER: 64 * 1024,
+    // Per-uid process sweep (`time_wrapper --kill-uid`, A4-02): SIGKILLs
+    // every process of a sandbox identity as that identity. Runs before an
+    // identity is handed out, after the compile, after every testcase and
+    // at the end of the pipeline; a sweep that fails quarantines the uid.
+    SANDBOX_SWEEP_TIMEOUT_MS: 5000,
+    // World-writable places outside the workspace a sandbox uid can still
+    // reach (the image makes /tmp, /var/tmp and /run/lock 1755; /dev/shm
+    // and /dev/mqueue are runtime mounts). After each submission every
+    // top-level entry the uid owns here, or in the submissions root, is
+    // removed as the uid (A9-05).
+    SANDBOX_SHARED_SCRATCH_DIRS: ['/tmp', '/var/tmp', '/run/lock', '/dev/shm', '/dev/mqueue'],
+    SANDBOX_STRAY_REMOVE_BATCH: 256,
     // --- Compile-step resource caps (RUNNER-005), mirroring the authoring
     // compiler's prlimit recipe ---
     PRLIMIT_PATH: '/usr/bin/prlimit',

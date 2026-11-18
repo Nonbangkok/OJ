@@ -22,12 +22,15 @@ import { awardSolveReward } from './progressionService';
 import { enqueueTrackedJudgeTask } from './judgeQueue';
 import { getHeaderJudgeSpec } from './problemFilesService';
 import {
+  acquireSandboxIdentity,
   canDropPrivileges,
   chmodSandboxPath,
   createSandboxWorkspace,
-  nextSandboxIdentity,
+  killSandboxProcesses,
   prlimitWrap,
+  releaseSandboxIdentity,
   removeSandboxFiles,
+  removeSandboxStrays,
   removeSandboxWorkspace,
   runBoundedChildProcess,
   SandboxIdentity,
@@ -363,8 +366,11 @@ async function runSubmissionPipeline(
     // testcase run of THIS submission share one pool uid+gid, distinct from
     // any concurrently judged submission's. RLIMIT_NPROC is per-uid, so
     // forking budgets stay independent, and file ownership gives the
-    // workspace its privacy below.
-    const sandbox = nextSandboxIdentity();
+    // workspace its privacy below. In production nothing may still run
+    // under the uid when it is handed out (A4-02): the acquisition kills
+    // any leftovers and fails closed (System Error) if it cannot.
+    const privilegedRun = canDropPrivileges();
+    const sandbox = await acquireSandboxIdentity({ sweep: privilegedRun });
     cleanupIdentity = sandbox;
 
     // Per-submission workspace (RUNNER-003): every submission gets a private
@@ -382,7 +388,6 @@ async function runSubmissionPipeline(
     // by uid-dropped children — the sandbox identity owns it BY CONSTRUCTION
     // and `chown` is never called. The dev path (no uid drop available)
     // keeps the plain mkdtemp/write flow.
-    const privilegedRun = canDropPrivileges();
     privileged = privilegedRun;
     if (privilegedRun) {
       workspaceDir = await createSandboxWorkspace(`${uniqueId}_`, { sandbox, context: uniqueId });
@@ -421,6 +426,10 @@ async function runSubmissionPipeline(
     // no server directories at all.
     const compileCommand = prlimitWrap(plan.check.command, plan.check.args);
     const compile = await runBoundedCompile(workspaceDir, compileCommand.command, compileCommand.args, sandbox);
+    // Nothing the prepare step started may outlive it (A4-02): root cannot
+    // kill a timed-out compile in production (no CAP_KILL), the sweep can.
+    // Throws (System Error) if the uid cannot be proven clean.
+    if (privileged) await killSandboxProcesses(sandbox);
     if (!compile.ok) {
       logger.warn('submission compile failed', { submissionId, table, language: submissionLanguage, stderr: compile.stderr });
       await recordCompilationError(
@@ -545,6 +554,22 @@ async function runSubmissionPipeline(
       logger.error('failed to record system-error status', { submissionId, table, err: dbError });
     }
   } finally {
+    // No process of this submission may outlive it (A4-02): kill whatever is
+    // left under its uid before anything is removed (a live process could
+    // recreate files). Every verdict above was written after a passing
+    // sweep (compile, each testcase); this one covers the exception paths.
+    // If it fails, the uid is quarantined instead of returned to the pool.
+    let sandboxClean = true;
+    if (cleanupIdentity && privileged) {
+      try {
+        await killSandboxProcesses(cleanupIdentity);
+      } catch (sweepError) {
+        sandboxClean = false;
+        logger.error('sandbox identity quarantined: its processes could not be killed', {
+          submissionId, table, uid: cleanupIdentity.uid, err: sweepError,
+        });
+      }
+    }
     // Remove the whole per-submission workspace (source, binary, compiler
     // scratch). One recursive rmtree replaces the per-file unlinks. In the
     // by-construction path the workspace is uid-owned and root cannot remove
@@ -558,6 +583,11 @@ async function runSubmissionPipeline(
           if (err) logger.warn('failed to delete submission workspace', { submissionId, err });
         });
       }
+    }
+    if (cleanupIdentity) {
+      // ...and anything it wrote outside the workspace (A9-05).
+      if (privileged) await removeSandboxStrays(cleanupIdentity, { context: `submission ${submissionId}` });
+      releaseSandboxIdentity(cleanupIdentity, { quarantine: !sandboxClean });
     }
   }
 }

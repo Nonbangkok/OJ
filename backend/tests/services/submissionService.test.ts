@@ -40,6 +40,10 @@ jest.mock('fs', () => ({
         chown: jest.fn(),
         mkdir: jest.fn(),
         rm: jest.fn(),
+        // The submissions root is ours (ensureSandboxSubmissionsRoot checks).
+        lstat: jest.fn(async () => ({ isDirectory: () => true, uid: process.getuid?.() ?? 0 })),
+        // No shared scratch dir holds anything the sandbox uid left behind.
+        opendir: jest.fn(async () => { throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' }); }),
         // mkdtemp yields a workspace directory; tests assert on its usage.
         mkdtemp: jest.fn(async (prefix: string) => `${prefix}XXXXXX`),
     }
@@ -806,6 +810,143 @@ describe('Submission Service', () => {
             expect(helperCmds).not.toContain('dd');
             expect(judge).toHaveBeenCalledTimes(1);
             expect(fs.promises.chown).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('process sweep and scratch cleanup (A4-02 / A9-05)', () => {
+        // Production path: nothing may still run under the sandbox uid when it
+        // is handed out, after the compile, or when the workspace is removed,
+        // and whatever the uid left outside its workspace is removed as the uid.
+        let spawnCalls: Array<[string, string[], Record<string, unknown>]>;
+        /** Exit code of the Nth `--kill-uid` sweep of this pipeline (default 0). */
+        let sweepExitCodes: number[];
+
+        const isSweep = ([, args]: [string, string[], unknown]): boolean => args[0] === '--kill-uid';
+
+        beforeEach(() => {
+            spawnCalls = [];
+            sweepExitCodes = [];
+            const sandboxProcess = jest.requireActual('../../utils/sandboxProcess');
+            jest.spyOn(sandboxProcess, 'canDropPrivileges').mockReturnValue(true);
+            (cp.spawn as unknown as jest.Mock).mockImplementation(
+                (command: string, args: string[], options: Record<string, unknown>) => {
+                    spawnCalls.push([command, args, options]);
+                    const sweepIndex = spawnCalls.filter(isSweep).length - 1;
+                    const exitCode = args[0] === '--kill-uid' ? (sweepExitCodes[sweepIndex] ?? 0) : 0;
+                    const handlers: Record<string, (...a: unknown[]) => void> = {};
+                    const child = {
+                        pid: 1111,
+                        stdin: { on: jest.fn(), end: jest.fn() },
+                        stdout: { on: (_e: string, fn: (...a: unknown[]) => void) => { handlers.stdout = fn; } },
+                        stderr: { on: (_e: string, fn: (...a: unknown[]) => void) => { handlers.stderr = fn; } },
+                        on: (event: string, fn: (...a: unknown[]) => void) => { handlers[event] = fn; },
+                        kill: jest.fn(),
+                    };
+                    setImmediate(() => {
+                        if (command === 'mktemp') handlers.stdout?.(Buffer.from('/tmp/oj-submissions/sub_1_1_testws\n'));
+                        handlers.close?.(exitCode, null);
+                    });
+                    return child;
+                }
+            );
+        });
+
+        afterEach(() => {
+            (cp.spawn as unknown as jest.Mock).mockImplementation(benignSpawn as never);
+            (fs.promises.opendir as jest.Mock).mockImplementation(async () => {
+                throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+            });
+            (fs.promises.lstat as jest.Mock).mockImplementation(async () => ({ isDirectory: () => true, uid: process.getuid?.() ?? 0 }));
+        });
+
+        const queueAcceptedRun = (): void => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}) // UPDATE Running
+                .mockResolvedValueOnce({ rowCount: 1 }); // final UPDATE (landed)
+            (judge as jest.Mock).mockResolvedValueOnce({
+                results: [], score: 100, overallStatus: 'Accepted', maxTimeMs: 1, maxMemoryKb: 1024
+            });
+        };
+
+        it('sweeps the uid before it is used, after the compile, and before the workspace is removed', async () => {
+            queueAcceptedRun();
+
+            await processSubmission(1);
+
+            const order = spawnCalls.map(([command, args]) => (args[0] === '--kill-uid' ? 'sweep' : command));
+            const sweeps = spawnCalls.filter(isSweep);
+            expect(sweeps).toHaveLength(3);
+            // Run as root (the helper drops to the uid itself), for the uid the pipeline used.
+            const uid = Number(sweeps[0][1][1]);
+            expect(uid).toBeGreaterThanOrEqual(JUDGE_CONFIG.SANDBOX_UID_BASE);
+            for (const [command, args, options] of sweeps) {
+                expect(path.basename(command)).toBe('time_wrapper');
+                expect(args).toEqual(['--kill-uid', String(uid)]);
+                expect(options.uid).toBeUndefined();
+            }
+            expect(order.indexOf('sweep')).toBeLessThan(order.indexOf('mktemp'));
+            expect(order.indexOf(JUDGE_CONFIG.PRLIMIT_PATH)).toBeLessThan(order.indexOf('sweep', order.indexOf('mktemp')));
+            const removeWorkspace = spawnCalls.findIndex(([command, args]) => command === 'rm' && args.includes('/tmp/oj-submissions/sub_1_1_testws'));
+            expect(order.lastIndexOf('sweep')).toBeLessThan(removeWorkspace);
+            expect((judge as jest.Mock).mock.calls[0][3].uid).toBe(uid);
+        });
+
+        it('removes, as the uid, what the uid left in the shared scratch dirs', async () => {
+            queueAcceptedRun();
+            let uid = -1;
+            (fs.promises.opendir as jest.Mock).mockImplementation(async (root: string) => {
+                if (root !== '/dev/shm') throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+                uid = Number(spawnCalls.find(isSweep)?.[1][1]);
+                return (async function* entries() {
+                    yield { name: 'mine' };
+                    yield { name: 'someone-elses' };
+                })();
+            });
+            (fs.promises.lstat as jest.Mock).mockImplementation(async (target: string) => ({
+                isDirectory: () => true,
+                uid: target === '/dev/shm/mine' ? uid : target === '/dev/shm/someone-elses' ? 0 : (process.getuid?.() ?? 0),
+            }));
+
+            await processSubmission(1);
+
+            const removals = spawnCalls.filter(([command, args]) => command === 'rm' && args.includes('/dev/shm/mine'));
+            expect(removals).toHaveLength(1);
+            expect(removals[0][1]).toEqual(['-rf', '--', '/dev/shm/mine']);
+            expect(removals[0][2].uid).toBe(uid);
+            expect(spawnCalls.some(([, args]) => args.includes('/dev/shm/someone-elses'))).toBe(false);
+        });
+
+        it('fails closed (System Error, nothing compiled) when the uid cannot be swept before use', async () => {
+            sweepExitCodes = [3];
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}); // UPDATE System Error
+
+            await processSubmission(1);
+
+            expect(db.query).toHaveBeenNthCalledWith(3,
+                expect.stringContaining('UPDATE submissions SET overall_status = \'System Error\''), [1]);
+            const commands = spawnCalls.map(([command]) => command);
+            expect(commands).not.toContain('mktemp');
+            expect(commands).not.toContain(JUDGE_CONFIG.PRLIMIT_PATH);
+            expect(judge).not.toHaveBeenCalled();
+        });
+
+        it('fails closed (System Error, nothing runs) when the compile leaves processes that cannot be killed', async () => {
+            sweepExitCodes = [0, 3];
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}); // UPDATE System Error
+
+            await processSubmission(1);
+
+            expect(db.query).toHaveBeenNthCalledWith(3,
+                expect.stringContaining('UPDATE submissions SET overall_status = \'System Error\''), [1]);
+            expect(judge).not.toHaveBeenCalled();
         });
     });
 
