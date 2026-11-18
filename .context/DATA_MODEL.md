@@ -543,6 +543,8 @@ three-table write. See `AUTHORING_PUBLISH.md`.
 
 Possible `status` values: `Accepted`, `Wrong Answer`, `Time Limit Exceeded`, `Memory Limit Exceeded`, `Runtime Error`, `System Error`, `Skipped`.
 
+A failed case other than Wrong Answer may carry `output`: for a Runtime Error the program's stderr without server paths, capped at 4 KiB with a `[truncated N bytes]` marker (on header problems only a neutral crash description such as `Program terminated by signal SIGABRT`).
+
 ### `contest_scoreboards.detailed_scores`
 
 Two shapes exist and readers must accept both:

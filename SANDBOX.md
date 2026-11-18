@@ -24,10 +24,11 @@ change, so they ship immediately.
 
 ### 1. Environment stripping for executed code
 `backend/services/judgeService.ts` runs each testcase with
-`env: { PATH: JUDGE_CONFIG.SANDBOX_PATH }` (`/usr/bin:/bin`). The compiled
-binary no longer inherits `DATABASE_URL` / `PGPASSWORD` / `SECRET_KEY`, so it
-cannot read them via `getenv()`. Only a minimal `PATH` is provided (needed for
-the shell to locate `timeout`).
+`env: { PATH: JUDGE_CONFIG.SANDBOX_PATH, TMPDIR: <workspace> }` (`PATH` is
+`/usr/bin:/bin`). The compiled binary no longer inherits `DATABASE_URL` /
+`PGPASSWORD` / `SECRET_KEY`, so it cannot read them via `getenv()`. Only a
+minimal `PATH` (to locate `timeout`) and `TMPDIR` (the submission's own
+workspace, see section 6) are provided.
 
 ### 2. In-process resource limits + privilege drop
 `backend/scripts/time_wrapper.c` (the per-run wrapper) now, in the child between
@@ -46,11 +47,32 @@ the shell to locate `timeout`).
 
 The memory limit (MB), CPU-seconds and sandbox uid are passed as **positional
 argv parameters** by `judgeService.ts`:
-`timeout -k <grace>s <limit>s ./scripts/time_wrapper <exe> <mem_mb> <cpu_s> <uid>`.
-The wrapper strips those values from the child's argv before `execv`, and
-its `TIME_USED:.../MEM_USED:...` stderr line is unchanged so the judge parser
-still works. The wrapper remains backwards-compatible with the legacy 1-arg
-invocation (no limits applied).
+`timeout -k <grace>s <limit>s ./scripts/time_wrapper <exe> <mem_mb> <cpu_s> <uid>`,
+spawned without a shell. The wrapper strips those values from the child's
+argv before `execv`. The wrapper remains backwards-compatible with the legacy
+1-arg invocation (no limits applied).
+
+**Telemetry on its own fd (A4-04).** The wrapper reports
+`TIME_USED:<user>+<sys> MEM_USED:<kb>` on fd 3, a fourth pipe the judge opens
+for it. The fd is close-on-exec and closed in the child before `execv`, so
+the program never has it, and the judge parses time and memory from fd 3
+only. Stderr is shared with the program: when the figures came from there, a
+program could print `MEM_USED:1` first and turn a Memory Limit Exceeded into
+an Accepted. A missing report still means the wrapper was killed (timeout
+evidence). Without fd 3 (a manual run) the line goes to stderr as before.
+
+**Runtime Error output (A9-04).** The judge keeps at most 64 KiB of a run's
+stderr in memory and drains the rest. The stored Runtime Error text has
+telemetry look-alikes, NUL bytes and the workspace path removed (a Python
+traceback names `solution.py`, not `/tmp/oj-submissions/<id>/solution.py`) and
+is capped at 4 KiB with a `[truncated N bytes]` marker
+(`formatRuntimeErrorOutput`). On **header problems** the grader is compiled
+into the student's process, which can read the grader's code and string
+literals from its own memory or `/proc/self/exe`. Program stderr is therefore
+never stored for them, only a neutral description such as
+`Program terminated by signal SIGABRT` (this also drops the UBSan line there).
+Narrow channels remain (per-case verdict, time, memory), so a grader must
+still never embed answers or other secrets.
 
 ### 3. Compile-step DoS guard
 `backend/services/submissionService.ts` (`processSubmission` and
@@ -127,6 +149,22 @@ by-construction design needs no extra privilege and works regardless of the
 container's capability set. (It was verified live in a production-caps
 container via `backend/scripts/verifyHotfix.ts` — `node dist/scripts/verifyHotfix.js`.)
 
+**Judged code writes only inside its workspace (A9-05, A9-02 pre-claim).**
+The backend image sets `/tmp`, `/var/tmp` and `/run/lock` to **1755** (root,
+their owner, still writes there; sandbox uids cannot) and creates
+`/tmp/oj-submissions` root-owned at 1733 at build time. A judged program can
+therefore neither fill the disk outside its workspace nor create a path the
+backend later trusts (such as `/tmp/oj_uploads`). The compile and every run
+get `TMPDIR=<workspace>` (g++, `py_compile` and Python's `tempfile` honour it;
+glibc `tmpfile()` ignores `TMPDIR` and now fails for judged programs).
+`ensureSandboxSubmissionsRoot` refuses a submissions root it does not own.
+What a uid can still write outside its workspace (siblings in the 1733 root,
+`/dev/shm`, `/dev/mqueue`, which are runtime mounts) is removed after each
+submission: root lists those directories and a uid-dropped `rm -rf` deletes
+every top-level entry the uid owns (`removeSandboxStrays`). Disk use inside
+the workspace is still bounded only per file (`RLIMIT_FSIZE`) and by the time
+limit, until the workspace is removed.
+
 Because RLIMIT_NPROC is enforced **per uid**, concurrent submissions run
 under *distinct* pool identities — the compile and all testcase runs of one
 submission share one identity (passed from `submissionService` through
@@ -135,13 +173,34 @@ judged submission gets a different one. A submission forking toward its
 process cap can no longer starve a concurrent legitimate submission (the old
 behavior: everything ran as nobody/65534 and shared one NPROC budget of 64).
 
-### 7. TLE SIGKILL escalation (RUNNER-004)
+### 7. TLE SIGKILL escalation (RUNNER-004) and the per-uid sweep (A4-02)
 The judge's wall-clock command is now `timeout -k <grace>s <limit>s ...`
 (KILL_GRACE_MS = 2s): after the limit GNU timeout sends SIGTERM, then SIGKILLs
 a process that ignores it. A Node-side escalation timer
 (`JUDGE_CONFIG.TIMEOUT_BUFFER_MS + KILL_GRACE_MS` after the limit) force-kills
 the whole process group as a backstop, so a SIGTERM-ignoring sleeper can no
 longer hold a judge slot (3 of which would stall all judging).
+
+Those kills only reach root's own processes. In production root has no
+`CAP_KILL`, so neither `timeout` nor Node can signal the sandbox uid: a
+sleeping TLE program, or a `setsid`'d daemon with its stdio closed, outlived
+its submission, came back with the same uid 16 pipelines later, and could read
+or tamper with that later submission's workspace (including a header
+problem's grader during the compile). Now `time_wrapper --kill-uid <uid>`
+drops to the uid and calls `kill(-1, SIGKILL)`, which from uid X reaches
+exactly X's processes and needs no capability, and repeats until
+`/proc/<pid>/status` shows no live process with that uid (bounded, about a
+second; a "zombie" whose `Threads:` count is above 1 still has running
+threads and counts as live). It runs (`killSandboxProcesses`) before an identity is handed out,
+after the compile, after every testcase (which also releases stdio pipes an
+orphan still holds) and in the pipeline's `finally` before the workspace is
+removed. It fails closed: a sweep that cannot run or leaves processes makes
+the submission a System Error, and the uid is quarantined until a later sweep
+passes. `acquireSandboxIdentity` also never hands an identity to a second live
+pipeline. The helper refuses to run unless started as root, so a dev run
+cannot kill the developer's own processes. Memory is still accounted per
+process (`RLIMIT_AS`, `wait4` peak RSS), so forked workers can together use
+more than the limit (A9-06, open by owner decision).
 
 ### 8. seccomp socket-deny in time_wrapper (RUNNER-002, partial)
 `time_wrapper.c` now installs a seccomp filter (recipe copied from
