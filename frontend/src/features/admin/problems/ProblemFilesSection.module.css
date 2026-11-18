@@ -131,6 +131,11 @@
   line-height: 1.45;
 }
 
+.section .done {
+  color: var(--verdict-accepted);
+  font-size: var(--font-size-metadata);
+}
+
 .section .error {
   color: var(--error-text);
   font-size: var(--font-size-metadata);

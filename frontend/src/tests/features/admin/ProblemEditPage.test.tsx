@@ -167,6 +167,20 @@ describe('ProblemEditPage', () => {
     expect(await screen.findByText('grader.cpp')).toBeInTheDocument();
   });
 
+  it('Grader files tab offers the admin a rejudge of the earlier submissions after a replace', async () => {
+    jest.mocked(adminService.getProblemDetail).mockResolvedValue(detail({ problem_type: 'header', submission_filename: 'student.h' }) as never);
+    jest.mocked(adminService.getProblemFiles).mockResolvedValue(filesInfo() as never);
+    jest.mocked(adminService.replaceProblemFiles).mockResolvedValue({ message: 'ok' } as never);
+    jest.mocked(adminService.rejudgeProblem).mockResolvedValue({ message: 'ok' } as never);
+    renderAt('/admin/problems/P1/grader');
+    await screen.findByText('grader.cpp');
+    fireEvent.change(screen.getByLabelText('Replace all grader files'), { target: { files: [new File(['z'], 'g.zip')] } });
+    const dialog = await screen.findByRole('dialog', { name: 'Replace all grader files?' });
+    expect(dialog).toHaveTextContent('214 earlier submissions');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Replace and rejudge' }));
+    await waitFor(() => expect(adminService.rejudgeProblem).toHaveBeenCalledWith('P1'));
+  });
+
   it('Danger zone deletes with a typed confirm naming submissions', async () => {
     jest.mocked(adminService.deleteProblem).mockResolvedValue({ message: 'ok' });
     renderAt('/admin/problems/P1/danger');

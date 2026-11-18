@@ -5,8 +5,16 @@ import type { ProblemFilesResponse } from '../../../types';
 import ProblemFilesSection from './ProblemFilesSection';
 import styles from './ProblemEditor.module.css';
 
+interface ProblemGraderTabProps {
+  problemId: string;
+  /** Submissions judged with the current grader (B6 facts). */
+  submissionCount: number;
+  /** Rejudge is admin-only on the server. */
+  canRejudge: boolean;
+}
+
 /** Grader files tab (header problems): the grader and starter file sets. */
-export default function ProblemGraderTab({ problemId }: { problemId: string }) {
+export default function ProblemGraderTab({ problemId, submissionCount, canRejudge }: ProblemGraderTabProps) {
   const [files, setFiles] = useState<ProblemFilesResponse | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -34,7 +42,15 @@ export default function ProblemGraderTab({ problemId }: { problemId: string }) {
     <div className={styles.panel}>
       {failed && !files && <InlineError message="Could not load the grader files." />}
       {!failed && !files && <p className={styles.muted} aria-live="polite">Loading grader files…</p>}
-      {files && <ProblemFilesSection problemId={problemId} files={files.files} onChanged={load} />}
+      {files && (
+        <ProblemFilesSection
+          problemId={problemId}
+          files={files.files}
+          onChanged={load}
+          submissionCount={submissionCount}
+          canRejudge={canRejudge}
+        />
+      )}
     </div>
   );
 }

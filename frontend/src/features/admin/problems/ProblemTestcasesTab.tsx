@@ -6,6 +6,7 @@ import { getErrorMessage } from '../../../utils/error';
 import type { TestcaseMetadataResponse, TestcaseViewResponse } from '../../../types';
 import { countZipTestcases } from './countZipTestcases';
 import { uploadTestcasesZip } from './uploadTestcasesZip';
+import RejudgeOnReplace, { plural, rejudgeAfterReplace } from './RejudgeOnReplace';
 import editorStyles from './ProblemEditor.module.css';
 import styles from './ProblemTestcasesTab.module.css';
 
@@ -28,8 +29,6 @@ export const formatSize = (bytes: number): string => {
   }
   return `${(bytes / 1_000_000).toFixed(1)} MB`;
 };
-
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 function CasePane({ label, side }: { label: string; side: TestcaseViewResponse['input'] }) {
   const shown = side.content.slice(0, VIEW_CHARS);
@@ -117,12 +116,9 @@ export default function ProblemTestcasesTab({ problemId, submissionCount, canRej
     let rejudged = false;
     if (rejudgeAfter) {
       setProgress('Starting the rejudge…');
-      try {
-        await adminService.rejudgeProblem(problemId);
-        rejudged = true;
-      } catch (err) {
-        setError(`The rejudge didn't start: ${getErrorMessage(err, 'unknown error')}. Run it from the problem's row menu.`);
-      }
+      const rejudgeError = await rejudgeAfterReplace(problemId);
+      if (rejudgeError) setError(rejudgeError);
+      else rejudged = true;
     }
     setDone(`Replaced with ${plural(next.length, 'testcase')}.${rejudged ? ` Rejudging ${plural(submissionCount, 'submission')}.` : ''}`);
     setProgress('');
@@ -198,21 +194,14 @@ export default function ProblemTestcasesTab({ problemId, submissionCount, canRej
         tier="destructive"
         title={confirmTitle}
         body={(
-          <div className={styles.confirmBody}>
-            <p>Every current case is deleted and replaced by the ones in {pending?.file.name}.</p>
-            {submissionCount > 0 && (
-              <p>{`${plural(submissionCount, 'earlier submission')} ${submissionCount === 1 ? 'was' : 'were'} judged against the current set.`}{!canRejudge && ' An admin can rejudge them afterwards.'}</p>
-            )}
-            {submissionCount > 0 && canRejudge && (
-              <label className={styles.switchRow}>
-                <span className={styles.toggleSwitch}>
-                  <input type="checkbox" role="switch" aria-label="Rejudge after replacing" checked={rejudge} onChange={() => setRejudge((v) => !v)} />
-                  <span className={styles.toggleTrack} aria-hidden="true" />
-                </span>
-                <span>Rejudge after replacing</span>
-              </label>
-            )}
-          </div>
+          <RejudgeOnReplace
+            lead={<>Every current case is deleted and replaced by the ones in {pending?.file.name}.</>}
+            submissionCount={submissionCount}
+            judgedWith="against the current set"
+            canRejudge={canRejudge}
+            rejudge={rejudge}
+            onToggleRejudge={() => setRejudge((v) => !v)}
+          />
         )}
         confirmLabel={willRejudge ? 'Replace and rejudge' : 'Replace testcases'}
         onConfirm={() => { void replace(); }}

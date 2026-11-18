@@ -1,0 +1,68 @@
+/* The body of a replace confirm that judged submissions depend on
+   (testcases, grader files): what goes, who was judged with it, and the
+   admin's rejudge switch. Moved verbatim from the Testcases tab. */
+
+.confirmBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.confirmBody p {
+  margin: 0;
+}
+
+.switchRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.toggleSwitch {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 50px;
+  height: 28px;
+}
+
+.toggleSwitch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleTrack {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  background-color: var(--action-disabled-bg);
+  border-radius: 34px;
+  transition: 0.2s;
+}
+
+.toggleTrack::before {
+  position: absolute;
+  content: '';
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: var(--background-primary);
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+.toggleSwitch input:checked + .toggleTrack {
+  background-color: var(--accent-primary);
+}
+
+.toggleSwitch input:focus-visible + .toggleTrack {
+  outline: 3px solid var(--action-focus-ring);
+  outline-offset: 2px;
+}
+
+.toggleSwitch input:checked + .toggleTrack::before {
+  transform: translateX(22px);
+}
