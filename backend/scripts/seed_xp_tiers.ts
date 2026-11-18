@@ -1,23 +1,53 @@
 import 'dotenv/config';
+import { randomBytes } from 'crypto';
+import bcrypt from 'bcrypt';
+import type { Pool } from 'pg';
 import { pool } from '../db';
+import { SECURITY_CONFIG, USER_ROLES, USER_VALIDATION } from '../constants';
 
 /**
  * Seeds demo users spanning every tier and interesting level boundary so the
  * profile progression UI can be reviewed at a glance. Idempotent: users and
- * rewards are keyed by username/(user, problem) so reruns are no-ops.
+ * rewards are keyed by username/(user, problem) so reruns add nothing new.
  *
  * The demo problems are synthetic ids (e.g. "demo-l3-a") with a difficulty
  * snapshot baked into each reward — user_problem_rewards deliberately has no
  * FK to problems, so these need no problems rows. Real problems are mixed in
  * for a couple of users so the Recent XP list shows real titles too.
  *
- * All demo accounts share the password Verify#2026.
+ * The demo accounts' password is never kept in the repository. Each run
+ * generates a random one and prints it once, unless XP_DEMO_PASSWORD is set
+ * (then that is used and not printed). Demo accounts that already exist with
+ * role `user` get the same password, so the one printed is the one that works.
+ * Refuses to run with NODE_ENV=production: demo accounts never belong there.
  *
  * Run inside the backend container after building:
  *   docker cp dist/scripts/seed_xp_tiers.js <backend>:/usr/src/app/dist/scripts/
  *   docker exec <backend> node dist/scripts/seed_xp_tiers.js
+ * (`docker exec -e XP_DEMO_PASSWORD <backend> ...` passes a chosen password
+ * from your shell's environment without putting it on the command line.)
  */
-const PASSWORD_HASH = '$2b$10$xi4NMhV7K4l1EYETwVknUeiexy25E0xgopFV/Jy2CR8EuW/wjR7hu';
+export const DEMO_PASSWORD_ENV = 'XP_DEMO_PASSWORD';
+
+type Env = Record<string, string | undefined>;
+
+export const assertSeedingAllowed = (env: Env = process.env): void => {
+    if (env.NODE_ENV === 'production') {
+        throw new Error('seed_xp_tiers creates demo accounts and refuses to run with NODE_ENV=production.');
+    }
+};
+
+export const resolveDemoPassword = (env: Env = process.env): { password: string; generated: boolean } => {
+    const chosen = env[DEMO_PASSWORD_ENV];
+    if (chosen) {
+        if (chosen.length < USER_VALIDATION.MIN_PASSWORD_LENGTH) {
+            throw new Error(`${DEMO_PASSWORD_ENV} must be at least ${USER_VALIDATION.MIN_PASSWORD_LENGTH} characters long.`);
+        }
+        return { password: chosen, generated: false };
+    }
+    // 18 random bytes: a 24-character base64url password.
+    return { password: randomBytes(18).toString('base64url'), generated: true };
+};
 
 /** Exact XP for a difficulty (must match calculateProblemXP). */
 const xp = (difficulty: number): number =>
@@ -128,75 +158,107 @@ const DEMO_USERS: DemoUser[] = [
     { username: 'xp-grandmaster-40', targetXp: 152100, daysBack: 28 },// Grandmaster L40
 ];
 
-const main = async (): Promise<void> => {
+type Log = (message: string) => void;
+
+/** Creates (or refreshes) the demo accounts and their rewards in one transaction. */
+export const seedXpTiers = async (database: Pick<Pool, 'connect'>, passwordHash: string, log: Log): Promise<void> => {
+    const client = await database.connect();
     try {
-        const client = await pool.connect();
-        try {
-            await client.query('BEGIN');
+        await client.query('BEGIN');
 
-            for (const demo of DEMO_USERS) {
-                const inserted = await client.query(
-                    `INSERT INTO users (username, password_hash, role, created_at)
-                     VALUES ($1, $2, 'user', NOW() - ($3 || ' days')::interval)
-                     ON CONFLICT (username) DO NOTHING
-                     RETURNING id`,
-                    [demo.username, PASSWORD_HASH, demo.daysBack + 30],
+        for (const demo of DEMO_USERS) {
+            const inserted = await client.query<{ id: number }>(
+                `INSERT INTO users (username, password_hash, role, created_at)
+                 VALUES ($1, $2, '${USER_ROLES.USER}', NOW() - ($3 || ' days')::interval)
+                 ON CONFLICT (username) DO NOTHING
+                 RETURNING id`,
+                [demo.username, passwordHash, demo.daysBack + 30],
+            );
+            let userId: number;
+            if (inserted.rows.length > 0) {
+                userId = inserted.rows[0].id;
+                log(`created user ${demo.username} (${userId})`);
+            } else {
+                const existing = await client.query<{ id: number; role: string }>(
+                    'SELECT id, role FROM users WHERE username = $1',
+                    [demo.username],
                 );
-                let userId: number;
-                if (inserted.rows.length > 0) {
-                    userId = inserted.rows[0].id;
-                    console.log(`created user ${demo.username} (${userId})`);
-                } else {
-                    const existing = await client.query('SELECT id FROM users WHERE username = $1', [demo.username]);
-                    userId = existing.rows[0].id;
+                userId = existing.rows[0].id;
+                // Older runs gave demo accounts a password that was public in
+                // the repository; only plain users are demo accounts.
+                if (existing.rows[0].role === USER_ROLES.USER) {
+                    await client.query('UPDATE users SET password_hash = $2 WHERE id = $1', [userId, passwordHash]);
+                    log(`reset the password of existing user ${demo.username} (${userId})`);
                 }
-
-                // Rerun safety: never re-seed a user that already has rewards.
-                const has = await client.query(
-                    'SELECT 1 FROM user_problem_rewards WHERE user_id = $1 LIMIT 1',
-                    [userId],
-                );
-                if (has.rows.length > 0) {
-                    console.log(`skip ${demo.username}: rewards already exist`);
-                    continue;
-                }
-
-                const rewards = buildRewards(demo.targetXp);
-                // Newest timestamps go to real problems first so the Recent XP
-                // list shows recognizable titles; synthetic fills age backwards.
-                const ordered = [
-                    ...rewards.filter(r => !r.problem.startsWith('demo-')),
-                    ...rewards.filter(r => r.problem.startsWith('demo-')),
-                ];
-                // Spread across the window so history looks organic; at least
-                // one reward lands "today" for streak-adjacent visuals.
-                const span = Math.max(1, demo.daysBack);
-                let dayOffset = 0;
-                let index = 0;
-                for (const reward of ordered) {
-                    await client.query(
-                        `INSERT INTO user_problem_rewards (user_id, problem_id, xp_awarded, difficulty_snapshot, awarded_at)
-                         VALUES ($1, $2, $3, $4, NOW() - ($5 || ' days')::interval)
-                         ON CONFLICT (user_id, problem_id) DO NOTHING`,
-                        [userId, reward.problem, xp(reward.difficulty), reward.difficulty, dayOffset],
-                    );
-                    index += 1;
-                    dayOffset = Math.round((index / Math.max(1, ordered.length)) * span);
-                }
-                console.log(`seeded ${demo.username}: ${demo.targetXp} XP across ${rewards.length} rewards`);
             }
 
-            await client.query('COMMIT');
-            console.log('XP tier demo seeding complete.');
-        } catch (err) {
-            await client.query('ROLLBACK');
-            throw err;
-        } finally {
-            client.release();
+            // Rerun safety: never re-seed a user that already has rewards.
+            const has = await client.query(
+                'SELECT 1 FROM user_problem_rewards WHERE user_id = $1 LIMIT 1',
+                [userId],
+            );
+            if (has.rows.length > 0) {
+                log(`skip ${demo.username}: rewards already exist`);
+                continue;
+            }
+
+            const rewards = buildRewards(demo.targetXp);
+            // Newest timestamps go to real problems first so the Recent XP
+            // list shows recognizable titles; synthetic fills age backwards.
+            const ordered = [
+                ...rewards.filter(r => !r.problem.startsWith('demo-')),
+                ...rewards.filter(r => r.problem.startsWith('demo-')),
+            ];
+            // Spread across the window so history looks organic; at least
+            // one reward lands "today" for streak-adjacent visuals.
+            const span = Math.max(1, demo.daysBack);
+            let dayOffset = 0;
+            let index = 0;
+            for (const reward of ordered) {
+                await client.query(
+                    `INSERT INTO user_problem_rewards (user_id, problem_id, xp_awarded, difficulty_snapshot, awarded_at)
+                     VALUES ($1, $2, $3, $4, NOW() - ($5 || ' days')::interval)
+                     ON CONFLICT (user_id, problem_id) DO NOTHING`,
+                    [userId, reward.problem, xp(reward.difficulty), reward.difficulty, dayOffset],
+                );
+                index += 1;
+                dayOffset = Math.round((index / Math.max(1, ordered.length)) * span);
+            }
+            log(`seeded ${demo.username}: ${demo.targetXp} XP across ${rewards.length} rewards`);
         }
+
+        await client.query('COMMIT');
+        log('XP tier demo seeding complete.');
+    } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
     } finally {
-        await pool.end();
+        client.release();
     }
 };
 
-void main();
+/** Everything but closing the pool: refuse production, pick the password, hash it, seed, print. */
+export const runSeed = async ({ env = process.env, database = pool, log = console.log }: {
+    env?: Env;
+    database?: Pick<Pool, 'connect'>;
+    log?: Log;
+} = {}): Promise<void> => {
+    assertSeedingAllowed(env);
+    const { password, generated } = resolveDemoPassword(env);
+    const passwordHash = await bcrypt.hash(password, SECURITY_CONFIG.SALT_ROUNDS);
+    await seedXpTiers(database, passwordHash, log);
+    log(generated
+        ? `Demo account password (generated for this run, not stored anywhere): ${password}`
+        : `Demo account password: the value of ${DEMO_PASSWORD_ENV}.`);
+};
+
+if (require.main === module) {
+    runSeed()
+        .catch((error: unknown) => {
+            console.error('XP tier demo seeding failed:', error instanceof Error ? error.message : error);
+            process.exitCode = 1;
+        })
+        .finally(() => {
+            void pool.end();
+        });
+}

@@ -122,7 +122,7 @@ Submission statuses and judge tuning (buffers, timeout slack, kill grace, drain 
 
 ### Progression (XP / levels / tiers)
 
-`services/progressionService.ts` — `user_problem_rewards` (one row per unique first solve, migration 0016) is the single source of XP; level (`100·(L−1)²`), tier (Novice → Grandmaster) and global rank are always derived, never stored. XP per solve follows the difficulty-based formula in `constants/progression.ts`. `backend/scripts/backfill_xp.ts` backfills rewards from history; `seed_xp_tiers.ts` is a demo seeder.
+`services/progressionService.ts` — `user_problem_rewards` (one row per unique first solve, migration 0016) is the single source of XP; level (`100·(L−1)²`), tier (Novice → Grandmaster) and global rank are always derived, never stored. XP per solve follows the difficulty-based formula in `constants/progression.ts`. `backend/scripts/backfill_xp.ts` backfills rewards from history; `seed_xp_tiers.ts` is a demo seeder (refuses `NODE_ENV=production`; its accounts get a random password printed once per run, or `XP_DEMO_PASSWORD`; no password is kept in the repo).
 
 ### Realtime
 
