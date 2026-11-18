@@ -257,18 +257,27 @@ describe('Contest Scheduler Service', () => {
         });
 
         it('pause() resolves only after a tick that was already running has finished', async () => {
+            // Independent of query order and of once-values other tests may
+            // have queued: answer by SQL text, hold the tick inside the
+            // finish migration of one contest whose end time has passed.
+            (db.query as jest.Mock).mockReset();
+            (migrateSubmissionsAfterContest as jest.Mock).mockReset();
             let releaseMigration!: () => void;
-            (migrateSubmissionsAfterContest as jest.Mock).mockImplementationOnce(
-                () => new Promise<void>((resolve) => { releaseMigration = resolve; }),
+            (migrateSubmissionsAfterContest as jest.Mock).mockImplementation(
+                () => new Promise((resolve) => {
+                    releaseMigration = () => resolve({ success: true, message: 'ok', migratedSubmissions: 0, finalScoreboard: 0 });
+                }),
             );
-            (db.query as jest.Mock)
-                .mockResolvedValueOnce({ rows: [] })
-                .mockResolvedValueOnce({ rows: [{ id: 7, title: 'Slow Contest', status: 'running' }] })
-                .mockResolvedValueOnce({});
+            (db.query as jest.Mock).mockImplementation(async (sql: string) => (
+                /SELECT[\s\S]*end_time/i.test(sql) && /'running'/.test(sql)
+                    ? { rows: [{ id: 7, title: 'Slow Contest', status: 'running' }] }
+                    : { rows: [], rowCount: 0 }
+            ));
             const tick = contestScheduler.checkContestStatus();
-            for (let i = 0; i < 20 && (migrateSubmissionsAfterContest as jest.Mock).mock.calls.length === 0; i++) {
-                await Promise.resolve();
+            for (let i = 0; i < 50 && (migrateSubmissionsAfterContest as jest.Mock).mock.calls.length === 0; i++) {
+                await new Promise((resolve) => setImmediate(resolve));
             }
+            expect(migrateSubmissionsAfterContest).toHaveBeenCalledTimes(1);
 
             let paused = false;
             const pausing = contestScheduler.pause().then(() => { paused = true; });
