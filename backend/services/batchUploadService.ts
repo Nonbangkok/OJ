@@ -299,6 +299,18 @@ async function processProblemDirectory(problemPath: string): Promise<ProblemProc
       return { status: UPLOAD_STATUS.SKIPPED, problemId };
     }
 
+    // grader/ and starter/ are read only for a header problem. Next to any
+    // other config (problem_type absent or misspelled, which the schema
+    // strips) they would be dropped silently and the secret grader lost, so
+    // the new problem fails instead.
+    if (!isHeader) {
+      const roleFolders = HEADER_FILE_DIRS.filter((role) => filesInProblemDir.includes(role));
+      if (roleFolders.length > 0) {
+        throw new Error(`Problem "${problemId}": ${roleFolders.map((role) => `${role}/`).join(' and ')} `
+          + 'found, but config.json does not set "problem_type": "header".');
+      }
+    }
+
     const pdfFileName = filesInProblemDir.find(f => f.toLowerCase().endsWith('.pdf'));
     if (pdfFileName) {
       try {
@@ -322,6 +334,13 @@ async function processProblemDirectory(problemPath: string): Promise<ProblemProc
       // Validation failure throws -> whole problem rolls back and is reported.
       for (const role of HEADER_FILE_DIRS) {
         const files = await readRoleDirectory(problemPath, role);
+        if (role === 'grader' && files.length === 0) {
+          // Same state admin create allows (and export writes): the problem
+          // exists but is not submittable until a grader is uploaded. A
+          // non-empty grader set must still include a .cpp.
+          log.push('No grader files yet; the problem is not submittable until a grader is uploaded.');
+          continue;
+        }
         try {
           await replaceProblemFiles(client, problemId, role, files);
         } catch (e) {

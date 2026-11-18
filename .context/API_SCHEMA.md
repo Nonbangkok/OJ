@@ -499,7 +499,7 @@
 ### 61. `GET /admin/problems/batch-upload-progress/:progressId`
 - Auth: `staff|admin`
 - Purpose: subscribe progress ของ batch upload
-- Response: `text/event-stream` — Events: `initial`, `progress`, `complete`, `error`
+- Response: `text/event-stream` — Events: `initial`, `progress`, `complete`, `error` (`complete` มี `added`, `skipped`, `errors: [{ directory, message }]`; `errors` ไม่ว่าง = มีโจทย์หรือทั้ง archive ถูกปฏิเสธ)
 
 ### 62. `POST /admin/problems/:id/upload`
 - Auth: `staff|admin`
@@ -515,7 +515,7 @@
 - Body: `{ problemIds: string[] }`
 - Response 200: ZIP binary
 - Error 400: ไม่มี problemIds
-- Header problems: `config.json` มี `problem_type`/`submission_filename` และ ZIP มี `<id>/grader/*`, `<id>/starter/*` (batch upload รับรูปแบบเดียวกัน; ต้องมี grader `.cpp` อย่างน้อยหนึ่งไฟล์, id ที่มีอยู่แล้วถูก SKIPPED)
+- Header problems: `config.json` มี `problem_type`/`submission_filename` และ ZIP มี `<id>/grader/*`, `<id>/starter/*` (batch upload รับรูปแบบเดียวกัน; grader ที่ไม่ว่างต้องมี `.cpp` อย่างน้อยหนึ่งไฟล์ — ไม่มี `grader/` เลยก็ import ได้ แต่ยัง submit ไม่ได้เหมือน admin create; มี `grader/`/`starter/` แต่ config ไม่ใช่ header = error ของโจทย์นั้น; id ที่มีอยู่แล้วถูก SKIPPED)
 
 ### 63a. Header problem files (admin)
 - Auth: `staff|admin`
