@@ -128,6 +128,9 @@ export interface SubmissionDetail extends SubmissionSummary {
   /** The problem's limits, for the time/memory bars. */
   time_limit_ms?: number;
   memory_limit_mb?: number;
+  /** A header submission's code is the file named submission_filename. */
+  problem_type?: 'standard' | 'header' | null;
+  submission_filename?: string | null;
 }
 
 /** Per-status problem counts (GET /problem-status-counts); buckets partition `all`. */

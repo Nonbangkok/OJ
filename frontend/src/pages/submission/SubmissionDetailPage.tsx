@@ -25,8 +25,8 @@ const highlight = (code: string, language: string): string => {
   }
 };
 
-/** Collapsible, copyable source of a submission. */
-function SubmittedCode({ code, language }: { code: string; language: string }) {
+/** Collapsible, copyable source of a submission; `filename` names a header submission's file. */
+function SubmittedCode({ code, language, filename = null }: { code: string; language: string; filename?: string | null }) {
   const [open, setOpen] = useState(true);
   const [copied, setCopied] = useState(false);
   const lines = code.split('\n');
@@ -46,7 +46,9 @@ function SubmittedCode({ code, language }: { code: string; language: string }) {
           {open ? <CaretDown size={14} aria-hidden="true" /> : <CaretRight size={14} aria-hidden="true" />}
           Submitted code
         </button>
-        <span className={styles.codeMeta}>{`${getLanguageDisplayName(language)} · ${lines.length} lines`}</span>
+        <span className={styles.codeMeta}>
+          {[filename, getLanguageDisplayName(language), `${lines.length} lines`].filter(Boolean).join(' · ')}
+        </span>
         <button type="button" className={styles.copy} onClick={copy}>
           <Copy size={14} aria-hidden="true" />
           {copied ? 'Copied' : 'Copy'}
@@ -105,7 +107,11 @@ const SubmissionDetailPage = () => {
               </>
             )}
           />
-          <SubmittedCode code={submission.code} language={submission.language} />
+          <SubmittedCode
+            code={submission.code}
+            language={submission.language}
+            filename={submission.problem_type === 'header' ? submission.submission_filename : null}
+          />
         </>
       )}
     </div>

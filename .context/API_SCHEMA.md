@@ -567,7 +567,7 @@
 ### 68. `GET /submissions/:id`
 - Auth: required (guest ไม่ได้รับสิทธิ์นี้แม้ใน PUBLIC mode)
 - Query optional: `contestId`
-- Response 200: submission detail
+- Response 200: submission detail — row ของ `submissions`/`contest_submissions` + `username`, `problem_name`, `time_limit_ms`, `memory_limit_mb`, `problem_type`, `submission_filename` (จาก `problems`; header submission แสดงชื่อไฟล์ในหัว code panel)
 - Errors:
   - 404 not found (id ต้องเป็นตัวเลข — ไม่ใช่ตอบ 500)
   - 403 ไม่มีสิทธิ์ดู

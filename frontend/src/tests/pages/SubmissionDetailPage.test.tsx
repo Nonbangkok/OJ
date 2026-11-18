@@ -48,6 +48,20 @@ describe('SubmissionDetailPage', () => {
         expect(within(code).queryByText(source)).toBeNull();
     });
 
+    it('a whole-program submission\'s code panel names only the language and length', async () => {
+        jest.mocked(submissionService.getById).mockResolvedValue({ ...detail, problem_type: 'standard', submission_filename: null } as never);
+        renderAt('/submissions/48213');
+        const code = await screen.findByRole('region', { name: 'Submitted code' });
+        expect(within(code).getByText('C++ · 3 lines')).toBeInTheDocument();
+    });
+
+    it('a header submission\'s code panel names the file it was submitted as', async () => {
+        jest.mocked(submissionService.getById).mockResolvedValue({ ...detail, problem_type: 'header', submission_filename: 'queue.hpp' } as never);
+        renderAt('/contests/3/submissions/48213');
+        const code = await screen.findByRole('region', { name: 'Submitted code' });
+        expect(within(code).getByText('queue.hpp · C++ · 3 lines')).toBeInTheDocument();
+    });
+
     it('a Python run is measured against the limits the judge gave it (time x4, memory x2)', async () => {
         jest.mocked(submissionService.getById).mockResolvedValue({ ...detail, language: 'python' } as never);
         renderAt('/submissions/48213');

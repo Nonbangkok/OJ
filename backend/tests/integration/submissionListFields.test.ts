@@ -92,6 +92,29 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     expect(await getSubmissionDetail(String(id))).toMatchObject({ time_limit_ms: 1500, memory_limit_mb: 128 });
   });
 
+  it('detail carries the problem type and the header file name the code was submitted as', async () => {
+    await pool.query("UPDATE problems SET problem_type = 'header', submission_filename = 'queue.hpp' WHERE id = 'vis'");
+    const header = await submit(1, 'vis', 'Accepted', 100, '[]');
+    expect(await getSubmissionDetail(String(header))).toMatchObject({ problem_type: 'header', submission_filename: 'queue.hpp' });
+    const standard = await submit(1, 'hid', 'Accepted', 100, '[]');
+    expect(await getSubmissionDetail(String(standard))).toMatchObject({ problem_type: 'standard', submission_filename: null });
+  });
+
+  it('contest detail carries the problem type and header file name too', async () => {
+    await pool.query('DELETE FROM contests WHERE id = 5');
+    await pool.query("UPDATE problems SET problem_type = 'header', submission_filename = 'student.h' WHERE id = 'vis'");
+    await pool.query(`INSERT INTO contests (id, title, start_time, end_time, status)
+      VALUES (5, 'C', NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 hour', 'running')`);
+    await pool.query("INSERT INTO contest_problems (contest_id, problem_id, title) VALUES (5, 'vis', 'Visible (contest)')");
+    const { rows: [{ id }] } = await pool.query(
+      `INSERT INTO contest_submissions (contest_id, user_id, problem_id, code, language, overall_status, score, results)
+       VALUES (5, 1, 'vis', 'x', 'cpp', 'Accepted', 100, '[]') RETURNING id`,
+    );
+    expect(await getSubmissionDetail(String(id), '5')).toMatchObject({
+      problem_name: 'Visible (contest)', problem_type: 'header', submission_filename: 'student.h',
+    });
+  });
+
   it('problem detail carries collection, viewer best and submission count', async () => {
     await submit(1, 'vis', 'Wrong Answer', 40, '[{"status":"Accepted"},{"status":"Wrong Answer"}]');
     await submit(1, 'vis', 'Wrong Answer', 20, '[{"status":"Wrong Answer"}]');

@@ -186,8 +186,17 @@ export interface SubmissionRow {
 }
 
 
+/** Problem facts the submission page shows next to the code (LEFT JOIN, so null for a deleted problem). */
+export interface SubmissionDetailProblemFields {
+    time_limit_ms: number | null;
+    memory_limit_mb: number | null;
+    /** A header submission's code is the file named `submission_filename`. */
+    problem_type: ProblemType | null;
+    submission_filename: string | null;
+}
+
 /** `submissions` row augmented with username for display. */
-export interface SubmissionDetailRow extends SubmissionRow {
+export interface SubmissionDetailRow extends SubmissionRow, SubmissionDetailProblemFields {
     username: string;
     problem_name: string;
 }
@@ -233,7 +242,7 @@ export interface ContestSubmissionRow {
 
 
 /** `contest_submissions` row augmented with username for display. */
-export interface ContestSubmissionDetailRow extends ContestSubmissionRow {
+export interface ContestSubmissionDetailRow extends ContestSubmissionRow, SubmissionDetailProblemFields {
     username: string;
     problem_name: string;
 }
