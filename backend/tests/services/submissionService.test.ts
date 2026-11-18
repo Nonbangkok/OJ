@@ -637,12 +637,15 @@ describe('Submission Service', () => {
             void compileArgs;
             void compileOpts;
             // ...and judge() receives that same identity so every testcase
-            // runs as it too (uid drop is verified end-to-end in production).
+            // runs as it too (uid drop is verified end-to-end in production),
+            // plus the workspace (the program's TMPDIR).
             const judgeArgs = (judge as jest.Mock).mock.calls[0];
-            const identity = judgeArgs[3];
+            const { sandbox: identity, workspaceDir, hideProgramStderr } = judgeArgs[3];
             expect(identity).toBeDefined();
             expect(identity.uid).toBeGreaterThanOrEqual(JUDGE_CONFIG.SANDBOX_UID_BASE);
             expect(identity.gid).toBe(identity.uid);
+            expect(String(workspaceDir)).toContain('oj-submissions');
+            expect(hideProgramStderr).toBe(false);
         });
 
         it('removes the whole workspace (recursive rmtree) after the run', async () => {
@@ -890,7 +893,7 @@ describe('Submission Service', () => {
             expect(order.indexOf(JUDGE_CONFIG.PRLIMIT_PATH)).toBeLessThan(order.indexOf('sweep', order.indexOf('mktemp')));
             const removeWorkspace = spawnCalls.findIndex(([command, args]) => command === 'rm' && args.includes('/tmp/oj-submissions/sub_1_1_testws'));
             expect(order.lastIndexOf('sweep')).toBeLessThan(removeWorkspace);
-            expect((judge as jest.Mock).mock.calls[0][3].uid).toBe(uid);
+            expect((judge as jest.Mock).mock.calls[0][3].sandbox.uid).toBe(uid);
         });
 
         it('removes, as the uid, what the uid left in the shared scratch dirs', async () => {
@@ -947,6 +950,28 @@ describe('Submission Service', () => {
             expect(db.query).toHaveBeenNthCalledWith(3,
                 expect.stringContaining('UPDATE submissions SET overall_status = \'System Error\''), [1]);
             expect(judge).not.toHaveBeenCalled();
+        });
+
+        it('asks the judge to hide program stderr on header problems only', async () => {
+            const sandboxProcess = jest.requireActual('../../utils/sandboxProcess');
+            jest.spyOn(sandboxProcess, 'removeSandboxFiles').mockResolvedValue(undefined);
+            (getHeaderJudgeSpec as jest.Mock).mockResolvedValue({
+                problemType: 'header',
+                submissionFilename: 'student.h',
+                graderFiles: [{ filename: 'main.cpp', content: Buffer.from('#include "student.h"\nint main(){}\n') }],
+            });
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'H1', user_id: 7, code: 'void f(){}\n', language: 'cpp' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}) // UPDATE Running
+                .mockResolvedValueOnce({ rowCount: 1 }); // final UPDATE (landed)
+            (judge as jest.Mock).mockResolvedValueOnce({
+                results: [], score: 100, overallStatus: 'Accepted', maxTimeMs: 1, maxMemoryKb: 1024
+            });
+
+            await processSubmission(1);
+
+            expect((judge as jest.Mock).mock.calls[0][3]).toMatchObject({ hideProgramStderr: true });
         });
     });
 

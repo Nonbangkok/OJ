@@ -488,7 +488,9 @@ async function runSubmissionPipeline(
       problem_id,
       plan.runCommand(artifactPath ?? sourcePath),
       submissionLanguage,
-      sandbox
+      // Header problems keep only a neutral crash description: the grader is
+      // linked into the program, which could print it from its own memory.
+      { sandbox, workspaceDir, hideProgramStderr: isHeader }
     );
 
     const { results, score, overallStatus, maxTimeMs, maxMemoryKb } = judgeResult;

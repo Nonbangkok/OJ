@@ -189,7 +189,7 @@ export const ANALYTICS_TIMEZONE = 'Asia/Bangkok';
 export const RANKING_PAGE_SIZE = 50;
 
 export const JUDGE_CONFIG = {
-    EXEC_MAX_BUFFER: 50 * 1024 * 1024, // 50MB
+    EXEC_MAX_BUFFER: 50 * 1024 * 1024, // 50MB cap on one testcase run's stdout
     TIMEOUT_BUFFER_MS: 500,
     // Grace period after the wall-clock limit before a judge execution is
     // SIGKILLed outright (RUNNER-004). GNU `timeout` runs with `-k` using this
@@ -204,16 +204,29 @@ export const JUDGE_CONFIG = {
     SIGNAL_EXIT_BASE: 128,
     SIGKILL: 9,
     SIGXCPU: 24,
-    // time_wrapper telemetry tokens (see scripts/time_wrapper.c). Parsed for
-    // time/memory figures; WRAPPER_TELEMETRY_STRIP removes them from any
-    // stderr shown to submitters (JUDGE-001). Token-based (not line-based):
-    // when a program's own output lacks a trailing newline the tokens
-    // concatenate onto that line, so whole-line filtering misses them.
+    // time_wrapper telemetry tokens (see scripts/time_wrapper.c). The wrapper
+    // writes them to its own fd (WRAPPER_TELEMETRY_FD), which the program
+    // never inherits, and the judge parses time/memory from that fd ONLY:
+    // stderr is shared with the program, so a token there is forgeable
+    // (A4-04). WRAPPER_TELEMETRY_STRIP still removes look-alike tokens from
+    // any stderr shown to submitters (JUDGE-001).
     WRAPPER_TIME_REPORT: /TIME_USED:([0-9.+]+)/,
     WRAPPER_MEM_REPORT: /MEM_USED:(\d+)/,
     WRAPPER_TELEMETRY_STRIP: /\s*TIME_USED:[0-9.+]+\s*MEM_USED:\d+\s*|\s*(?:TIME_USED:[0-9.+]+|MEM_USED:\d+)\s*/g,
-    // The judge's wrapper (also the per-uid sweep helper, `--kill-uid`).
+    // The judge's run spawn: `timeout` + the wrapper, no shell, stdio
+    // [stdin, stdout, stderr, telemetry]. The wrapper is also the per-uid
+    // sweep helper (`--kill-uid`).
     TIME_WRAPPER_PATH: './scripts/time_wrapper',
+    WRAPPER_TELEMETRY_FD: 3,
+    WRAPPER_TELEMETRY_MAX_BYTES: 4 * 1024,
+    // Program stderr kept in memory per run (the rest is drained, never
+    // buffered), and the Runtime Error text stored from it, truncation
+    // marker included (A9-04).
+    RUN_STDERR_MAX_BYTES: 64 * 1024,
+    RUNTIME_ERROR_OUTPUT_MAX_BYTES: 4 * 1024,
+    // After the run's `timeout` process exits, how long to wait for its
+    // stdio pipes to close before abandoning them.
+    RUN_STDIO_DRAIN_GRACE_MS: 1000,
     // CPU-time slack (seconds) added on top of the wall-clock limit before the
     // in-process RLIMIT_CPU hard-kills the program. The `timeout` command still
     // owns wall-clock TLE detection; this is a defence-in-depth backstop against
