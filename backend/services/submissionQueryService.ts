@@ -19,16 +19,6 @@ import {
     SubmissionListRow,
 } from '../types/service';
 
-/**
- * Every column of a contest_submissions row (all present in `submissions`
- * too): a contest's rows are read from both tables, see contestSubmissionsSql.
- */
-const CONTEST_SUBMISSION_COLUMNS =
-    'id, contest_id, user_id, problem_id, code, language, overall_status, score, results, max_time_ms, max_memory_kb, submitted_at';
-/** The contest feed's row source: no code (results only feed the per-case status list). */
-const CONTEST_FEED_COLUMNS =
-    'id, contest_id, user_id, problem_id, language, overall_status, score, results, max_time_ms, max_memory_kb, submitted_at';
-
 /** Header problems are C++-only and need at least one grader .cpp to be judgeable. */
 const assertHeaderSubmitAllowed = async (
     problemType: string | undefined,
@@ -151,6 +141,16 @@ export const validateAndQueueSubmission = async (
         isContestSubmission: false,
     };
 };
+
+/**
+ * Every column of a contest_submissions row (all present in `submissions`
+ * too): a contest's rows are read from both tables, see contestSubmissionsSql.
+ */
+const CONTEST_SUBMISSION_COLUMNS =
+    'id, contest_id, user_id, problem_id, code, language, overall_status, score, results, max_time_ms, max_memory_kb, submitted_at';
+/** The contest feed's row source: no code (results only feed the per-case status list). */
+const CONTEST_FEED_COLUMNS =
+    'id, contest_id, user_id, problem_id, language, overall_status, score, results, max_time_ms, max_memory_kb, submitted_at';
 
 export const getSubmissions = async (
     queryInput: SubmissionListQuery,
@@ -399,7 +399,8 @@ export const getSubmissionDetail = async (
         // have new ids: the lookup is by id AND contest, so an unrelated
         // practice submission that carries the id is never returned here.
         const result = await db.query<ContestSubmissionDetailRow>(
-            `SELECT cs.*, u.username, cp.title AS problem_name, p.time_limit_ms, p.memory_limit_mb
+            `SELECT cs.*, u.username, cp.title AS problem_name, p.time_limit_ms, p.memory_limit_mb,
+                    p.problem_type, p.submission_filename
              FROM ${contestSubmissionsSql('$2', CONTEST_SUBMISSION_COLUMNS)} cs
              LEFT JOIN users u ON cs.user_id = u.id
              LEFT JOIN contest_problems cp ON cs.problem_id = cp.problem_id AND cs.contest_id = cp.contest_id

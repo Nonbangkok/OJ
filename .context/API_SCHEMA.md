@@ -577,10 +577,10 @@
 - Auth: required (guest ไม่ได้รับสิทธิ์นี้แม้ใน PUBLIC mode)
 - Query optional: `contestId`
 - Response 200: submission detail
-- `?contestId=`: หาแถวด้วย id **และ** contest — `contest_submissions` ตอน running/finishing, แถวที่ย้ายไป `submissions` (`contest_id`) เมื่อ finished; submission ฝึกที่บังเอิญมี id เดียวกันไม่มีวันถูกคืนผ่าน route นี้ (404). สิทธิ์เหมือนเดิม: เจ้าของหรือ staff
 - Errors:
   - 404 not found (id ต้องเป็นตัวเลข — ไม่ใช่ตอบ 500)
   - 403 ไม่มีสิทธิ์ดู
+- `?contestId=`: หาแถวด้วย id **และ** contest — `contest_submissions` ตอน running/finishing, แถวที่ย้ายไป `submissions` (`contest_id`) เมื่อ finished; submission ฝึกที่บังเอิญมี id เดียวกันไม่มีวันถูกคืนผ่าน route นี้ (404). สิทธิ์เหมือนเดิม: เจ้าของหรือ staff
 
 ### 69. `GET /scoreboard`
 - Auth: `requirePublicAccess` (PUBLIC mode guest อ่านได้)

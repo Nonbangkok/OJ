@@ -132,6 +132,17 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
       expect(await getSubmissionDetail(String(practiceId))).toMatchObject({ id: practiceId, problem_name: 'Practice' });
     });
 
+    it('carries the problem type and the header file name, running and finished (A7-05)', async () => {
+      await pool.query("UPDATE problems SET problem_type = 'header', submission_filename = 'student.h' WHERE id = 'a'");
+      const contestRow = (await pool.query<{ id: number }>('SELECT id FROM contest_submissions ORDER BY id LIMIT 1')).rows[0].id;
+      expect(await getSubmissionDetail(String(contestRow), '1'))
+        .toMatchObject({ problem_type: 'header', submission_filename: 'student.h' });
+      await finish();
+      const [first] = await movedIds();
+      expect(await getSubmissionDetail(String(first), '1'))
+        .toMatchObject({ problem_type: 'header', submission_filename: 'student.h' });
+    });
+
     it('serves the contest row while the contest runs, as before', async () => {
       const contestRow = (await pool.query<{ id: number }>('SELECT id FROM contest_submissions ORDER BY id LIMIT 1')).rows[0].id;
       expect(await getSubmissionDetail(String(contestRow), '1')).toMatchObject({ id: contestRow, contest_id: 1, score: 40 });
