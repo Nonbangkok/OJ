@@ -95,6 +95,7 @@ Cross-cutting concerns:
 - **Errors** — `middleware/errorHandler.ts` provides `asyncHandler`, `AppError`, plus `notFoundHandler`/`errorHandler` mounted last in `app.ts`. Use `utils/dbErrors.ts` (`isUniqueViolation`, Postgres 23505) to map duplicate-key errors to 409s instead of string-matching.
 - **Uploads** — `middleware/upload.ts` (multer). General limit is 2 GiB (PDFs, testcase ZIPs, DB dumps); 10 MiB in-memory policies for author profile images, user avatars, and statement assets.
 - **Maintenance mode** — `services/maintenanceMode.ts`: while a database import runs, a global gate 503s every other request (health checks and the token-authenticated import-progress endpoint stay reachable) and the contest scheduler skips ticks.
+- **Temp files** — never write backend temp files to `/tmp` directly (judged programs share it): use `utils/privateTemp.ts` (`privateTempDir(prefix)` makes a 0700 `mkdtemp` dir under the private per-process work root, created at boot under `OJ_WORK_DIR` or `os.tmpdir()`; `removePrivateTemp` cleans up).
 - **Constants** — magic values (roles, submission/contest statuses, judge config, sandbox identities, validation limits, query/pagination caps, XP progression in `constants/progression.ts`) are centralized in `backend/constants/`. Reuse these rather than hardcoding strings.
 - **Logging** — use `backend/utils/logger.ts` (structured: JSON in production, level-tagged text in dev), not raw `console.*`. Failed logins, judge pipeline failures, and contest scheduler transitions are all logged through it.
 

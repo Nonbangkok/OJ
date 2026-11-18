@@ -1,8 +1,11 @@
+import fs from 'fs';
+import path from 'path';
 import {
   buildDatabaseExportCommand,
   buildDatabaseExportFilePath,
   buildDatabaseImportCommand,
 } from '../../services/adminSystemService';
+import { backendWorkRoot, removePrivateTemp } from '../../utils/privateTemp';
 
 describe('adminSystemService', () => {
   describe('buildDatabaseImportCommand', () => {
@@ -58,9 +61,19 @@ describe('adminSystemService', () => {
   });
 
   describe('buildDatabaseExportFilePath', () => {
-    it('should build deterministic export path', () => {
-      const result = buildDatabaseExportFilePath(1700000000000);
-      expect(result).toBe('/tmp/db_backup_1700000000000.sql');
+    it('puts each dump in its own fresh 0700 directory inside the private work root', async () => {
+      const first = buildDatabaseExportFilePath(1700000000000);
+      const second = buildDatabaseExportFilePath(1700000000000);
+      try {
+        expect(path.basename(first)).toBe('db_backup_1700000000000.sql');
+        expect(path.dirname(path.dirname(first))).toBe(backendWorkRoot());
+        expect(path.basename(path.dirname(first))).toMatch(/^export-/);
+        expect(path.dirname(second)).not.toBe(path.dirname(first));
+        expect(fs.lstatSync(path.dirname(first)).mode & 0o777).toBe(0o700);
+      } finally {
+        await removePrivateTemp(path.dirname(first));
+        await removePrivateTemp(path.dirname(second));
+      }
     });
   });
 

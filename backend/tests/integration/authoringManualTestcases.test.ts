@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { readdir } from 'node:fs/promises';
-import os from 'node:os';
 import pg from 'pg';
 import express from 'express';
 import session from 'express-session';
@@ -13,6 +12,7 @@ import { errorHandler } from '../../middleware/errorHandler';
 import { runMigrationsFromPool } from '../../scripts/migrate';
 import { createProblemDraft } from '../../services/authoringDraftQueryService';
 import { attachRequestUser } from '../../middleware/requestContext';
+import { backendWorkRoot } from '../../utils/privateTemp';
 
 jest.unmock('pg');
 jest.mock('../../db', () => ({ query: jest.fn(), pool: { query: jest.fn(), connect: jest.fn() } }));
@@ -108,12 +108,12 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   });
 
   it('cleans per-request disk uploads after success and invalid payloads', async () => {
-    const before = (await readdir(os.tmpdir())).filter(n => n.startsWith('oj-authoring-upload-')).sort();
+    const before = (await readdir(backendWorkRoot())).filter(n => n.startsWith('authoring-upload-')).sort();
     const a = app();
     expect((await request(a).post(base).field('expectedRevision', '1').attach('input', Buffer.from('x'), '1.in')).status).toBe(201);
     expect((await request(a).post(base).field('expectedRevision', '2').attach('input', Buffer.from('a\0b'), '2.in')).status).toBe(400);
     expect((await request(a).post(base).field('expectedRevision', '2').attach('output', Buffer.from('orphan'), '2.out')).status).toBe(400);
-    expect((await readdir(os.tmpdir())).filter(n => n.startsWith('oj-authoring-upload-')).sort()).toEqual(before);
+    expect((await readdir(backendWorkRoot())).filter(n => n.startsWith('authoring-upload-')).sort()).toEqual(before);
   });
 
   it('requires admin-or-staff authorization for every testcase route', async () => {
@@ -153,7 +153,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   });
 
   it('cleans partially streamed uploads when a client disconnects', async () => {
-    const before = new Set((await readdir(os.tmpdir())).filter(n => n.startsWith('oj-authoring-upload-')));
+    const before = new Set((await readdir(backendWorkRoot())).filter(n => n.startsWith('authoring-upload-')));
     const server = app().listen(0, '127.0.0.1');
     await new Promise<void>(resolve => server.once('listening', resolve));
     const address = server.address(); if (!address || typeof address === 'string') throw new Error('Missing test listener');
@@ -164,13 +164,13 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
       raw.write('--fixture\r\nContent-Disposition: form-data; name="expectedRevision"\r\n\r\n1\r\n--fixture\r\nContent-Disposition: form-data; name="input"; filename="1.in"\r\nContent-Type: text/plain\r\n\r\npartial');
       let observed = false;
       for (let i = 0; i < 100; i++) {
-        if ((await readdir(os.tmpdir())).some(n => n.startsWith('oj-authoring-upload-') && !before.has(n))) { observed = true; break; }
+        if ((await readdir(backendWorkRoot())).some(n => n.startsWith('authoring-upload-') && !before.has(n))) { observed = true; break; }
         await delay(10);
       }
       expect(observed).toBe(true); raw.destroy();
       let cleaned = false;
       for (let i = 0; i < 100; i++) {
-        if (!(await readdir(os.tmpdir())).some(n => n.startsWith('oj-authoring-upload-') && !before.has(n))) { cleaned = true; break; }
+        if (!(await readdir(backendWorkRoot())).some(n => n.startsWith('authoring-upload-') && !before.has(n))) { cleaned = true; break; }
         await delay(10);
       }
       expect(cleaned).toBe(true); expect((await cases()).rows).toEqual([]);

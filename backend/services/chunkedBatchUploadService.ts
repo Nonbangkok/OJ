@@ -1,5 +1,4 @@
 import { createReadStream, createWriteStream, promises as fs } from 'fs';
-import os from 'os';
 import path from 'path';
 import { randomUUID, timingSafeEqual } from 'crypto';
 import { pipeline } from 'stream/promises';
@@ -10,6 +9,7 @@ import {
   chunkedBatchUploadInitSchema,
 } from '../schemas/requestSchemas';
 import { AppError } from '../middleware/errorHandler';
+import { ensurePrivateDirectory, privateTempDir } from '../utils/privateTemp';
 
 export const CHUNKED_BATCH_UPLOAD_CHUNK_BYTES = schemaChunkBytes;
 export const CHUNKED_BATCH_UPLOAD_MAX_FILE_BYTES = schemaMaxFileBytes;
@@ -53,9 +53,9 @@ export interface AssembleChunkedBatchUploadInput {
 }
 
 export interface ChunkedBatchUploadServiceOptions {
-  /** Root for session directories; defaults to /tmp/oj-chunk-uploads. */
+  /** Root for session directories; defaults to a private dir in the backend work root. */
   sessionRoot?: string;
-  /** Root for assembled ZIPs; defaults to /tmp. */
+  /** Root for assembled ZIPs; defaults to a private dir in the backend work root. */
   assembledRoot?: string;
   /** Injected clock keeps expiry tests deterministic. */
   now?: () => number;
@@ -68,14 +68,15 @@ export interface ChunkedBatchUploadServiceOptions {
  * instance until it can be handed to the existing batch-upload processor.
  */
 export class ChunkedBatchUploadService {
-  private readonly sessionRoot: string;
-  private readonly assembledRoot: string;
+  private readonly sessionRootOption: string | undefined;
+  private readonly assembledRootOption: string | undefined;
+  private rootsPromise: Promise<{ sessionRoot: string; assembledRoot: string }> | null = null;
   private readonly now: () => number;
   private readonly outputStreamFactory: (zipPath: string) => Writable;
 
   constructor(options: ChunkedBatchUploadServiceOptions = {}) {
-    this.sessionRoot = options.sessionRoot ?? path.join(os.tmpdir(), 'oj-chunk-uploads');
-    this.assembledRoot = options.assembledRoot ?? os.tmpdir();
+    this.sessionRootOption = options.sessionRoot;
+    this.assembledRootOption = options.assembledRoot;
     this.now = options.now ?? Date.now;
     this.outputStreamFactory = options.createOutputStream
       ?? ((zipPath) => createWriteStream(zipPath, { flags: 'wx', mode: FILE_MODE }));
@@ -100,11 +101,9 @@ export class ChunkedBatchUploadService {
     }
 
     await this.cleanupExpired();
-    await fs.mkdir(this.sessionRoot, { recursive: true, mode: SESSION_DIRECTORY_MODE });
-    await this.restrictDirectoryPermissions(this.sessionRoot);
 
     const uploadId = randomUUID();
-    const sessionPath = this.sessionPath(uploadId);
+    const sessionPath = await this.sessionPath(uploadId);
     const metadata: ChunkedBatchUploadMetadata = {
       ownerId: input.userId,
       ...parsed.data,
@@ -115,7 +114,7 @@ export class ChunkedBatchUploadService {
 
     try {
       await fs.mkdir(sessionPath, { mode: SESSION_DIRECTORY_MODE });
-      await this.restrictDirectoryPermissions(sessionPath);
+      await ensurePrivateDirectory(sessionPath, 'Chunked upload session');
       await this.writeFileAtomically(path.join(sessionPath, metadataFileName), Buffer.from(JSON.stringify(metadata)));
     } catch (error) {
       await fs.rm(sessionPath, { recursive: true, force: true });
@@ -213,13 +212,13 @@ export class ChunkedBatchUploadService {
       partPaths.push(partPath);
     }
 
-    await fs.mkdir(this.assembledRoot, { recursive: true, mode: SESSION_DIRECTORY_MODE });
-    const zipPath = path.join(this.assembledRoot, `${archivePrefix}-${uploadId}.zip`);
+    const { assembledRoot } = await this.roots();
+    const zipPath = path.join(assembledRoot, `${archivePrefix}-${uploadId}.zip`);
     // Assemble to an attempt-local file. A concurrent request must never be
     // able to remove or replace another request's in-progress/final archive.
     // Keeping the .zip suffix also lets the existing two-hour cleanup collect
     // a temporary file left behind by an interrupted process.
-    const temporaryZipPath = path.join(this.assembledRoot, `${archivePrefix}-${uploadId}.${randomUUID()}.zip`);
+    const temporaryZipPath = path.join(assembledRoot, `${archivePrefix}-${uploadId}.${randomUUID()}.zip`);
 
     try {
       const output = this.outputStreamFactory(temporaryZipPath);
@@ -251,8 +250,9 @@ export class ChunkedBatchUploadService {
 
   async cleanupExpired(): Promise<void> {
     const expiredBefore = this.now() - CHUNKED_BATCH_UPLOAD_TTL_MS;
-    await this.removeOldEntries(this.sessionRoot, expiredBefore, (entry) => entry.isDirectory());
-    await this.removeOldEntries(this.assembledRoot, expiredBefore,
+    const { sessionRoot, assembledRoot } = await this.roots();
+    await this.removeOldEntries(sessionRoot, expiredBefore, (entry) => entry.isDirectory());
+    await this.removeOldEntries(assembledRoot, expiredBefore,
       (entry) => entry.isFile() && /^oj-(?:batch|testcases)-.+\.zip$/.test(entry.name));
   }
 
@@ -286,7 +286,7 @@ export class ChunkedBatchUploadService {
   }
 
   private async loadOwnedSession(uploadId: string, userId: number): Promise<{ sessionPath: string; metadata: ChunkedBatchUploadMetadata }> {
-    const sessionPath = this.sessionPath(uploadId);
+    const sessionPath = await this.sessionPath(uploadId);
     let rawMetadata: string;
     try {
       rawMetadata = await fs.readFile(path.join(sessionPath, metadataFileName), 'utf8');
@@ -312,11 +312,32 @@ export class ChunkedBatchUploadService {
     return { sessionPath, metadata };
   }
 
-  private sessionPath(uploadId: string): string {
+  /**
+   * Session and assembled-ZIP roots, created once and verified on every use:
+   * real directories owned by this uid with mode 0700. A root another uid
+   * created first (e.g. a judged program racing the backend) is refused.
+   */
+  private roots(): Promise<{ sessionRoot: string; assembledRoot: string }> {
+    this.rootsPromise ??= Promise.all([
+      this.sessionRootOption ?? privateTempDir('chunk-sessions-'),
+      this.assembledRootOption ?? privateTempDir('chunk-assembled-'),
+    ]).then(([sessionRoot, assembledRoot]) => ({ sessionRoot, assembledRoot }));
+    const pending = this.rootsPromise;
+    return pending.then(async (roots) => {
+      await ensurePrivateDirectory(roots.sessionRoot, 'Chunked upload session root');
+      await ensurePrivateDirectory(roots.assembledRoot, 'Chunked upload assembly root');
+      return roots;
+    }, (error: unknown) => {
+      if (this.rootsPromise === pending) this.rootsPromise = null;
+      throw error;
+    });
+  }
+
+  private async sessionPath(uploadId: string): Promise<string> {
     if (!uuidPattern.test(uploadId)) {
       throw new AppError('Upload session ID is invalid.', 400);
     }
-    return path.join(this.sessionRoot, uploadId);
+    return path.join((await this.roots()).sessionRoot, uploadId);
   }
 
   private expectedChunkSize(metadata: ChunkedBatchUploadMetadata, chunkIndex: number): number {
@@ -327,17 +348,6 @@ export class ChunkedBatchUploadService {
   private async touchSession(sessionPath: string): Promise<void> {
     const now = new Date(this.now());
     await fs.utimes(sessionPath, now, now);
-  }
-
-  private async restrictDirectoryPermissions(directory: string): Promise<void> {
-    try {
-      await fs.chmod(directory, SESSION_DIRECTORY_MODE);
-    } catch (error) {
-      // Some filesystems (notably Windows volume mounts) do not expose POSIX
-      // modes. On platforms that do, chmod failures must still surface.
-      if (['ENOSYS', 'ENOTSUP', 'EOPNOTSUPP', 'EPERM'].includes((error as NodeJS.ErrnoException).code ?? '')) return;
-      throw error;
-    }
   }
 
   private async writeFileAtomically(filePath: string, content: Buffer): Promise<void> {

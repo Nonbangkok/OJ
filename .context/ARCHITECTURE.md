@@ -378,6 +378,10 @@ Key judging properties:
 
   Secrecy is "no casual source-text leak", the same level standard problems already give (a program can print its own testcase input and read it back from a Runtime Error). `findForbiddenAsm` rejects `asm`/`incbin`/`.include` to close the assembler file-embed channel; the unprivileged compile remains the real boundary.
 
+### Backend Temp Files
+
+Judged programs share the backend container's `/tmp`, so every backend temp file (multer disk uploads, batch and testcase-ZIP extraction, chunked-upload sessions, DB export dumps, authoring testcase uploads) lives in a `mkdtemp` directory under a private 0700 per-process work root (`utils/privateTemp.ts`, created at boot under `OJ_WORK_DIR` or `os.tmpdir()`; the server refuses to start if `OJ_WORK_DIR` is not a real 0700 directory it owns). See `SANDBOX.md` §9.
+
 ### Database Import / Maintenance Mode
 
 Admin database import runs `DROP SCHEMA public CASCADE` + `pg_restore` as a background job. While it runs, `services/maintenanceMode.ts` activates a global gate: every request except health checks and the token-authenticated import-progress endpoint answers 503, and the contest scheduler skips ticks. Imports are single-flight (a second concurrent import gets 409). Exports use `pg_dump --exclude-table=user_sessions` (sessions are runtime state).

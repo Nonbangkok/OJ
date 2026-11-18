@@ -2,7 +2,6 @@ import fs from 'fs';
 const fsPromises = fs.promises;
 import path from 'path';
 import * as unzipper from 'unzipper';
-import os from 'os';
 import { Readable } from 'stream';
 import type { PoolClient } from 'pg';
 import * as db from '../db';
@@ -24,6 +23,7 @@ import { replaceProblemFiles } from './problemFilesService';
 import type { ProblemFileInput } from '../utils/headerProblemFiles';
 import { pairFlatDirTestcaseFiles, pairZippedTestcaseFiles } from './testcaseZipPairing';
 import { assertSafeArchive, MAX_ARCHIVE_ENTRIES, type ArchiveEntryLike } from '../utils/archiveSafety';
+import { privateTempDir, removePrivateTemp } from '../utils/privateTemp';
 
 // Re-exported for the callers that have always imported the archive guard from
 // this service; the implementation now lives in `utils/archiveSafety`.
@@ -37,11 +37,6 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
   return 'Unknown error';
-}
-
-/** Remove a directory tree without spawning a shell (avoids command injection). */
-async function removeDir(dir: string): Promise<void> {
-  await fsPromises.rm(dir, { recursive: true, force: true });
 }
 
 async function processTestcasesFromZip(client: PoolClient, problemId: string, zipPath: string, log: string[]): Promise<number> {
@@ -58,15 +53,14 @@ async function processTestcasesFromZip(client: PoolClient, problemId: string, zi
     // --- New Logic: Handle zipped input/output directories ---
     log.push('Detected input/output directory structure inside zip.');
 
-    const tempExtractDir = path.join(os.tmpdir(), `oj_inner_zip_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+    let tempExtractDir: string | undefined;
 
     try {
-      await fsPromises.mkdir(tempExtractDir, { recursive: true });
-
       // Validate entries (zip-slip / zip-bomb) before extracting to disk.
       assertSafeArchive(zip.files as unknown as ArchiveEntryLike[]);
 
-      // Extract the entire zip to the temporary directory
+      // Extract the entire zip into a private directory.
+      tempExtractDir = await privateTempDir('inner-zip-');
       await zip.extract({ path: tempExtractDir });
 
       // Find the common base path of the input/output directories.
@@ -79,7 +73,7 @@ async function processTestcasesFromZip(client: PoolClient, problemId: string, zi
 
     } finally {
       // Clean up the temporary extraction directory (no shell — avoids injection).
-      await removeDir(tempExtractDir);
+      if (tempExtractDir) await removePrivateTemp(tempExtractDir);
     }
 
   } else {
@@ -396,16 +390,17 @@ export async function processBatchUpload(
   onProgress?: (progress: BatchUploadProgressData) => void,
 ): Promise<BatchUploadResult> {
   const results: BatchUploadResult = { added: [], skipped: [], errors: [] };
-  const tempDir = path.join(os.tmpdir(), `oj_batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  let tempDir: string | undefined;
 
   try {
-    await fsPromises.mkdir(tempDir, { recursive: true });
-
     const directory = await unzipper.Open.file(zipFilePath);
 
     // Validate entries (zip-slip / zip-bomb) before extracting to disk.
     assertSafeArchive(directory.files as unknown as ArchiveEntryLike[]);
 
+    // Graders and hidden testcases: extract only into a private 0700
+    // directory, never a predictable /tmp path judged programs can read.
+    tempDir = await privateTempDir('batch-');
     await directory.extract({ path: tempDir });
 
     const junkDirs = new Set(['__MACOSX', '.vscode']);
@@ -464,11 +459,9 @@ export async function processBatchUpload(
     results.errors.push({ directory: 'Batch Process', message: getErrorMessage(error) || 'A critical error occurred.' });
   } finally {
     const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-    try {
+    if (tempDir) {
       await delay(FILE_CONFIG.CLEANUP_DELAY_MS);
-      await removeDir(tempDir);
-    } catch (err: unknown) {
-      console.warn(`[Robust Cleanup] Failed to remove temp directory ${tempDir}:`, err);
+      await removePrivateTemp(tempDir);
     }
 
     try {

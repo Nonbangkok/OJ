@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { mkdtemp, rm, unlink } from 'node:fs/promises';
-import os from 'node:os';
+import { unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -13,6 +12,7 @@ import { asyncHandler } from '../middleware/errorHandler';
 import { TESTCASE_LIMITS, TestcaseError, validateTestcaseFilename } from '../authoring/testcases';
 import { prepareTestcaseArchive, prepareTestcaseFile } from '../services/authoringTestcaseUploadService';
 import { getDraftTestcase, listDraftTestcases, mutateDraftTestcases, TestcaseMutationResult } from '../services/authoringTestcaseQueryService';
+import { privateTempDir, removePrivateTemp } from '../utils/privateTemp';
 
 const router = Router();
 const base = '/admin/authoring/drafts/:id/testcases';
@@ -50,7 +50,7 @@ function handleUploadError(error: unknown, res: Response): boolean {
 /** Each request owns its private directory, byte budget and cancellable disk streams. */
 async function withUpload(req: Request, res: Response, action: (files: Record<string, Express.Multer.File[]>, expectedRevision: number) => Promise<void>) {
   if (!req.is('multipart/form-data')) throw new TestcaseError('invalid_testcase_upload', 'Use multipart/form-data with input/output files or an archive');
-  const root = await mkdtemp(path.join(os.tmpdir(), 'oj-authoring-upload-'));
+  const root = await privateTempDir('authoring-upload-');
   const abort = new AbortController(); const pending: Promise<void>[] = []; let total = 0;
   const storage: multer.StorageEngine = {
     _handleFile(_req, file, callback) {
@@ -101,7 +101,7 @@ async function withUpload(req: Request, res: Response, action: (files: Record<st
     await action((req.files ?? {}) as Record<string, Express.Multer.File[]>, revision(req.body));
   } finally {
     abort.abort(); await Promise.allSettled(pending);
-    await rm(root, { recursive: true, force: true }); res.off('close', onClose);
+    await removePrivateTemp(root); res.off('close', onClose);
   }
 }
 

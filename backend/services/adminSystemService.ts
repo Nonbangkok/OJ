@@ -1,5 +1,6 @@
 import path from 'path';
 import { BuildDatabaseExportCommandResult, BuildDatabaseImportCommandResult } from '../types/service';
+import { privateTempDirSync } from '../utils/privateTemp';
 
 export const buildDatabaseImportCommand = (
   originalFileName: string,
@@ -50,7 +51,13 @@ export const buildDatabaseImportCommand = (
   return { kind: 'unsupported_extension' };
 };
 
-export const buildDatabaseExportFilePath = (timestamp: number): string => path.join('/tmp', `db_backup_${timestamp}.sql`);
+/**
+ * Path for a new export dump, inside a fresh private 0700 directory made for
+ * it in the backend work root (the dump holds every hash, grader and hidden
+ * testcase). The caller removes `path.dirname(result)` with removePrivateTemp.
+ */
+export const buildDatabaseExportFilePath = (timestamp: number): string =>
+  path.join(privateTempDirSync('export-'), `db_backup_${timestamp}.sql`);
 
 export const buildDatabaseExportCommand = (
   dumpFilePath: string,

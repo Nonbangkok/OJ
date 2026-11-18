@@ -157,6 +157,23 @@ mitigation was chosen for Phase 0 because moving compile+run into a separate
 compose service (queue/transport, results plumbing) is an architectural change
 that belongs to its own phase.
 
+### 9. Private backend work root for temp files (A1-01 / A2-01 / A9-02)
+Judged programs share the backend container's world-writable `/tmp` with no
+filesystem confinement, so the backend never stages anything there at a
+predictable path or in a listable directory. `backend/utils/privateTemp.ts`
+creates one per-process root at boot (`server.ts`, before listening):
+`oj-work-<pid>-XXXXXX` via `mkdtemp`, mode 0700, owned by the backend uid,
+under `OJ_WORK_DIR` when set and `os.tmpdir()` otherwise. `OJ_WORK_DIR` must
+be a real directory (not a symlink) owned by the backend uid with mode 0700,
+or the backend refuses to start. Roots of earlier processes are removed at
+boot (our prefix, our uid, pid gone or reused). Everything temporary lives in
+a fresh `mkdtemp` directory inside it: multer disk uploads (batch ZIPs, chunk
+parts, DB dumps), batch and inner testcase-ZIP extraction, chunked-upload
+sessions and assembled ZIPs, DB export dumps (removed after the download and
+when `pg_dump` fails) and authoring testcase uploads. Directory roots passed
+explicitly (chunked uploads) are verified the same way; a root another uid
+created first, or a chmod failure, is an error, never skipped.
+
 ### Why the backend container still runs as root
 See the long comment in `backend/Dockerfile`. In short: the per-submission
 privilege drop in `time_wrapper.c` (root → nobody) only works if the parent

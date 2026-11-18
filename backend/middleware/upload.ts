@@ -1,9 +1,9 @@
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
 import { AUTHOR_PROFILE_IMAGE, FILE_CONFIG, STATEMENT_ASSET, USER_AVATAR } from '../constants';
 import { AppError } from './errorHandler';
 import { CHUNKED_BATCH_UPLOAD_MULTER_FILE_SIZE_BYTES } from '../services/chunkedBatchUploadService';
+import { privateTempDir } from '../utils/privateTemp';
 
 // Multer configuration for single file uploads (in memory)
 export const memoryUpload = multer({
@@ -47,18 +47,22 @@ export const statementAssetUpload = multer({
     },
 });
 
-// Multer configuration for batch uploads (to disk)
+// Multer configuration for batch uploads (to disk). Uploads (batch ZIPs,
+// chunk parts, DB dumps) are staged in one 0700 directory inside the private
+// backend work root, never at a predictable path in the shared /tmp that
+// judged programs can list or pre-create.
+let diskUploadDirectory: Promise<string> | null = null;
+const getDiskUploadDirectory = (): Promise<string> => {
+    diskUploadDirectory ??= privateTempDir('uploads-').catch((error: unknown) => {
+        diskUploadDirectory = null;
+        throw error;
+    });
+    return diskUploadDirectory;
+};
+
 const diskStorage = multer.diskStorage({
     destination: function (req, file, cb) {
-        // We'll use a temporary directory provided by the OS
-        const uploadPath = path.join('/tmp', 'oj_uploads');
-
-        // Ensure the directory exists
-        if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath, { recursive: true });
-        }
-
-        cb(null, uploadPath);
+        getDiskUploadDirectory().then((uploadPath) => cb(null, uploadPath), (error: Error) => cb(error, ''));
     },
     filename: function (req, file, cb) {
         // Create a unique filename to avoid conflicts

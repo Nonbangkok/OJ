@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { Writable } from 'stream';
+import { backendWorkRoot } from '../../utils/privateTemp';
 
 // This test is intentionally added before the service exists. The runtime
 // contract below is the one routes will consume in the next implementation
@@ -80,6 +81,45 @@ describe('ChunkedBatchUploadService', () => {
     await createUpload();
 
     expect((await fs.promises.stat(sessionRoot)).mode & 0o077).toBe(0);
+  });
+
+  it('refuses a session root another uid created first instead of writing into it (A9-02)', async () => {
+    await fs.promises.mkdir(sessionRoot, { recursive: true });
+    await fs.promises.chmod(sessionRoot, 0o777);
+    jest.spyOn(process, 'getuid').mockReturnValue(process.getuid!() + 1);
+
+    await expect(createUpload()).rejects.toThrow(/is owned by uid/);
+    expect(await fs.promises.readdir(sessionRoot)).toEqual([]);
+  });
+
+  it('fails instead of swallowing EPERM when the session root cannot be made private', async () => {
+    await fs.promises.mkdir(sessionRoot, { recursive: true });
+    await fs.promises.chmod(sessionRoot, 0o777);
+    jest.spyOn(fs.promises, 'chmod').mockRejectedValue(Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' }));
+
+    await expect(createUpload()).rejects.toMatchObject({ code: 'EPERM' });
+    expect(await fs.promises.readdir(sessionRoot)).toEqual([]);
+  });
+
+  it('keeps sessions and assembled ZIPs in private directories of the backend work root by default', async () => {
+    service = new chunkedBatchUpload.ChunkedBatchUploadService();
+    const file = Buffer.from('zip');
+    const { uploadId } = await service.createSession({ userId: 17, fileName: 'problems.zip', fileSize: file.length, totalChunks: 1 });
+    await service.writeChunk({ uploadId, userId: 17, chunkIndex: 0, data: file });
+    const { zipPath } = await service.assemble({ uploadId, userId: 17 });
+    try {
+      const assembledDir = path.dirname(zipPath);
+      expect(path.dirname(assembledDir)).toBe(backendWorkRoot());
+      expect(path.basename(assembledDir)).toMatch(/^chunk-assembled-/);
+      expect((await fs.promises.lstat(assembledDir)).mode & 0o777).toBe(0o700);
+      const sessionDirs = (await fs.promises.readdir(backendWorkRoot())).filter((name) => name.startsWith('chunk-sessions-'));
+      expect(sessionDirs.length).toBeGreaterThan(0);
+      for (const name of sessionDirs) {
+        expect((await fs.promises.lstat(path.join(backendWorkRoot(), name))).mode & 0o777).toBe(0o700);
+      }
+    } finally {
+      await fs.promises.rm(zipPath, { force: true });
+    }
   });
 
   it('accepts only the expected 25 MiB chunk and final remainder from its owner', async () => {

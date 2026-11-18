@@ -1,3 +1,4 @@
+import path from 'path';
 import express, { Request, Response, Router } from 'express';
 import { requireAuth, requireAdmin, requireStaffOrAdmin } from '../middleware/auth';
 import { CONTEST_STATUS, USER_VALIDATION, SECURITY_CONFIG } from '../constants';
@@ -33,13 +34,14 @@ import {
   updatePasswordChangeSettingSchema,
 } from '../schemas/requestSchemas';
 import { getContestStatusById } from '../services/contestAccess';
+import { logger } from '../utils/logger';
+import { removePrivateTemp } from '../utils/privateTemp';
 import { rejudgeContest, rejudgeProblem } from '../services/rejudgeService';
 import {
   buildDatabaseExportRequest,
   getDatabaseImportProgress,
   runCommand,
   startDatabaseImport,
-  unlinkIfExists,
 } from '../services/adminDatabaseService';
 import {
   createAdminUser,
@@ -247,21 +249,27 @@ router.get('/admin/database/import-progress/:jobId', (req: Request, res: Respons
 });
 
 router.post('/admin/database/export', requireAuth, requireAdmin, asyncHandler(async (_req: Request, res: Response) => {
+  // The dump is written into its own private 0700 directory; the directory
+  // and the (possibly partial) dump are removed once the download ends, and
+  // also when pg_dump fails.
   const { command, dumpFilePath, downloadName } = buildDatabaseExportRequest();
+  try {
+    await runCommand(command);
 
-  await runCommand(command);
-
-  // Send the file as a download
-  res.download(dumpFilePath, downloadName, (err) => {
-    if (err) {
-      console.error('Error sending file:', err);
-      if (!res.headersSent) {
-        res.status(500).json({ message: 'Error downloading backup file.' });
-      }
-    }
-    // Clean up the temporary dump file
-    void unlinkIfExists(dumpFilePath);
-  });
+    await new Promise<void>((resolve) => {
+      res.download(dumpFilePath, downloadName, (err) => {
+        if (err) {
+          logger.error('database export download failed', { err });
+          if (!res.headersSent) {
+            res.status(500).json({ message: 'Error downloading backup file.' });
+          }
+        }
+        resolve();
+      });
+    });
+  } finally {
+    await removePrivateTemp(path.dirname(dumpFilePath));
+  }
 }));
 
 router.get('/admin/settings/registration', requireAuth, requireAdmin, asyncHandler(async (_req: Request, res: Response) => {
