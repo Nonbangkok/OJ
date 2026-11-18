@@ -27,10 +27,10 @@ describe('import safety commands (A2-02)', () => {
     });
   });
 
-  it('takes a full custom-format safety copy (sessions included)', () => {
+  it('takes a full custom-format safety copy (sessions included, subscriptions left out like the drop leaves them)', () => {
     expect(buildDatabaseSafetyCopyCommand('/tmp/oj-db-import-x/pre-import.dump', connection)).toEqual({
       executable: 'pg_dump',
-      args: ['-h', 'db', '-p', '5432', '-U', 'postgres', '-d', 'oj_db', '-F', 'c', '-f', '/tmp/oj-db-import-x/pre-import.dump'],
+      args: ['-h', 'db', '-p', '5432', '-U', 'postgres', '-d', 'oj_db', '--no-subscriptions', '-F', 'c', '-f', '/tmp/oj-db-import-x/pre-import.dump'],
       env: { PGPASSWORD: 'secret' },
     });
   });

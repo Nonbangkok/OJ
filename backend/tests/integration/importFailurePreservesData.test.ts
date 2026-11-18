@@ -119,10 +119,39 @@ type Outcome = { status: string; message: string };
   };
 
   const resetLiveDatabase = async (applied = migrations): Promise<void> => {
+    await db.query('DROP SCHEMA IF EXISTS extra CASCADE');
+    await db.query('DROP SCHEMA IF EXISTS from_upload CASCADE');
+    await db.query('DROP PUBLICATION IF EXISTS oj_import_extra_pub');
+    await db.query('SELECT lo_unlink(oid) FROM pg_largeobject_metadata');
     await db.query('DROP SCHEMA IF EXISTS public CASCADE');
     await db.query('CREATE SCHEMA public');
     await runMigrationsFromPool(db.pool, applied);
   };
+
+  /**
+   * A2-02: what a full pg_dump holds beyond `public` — another schema with
+   * data, a large object, a publication. The safety copy holds them, so the
+   * drop before a restore must remove them too, or restoring the copy stops
+   * at "already exists" and leaves the database empty.
+   */
+  const addObjectsOutsidePublic = async (body = 'kept outside public'): Promise<void> => {
+    await db.query('CREATE SCHEMA extra');
+    await db.query('CREATE TABLE extra.notes (id int PRIMARY KEY, body text)');
+    await db.query('INSERT INTO extra.notes VALUES (1, $1)', [body]);
+    await db.query('CREATE PUBLICATION oj_import_extra_pub FOR TABLE extra.notes');
+    await db.query("SELECT lo_from_bytea(0, convert_to('large object: ' || $1::text, 'UTF8'))", [body]);
+  };
+
+  const objectsOutsidePublic = async (): Promise<{ notes: string[]; publishedTables: string[]; largeObjects: string[] }> => ({
+    notes: (await db.query('SELECT body FROM extra.notes ORDER BY id')).rows.map((row) => row.body as string),
+    publishedTables: (await db.query('SELECT schemaname, tablename FROM pg_publication_tables WHERE pubname = $1', ['oj_import_extra_pub']))
+      .rows.map((row) => `${row.schemaname as string}.${row.tablename as string}`),
+    largeObjects: (await db.query("SELECT convert_from(lo_get(oid), 'UTF8') AS content FROM pg_largeobject_metadata ORDER BY oid"))
+      .rows.map((row) => row.content as string),
+  });
+
+  const schemaExists = async (name: string): Promise<boolean> =>
+    (await db.query('SELECT 1 FROM pg_namespace WHERE nspname = $1', [name])).rows.length === 1;
 
   const usernames = async (): Promise<string[]> =>
     (await db.query('SELECT username FROM users ORDER BY username')).rows.map((row) => row.username as string);
@@ -187,6 +216,78 @@ type Outcome = { status: string; message: string };
     expect(await liveSessionSurvived()).toBe(true);
     // ...and it is removed once the database is back.
     expect(safetyCopyDirs()).toEqual(before);
+  });
+
+  it('a failed restore puts back another schema, a large object and a publication of the live database too', async () => {
+    const dump = await exportDatabase();
+    const foreignDump = dump.replace(/OWNER TO [^;]+;/g, 'OWNER TO oj_import_role_from_another_install;');
+    await addObjectsOutsidePublic();
+    const before = safetyCopyDirs();
+
+    const outcome = await importFile('backup.sql', foreignDump);
+
+    expect(outcome.status).toBe('failed');
+    expect(outcome.message).toContain('the previous database was restored');
+    expect(await usernames()).toEqual(['live-admin']);
+    expect(await liveSessionSurvived()).toBe(true);
+    expect(await objectsOutsidePublic()).toEqual({
+      notes: ['kept outside public'],
+      publishedTables: ['extra.notes'],
+      largeObjects: ['large object: kept outside public'],
+    });
+    expect(safetyCopyDirs()).toEqual(before);
+  });
+
+  it('a backup that fails its migrations is rolled back completely, a schema it created outside public included', async () => {
+    // Taken before 0018 with case-colliding usernames (0018 cannot migrate
+    // it), from a database that also had a schema of its own.
+    await resetLiveDatabase(migrations.filter((migration) => migration.version < '0018'));
+    await db.query("INSERT INTO users (username, password_hash, role) VALUES ('Alice', 'x', 'user'), ('alice', 'x', 'user')");
+    await db.query('CREATE SCHEMA from_upload');
+    await db.query('CREATE TABLE from_upload.t (id int)');
+    const dump = await exportDatabase();
+    await resetLiveDatabase();
+    await db.query("INSERT INTO users (username, password_hash, role) VALUES ('live-admin', 'x', 'admin')");
+    await db.query("INSERT INTO user_sessions (sid, sess, expire) VALUES ('live-session', '{}', NOW() + INTERVAL '1 day')");
+    await addObjectsOutsidePublic();
+
+    const outcome = await importFile('backup.sql', dump);
+
+    expect(outcome.status).toBe('failed');
+    expect(outcome.message).toContain('the previous database was restored');
+    expect(await usernames()).toEqual(['live-admin']);
+    expect(await liveSessionSurvived()).toBe(true);
+    expect(await schemaExists('from_upload')).toBe(false);
+    expect(await objectsOutsidePublic()).toEqual({
+      notes: ['kept outside public'],
+      publishedTables: ['extra.notes'],
+      largeObjects: ['large object: kept outside public'],
+    });
+  });
+
+  it('a full pg_dump -Fc backup holding another schema restores over a live database that has that schema too', async () => {
+    const archivePath = path.join(workDir, `full-${Date.now()}.dump`);
+    const url = new URL(integrationDatabaseUrl!);
+    await addObjectsOutsidePublic('from the backup');
+    await db.query("INSERT INTO users (username, password_hash, role) VALUES ('in-backup', 'x', 'user')");
+    // Like the CD pre-deploy backup: the whole database, sessions included.
+    const dump = spawnSync('pg_dump', [
+      '-h', url.hostname, '-p', url.port || '5432', '-U', decodeURIComponent(url.username), '-d', databaseName,
+      '-F', 'c', '-f', archivePath,
+    ], { encoding: 'utf8', env: { ...process.env, PGPASSWORD: decodeURIComponent(url.password) } });
+    if (dump.status !== 0) throw new Error(`pg_dump failed: ${dump.stderr}`);
+    await db.query("UPDATE extra.notes SET body = 'changed after the backup'");
+    await db.query("INSERT INTO users (username, password_hash, role) VALUES ('after-backup', 'x', 'user')");
+
+    const outcome = await importFile('backup.dump', fs.readFileSync(archivePath));
+
+    expect(outcome).toEqual({ status: 'completed', message: 'Database imported successfully.' });
+    expect(await usernames()).toEqual(['in-backup', 'live-admin']);
+    expect(await objectsOutsidePublic()).toEqual({
+      notes: ['from the backup'],
+      publishedTables: ['extra.notes'],
+      largeObjects: ['large object: from the backup'],
+    });
   });
 
   it('a custom-format .dump with an object owned by a role this install lacks restores (owners are skipped)', async () => {

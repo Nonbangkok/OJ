@@ -92,14 +92,21 @@ export const buildDatabaseArchiveCheckCommand = (archivePath: string): PgClientC
   env: {},
 });
 
-/** A2-02: full custom-format copy of the live database, taken before the import drops it. */
+/**
+ * A2-02: full custom-format copy of the live database (sessions included),
+ * taken before the import drops it. It holds exactly what
+ * dropAllTablesForImport removes: subscriptions are left out because the
+ * drop leaves them alone (DROP SUBSCRIPTION of one with a replication slot
+ * cannot run inside a transaction), so restoring the copy never meets an
+ * object that is still there.
+ */
 export const buildDatabaseSafetyCopyCommand = (safetyCopyPath: string, connection: PgConnection): PgClientCommand => ({
   executable: 'pg_dump',
-  args: [...pgConnectionArgs(connection), '-F', 'c', '-f', safetyCopyPath],
+  args: [...pgConnectionArgs(connection), '--no-subscriptions', '-F', 'c', '-f', safetyCopyPath],
   env: pgClientEnv(connection),
 });
 
-/** A2-02: put the safety copy back into the emptied public schema after a failed import. */
+/** A2-02: put the safety copy back after dropAllTablesForImport emptied the database again. */
 export const buildDatabaseSafetyRestoreCommand = (safetyCopyPath: string, connection: PgConnection): PgClientCommand => ({
   executable: 'pg_restore',
   args: ['--single-transaction', '--exit-on-error', ...pgConnectionArgs(connection), safetyCopyPath],

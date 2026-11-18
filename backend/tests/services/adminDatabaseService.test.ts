@@ -307,6 +307,22 @@ describe('startDatabaseImport (DB-05 / ADMIN-003 / A2-02)', () => {
     expect(isMaintenanceActive()).toBe(false);
   });
 
+  it('reports an unchanged database when the drop itself fails (it is one statement) and restores nothing', async () => {
+    (dropAllTablesForImport as jest.Mock).mockRejectedValueOnce(new Error('permission denied for schema extra'));
+
+    const { outcome } = await importAndWait('backup.sql');
+
+    expect(outcome.status).toBe('failed');
+    expect(outcome.message).toContain('the live database was not changed');
+    expect(outcome.message).toContain('permission denied for schema extra');
+    expect(dropAllTablesForImport).toHaveBeenCalledTimes(1);
+    // Only the safety copy ran: no upload restore, no safety-copy restore.
+    expect(commandCalls().map((command) => command.executable)).toEqual(['pg_dump']);
+    const safetyCopyPath = commandCalls()[0].args.at(-1)!;
+    expect(fs.existsSync(path.dirname(safetyCopyPath))).toBe(false);
+    expect(isMaintenanceActive()).toBe(false);
+  });
+
   it('does not claim maintenance mode for an unsupported file type', async () => {
     const result = await startDatabaseImport('backup.txt', '/tmp/backup.txt');
 

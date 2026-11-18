@@ -210,11 +210,8 @@ const ensureUserSessionsTable = async (): Promise<void> => {
   await pool.query(ENSURE_USER_SESSIONS_SQL);
 };
 
-/** Drop the live schema, restore the upload and migrate it forward. Throws on any failure. */
-const replaceDatabase = async (job: ImportJob): Promise<void> => {
-  job.setProgress('uploading', 'Importing database dump. This may take several minutes.');
-  logger.warn('database import: dropping the live schema and restoring the uploaded dump');
-  await dropAllTablesForImport();
+/** Restore the upload into the emptied database and migrate it forward. Throws on any failure. */
+const restoreAndMigrate = async (job: ImportJob): Promise<void> => {
   await restoreUpload(job);
   await ensureUserSessionsTable();
 
@@ -264,8 +261,13 @@ const runImportJob = async (job: ImportJob): Promise<void> => {
       const safetyCopyPath = path.join(safetyDir, 'pre-import.dump');
       await runCommand(buildDatabaseSafetyCopyCommand(safetyCopyPath, connection));
 
+      job.setProgress('uploading', 'Importing database dump. This may take several minutes.');
+      logger.warn('database import: dropping the live database contents and restoring the uploaded dump');
+      // One statement: if it fails, nothing was dropped (outer catch).
+      await dropAllTablesForImport();
+
       try {
-        await replaceDatabase(job);
+        await restoreAndMigrate(job);
         imported = true;
       } catch (importError: unknown) {
         logger.error('database import failed; restoring the pre-import safety copy', { err: importError });
@@ -279,7 +281,7 @@ const runImportJob = async (job: ImportJob): Promise<void> => {
         }
       }
     } catch (error: unknown) {
-      // Quiesce or the safety copy failed: nothing has been dropped.
+      // Quiesce, the safety copy or the (atomic) drop failed: nothing has been dropped.
       logger.error('database import aborted before the live database was changed', { err: error });
       failureMessage = `Failed to import database; the live database was not changed. ${getErrorMessage(error)}`;
     }

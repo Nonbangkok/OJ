@@ -433,15 +433,23 @@ describe('adminQueryService', () => {
     );
   });
 
-  it('dropAllTablesForImport tears down the whole public schema (DB-01)', async () => {
+  it('dropAllTablesForImport tears down every schema a full pg_dump holds, in one statement (DB-01 / A2-02)', async () => {
     (db.query as jest.Mock).mockResolvedValue({});
 
     await dropAllTablesForImport();
 
     // Schema-level teardown: every migration-created table (including
     // collections, user_problem_rewards, authoring_profile_sync*) goes away,
-    // and a fresh public schema is left for the restore.
-    expect(db.query).toHaveBeenCalledWith('DROP SCHEMA public CASCADE');
-    expect(db.query).toHaveBeenCalledWith('CREATE SCHEMA public');
+    // and a fresh public schema is left for the restore. A2-02: not only
+    // public — every non-system schema, large object and publication, which
+    // is what the safety copy holds. One statement, so a failure drops nothing.
+    expect(db.query).toHaveBeenCalledTimes(1);
+    const [sql] = (db.query as jest.Mock).mock.calls[0] as [string];
+    expect(sql).toMatch(/^DO /);
+    expect(sql).toContain('FROM pg_namespace');
+    expect(sql).toContain("DROP SCHEMA IF EXISTS %I CASCADE");
+    expect(sql).toContain('lo_unlink');
+    expect(sql).toContain('DROP PUBLICATION %I');
+    expect(sql).toContain('CREATE SCHEMA public');
   });
 });
