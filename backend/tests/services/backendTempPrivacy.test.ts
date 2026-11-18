@@ -11,6 +11,7 @@ import { diskUpload } from '../../middleware/upload';
 import adminRouter from '../../controllers/adminController';
 import { errorHandler } from '../../middleware/errorHandler';
 import type { SpawnCommand } from '../../utils/runCommand';
+import { backendWorkRoot } from '../../utils/privateTemp';
 
 // A1-01 / A2-01 / A4-03 / A9-02 / A2-05: the backend's most sensitive
 // transient files (extracted batch ZIPs with grader/ and hidden testcases,
@@ -164,6 +165,26 @@ describe('backend temp files are not readable by other uids', () => {
       .expect(200);
 
     expect(seen).toEqual([]);
+  });
+
+  it('A9-02: uploads are staged in a private work-root directory, not a predictable /tmp path another uid can pre-create', async () => {
+    let staging: { dir: string; uid: number; mode: number } | null = null;
+    const app = express();
+    app.post('/upload', diskUpload.single('problemsZip'), (req: Request, res: Response) => {
+      const dir = path.dirname(req.file!.path);
+      const stat = fs.lstatSync(dir);
+      staging = { dir, uid: stat.uid, mode: stat.mode & 0o777 };
+      fs.rmSync(req.file!.path, { force: true });
+      res.json({ ok: true });
+    });
+
+    await request(app).post('/upload').attach('problemsZip', Buffer.from('PK'), 'problems.zip').expect(200);
+
+    expect(staging).not.toBeNull();
+    const { dir, uid, mode } = staging!;
+    expect(path.dirname(dir)).toBe(backendWorkRoot());
+    expect(path.basename(dir)).toMatch(/^uploads-[A-Za-z0-9]{6}$/);
+    expect({ uid, mode }).toEqual({ uid: process.getuid!(), mode: 0o700 });
   });
 
   it('database export does not write the dump where other uids can read it', async () => {

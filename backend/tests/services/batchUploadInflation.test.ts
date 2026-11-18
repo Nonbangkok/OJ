@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import { ZipArchive } from 'archiver';
 import * as db from '../../db';
+import { backendWorkRoot } from '../../utils/privateTemp';
 import { countInflatedBytes, lyingZip } from '../fixtures/lyingZip';
 
 // A9-08 (batch part): processBatchUpload validates the archive with
@@ -27,7 +28,7 @@ jest.mock('../../constants', () => {
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { processBatchUpload } = require('../../services/batchUploadService') as typeof import('../../services/batchUploadService');
 
-async function zipOf(entries: Array<[string, string | Buffer]>): Promise<Buffer> {
+async function zipOf(entries: Array<[string, string | Buffer, { store?: boolean }?]>): Promise<Buffer> {
   const chunks: Buffer[] = [];
   const archive = new ZipArchive({ zlib: { level: 9 } });
   const done = new Promise<void>((resolve, reject) => {
@@ -35,7 +36,7 @@ async function zipOf(entries: Array<[string, string | Buffer]>): Promise<Buffer>
     archive.on('end', () => resolve());
     archive.on('error', reject);
   });
-  for (const [name, content] of entries) archive.append(content, { name });
+  for (const [name, content, options] of entries) archive.append(content, { name, ...options });
   await archive.finalize();
   await done;
   return Buffer.concat(chunks);
@@ -121,6 +122,53 @@ describe('processBatchUpload extraction is bounded by the real inflated size', (
     expect(results).toMatchObject({ added: ['p1'], errors: [] });
     const sql = (db.pool.query as jest.Mock).mock.calls.map(([text]) => String(text));
     expect(sql.some((text) => text.includes('INSERT INTO testcases'))).toBe(false);
+  });
+
+  it('extracts an honest archive (directory, stored, empty and deflated entries) into 0700/0600 paths', async () => {
+    const config = JSON.stringify({ id: 'p1', title: 'P1', author: 'A', time_limit_ms: 1000, memory_limit_mb: 256 });
+    const zipPath = write('honest-tree.zip', await zipOf([
+      ['p1/', ''],
+      ['p1/config.json', config],
+      ['p1/testcases/', ''],
+      ['p1/testcases/1.in', '1 2\n', { store: true }],
+      ['p1/testcases/1.out', '3\n'],
+      ['p1/notes.txt', ''],
+    ]));
+
+    // Snapshot the extracted tree at the first statement of the problem's
+    // transaction, while it is still on disk.
+    let tree: Record<string, string> | null = null;
+    (db.pool.query as jest.Mock).mockImplementation(async () => {
+      if (!tree) {
+        const root = backendWorkRoot();
+        const [batchDir] = fs.readdirSync(root).filter((name) => name.startsWith('batch-'));
+        const snapshot: Record<string, string> = {};
+        const visit = (dir: string): void => {
+          const stat = fs.lstatSync(dir);
+          const relative = path.relative(path.join(root, batchDir), dir) || '.';
+          snapshot[relative] = stat.isDirectory()
+            ? `dir ${(stat.mode & 0o777).toString(8)}`
+            : `file ${(stat.mode & 0o777).toString(8)} ${JSON.stringify(fs.readFileSync(dir, 'utf8'))}`;
+          if (stat.isDirectory()) for (const name of fs.readdirSync(dir)) visit(path.join(dir, name));
+        };
+        visit(path.join(root, batchDir));
+        tree = snapshot;
+      }
+      return { rows: [], rowCount: 1 };
+    });
+
+    const results = await processBatchUpload(zipPath);
+
+    expect(results).toMatchObject({ added: ['p1'], errors: [] });
+    expect(tree).toEqual({
+      '.': 'dir 700',
+      p1: 'dir 700',
+      'p1/config.json': `file 600 ${JSON.stringify(config)}`,
+      'p1/notes.txt': 'file 600 ""',
+      'p1/testcases': 'dir 700',
+      'p1/testcases/1.in': 'file 600 "1 2\\n"',
+      'p1/testcases/1.out': 'file 600 "3\\n"',
+    });
   });
 
   it('rejects an entry that inflates to fewer bytes than it declares', async () => {

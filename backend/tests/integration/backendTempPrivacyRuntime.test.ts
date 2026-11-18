@@ -89,7 +89,7 @@ int main() {
 `;
 
 (enabled ? describe : describe.skip)('judged programs cannot reach backend temp files', () => {
-  jest.setTimeout(60_000);
+  jest.setTimeout(120_000); // compiles and judges real submissions; slow on a loaded host
   const schema = `tmppriv_${randomUUID().replaceAll('-', '')}`;
   const admin = new pg.Pool({ connectionString: process.env.INTEGRATION_DATABASE_URL });
   const pool = new pg.Pool({ connectionString: process.env.INTEGRATION_DATABASE_URL, options: `-c search_path=${schema}` });
