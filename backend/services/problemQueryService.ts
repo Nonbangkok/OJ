@@ -21,6 +21,7 @@ import { isUniqueViolation } from '../utils/dbErrors';
 import { AppError } from '../middleware/errorHandler';
 import { getProblemFiles } from './problemFilesService';
 import { validateProblemFileSet } from '../utils/headerProblemFiles';
+import { ProblemViewerStats, ProblemViewerStatsRow, toProblemViewerStats } from './problemViewerStats';
 
 /**
  * Run `body` inside a single transaction. BEGIN/COMMIT/ROLLBACK on a dedicated
@@ -456,10 +457,8 @@ export const getProblemDetail = async (problemId: string): Promise<ProblemDetail
 };
 
 /** The problem page's per-viewer context: collection, the viewer's best submission, attempt count. */
-export interface ProblemViewerContext {
+export interface ProblemViewerContext extends ProblemViewerStats {
   collection: { id: number; name: string } | null;
-  viewerBest: { score: number; caseStatuses: string[] } | null;
-  viewerSubmissionCount: number;
 }
 
 export const getProblemViewerContext = async (
@@ -468,8 +467,7 @@ export const getProblemViewerContext = async (
 ): Promise<ProblemViewerContext> => {
   const result = await db.query<{
     collection_id: number | null; collection_name: string | null;
-    best_score: number | null; best_results: unknown; submission_count: number;
-  }>(`
+  } & ProblemViewerStatsRow>(`
     SELECT c.id AS collection_id, c.name AS collection_name,
       best.score AS best_score, best.results AS best_results,
       (SELECT COUNT(*)::int FROM submissions s WHERE s.user_id = $2 AND s.problem_id = p.id) AS submission_count
@@ -483,13 +481,9 @@ export const getProblemViewerContext = async (
     WHERE p.id = $1
   `, [problemId, userId]);
   const row = result.rows[0];
-  const caseStatuses = Array.isArray(row?.best_results)
-    ? (row!.best_results as { status?: unknown }[]).map((r) => String(r?.status ?? ''))
-    : [];
   return {
     collection: row?.collection_id != null ? { id: row.collection_id, name: row.collection_name ?? '' } : null,
-    viewerBest: row?.best_score != null ? { score: Number(row.best_score), caseStatuses } : null,
-    viewerSubmissionCount: Number(row?.submission_count ?? 0),
+    ...toProblemViewerStats(row),
   };
 };
 

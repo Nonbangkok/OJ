@@ -349,12 +349,13 @@
 - Auth: required
 - Purpose: list problems สำหรับ participant (ต้องเป็น participant; hidden contest = 404)
 - Response 200: list problems หรือ `[]` ถ้า contest ยังไม่ active
+- `best_score` / `submission_count` / latest / best ของ viewer มาจาก contest submissions ของตัวเอง — contest ที่ finished อ่านแถวที่ย้ายไป `submissions` (`contest_id`)
 - Errors: 403 ไม่ได้ join, 404 ไม่พบ/hidden
 
 ### 40. `GET /contests/:id/problems/:problemId`
 - Auth: required
 - Purpose: problem detail ใน contest (participant เท่านั้น)
-- Response 200: problem detail
+- Response 200: problem detail + `viewerBest: { score, caseStatuses } | null`, `viewerSubmissionCount` (เหมือน #46 `GET /problems/:id`) จาก contest submissions ของ viewer เอง: `contest_submissions` ตอน running/finishing, `submissions WHERE contest_id` เมื่อ finished (A7-03; contest ที่ finish ก่อน migration 0029 ได้ 0/null). staff ที่ดูโดยไม่ได้ join ได้ 0/null
 - Errors: 403/404
 
 ### 41. `GET /contests/:id/problems/:problemId/pdf`

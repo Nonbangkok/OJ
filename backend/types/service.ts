@@ -489,6 +489,9 @@ export interface ContestProblemDetailRow extends ContestProblemsSummaryRow {
   problem_type: ProblemType;
   submission_filename: string | null;
   has_starter_files: boolean;
+  /** A7-03: the viewer's own contest submissions on this problem (as GET /problems/:id sends them). */
+  viewerBest: { score: number; caseStatuses: string[] } | null;
+  viewerSubmissionCount: number;
 }
 
 export type ContestProblemsForParticipantResult =

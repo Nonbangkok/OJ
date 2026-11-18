@@ -38,9 +38,9 @@ describe('contest problem detail starter flag is header-only', () => {
 
     await getContestProblemDetailForParticipant('1', 'P1', 7);
 
-    const sql = String(query.mock.calls.at(-1)![0]);
+    // The detail row's query (the viewer's stats are read separately, A7-03).
+    const sql = query.mock.calls.map((call) => String(call[0])).find((text) => text.includes('AS has_starter_files')) ?? '';
     expect(sql).toContain(fromClause);
-    expect(sql).toContain("AS has_starter_files");
     // The EXISTS must be conjoined with a header check, never stand alone.
     expect(sql).toMatch(/problem_type(?:,\s*'standard'\))?\s*=\s*'header'\s+AND\s+(?:\(p\.contest_id IS NULL OR \$3::boolean\)\s+AND\s+)?EXISTS \(SELECT 1 FROM problem_files/);
   });

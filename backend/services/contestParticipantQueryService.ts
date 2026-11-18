@@ -16,6 +16,8 @@ import {
     ContestProblemStatsRow,
 } from '../types/service';
 import { contestProblemOrderSql } from './contestProblemOrder';
+import { contestSubmissionsSql } from './contestSubmissionsSql';
+import { ProblemViewerStats, ProblemViewerStatsRow, toProblemViewerStats } from './problemViewerStats';
 
 /**
  * Contestant-facing contest problem access, split out of contestQueryService.
@@ -65,6 +67,8 @@ export const getContestProblemsForParticipant = async (
         return { kind: 'inactive', data: [] };
     }
 
+    // A5-04/A7-03: the viewer's contest submissions in every status (the
+    // migrated `submissions` rows once the contest has finished).
     const baseQuery = `
       WITH RankedSubmissions AS (
         SELECT
@@ -72,7 +76,7 @@ export const getContestProblemsForParticipant = async (
           cs.results, cs.submitted_at,
           ROW_NUMBER() OVER(PARTITION BY cs.user_id, cs.problem_id ORDER BY cs.score DESC, cs.id DESC) as rn_best,
           ROW_NUMBER() OVER(PARTITION BY cs.user_id, cs.problem_id ORDER BY cs.id DESC) as rn_latest
-        FROM contest_submissions cs
+        FROM ${contestSubmissionsSql('$2', CONTEST_SUBMISSION_COLUMNS)} cs
         WHERE cs.user_id = $1 AND cs.contest_id = $2
       ),
       UserProblemStats AS (
@@ -80,8 +84,7 @@ export const getContestProblemsForParticipant = async (
           problem_id,
           MAX(score) AS best_score,
           COUNT(*) AS submission_count
-        FROM contest_submissions
-        WHERE user_id = $1 AND contest_id = $2
+        FROM RankedSubmissions
         GROUP BY problem_id
       )
     `;
@@ -129,6 +132,33 @@ export const getContestProblemsForParticipant = async (
     return { kind: 'ok', data: result.rows };
 };
 
+const CONTEST_SUBMISSION_COLUMNS = 'id, contest_id, user_id, problem_id, score, overall_status, results, submitted_at';
+
+/**
+ * A7-03: the viewer's best result and attempt count on one contest problem,
+ * from their own contest submissions (the migrated rows once finished) —
+ * the contest equivalent of getProblemViewerContext.
+ */
+const getContestProblemViewerStats = async (
+    contestId: string,
+    problemId: string,
+    userId: number,
+): Promise<ProblemViewerStats> => {
+    const result = await db.query<ProblemViewerStatsRow>(
+        `WITH mine AS (
+           SELECT cs.id, cs.score, cs.results
+           FROM ${contestSubmissionsSql('$1', CONTEST_SUBMISSION_COLUMNS)} cs
+           WHERE cs.user_id = $3 AND cs.problem_id = $2
+         )
+         SELECT best.score AS best_score, best.results AS best_results,
+                (SELECT COUNT(*)::int FROM mine) AS submission_count
+         FROM (SELECT 1) one
+         LEFT JOIN LATERAL (SELECT score, results FROM mine ORDER BY score DESC, id DESC LIMIT 1) best ON true`,
+        [contestId, problemId, userId],
+    );
+    return toProblemViewerStats(result.rows[0]);
+};
+
 export const getContestProblemDetailForParticipant = async (
     contestId: string,
     problemId: string,
@@ -155,7 +185,7 @@ export const getContestProblemDetailForParticipant = async (
         // starter flag) is read from the live row and gated like the routes
         // that serve those files.
         const servable = liveProblemServableSql('p', '$3');
-        const result = await db.query<ContestProblemDetailRow>(
+        const result = await db.query<Omit<ContestProblemDetailRow, keyof ProblemViewerStats>>(
             `SELECT cp.problem_id AS id, cp.title, cp.author, cp.time_limit_ms, cp.memory_limit_mb,
                     (p.problem_pdf IS NOT NULL AND ${servable}) AS has_pdf,
                     COALESCE(p.problem_type, 'standard') AS problem_type, p.submission_filename,
@@ -169,17 +199,17 @@ export const getContestProblemDetailForParticipant = async (
         if (!result.rows[0]) {
             return { kind: 'not_found_problem' };
         }
-        return { kind: 'ok', data: result.rows[0] };
+        return { kind: 'ok', data: { ...result.rows[0], ...(await getContestProblemViewerStats(contestId, problemId, userId)) } };
     }
 
-    const result = await db.query<ContestProblemDetailRow>(
+    const result = await db.query<Omit<ContestProblemDetailRow, keyof ProblemViewerStats>>(
         'SELECT id, title, author, time_limit_ms, memory_limit_mb, (problem_pdf IS NOT NULL) AS has_pdf, problem_type, submission_filename, (problems.problem_type = \'header\' AND EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = problems.id AND f.role = \'starter\')) AS has_starter_files FROM problems WHERE id = $1 AND contest_id = $2',
         [problemId, contestId],
     );
     if (!result.rows[0]) {
         return { kind: 'not_found_problem' };
     }
-    return { kind: 'ok', data: result.rows[0] };
+    return { kind: 'ok', data: { ...result.rows[0], ...(await getContestProblemViewerStats(contestId, problemId, userId)) } };
 };
 
 export const getContestProblemPdfForParticipant = async (
