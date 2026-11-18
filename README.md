@@ -607,23 +607,24 @@ Export writes the same layout back, so a header problem round-trips.
 
 ### The bundled 50-problem set
 
-`content/header-problems/` holds the source and the build harness for a starter
-set of 50 header problems (pair, vector, stack, queue, priority_queue — ten
-each, easy to hard, statements in Thai). Problems are authored as plain files
-and built into the import ZIP inside a throwaway Docker image that carries the
+The source and the build harness for a starter set of 50 header problems (pair,
+vector, stack, queue, priority_queue — ten each, easy to hard, statements in
+Thai) live in the public [CP-Author](https://github.com/Nonbangkok/CP-Author)
+repository under `header-problems/`. Problems are authored as plain files and
+built into the import ZIP inside a throwaway Docker image that carries the
 judge's compiler and a Thai-capable PDF renderer:
 
 ```bash
-cd content/header-problems
+cd CP-Author/header-problems
 ./run.sh build  --all     # statements -> PDF, generators -> testcases, then dist/header-problems.zip
 ./run.sh verify --all     # reference solution must be Accepted; the naive one must time out
 ```
 
 `verify` is the point of the harness: every problem ships a reference solution
 that has to score 100 and, where the problem promises a complexity, a correct
-but naive `slow.h` that has to exceed the time limit on the large subtask. See
-[content/header-problems/README.md](content/header-problems/README.md) for the
-per-problem file contract and how to add one.
+but naive `slow.h` that has to exceed the time limit on the large subtask. Import
+`dist/header-problems.zip` through Manage → Problems → batch upload. See that
+folder's README for the per-problem file contract and how to add one.
 
 ## Contests Management
 

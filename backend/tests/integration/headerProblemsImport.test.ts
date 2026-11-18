@@ -13,23 +13,24 @@ jest.unmock('pg');
 jest.mock('../../db', () => ({ query: jest.fn(), pool: { connect: jest.fn() }, withTransaction: jest.fn() }));
 
 /**
- * Feeds the ZIP produced by content/header-problems (`./run.sh build --all`)
+ * Feeds the ZIP produced by CP-Author's header-problems (`./run.sh build --all`)
  * to the REAL importer, checks what lands in the database, then judges each
  * problem's reference solution with the REAL judge pipeline. Pins the
  * content pipeline's ZIP layout to the backend's actual contract.
  *
  *   HEADER_PROBLEMS_DIST  directory holding header-problems.zip and dist/<id>/
- *                         (default: ../content/header-problems/dist)
+ *                         (default: a sibling CP-Author checkout,
+ *                         ../../CP-Author/header-problems/dist from backend/)
  *   HEADER_PROBLEMS_SRC   directory holding problems/<id>/solution.h
- *                         (default: ../content/header-problems/problems)
+ *                         (default: ../../CP-Author/header-problems/problems)
  *   HEADER_PROBLEMS_REQUIRED=1  fail instead of skipping when the ZIP is absent
  *
  * Skips when the ZIP is absent. The judge half also needs the backend image
  * (linux, root, compiled scripts/time_wrapper); without them only the import
  * assertions run.
  */
-const distDir = path.resolve(process.env.HEADER_PROBLEMS_DIST ?? '../content/header-problems/dist');
-const srcDir = path.resolve(process.env.HEADER_PROBLEMS_SRC ?? '../content/header-problems/problems');
+const distDir = path.resolve(process.env.HEADER_PROBLEMS_DIST ?? '../../CP-Author/header-problems/dist');
+const srcDir = path.resolve(process.env.HEADER_PROBLEMS_SRC ?? '../../CP-Author/header-problems/problems');
 const zipPath = path.join(distDir, 'header-problems.zip');
 const zipPresent = fs.existsSync(zipPath);
 const canJudge = process.platform === 'linux' && process.getuid?.() === 0 && fs.existsSync('scripts/time_wrapper');

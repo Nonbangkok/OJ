@@ -137,29 +137,29 @@ cp .env.production.example .env
 docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
 ```
 
-### Problem content (`content/header-problems/`)
+### Problem content (CP-Author repo)
 
-Problem content is versioned as source, not as a binary ZIP. Adding or editing
-one of the 50 header problems means editing files under
-`content/header-problems/problems/<id>/` and rebuilding:
+The 50 bundled header problems are versioned as source, not as a binary ZIP, in
+the public [CP-Author](https://github.com/Nonbangkok/CP-Author) repository
+under `header-problems/` (moved out of this repo; students may read them).
+Adding or editing one means editing `header-problems/problems/<id>/` there and
+rebuilding:
 
 ```bash
-cd content/header-problems
+cd CP-Author/header-problems
 ./run.sh build  <id>
 ./run.sh verify <id> --measure
 ```
 
 `verify` is a real gate, not a lint: it compiles the problem's reference
-solution against the secret grader and requires **Accepted on all 10 cases**,
-and where the problem promises a complexity it requires the bundled naive
-solution to **exceed the time limit** on the large subtask. It also checks that
-the statement's sample actually runs, that the grader has no `student.h`, and
-that the Thai text and the rendered math survive into the PDF. Never loosen a
-check to make a problem pass — fix the problem.
-
-Everything runs in a throwaway Docker image built by `run.sh`; it carries the
-same `g++` major version as the judge so measured times mean something. The
-image and `dist/` are git-ignored build artifacts.
+solution against the grader and requires **Accepted on all 10 cases**, and
+where the problem promises a complexity it requires the bundled naive solution
+to **exceed the time limit** on the large subtask. Never loosen a check to make
+a problem pass — fix the problem. When this repo changes a value the harness
+mirrors (compile flags, categories, filename rules, output comparison), update
+`harness.py` in CP-Author too. To run this repo's content suites, check
+CP-Author out next to this repo (or set `HEADER_PROBLEMS_DIST`,
+`HEADER_PROBLEMS_SRC`, `HEADER_PROBLEMS_CONTENT`).
 
 ## After your commit lands on `main`
 

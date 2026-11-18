@@ -59,19 +59,19 @@ npm run test:visual:update                 # regenerate visual baselines after a
 ./tests/run_tests.sh    # backend then frontend; exit 0 only if both pass. Requires DB running.
 ```
 
-### Problem content (`content/header-problems/`)
+### Problem content (in the `Nonbangkok/CP-Author` repo)
 
-Source and build harness for the bundled 50 header problems — content, not app code. Each problem is a directory of eight files (`meta.json`, `statement.md`, the two `main.cpp`, `student_template.h`, `solution.h`, `slow.h`, `gen.py`); everything else is generated.
+The source and build harness of the bundled 50 header problems live in the public [`Nonbangkok/CP-Author`](https://github.com/Nonbangkok/CP-Author) repository under `header-problems/`, not in this repo — content, not app code, and public on purpose (students may read the references and graders, owner decision 2026-11-18). Each problem is a directory of eight files (`meta.json`, `statement.md`, the two `main.cpp`, `student_template.h`, `solution.h`, `slow.h`, `gen.py`); everything else is generated.
 
 ```bash
-cd content/header-problems
+cd ../CP-Author/header-problems     # a CP-Author checkout next to this one
 ./run.sh build  <id|--all>          # <ds>.h, PDF, testcases (outputs come from running the reference), dist/ + the import ZIP
 ./run.sh verify <id|--all> --measure # the real gate, see below
 ```
 
-`verify` requires the reference solution to be **Accepted on all 10 cases** and, when `meta.json` says `has_tle_subtask`, the bundled naive `slow.h` to **exceed the time limit** at exactly the promised subtask boundary — so a complexity claim in a statement is proven, not asserted. It also runs the starter against the statement's own sample, checks grader hygiene (≥1 `.cpp`, no `student.h`), and extracts the Thai text and rendered math back out of the finished PDF. Fix the problem, never the check; the harness is not meant to change when adding a problem.
+`verify` requires the reference solution to be **Accepted on all 10 cases** and, when `meta.json` says `has_tle_subtask`, the bundled naive `slow.h` to **exceed the time limit** at exactly the promised subtask boundary — so a complexity claim in a statement is proven, not asserted. It also runs the starter against the statement's own sample, checks grader hygiene (≥1 `.cpp`, no `student.h`), and extracts the Thai text and rendered math back out of the finished PDF. Fix the problem, never the check; the harness is not meant to change when adding a problem. The harness mirrors backend values (compile flags, categories, filename rules, output comparison) in `harness.py`; keep it in sync when those change here.
 
-Everything runs in a throwaway image (`run.sh` builds it) carrying the judge's `g++` major version plus a Thai-capable PDF renderer. `dist/` is git-ignored, which is why `tests/integration/headerProblemsImport.test.ts` skips in a fresh checkout. Statements follow the house template documented in `content/header-problems/README.md`; math renders server-side to HTML+CSS with Unicode super/subscripts because KaTeX cannot run in wkhtmltopdf.
+Backend suites that use the content (`tests/integration/headerProblemsImport.test.ts`, the bundled-problem case of `tests/services/headerSourceGuard.test.ts`) read a sibling `../CP-Author/header-problems` checkout by default (override with `HEADER_PROBLEMS_DIST` / `HEADER_PROBLEMS_SRC` / `HEADER_PROBLEMS_CONTENT`) and skip when it is absent. Statements follow the house template documented in that folder's `README.md`; math renders server-side to HTML+CSS with Unicode super/subscripts because KaTeX cannot run in wkhtmltopdf.
 
 ## Architecture
 
