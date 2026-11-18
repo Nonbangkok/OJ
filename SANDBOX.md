@@ -189,20 +189,24 @@ such as `/tmp` itself) is left untouched and the backend refuses to start:
 tightening `/tmp` to 0700 would lock judged programs out of their
 workspaces.
 
-Batch import reads every archive entry it inflates through one counting
-helper (`inflateEntryBounded` in `batchUploadService.ts`) that counts the
-bytes actually inflated: an entry may not exceed (or fall short of) the
+Batch import reads every archive entry it inflates through one counting helper
+(`inflateEntryBounded` in `batchUploadService.ts`) that counts the bytes
+actually inflated: an entry may not exceed (or fall short of) the
 `uncompressedSize` it declares, and the archive may not exceed
 `ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES`, so a lying size cannot make it
-inflate more than that cap, on disk or in memory. That covers the batch ZIP itself, an inner testcase ZIP
-with the `input/`/`output/` layout (extracted into a private directory), and
-a flat-layout inner testcase ZIP (`1.in`/`1.out` at its root, which is never
-extracted: `assertSafeArchive` runs first, then each paired entry is read into
-memory through the same helper). An `input\output` layout written with
-backslash separators is detected as flat and handled the same way. A testcase
-ZIP rejected part-way is rolled back to a savepoint, so the problem keeps no
-partial testcase set. Other archive readers (the admin testcase-ZIP
-replacement and header grader/starter ZIPs) do not go through this helper.
+inflate more than that cap, on disk or in memory. That covers the batch ZIP
+itself, an inner testcase ZIP with the `input/`/`output/` layout (extracted
+into a private directory), and a flat-layout inner testcase ZIP
+(`1.in`/`1.out` at its root, which is never extracted: `assertSafeArchive`
+runs first, then each paired entry is read into memory through the same
+helper). An `input\output` layout written with backslash separators is not
+detected as `input/`/`output/` and takes the flat branch too, so
+`assertSafeArchive` runs on it; its entry names never match the testcase name
+pattern (the basename is not split on `\`), so none of them is read and it
+imports no testcases, as before. A testcase ZIP rejected part-way is rolled
+back to a savepoint, so the problem keeps no partial testcase set. Other
+archive readers (the admin testcase-ZIP replacement and header grader/starter
+ZIPs) do not go through this helper.
 
 ### Why the backend container still runs as root
 See the long comment in `backend/Dockerfile`. In short: the per-submission

@@ -114,7 +114,10 @@ describe('processBatchUpload extraction is bounded by the real inflated size', (
   // The flat layout (1.in / 1.out at the inner ZIP root) is never extracted:
   // its paired entries are read straight into memory, so the bound has to
   // hold there too. A ZIP with an input\output layout written with backslash
-  // separators is not detected as input/output and lands in this branch.
+  // separators is not detected as input/output and lands in this branch as
+  // well; its names never pair (path.basename does not split on '\'), so
+  // nothing is read today. That case passes on the old code too: it pins the
+  // bound so a later change that pairs backslash names cannot reopen it.
   const problemConfig = JSON.stringify({ id: 'p1', title: 'P1', author: 'A', time_limit_ms: 1000, memory_limit_mb: 256 });
   const batchWithTestcaseZip = async (inner: Buffer): Promise<string> =>
     write('flat.zip', await zipOf([['p1/config.json', problemConfig], ['p1/tests.zip', inner]]));
