@@ -46,12 +46,19 @@ describe('readZipEntryBounded', () => {
     expect(state.destroyed).toBe(true);
   });
 
-  it('stops reading an endless entry one chunk past the per-entry cap', async () => {
+  it('never opens an endless entry that declares more than the per-entry cap', async () => {
     const { entry, state } = fakeEntry(Number.MAX_SAFE_INTEGER, 16 * KiB, Infinity);
     await expect(readZipEntryBounded(entry, 64 * KiB))
       .rejects.toThrow(new ZipEntryLimitError(`ZIP entry "case.in" exceeds ${64 * KiB} bytes.`));
-    // 4 chunks reach the cap, the 5th crosses it; a couple more may sit in
-    // the stream's read-ahead buffer, but reading never continues.
+    expect(state.pulled).toBe(0);
+  });
+
+  it('stops reading an endless entry that declares a size within the cap one chunk past it', async () => {
+    const { entry, state } = fakeEntry(64 * KiB, 16 * KiB, Infinity);
+    await expect(readZipEntryBounded(entry, 64 * KiB))
+      .rejects.toThrow(new ZipEntryLimitError('ZIP entry "case.in" does not match its declared size.'));
+    // 4 chunks reach the declared size, the 5th crosses it; a couple more may
+    // sit in the stream's read-ahead buffer, but reading never continues.
     expect(state.pulled).toBeLessThanOrEqual(8);
     expect(state.destroyed).toBe(true);
   });
@@ -74,7 +81,55 @@ describe('readZipEntryBounded', () => {
     await expect(readZipEntryBounded(second.entry, 64 * KiB, budget)).rejects.toThrow(
       `Archive rejected: uncompressed size exceeds ${100 * KiB} bytes (decompression bomb).`,
     );
-    expect(second.state.destroyed).toBe(true);
+    expect(second.state.pulled).toBe(0);
+    expect(budget.usedBytes).toBe(60 * KiB);
+  });
+
+  it('charges the budget before inflating, so two reads in flight cannot both overrun it', async () => {
+    const budget = createInflateBudget(100 * KiB);
+    const first = fakeEntry(60 * KiB, 20 * KiB, 3);
+    const second = fakeEntry(60 * KiB, 20 * KiB, 3);
+
+    const results = await Promise.allSettled([
+      readZipEntryBounded(first.entry, 64 * KiB, budget),
+      readZipEntryBounded(second.entry, 64 * KiB, budget),
+    ]);
+
+    expect(results.map((result) => result.status)).toEqual(['fulfilled', 'rejected']);
+    expect(second.state.pulled).toBe(0);
+  });
+
+  // A declared size above the per-entry cap or the budget left can never be
+  // read successfully (real bytes must equal declared ones), so such an entry
+  // is refused before its stream is opened. That also lets the reader
+  // allocate the declared size once instead of collecting chunks and
+  // concatenating them (two copies of the entry at the peak).
+  it('refuses an entry declaring more than the per-entry cap without inflating it', async () => {
+    const { entry, state } = fakeEntry(64 * KiB + 1, 16 * KiB, 5);
+    await expect(readZipEntryBounded(entry, 64 * KiB))
+      .rejects.toThrow(new ZipEntryLimitError(`ZIP entry "case.in" exceeds ${64 * KiB} bytes.`));
+    expect(state.pulled).toBe(0);
+  });
+
+  it('refuses an entry declaring more than the archive budget has left without inflating it', async () => {
+    const budget = createInflateBudget(100 * KiB);
+    const first = fakeEntry(60 * KiB, 20 * KiB, 3);
+    const second = fakeEntry(40 * KiB + 1, 20 * KiB, 3);
+
+    await expect(readZipEntryBounded(first.entry, 64 * KiB, budget)).resolves.toHaveLength(60 * KiB);
+    await expect(readZipEntryBounded(second.entry, 64 * KiB, budget)).rejects.toThrow(
+      `Archive rejected: uncompressed size exceeds ${100 * KiB} bytes (decompression bomb).`,
+    );
+    expect(second.state.pulled).toBe(0);
+  });
+
+  it('refuses an entry whose declared size is not a byte count without inflating it', async () => {
+    for (const declared of [-1, Number.NaN, 1.5]) {
+      const { entry, state } = fakeEntry(declared, KiB, 2);
+      await expect(readZipEntryBounded(entry, 64 * KiB))
+        .rejects.toThrow(new ZipEntryLimitError('ZIP entry "case.in" does not match its declared size.'));
+      expect(state.pulled).toBe(0);
+    }
   });
 
   it('rejects an entry whose real size differs from the declared size', async () => {
