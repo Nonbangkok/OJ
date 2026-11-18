@@ -8,6 +8,7 @@ import * as db from '../../db';
 import { publishRealtime } from '../../services/realtimeHub';
 import { enqueueTrackedJudgeTask, waitForContestJudgesToDrain } from '../../services/judgeQueue';
 import { processSubmission } from '../../services/submissionService';
+import { JUDGE_CONFIG } from '../../constants';
 
 jest.mock('../../services/realtimeHub', () => ({
     publishRealtime: jest.fn(),
@@ -234,6 +235,21 @@ describe('Problem Migration Service', () => {
             const drainOrder = (waitForContestJudgesToDrain as jest.Mock).mock.invocationCallOrder[0];
             const connectOrder = (db.pool.connect as jest.Mock).mock.invocationCallOrder[0];
             expect(drainOrder).toBeLessThan(connectOrder);
+        });
+
+        it('waits the full drain timeout by default and the given one when told to', async () => {
+            (mockClient.query as jest.Mock).mockImplementation(async (text: string) => {
+                if (String(text).includes('SELECT id, status FROM contests')) {
+                    return { rows: [{ id: 1, status: 'finishing' }] };
+                }
+                return { rows: [] };
+            });
+
+            await migrateSubmissionsAfterContest(1);
+            expect(waitForContestJudgesToDrain).toHaveBeenLastCalledWith(1, JUDGE_CONFIG.CONTEST_MIGRATION_DRAIN_TIMEOUT_MS);
+
+            await migrateSubmissionsAfterContest(1, { drainTimeoutMs: 1234 });
+            expect(waitForContestJudgesToDrain).toHaveBeenLastCalledWith(1, 1234);
         });
 
         it('A5-02: defers without writing anything when the drain times out with judges still in flight', async () => {

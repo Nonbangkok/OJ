@@ -1,7 +1,7 @@
 import cron, { ScheduledTask } from 'node-cron';
 import * as db from '../db';
 import { migrateSubmissionsAfterContest } from './problemMigration';
-import { CONTEST_STATUS } from '../constants';
+import { CONTEST_STATUS, JUDGE_CONFIG } from '../constants';
 import { ContestSchedulerStatus, ContestTimingRow } from '../types/service';
 import { logger } from '../utils/logger';
 
@@ -30,6 +30,8 @@ const MIGRATION_MAX_RETRIES = 5;
  * judge backlog is not a failure, so deferrals never use up
  * MIGRATION_MAX_RETRIES. Once this budget is spent the contest finishes
  * anyway and its unjudged submissions are re-judged in the practice pool.
+ * Counted in ticks, not in drain time: each retry waits only
+ * JUDGE_CONFIG.CONTEST_MIGRATION_RETRY_DRAIN_TIMEOUT_MS for the judges.
  */
 const MIGRATION_MAX_DRAIN_DEFERRALS = 30;
 
@@ -126,10 +128,11 @@ class ContestScheduler {
     this.tickInProgress = true;
 
     try {
-      // 1. Start scheduled contests
+      // 1. Start scheduled contests (a status flip only, never waits)
       await this.startScheduledContests(now);
 
-      // 2. End running contests
+      // 2. End running contests: flip every due one to 'finishing' first,
+      //    then run the finish migrations (which may wait for judges)
       await this.endRunningContests(now);
 
     } catch (error) {
@@ -176,6 +179,14 @@ class ContestScheduler {
   // contests still stuck in 'finishing' (XSYS-006/CONTEST-004: a failed
   // migration must NOT mark the contest finished — that stranded the whole
   // contest's data with no retry path, since migrate requires 'finishing').
+  //
+  // Fairness: every status flip of this tick happens before any finish
+  // migration, because a migration may wait for its contest's judges to
+  // drain. The attempt on the tick a contest ends may wait the full
+  // CONTEST_MIGRATION_DRAIN_TIMEOUT_MS; every later attempt waits only
+  // CONTEST_MIGRATION_RETRY_DRAIN_TIMEOUT_MS, so contests that keep deferring
+  // cannot stretch the tick past a minute (an overrunning tick makes the next
+  // cron fire skip, delaying other contests' start and end).
   async endRunningContests(now: Date): Promise<void> {
     try {
       const result = await db.query<ContestTimingRow & { status: string }>(`
@@ -186,6 +197,9 @@ class ContestScheduler {
         ORDER BY end_time ASC
       `, [now]);
 
+      // 1. Status flips: running -> finishing closes the contest for everyone
+      //    whose end time has passed, before any migration below can wait.
+      const attempts: Array<{ contestId: number; endedThisTick: boolean }> = [];
       for (const contest of result.rows) {
         if (contest.status === CONTEST_STATUS.RUNNING) {
           logger.info('ending contest', { contestId: contest.id, title: contest.title });
@@ -198,6 +212,7 @@ class ContestScheduler {
           `, [contest.id]);
 
           logger.info('contest status updated', { contestId: contest.id, status: CONTEST_STATUS.FINISHING });
+          attempts.push({ contestId: contest.id, endedThisTick: true });
         } else {
           // A previous tick's migration failed or was deferred; this tick is the retry.
           const failures = this.migrationFailures.get(contest.id) ?? 0;
@@ -211,55 +226,13 @@ class ContestScheduler {
           } else {
             logger.warn('retrying failed contest migration', { contestId: contest.id, attempt: failures + 1 });
           }
+          attempts.push({ contestId: contest.id, endedThisTick: false });
         }
+      }
 
-        // Migrate submissions and finalize contest (this may take time)
-        try {
-          logger.info('migrating submissions after contest', { contestId: contest.id });
-          const deferrals = this.drainDeferrals.get(contest.id) ?? 0;
-          const proceedWithJudgesInFlight = deferrals >= MIGRATION_MAX_DRAIN_DEFERRALS;
-          if (proceedWithJudgesInFlight) {
-            logger.error('contest judges did not drain within the deferral budget - finishing anyway, unjudged submissions are re-judged after the move', {
-              contestId: contest.id,
-              deferrals,
-            });
-          }
-          const result = await migrateSubmissionsAfterContest(contest.id, { proceedWithJudgesInFlight });
-          if (result?.deferred) {
-            // Judges still in flight: nothing was written, the contest stays
-            // 'finishing' and the next tick tries again.
-            this.drainDeferrals.set(contest.id, deferrals + 1);
-            logger.warn('contest migration deferred - judges still in flight, will retry on next tick', {
-              contestId: contest.id,
-              deferral: deferrals + 1,
-              maxDeferrals: MIGRATION_MAX_DRAIN_DEFERRALS,
-            });
-            continue;
-          }
-          this.migrationFailures.delete(contest.id);
-          this.drainDeferrals.delete(contest.id);
-          logger.info('contest migration completed', { contestId: contest.id });
-        } catch (migrationError) {
-          const failures = (this.migrationFailures.get(contest.id) ?? 0) + 1;
-          this.migrationFailures.set(contest.id, failures);
-
-          if (failures >= MIGRATION_MAX_RETRIES) {
-            // The contest STAYS in 'finishing' — the only status from which
-            // migration can (re)run — so recovery remains possible after the
-            // underlying problem is fixed. This needs manual attention.
-            logger.error(
-              'contest migration failed permanently - contest left in finishing status, manual intervention required',
-              { contestId: contest.id, attempts: failures, err: migrationError },
-            );
-          } else {
-            logger.error('contest migration failed - will retry on next tick', {
-              contestId: contest.id,
-              attempt: failures,
-              maxRetries: MIGRATION_MAX_RETRIES,
-              err: migrationError,
-            });
-          }
-        }
+      // 2. Finish migrations (these may take time).
+      for (const { contestId, endedThisTick } of attempts) {
+        await this.migrateFinishingContest(contestId, endedThisTick);
       }
 
       if (result.rows.length > 0) {
@@ -268,6 +241,62 @@ class ContestScheduler {
     } catch (error) {
       logger.error('failed to end running contests', { err: error });
       throw error;
+    }
+  }
+
+  // Migrate submissions and finalize one 'finishing' contest. Never throws:
+  // a failure is counted and retried on later ticks (MIGRATION_MAX_RETRIES),
+  // a deferral (judges still in flight) is counted against
+  // MIGRATION_MAX_DRAIN_DEFERRALS.
+  private async migrateFinishingContest(contestId: number, endedThisTick: boolean): Promise<void> {
+    try {
+      logger.info('migrating submissions after contest', { contestId });
+      const deferrals = this.drainDeferrals.get(contestId) ?? 0;
+      const proceedWithJudgesInFlight = deferrals >= MIGRATION_MAX_DRAIN_DEFERRALS;
+      if (proceedWithJudgesInFlight) {
+        logger.error('contest judges did not drain within the deferral budget - finishing anyway, unjudged submissions are re-judged after the move', {
+          contestId,
+          deferrals,
+        });
+      }
+      const drainTimeoutMs = endedThisTick
+        ? JUDGE_CONFIG.CONTEST_MIGRATION_DRAIN_TIMEOUT_MS
+        : JUDGE_CONFIG.CONTEST_MIGRATION_RETRY_DRAIN_TIMEOUT_MS;
+      const result = await migrateSubmissionsAfterContest(contestId, { proceedWithJudgesInFlight, drainTimeoutMs });
+      if (result?.deferred) {
+        // Judges still in flight: nothing was written, the contest stays
+        // 'finishing' and the next tick tries again.
+        this.drainDeferrals.set(contestId, deferrals + 1);
+        logger.warn('contest migration deferred - judges still in flight, will retry on next tick', {
+          contestId,
+          deferral: deferrals + 1,
+          maxDeferrals: MIGRATION_MAX_DRAIN_DEFERRALS,
+        });
+        return;
+      }
+      this.migrationFailures.delete(contestId);
+      this.drainDeferrals.delete(contestId);
+      logger.info('contest migration completed', { contestId });
+    } catch (migrationError) {
+      const failures = (this.migrationFailures.get(contestId) ?? 0) + 1;
+      this.migrationFailures.set(contestId, failures);
+
+      if (failures >= MIGRATION_MAX_RETRIES) {
+        // The contest STAYS in 'finishing' — the only status from which
+        // migration can (re)run — so recovery remains possible after the
+        // underlying problem is fixed. This needs manual attention.
+        logger.error(
+          'contest migration failed permanently - contest left in finishing status, manual intervention required',
+          { contestId, attempts: failures, err: migrationError },
+        );
+      } else {
+        logger.error('contest migration failed - will retry on next tick', {
+          contestId,
+          attempt: failures,
+          maxRetries: MIGRATION_MAX_RETRIES,
+          err: migrationError,
+        });
+      }
     }
   }
 

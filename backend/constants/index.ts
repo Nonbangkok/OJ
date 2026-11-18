@@ -238,6 +238,14 @@ export const JUDGE_CONFIG = {
     // hang on a stuck judge; not drained by then, the migration is deferred
     // to the next tick (contestScheduler caps the deferrals).
     CONTEST_MIGRATION_DRAIN_TIMEOUT_MS: 30_000,
+    // The same wait on every later attempt (a retry of a deferred or failed
+    // migration). Kept short so contests still waiting on their judges
+    // cannot stretch the one-minute scheduler tick for everyone else: a tick
+    // that overruns makes the next cron fire skip, which delays other
+    // contests' start and end. The deferral budget is counted in ticks
+    // (contestScheduler), so this does not shorten how long a contest may
+    // wait for its judges.
+    CONTEST_MIGRATION_RETRY_DRAIN_TIMEOUT_MS: 5_000,
     // --- Sandbox identities (RUNNER-003 / RUNNER-006) ---
     // Compiles and testcase runs of one submission share an identity (uid and
     // matching gid) drawn from this rotating pool, so no two LIVE submissions

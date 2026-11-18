@@ -209,6 +209,13 @@ export interface MigrateContestOptions {
    * migrated row that is not yet judged is re-judged in the practice pool.
    */
   proceedWithJudgesInFlight?: boolean;
+  /**
+   * How long to wait for the contest's judges to drain before deferring.
+   * Defaults to JUDGE_CONFIG.CONTEST_MIGRATION_DRAIN_TIMEOUT_MS; the
+   * scheduler passes the short CONTEST_MIGRATION_RETRY_DRAIN_TIMEOUT_MS on
+   * every attempt after the one on the tick the contest ended.
+   */
+  drainTimeoutMs?: number;
 }
 
 /**
@@ -220,22 +227,22 @@ export interface MigrateContestOptions {
  */
 export const migrateSubmissionsAfterContest = async (
   contestId: number,
-  { proceedWithJudgesInFlight = false }: MigrateContestOptions = {},
+  {
+    proceedWithJudgesInFlight = false,
+    drainTimeoutMs = JUDGE_CONFIG.CONTEST_MIGRATION_DRAIN_TIMEOUT_MS,
+  }: MigrateContestOptions = {},
 ): Promise<ContestMigrationResult> => {
   // JUDGE-005 / XSYS-001/002 / A5-02: contest_submissions rows are DELETED
   // below. A judge still queued or running for this contest would then find
   // no row (or its final UPDATE would hit zero rows) and the verdict would be
   // lost: the migrated copy in `submissions` would stay pre-verdict and the
   // frozen final scoreboard would count it as 0. So drain the contest's
-  // judges first, bounded by CONTEST_MIGRATION_DRAIN_TIMEOUT_MS so a tick
-  // never hangs. Not drained: write nothing and report `deferred` — the
-  // contest stays 'finishing' (submissions are already closed by the
-  // wall-clock gate) and the scheduler tries again next tick. The drain runs
-  // before a pool client is taken, so no transaction idles while waiting.
-  const drained = await waitForContestJudgesToDrain(
-    contestId,
-    JUDGE_CONFIG.CONTEST_MIGRATION_DRAIN_TIMEOUT_MS
-  );
+  // judges first, bounded by `drainTimeoutMs` so a tick never hangs. Not
+  // drained: write nothing and report `deferred` — the contest stays
+  // 'finishing' (submissions are already closed by the wall-clock gate) and
+  // the scheduler tries again next tick. The drain runs before a pool client
+  // is taken, so no transaction idles while waiting.
+  const drained = await waitForContestJudgesToDrain(contestId, drainTimeoutMs);
   if (!drained && !proceedWithJudgesInFlight) {
     logger.warn('contest migration deferred - contest judges still in flight', {
       contestId,
