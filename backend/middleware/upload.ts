@@ -1,15 +1,69 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { AUTHOR_PROFILE_IMAGE, FILE_CONFIG, STATEMENT_ASSET, USER_AVATAR } from '../constants';
+import type { NextFunction, Request, RequestHandler, Response } from 'express';
+import {
+    AUTHOR_PROFILE_IMAGE,
+    FILE_CONFIG,
+    PROBLEM_UPLOAD_LIMITS,
+    STATEMENT_ASSET,
+    SUBMISSION_FORM_LIMITS,
+    SUBMISSION_VALIDATION,
+    USER_AVATAR,
+} from '../constants';
 import { AppError } from './errorHandler';
-import { PROBLEM_UPLOAD_LIMITS } from '../constants';
 import { CHUNKED_BATCH_UPLOAD_MULTER_FILE_SIZE_BYTES } from '../services/chunkedBatchUploadService';
 
-// Multer configuration for single file uploads (in memory)
-export const memoryUpload = multer({
+type MulterErrorMessages = Partial<Record<multer.ErrorCode, (error: multer.MulterError) => AppError>>;
+
+/**
+ * Runs a multer middleware and turns the multer errors listed in `messages`
+ * into AppErrors that say what the route accepts. Any other error, including
+ * the LIMIT_FILE_SIZE ones errorHandler maps to a 413 by field, passes through.
+ */
+const withMulterMessages = (middleware: RequestHandler, messages: MulterErrorMessages): RequestHandler =>
+    (req: Request, res: Response, next: NextFunction): void => {
+        middleware(req, res, (error?: unknown) => {
+            const toAppError = error instanceof multer.MulterError ? messages[error.code] : undefined;
+            next(toAppError ? toAppError(error as multer.MulterError) : error);
+        });
+    };
+
+// POST /submit takes JSON or a multipart form of submitSchema's text fields.
+// Any logged-in account reaches it, and busboy keeps every field in RAM until
+// zod runs, so the form is capped to those fields, no files and a per-field
+// byte cap that still holds the longest code the schema accepts. Multer stops
+// at the first part past a limit and discards the rest of the body.
+export const submissionFormUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: FILE_CONFIG.MAX_UPLOAD_SIZE_BYTES },
+    limits: {
+        files: 0,
+        fields: SUBMISSION_FORM_LIMITS.MAX_FIELDS,
+        parts: SUBMISSION_FORM_LIMITS.MAX_FIELDS,
+        fieldSize: SUBMISSION_FORM_LIMITS.MAX_FIELD_BYTES,
+    },
+});
+
+const tooManySubmissionFields = (): AppError => new AppError(
+    `A submission form takes at most ${SUBMISSION_FORM_LIMITS.MAX_FIELDS} fields: `
+    + SUBMISSION_FORM_LIMITS.FIELD_NAMES.join(', '),
+    400,
+);
+const noSubmissionFiles = (): AppError => new AppError(
+    'A submission takes no file uploads; send the code as the "code" text field',
+    400,
+);
+
+export const parseSubmissionForm: RequestHandler = withMulterMessages(submissionFormUpload.none(), {
+    LIMIT_FIELD_VALUE: (error) => new AppError(
+        `Submission field "${error.field ?? ''}" is larger than ${SUBMISSION_FORM_LIMITS.MAX_FIELD_BYTES} bytes `
+        + `(code is limited to ${SUBMISSION_VALIDATION.MAX_CODE_LENGTH} characters)`,
+        413,
+    ),
+    LIMIT_FIELD_COUNT: tooManySubmissionFields,
+    LIMIT_PART_COUNT: tooManySubmissionFields,
+    LIMIT_FILE_COUNT: noSubmissionFiles,
+    LIMIT_UNEXPECTED_FILE: noSubmissionFiles,
 });
 
 // The staff problem routes buffer uploads in RAM, so each gets its own cap
@@ -37,9 +91,11 @@ export const authorProfileImageUpload = multer({
     },
 });
 
+// PUT /profile/avatar (any logged-in account): one image file and nothing
+// else, so no text field is ever buffered.
 export const userAvatarUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: USER_AVATAR.MAX_UPLOAD_BYTES },
+    limits: { fileSize: USER_AVATAR.MAX_UPLOAD_BYTES, files: 1, fields: 0, parts: 1 },
     fileFilter: (_req, file, callback) => {
         if (!(USER_AVATAR.ALLOWED_MIME_TYPES as readonly string[]).includes(file.mimetype)) {
             callback(new AppError('Unsupported user avatar type', 400));
@@ -48,6 +104,21 @@ export const userAvatarUpload = multer({
         callback(null, true);
     },
 });
+
+const avatarOnly = (): AppError => new AppError(
+    `The avatar upload takes only the "${USER_AVATAR.FIELD_NAME}" image file`,
+    400,
+);
+
+export const parseUserAvatarUpload: RequestHandler = withMulterMessages(
+    userAvatarUpload.single(USER_AVATAR.FIELD_NAME),
+    {
+        LIMIT_FIELD_COUNT: avatarOnly,
+        LIMIT_PART_COUNT: avatarOnly,
+        LIMIT_FILE_COUNT: avatarOnly,
+        LIMIT_UNEXPECTED_FILE: avatarOnly,
+    },
+);
 
 export const statementAssetUpload = multer({
     storage: multer.memoryStorage(),

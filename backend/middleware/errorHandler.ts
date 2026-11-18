@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
-import { AUTHOR_PROFILE_IMAGE, PROBLEM_UPLOAD_LIMITS, STATEMENT_ASSET } from '../constants';
+import { AUTHOR_PROFILE_IMAGE, PROBLEM_UPLOAD_LIMITS, STATEMENT_ASSET, USER_AVATAR } from '../constants';
 
 export class AppError extends Error {
     statusCode: number;
@@ -77,6 +77,12 @@ export const errorHandler = (
             });
             return;
         }
+        if (err.code === 'LIMIT_FILE_SIZE' && err.field === USER_AVATAR.FIELD_NAME) {
+            res.status(413).json({
+                message: `User avatar must not exceed ${USER_AVATAR.MAX_UPLOAD_MIB} MiB`,
+            });
+            return;
+        }
         if (err.code === 'LIMIT_FILE_SIZE' && err.field === STATEMENT_ASSET.FIELD_NAME) {
             res.status(413).json({
                 message: `Statement asset must not exceed ${STATEMENT_ASSET.MAX_FILE_MIB} MiB`,
@@ -88,6 +94,8 @@ export const errorHandler = (
             res.status(413).json({ message: problemUploadMessage });
             return;
         }
+        // The fallback names diskUpload's cap; the in-memory upload fields
+        // are mapped to their own caps above.
         const message = err.code === 'LIMIT_FILE_SIZE'
             ? 'Uploaded file is too large. Maximum allowed size is 2GB.'
             : err.message;

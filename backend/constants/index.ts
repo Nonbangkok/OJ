@@ -372,6 +372,21 @@ export const SUBMISSION_VALIDATION = {
     MAX_CODE_LENGTH: 65536, // 64 KiB
 } as const;
 
+const SUBMISSION_FORM_FIELD_NAMES = ['problemId', 'language', 'code', 'contestId'] as const;
+
+/**
+ * Multipart POST /submit (any logged-in account): busboy holds every text
+ * field in RAM before zod runs, so the form is capped to submitSchema's own
+ * fields, no files, and a per-field byte cap. A UTF-16 code unit (what the
+ * schema's max counts) is at most 3 UTF-8 bytes, so 3 x MAX_CODE_LENGTH bytes
+ * hold any code the schema accepts.
+ */
+export const SUBMISSION_FORM_LIMITS = {
+    FIELD_NAMES: SUBMISSION_FORM_FIELD_NAMES,
+    MAX_FIELDS: SUBMISSION_FORM_FIELD_NAMES.length,
+    MAX_FIELD_BYTES: 3 * SUBMISSION_VALIDATION.MAX_CODE_LENGTH,
+} as const;
+
 export const AUTHORING_VALIDATION = {
     MAX_PROBLEM_ID_LENGTH: 50,
     MAX_TITLE_LENGTH: 255,
