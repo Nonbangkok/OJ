@@ -31,6 +31,8 @@
  * copies only its compiled file (see backend/authoring/Dockerfile).
  */
 
+import { createHash } from 'node:crypto';
+
 // ---------------------------------------------------------------------------
 // Lexer
 // ---------------------------------------------------------------------------
@@ -992,6 +994,25 @@ export interface HeaderSourceContext {
   starterFilenames: readonly string[];
 }
 
+/**
+ * Grader identifier sets by content hash, least recently used first. Every
+ * submission to a problem checks against the same grader set, and lexing a
+ * large one (up to 20 x 1 MiB) costs about a second of the API event loop;
+ * hashing it costs a few percent of that. Bounded by entries and by the
+ * identifiers held in total.
+ */
+const GRADER_IDENTIFIER_CACHE = { MAX_ENTRIES: 32, MAX_IDENTIFIERS: 500_000 } as const;
+const graderIdentifierCache = new Map<string, ReadonlySet<string>>();
+let cachedIdentifierCount = 0;
+
+/** Order-independent content key of a grader set (the identifiers do not depend on file names). */
+function graderSetKey(files: HeaderSourceContext['graderFiles']): string {
+  const digests = files
+    .map((file) => createHash('sha256').update(file.content).digest('hex'))
+    .sort();
+  return createHash('sha256').update(digests.join('\n')).digest('hex');
+}
+
 /** Every identifier the grader's code (not its comments or strings) uses. */
 function collectGraderIdentifiers(files: HeaderSourceContext['graderFiles']): Set<string> {
   const identifiers = new Set<string>();
@@ -1001,6 +1022,35 @@ function collectGraderIdentifiers(files: HeaderSourceContext['graderFiles']): Se
       for (const token of line.tokens) {
         if (token.kind === 'identifier') identifiers.add(token.text);
       }
+    }
+  }
+  return identifiers;
+}
+
+/**
+ * Every identifier the grader's code uses, cached by the grader set's
+ * content (the same set object is returned for the same bytes). Exported for
+ * tests; callers must not mutate the set.
+ */
+export function graderIdentifiers(files: HeaderSourceContext['graderFiles']): ReadonlySet<string> {
+  const key = graderSetKey(files);
+  const cached = graderIdentifierCache.get(key);
+  if (cached) {
+    graderIdentifierCache.delete(key);
+    graderIdentifierCache.set(key, cached);
+    return cached;
+  }
+  const identifiers = collectGraderIdentifiers(files);
+  if (identifiers.size <= GRADER_IDENTIFIER_CACHE.MAX_IDENTIFIERS) {
+    graderIdentifierCache.set(key, identifiers);
+    cachedIdentifierCount += identifiers.size;
+    while (
+      graderIdentifierCache.size > GRADER_IDENTIFIER_CACHE.MAX_ENTRIES
+      || cachedIdentifierCount > GRADER_IDENTIFIER_CACHE.MAX_IDENTIFIERS
+    ) {
+      const [oldestKey, oldest] = graderIdentifierCache.entries().next().value as [string, ReadonlySet<string>];
+      graderIdentifierCache.delete(oldestKey);
+      cachedIdentifierCount -= oldest.size;
     }
   }
   return identifiers;
@@ -1100,7 +1150,7 @@ export function findHeaderSourceRejection(code: string, context: HeaderSourceCon
   if (first) {
     return `Compilation rejected (${file}:${first.line}): ${LEX_PROBLEM_MESSAGES[first.kind]}`;
   }
-  const identifiers = collectGraderIdentifiers(context.graderFiles);
+  const identifiers = graderIdentifiers(context.graderFiles);
   const publicHeaders = [...new Set(context.starterFilenames)]
     .filter((name) => isHeaderName(name) && name !== context.submissionFilename)
     .sort();

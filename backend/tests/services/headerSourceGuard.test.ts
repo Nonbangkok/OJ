@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { findHeaderSourceRejection, type HeaderSourceContext } from '../../utils/compileGuard';
+import { findHeaderSourceRejection, graderIdentifiers, type HeaderSourceContext } from '../../utils/compileGuard';
 
 /**
  * Header-problem source rules (defence in depth over the two-step build).
@@ -230,6 +230,35 @@ describe('findHeaderSourceRejection', () => {
       const code = `${STUDENT_OK}// don't worry, it's fine\n/* the grader's main calls this */\n`
         + "#if 0\nThis doesn't compile yet; it's a draft.\n#endif\nconst long long big = 1'000'000;\nconst char q = '\\'';\n";
       expect(reject(code)).toBeNull();
+    });
+  });
+
+  describe('grader identifier cache', () => {
+    const files = (main: string) => [
+      { filename: 'main.cpp', content: Buffer.from(main) },
+      { filename: 'vector.h', content: Buffer.from(GRADER_VECTOR) },
+    ];
+
+    it('lexes a grader set once and serves identical content from the cache', () => {
+      const first = graderIdentifiers(files(GRADER_MAIN));
+      // Fresh buffers, same bytes (a new submission to the same problem).
+      expect(graderIdentifiers(files(GRADER_MAIN))).toBe(first);
+      expect(first.has('SECRET_LIMIT')).toBe(true);
+      expect(first.has('GRADER_SECRET_NOTES_42')).toBe(false);
+    });
+
+    it('re-lexes when the grader content changes', () => {
+      const before = graderIdentifiers(files(GRADER_MAIN));
+      const after = graderIdentifiers(files(`${GRADER_MAIN}int another_name;\n`));
+      expect(after).not.toBe(before);
+      expect(after.has('another_name')).toBe(true);
+      expect(before.has('another_name')).toBe(false);
+    });
+
+    it('stays bounded: the least recently used set is evicted', () => {
+      const first = graderIdentifiers(files('int evict_me_first;\n'));
+      for (let i = 0; i < 64; i += 1) graderIdentifiers(files(`int filler_${i};\n`));
+      expect(graderIdentifiers(files('int evict_me_first;\n'))).not.toBe(first);
     });
   });
 });
