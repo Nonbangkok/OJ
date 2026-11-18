@@ -459,8 +459,12 @@ describe('Submission Controller', () => {
 
                 expect(res.status).toBe(403);
                 expect(JSON.stringify(res.body)).not.toContain('uint64_t');
-                // The lookup was scoped to the contest table.
-                expect((db.query as jest.Mock).mock.calls[0][0]).toContain('FROM contest_submissions cs');
+                // The lookup was scoped to the contest: its contest_submissions
+                // rows, or its moved submissions rows once finished, by id AND contest.
+                const detailSql = String((db.query as jest.Mock).mock.calls[0][0]);
+                expect(detailSql).toContain('FROM contest_submissions WHERE contest_id = $2');
+                expect(detailSql).toContain('FROM submissions WHERE contest_id = $2');
+                expect(detailSql).toContain('WHERE cs.id = $1 AND cs.contest_id = $2');
             });
 
             it.each([
@@ -486,7 +490,10 @@ describe('Submission Controller', () => {
                 // the testcase strip; no output, log or compiler text leaves.
                 expect(feedSql).toContain("jsonb_agg(r->>'status')");
                 const withoutStatusList = feedSql!.replace(/COALESCE\(\(SELECT jsonb_agg\(r->>'status'\)[\s\S]*?AS case_statuses/, '');
-                expect(withoutStatusList).not.toMatch(/\bresults\b/);
+                // What the query returns: the select list (the contest feed's row
+                // source reads `results` only for that status list).
+                const selectList = withoutStatusList.slice(0, withoutStatusList.search(/\bFROM\b/));
+                expect(selectList).not.toMatch(/\bresults\b/);
                 expect(feedSql).not.toMatch(/\.\*/);
                 expect(feedSql).not.toMatch(/\bcode\b/);
             });

@@ -558,6 +558,7 @@
   - `page: number` (default 1, max 500; หน้าละ 200 แถว — SUB-004)
 - Response 200: submissions list
 - การ gate: feed สาธารณะไม่รวมโจทย์ hidden/contest สำหรับ non-staff; feed ต่อ contest (`?contestId=`) ต้องเป็น participant/staff และ contest ต้อง visible; ก่อน contest finished non-staff เห็น `case_statuses` เฉพาะ submission ของตัวเอง (ของคนอื่นเป็น `[]`, verdict/score ยังเห็น)
+- feed ต่อ contest อ่าน `contest_submissions` ตอน running/finishing และ submission ที่ย้ายไป `submissions WHERE contest_id` เมื่อ finished (migration 0029) — แถวเดียวกับที่หน้าโจทย์ contest นับเป็น "Submissions N"; id ของ contest ที่ finished เป็น id ใน practice pool (เปลี่ยนตอน finish — ลิงก์ id เดิมจากช่วงแข่งใช้ไม่ได้แล้ว). contest ที่ finish ก่อน 0029 ได้ `[]`
 
 ### 66. `GET /search/problems`
 - Auth: required
@@ -576,6 +577,7 @@
 - Auth: required (guest ไม่ได้รับสิทธิ์นี้แม้ใน PUBLIC mode)
 - Query optional: `contestId`
 - Response 200: submission detail
+- `?contestId=`: หาแถวด้วย id **และ** contest — `contest_submissions` ตอน running/finishing, แถวที่ย้ายไป `submissions` (`contest_id`) เมื่อ finished; submission ฝึกที่บังเอิญมี id เดียวกันไม่มีวันถูกคืนผ่าน route นี้ (404). สิทธิ์เหมือนเดิม: เจ้าของหรือ staff
 - Errors:
   - 404 not found (id ต้องเป็นตัวเลข — ไม่ใช่ตอบ 500)
   - 403 ไม่มีสิทธิ์ดู
