@@ -383,17 +383,51 @@ type ImportDatabase = {
 };
 
 /**
- * DB-01: tear the whole public schema down instead of dropping a
- * hand-maintained table list. The list had already drifted (collections,
- * user_problem_rewards, authoring_profile_syncs, authoring_profile_sync_items
- * survived the drop), which both stranded stale data and broke
- * self-export→import roundtrips (restore fails on CREATE TABLE after the
- * destructive drop). Schema-level teardown is introspection-free and
- * future-proof: any table any migration ever created goes away.
+ * What the import's safety copy (a full `pg_dump -Fc --no-subscriptions`)
+ * holds, removed in one statement so a failure drops nothing: every
+ * non-system schema with everything in it (CASCADE also takes extensions
+ * installed there and whatever depends on their objects), every large
+ * object and every publication. A fresh empty `public` is left for the
+ * restore, because a full pg_dump never writes CREATE SCHEMA public. Names
+ * starting with pg_ are reserved for system schemas (pg_catalog, pg_toast,
+ * pg_temp_N). Not covered: database-level objects that sit in no schema and
+ * depend on nothing in one (a foreign-data wrapper without handler
+ * functions, say), which this app never creates.
+ */
+const DROP_DATABASE_CONTENTS_SQL = `DO $drop$
+DECLARE
+  item record;
+BEGIN
+  FOR item IN
+    SELECT nspname FROM pg_namespace
+    WHERE nspname <> 'information_schema' AND nspname NOT LIKE 'pg\\_%'
+  LOOP
+    -- IF EXISTS: an earlier CASCADE may already have taken this schema.
+    EXECUTE format('DROP SCHEMA IF EXISTS %I CASCADE', item.nspname);
+  END LOOP;
+  FOR item IN SELECT pubname FROM pg_publication LOOP
+    EXECUTE format('DROP PUBLICATION %I', item.pubname);
+  END LOOP;
+  PERFORM lo_unlink(oid) FROM pg_largeobject_metadata;
+  CREATE SCHEMA public;
+END
+$drop$`;
+
+/**
+ * DB-01: tear schemas down instead of dropping a hand-maintained table list.
+ * The list had already drifted (collections, user_problem_rewards,
+ * authoring_profile_syncs, authoring_profile_sync_items survived the drop),
+ * which both stranded stale data and broke self-export→import roundtrips
+ * (restore fails on CREATE TABLE after the destructive drop).
+ *
+ * A2-02: not only `public`. The safety copy is a full dump, so a database
+ * with any other schema (or a large object, or a publication) could not be
+ * restored from it after a public-only drop: the restore stopped at
+ * "already exists" and left the site empty. The drop now covers exactly what
+ * a full dump holds, and an upload that carries another schema restores too.
  */
 export const dropAllTablesForImport = async (database: ImportDatabase = db): Promise<void> => {
-  await database.query('DROP SCHEMA public CASCADE');
-  await database.query('CREATE SCHEMA public');
+  await database.query(DROP_DATABASE_CONTENTS_SQL);
 };
 
 export const getRegistrationEnabled = async (): Promise<boolean> => {

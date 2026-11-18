@@ -101,4 +101,86 @@ describe('useAdminSettings', () => {
         expect(adminService.exportDatabase).toHaveBeenCalled();
         expect(result.current.databaseSuccess).toBe('Database exported successfully!');
     });
+
+    describe('database import progress polling (A2-07)', () => {
+        const httpError = (status: number) => Object.assign(new Error(`Request failed with status code ${status}`), { response: { status, data: {} } });
+
+        const startImport = async () => {
+            const hook = renderHook(() => useAdminSettings(), { wrapper });
+            await waitFor(() => expect(hook.result.current.isLoadingRegistration).toBe(false));
+            act(() => {
+                hook.result.current.selectDatabaseFile(new File(['--'], 'backup.sql'));
+            });
+            await act(async () => {
+                await hook.result.current.handleImportDatabase();
+            });
+            return hook;
+        };
+
+        /** Let the poll scheduled `ms` from now run, including its awaited request. */
+        const advance = async (ms: number) => {
+            await act(async () => {
+                await jest.advanceTimersByTimeAsync(ms);
+            });
+        };
+
+        beforeEach(() => {
+            jest.useFakeTimers();
+            (jest.mocked(adminService.importDatabase) as jest.Mock).mockResolvedValue({ jobId: 'job-1', token: 'token-1' });
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        it('stops spinning and reports the problem after repeated poll failures', async () => {
+            (jest.mocked(adminService.getImportDatabaseProgress) as jest.Mock).mockRejectedValue(new Error('Network Error'));
+
+            const { result } = await startImport();
+            expect(result.current.isImporting).toBe(true);
+            await advance(60_000);
+
+            expect(result.current.isImporting).toBe(false);
+            expect(result.current.databaseError).toMatch(/lost contact with the server/i);
+            const polls = (adminService.getImportDatabaseProgress as jest.Mock).mock.calls.length;
+            await advance(60_000);
+            expect((adminService.getImportDatabaseProgress as jest.Mock).mock.calls.length).toBe(polls);
+        });
+
+        it('stops at once when the server no longer knows the import job (404)', async () => {
+            (jest.mocked(adminService.getImportDatabaseProgress) as jest.Mock).mockRejectedValue(httpError(404));
+
+            const { result } = await startImport();
+            await advance(0);
+
+            expect(result.current.isImporting).toBe(false);
+            expect(result.current.databaseError).toMatch(/import status is no longer available/i);
+            expect(adminService.getImportDatabaseProgress).toHaveBeenCalledTimes(1);
+        });
+
+        it('keeps polling through a transient failure and reports completion', async () => {
+            (jest.mocked(adminService.getImportDatabaseProgress) as jest.Mock)
+                .mockRejectedValueOnce(httpError(502))
+                .mockResolvedValueOnce({ status: 'uploading', message: 'Importing database dump.' })
+                .mockResolvedValueOnce({ status: 'completed', message: 'Database imported successfully.' });
+
+            const { result } = await startImport();
+            await advance(60_000);
+
+            expect(result.current.isImporting).toBe(false);
+            expect(result.current.databaseError).toBe('');
+            expect(adminService.getImportDatabaseProgress).toHaveBeenCalledTimes(3);
+        });
+
+        it('shows a failed import as an error', async () => {
+            (jest.mocked(adminService.getImportDatabaseProgress) as jest.Mock)
+                .mockResolvedValueOnce({ status: 'failed', message: 'Failed to import database; the previous database was restored.' });
+
+            const { result } = await startImport();
+            await advance(0);
+
+            expect(result.current.isImporting).toBe(false);
+            expect(result.current.databaseError).toBe('Failed to import database; the previous database was restored.');
+        });
+    });
 });

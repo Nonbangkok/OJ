@@ -344,6 +344,57 @@ mitigation was chosen for Phase 0 because moving compile+run into a separate
 compose service (queue/transport, results plumbing) is an architectural change
 that belongs to its own phase.
 
+### 9. Private backend work root for temp files (A1-01 / A2-01 / A9-02)
+Judged programs share the backend container's world-writable `/tmp` with no
+filesystem confinement, so the backend never stages anything there at a
+predictable path or in a listable directory. `backend/utils/privateTemp.ts`
+creates one per-process root at boot (`server.ts`, before listening):
+`oj-work-<pid>-XXXXXX` via `mkdtemp`, mode 0700, owned by the backend uid,
+under `OJ_WORK_DIR` when set and `os.tmpdir()` otherwise. Roots of earlier
+processes are removed at boot (our prefix, our uid, pid gone or reused).
+Everything temporary lives in a fresh `mkdtemp` directory inside it: multer
+disk uploads (batch ZIPs, chunk parts, DB dumps), batch and inner
+testcase-ZIP extraction, chunked-upload
+sessions and assembled ZIPs, DB export dumps (removed after the download and
+when `pg_dump` fails) and authoring testcase uploads. Directory roots passed
+explicitly (chunked uploads) are verified the same way; a root another uid
+created first, or a chmod failure, is an error, never skipped.
+
+`OJ_WORK_DIR` is optional, and `docker-compose.yml` does not pass it: the
+backend's `environment` lists its keys explicitly, so setting it in `.env`
+alone changes nothing and the work root stays under the container's `/tmp`.
+To move the root (for example onto a dedicated volume), add `OJ_WORK_DIR`
+to the backend environment in compose. It must be a real directory (not a
+symlink) owned by the backend uid, which is root in the container. A missing
+one is created 0700; an existing one with any other mode is tightened to 0700
+at boot (through an `O_NOFOLLOW` descriptor), so a fresh named volume mounted
+there works as is (its mountpoint is `root:root` 0755 unless the image
+already has a directory at that path, whose mode Docker copies). A symlink,
+a file, a directory owned by another uid (a bind mount of a host directory
+owned by a host user, say) or a shared directory (sticky or world-writable,
+such as `/tmp` itself) is left untouched and the backend refuses to start:
+tightening `/tmp` to 0700 would lock judged programs out of their
+workspaces.
+
+Batch import reads every archive entry it inflates through one counting helper
+(`inflateEntryBounded` in `batchUploadService.ts`) that counts the bytes
+actually inflated: an entry may not exceed (or fall short of) the
+`uncompressedSize` it declares, and the archive may not exceed
+`ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES`, so a lying size cannot make it
+inflate more than that cap, on disk or in memory. That covers the batch ZIP
+itself, an inner testcase ZIP with the `input/`/`output/` layout (extracted
+into a private directory), and a flat-layout inner testcase ZIP
+(`1.in`/`1.out` at its root, which is never extracted: `assertSafeArchive`
+runs first, then each paired entry is read into memory through the same
+helper). An `input\output` layout written with backslash separators is not
+detected as `input/`/`output/` and takes the flat branch too, so
+`assertSafeArchive` runs on it; its entry names never match the testcase name
+pattern (the basename is not split on `\`), so none of them is read and it
+imports no testcases, as before. A testcase ZIP rejected part-way is rolled
+back to a savepoint, so the problem keeps no partial testcase set. Other
+archive readers (the admin testcase-ZIP replacement and header grader/starter
+ZIPs) do not go through this helper.
+
 ### Why the backend container still runs as root
 See the long comment in `backend/Dockerfile`. In short: the per-submission
 privilege drop in `time_wrapper.c` (root → nobody) only works if the parent

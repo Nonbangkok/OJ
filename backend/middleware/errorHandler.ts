@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
-import { AUTHOR_PROFILE_IMAGE, STATEMENT_ASSET } from '../constants';
+import { AUTHOR_PROFILE_IMAGE, PROBLEM_UPLOAD_LIMITS, STATEMENT_ASSET, USER_AVATAR } from '../constants';
 
 export class AppError extends Error {
     statusCode: number;
@@ -25,6 +25,24 @@ export const asyncHandler = <
     };
 };
 
+/** 413 messages for the staff problem routes' in-memory upload caps, by field. */
+const PROBLEM_UPLOAD_SIZE_MESSAGES: ReadonlyMap<string, string> = new Map([
+    [PROBLEM_UPLOAD_LIMITS.FILES_ZIP_FIELD_NAME,
+        `Header problem file ZIP must not exceed ${PROBLEM_UPLOAD_LIMITS.FILES_ZIP_MAX_MIB} MiB`],
+    [PROBLEM_UPLOAD_LIMITS.PDF_FIELD_NAME,
+        `Problem PDF must not exceed ${PROBLEM_UPLOAD_LIMITS.SINGLE_REQUEST_MAX_MIB} MiB`],
+    [PROBLEM_UPLOAD_LIMITS.TESTCASES_ZIP_FIELD_NAME,
+        `Testcase ZIP must not exceed ${PROBLEM_UPLOAD_LIMITS.SINGLE_REQUEST_MAX_MIB} MiB in one request; larger ZIPs use the chunked upload`],
+]);
+
+/** body-parser's client errors (malformed JSON, unsupported encoding, ...). */
+const isBodyParserClientError = (err: unknown): err is { type: string; status: number; message: string } => {
+    if (typeof err !== 'object' || err === null) return false;
+    const { type, status, expose } = err as { type?: unknown; status?: unknown; expose?: unknown };
+    return typeof type === 'string' && expose === true
+        && typeof status === 'number' && status >= 400 && status < 500;
+};
+
 export const notFoundHandler = (req: Request, res: Response): void => {
     res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });
 };
@@ -45,10 +63,23 @@ export const errorHandler = (
         return;
     }
 
+    if (isBodyParserClientError(err)) {
+        res.status(err.status).json({
+            message: err.type === 'entity.parse.failed' ? 'Malformed JSON request body' : err.message,
+        });
+        return;
+    }
+
     if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE' && err.field === AUTHOR_PROFILE_IMAGE.FIELD_NAME) {
             res.status(413).json({
                 message: `Author profile image must not exceed ${AUTHOR_PROFILE_IMAGE.MAX_UPLOAD_MIB} MiB`,
+            });
+            return;
+        }
+        if (err.code === 'LIMIT_FILE_SIZE' && err.field === USER_AVATAR.FIELD_NAME) {
+            res.status(413).json({
+                message: `User avatar must not exceed ${USER_AVATAR.MAX_UPLOAD_MIB} MiB`,
             });
             return;
         }
@@ -58,6 +89,13 @@ export const errorHandler = (
             });
             return;
         }
+        const problemUploadMessage = err.field === undefined ? undefined : PROBLEM_UPLOAD_SIZE_MESSAGES.get(err.field);
+        if (err.code === 'LIMIT_FILE_SIZE' && problemUploadMessage !== undefined) {
+            res.status(413).json({ message: problemUploadMessage });
+            return;
+        }
+        // The fallback names diskUpload's cap; the in-memory upload fields
+        // are mapped to their own caps above.
         const message = err.code === 'LIMIT_FILE_SIZE'
             ? 'Uploaded file is too large. Maximum allowed size is 2GB.'
             : err.message;

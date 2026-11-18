@@ -25,6 +25,10 @@ const baseEnvSchema = z.object({
   TRUST_PROXY: z.coerce.number().int().min(0).default(1),
   AUTHORING_JOBS_DIR: z.string().default('').refine(value => value === ''
     || (path.isAbsolute(value) && path.resolve(value) !== path.parse(value).root)),
+  // Private work root for backend temp files (utils/privateTemp); '' = os.tmpdir().
+  // docker-compose.yml does not pass it: add it to the backend environment to use it.
+  OJ_WORK_DIR: z.string().default('').refine(value => value === ''
+    || (path.isAbsolute(value) && path.resolve(value) !== path.parse(value).root)),
 });
 
 export const parseRuntimeEnv = (input: NodeJS.ProcessEnv) => {

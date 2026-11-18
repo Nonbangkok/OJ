@@ -100,4 +100,14 @@ std::cout << "\n";
     expect(compileStatementSource(source, [])).toContain('$x$');
     expect(Date.now() - started).toBeLessThan(750);
   });
+
+  // A9-10: marked before 4.0.10 backtracks for seconds on a few KiB of
+  // reference-definition text (GHSA-5v2h-r2cx-5xgj), and compilation runs on
+  // the API's main thread (authoring preview, publish, PDF snapshot).
+  it('compiles a ReDoS-shaped reference definition in bounded time', () => {
+    const source = `[x]:${' '.repeat(1500)}x ${' '.repeat(1500)} x`;
+    const started = Date.now();
+    expect(typeof compileStatementSource(source, [])).toBe('string');
+    expect(Date.now() - started).toBeLessThan(750);
+  });
 });

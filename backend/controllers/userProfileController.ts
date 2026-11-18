@@ -1,8 +1,7 @@
 import express, { Request, Response, Router } from 'express';
-import { USER_AVATAR } from '../constants';
 import { requireAuth } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
-import { userAvatarUpload } from '../middleware/upload';
+import { parseUserAvatarUpload } from '../middleware/upload';
 import { validateRequest } from '../middleware/validation';
 import { usernameParamSchema } from '../schemas/requestSchemas';
 import { normalizeUserAvatar } from '../services/userAvatarImageService';
@@ -75,7 +74,7 @@ router.get('/users/:username/avatar',
 
 router.put('/profile/avatar',
   requireAuth,
-  userAvatarUpload.single(USER_AVATAR.FIELD_NAME),
+  parseUserAvatarUpload,
   asyncHandler(async (req: Request, res: Response) => {
     if (!req.file) {
       throw new AppError('Avatar image is required', 400);

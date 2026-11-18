@@ -2,15 +2,14 @@ import fs from 'fs';
 const fsPromises = fs.promises;
 import path from 'path';
 import * as unzipper from 'unzipper';
-import os from 'os';
-import { Readable } from 'stream';
+import { Transform, Writable } from 'stream';
+import { pipeline } from 'stream/promises';
 import type { PoolClient } from 'pg';
 import * as db from '../db';
-import { UPLOAD_STATUS, FILE_CONFIG, DEFAULT_SUBMISSION_FILENAME, type ProblemFileRole } from '../constants';
+import { UPLOAD_STATUS, FILE_CONFIG, DEFAULT_SUBMISSION_FILENAME, ARCHIVE_LIMITS, type ProblemFileRole } from '../constants';
 import { BatchUploadProgressData } from '../types/api';
 import {
   BatchUploadResult,
-  BufferedContent,
   ProblemProcessResult,
   TestcasePairMap,
 } from '../types/service';
@@ -24,6 +23,8 @@ import { replaceProblemFiles } from './problemFilesService';
 import type { ProblemFileInput } from '../utils/headerProblemFiles';
 import { pairFlatDirTestcaseFiles, pairZippedTestcaseFiles } from './testcaseZipPairing';
 import { assertSafeArchive, MAX_ARCHIVE_ENTRIES, type ArchiveEntryLike } from '../utils/archiveSafety';
+import { privateTempDir, removePrivateTemp } from '../utils/privateTemp';
+import { isMaintenanceActive } from './maintenanceMode';
 
 // Re-exported for the callers that have always imported the archive guard from
 // this service; the implementation now lives in `utils/archiveSafety`.
@@ -39,12 +40,111 @@ function getErrorMessage(error: unknown): string {
   return 'Unknown error';
 }
 
-/** Remove a directory tree without spawning a shell (avoids command injection). */
-async function removeDir(dir: string): Promise<void> {
-  await fsPromises.rm(dir, { recursive: true, force: true });
+/** Bytes inflated so far from one archive, shared by all of its entries. */
+interface InflateBudget {
+  total: number;
 }
 
+/**
+ * Inflate one archive entry into `sink`, counting the bytes it actually
+ * produces. The entry may not produce more than the uncompressedSize its
+ * central directory declares (which assertSafeArchive summed against the cap),
+ * so a lying size aborts the inflate at once instead of filling the disk or
+ * the heap; it may not end short of it either; and the archive's running total
+ * may not pass ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES. Every read of an archive
+ * entry goes through here: extraction to disk and in-memory reads alike.
+ */
+async function inflateEntryBounded(entry: unzipper.File, budget: InflateBudget, sink: Writable): Promise<void> {
+  const declared = entry.uncompressedSize;
+  if (!Number.isSafeInteger(declared) || declared < 0) {
+    throw new Error(`Archive rejected: entry "${entry.path}" has no valid declared size.`);
+  }
+  let size = 0;
+  const counter = new Transform({
+    transform(chunk: Buffer, _encoding, done) {
+      size += chunk.length;
+      budget.total += chunk.length;
+      if (size > declared) {
+        done(new Error(`Archive rejected: entry "${entry.path}" inflates past its declared size of ${declared} bytes.`));
+        return;
+      }
+      if (budget.total > ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES) {
+        done(new Error(`Archive rejected: uncompressed size exceeds ${ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES} bytes (decompression bomb).`));
+        return;
+      }
+      done(null, chunk);
+    },
+  });
+  await pipeline(entry.stream(), counter, sink);
+  if (size !== declared) {
+    throw new Error(`Archive rejected: entry "${entry.path}" holds ${size} bytes but declares ${declared}.`);
+  }
+}
+
+/** Read one archive entry into memory through inflateEntryBounded. */
+async function readEntryBounded(entry: unzipper.File, budget: InflateBudget): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  await inflateEntryBounded(entry, budget, new Writable({
+    write(chunk: Buffer, _encoding, done) {
+      chunks.push(chunk);
+      done();
+    },
+  }));
+  return Buffer.concat(chunks);
+}
+
+/**
+ * Extract an archive entry by entry into `destination` (a private temp dir),
+ * each entry through inflateEntryBounded. Directories are 0700 and files
+ * 0600. Call assertSafeArchive first; paths are re-checked here so nothing
+ * lands outside `destination`, and a duplicate entry is rejected.
+ */
+async function extractArchiveBounded(entries: unzipper.File[], destination: string): Promise<void> {
+  const root = path.resolve(destination);
+  const budget: InflateBudget = { total: 0 };
+  for (const entry of entries) {
+    const target = path.resolve(root, entry.path.replace(/\\/g, '/'));
+    const relative = path.relative(root, target);
+    if (relative === '') continue;
+    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+      throw new Error(`Archive rejected: path traversal in entry "${entry.path}".`);
+    }
+    if (entry.type === 'Directory') {
+      await fsPromises.mkdir(target, { recursive: true, mode: 0o700 });
+      continue;
+    }
+    await fsPromises.mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
+
+    try {
+      await inflateEntryBounded(entry, budget, fs.createWriteStream(target, { flags: 'wx', mode: 0o600 }));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+        throw new Error(`Archive rejected: duplicate entry "${entry.path}".`);
+      }
+      throw error;
+    }
+  }
+}
+
+/**
+ * Import a problem's testcase ZIP whole or not at all. The flat layout inserts
+ * pair by pair as it reads, so an entry rejected part-way (lying or short
+ * size, over the cap) or a failed insert rolls back to the savepoint, leaving
+ * the problem with no testcases rather than a partial set.
+ */
 async function processTestcasesFromZip(client: PoolClient, problemId: string, zipPath: string, log: string[]): Promise<number> {
+  await client.query('SAVEPOINT testcase_zip');
+  try {
+    const count = await insertTestcasesFromZip(client, problemId, zipPath, log);
+    await client.query('RELEASE SAVEPOINT testcase_zip');
+    return count;
+  } catch (error) {
+    await client.query('ROLLBACK TO SAVEPOINT testcase_zip');
+    throw error;
+  }
+}
+
+async function insertTestcasesFromZip(client: PoolClient, problemId: string, zipPath: string, log: string[]): Promise<number> {
   const zip = await unzipper.Open.file(zipPath);
 
   // Check for input/output directory structure within the zip
@@ -58,16 +158,15 @@ async function processTestcasesFromZip(client: PoolClient, problemId: string, zi
     // --- New Logic: Handle zipped input/output directories ---
     log.push('Detected input/output directory structure inside zip.');
 
-    const tempExtractDir = path.join(os.tmpdir(), `oj_inner_zip_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+    let tempExtractDir: string | undefined;
 
     try {
-      await fsPromises.mkdir(tempExtractDir, { recursive: true });
-
       // Validate entries (zip-slip / zip-bomb) before extracting to disk.
       assertSafeArchive(zip.files as unknown as ArchiveEntryLike[]);
 
-      // Extract the entire zip to the temporary directory
-      await zip.extract({ path: tempExtractDir });
+      // Extract the entire zip into a private directory, bounded by real size.
+      tempExtractDir = await privateTempDir('inner-zip-');
+      await extractArchiveBounded(zip.files, tempExtractDir);
 
       // Find the common base path of the input/output directories.
       const basePathInZip = path.dirname(firstInputFile.path).split('/input')[0];
@@ -79,14 +178,18 @@ async function processTestcasesFromZip(client: PoolClient, problemId: string, zi
 
     } finally {
       // Clean up the temporary extraction directory (no shell — avoids injection).
-      await removeDir(tempExtractDir);
+      if (tempExtractDir) await removePrivateTemp(tempExtractDir);
     }
 
   } else {
     // --- Fallback to original logic for flat zip files ---
+    // Nothing is extracted here: the paired entries are read into memory, so
+    // validate the whole archive first and read each one bounded by real size.
     log.push('Detected flat file structure inside zip.');
+    assertSafeArchive(zip.files as unknown as ArchiveEntryLike[]);
     const testcaseFiles = pairZippedTestcaseFiles(zip.files);
-    return processPairedFiles(client, problemId, testcaseFiles, (file) => Promise.resolve(file.stream()), log);
+    const budget: InflateBudget = { total: 0 };
+    return processPairedFiles(client, problemId, testcaseFiles, (file) => readEntryBounded(file, budget), log);
   }
 }
 
@@ -126,20 +229,11 @@ async function processTestcasesFromFlatDir(client: PoolClient, problemId: string
   return processPairedFiles(client, problemId, testcaseFiles, (filePath: string) => fsPromises.readFile(filePath), log);
 }
 
-async function streamToBuffer(stream: Readable): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    stream.on('data', (chunk: Buffer) => chunks.push(chunk));
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-    stream.on('error', reject);
-  });
-}
-
 async function processPairedFiles<TSource>(
   client: PoolClient,
   problemId: string,
   pairedFiles: TestcasePairMap<TSource>,
-  readFileFunc: (source: TSource) => Promise<BufferedContent>,
+  readFileFunc: (source: TSource) => Promise<Buffer>,
   log: string[],
 ): Promise<number> {
   const keys = Object.keys(pairedFiles).map(Number).sort((a, b) => a - b);
@@ -154,11 +248,8 @@ async function processPairedFiles<TSource>(
   for (const key of keys) {
     const pair = pairedFiles[key];
     if (pair && pair.in && pair.out) {
-      const inputContent = await readFileFunc(pair.in);
-      const outputContent = await readFileFunc(pair.out);
-
-      const inputData = inputContent instanceof Readable ? await streamToBuffer(inputContent) : inputContent;
-      const outputData = outputContent instanceof Readable ? await streamToBuffer(outputContent) : outputContent;
+      const inputData = await readFileFunc(pair.in);
+      const outputData = await readFileFunc(pair.out);
 
       await client.query(
         'INSERT INTO testcases (problem_id, case_number, input_data, output_data) VALUES ($1, $2, $3, $4)',
@@ -391,22 +482,34 @@ async function processProblemDirectory(problemPath: string): Promise<ProblemProc
   });
 }
 
+/**
+ * A2-03: batch uploads being processed right now. Each one runs after its
+ * request has been answered 202, one transaction per problem, so the
+ * database import cannot rely on the maintenance gate to keep it out.
+ */
+let runningBatchUploads = 0;
+
+/** A2-03: whether a batch upload may still write problems; a database import refuses to start while one does. */
+export const isBatchUploadRunning = (): boolean => runningBatchUploads > 0;
+
 export async function processBatchUpload(
   zipFilePath: string,
   onProgress?: (progress: BatchUploadProgressData) => void,
 ): Promise<BatchUploadResult> {
   const results: BatchUploadResult = { added: [], skipped: [], errors: [] };
-  const tempDir = path.join(os.tmpdir(), `oj_batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  let tempDir: string | undefined;
+  runningBatchUploads += 1;
 
   try {
-    await fsPromises.mkdir(tempDir, { recursive: true });
-
     const directory = await unzipper.Open.file(zipFilePath);
 
     // Validate entries (zip-slip / zip-bomb) before extracting to disk.
     assertSafeArchive(directory.files as unknown as ArchiveEntryLike[]);
 
-    await directory.extract({ path: tempDir });
+    // Graders and hidden testcases: extract only into a private 0700
+    // directory, never a predictable /tmp path judged programs can read.
+    tempDir = await privateTempDir('batch-');
+    await extractArchiveBounded(directory.files, tempDir);
 
     const junkDirs = new Set(['__MACOSX', '.vscode']);
     const topLevelItems = await fsPromises.readdir(tempDir, { withFileTypes: true });
@@ -435,7 +538,17 @@ export async function processBatchUpload(
     let processedCount = 0;
     const totalProblems = problemPathsToProcess.length;
 
-    for (const problemPath of problemPathsToProcess) {
+    for (const [index, problemPath] of problemPathsToProcess.entries()) {
+      // A2-03: an import is dropping and restoring the database (this batch
+      // reached its first problem after the import began). Write nothing more.
+      if (isMaintenanceActive()) {
+        const notProcessed = totalProblems - index;
+        results.errors.push({
+          directory: 'Batch Process',
+          message: `Stopped because a database import started: ${notProcessed} of ${totalProblems} problems were not processed. Upload them again after the import has finished.`,
+        });
+        break;
+      }
       try {
         const result = await processProblemDirectory(problemPath);
         if (result.status === UPLOAD_STATUS.ADDED) {
@@ -463,12 +576,12 @@ export async function processBatchUpload(
     console.error('An unexpected error occurred during the batch upload process:', error);
     results.errors.push({ directory: 'Batch Process', message: getErrorMessage(error) || 'A critical error occurred.' });
   } finally {
+    // Only temporary files are touched from here on.
+    runningBatchUploads -= 1;
     const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-    try {
+    if (tempDir) {
       await delay(FILE_CONFIG.CLEANUP_DELAY_MS);
-      await removeDir(tempDir);
-    } catch (err: unknown) {
-      console.warn(`[Robust Cleanup] Failed to remove temp directory ${tempDir}:`, err);
+      await removePrivateTemp(tempDir);
     }
 
     try {

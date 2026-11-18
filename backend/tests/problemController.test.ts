@@ -2,7 +2,6 @@ import request from 'supertest';
 import express, { Express, Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import fs from 'fs/promises';
-import os from 'os';
 import path from 'path';
 import problemRouter from '../controllers/problemController';
 import { errorHandler } from '../middleware/errorHandler';
@@ -11,6 +10,7 @@ import * as db from '../db';
 import { processBatchUpload } from '../services/batchUploadService';
 import * as problemQueryService from '../services/problemQueryService';
 import { readFlatZip } from '../utils/headerProblemFiles';
+import { backendWorkRoot } from '../utils/privateTemp';
 
 // Mock dependencies
 jest.mock('../db');
@@ -47,8 +47,10 @@ jest.mock('../middleware/upload', () => ({
             next();
         }
     },
-    memoryUpload: {
+    problemSingleRequestUpload: {
         fields: () => (req: Request, res: Response, next: NextFunction) => next(),
+    },
+    problemFilesZipUpload: {
         single: () => (req: Request, _res: Response, next: NextFunction) => {
             if (req.headers['x-test-has-file'] === '1') {
                 req.file = { buffer: Buffer.from('zip-bytes') } as Express.Multer.File;
@@ -699,12 +701,20 @@ describe('Problem Controller', () => {
         });
     });
 
+    /** Chunk sessions live in the service's private dirs inside the backend work root. */
+    async function removeChunkUploadLeftovers(uploadId: string): Promise<void> {
+        const root = backendWorkRoot();
+        for (const name of await fs.readdir(root)) {
+            if (name.startsWith('chunk-sessions-')) await fs.rm(path.join(root, name, uploadId), { recursive: true, force: true });
+            if (name.startsWith('chunk-assembled-')) await fs.rm(path.join(root, name, `oj-testcases-${uploadId}.zip`), { force: true });
+        }
+    }
+
     describe('chunked batch upload routes', () => {
         let createdUploadIds: string[];
         beforeEach(() => { createdUploadIds = []; });
         afterEach(async () => {
-            await Promise.all(createdUploadIds.map((uploadId) =>
-                fs.rm(path.join(os.tmpdir(), 'oj-chunk-uploads', uploadId), { recursive: true, force: true })));
+            await Promise.all(createdUploadIds.map(removeChunkUploadLeftovers));
         });
 
         const init = async (userId = '1') => {
@@ -786,6 +796,7 @@ describe('Problem Controller', () => {
             expect(completed.body).toEqual({ message: 'Batch upload initiated.', progressId: expect.any(String) });
             const [zipPath] = (processBatchUpload as jest.Mock).mock.calls[0] as [string, unknown];
             expect(zipPath).toMatch(/\/oj-batch-.+\.zip$/);
+            expect(path.relative(backendWorkRoot(), zipPath).startsWith('..')).toBe(false);
             expect(processBatchUpload).toHaveBeenCalledWith(zipPath, expect.any(Function));
             await new Promise<void>((resolve) => setTimeout(resolve, 25));
             await expect(fs.access(zipPath)).rejects.toThrow();
@@ -796,10 +807,7 @@ describe('Problem Controller', () => {
         let createdUploadIds: string[];
         beforeEach(() => { createdUploadIds = []; });
         afterEach(async () => {
-            await Promise.all(createdUploadIds.map(async (uploadId) => {
-                await fs.rm(path.join(os.tmpdir(), 'oj-chunk-uploads', uploadId), { recursive: true, force: true });
-                await fs.rm(path.join(os.tmpdir(), `oj-testcases-${uploadId}.zip`), { force: true });
-            }));
+            await Promise.all(createdUploadIds.map(removeChunkUploadLeftovers));
         });
 
         it('uploads testcase ZIP chunks and completes against the problem bound at init', async () => {
@@ -823,7 +831,9 @@ describe('Problem Controller', () => {
             expect(completed.status).toBe(200);
             expect(completed.body).toEqual({ message: 'Test Cases ZIP processed successfully.', insertedCount: 2 });
             expect(parser).toHaveBeenCalledWith('P1', expect.stringMatching(/\/oj-testcases-.+\.zip$/));
-            await expect(fs.access(path.join(os.tmpdir(), `oj-testcases-${uploadId}.zip`))).rejects.toThrow();
+            const [, assembledZipPath] = parser.mock.calls[0];
+            expect(path.relative(backendWorkRoot(), assembledZipPath).startsWith('..')).toBe(false);
+            await expect(fs.access(assembledZipPath)).rejects.toThrow();
         });
 
         it('rejects testcase upload initialization for a missing problem', async () => {

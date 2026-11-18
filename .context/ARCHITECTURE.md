@@ -92,7 +92,7 @@ OJ/
 │   │   ├── siteAccess.ts   # requirePublicAccess (PUBLIC/PRIVATE mode gate)
 │   │   ├── validation.ts   # zod runtime request validation middleware
 │   │   ├── errorHandler.ts # asyncHandler + AppError + global error middleware
-│   │   └── upload.ts       # Multer configuration (2 GiB general, 10 MiB images)
+│   │   └── upload.ts       # Multer configuration (2 GiB disk, 25/64 MiB problem-route memory caps, 10 MiB images)
 │   ├── schemas/
 │   │   └── requestSchemas.ts # Shared z.object request schemas (all controllers)
 │   ├── utils/
@@ -223,13 +223,13 @@ graph LR
 Nginx strips the `/api` prefix before forwarding to the backend, and overwrites `X-Real-IP`/`X-Forwarded-For` with `$remote_addr` on every `/api/` request so the backend's rate limiters key on a proxy-vouched client IP (client-supplied XFF is untrusted). The frontend is a static React build served by its own Nginx instance inside the container. A separate authoring-runner container shares only the `authoring-jobs` spool volume and has no network.
 
 Backend runtime request pipeline (high-level, in `app.ts` mount order):
-1. JSON body parsing (larger limit for authoring draft routes).
-2. Health checks (`/health/*`) — before sessions and the maintenance gate, so liveness never depends on the DB.
-3. `maintenanceGate` — 503 for everything (except health/import-progress) while a database import runs.
-4. `express-session` resolves session state from `user_sessions` (skipped for the token-authenticated import-progress path).
-5. `revalidateSessionUser` re-syncs the session's username/role/existence from the live `users` row — deleted user → request proceeds unauthenticated; role changes take effect on the next request.
-6. `attachRequestUser` maps session into typed `req.user` (controllers read `req.user` only, never `req.session`).
-7. `generalApiLimiter` (1000/15min, proxy-vouched IP key; authoring/realtime paths excluded).
+1. Health checks (`/health/*`) — before sessions and the maintenance gate, so liveness never depends on the DB.
+2. `maintenanceGate` — 503 for everything (except health/import-progress) while a database import runs.
+3. `express-session` resolves session state from `user_sessions` (skipped for the token-authenticated import-progress path).
+4. `revalidateSessionUser` re-syncs the session's username/role/existence from the live `users` row — deleted user → request proceeds unauthenticated; role changes take effect on the next request.
+5. `attachRequestUser` maps session into typed `req.user` (controllers read `req.user` only, never `req.session`).
+6. `generalApiLimiter` (1000/15min, proxy-vouched IP key; staff/admin sessions exempt; only a bodiless `GET /realtime/submissions` or `GET /realtime/contests/:id` is skipped, every other method/path under `/realtime/` is counted).
+7. JSON body parsing — `/admin/authoring/drafts*` runs `requireAuth` + `requireStaffOrAdmin` first, then the 7 MiB authoring parser; every other request gets the 100 KB default.
 8. Route-level middleware (`requirePublicAccess` / `requireAuth` / `requireStaffOrAdmin` / `requireAdmin`) and payload validation (`zod` via shared schemas + `validateRequest`).
 9. Controllers call services for DB-heavy logic.
 10. Errors propagate via `asyncHandler` to centralized `errorHandler`.
@@ -259,9 +259,13 @@ The first authoring release accepts JPEG, PNG, and WebP statement images. `state
 
 Statement text uses the task-pdf-writer hybrid format: Markdown, inline HTML and
 LaTeX stored under the historical `statement_html` name. `statementCompiler.ts`
-uses the Marked 4.0.8 code pinned inside `red-gate-v1`, protects math delimiters
+re-exports `shared/statement-renderer`, which the frontend live preview also
+uses. It parses with Marked 4.3.0 from npm (same output for statements as the
+Marked 4.0.8 copy in `red-gate-v1`'s bundle), protects math delimiters
 during Markdown parsing, normalizes bounded legacy markup, and then delegates to
-the HTML allowlist sanitizer. Fast Preview and immutable PDF/Verify snapshots call
+the HTML allowlist sanitizer. Server preview and PDF math use the bundle's KaTeX
+0.15.1 (the VM-bounded renderer, and the PDF page); the live preview uses npm
+KaTeX 0.16.21, whose visible markup matches the bundle's CSS. Fast Preview and immutable PDF/Verify snapshots call
 this same compiler; the runner re-sanitizes captured HTML at its trust boundary.
 
 The Admin Statement tab links to `/admin/authoring/:draftId/editor`. For this
@@ -380,9 +384,21 @@ Key judging properties:
 
   The compiled grader runs inside the student's process, so its code and literals are readable at run time: graders must not embed answers or secrets. See `SANDBOX.md` § Header problems.
 
+### Backend Temp Files
+
+Judged programs share the backend container's `/tmp`, so every backend temp file (multer disk uploads, batch and testcase-ZIP extraction, chunked-upload sessions, DB export dumps, authoring testcase uploads) lives in a `mkdtemp` directory under a private 0700 per-process work root (`utils/privateTemp.ts`, created at boot under `OJ_WORK_DIR` or `os.tmpdir()`; an existing `OJ_WORK_DIR` the backend uid owns is tightened to 0700, and the server refuses to start if it is a symlink, a file, owned by another uid or a shared sticky/world-writable directory such as `/tmp`; `docker-compose.yml` does not pass `OJ_WORK_DIR`, so it takes effect only once added to the backend environment). Batch import (extraction of the batch ZIP and of an `input/`/`output/` testcase ZIP, and the in-memory read of a flat-layout testcase ZIP) counts the bytes it actually inflates and rejects entries whose real size differs from the declared one; a testcase ZIP rejected part-way imports no testcases. See `SANDBOX.md` §9.
+
 ### Database Import / Maintenance Mode
 
-Admin database import runs `DROP SCHEMA public CASCADE` + `pg_restore` as a background job. While it runs, `services/maintenanceMode.ts` activates a global gate: every request except health checks and the token-authenticated import-progress endpoint answers 503, and the contest scheduler skips ticks. Imports are single-flight (a second concurrent import gets 409). Exports use `pg_dump --exclude-table=user_sessions` (sessions are runtime state).
+Admin database import (`services/adminDatabaseService.ts`) first validates the upload, before maintenance mode starts: a `.dump`/`.tar` must pass `pg_restore --list`; a `.sql` must be plain pg_dump output: header, "dump complete" footer, and no backslash at statement level except pg_dump 18's own `\restrict`/`\unrestrict` (`services/databaseDumpGuard.ts`). The scan follows SQL lexical state between COPY blocks the way psql does: `'...'` (standard_conforming_strings on, as pg_dump sets it), `E'...'`, `"..."`, `$tag$` bodies, `--` and nested `/* */` comments, statement-ending semicolons. A backslash inside a literal, such as a LaTeX line in a `pg_dump --inserts` dump, is data. A meta-command after SQL on the same line is still found, and a COPY or footer line inside a literal is not taken for one. The scan gives a clear 400; it is not the boundary (a dump that turns standard_conforming_strings off, or psql's BEGIN ATOMIC handling, can hide a meta-command from it), restricted psql is. Anything rejected gets a 400 and nothing is touched. An import is also refused (409) while a batch problem upload is still writing problems: that job runs after its 202, one transaction per problem, so maintenance mode alone would not keep it out. A batch that reaches a problem while maintenance is active writes nothing more and reports what it did not process. The background job then:
+
+1. Quiesces background work: it awaits a running contest-scheduler tick, pauses the judge queue and waits for running judge tasks, and waits for a running authoring reconcile pass. The coordinator skips ticks while maintenance is active. Each wait is bounded (`DATABASE_IMPORT.QUIESCE_TIMEOUT_MS`), and a timeout fails the import with nothing dropped.
+2. Takes a safety copy (`pg_dump -Fc --no-subscriptions`, sessions included) into a private 0700 `fs.mkdtemp` directory.
+3. Empties the database in one statement (`dropAllTablesForImport`): every non-system schema with everything in it (extensions installed there included), every publication and every large object, then an empty `public`. That is exactly what the safety copy holds, so the copy restores into it; subscriptions are left alone by both. It then restores the upload as a single transaction. Archives use `pg_restore --no-owner --no-privileges --single-transaction --exit-on-error`. A `.sql` goes to `psql -X -v ON_ERROR_STOP=1 --single-transaction -f -` on stdin, behind a `\restrict` with a fresh random key, so psql refuses every meta-command in the file. The job then ensures `user_sessions` exists and runs the migrations.
+4. On any failure it empties the database again and restores the safety copy. If that restore fails too, the copy is kept and its path is reported.
+5. On success it discards the stale pre-import judge queue and its in-flight registry, runs `sweepOrphanedSubmissions()` as a boot would, removes the copy, and ends maintenance.
+
+While it runs, `services/maintenanceMode.ts` activates a global gate: every request except health checks and the token-authenticated import-progress endpoint answers 503. Imports are single-flight (a second concurrent import gets 409). pg client tools (`utils/runCommand.ts`) get only PATH plus `PGPASSWORD`, never the backend's environment. Exports use `pg_dump --exclude-table=user_sessions` (sessions are runtime state). The restore still connects as the database superuser, so an admin upload can run server-side SQL such as `COPY ... PROGRAM`; that remains part of the admin trust boundary.
 
 ### Contest Lifecycle
 

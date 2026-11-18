@@ -1,6 +1,7 @@
-// The general API limiter skips read-heavy authoring workspace routes.
-// These guards pin the skip list so new authoring endpoints don't regress
-// into 429s during normal admin sessions (as happened with profile-syncs).
+// The general API limiter exempts staff/admin sessions everywhere (that is
+// what keeps the authoring workspace's polling out of 429s) and skips SSE
+// streams for everyone. Staff-only authoring paths get no path-based skip:
+// it would only exempt anonymous and user-role callers.
 
 type SkipRequest = Parameters<typeof import('../../middleware/rateLimit').skipGeneralLimit>[0];
 
@@ -12,14 +13,18 @@ describe('general API limiter skip paths', () => {
     jest.resetModules();
   });
 
-  const skipped = (path: string): boolean => {
+  const skipped = (
+    path: string,
+    role?: string,
+    { method = 'GET', headers = {} }: { method?: string; headers?: Record<string, string> } = {},
+  ): boolean => {
     jest.resetModules();
     process.env.NODE_ENV = 'production';
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { skipGeneralLimit } = require('../../middleware/rateLimit') as {
       skipGeneralLimit: (req: SkipRequest) => boolean;
     };
-    return skipGeneralLimit({ path } as SkipRequest);
+    return skipGeneralLimit({ path, method, headers, ...(role ? { user: { role } } : {}) } as SkipRequest);
   };
 
   it('skips a route-agnostic request when the session is staff/admin (revalidated req.user role)', () => {
@@ -39,18 +44,57 @@ describe('general API limiter skip paths', () => {
   });
 
 
-  it('skips draft, job, profile, and profile-sync workspace traffic', () => {
-    expect(skipped('/admin/authoring/drafts/abc')).toBe(true);
-    expect(skipped('/admin/authoring/jobs/abc')).toBe(true);
-    expect(skipped('/admin/authoring/profile-syncs')).toBe(true);
-    expect(skipped('/admin/authoring/profile-syncs/abc')).toBe(true);
-    expect(skipped('/admin/author-profiles')).toBe(true);
-    expect(skipped('/admin/author-profiles/abc/image')).toBe(true);
+  const workspacePaths = [
+    '/admin/authoring/drafts/abc',
+    '/admin/authoring/jobs/abc',
+    '/admin/authoring/profile-syncs',
+    '/admin/authoring/profile-syncs/abc',
+    '/admin/author-profiles',
+    '/admin/author-profiles/abc/image',
+  ];
+
+  it('skips draft, job, profile, and profile-sync workspace traffic for staff and admin sessions', () => {
+    for (const path of workspacePaths) {
+      expect(skipped(path, 'staff')).toBe(true);
+      expect(skipped(path, 'admin')).toBe(true);
+    }
+  });
+
+  it('keeps anonymous and user-role callers limited on the staff-only workspace paths', () => {
+    for (const path of workspacePaths) {
+      expect(skipped(path)).toBe(false);
+      expect(skipped(path, 'user')).toBe(false);
+    }
   });
 
   it('skips SSE realtime streams', () => {
     expect(skipped('/realtime/submissions')).toBe(true);
     expect(skipped('/realtime/contests/5')).toBe(true);
+    expect(skipped('/realtime/contests/5', 'user')).toBe(true);
+  });
+
+  // The JSON parser runs after the limiter and before routing, so a skipped
+  // request with a body is an unthrottled inflate + JSON.parse for anyone.
+  // Only the bodiless GET an EventSource sends to a stream route is skipped.
+  it('counts any other method under /realtime/', () => {
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+      expect(skipped('/realtime/submissions', undefined, { method })).toBe(false);
+      expect(skipped('/realtime/contests/5', undefined, { method })).toBe(false);
+      expect(skipped('/realtime/anything', undefined, { method })).toBe(false);
+    }
+  });
+
+  it('counts GETs under /realtime/ that are not one of the two stream routes', () => {
+    expect(skipped('/realtime/anything')).toBe(false);
+    expect(skipped('/realtime/contests')).toBe(false);
+    expect(skipped('/realtime/contests/5/extra')).toBe(false);
+    expect(skipped('/realtime/submissions/extra')).toBe(false);
+  });
+
+  it('counts a stream GET that carries a body', () => {
+    expect(skipped('/realtime/submissions', undefined, { headers: { 'content-length': '140' } })).toBe(false);
+    expect(skipped('/realtime/contests/5', undefined, { headers: { 'transfer-encoding': 'chunked' } })).toBe(false);
+    expect(skipped('/realtime/submissions', undefined, { headers: { 'content-length': '0' } })).toBe(true);
   });
 
   it('does not skip unrelated routes', () => {

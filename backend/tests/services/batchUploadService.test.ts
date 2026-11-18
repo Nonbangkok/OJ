@@ -3,6 +3,7 @@ import * as db from '../../db';
 import { promises as fsPromises } from 'fs';
 import fs from 'fs';
 import unzipper from 'unzipper';
+import { Readable } from 'stream';
 jest.mock('unzipper');
 jest.mock('child_process', () => ({
     exec: jest.fn((cmd, cb) => cb && cb(null, { stdout: '', stderr: '' }))
@@ -103,9 +104,8 @@ describe('Batch Upload Service', () => {
 
     describe('processBatchUpload', () => {
         it('should extract zip and process valid problem directories', async () => {
-            // Mock unzipper extraction for the main batch zip
-            const mockExtract = jest.fn().mockResolvedValue(undefined);
-            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ extract: mockExtract });
+            // Empty central directory: the fs mocks stand in for the extracted tree.
+            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ files: [] });
 
             stubSingleProblemDirLayout('P1', ['config.json', 'statement.pdf', 'testcases.zip']);
             stubConfig({
@@ -119,11 +119,12 @@ describe('Batch Upload Service', () => {
 
             stubDb({ problemInsertRowCount: 1 });
 
-            // Mock unzipper for the testcases zip
+            // Mock unzipper for the testcases zip (flat layout: entries are
+            // read in memory, bounded by their declared uncompressedSize)
             (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({
                 files: [
-                    { path: '1.in', stream: () => Buffer.from('in'), type: 'File' },
-                    { path: '1.out', stream: () => Buffer.from('out'), type: 'File' }
+                    { path: '1.in', stream: () => Readable.from([Buffer.from('in')]), uncompressedSize: 2, type: 'File' },
+                    { path: '1.out', stream: () => Readable.from([Buffer.from('out')]), uncompressedSize: 3, type: 'File' }
                 ]
             });
 
@@ -141,12 +142,15 @@ describe('Batch Upload Service', () => {
                 expect.stringContaining('INSERT INTO problems'),
                 ['P1', 'Problem 1', 'Admin', 1000, 256, [], null, null, 'standard', null]
             );
+            expect(dbQuery).toHaveBeenCalledWith(
+                expect.stringContaining('INSERT INTO testcases'),
+                ['P1', 1, 'in', 'out']
+            );
             expect(fsPromises.unlink).toHaveBeenCalledWith('/tmp/test.zip');
         });
 
         it('should persist categories, difficulty, and collection for a new problem', async () => {
-            const mockExtract = jest.fn().mockResolvedValue(undefined);
-            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ extract: mockExtract });
+            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ files: [] });
 
             stubSingleProblemDirLayout('P1', ['config.json']);
             stubConfig({
@@ -179,8 +183,7 @@ describe('Batch Upload Service', () => {
         });
 
         it('should return skipped status if problem already exists', async () => {
-            const mockExtract = jest.fn().mockResolvedValue(undefined);
-            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ extract: mockExtract });
+            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ files: [] });
 
             stubSingleProblemDirLayout('P2', ['config.json']);
             stubConfig({
@@ -205,8 +208,7 @@ describe('Batch Upload Service', () => {
         });
 
         it('should preserve existing metadata when fields are omitted on a skipped problem', async () => {
-            const mockExtract = jest.fn().mockResolvedValue(undefined);
-            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ extract: mockExtract });
+            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ files: [] });
 
             stubSingleProblemDirLayout('P2', ['config.json']);
             stubConfig({
@@ -230,8 +232,7 @@ describe('Batch Upload Service', () => {
         });
 
         it('should clear existing metadata when fields are explicitly null/empty', async () => {
-            const mockExtract = jest.fn().mockResolvedValue(undefined);
-            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ extract: mockExtract });
+            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ files: [] });
 
             stubSingleProblemDirLayout('P2', ['config.json']);
             stubConfig({
@@ -263,8 +264,7 @@ describe('Batch Upload Service', () => {
         });
 
         it('should reject an unknown category with a per-problem, named error', async () => {
-            const mockExtract = jest.fn().mockResolvedValue(undefined);
-            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ extract: mockExtract });
+            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ files: [] });
 
             stubSingleProblemDirLayout('tree-dp', ['config.json']);
             stubConfig({
@@ -290,8 +290,7 @@ describe('Batch Upload Service', () => {
         });
 
         it('should reject an out-of-scale difficulty with a named error', async () => {
-            const mockExtract = jest.fn().mockResolvedValue(undefined);
-            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ extract: mockExtract });
+            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ files: [] });
 
             stubSingleProblemDirLayout('P4', ['config.json']);
             stubConfig({
@@ -317,9 +316,8 @@ describe('Batch Upload Service', () => {
             // Reset all mocks for this specific test
             jest.clearAllMocks();
 
-            // Mock unzipper extraction for the main batch zip
-            const mockExtract = jest.fn().mockResolvedValue(undefined);
-            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ extract: mockExtract });
+            // Empty central directory: the fs mocks stand in for the extracted tree.
+            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ files: [] });
 
             // Track the call order for readdir
             let readdirCallCount = 0;
@@ -349,8 +347,7 @@ describe('Batch Upload Service', () => {
         });
 
         it('should report one problem failing without stopping the batch, and roll back its unit', async () => {
-            const mockExtract = jest.fn().mockResolvedValue(undefined);
-            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ extract: mockExtract });
+            (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ files: [] });
 
             // Batch root contains two problem directories.
             (fsPromises.readdir as jest.Mock)
@@ -442,7 +439,7 @@ describe('Batch Upload Service', () => {
             });
         }
 
-        const extract = () => (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ extract: jest.fn().mockResolvedValue(undefined) });
+        const extract = () => (unzipper.Open.file as jest.Mock).mockResolvedValueOnce({ files: [] });
 
         it('adds a header problem: stores type, default filename and grader/starter files', async () => {
             extract();

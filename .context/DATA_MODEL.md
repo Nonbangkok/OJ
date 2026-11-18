@@ -586,7 +586,8 @@ Maps `problem_id` to the user's best score for that problem in the contest (the 
 ## Database Import / Export Notes
 
 - Export uses `pg_dump` with `--exclude-table=user_sessions` — sessions are runtime state, never shipped in a backup.
-- Import performs `DROP SCHEMA public CASCADE` (complete, not a hand-listed set of tables), runs inside maintenance mode (every other request 503s; the scheduler skips ticks), and is single-flight (a second concurrent import gets 409).
+- Import empties the database in one statement: every non-system schema with everything in it (complete, not a hand-listed set of tables), every publication and every large object, then an empty `public`. It runs inside maintenance mode (every other request 503s; the scheduler skips ticks), is single-flight (a second concurrent import gets 409), and is refused (409) while a batch problem upload is still writing problems.
+- Before the drop, the import validates the upload (400 otherwise) and takes a `pg_dump -Fc --no-subscriptions` safety copy of the live database, which holds exactly what the drop removes. A failed restore or migration puts that copy back, so a bad upload never leaves the site without data or `user_sessions`. `user_sessions` is recreated before the post-restore migrations, because 0018 alters it. Restored `Pending` submissions are re-enqueued and `Compiling`/`Running` ones are marked System Error, as at boot. See `.context/ARCHITECTURE.md` → Database Import.
 
 ## Migration Instructions
 

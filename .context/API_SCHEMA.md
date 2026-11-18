@@ -28,11 +28,12 @@
   - `requirePublicAccess`: ผ่านเสมอใน PUBLIC mode; ใน PRIVATE mode ต้อง login (guest ได้ 401)
   - `validateRequest`: ตรวจสอบ `body/params/query` ด้วย `z.object` จาก shared schema กลาง (`backend/schemas/requestSchemas.ts`)
 - Rate limiting (ทุก limiter key บน proxy-vouched IP — nginx เขียนทับ X-Real-IP/XFF ด้วย `$remote_addr` เสมอ):
-  - General: 1000 requests / 15 นาที (ยกเว้น path ที่ prefix ด้วย `/admin/authoring/`, `/admin/author-profiles`, `/realtime/`)
+  - General: 1000 requests / 15 นาที (ยกเว้นเฉพาะ `GET /realtime/submissions` และ `GET /realtime/contests/:id` ที่ไม่มี body; method/path อื่นใต้ `/realtime/` ถูกนับ; staff/admin sessions ได้รับยกเว้นทุก path)
   - Auth (`/login`, `/register`): 10 / 15 นาที + per-account lockout (10 ครั้งผิดพร่อง / 15 นาที → lock 15 นาที, ตอบ 429)
   - Submit: 30 / นาที (key ด้วย user id ถ้า login)
   - ตอบ 429 พร้อม standard rate-limit headers
 - Maintenance mode: ระหว่าง database import ทุก request อื่นตอบ 503 (ยกเว้น health checks และ import-progress ที่ auth ด้วย token)
+- JSON body: 100 KB default; `/admin/authoring/drafts*` ได้ 7 MiB เฉพาะ staff/admin (parse หลัง `requireAuth` + `requireStaffOrAdmin`, guest ได้ 401 ก่อนอ่าน body); malformed JSON → 400, เกิน limit → 413
 - รูปแบบ error ที่พบได้:
   - `{ message: string }`
   - `{ message: string, errors: [...] }` (validation)
@@ -129,9 +130,15 @@
   - `{ message, jobId, token }` — ใช้ token ตรวจ progress
 - Errors:
   - 400 ไม่มีไฟล์ / extension ไม่รองรับ
+  - 400 ไฟล์ไม่ผ่านการตรวจ (`{ message }` บอกเหตุผล): `.dump`/`.tar` ที่ `pg_restore --list` อ่านไม่ได้, `.sql` ที่ไม่ใช่ pg_dump plain output (ไม่มี header/footer หรือมี psql meta-command ที่ระดับ statement — backslash ใน string literal / identifier / dollar-quoted body / comment เป็นข้อมูล ไม่นับ) — ตรวจก่อนเริ่ม maintenance mode จึงไม่มีอะไรถูกแตะ
   - 409 มี import กำลังรันอยู่ (single-flight)
-- ระหว่าง import: maintenance mode active — request อื่นตอบ 503, scheduler หยุด tick
-- Import ใช้ `DROP SCHEMA public CASCADE` (ครบทุกตาราง)
+  - 409 batch problem upload ยังประมวลผลอยู่ (`A batch problem upload is still being processed. Wait for it to finish, then start the import again.`)
+- ระหว่าง import: maintenance mode active — request อื่นตอบ 503, scheduler หยุด tick, judge queue หยุดรอ
+- Import ล้าง database ใน statement เดียว: ทุก schema ที่ไม่ใช่ของระบบ (พร้อมทุกอย่างข้างใน), publication และ large object ทั้งหมด แล้วสร้าง `public` ว่างใหม่ — ตรงกับสิ่งที่อยู่ใน safety copy (`pg_dump -Fc --no-subscriptions`) ที่ทำไว้ก่อน ถ้า restore หรือ migration ล้มเหลวจะ restore safety copy กลับอัตโนมัติ (progress `failed` พร้อมข้อความว่ากู้ database เดิมแล้ว)
+
+- ข้อจำกัดที่ยอมรับแล้ว (owner 2026-11-18):
+  - backup ที่ export จากระบบก่อน migration 0018 import ไม่ได้ (dump ไม่มีตาราง `user_sessions` แต่ 0018 แก้ตารางนั้น) — import จะล้มแล้วกู้ safety copy คืน ข้อมูลเดิมไม่หาย; ถ้าจำเป็นต้องกู้ backup เก่าแบบนั้น ให้ restore ลงฐานข้อมูลแยกด้วย `pg_restore`/`psql` เองก่อน แล้วค่อย export ใหม่จากระบบปัจจุบัน
+  - การ restore ยังเชื่อมต่อด้วย superuser ของฐานข้อมูล admin ที่ import dump ได้จึงยังสั่ง `COPY ... FROM PROGRAM` ใน container ของ DB ได้ — ถือว่า admin เป็นผู้ที่ไว้ใจได้ (เป็นเส้นแบ่งความเชื่อใจเดียวกับสิทธิ์ admin อื่น ๆ)
 
 ### 9. `GET /admin/database/import-progress/:jobId`
 - Auth: header `x-import-token` ที่ได้จาก endpoint 8 (session ใช้ไม่ได้ระหว่าง import เพราะ session table ถูก drop)
@@ -510,7 +517,7 @@
   - `problemPdf` (optional — ต้องขึ้นต้นด้วย `%PDF`)
   - `testcasesZip` (optional)
 - Response 200: `{ message: 'Files processed successfully.' }`
-- Errors: 400 (ไม่มีไฟล์/ไม่ใช่ PDF/ไม่มี valid pairs), 404 problem ไม่พบ
+- Errors: 400 (ไม่มีไฟล์/ไม่ใช่ PDF/ไม่มี valid pairs/testcase files ใน ZIP รวมกันเกิน 256 MiB uncompressed หรือไฟล์ใดเกิน 64 MiB uncompressed หรือขนาดไม่ตรงที่ประกาศ — cap เดียวกันใช้กับ chunked `/admin/problems/:id/testcases-upload/complete`), 404 problem ไม่พบ, 413 ไฟล์ upload ใดเกิน 64 MiB
 
 ### 63. `POST /admin/problems/export`
 - Auth: `staff|admin`
@@ -524,7 +531,7 @@
 - `GET /admin/problems/:id/files` — `{ problem_type, submission_filename, files: [{ role, filename, bytes }] }`
 - `GET /admin/problems/:id/files/:role/:filename` — โหลดไฟล์เดียว (`application/octet-stream`, `nosniff`); `role` = `grader|starter`
 - `PUT /admin/problems/:id/files/:role` — multipart `filesZip` (flat ZIP) แทนที่ทั้ง role ใน transaction
-- Errors: 400 (ไม่ใช่ header problem / ZIP ไม่ valid / nested path / ไม่มีไฟล์), 404 problem ไม่พบ
+- Errors: 400 (ไม่ใช่ header problem / ZIP ไม่ valid / nested path / ไม่มีไฟล์ / entry ขยายแล้วเกิน 1 MiB หรือไม่ตรงขนาดที่ประกาศ), 404 problem ไม่พบ, 413 ZIP เกิน 25 MiB
 
 ---
 
@@ -538,9 +545,11 @@
   - `language: 'cpp' | 'python'` (Python ได้ time ×4 / memory ×2)
   - `code: string` (max 64 KiB)
   - `contestId?: string`
+- Body เป็น JSON หรือ `multipart/form-data` ก็ได้; multipart รับเฉพาะ text fields ข้างบน (สูงสุด 4 fields, field ละไม่เกิน 3 × 65536 bytes, ห้ามมีไฟล์)
 - Response 202: `{ message, submissionId, isContestSubmission }`
 - Errors:
-  - 400 language/problem invalid / โจทย์ไม่มี testcase เลย (DB-06)
+  - 400 language/problem invalid / โจทย์ไม่มี testcase เลย (DB-06) / multipart มี field เกิน 4 หรือมีไฟล์
+  - 413 multipart field ใหญ่เกิน 3 × 65536 bytes
   - 403 ไม่ได้ join contest
   - 404 contest not found
 - Contest submission: ตรวจ wall-clock `start_time`/`end_time` ตรง ๆ (ไม่พึ่ง scheduler status เพียงอย่างเดียว)
@@ -625,8 +634,9 @@
 
 ### 76. `PUT /profile/avatar`
 - Auth: required
-- Multipart: `avatar` (JPEG/PNG/WebP, max 10 MiB — normalize เป็น 256×256 PNG)
+- Multipart: `avatar` (JPEG/PNG/WebP, max 10 MiB — normalize เป็น 256×256 PNG); รับไฟล์ `avatar` ไฟล์เดียว ไม่รับ text field
 - Response 200: `{ message, avatarUpdatedAt }`
+- Errors: 400 ไม่มีไฟล์ / ชนิดไฟล์ไม่รองรับ / มี field หรือไฟล์อื่นปน, 413 ไฟล์เกิน 10 MiB
 
 ---
 

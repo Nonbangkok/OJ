@@ -1,24 +1,47 @@
-import path from 'path';
-import fs from 'fs';
-import { memoryUpload, diskUpload } from '../../middleware/upload';
+import { diskUpload, submissionFormUpload, userAvatarUpload } from '../../middleware/upload';
+import { privateTempDir } from '../../utils/privateTemp';
+import { SUBMISSION_VALIDATION, USER_AVATAR } from '../../constants';
 import { Request } from 'express';
 
-// Mock fs to avoid actually creating directories during tests
-jest.mock('fs', () => ({
-    existsSync: jest.fn(),
-    mkdirSync: jest.fn(),
+// Disk uploads are staged in a private directory of the backend work root.
+jest.mock('../../utils/privateTemp', () => ({
+    privateTempDir: jest.fn(),
 }));
+
+/** Run multer's destination callback and resolve with what it reported. */
+function destinationOf(storage: { getDestination: Function }): Promise<[unknown, unknown]> {
+    return new Promise((resolve) => {
+        storage.getDestination({} as Request, {} as any, (error: unknown, destination: unknown) => resolve([error, destination]));
+    });
+}
 
 describe('Upload Middleware', () => {
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
-    describe('memoryUpload', () => {
-        it('should use memory storage', () => {
-            // Memory storage is mostly opaque, but we can verify it was created
-            expect((memoryUpload as any).storage).toBeDefined();
-            expect((memoryUpload as any).storage.constructor.name).toBe('MemoryStorage');
+    // The two in-memory instances a regular user account reaches. Busboy
+    // holds text fields in RAM, so neither may keep multer's defaults
+    // (unlimited fields of up to 1 MB each).
+    describe('user-reachable in-memory uploads', () => {
+        it('caps the submission form to the schema fields, no files, and the code byte cap', () => {
+            expect((submissionFormUpload as any).storage.constructor.name).toBe('MemoryStorage');
+            expect((submissionFormUpload as any).limits).toEqual({
+                files: 0,
+                fields: 4,
+                parts: 4,
+                fieldSize: 3 * SUBMISSION_VALIDATION.MAX_CODE_LENGTH,
+            });
+        });
+
+        it('caps the avatar upload to one image file and no text fields', () => {
+            expect((userAvatarUpload as any).storage.constructor.name).toBe('MemoryStorage');
+            expect((userAvatarUpload as any).limits).toEqual({
+                fileSize: USER_AVATAR.MAX_UPLOAD_BYTES,
+                files: 1,
+                fields: 0,
+                parts: 1,
+            });
         });
     });
 
@@ -30,40 +53,30 @@ describe('Upload Middleware', () => {
             expect(storage.getFilename).toBeInstanceOf(Function);
         });
 
-        it('should set destination to /tmp/oj_uploads and create directory if it does not exist', () => {
-            (fs.existsSync as jest.Mock).mockReturnValue(false); // Simulate dir not existing
-
-            const req = {} as Request;
-            const file = {} as any;
-            const cb = jest.fn();
-
-            // Invoke the destination function
+        it('stages uploads in one private work-root directory, created once', async () => {
+            (privateTempDir as jest.Mock).mockResolvedValue('/work/oj-work-1-abcdef/uploads-123456');
             const storage = (diskUpload as any).storage;
-            storage.getDestination(req, file, cb);
 
-            // Verify fs functions were called
-            const expectedPath = path.join('/tmp', 'oj_uploads');
-            expect(fs.existsSync).toHaveBeenCalledWith(expectedPath);
-            expect(fs.mkdirSync).toHaveBeenCalledWith(expectedPath, { recursive: true });
+            await expect(destinationOf(storage)).resolves.toEqual([null, '/work/oj-work-1-abcdef/uploads-123456']);
+            await expect(destinationOf(storage)).resolves.toEqual([null, '/work/oj-work-1-abcdef/uploads-123456']);
 
-            // Verify callback was called with correct path
-            expect(cb).toHaveBeenCalledWith(null, expectedPath);
+            expect(privateTempDir).toHaveBeenCalledTimes(1);
+            expect(privateTempDir).toHaveBeenCalledWith('uploads-');
         });
 
-        it('should set destination without creating directory if it already exists', () => {
-            (fs.existsSync as jest.Mock).mockReturnValue(true); // Simulate dir existing
+        it('fails the upload when the private directory cannot be made, and retries on the next one', async () => {
+            await jest.isolateModulesAsync(async () => {
+                const isolatedTemp = jest.requireMock('../../utils/privateTemp') as { privateTempDir: jest.Mock };
+                const { diskUpload: isolatedUpload } = jest.requireActual('../../middleware/upload') as typeof import('../../middleware/upload');
+                isolatedTemp.privateTempDir
+                    .mockRejectedValueOnce(new Error('work root is not private'))
+                    .mockResolvedValueOnce('/work/uploads-2');
+                const storage = (isolatedUpload as any).storage;
 
-            const req = {} as Request;
-            const file = {} as any;
-            const cb = jest.fn();
-
-            const storage = (diskUpload as any).storage;
-            storage.getDestination(req, file, cb);
-
-            const expectedPath = path.join('/tmp', 'oj_uploads');
-            expect(fs.existsSync).toHaveBeenCalledWith(expectedPath);
-            expect(fs.mkdirSync).not.toHaveBeenCalled();
-            expect(cb).toHaveBeenCalledWith(null, expectedPath);
+                const [error] = await destinationOf(storage);
+                expect(error).toEqual(new Error('work root is not private'));
+                await expect(destinationOf(storage)).resolves.toEqual([null, '/work/uploads-2']);
+            });
         });
 
         it('should generate a unique filename retaining original extension', () => {
