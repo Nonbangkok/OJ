@@ -1,6 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { findHeaderSourceRejection, graderIdentifiers, type HeaderSourceContext } from '../../utils/compileGuard';
+import {
+  findHeaderSourceRejection,
+  findIncludeRejection,
+  graderIdentifiers,
+  type HeaderSourceContext,
+} from '../../utils/compileGuard';
 
 /**
  * Header-problem source rules (defence in depth over the two-step build).
@@ -265,8 +270,9 @@ describe('findHeaderSourceRejection', () => {
 
 /**
  * Every bundled header problem's own headers (reference solution, naive
- * solution, starter template) must pass the rules against that problem's
- * real grader and starter file sets. The sets are rebuilt the way
+ * solution, starter template) must pass the include guard and the header
+ * rules against that problem's real grader and starter file sets, as the
+ * pipeline runs them. The sets are rebuilt the way
  * content/header-problems/build.py ships them: grader = main.cpp
  * (grader_main.cpp) + <ds>.h, starter = main.cpp (starter_main.cpp) + <ds>.h +
  * student.h, where <ds>.h is lib/<topic>.h with meta.json's declarations
@@ -314,7 +320,9 @@ function composeHeader(topic: string, declarations: string[]): string {
     };
     for (const file of ['solution.h', 'slow.h', 'student_template.h']) {
       const code = fs.readFileSync(path.join(dir, file), 'utf8');
-      expect({ file, rejection: findHeaderSourceRejection(code, context) }).toEqual({ file, rejection: null });
+      // The pipeline runs the include guard first, then the header rules.
+      const rejection = findIncludeRejection(code, submissionFilename) ?? findHeaderSourceRejection(code, context);
+      expect({ file, rejection }).toEqual({ file, rejection: null });
     }
   });
 });
