@@ -7,6 +7,7 @@ import * as db from '../db';
 import { runMigrationsFromPool } from '../scripts/migrate';
 import { errorHandler } from '../middleware/errorHandler';
 import { resetPasswordChangeEnabledCache } from '../services/siteSettingsService';
+import { isMaintenanceActive } from '../services/maintenanceMode';
 
 // Mock Dependencies
 jest.mock('../db', () => {
@@ -54,11 +55,20 @@ jest.mock('../middleware/auth', () => ({
 
 // Drive the database-import flow deterministically without touching the real DB
 // or spawning psql/pg_restore, so we can assert the per-job token behaviour.
+// The import reads the upload before it starts (A2-02/A2-06), so each request
+// gets a real file holding `mockUploadContents`.
+const MOCK_VALID_DUMP = '--\n-- PostgreSQL database dump\n--\n\nSELECT 1;\n\n--\n-- PostgreSQL database dump complete\n--\n';
+let mockUploadContents = MOCK_VALID_DUMP;
 jest.mock('../middleware/upload', () => ({
     diskUpload: {
         single: () => (req: Request, _res: Response, next: NextFunction) => {
+            const nodeFs = jest.requireActual('fs');
+            const nodeOs = jest.requireActual('os');
+            const nodePath = jest.requireActual('path');
+            const uploadPath = nodePath.join(nodeOs.tmpdir(), `oj-admin-upload-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.sql`);
+            nodeFs.writeFileSync(uploadPath, mockUploadContents);
             req.file = {
-                path: '/tmp/mock-dump.sql',
+                path: uploadPath,
                 originalname: 'dump.sql',
             } as Express.Multer.File;
             next();
@@ -421,6 +431,31 @@ describe('Admin Controller', () => {
             return res;
         };
 
+        const waitForImportToFinish = async (): Promise<void> => {
+            const deadline = Date.now() + 5_000;
+            while (isMaintenanceActive()) {
+                if (Date.now() > deadline) throw new Error('import did not finish');
+                await new Promise((resolve) => setTimeout(resolve, 5));
+            }
+        };
+
+        // One import at a time: let each test's import finish before the next starts.
+        afterEach(async () => {
+            await waitForImportToFinish();
+            mockUploadContents = MOCK_VALID_DUMP;
+        });
+
+        it('rejects an upload that is not plain pg_dump output with 400 before starting (A2-06)', async () => {
+            mockUploadContents = 'SELECT 1;\n\\! id\n';
+
+            const res = await startImport();
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toContain('not a pg_dump plain-text dump');
+            expect(res.body.jobId).toBeUndefined();
+            expect(isMaintenanceActive()).toBe(false);
+        });
+
         it('should return a per-job token when an import starts', async () => {
             const res = await startImport();
 
@@ -483,8 +518,7 @@ describe('Admin Controller', () => {
         it('should run migrations after a successful database restore', async () => {
             const start = await startImport();
 
-            await new Promise<void>((resolve) => setImmediate(resolve));
-            await new Promise<void>((resolve) => setImmediate(resolve));
+            await waitForImportToFinish();
 
             // DB-10: migrations run on a dedicated pool (no statement_timeout),
             // not the shared app pool.

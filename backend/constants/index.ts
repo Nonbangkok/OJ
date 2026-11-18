@@ -179,6 +179,16 @@ export const DATABASE_POOL = {
 } as const;
 
 /**
+ * A2-03: Settings -> Replace database waits this long (per step) for an
+ * in-progress contest-scheduler tick, the running judge tasks and an
+ * in-progress authoring reconcile pass before it drops anything. Past the
+ * bound the import fails with the live database untouched.
+ */
+export const DATABASE_IMPORT = {
+    QUIESCE_TIMEOUT_MS: 120_000,
+} as const;
+
+/**
  * The local timezone day-bucketing is computed in (ANALYSIS-002/SCORE-006).
  * The contest scheduler runs on Asia/Bangkok; analytics and profile heatmaps
  * bucket on the same zone so a "day" means the same thing everywhere.

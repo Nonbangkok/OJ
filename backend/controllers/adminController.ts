@@ -224,6 +224,10 @@ router.post('/admin/database/import', requireAuth, requireAdmin, diskUpload.sing
     // running concurrently would interleave destructively.
     return res.status(409).json({ message: 'A database import is already in progress. Wait for it to finish before starting another.' });
   }
+  if (startResult.kind === 'invalid_dump') {
+    // A2-02/A2-06: rejected before maintenance mode; nothing was touched.
+    return res.status(400).json({ message: startResult.message });
+  }
   return res.status(400).json({ message: 'Unsupported file type. Only .sql, .dump, or .tar files are allowed.' });
 });
 

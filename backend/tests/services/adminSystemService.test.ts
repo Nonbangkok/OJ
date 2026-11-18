@@ -4,6 +4,46 @@ import {
   buildDatabaseImportCommand,
 } from '../../services/adminSystemService';
 
+import {
+  buildDatabaseArchiveCheckCommand,
+  buildDatabaseSafetyCopyCommand,
+  buildDatabaseSafetyRestoreCommand,
+} from '../../services/adminSystemService';
+
+const connection = {
+  databaseName: 'oj_db',
+  databaseUser: 'postgres',
+  databaseHost: 'db',
+  databasePort: '5432',
+  databasePassword: 'secret',
+};
+
+describe('import safety commands (A2-02)', () => {
+  it('checks an archive with pg_restore --list, without connecting or credentials', () => {
+    expect(buildDatabaseArchiveCheckCommand('/tmp/up.dump')).toEqual({
+      executable: 'pg_restore',
+      args: ['--list', '/tmp/up.dump'],
+      env: {},
+    });
+  });
+
+  it('takes a full custom-format safety copy (sessions included)', () => {
+    expect(buildDatabaseSafetyCopyCommand('/tmp/oj-db-import-x/pre-import.dump', connection)).toEqual({
+      executable: 'pg_dump',
+      args: ['-h', 'db', '-p', '5432', '-U', 'postgres', '-d', 'oj_db', '-F', 'c', '-f', '/tmp/oj-db-import-x/pre-import.dump'],
+      env: { PGPASSWORD: 'secret' },
+    });
+  });
+
+  it('restores the safety copy all-or-nothing', () => {
+    expect(buildDatabaseSafetyRestoreCommand('/tmp/oj-db-import-x/pre-import.dump', connection)).toEqual({
+      executable: 'pg_restore',
+      args: ['--single-transaction', '--exit-on-error', '-h', 'db', '-p', '5432', '-U', 'postgres', '-d', 'oj_db', '/tmp/oj-db-import-x/pre-import.dump'],
+      env: { PGPASSWORD: 'secret' },
+    });
+  });
+});
+
 describe('adminSystemService', () => {
   describe('buildDatabaseImportCommand', () => {
     it('should build psql command for .sql file', () => {
@@ -17,11 +57,24 @@ describe('adminSystemService', () => {
         'secret'
       );
 
-      expect(result.kind).toBe('ok');
-      if (result.kind === 'ok') {
-        expect(result.executable).toBe('psql');
-        expect(result.args).toContain('/tmp/backup.sql');
-      }
+      expect(result).toEqual({
+        kind: 'ok',
+        format: 'plain',
+        executable: 'psql',
+        // A2-06: the dump arrives on stdin behind the service's \restrict,
+        // never as `-f <upload>`; -X skips ~/.psqlrc.
+        args: [
+          '-X',
+          '-v', 'ON_ERROR_STOP=1',
+          '--single-transaction',
+          '-h', 'db',
+          '-p', '5432',
+          '-U', 'postgres',
+          '-d', 'oj_db',
+          '-f', '-',
+        ],
+        env: { PGPASSWORD: 'secret' },
+      });
     });
 
     it('should build pg_restore command for .dump file', () => {
@@ -35,11 +88,30 @@ describe('adminSystemService', () => {
         'secret'
       );
 
-      expect(result.kind).toBe('ok');
-      if (result.kind === 'ok') {
-        expect(result.executable).toBe('pg_restore');
-        expect(result.args).toContain('/tmp/backup.dump');
-      }
+      expect(result).toEqual({
+        kind: 'ok',
+        format: 'archive',
+        executable: 'pg_restore',
+        // A2-02: all-or-nothing, first error is fatal, foreign owners/GRANTs skipped.
+        args: [
+          '--no-owner',
+          '--no-privileges',
+          '--single-transaction',
+          '--exit-on-error',
+          '-h', 'db',
+          '-p', '5432',
+          '-U', 'postgres',
+          '-d', 'oj_db',
+          '/tmp/backup.dump',
+        ],
+        env: { PGPASSWORD: 'secret' },
+      });
+    });
+
+    it('treats .tar like .dump', () => {
+      const result = buildDatabaseImportCommand('backup.TAR', '/tmp/backup.tar', 'oj_db', 'postgres', 'db', '5432', 'secret');
+
+      expect(result).toMatchObject({ kind: 'ok', format: 'archive', executable: 'pg_restore' });
     });
 
     it('should return unsupported_extension for unknown file type', () => {

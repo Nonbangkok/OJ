@@ -387,6 +387,8 @@ export type DatabaseImportExecutable = 'psql' | 'pg_restore';
 
 export interface DatabaseImportExecution {
   kind: 'ok';
+  /** 'plain': psql reads the guarded dump on stdin; 'archive': pg_restore reads the file. */
+  format: 'plain' | 'archive';
   executable: DatabaseImportExecutable;
   args: string[];
   env: NodeJS.ProcessEnv | Record<string, string>;
