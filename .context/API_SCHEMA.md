@@ -273,7 +273,7 @@
 - Auth: `requirePublicAccess`
 - Purpose: ดูรายละเอียด contest
 - Params: `id`
-- Response 200: contest detail + problem metadata
+- Response 200: contest detail + problem metadata (`problems` ของ contest ที่ running มี `problem_type` ด้วย — มุมมอง staff watching แสดง badge HEADER)
 - Errors: 404 contest ไม่พบ **หรือ hidden สำหรับ non-staff** (hidden = nonexistent, ไม่มี oracle)
 
 ### 30. `POST /contests/:id/join`
@@ -350,6 +350,7 @@
 - Purpose: list problems สำหรับ participant (ต้องเป็น participant; hidden contest = 404)
 - Response 200: list problems หรือ `[]` ถ้า contest ยังไม่ active
 - `best_score` / `submission_count` / latest / best ของ viewer มาจาก contest submissions ของตัวเอง — contest ที่ finished อ่านแถวที่ย้ายไป `submissions` (`contest_id`)
+- แต่ละแถวมี `problem_type` (`standard`/`header`; contest ที่ finished อ่านจากแถว `problems` ปัจจุบัน) — หน้า contest problems และ sidebar ของ ContestShell แสดง badge HEADER / `.h` (A7-06)
 - Errors: 403 ไม่ได้ join, 404 ไม่พบ/hidden
 
 ### 40. `GET /contests/:id/problems/:problemId`

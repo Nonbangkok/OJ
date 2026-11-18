@@ -1,5 +1,6 @@
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { InlineError, InlineNotice, PageHeader, StatusMark, TestcaseStrip, type VerdictTone } from '../../components/ui';
+import { HeaderProblemBadge } from '../../features/contest/HeaderProblemBadge';
 import LoadingPage from '../../components/shared/LoadingPage';
 import { useContest } from '../../features/contest/ContestContext';
 import { useAuth } from '../../context/AuthContext';
@@ -39,7 +40,12 @@ const ContestProblems = () => {
             {(contest.problems ?? []).map((problem, i) => (
               <tr key={problem.id}>
                 <td className={styles.letter}>{problemLetter(i)}</td>
-                <td><Link to={`/contests/${contestId}/problems/${problem.id}`} className={styles.problemLink}>{problem.title}</Link></td>
+                <td>
+                  <span className={styles.problemCell}>
+                    <Link to={`/contests/${contestId}/problems/${problem.id}`} className={styles.problemLink}>{problem.title}</Link>
+                    <HeaderProblemBadge problem={problem} />
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -83,6 +89,7 @@ const ContestProblems = () => {
                   <span className={styles.problemCell}>
                     <StatusMark tone={tone} />
                     <Link to={`/contests/${contestId}/problems/${problem.id}`} className={styles.problemLink}>{problem.title}</Link>
+                    <HeaderProblemBadge problem={problem} />
                   </span>
                   {strip.length > 0 && <span className={styles.phoneStrip} aria-hidden="true"><TestcaseStrip results={strip} /></span>}
                 </td>

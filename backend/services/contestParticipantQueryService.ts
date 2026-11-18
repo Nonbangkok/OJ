@@ -94,12 +94,14 @@ export const getContestProblemsForParticipant = async (
             baseQuery + `
             SELECT
               cp.problem_id as id, cp.title, cp.author,
+              COALESCE(live.problem_type, 'standard') AS problem_type,
               ups.best_score, ups.submission_count,
               latest.submitted_at AS latest_submission_at,
               latest.overall_status AS latest_submission_status,
               best.overall_status AS best_submission_status,
               best.results AS best_submission_results
             FROM contest_problems cp
+            LEFT JOIN problems live ON live.id = cp.problem_id
             LEFT JOIN UserProblemStats ups ON cp.problem_id = ups.problem_id
             LEFT JOIN RankedSubmissions latest ON cp.problem_id = latest.problem_id AND latest.rn_latest = 1
             LEFT JOIN RankedSubmissions best ON cp.problem_id = best.problem_id AND best.rn_best = 1
@@ -114,7 +116,7 @@ export const getContestProblemsForParticipant = async (
     const result = await db.query<ContestProblemStatsRow>(
         baseQuery + `
         SELECT
-          p.id, p.title, p.author, p.time_limit_ms, p.memory_limit_mb,
+          p.id, p.title, p.author, p.time_limit_ms, p.memory_limit_mb, p.problem_type,
           ups.best_score, ups.submission_count,
           latest.submitted_at AS latest_submission_at,
           latest.overall_status AS latest_submission_status,

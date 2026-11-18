@@ -126,10 +126,23 @@
   color: var(--text-muted);
 }
 
+/* Title and the Header badge share the title column; the title truncates first. */
+.problemName {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .problemTitle {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.problemName > :last-child:not(.problemTitle) {
+  flex-shrink: 0;
 }
 
 .score {

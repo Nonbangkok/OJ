@@ -401,7 +401,8 @@ type ContestState = 'list' | 'scheduled' | 'running-guest' | 'running' | 'finish
 const contestStatuses = (s: string) => [...s].map((c) => ({ status: c === 'P' ? 'Accepted' : c === 'F' ? 'Wrong Answer' : c === 'T' ? 'Time Limit Exceeded' : 'Skipped' }));
 const contestProblems = [
   { id: 'sum_digits', title: 'Sum of digits', best_score: 100, submission_count: '1', best_submission_results: contestStatuses('PPPPPPPPPP') },
-  { id: 'queue_rotate', title: 'Queue rotate', best_score: 100, submission_count: '3', best_submission_results: contestStatuses('PPPPPPPPPP') },
+  // A header problem: the contest list and sidebar mark it (A7-06).
+  { id: 'queue_rotate', title: 'Queue rotate', problem_type: 'header', best_score: 100, submission_count: '3', best_submission_results: contestStatuses('PPPPPPPPPP') },
   { id: 'interval', title: 'Interval merge', best_score: 60, submission_count: '4', best_submission_results: contestStatuses('PPPPPPFNNN') },
   { id: 'detour', title: 'Shortest detour', best_score: 40, submission_count: '2', best_submission_results: contestStatuses('PPPPTNNNNN') },
   { id: 'matrix', title: 'Matrix exponent', best_score: null, submission_count: '0', best_submission_results: null },
@@ -411,7 +412,7 @@ const at = (minutes: number) => new Date(fixedTime.getTime() + minutes * 60_000)
 
 const contestFor = (state: ContestState) => {
   const base = { id: 1, title: 'Mid-term practice', description: null, participant_count: '86', problem_count: 5, is_visible: true };
-  const problems = contestProblems.map(({ id, title }) => ({ id, title }));
+  const problems = contestProblems.map(({ id, title, problem_type }) => ({ id, title, problem_type }));
   switch (state) {
     case 'scheduled':
       return { ...base, title: 'Weekly round #19', status: 'scheduled', start_time: at(4 * 1440 + 372), end_time: at(4 * 1440 + 492), is_participant: false, problem_count: 6, problems: [] };

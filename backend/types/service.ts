@@ -433,6 +433,8 @@ export interface ContestListRow {
 
 export interface ContestProblemsSummaryRow extends IdTitlePair {
   author: string | null;
+  /** The contest problem lists mark header problems (A7-06); absent from the finished snapshot list. */
+  problem_type?: ProblemType;
 }
 
 export interface ContestScoreboardRow {

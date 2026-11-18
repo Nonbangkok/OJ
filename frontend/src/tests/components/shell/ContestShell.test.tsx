@@ -72,6 +72,19 @@ describe('ContestShell', () => {
     expect(within(nav).getByRole('link', { name: /scoreboard/i })).toHaveAttribute('href', '/contests/3/scoreboard');
   });
 
+  it('marks header problems in the sidebar (A7-06)', async () => {
+    jest.mocked(contestService.getProblems).mockResolvedValue(problems.map((p) =>
+      ({ ...p, problem_type: p.id === 'queue' ? 'header' : 'standard' })) as never);
+    jest.mocked(contestService.getById).mockResolvedValue(contest());
+    renderShell();
+    const nav = await screen.findByRole('navigation', { name: 'Contest' });
+    // The narrow sidebar shows a compact ".h"; screen readers hear "Header problem".
+    const queue = await within(nav).findByRole('link', { name: /B\s+Queue rotate\s+Header problem/ });
+    expect(within(queue).getByText('.h')).toBeInTheDocument();
+    expect(within(queue).getByText('40')).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: /A\s+Stack min/ })).not.toHaveTextContent('Header problem');
+  });
+
   it('reloads when a page reports a join', async () => {
     jest.mocked(contestService.getById).mockResolvedValue(contest({ is_participant: false }));
     const JoinButton = () => {
