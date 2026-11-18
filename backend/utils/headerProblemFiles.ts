@@ -1,7 +1,14 @@
 import path from 'path';
 import * as unzipper from 'unzipper';
 import { HEADER_PROBLEM_LIMITS, type ProblemFileRole } from '../constants';
-import { validateProblemFilename, validateSubmissionFilename } from './problemFilename';
+import {
+  GRADER_SOURCE_EXTENSION_LIST,
+  hasMiscasedCppExtension,
+  isGraderHeaderFilename,
+  isGraderSourceFilename,
+  validateProblemFilename,
+  validateSubmissionFilename,
+} from './problemFilename';
 import { assertSafeArchive, type ArchiveEntryLike } from './archiveSafety';
 
 export { validateProblemFilename, validateSubmissionFilename };
@@ -11,7 +18,32 @@ export interface ProblemFileInput {
   content: Buffer;
 }
 
-const GRADER_EXTENSIONS = new Set(['.cpp', '.h', '.hpp']);
+/** Grader-role rules: exact-case extensions, at least one source, one `.s` per source. */
+function validateGraderFiles(files: readonly ProblemFileInput[], submissionFilename: string | null): string | null {
+  for (const file of files) {
+    if (!isGraderSourceFilename(file.filename) && !isGraderHeaderFilename(file.filename)) {
+      return `Grader file "${file.filename}" must be a C++ source (${GRADER_SOURCE_EXTENSION_LIST}, in exactly that case: `
+        + 'the suffixes g++ compiles as C++) or a header (.h or .hpp).';
+    }
+    if (submissionFilename !== null && file.filename === submissionFilename) {
+      return `Grader file must not be named "${submissionFilename}" (that is the student's submission file).`;
+    }
+  }
+  const sources = files.filter((f) => isGraderSourceFilename(f.filename));
+  if (sources.length === 0) {
+    return `Grader files must include at least one C++ source file (${GRADER_SOURCE_EXTENSION_LIST}).`;
+  }
+  // The judge compiles each source to `<stem>.s` in one workspace, so two
+  // sources may not share a stem (`a.cpp` + `a.cc`).
+  const byStem = new Map<string, string>();
+  for (const source of sources) {
+    const stem = path.basename(source.filename, path.extname(source.filename));
+    const other = byStem.get(stem);
+    if (other) return `Grader sources "${other}" and "${source.filename}" share the name "${stem}"; rename one of them.`;
+    byStem.set(stem, source.filename);
+  }
+  return null;
+}
 
 export function validateProblemFileSet(
   role: ProblemFileRole,
@@ -30,21 +62,14 @@ export function validateProblemFileSet(
     if (file.content.length > HEADER_PROBLEM_LIMITS.MAX_FILE_BYTES) {
       return `File "${file.filename}" exceeds ${HEADER_PROBLEM_LIMITS.MAX_FILE_BYTES} bytes.`;
     }
-  }
-  if (role === 'grader') {
-    for (const file of files) {
-      if (!GRADER_EXTENSIONS.has(path.extname(file.filename).toLowerCase())) {
-        return `Grader file "${file.filename}" must end in .cpp, .h or .hpp.`;
-      }
-      if (submissionFilename !== null && file.filename === submissionFilename) {
-        return `Grader file must not be named "${submissionFilename}" (that is the student's submission file).`;
-      }
-    }
-    if (!files.some((f) => path.extname(f.filename).toLowerCase() === '.cpp')) {
-      return 'Grader files must include at least one .cpp file.';
+    // Starters may hold any file (notes, sample inputs); one that looks like
+    // C++ must use a casing students' g++ compiles as C++.
+    if (role === 'starter' && hasMiscasedCppExtension(file.filename)) {
+      return `Starter file "${file.filename}" has a C++ extension in a casing g++ does not compile as C++; `
+        + `use ${GRADER_SOURCE_EXTENSION_LIST}, .h or .hpp.`;
     }
   }
-  return null;
+  return role === 'grader' ? validateGraderFiles(files, submissionFilename) : null;
 }
 
 function isIgnoredEntry(entryPath: string): boolean {

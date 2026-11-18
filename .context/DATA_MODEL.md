@@ -276,7 +276,7 @@ Secret grader sources and public starter files of **header problems** (migration
 | `content` | `BYTEA` | NOT NULL |
 | | | PK(`problem_id`, `role`, `filename`) |
 
-`grader` files (at least one `.cpp`) are compiled with the student's header and never served to non-staff; `starter` files are what students download. Rows are kept if a problem's type is later switched back to standard (only possible before the first submission).
+`grader` files (at least one C++ source: exactly `.cpp`/`.cc`/`.cxx`/`.cp`/`.c++`/`.C`/`.CPP`; headers `.h`/`.hpp`) are compiled with the student's header and never served to non-staff; `starter` files are what students download. Rows are kept if a problem's type is later switched back to standard (only possible before the first submission).
 
 ### `testcases`
 Input/output pairs for judging.

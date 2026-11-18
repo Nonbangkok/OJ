@@ -102,9 +102,43 @@ runs as root, wrapped in `prlimit --as --cpu --nproc --fsize --core=0`
 and output cap that SIGKILL the whole process group. A macro-include of
 `/proc/1/environ` therefore fails: the sandboxed g++ cannot read root-only
 files, and no secrets are in its environment to begin with. The include guard
-(`compileGuard.ts`) is hardened as a second layer — it now rejects macro
-includes (`#define E "/proc/1/environ"` + `#include E`), string-concatenated
-paths, and backslash-newline-continuation-hidden paths.
+(`compileGuard.ts`, `findIncludeRejection`) is hardened as a second layer.
+
+- **It lexes like GCC.** The guard runs on preprocessing tokens from a lexer
+  written to agree with libcpp (checked against g++ 14, `-std=c++20`):
+  splices (a NUL between the backslash and the newline counts as
+  whitespace), comments, string / character / raw-string literals, pp-numbers
+  with digit separators, `%:` digraphs. An unterminated `'` or `"` makes the
+  rest of its line one opaque token, as in GCC, so nothing after it on that
+  line opens a comment or a raw string. Every operand of an `#include` /
+  `#include_next` / `#import` line is lexed as a header name, as GCC does for
+  the whole line. Wherever the two lexers could disagree about where a
+  comment or literal starts, a submission could hide a directive from the
+  guard that g++ still runs, so the guard rejects the constructs it cannot
+  read the way GCC would in every context: a backslash outside literals
+  (universal character names), a line splice inside a raw string, a
+  malformed raw string (including delimiters g++ rejects, such as `$`), a
+  prefix word glued to a literal (`"x"R"y(`, where GCC's reading depends on
+  macros), and a `__has_include` operand that lexes differently when GCC
+  does not evaluate it (a skipped block, a `#define` body).
+- **What it rejects.** Absolute or `..` paths in the include family and in
+  `__has_include` operands, in every header name on an include line (a macro
+  in front can make any of them the operand), in macro bodies (path strings,
+  including concatenated or escaped ones, and `<...>` path spans), on a
+  computed include line itself (`#define LT <` + `#include LT/etc/passwd>`:
+  any `/`, `..`, path literal or reserved identifier on the line, or a
+  macro there whose body, followed through the macros it names, holds one),
+  and in `#line` / line markers (g++ prints that file's lines as the caret
+  context of later diagnostics). `#embed` is rejected outright.
+- **What it does not do.** It is lexical, not a preprocessor, so it stays a
+  best-effort layer and the unprivileged compile stays the boundary: a path
+  assembled from macros of a system header whose names are not reserved is
+  not seen, and `#pragma GCC dependency` can still test whether a path
+  exists (it reads no content). Re-check the lexer before a GCC upgrade
+  (`#embed` and `\u{...}` / `\N{...}` identifiers in particular).
+
+It stays linear on hostile input. It runs on C++ submissions only: Python
+has no preprocessor, and its `#` lines are comments.
 
 ### 6. Per-submission workspaces (RUNNER-003 / RUNNER-006) — ownership BY CONSTRUCTION
 Every submission gets a private workspace under
@@ -302,6 +336,82 @@ privilege drop (CAP_SETUID is dropped) and break the compile/chmod chain.
 Running each submission as `nobody` via the wrapper gives most of the benefit
 without that breakage. Full `USER node` becomes safe once judging is isolated
 (below).
+
+## Header problems
+
+A header problem's submission (`student.h`) is compiled in the same
+translation unit as the problem's SECRET grader files (`problem_files`, role
+`grader`), as the submission's sandbox uid. What is guaranteed, and what is
+an accepted limit:
+
+- **Grader sources are never readable by student code at assemble or run
+  time.** The build has two steps (`HEADER_CPP_PREPARE`, `headerPreparePlan`
+  in `submissionService.ts`): `g++ -S` compiles the grader sources with every
+  file present; every grader file and the submitted header are then removed
+  (as their owner — a failed removal is a System Error, never a run); only
+  then are the `.s` files assembled and linked, and the `.s` files are removed
+  before any testcase runs. Whatever a submission smuggles into the assembly
+  (`.incbin "main.cpp"`, `.include`, through `asm`, a section attribute or
+  anything else) finds no grader source or header and fails as a
+  Compilation Error ("file not found"). The compile proper (cc1plus) is the
+  only step that reads the grader sources. Re-check this before a GCC 15
+  upgrade: `#embed` would read bytes at that step (the source rules below
+  reject it).
+- **The `.s` files are still there while the assembler runs.** Each source
+  is assembled while every `.s` exists, so an injected `.incbin` can embed a
+  translation unit's own `.s` or another grader source's. Those hold the
+  compiled grader plus the symbol names `-s` strips from the binary (static
+  and internal functions and globals, mangled with their parameter types).
+  Against an assembler embed, `-s` is therefore best effort; what blocks the
+  embed is the asm / section / `incbin` rule below (assembling each `.s` in
+  a step of its own, with the others absent, would close it structurally).
+- **Source rules, defence in depth** (`findHeaderSourceRejection` in
+  `compileGuard.ts`, on the GCC-faithful lexer above): every lexical problem
+  is rejected with a neutral message (the include guard's list plus
+  undecodable escapes and an unterminated comment or literal at the end of
+  the file); includes only as `<header>` (no `..`, `\`, leading `/`) or
+  `"name"` naming one of the problem's public starter headers, no computed
+  includes, no `#embed`; no `#define`/`#undef` of a C++ keyword or
+  alternative token or of any identifier the grader uses (a student macro
+  could otherwise stringize the grader's own code into a `static_assert`
+  diagnostic); no function-like or
+  non-empty `#define` of a reserved name; no `asm`, `section`/`weakref`/
+  `symver` attributes, `#ident`/`#sccs`, `##` pasting, or `incbin`/`.include`
+  in a string after concatenation and escape decoding. Rejection messages
+  quote only the submission's own text.
+- **For problem setters: a header students `#include "name"` must be in the
+  starter set.** Quoted includes are limited to the starter headers (`.h` /
+  `.hpp`, not the submission file) by secure default, even for a grader
+  header the grader's own sources include: put every header the statement
+  tells students to include into `starter/` (the bundled problems ship their
+  `<ds>.h` there). A grader-only header students include by name makes every
+  submission a Compilation Error.
+- **The compiled grader runs inside the student's process.** Its machine
+  code, data and string literals are in memory and in the binary the program
+  can read (`/proc/self/exe`); `-s` only strips the symbol table. Graders
+  must therefore not embed expected answers or secrets — expected outputs
+  never enter the sandbox, which is what keeps verdicts trustworthy.
+- **Diagnostics located in grader files may show grader expressions,
+  identifiers, types and line numbers — not whole files or source lines**
+  (accepted for now). `-fno-diagnostics-show-caret` stops g++ echoing source
+  lines and `-fmax-errors=10` bounds the log, and the macro rules close the
+  stringizing route (A8-03). But g++ quotes expressions on its own, with no
+  macro involved: a submission can give a function the grader calls a type
+  that makes the call fail (a `consteval` function, a return type with no
+  matching operator), and the error at the grader's call site quotes the
+  grader's expression, e.g. `call to consteval function
+  'operator!=(solve(n, ((secret_k * 3) + 7)), ...)' is not a constant
+  expression` or `no match for 'operator+=' in 'acc += solve(i, ...)'`. That
+  is one expression per error and ten errors per submission, but repeatable,
+  so a determined student can recover a grader's checks piece by piece.
+  Hiding or genericising diagnostics located in grader files is an open
+  owner decision; it would also cost students useful messages such as "no
+  member named push".
+- **Runtime Error output** for header problems is never the program's
+  stderr, only a neutral crash description (see "Runtime Error output"
+  above), because the program could otherwise print the compiled grader
+  from its own memory or `/proc/self/exe`. Covert channels (verdict, time,
+  exit code) still leak slowly; graders must not embed answers or secrets.
 
 ## Stretch / recommended next step: a dedicated `judge` container
 

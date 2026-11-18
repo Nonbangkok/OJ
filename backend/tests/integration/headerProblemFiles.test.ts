@@ -108,13 +108,23 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   });
 
   describe('hasGraderSource', () => {
-    it('accepts an upper-case .CPP grader extension', async () => {
+    it('matches exactly the source suffixes the judge compiles', async () => {
+      // Upload validation and headerPreparePlan accept exactly the suffixes
+      // g++ compiles as C++ (.cpp .cc .cxx .cp .c++ .C .CPP); g++ hands any
+      // other casing (`main.Cpp`) to the linker, so a stored row like that
+      // must not make the problem look ready.
       await seedHeaderProblem('h3');
-      // validateProblemFileSet lower-cases the extension, so `main.CPP`
-      // uploads fine and headerPreparePlan compiles it; a case-sensitive
-      // check here would leave the problem permanently unsubmittable.
+      await addFile('h3', 'grader', 'Main.Cpp', 'int main(){}');
+      await addFile('h3', 'grader', 'main.CXX', 'int main(){}');
+      expect(await hasGraderSource('h3')).toBe(false);
       await addFile('h3', 'grader', 'main.CPP', 'int main(){}');
       expect(await hasGraderSource('h3')).toBe(true);
+      // The Postgres regex escapes `+`.
+      await seedHeaderProblem('h3plus');
+      await addFile('h3plus', 'grader', 'main.ccc', 'int main(){}');
+      expect(await hasGraderSource('h3plus')).toBe(false);
+      await addFile('h3plus', 'grader', 'main.c++', 'int main(){}');
+      expect(await hasGraderSource('h3plus')).toBe(true);
     });
 
     it('stays false when no grader source is stored', async () => {

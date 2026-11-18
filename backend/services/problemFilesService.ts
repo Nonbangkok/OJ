@@ -6,6 +6,7 @@ import * as db from '../db';
 import { AppError } from '../middleware/errorHandler';
 import type { ProblemFileRole, ProblemType } from '../constants';
 import { validateProblemFileSet, type ProblemFileInput } from '../utils/headerProblemFiles';
+import { GRADER_SOURCE_FILENAME_SQL_REGEX } from '../utils/problemFilename';
 
 export async function listProblemFiles(
   problemId: string,
@@ -75,6 +76,8 @@ export async function getHeaderJudgeSpec(problemId: string): Promise<{
   problemType: ProblemType;
   submissionFilename: string | null;
   graderFiles: ProblemFileInput[];
+  /** Names of the public starter files: the only files a submission may `#include "..."`. */
+  starterFilenames: string[];
 } | null> {
   const result = await db.query(
     'SELECT problem_type, submission_filename FROM problems WHERE id = $1',
@@ -83,15 +86,28 @@ export async function getHeaderJudgeSpec(problemId: string): Promise<{
   const row = result.rows[0];
   if (!row) return null;
   const problemType = row.problem_type as ProblemType;
-  const graderFiles = problemType === 'header' ? await getProblemFiles(problemId, 'grader') : [];
-  return { problemType, submissionFilename: row.submission_filename ?? null, graderFiles };
+  if (problemType !== 'header') {
+    return { problemType, submissionFilename: row.submission_filename ?? null, graderFiles: [], starterFilenames: [] };
+  }
+  const graderFiles = await getProblemFiles(problemId, 'grader');
+  const starters = await db.query<{ filename: string }>(
+    `SELECT filename FROM problem_files WHERE problem_id = $1 AND role = 'starter' ORDER BY filename`,
+    [problemId],
+  );
+  return {
+    problemType,
+    submissionFilename: row.submission_filename ?? null,
+    graderFiles,
+    starterFilenames: starters.rows.map((r) => r.filename),
+  };
 }
 
+/** True when the problem has a grader file the judge would compile (exact-case .cpp/.cc/.cxx). */
 export async function hasGraderSource(problemId: string): Promise<boolean> {
   const result = await db.query(
     `SELECT EXISTS (
        SELECT 1 FROM problem_files
-        WHERE problem_id = $1 AND role = 'grader' AND LOWER(filename) LIKE '%.cpp'
+        WHERE problem_id = $1 AND role = 'grader' AND filename ~ '${GRADER_SOURCE_FILENAME_SQL_REGEX}'
      ) AS exists`,
     [problemId],
   );
