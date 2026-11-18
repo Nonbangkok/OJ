@@ -303,8 +303,8 @@ in that cache, so `docker builder prune` removes them too.
 > does not need it.
 
 Migrations only move forward, so a release that ran a bad migration needs both
-the previous images and the matching dump. Outline (not rehearsed; check each
-step on a real incident):
+the previous images and the matching dump. Outline (steps 1, 2 and the release
+switch are not rehearsed on the host; check them on a real incident):
 
 ```bash
 cd /srv/docker/apps/OJ
@@ -314,17 +314,71 @@ docker compose $P ps --format '{{.Name}}' database
 # 2. Stop the database's clients (the backend; the one-shot migrate service
 #    only runs at deploy time). The authoring runner has no network.
 docker compose $P stop backend
-# 3. Restore. POSTGRES_USER / POSTGRES_DB are read INSIDE the container, where
-#    they are set, so nothing depends on your shell's environment.
-docker exec -i <database-container> sh -c \
-  'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --single-transaction' \
-  < backups/pre-deploy-<sha>-<timestamp>.dump
 ```
 
+Step 3 restores into an **empty** database, in one transaction. CI runs this
+exact block (`tests/dbRestoreRunbook.test.mjs`) against a throwaway Postgres 18.
+Fill in the container name from step 1 and the dump, then paste it as it is:
+
+<!-- tested by tests/dbRestoreRunbook.test.mjs -->
+```bash
+# 3. Restore. POSTGRES_USER / POSTGRES_DB are read INSIDE the container, where
+#    they are set, so nothing depends on your shell's environment.
+DB=<database-container>
+DUMP=backups/pre-deploy-<sha>-<timestamp>.dump
+# 3a. What empties the database: every non-system schema (with everything in
+#     it), publication and large object, then a fresh default `public`. The
+#     same as the admin import's DROP_DATABASE_CONTENTS_SQL in
+#     backend/services/adminQueryService.ts. The file opens the transaction
+#     and does not commit it.
+docker exec -i "$DB" sh -c 'cat > /tmp/empty-database.sql' <<'SQL'
+-- Quiet: CASCADE's NOTICE list, and the warning pg_restore's own BEGIN gets.
+SET client_min_messages = error;
+BEGIN;
+DO $drop$
+DECLARE
+  item record;
+BEGIN
+  FOR item IN
+    SELECT nspname FROM pg_namespace
+    WHERE nspname <> 'information_schema' AND nspname NOT LIKE 'pg\_%'
+  LOOP
+    EXECUTE format('DROP SCHEMA IF EXISTS %I CASCADE', item.nspname);
+  END LOOP;
+  FOR item IN SELECT pubname FROM pg_publication LOOP
+    EXECUTE format('DROP PUBLICATION %I', item.pubname);
+  END LOOP;
+  PERFORM lo_unlink(oid) FROM pg_largeobject_metadata;
+END
+$drop$;
+CREATE SCHEMA public AUTHORIZATION pg_database_owner;
+GRANT USAGE ON SCHEMA public TO PUBLIC;
+COMMENT ON SCHEMA public IS 'standard public schema';
+SQL
+# 3b. Empty and restore in that one transaction. The only COMMIT is the
+#     last line pg_restore writes, so nothing is committed unless it read the
+#     whole dump and psql ran every statement in it.
+docker exec -i "$DB" sh -c 'set -o pipefail
+  { cat /tmp/empty-database.sql && pg_restore --single-transaction -f -; } |
+    psql -X -q -o /dev/null -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+  status=$?; rm -f /tmp/empty-database.sql; exit $status' \
+  < "$DUMP" && echo 'RESTORE OK'
+```
+
+It prints `RESTORE OK` and nothing else when it worked. **If it fails for any
+reason** (an error from `psql`, or `pg_restore` cannot read the dump to the
+end), it prints the error and no `RESTORE OK`, nothing was committed, and the
+database is exactly as it was: fix the cause and run the whole block again.
+
+Not `pg_restore --clean`: it drops only the objects that are in the dump, and
+never with CASCADE. A table the bad migration added with a foreign key into a
+dumped table (as 0024 added `problem_files` → `problems`) blocks the drop, and
+the whole restore rolls back with `cannot drop constraint problems_pkey ...
+because other objects depend on it`. Tables and columns that are not in the
+dump would survive it anyway.
+
 Any other session still connected to the database (a `psql` left open, say)
-can make `--clean` wait on a lock; find and close it rather than waiting it out.
-If `pg_restore` aborts for any reason, `--single-transaction` leaves the database
-exactly as it was, so you can fix the cause and run it again.
+can make step 3 wait on a lock; find and close it rather than waiting it out.
 
 Then start the previous release with the "Rollback failed" commands above.
 **Do not take the values from `.last-release` in this scenario:** the release
