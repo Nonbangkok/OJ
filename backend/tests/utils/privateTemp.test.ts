@@ -94,6 +94,21 @@ describe('privateTemp', () => {
       expect(mode(root)).toBe(0o700);
     });
 
+    // Tightening is for a dedicated directory such as a fresh volume. A shared
+    // scratch directory (OJ_WORK_DIR=/tmp, say) must stay as it is: chmodding
+    // /tmp to 0700 would lock every judged program out of its workspace.
+    it.each([
+      ['a sticky world-writable directory such as /tmp', 0o1777],
+      ['a world-writable directory', 0o777],
+    ])('refuses %s instead of tightening it, and leaves its mode alone', (_label, sharedMode) => {
+      const configuredDir = path.join(scratch, 'shared');
+      fs.mkdirSync(configuredDir);
+      fs.chmodSync(configuredDir, sharedMode);
+      expect(() => initBackendWorkRoot({ configuredDir })).toThrow(/is a shared directory \(mode [01]777,/);
+      expect(fs.lstatSync(configuredDir).mode & 0o7777).toBe(sharedMode);
+      expect(fs.readdirSync(configuredDir)).toEqual([]);
+    });
+
     it('refuses a symlink, even to a private directory, and never changes its target', () => {
       const real = path.join(scratch, 'real');
       fs.mkdirSync(real, { mode: 0o700 });

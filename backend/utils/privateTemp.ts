@@ -16,8 +16,8 @@ import { logger } from './logger';
  * (`oj-work-<pid>-XXXXXX`, made by mkdtemp, mode 0700, owned by the backend
  * uid) under OJ_WORK_DIR when set, else under os.tmpdir(). OJ_WORK_DIR itself
  * must be a real directory owned by the backend uid; a looser mode is
- * tightened to 0700 at boot, and a symlink, a file or a directory another uid
- * owns fails boot.
+ * tightened to 0700 at boot, and a symlink, a file, a directory another uid
+ * owns or a shared (sticky or world-writable) directory fails boot.
  */
 
 const PRIVATE_DIR_MODE = 0o700;
@@ -118,6 +118,9 @@ export interface InitBackendWorkRootOptions {
   removeStaleOwnPid?: boolean;
 }
 
+/** Sticky or world-writable: the mark of a shared scratch directory such as /tmp. */
+const SHARED_DIR_BITS = 0o1002;
+
 /**
  * Tighten an existing OJ_WORK_DIR to 0700 when it is a real directory this
  * uid owns (a fresh Docker volume mountpoint is root:root 0755), as
@@ -125,11 +128,17 @@ export interface InitBackendWorkRootOptions {
  * with O_NOFOLLOW and checked to be the directory lstat saw, so a path
  * swapped for a symlink in between is never followed. A symlink, a file or a
  * directory another uid owns is left untouched for assertPrivateDirectory to
- * refuse.
+ * refuse. A shared directory (sticky or world-writable, e.g. OJ_WORK_DIR=/tmp)
+ * is refused rather than tightened: other users rely on it, and a 0700 /tmp
+ * would lock every judged program out of its workspace.
  */
 function tightenOwnDirectorySync(dir: string): void {
   const stats = fs.lstatSync(dir);
   if (!needsTightening(stats)) return;
+  if ((stats.mode & SHARED_DIR_BITS) !== 0) {
+    throw new Error(`OJ_WORK_DIR ${dir} is a shared directory (mode ${(stats.mode & 0o7777).toString(8).padStart(4, '0')}, `
+      + 'sticky or world-writable); point OJ_WORK_DIR at a dedicated directory.');
+  }
   const fd = fs.openSync(dir, fs.constants.O_RDONLY | (fs.constants.O_DIRECTORY ?? 0) | (fs.constants.O_NOFOLLOW ?? 0));
   try {
     const opened = fs.fstatSync(fd);
@@ -143,8 +152,8 @@ function tightenOwnDirectorySync(dir: string): void {
 
 /**
  * Base directory the per-process root is created in. OJ_WORK_DIR is created
- * as 0700 when missing, tightened to 0700 when this uid owns it, then
- * verified strictly.
+ * as 0700 when missing, tightened to 0700 when this uid owns it and it is not
+ * a shared directory, then verified strictly.
  */
 function resolveBase(configuredDir: string): string {
   if (!configuredDir) return os.tmpdir();

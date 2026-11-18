@@ -181,10 +181,13 @@ to the backend environment in compose. It must be a real directory (not a
 symlink) owned by the backend uid, which is root in the container. A missing
 one is created 0700; an existing one with any other mode is tightened to 0700
 at boot (through an `O_NOFOLLOW` descriptor), so a fresh named volume mounted
-there works as is (its mountpoint is normally `root:root` 0755). A symlink,
-a file, or a directory owned by another uid (a bind mount of a host directory
-owned by a host user, say) is left untouched and the backend refuses to
-start.
+there works as is (its mountpoint is `root:root` 0755 unless the image
+already has a directory at that path, whose mode Docker copies). A symlink,
+a file, a directory owned by another uid (a bind mount of a host directory
+owned by a host user, say) or a shared directory (sticky or world-writable,
+such as `/tmp` itself) is left untouched and the backend refuses to start:
+tightening `/tmp` to 0700 would lock judged programs out of their
+workspaces.
 
 Batch import reads every archive entry it inflates through one counting
 helper (`inflateEntryBounded` in `batchUploadService.ts`) that counts the
