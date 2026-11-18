@@ -11,7 +11,7 @@ import {
 import authService from '../services/authService';
 import { clearSessionExpiryRedirect } from '../services/api';
 import type { AuthUser } from '../types';
-import { clearSubmissionDrafts } from '../utils/submissionDrafts';
+import { bindSubmissionDraftsToUser, clearSubmissionDrafts } from '../utils/submissionDrafts';
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -61,8 +61,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         // the expired-login flow) from a guest hitting an auth-required
         // endpoint (a normal guest state, never an expiry).
         window.sessionStorage.setItem('oj:had-session', '1');
+        bindSubmissionDraftsToUser(data.user.id);
         applyUser(data.user);
       } else {
+        // No session (never signed in, or it ended without a Logout click):
+        // nobody owns the stored code drafts any more.
+        bindSubmissionDraftsToUser(null);
         applyUser(null);
       }
     } catch {
@@ -98,6 +102,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // redirect because the one-shot loop-guard flag never reset.
     clearSessionExpiryRedirect();
     window.sessionStorage.setItem('oj:had-session', '1');
+    // Another account signing in on this browser never sees the previous one's drafts.
+    bindSubmissionDraftsToUser(userData.id);
     setUser(userData);
   }, []);
 
