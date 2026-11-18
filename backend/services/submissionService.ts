@@ -15,7 +15,7 @@ import {
   SUBMISSION_STATUS,
   SubmissionLanguage,
 } from '../constants';
-import { findForbiddenAsm, findForbiddenInclude } from '../utils/compileGuard';
+import { findForbiddenInclude, findHeaderSourceRejection } from '../utils/compileGuard';
 import { isGraderSourceFilename } from '../utils/problemFilename';
 import { logger } from '../utils/logger';
 import { publishRealtime } from './realtimeHub';
@@ -131,28 +131,34 @@ const FORBIDDEN_INCLUDE_MESSAGE = (target: string): string =>
   `Compilation rejected: #include of a non-permitted path ("${target}") is not allowed. ` +
   `Use standard library headers (e.g. <bits/stdc++.h>) only.`;
 
-const FORBIDDEN_ASM_MESSAGE = (target: string): string =>
-  `Compilation rejected: inline assembly ("${target}") is not allowed in this problem.`;
-
 const HEADER_CPP_ONLY_MESSAGE = 'This problem accepts C++ only.';
 
 /**
- * Pre-compile source guard. The `#include` check protects every submission
- * (compile-time arbitrary file read, RUNNER-001). The inline-assembly check
- * is header-only: `asm(".incbin \"main.cpp\"")` would bake the grader's
- * secret bytes into the binary, a vector that only exists when secret files
- * share the translation unit. Returns the submitter-facing message, or null.
+ * Pre-compile source guard. The `#include` check protects every C++
+ * submission (compile-time arbitrary file read, RUNNER-001); Python never
+ * goes through a preprocessor, so its `#` comments (`# import (x) ...`) are
+ * not directives to inspect. The header rules (include whitelist, no
+ * redefinition of keywords or grader names, no assembler embedding) only
+ * apply when secret grader files share the translation unit; they are
+ * defence in depth over the two-step header build. Returns the
+ * submitter-facing message, or null.
  */
-function findSourceRejection(code: string, isHeader: boolean): string | null {
+function findSourceRejection(
+  code: string,
+  language: SubmissionLanguage,
+  headerSpec: HeaderJudgeSpec | null,
+): string | null {
+  if (language !== 'cpp') return null;
   const forbiddenInclude = findForbiddenInclude(code);
   if (forbiddenInclude) {
     return FORBIDDEN_INCLUDE_MESSAGE(forbiddenInclude);
   }
-  if (isHeader) {
-    const forbiddenAsm = findForbiddenAsm(code);
-    if (forbiddenAsm) {
-      return FORBIDDEN_ASM_MESSAGE(forbiddenAsm);
-    }
+  if (headerSpec) {
+    return findHeaderSourceRejection(code, {
+      submissionFilename: headerSpec.submissionFilename ?? DEFAULT_SUBMISSION_FILENAME,
+      graderFiles: headerSpec.graderFiles,
+      starterFilenames: headerSpec.starterFilenames ?? [],
+    });
   }
   return null;
 }
@@ -345,11 +351,15 @@ async function runSubmissionPipeline(
     }
 
     // Reject sources that try to read files outside the submission via
-    // #include (and, for header problems, assembler-level file embedding)
-    // BEFORE anything is written or compiled — a first line of defence
-    // against the compile-time arbitrary file-read vector (the compile also
-    // runs unprivileged, see runBoundedCompile).
-    const sourceRejection = findSourceRejection(code, isHeader);
+    // #include (and, for header problems, the header source rules) BEFORE
+    // anything is written or compiled — a first line of defence against the
+    // compile-time arbitrary file-read vector (the compile also runs
+    // unprivileged, see runBoundedCompile).
+    const sourceRejection = findSourceRejection(
+      code,
+      submissionLanguage,
+      isHeader ? (headerSpec as HeaderJudgeSpec) : null,
+    );
     if (sourceRejection) {
       await recordCompilationError(table, submissionId, user_id, sourceRejection);
       return;

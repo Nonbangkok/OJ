@@ -536,6 +536,26 @@ describe('Submission Service', () => {
             expect(judge).not.toHaveBeenCalled();
         });
 
+        it('does not run the C++ include guard over Python comments', async () => {
+            // The guard covers #import / #include_next now; to a Python
+            // program these lines are comments, never directives.
+            const code = '# import (helpers) below\n# include "/etc/passwd" is not a thing here\nprint(1)\n';
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code, language: 'python' }] })
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}) // UPDATE Running
+                .mockResolvedValueOnce({ rowCount: 1 }); // UPDATE final results (landed)
+            (judge as jest.Mock).mockResolvedValueOnce({
+                results: [], score: 100, overallStatus: 'Accepted', maxTimeMs: 0, maxMemoryKb: 0
+            });
+
+            await processSubmission(1);
+
+            expect(judge).toHaveBeenCalledTimes(1);
+            expect(db.query).not.toHaveBeenCalledWith(
+                expect.stringContaining('Compilation Error'), expect.anything());
+        });
+
         it('does not chmod a compiled binary for python (no artifact)', async () => {
             (db.query as jest.Mock)
                 .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code: 'print(1)', language: 'python' }] })
@@ -904,6 +924,36 @@ describe('Submission Service', () => {
                 await processSubmission(1);
 
                 expect(compilationErrorOutput(2)).toContain('#include of a non-permitted path');
+                expect(cp.spawn).not.toHaveBeenCalled();
+            });
+
+            it('rejects redefining a name the grader uses, without quoting the grader', async () => {
+                // queue.h (a grader file) includes student.h; `main` is a
+                // grader identifier, so a student macro may not rewrite it.
+                (getHeaderJudgeSpec as jest.Mock).mockResolvedValue(HEADER_SPEC);
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce(mockRow('#define main(...) static_assert(false, #__VA_ARGS__)\n'))
+                    .mockResolvedValueOnce({}) // UPDATE Compiling
+                    .mockResolvedValueOnce({}); // UPDATE Compilation Error
+
+                await processSubmission(1);
+
+                const output = compilationErrorOutput(2);
+                expect(output).toContain('the grader uses that name');
+                expect(output).not.toContain('#include "queue.h"');
+                expect(cp.spawn).not.toHaveBeenCalled();
+            });
+
+            it('allows a quoted #include of a public starter header only', async () => {
+                (getHeaderJudgeSpec as jest.Mock).mockResolvedValue({ ...HEADER_SPEC, starterFilenames: ['queue.h', 'student.h'] });
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce(mockRow('#include "main.cpp"\n'))
+                    .mockResolvedValueOnce({}) // UPDATE Compiling
+                    .mockResolvedValueOnce({}); // UPDATE Compilation Error
+
+                await processSubmission(1);
+
+                expect(compilationErrorOutput(2)).toContain('public headers: "queue.h"');
                 expect(cp.spawn).not.toHaveBeenCalled();
             });
         });

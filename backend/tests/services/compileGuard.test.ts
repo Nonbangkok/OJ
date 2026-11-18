@@ -1,5 +1,6 @@
-import { findForbiddenAsm, findForbiddenInclude } from '../../utils/compileGuard';
+import { findForbiddenAsm, findForbiddenInclude, findHeaderSourceRejection } from '../../utils/compileGuard';
 import { sanitizeCompilerStderr } from '../../services/submissionService';
+import { SUBMISSION_VALIDATION } from '../../constants';
 
 /**
  * Unit tests for the compile-time hardening (security item N1):
@@ -75,6 +76,66 @@ describe('findForbiddenInclude', () => {
     // Comment between directive parts must not splice into a path.
     expect(findForbiddenInclude('#include <ios/* comment */tream>')).toBeNull();
   });
+
+  // --- A4-07 / A9-07: the rest of the include family ----------------------
+  // GCC honours #import and #include_next too, and both accept absolute
+  // paths; the guard used to match `#include` only.
+
+  it('rejects #import of an absolute path', () => {
+    expect(findForbiddenInclude('#import "/etc/hostname"')).toBe('/etc/hostname');
+  });
+
+  it('rejects #include_next of an absolute path (angle form)', () => {
+    expect(findForbiddenInclude('#include_next </etc/hostname>')).toBe('/etc/hostname');
+  });
+
+  it('rejects #include_next of an absolute path (quote form)', () => {
+    expect(findForbiddenInclude('#include_next "/proc/self/environ"')).toBe('/proc/self/environ');
+  });
+
+  it('rejects #import of a traversing path', () => {
+    expect(findForbiddenInclude('#import "../../app/.env"')).toBe('../../app/.env');
+  });
+
+  it('rejects #embed of an absolute path', () => {
+    expect(findForbiddenInclude('#embed "/etc/passwd"')).toBe('/etc/passwd');
+  });
+
+  it('sees directives spelled with the %: digraph or a comment after #', () => {
+    expect(findForbiddenInclude('%:include "/etc/passwd"')).toBe('/etc/passwd');
+    expect(findForbiddenInclude('# /* c */ include "/etc/passwd"')).toBe('/etc/passwd');
+    expect(findForbiddenInclude('#/**/include_next </etc/passwd>')).toBe('/etc/passwd');
+  });
+
+  it('treats a lone CR as a line break, like GCC', () => {
+    expect(findForbiddenInclude('int x; // note\r#include "/etc/passwd"\n')).toBe('/etc/passwd');
+  });
+
+  it('rejects absolute and traversing __has_include operands', () => {
+    expect(findForbiddenInclude('#if __has_include("/etc/passwd")\n#endif')).toBe('/etc/passwd');
+    expect(findForbiddenInclude('#if __has_include_next(<../x.h>)\n#endif')).toBe('../x.h');
+    expect(findForbiddenInclude('#if __has_include(<vector>)\n#endif')).toBeNull();
+  });
+
+  it('rejects path-like angle spans and escaped literals in macro bodies', () => {
+    expect(findForbiddenInclude('#define E </etc/passwd>\n#include E')).toBe('/etc/passwd');
+    expect(findForbiddenInclude('#define E "\\x2f" "etc/passwd"\n#include E')).toBe('/etc/passwd');
+    expect(findForbiddenInclude('#define E "\\057etc/passwd"\n#include E')).toBe('/etc/passwd');
+    expect(findForbiddenInclude('#define F(x) "/etc/" #x\n#include F(passwd)')).toBe('/etc/');
+  });
+
+  it('ignores include-like text in comments and string literals', () => {
+    expect(findForbiddenInclude('/*\n#include "/etc/passwd"\n*/\nint main(){}')).toBeNull();
+    expect(findForbiddenInclude('const char* s = R"(\n#include "/etc/passwd"\n)";')).toBeNull();
+  });
+
+  it('does not mistake an ellipsis in a macro string for a traversal', () => {
+    expect(findForbiddenInclude('#define dbg(x) std::cerr << #x << "..." << (x)\n#define MSG "Loading..."')).toBeNull();
+  });
+
+  it('leaves an unterminated #include for the compiler to report', () => {
+    expect(findForbiddenInclude('#include <iostream\nint main(){}')).toBeNull();
+  });
 });
 
 describe('findForbiddenAsm', () => {
@@ -110,6 +171,93 @@ describe('findForbiddenAsm', () => {
 
   it('allows ordinary code', () => {
     expect(findForbiddenAsm('#include <bits/stdc++.h>\nint main(){ return 0; }')).toBeNull();
+  });
+
+  // --- A4-01 / A9-03: grader-embedding bypasses ---------------------------
+  // GCC writes asm strings and section names into the assembly verbatim, so
+  // any of these used to bake the grader's main.cpp into the binary.
+
+  it('rejects the asm keyword assembled by token pasting + octal-escaped incbin (A4-01 PoC1)', () => {
+    // `J(as,m)(...)` expands to `asm(...)`: the literal `asm` never appears,
+    // and `\56\151ncbin` decodes to `.incbin` only inside the assembler.
+    const code =
+      '#define J(a,b) a##b\nJ(as,m)(".pushsection .rodata\\n\\56\\151ncbin \\"main.cpp\\"\\n.byte 0\\n.popsection");';
+    expect(findForbiddenAsm(code)).toBe('##');
+    expect(findForbiddenAsm('%:define J(a,b) a%:%:b')).toBe('##');
+  });
+
+  it('decodes escapes before looking for incbin in a string', () => {
+    expect(findForbiddenAsm('const char* s = "\\56\\151ncbin";')).toBe('incbin');
+    // Hex escapes are greedy, so `\x63` needs a literal break before `bin`.
+    expect(findForbiddenAsm('const char* s = ".in\\x63" "bin";')).toBe('incbin');
+    expect(findForbiddenAsm('const char* s = ".IN\\x43\\x42IN";')).toBe('incbin');
+    expect(findForbiddenAsm('const char* s = ".IN\\u0043BIN";')).toBe('incbin');
+  });
+
+  it('rejects an .incbin smuggled through a section attribute with no asm keyword (A4-01 PoC2)', () => {
+    const code =
+      '__attribute__((used, section(".data.g\\n.globl gsrc\\ngsrc:\\n\\56\\151ncbin \\"main.cpp\\"\\n.byte 0\\n#"))) char gpad = 0;';
+    expect(findForbiddenAsm(code)).toBe('section');
+  });
+
+  it('rejects an .incbin split across adjacent string literals (A9-03)', () => {
+    // GCC concatenates `".inc" "bin ..."` before the assembler sees it.
+    expect(findForbiddenAsm('const char* s = ".inc" "bin \\"main.cpp\\"";')).toBe('incbin');
+    expect(findForbiddenAsm('const char* s = ".inc"\n  "bin";')).toBe('incbin');
+    const code =
+      '__attribute__((used, section(".rodata.x\\n.global leak\\nleak:\\n.inc" "bin \\"main.cpp\\"\\n.byte 0\\n#"))) static const char d = 0;';
+    expect(findForbiddenAsm(code)).not.toBeNull();
+  });
+
+  it('rejects a section attribute whatever escapes hide its payload (A9-03)', () => {
+    const code = '__attribute__((section(".x\\n.in\\x63bin \\"main.cpp\\"\\n#"))) char d = 0;';
+    expect(findForbiddenAsm(code)).not.toBeNull();
+  });
+
+  it('rejects every attribute and directive whose string reaches the assembler verbatim', () => {
+    expect(findForbiddenAsm('[[gnu::section(".x")]] char d;')).toBe('section');
+    expect(findForbiddenAsm('<:<:gnu::__section__(".x"):>:> char d;')).toBe('__section__');
+    expect(findForbiddenAsm('static int g __attribute__((weakref("x")));')).toBe('weakref');
+    expect(findForbiddenAsm('int f() __attribute__((symver("f@V1")));')).toBe('symver');
+    expect(findForbiddenAsm('#ident "x"')).toBe('#ident');
+    expect(findForbiddenAsm('%:sccs "x"')).toBe('#sccs');
+  });
+
+  it('sees asm through a backslash-space-newline splice', () => {
+    expect(findForbiddenAsm('as\\ \nm("nop");')).toBe('asm');
+  });
+
+  it('reads raw strings verbatim instead of decoding them', () => {
+    expect(findForbiddenAsm('const char* s = R"x(\\56\\151ncbin)x";')).toBeNull();
+    expect(findForbiddenAsm('const char* s = R"x(.incbin)x";')).toBe('incbin');
+  });
+});
+
+describe('guard cost on hostile input', () => {
+  // The guards run synchronously in the API process for every submission, so
+  // a quadratic path is a denial of service: a 64 KiB `#define X <<<...>`
+  // used to block the event loop for ~40 s. Each input below hits one path
+  // that is linear now (spans grouped by their `>`, memoised unterminated
+  // quotes, bounded literal runs, binary-searched splices); the budget is
+  // generous for a loaded machine and still far below the old cost.
+  const N = SUBMISSION_VALIDATION.MAX_CODE_LENGTH;
+  const context = { submissionFilename: 'student.h', graderFiles: [], starterFilenames: [] };
+  const hostile: Array<[string, string]> = [
+    ['angle spans in a macro body', `#define X ${'<'.repeat(N - 12)}>`],
+    ['spaced angle spans', `#define X ${'< a '.repeat((N - 12) / 4)}>`],
+    ['unterminated escaped quotes', '"\\'.repeat(N / 2)],
+    ['unterminated escaped char quotes', "'\\".repeat(N / 2)],
+    ['adjacent string literals', `const char* s = ${'"ab" '.repeat((N - 20) / 5)};`],
+    ['raw strings between splices', 'R"(a)" \\\n'.repeat(Math.floor(N / 9))],
+  ];
+
+  it.each(hostile)('%s', (_name, code) => {
+    expect(code.length).toBeLessThanOrEqual(N);
+    const started = Date.now();
+    findForbiddenInclude(code);
+    findForbiddenAsm(code);
+    findHeaderSourceRejection(code, context);
+    expect(Date.now() - started).toBeLessThan(3000);
   });
 });
 

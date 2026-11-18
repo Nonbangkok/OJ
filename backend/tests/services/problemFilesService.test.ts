@@ -106,19 +106,24 @@ describe('problemFilesService', () => {
     it('returns empty graderFiles for a standard problem without reading files', async () => {
       query.mockResolvedValueOnce({ rows: [{ problem_type: 'standard', submission_filename: null }] });
       expect(await getHeaderJudgeSpec('p1')).toEqual({
-        problemType: 'standard', submissionFilename: null, graderFiles: [],
+        problemType: 'standard', submissionFilename: null, graderFiles: [], starterFilenames: [],
       });
       expect(query).toHaveBeenCalledTimes(1);
     });
 
-    it('loads grader files for a header problem', async () => {
+    it('loads grader files and starter names for a header problem', async () => {
       query
         .mockResolvedValueOnce({ rows: [{ problem_type: 'header', submission_filename: 'student.h' }] })
-        .mockResolvedValueOnce({ rows: [{ filename: 'main.cpp', content: Buffer.from('x') }] });
+        .mockResolvedValueOnce({ rows: [{ filename: 'main.cpp', content: Buffer.from('x') }] })
+        .mockResolvedValueOnce({ rows: [{ filename: 'main.cpp' }, { filename: 'vector.h' }] });
       const spec = await getHeaderJudgeSpec('p1');
       expect(spec?.problemType).toBe('header');
       expect(spec?.submissionFilename).toBe('student.h');
       expect(spec?.graderFiles).toEqual([{ filename: 'main.cpp', content: Buffer.from('x') }]);
+      // Names only: the header source rules allow `#include "vector.h"`.
+      expect(spec?.starterFilenames).toEqual(['main.cpp', 'vector.h']);
+      expect(query.mock.calls[2][0]).toContain("role = 'starter'");
+      expect(query.mock.calls[2][0]).not.toContain('content');
     });
   });
 
