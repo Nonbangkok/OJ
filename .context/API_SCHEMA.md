@@ -515,7 +515,7 @@
 - Body: `{ problemIds: string[] }`
 - Response 200: ZIP binary
 - Error 400: ไม่มี problemIds
-- Header problems: `config.json` มี `problem_type`/`submission_filename` และ ZIP มี `<id>/grader/*`, `<id>/starter/*` (batch upload รับรูปแบบเดียวกัน; ต้องมี grader `.cpp` อย่างน้อยหนึ่งไฟล์, id ที่มีอยู่แล้วถูก SKIPPED)
+- Header problems: `config.json` มี `problem_type`/`submission_filename` และ ZIP มี `<id>/grader/*`, `<id>/starter/*` (batch upload รับรูปแบบเดียวกัน; ต้องมี grader C++ source (`.cpp`/`.cc`/`.cxx`/`.cp`/`.c++`/`.C`/`.CPP`) อย่างน้อยหนึ่งไฟล์, id ที่มีอยู่แล้วถูก SKIPPED)
 
 ### 63a. Header problem files (admin)
 - Auth: `staff|admin`
