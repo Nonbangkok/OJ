@@ -242,4 +242,43 @@ describe('Contest Scheduler Service', () => {
             jest.useRealTimers();
         });
     });
+
+    describe('pause / resume (DB-05 / A2-03)', () => {
+        afterEach(() => {
+            contestScheduler.resume();
+        });
+
+        it('pause() resolves at once when no tick is running, and paused ticks are skipped', async () => {
+            await expect(contestScheduler.pause()).resolves.toBeUndefined();
+
+            await contestScheduler.checkContestStatus();
+
+            expect(db.query).not.toHaveBeenCalled();
+        });
+
+        it('pause() resolves only after a tick that was already running has finished', async () => {
+            let releaseMigration!: () => void;
+            (migrateSubmissionsAfterContest as jest.Mock).mockImplementationOnce(
+                () => new Promise<void>((resolve) => { releaseMigration = resolve; }),
+            );
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [] })
+                .mockResolvedValueOnce({ rows: [{ id: 7, title: 'Slow Contest', status: 'running' }] })
+                .mockResolvedValueOnce({});
+            const tick = contestScheduler.checkContestStatus();
+            for (let i = 0; i < 20 && (migrateSubmissionsAfterContest as jest.Mock).mock.calls.length === 0; i++) {
+                await Promise.resolve();
+            }
+
+            let paused = false;
+            const pausing = contestScheduler.pause().then(() => { paused = true; });
+            await new Promise((resolve) => setImmediate(resolve));
+            expect(paused).toBe(false);
+
+            releaseMigration();
+            await tick;
+            await pausing;
+            expect(paused).toBe(true);
+        });
+    });
 });

@@ -4,6 +4,7 @@ import { AuthoringSpool } from '../authoring/spool';
 import { TestcaseError } from '../authoring/testcases';
 import { ACTIVE_JOB_STATUSES, AUTHORING_COORDINATOR_LOCK, applyJobResult, DurableJob, failAuthoringJob, getAuthoringJob, JobDatabase, readQueuedInput, readQueuedFile, setJobActivityListener } from './authoringJobQueryService';
 import { reconcileProfileSyncs } from './authoringProfileSyncService';
+import { isMaintenanceActive } from './maintenanceMode';
 
 /** Reconciles durable queue entries with disk, including both crash windows around result import. */
 export async function reconcileAuthoringJobs(spool: AuthoringSpool, database: JobDatabase = db, now = Date.now()): Promise<void> {
@@ -74,6 +75,25 @@ export async function reconcileAuthoringJobs(spool: AuthoringSpool, database: Jo
   }
 }
 
+/** A2-03: reconcile passes currently running, across every coordinator in the process. */
+const activeReconciles = new Set<Promise<void>>();
+
+/**
+ * A2-03: wait for any reconcile pass that was already running when the
+ * database import began (new passes are skipped while maintenance mode is
+ * active). Resolves false when the timeout (ms) elapses first.
+ */
+export async function waitForAuthoringCoordinatorIdle(timeoutMs: number): Promise<boolean> {
+  if (activeReconciles.size === 0) return true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<false>((resolve) => { timer = setTimeout(() => resolve(false), timeoutMs); });
+  try {
+    return await Promise.race([Promise.allSettled([...activeReconciles]).then(() => true), timedOut]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Starts a non-overlapping polling loop; the next tick retries transient DB/disk failures.
  *  `kick()` runs a reconciliation immediately — called when a job is enqueued so
  *  delivery to the runner doesn't wait for the next poll tick. */
@@ -87,9 +107,13 @@ export async function startAuthoringCoordinator(root: string): Promise<() => voi
   const tick = async () => {
     if (running) { kicked = true; return; } // a kick during a running tick reruns after it
     running = true;
-    try { await reconcileAuthoringJobs(spool); }
+    // A2-03: the database is being dropped and restored; touch nothing
+    // (spool cleanup included) until the import has finished.
+    const reconcile = isMaintenanceActive() ? Promise.resolve() : reconcileAuthoringJobs(spool);
+    activeReconciles.add(reconcile);
+    try { await reconcile; }
     catch { console.error('Authoring job reconciliation failed; will retry'); }
-    finally { running = false; }
+    finally { running = false; activeReconciles.delete(reconcile); }
     if (stopped) return;
     if (kicked) { kicked = false; timer = setTimeout(tick, 0); }
     else timer = setTimeout(tick, AUTHORING_RUNNER.POLL_MS);

@@ -15,9 +15,10 @@ import { Request, Response, NextFunction } from 'express';
  *    the token-authenticated import-progress endpoint.
  *
  * Deliberately simple: single-process state, no DB reads (the DB is being
- * dropped). The contest scheduler additionally checks the flag so it pauses
- * its ticks for the duration (see contestScheduler.pause/resume), and judge
- * intake stops naturally because /submit is 503'd.
+ * dropped). Background work is quiesced by the import itself (A2-03, see
+ * adminDatabaseService): the contest scheduler is paused and its running tick
+ * awaited, the judge queue is paused and its running tasks awaited, and the
+ * authoring coordinator skips its ticks while `isMaintenanceActive()`.
  */
 
 let maintenanceActive = false;
