@@ -15,12 +15,13 @@ import {
   TestcaseView,
   TestcaseViewPart,
 } from '../types/service';
-import { ADMIN_PROBLEM_LIST_CONFIG, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CONFIG, SUBMISSION_QUERY_CONFIG, TESTCASE_VIEWER_CONFIG, type ProblemFileRole, type ProblemType, type AdminProblemView, type AdminProblemSort } from '../constants';
+import { ADMIN_PROBLEM_LIST_CONFIG, ARCHIVE_LIMITS, DEFAULT_SUBMISSION_FILENAME, PROBLEM_LIST_CONFIG, SUBMISSION_QUERY_CONFIG, TESTCASE_VIEWER_CONFIG, type ProblemFileRole, type ProblemType, type AdminProblemView, type AdminProblemSort } from '../constants';
 import { fullyPairedCaseNumbers, pairZippedTestcaseFiles } from './testcaseZipPairing';
 import { isUniqueViolation } from '../utils/dbErrors';
 import { AppError } from '../middleware/errorHandler';
 import { getProblemFiles } from './problemFilesService';
 import { validateProblemFileSet } from '../utils/headerProblemFiles';
+import { createInflateBudget, readZipEntryBounded, withZipFile, ZipEntryLimitError } from '../utils/zipEntryReader';
 
 /**
  * Run `body` inside a single transaction. BEGIN/COMMIT/ROLLBACK on a dedicated
@@ -1059,14 +1060,29 @@ const replaceProblemTestcasesFromOpenedZip = async (
 
   // Read all pair buffers *before* opening the transaction so a corrupt zip
   // entry fails without touching existing testcases; the DELETE + INSERTs
-  // then run atomically.
+  // then run atomically. The archive's declared sizes are checked first and
+  // the real ones are counted while inflating, so a ZIP that lies about its
+  // sizes cannot inflate past the archive cap in memory.
+  const maxBytes = ARCHIVE_LIMITS.MAX_UNCOMPRESSED_BYTES;
+  const tooLarge = `Archive rejected: uncompressed size exceeds ${maxBytes} bytes (decompression bomb).`;
+  const declaredBytes = pairedCases.reduce(
+    (total, key) => total + testcaseFiles[key].in!.uncompressedSize + testcaseFiles[key].out!.uncompressedSize,
+    0,
+  );
+  if (declaredBytes > maxBytes) throw new AppError(tooLarge, 400);
+  const budget = createInflateBudget(maxBytes);
   const pairBuffers: Array<{ input: Buffer; output: Buffer }> = [];
-  for (const key of pairedCases) {
-    const pair = testcaseFiles[key];
-    pairBuffers.push({
-      input: await pair.in!.buffer(),
-      output: await pair.out!.buffer(),
-    });
+  try {
+    for (const key of pairedCases) {
+      const pair = testcaseFiles[key];
+      pairBuffers.push({
+        input: await readZipEntryBounded(pair.in!, maxBytes, budget),
+        output: await readZipEntryBounded(pair.out!, maxBytes, budget),
+      });
+    }
+  } catch (error) {
+    if (error instanceof ZipEntryLimitError) throw new AppError(error.message, 400);
+    throw error;
   }
 
   // The zip pairs exist, but they must land somewhere: refuse the silent
@@ -1106,7 +1122,7 @@ export const replaceProblemTestcasesFromZipFile = async (
   problemId: string,
   zipPath: string,
 ): Promise<ReplaceProblemTestcasesFromZipResult> =>
-  replaceProblemTestcasesFromOpenedZip(problemId, await unzipper.Open.file(zipPath));
+  withZipFile(zipPath, (zip) => replaceProblemTestcasesFromOpenedZip(problemId, zip));
 
 export const getProblemExportBundle = async (problemId: string): Promise<ProblemExportBundle | null> => {
   const problemResult = await db.query<ProblemExportBundle['problem']>(

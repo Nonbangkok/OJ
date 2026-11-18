@@ -3,6 +3,7 @@ import * as unzipper from 'unzipper';
 import { HEADER_PROBLEM_LIMITS, type ProblemFileRole } from '../constants';
 import { validateProblemFilename, validateSubmissionFilename } from './problemFilename';
 import { assertSafeArchive, type ArchiveEntryLike } from './archiveSafety';
+import { createInflateBudget, readZipEntryBounded } from './zipEntryReader';
 
 export { validateProblemFilename, validateSubmissionFilename };
 
@@ -79,12 +80,12 @@ export async function readFlatZip(zip: Buffer): Promise<ProblemFileInput[]> {
     }
   }
 
+  // The checks above use declared sizes; the read below counts real ones,
+  // so an entry that lies about its size cannot inflate past the caps.
+  const budget = createInflateBudget(HEADER_PROBLEM_LIMITS.MAX_FILES_PER_ROLE * HEADER_PROBLEM_LIMITS.MAX_FILE_BYTES);
   const result: ProblemFileInput[] = [];
   for (const entry of candidates) {
-    const content = await entry.buffer();
-    if (content.length > HEADER_PROBLEM_LIMITS.MAX_FILE_BYTES) {
-      throw new Error(`ZIP entry "${entry.path}" exceeds ${HEADER_PROBLEM_LIMITS.MAX_FILE_BYTES} bytes.`);
-    }
+    const content = await readZipEntryBounded(entry, HEADER_PROBLEM_LIMITS.MAX_FILE_BYTES, budget);
     result.push({ filename: entry.path, content });
   }
   return result;
