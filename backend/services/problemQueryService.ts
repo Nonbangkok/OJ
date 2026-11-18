@@ -745,7 +745,7 @@ const decodeAdminCursor = (raw: string): string => {
  */
 /**
  * A problem needs attention when students cannot be judged on it: no testcases,
- * no statement PDF, or a header problem without a grader .cpp.
+ * no statement PDF, or a header problem without a grader C++ source.
  */
 const HAS_TESTCASES_SQL = 'EXISTS (SELECT 1 FROM testcases t WHERE t.problem_id = p.id)';
 const HAS_GRADER_SQL = `EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = p.id AND f.role = 'grader' AND f.filename ~ '${GRADER_SOURCE_FILENAME_SQL_REGEX}')`;

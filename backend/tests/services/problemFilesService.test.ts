@@ -134,7 +134,7 @@ describe('problemFilesService', () => {
     // `main.Cpp` g++ would hand to the linker must not make the problem
     // look submittable.
     const sql = query.mock.calls[0][0] as string;
-    expect(sql).toContain("filename ~ '\\.(cpp|cc|cxx)$'");
+    expect(sql).toContain("filename ~ '\\.(cpp|cc|cxx|cp|c\\+\\+|C|CPP)$'");
     expect(sql).not.toMatch(/LOWER\(filename\)/i);
     query.mockResolvedValueOnce({ rows: [{ exists: false }] });
     expect(await hasGraderSource('p1')).toBe(false);

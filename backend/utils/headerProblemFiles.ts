@@ -2,6 +2,7 @@ import path from 'path';
 import * as unzipper from 'unzipper';
 import { HEADER_PROBLEM_LIMITS, type ProblemFileRole } from '../constants';
 import {
+  GRADER_SOURCE_EXTENSION_LIST,
   hasMiscasedCppExtension,
   isGraderHeaderFilename,
   isGraderSourceFilename,
@@ -21,7 +22,8 @@ export interface ProblemFileInput {
 function validateGraderFiles(files: readonly ProblemFileInput[], submissionFilename: string | null): string | null {
   for (const file of files) {
     if (!isGraderSourceFilename(file.filename) && !isGraderHeaderFilename(file.filename)) {
-      return `Grader file "${file.filename}" must end in .cpp, .cc, .cxx, .h or .hpp (lowercase).`;
+      return `Grader file "${file.filename}" must be a C++ source (${GRADER_SOURCE_EXTENSION_LIST}, in exactly that case: `
+        + 'the suffixes g++ compiles as C++) or a header (.h or .hpp).';
     }
     if (submissionFilename !== null && file.filename === submissionFilename) {
       return `Grader file must not be named "${submissionFilename}" (that is the student's submission file).`;
@@ -29,7 +31,7 @@ function validateGraderFiles(files: readonly ProblemFileInput[], submissionFilen
   }
   const sources = files.filter((f) => isGraderSourceFilename(f.filename));
   if (sources.length === 0) {
-    return 'Grader files must include at least one .cpp, .cc or .cxx source file.';
+    return `Grader files must include at least one C++ source file (${GRADER_SOURCE_EXTENSION_LIST}).`;
   }
   // The judge compiles each source to `<stem>.s` in one workspace, so two
   // sources may not share a stem (`a.cpp` + `a.cc`).
@@ -61,9 +63,10 @@ export function validateProblemFileSet(
       return `File "${file.filename}" exceeds ${HEADER_PROBLEM_LIMITS.MAX_FILE_BYTES} bytes.`;
     }
     // Starters may hold any file (notes, sample inputs); one that looks like
-    // C++ must use the lowercase extension students' g++ compiles as C++.
+    // C++ must use a casing students' g++ compiles as C++.
     if (role === 'starter' && hasMiscasedCppExtension(file.filename)) {
-      return `Starter file "${file.filename}" must use a lowercase extension (.cpp, .cc, .cxx, .h or .hpp).`;
+      return `Starter file "${file.filename}" has a C++ extension in a casing g++ does not compile as C++; `
+        + `use ${GRADER_SOURCE_EXTENSION_LIST}, .h or .hpp.`;
     }
   }
   return role === 'grader' ? validateGraderFiles(files, submissionFilename) : null;

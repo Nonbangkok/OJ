@@ -601,11 +601,12 @@ export type ProblemFileRole = (typeof PROBLEM_FILE_ROLES)[number];
 export const DEFAULT_SUBMISSION_FILENAME = 'student.h';
 
 /**
- * Grader file extensions, matched EXACTLY (lowercase): sources are what g++
- * compiles as C++ (it hands any other casing, e.g. `main.Cpp`, to the linker
- * as a linker script), headers only ever arrive through #include.
+ * Grader file extensions, matched EXACTLY (case-sensitive). Sources are the
+ * suffixes g++ itself compiles as C++ (gcc/cp/lang-specs.h: `.CPP` and `.C`
+ * included); it hands any other casing, e.g. `main.Cpp` or `main.CXX`, to the
+ * linker as a linker script. Headers only ever arrive through #include.
  */
-export const GRADER_SOURCE_EXTENSIONS = ['.cpp', '.cc', '.cxx'] as const;
+export const GRADER_SOURCE_EXTENSIONS = ['.cpp', '.cc', '.cxx', '.cp', '.c++', '.C', '.CPP'] as const;
 export const GRADER_HEADER_EXTENSIONS = ['.h', '.hpp'] as const;
 
 export const HEADER_PROBLEM_LIMITS = {

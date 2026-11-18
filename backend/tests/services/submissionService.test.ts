@@ -1056,6 +1056,23 @@ describe('Submission Service', () => {
                 ]);
             });
 
+            it('compiles every suffix g++ treats as C++ (.CPP, .c++) and links their .s files', async () => {
+                (getHeaderJudgeSpec as jest.Mock).mockResolvedValue({
+                    ...HEADER_SPEC,
+                    graderFiles: [
+                        { filename: 'helper.c++', content: Buffer.from('int helper(){return 1;}\n') },
+                        { filename: 'main.CPP', content: Buffer.from('#include "queue.h"\nint main(){}\n') },
+                        { filename: 'notes.Cpp', content: Buffer.from('not a source\n') },
+                        { filename: 'queue.h', content: Buffer.from('#include "student.h"\n') },
+                    ],
+                });
+                await runHeaderPipeline();
+
+                const [compileArgs, linkArgs] = gppRuns();
+                expect(compileArgs.slice(compileArgs.indexOf('-S') + 1)).toEqual(['helper.c++', 'main.CPP']);
+                expect(linkArgs.slice(linkArgs.indexOf('-s') + 1)).toEqual(['helper.s', 'main.s', '-o', 'solution.out']);
+            });
+
             it('writes every grader file and the submission into the workspace as the sandbox uid', async () => {
                 await runHeaderPipeline();
 

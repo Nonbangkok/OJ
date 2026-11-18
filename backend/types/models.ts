@@ -153,7 +153,7 @@ export interface AdminProblemRow extends Pick<
     testcase_bytes: number;
     submission_count: number;
     type_locked: boolean;
-    /** Health: a statement PDF is stored; a header problem has a grader .cpp. */
+    /** Health: a statement PDF is stored; a header problem has a grader C++ source. */
     has_pdf: boolean;
     has_grader: boolean;
     /** Practice submissions with a full score, and the distinct users behind them. */

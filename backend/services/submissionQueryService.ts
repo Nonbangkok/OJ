@@ -18,7 +18,7 @@ import {
     SubmissionListRow,
 } from '../types/service';
 
-/** Header problems are C++-only and need at least one grader .cpp to be judgeable. */
+/** Header problems are C++-only and need at least one grader C++ source (see isGraderSourceFilename) to be judgeable. */
 const assertHeaderSubmitAllowed = async (
     problemType: string | undefined,
     problemId: string,

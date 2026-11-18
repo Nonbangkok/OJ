@@ -108,16 +108,23 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   });
 
   describe('hasGraderSource', () => {
-    it('matches exactly the lowercase source extensions the judge compiles', async () => {
-      // Upload validation and headerPreparePlan accept only exact lowercase
-      // .cpp / .cc / .cxx (g++ hands `main.Cpp` to the linker), so a stored
-      // row with any other casing must not make the problem look ready.
+    it('matches exactly the source suffixes the judge compiles', async () => {
+      // Upload validation and headerPreparePlan accept exactly the suffixes
+      // g++ compiles as C++ (.cpp .cc .cxx .cp .c++ .C .CPP); g++ hands any
+      // other casing (`main.Cpp`) to the linker, so a stored row like that
+      // must not make the problem look ready.
       await seedHeaderProblem('h3');
-      await addFile('h3', 'grader', 'main.CPP', 'int main(){}');
       await addFile('h3', 'grader', 'Main.Cpp', 'int main(){}');
+      await addFile('h3', 'grader', 'main.CXX', 'int main(){}');
       expect(await hasGraderSource('h3')).toBe(false);
-      await addFile('h3', 'grader', 'main.cc', 'int main(){}');
+      await addFile('h3', 'grader', 'main.CPP', 'int main(){}');
       expect(await hasGraderSource('h3')).toBe(true);
+      // The Postgres regex escapes `+`.
+      await seedHeaderProblem('h3plus');
+      await addFile('h3plus', 'grader', 'main.ccc', 'int main(){}');
+      expect(await hasGraderSource('h3plus')).toBe(false);
+      await addFile('h3plus', 'grader', 'main.c++', 'int main(){}');
+      expect(await hasGraderSource('h3plus')).toBe(true);
     });
 
     it('stays false when no grader source is stored', async () => {
