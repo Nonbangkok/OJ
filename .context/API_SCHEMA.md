@@ -335,6 +335,7 @@
   - `action: 'move_to_contest' | 'move_to_main'`
 - Response 200: migration result
 - ย้ายเข้า contest: snapshot `is_visible_before_contest` — ทุก exit path (bulk/single move-back, contest delete, post-contest migration) คืนค่าเดิม
+- Errors (`move_to_main`): 404 ไม่พบ contest; 409 เมื่อ contest จบแล้ว (`finishing`/`finished` หรือเลย `end_time` แล้วแต่ scheduler ยังไม่เปลี่ยนสถานะ) เพราะ standings และ final snapshot นับเฉพาะโจทย์ที่ยังอยู่ใน contest
 
 ### 38. `DELETE /admin/contests/:id/problems/:problemId`
 - Auth: `staff|admin`
