@@ -35,6 +35,8 @@ class ContestScheduler {
   // recreated — ticks would only produce errors. Pausing keeps the cron task
   // registered; ticks are skipped until resume().
   private paused: boolean;
+  // A2-03: the tick body currently running, so pause() can wait for it.
+  private currentTick: Promise<void> | null;
   // XSYS-006/CONTEST-004: consecutive migration failures per contest. A
   // failing migration keeps the contest in 'finishing' and is retried on
   // later ticks until MIGRATION_MAX_RETRIES is exhausted (then it stops
@@ -46,6 +48,7 @@ class ContestScheduler {
     this.checkInterval = null;
     this.tickInProgress = false;
     this.paused = false;
+    this.currentTick = null;
     this.migrationFailures = new Map();
   }
 
@@ -77,10 +80,15 @@ class ContestScheduler {
     logger.info('contest scheduler started - checking every minute');
   }
 
-  /** DB-05: skip ticks while a database import holds the schema hostage. */
-  pause(): void {
+  /**
+   * DB-05: skip ticks while a database import holds the schema hostage.
+   * A2-03: resolves once a tick that was already in progress has settled,
+   * so the import can wait for it before dropping anything.
+   */
+  pause(): Promise<void> {
     this.paused = true;
     logger.warn('contest scheduler paused (database maintenance)');
+    return this.currentTick ?? Promise.resolve();
   }
 
   resume(): void {
@@ -111,6 +119,8 @@ class ContestScheduler {
 
     const now = new Date();
     this.tickInProgress = true;
+    let settleTick!: () => void;
+    this.currentTick = new Promise<void>((resolve) => { settleTick = resolve; });
 
     try {
       // 1. Start scheduled contests
@@ -124,6 +134,8 @@ class ContestScheduler {
       throw error;
     } finally {
       this.tickInProgress = false;
+      this.currentTick = null;
+      settleTick();
     }
   }
 

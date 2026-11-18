@@ -30,9 +30,11 @@ const queue: JudgeTask[] = [];
 const inFlight = new Set<string>();
 /** Per-contest count of in-flight (queued or running) judge tasks (JUDGE-005). */
 const inFlightByContest = new Map<number, number>();
+/** A2-03: while paused (database import), queued tasks wait and nothing new starts. */
+let paused = false;
 
 function pump(): void {
-  while (running < JUDGE_CONFIG.MAX_CONCURRENT_JUDGES && queue.length > 0) {
+  while (!paused && running < JUDGE_CONFIG.MAX_CONCURRENT_JUDGES && queue.length > 0) {
     const task = queue.shift();
     if (!task) {
       break;
@@ -130,6 +132,51 @@ export async function waitForContestJudgesToDrain(
     await new Promise((resolve) => setTimeout(resolve, JUDGE_CONFIG.DRAIN_POLL_INTERVAL_MS));
   }
   return true;
+}
+
+/**
+ * A2-03: hold the queue for a database import. Running tasks finish; queued
+ * and newly enqueued tasks wait until resumeJudgeQueue().
+ */
+export function pauseJudgeQueue(): void {
+  paused = true;
+}
+
+/** Undo pauseJudgeQueue() and start whatever is queued (idempotent). */
+export function resumeJudgeQueue(): void {
+  paused = false;
+  pump();
+}
+
+/**
+ * A2-03: wait until no judge task is running (queued ones stay held while
+ * the queue is paused). Resolves false when the timeout (ms) elapses first.
+ * Polls like waitForContestJudgesToDrain.
+ */
+export async function waitForRunningJudgesToSettle(timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (running > 0) {
+    if (Date.now() >= deadline) {
+      return false;
+    }
+    await new Promise((resolve) => setTimeout(resolve, JUDGE_CONFIG.DRAIN_POLL_INTERVAL_MS));
+  }
+  return true;
+}
+
+/**
+ * A2-03/A2-04: after a database import replaced every row, the queued tasks
+ * point at ids that now mean other submissions. Drop them and the in-flight
+ * registry; the caller re-enqueues the restored Pending rows with
+ * sweepOrphanedSubmissions(). Only call while paused with nothing running.
+ * Returns how many queued tasks were dropped.
+ */
+export function discardQueuedJudgeTasks(): number {
+  const discarded = queue.length;
+  queue.length = 0;
+  inFlight.clear();
+  inFlightByContest.clear();
+  return discarded;
 }
 
 /** Test/observability helper: current number of running + queued tasks. */

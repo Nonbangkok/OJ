@@ -24,6 +24,16 @@ export const REALTIME = {
   SCOREBOARD_POLL_WHEN_STREAM_DOWN_MS: POLLING_INTERVALS.SCOREBOARD,
 } as const;
 
+/**
+ * Settings -> Replace database progress polling (A2-07). A failed poll is
+ * retried after INTERVAL_MS × (failures + 1); after MAX_CONSECUTIVE_FAILURES
+ * in a row the dialog stops waiting and reports the lost contact.
+ */
+export const IMPORT_PROGRESS_POLLING = {
+  INTERVAL_MS: 3000,
+  MAX_CONSECUTIVE_FAILURES: 3,
+} as const;
+
 export const UI_TIMEOUTS = {
   SUCCESS_MESSAGE_SHORT: 3000,
   SUCCESS_MESSAGE_LONG: 5000,

@@ -1,11 +1,15 @@
 import {
+  discardQueuedJudgeTasks,
   enqueueJudgeTask,
   enqueueTrackedJudgeTask,
   getContestInFlightCount,
   getJudgeQueueStats,
   isSubmissionInFlight,
+  pauseJudgeQueue,
   resetInFlightTracking,
+  resumeJudgeQueue,
   waitForContestJudgesToDrain,
+  waitForRunningJudgesToSettle,
 } from '../../services/judgeQueue';
 import { JUDGE_CONFIG } from '../../constants';
 
@@ -202,5 +206,57 @@ describe('judgeQueue concurrency gate', () => {
       gate.resolve();
       await flush();
     });
+  });
+});
+
+describe('judgeQueue pause/drain for a database import (A2-03)', () => {
+  const MAX = JUDGE_CONFIG.MAX_CONCURRENT_JUDGES;
+
+  afterEach(() => {
+    resumeJudgeQueue();
+    resetInFlightTracking();
+  });
+
+  it('holds queued and new tasks while paused, and starts them on resume', async () => {
+    const started: string[] = [];
+    pauseJudgeQueue();
+    enqueueJudgeTask(async () => { started.push('a'); });
+    await flush();
+
+    expect(started).toEqual([]);
+    expect(getJudgeQueueStats()).toEqual({ running: 0, queued: 1 });
+
+    resumeJudgeQueue();
+    await flush();
+    expect(started).toEqual(['a']);
+  });
+
+  it('waits for running tasks to settle, or reports the timeout', async () => {
+    const gates = Array.from({ length: MAX }, () => deferred());
+    gates.forEach((gate) => enqueueJudgeTask(() => gate.promise));
+    pauseJudgeQueue();
+
+    await expect(waitForRunningJudgesToSettle(0)).resolves.toBe(false);
+
+    const settling = waitForRunningJudgesToSettle(5000);
+    gates.forEach((gate) => gate.resolve());
+    await expect(settling).resolves.toBe(true);
+    expect(getJudgeQueueStats().running).toBe(0);
+  });
+
+  it('discards queued tasks together with their in-flight registrations', async () => {
+    pauseJudgeQueue();
+    const ran: number[] = [];
+    enqueueTrackedJudgeTask(async () => { ran.push(1); }, { table: 'submissions', submissionId: 1 });
+    enqueueTrackedJudgeTask(async () => { ran.push(2); }, { table: 'contest_submissions', submissionId: 2 }, 5);
+
+    expect(discardQueuedJudgeTasks()).toBe(2);
+
+    expect(getJudgeQueueStats()).toEqual({ running: 0, queued: 0 });
+    expect(isSubmissionInFlight({ table: 'submissions', submissionId: 1 })).toBe(false);
+    expect(getContestInFlightCount(5)).toBe(0);
+    resumeJudgeQueue();
+    await flush();
+    expect(ran).toEqual([]);
   });
 });

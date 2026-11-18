@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import adminService from '../../services/adminService';
 import { useSettings } from '../../context/SettingsContext';
 import { APP_CONSTANTS } from '../../utils/constants';
-import { UI_TIMEOUTS } from '../../config/constants';
+import { IMPORT_PROGRESS_POLLING, UI_TIMEOUTS } from '../../config/constants';
 
 const useAdminSettings = () => {
     const [isRegistrationEnabled, setIsRegistrationEnabled] = useState(true);
@@ -191,8 +191,37 @@ const useAdminSettings = () => {
 
             setDatabaseSuccess('Database file uploaded. Import is running in the background...');
 
+            // A2-07: a failed poll must never leave the dialog spinning. Retry
+            // transient failures with a growing delay, then give up and say so.
+            let consecutiveFailures = 0;
+            const stopPollingWithError = (message: string) => {
+                setDatabaseSuccess('');
+                setDatabaseError(message);
+                setIsImporting(false);
+            };
+
             const pollImportProgress = async () => {
-                const progress = await adminService.getImportDatabaseProgress(jobId, token);
+                let progress;
+                try {
+                    progress = await adminService.getImportDatabaseProgress(jobId, token);
+                } catch (err) {
+                    const status = err?.response?.status;
+                    if (status === 404 || status === 401) {
+                        stopPollingWithError('Import status is no longer available (the server may have restarted). Check the database before importing again.');
+                        return;
+                    }
+                    consecutiveFailures += 1;
+                    if (consecutiveFailures >= IMPORT_PROGRESS_POLLING.MAX_CONSECUTIVE_FAILURES) {
+                        stopPollingWithError('Lost contact with the server while the import was running. Check the database before importing again.');
+                        return;
+                    }
+                    setDatabaseSuccess('Could not reach the server to check the import. Retrying...');
+                    window.setTimeout(() => {
+                        void pollImportProgress();
+                    }, IMPORT_PROGRESS_POLLING.INTERVAL_MS * (consecutiveFailures + 1));
+                    return;
+                }
+                consecutiveFailures = 0;
 
                 if (progress.status === 'completed') {
                     setDatabaseSuccess(progress.message || 'Database imported successfully! You may need to refresh or re-login.');
@@ -211,7 +240,7 @@ const useAdminSettings = () => {
                 setDatabaseSuccess(progress.message || 'Database import is still running...');
                 window.setTimeout(() => {
                     void pollImportProgress();
-                }, 3000);
+                }, IMPORT_PROGRESS_POLLING.INTERVAL_MS);
             };
 
             void pollImportProgress();
