@@ -547,8 +547,10 @@ export const STRING_LIMITS = {
     USERNAME: 50,
     PASSWORD: 256,
     PREFIX: 64,
-    TITLE: 256,
-    AUTHOR: 256,
+    // Must match problems.title / contests.title VARCHAR(255) and
+    // problems.author VARCHAR(100) (migrations/0001CoreSchema.ts).
+    TITLE: 255,
+    AUTHOR: 100,
     // Must match collections.name VARCHAR(100) (migrations/0014ProblemCollections.ts).
     COLLECTION_NAME: 100,
 } as const;

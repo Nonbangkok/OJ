@@ -425,7 +425,7 @@
 - Auth: `staff|admin`
 - Purpose: สร้างโจทย์ใหม่
 - Body:
-  - `id, title, author, time_limit_ms, memory_limit_mb`
+  - `id, title, author, time_limit_ms, memory_limit_mb` (`id` ≤ 50, `title` ≤ 255, `author` ≤ 100 ตัวอักษร ตามความกว้าง column — ยาวกว่านี้ได้ 400)
   - `categories?: string[]`, `difficulty?: number`, `collection_id?: number`
   - `problem_type?: 'standard'|'header'` (default `standard`), `submission_filename?: string` (header เท่านั้น, `.h`/`.hpp`, default `student.h`)
 - Response 201: created row
@@ -433,10 +433,10 @@
 
 ### 50. `PUT /admin/problems/:id`
 - Auth: `staff|admin`
-- Purpose: แก้โจทย์ (รวม rename id — rename cascade ไป `user_problem_rewards`/`authoring_published_problems`/`problem_drafts`)
+- Purpose: แก้โจทย์ (รวม rename id — rename cascade ไป `user_problem_rewards`/`authoring_published_problems`/`problem_drafts` และ key ของ `contest_scoreboards.detailed_scores` ของ contest ที่จบแล้ว)
 - Body: shape เดียวกับ create (field `id` คือใหม่)
 - Response 200: updated row
-- Errors: 404/409 — 409 ยังใช้เมื่อเปลี่ยน `problem_type`/`submission_filename` หลังมี submission แล้ว (type lock)
+- Errors: 404/409 — 409 ยังใช้เมื่อเปลี่ยน `problem_type`/`submission_filename` หลังมี submission แล้ว (type lock) และเมื่อ rename ไปยัง id ที่ยังมี `user_problem_rewards` ของโจทย์ที่ถูกลบไปแล้ว (XP ไม่ถูกลบตามโจทย์)
 
 ### 51. `DELETE /admin/problems/:id`
 - Auth: `staff|admin`

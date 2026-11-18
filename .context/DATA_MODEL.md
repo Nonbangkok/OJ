@@ -263,7 +263,7 @@ Programming problems. The PDF is stored as `BYTEA` directly in the database.
 | `problem_type` | `TEXT` | NOT NULL, DEFAULT `'standard'`; CHECK IN (`'standard'`, `'header'`) (migration 0024) |
 | `submission_filename` | `TEXT` | NULLABLE; CHECK `(problem_type = 'header') = (submission_filename IS NOT NULL)` — header problems only, `.h`/`.hpp` (migration 0024) |
 
-Renaming a problem id cascades to the non-FK references in `user_problem_rewards`, `authoring_published_problems`, and `problem_drafts` (the service updates them explicitly).
+Renaming a problem id cascades to the non-FK references in `user_problem_rewards`, `authoring_published_problems`, and `problem_drafts`, and re-keys the problem's cells in finished contests' `contest_scoreboards.detailed_scores` (the service updates them explicitly). Because rewards outlive problem deletion, a rename onto an id that still has `user_problem_rewards` rows is refused with 409.
 
 ### `problem_files`
 Secret grader sources and public starter files of **header problems** (migration 0024). Files are flat (no paths), at most 20 per role and 1 MiB each (`HEADER_PROBLEM_LIMITS`).

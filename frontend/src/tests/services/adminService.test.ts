@@ -146,6 +146,40 @@ describe('adminService', () => {
             expect(result).toBe(blob);
         });
 
+        it('encodes the problem id in every problem path', async () => {
+            const id = 'a/b#c?d%e';
+            const encoded = 'a%2Fb%23c%3Fd%25e';
+            jest.mocked(api.get).mockResolvedValue({ data: {} });
+            jest.mocked(api.put).mockResolvedValue({ data: {} });
+            jest.mocked(api.post).mockResolvedValue({ data: {} });
+            jest.mocked(api.delete).mockResolvedValue({ data: {} });
+            const formData = new FormData();
+
+            await adminService.getProblemDetail(id);
+            await adminService.updateProblem(id, { id, title: 'T' });
+            await adminService.deleteProblem(id);
+            await adminService.updateProblemVisibility(id, true);
+            await adminService.getProblemTestcases(id);
+            await adminService.getProblemTestcase(id, 2);
+            await adminService.rejudgeProblem(id);
+            await adminService.uploadFiles(id, formData);
+
+            expect(jest.mocked(api.get).mock.calls.map(([url]) => url)).toEqual([
+                `/admin/problems/${encoded}`,
+                `/admin/problems/${encoded}/testcases`,
+                `/admin/problems/${encoded}/testcases`,
+            ]);
+            expect(jest.mocked(api.put).mock.calls.map(([url]) => url)).toEqual([
+                `/admin/problems/${encoded}`,
+                `/admin/problems/${encoded}/visibility`,
+            ]);
+            expect(jest.mocked(api.delete)).toHaveBeenCalledWith(`/admin/problems/${encoded}`);
+            expect(jest.mocked(api.post).mock.calls.map(([url]) => url)).toEqual([
+                `/admin/rejudge/problem/${encoded}`,
+                `/admin/problems/${encoded}/upload`,
+            ]);
+        });
+
         it('updateProblemVisibility calls api.put with correct body', async () => {
             const response: ApiMessageResponse = { message: 'Updated' };
             jest.mocked(api.put).mockResolvedValueOnce({ data: response });

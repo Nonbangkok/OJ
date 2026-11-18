@@ -332,8 +332,11 @@ const refineSubmissionFilename = (
   }
 };
 
+/** Must match problems.id VARCHAR(50); a longer id passes Zod but 500s on the INSERT/UPDATE. */
+const problemIdField = nonEmptyString.max(AUTHORING_VALIDATION.MAX_PROBLEM_ID_LENGTH);
+
 export const createProblemSchema = z.object({
-  id: nonEmptyString,
+  id: problemIdField,
   title: z.string().trim().min(PROBLEM_VALIDATION.MIN_TITLE_LENGTH).max(STRING_LIMITS.TITLE),
   author: z.string().trim().min(PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH).max(STRING_LIMITS.AUTHOR),
   categories: problemCategories.optional(),
@@ -345,7 +348,7 @@ export const createProblemSchema = z.object({
 }).superRefine(refineSubmissionFilename);
 
 export const updateProblemSchema = z.object({
-  id: nonEmptyString,
+  id: problemIdField,
   title: z.string().trim().min(PROBLEM_VALIDATION.MIN_TITLE_LENGTH).max(STRING_LIMITS.TITLE).optional(),
   author: z.string().trim().min(PROBLEM_VALIDATION.MIN_AUTHOR_LENGTH).max(STRING_LIMITS.AUTHOR).optional(),
   categories: problemCategories.optional(),

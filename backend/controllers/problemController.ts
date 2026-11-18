@@ -358,6 +358,9 @@ router.put('/admin/problems/:id', requireAuth, requireStaffOrAdmin,
   if (updateResult === 'duplicate_id') {
     throw new AppError(`Problem ID '${newId}' already exists.`, 409);
   }
+  if (updateResult === 'reward_conflict') {
+    throw new AppError(`Problem ID '${newId}' still has XP rewards from a deleted problem; choose another ID.`, 409);
+  }
   if (updateResult === 'not_found') {
     throw new AppError('Problem not found', 404);
   }

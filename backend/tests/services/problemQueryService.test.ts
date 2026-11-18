@@ -357,6 +357,38 @@ describe('problemQueryService difficulty handling', () => {
     }
   });
 
+  it('re-keys the frozen contest board when a problem id is renamed', async () => {
+    const clientQuery = jest.fn().mockImplementation(async (sql: string) => (
+      String(sql).startsWith('SELECT') ? { rows: [] } : { rows: [{ id: 'p2' }] }));
+    (db.pool.connect as unknown as jest.Mock).mockResolvedValue({ query: clientQuery, release: jest.fn() });
+
+    await updateProblem('p1', { id: 'p2' });
+
+    const boardUpdate = clientQuery.mock.calls.find(([sql]) => String(sql).includes('UPDATE contest_scoreboards'));
+    expect(boardUpdate).toBeDefined();
+    expect(boardUpdate![1]).toEqual(['p2', 'p1']);
+  });
+
+  it('maps a unique violation during a rename to duplicate_id instead of a 500', async () => {
+    const clientQuery = jest.fn().mockImplementation(async (sql: string) => {
+      if (String(sql).startsWith('UPDATE problems')) throw Object.assign(new Error('duplicate key'), { code: '23505' });
+      return { rows: [] };
+    });
+    (db.pool.connect as unknown as jest.Mock).mockResolvedValue({ query: clientQuery, release: jest.fn() });
+
+    await expect(updateProblem('p1', { id: 'p2' })).resolves.toBe('duplicate_id');
+    expect(clientQuery).toHaveBeenCalledWith('ROLLBACK');
+  });
+
+  it('refuses a rename onto an id that still has XP rewards', async () => {
+    const clientQuery = jest.fn().mockImplementation(async (sql: string) => (
+      String(sql).includes('FROM user_problem_rewards') ? { rows: [{ '?column?': 1 }] } : { rows: [] }));
+    (db.pool.connect as unknown as jest.Mock).mockResolvedValue({ query: clientQuery, release: jest.fn() });
+
+    await expect(updateProblem('p1', { id: 'p2' })).resolves.toBe('reward_conflict');
+    expect(clientQuery.mock.calls.some(([sql]) => String(sql).startsWith('UPDATE problems'))).toBe(false);
+  });
+
   it('keeps difficulty tri-state on update (undefined = unchanged, null = clear)', async () => {
     const clientQuery = jest.fn().mockResolvedValue({ rows: [{ id: 'p1' }] });
     const poolConnect = db.pool.connect as unknown as jest.Mock;
