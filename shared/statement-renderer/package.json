@@ -9,7 +9,7 @@
   "types": "index.d.ts",
   "dependencies": {
     "htmlparser2": "10.0.0",
-    "katex": "0.15.1",
-    "marked": "4.0.8"
+    "katex": "0.16.21",
+    "marked": "4.3.0"
   }
 }

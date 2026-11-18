@@ -19,7 +19,8 @@ revision/published/busy conflicts, global queue cap and disabled-runner errors a
 
 Store the authored source in the historical `statement_html` column. Its content is
 the `task-pdf-writer` hybrid format: Markdown with inline HTML and LaTeX, not a full
-HTML document. The pinned Marked 4.0.8 bundle compiles it to HTML before the
+HTML document. `shared/statement-renderer` (pinned Marked 4.3.0, same output as
+the template bundle's 4.0.8) compiles it to HTML before the
 parser-based sanitizer rejects unsafe content instead of silently stripping it.
 The worker checks the captured compiled HTML again.
 

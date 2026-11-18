@@ -259,9 +259,13 @@ The first authoring release accepts JPEG, PNG, and WebP statement images. `state
 
 Statement text uses the task-pdf-writer hybrid format: Markdown, inline HTML and
 LaTeX stored under the historical `statement_html` name. `statementCompiler.ts`
-uses the Marked 4.0.8 code pinned inside `red-gate-v1`, protects math delimiters
+re-exports `shared/statement-renderer`, which the frontend live preview also
+uses. It parses with Marked 4.3.0 from npm (same output for statements as the
+Marked 4.0.8 copy in `red-gate-v1`'s bundle), protects math delimiters
 during Markdown parsing, normalizes bounded legacy markup, and then delegates to
-the HTML allowlist sanitizer. Fast Preview and immutable PDF/Verify snapshots call
+the HTML allowlist sanitizer. Server preview and PDF math use the bundle's KaTeX
+0.15.1 (the VM-bounded renderer, and the PDF page); the live preview uses npm
+KaTeX 0.16.21, whose visible markup matches the bundle's CSS. Fast Preview and immutable PDF/Verify snapshots call
 this same compiler; the runner re-sanitizes captured HTML at its trust boundary.
 
 The Admin Statement tab links to `/admin/authoring/:draftId/editor`. For this
