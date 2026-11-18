@@ -448,6 +448,7 @@
 - Auth: `staff|admin`
 - Purpose: list problems สำหรับ admin table
 - Response 200: list with visibility/contest status/collection/categories/difficulty
+  - B6 facts ต่อ row: `testcase_count`, `testcase_bytes`, `submission_count`, `type_locked`, `accepted_count`, `solver_count`, `has_pdf`, `has_grader` — `submission_count`, `accepted_count` (score เต็ม) และ `solver_count` (distinct user) นับบน practice + contest submissions ชุดเดียวกัน (AC rate ของโจทย์ที่อยู่ใน contest จึงไม่เป็น 0)
 
 ### 53. `PUT /admin/problems/:id/visibility`
 - Auth: `staff|admin`

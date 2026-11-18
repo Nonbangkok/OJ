@@ -800,8 +800,12 @@ const buildAdminProblemFilter = (options: AdminProblemFilters, params: unknown[]
  * list.
  */
 /**
- * B6 facts joined onto a \`page\` CTE of problems: testcase count, practice +
- * contest submission count, and type_locked (any submission locks the type).
+ * B6 facts joined onto a \`page\` CTE of problems: testcase count; the
+ * submission count, full-score (accepted) count and distinct solvers, all
+ * three over the same practice + contest submissions (contest rows move into
+ * \`submissions\` when the contest ends, so nothing is counted twice) so the
+ * AC rate is never "0 of N" for a problem in a contest; and type_locked (any
+ * submission locks the type).
  */
 const ADMIN_PROBLEM_FACTS_SQL = `
     , tc AS (
@@ -810,27 +814,22 @@ const ADMIN_PROBLEM_FACTS_SQL = `
       FROM testcases WHERE problem_id IN (SELECT id FROM page) GROUP BY problem_id
     ),
     subs AS (
-      SELECT problem_id, COUNT(*)::int AS n
-      FROM (SELECT problem_id FROM submissions WHERE problem_id IN (SELECT id FROM page)
+      SELECT problem_id, COUNT(*)::int AS n,
+             COUNT(*) FILTER (WHERE score >= ${FULL_SCORE})::int AS accepted,
+             COUNT(DISTINCT user_id) FILTER (WHERE score >= ${FULL_SCORE})::int AS solvers
+      FROM (SELECT problem_id, user_id, score FROM submissions WHERE problem_id IN (SELECT id FROM page)
             UNION ALL
-            SELECT problem_id FROM contest_submissions WHERE problem_id IN (SELECT id FROM page)) s
-      GROUP BY problem_id
-    ),
-    -- Practice results for the AC rate and solver count (full-score submissions).
-    acc AS (
-      SELECT problem_id, COUNT(*)::int AS accepted, COUNT(DISTINCT user_id)::int AS solvers
-      FROM submissions WHERE problem_id IN (SELECT id FROM page) AND score >= 100
+            SELECT problem_id, user_id, score FROM contest_submissions WHERE problem_id IN (SELECT id FROM page)) s
       GROUP BY problem_id
     )
     SELECT page.*, COALESCE(tc.n, 0) AS testcase_count, COALESCE(tc.bytes, 0)::float8 AS testcase_bytes,
            COALESCE(subs.n, 0) AS submission_count, COALESCE(subs.n, 0) > 0 AS type_locked,
-           COALESCE(acc.accepted, 0) AS accepted_count, COALESCE(acc.solvers, 0) AS solver_count,
+           COALESCE(subs.accepted, 0) AS accepted_count, COALESCE(subs.solvers, 0) AS solver_count,
            EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = page.id AND f.role = 'grader'
                    AND f.filename ~ '${GRADER_SOURCE_FILENAME_SQL_REGEX}') AS has_grader
     FROM page
     LEFT JOIN tc ON tc.problem_id = page.id
-    LEFT JOIN subs ON subs.problem_id = page.id
-    LEFT JOIN acc ON acc.problem_id = page.id`;
+    LEFT JOIN subs ON subs.problem_id = page.id`;
 
 export interface AdminProblemFacts {
   /** The editor's collection select; the shared detail query does not carry it. */

@@ -285,7 +285,7 @@ export interface AdminProblem extends ProblemBase {
   has_pdf?: boolean;
   has_grader?: boolean;
   testcase_bytes?: number;
-  /** Practice submissions with a full score, and the distinct users behind them. */
+  /** Full-score submissions and their distinct users, over the same practice + contest rows as submission_count. */
   accepted_count?: number;
   solver_count?: number;
 }
