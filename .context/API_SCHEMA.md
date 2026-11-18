@@ -341,6 +341,7 @@
 - Purpose: ย้ายโจทย์เดี่ยวกลับระบบหลัก
 - Response 200: `{ message, problem }`
 - Errors: 400/404
+- คะแนนของโจทย์ที่ถอนออกระหว่าง contest running ไม่นับใน standings อีก (ทั้ง live และ final snapshot)
 
 ### 39. `GET /contests/:id/problems`
 - Auth: required
@@ -359,6 +360,7 @@
 - Purpose: โหลด PDF ของโจทย์ใน contest (participant เท่านั้น)
 - Response 200: `application/pdf`
 - Errors: 403/404
+- contest ที่ finished: PDF (และ starter, `has_pdf`, `has_starter_files` ของ #40) อ่านจากแถว `problems` ปัจจุบัน; ถ้าโจทย์อยู่ใน contest อื่นแล้ว non-staff ได้ 404 / flag เป็น false
 
 ### 42. `GET /admin/contests/:id/similarity`
 - Auth: `staff|admin`
@@ -401,7 +403,7 @@
   - regular user จะไม่เห็น `is_visible`
   - staff/admin เห็นข้อมูลเต็ม
 - Errors:
-  - 404 not found **หรือ hidden สำหรับ non-staff** (PROBLEM-002: hidden = nonexistent, ไม่มี title oracle)
+  - 404 not found **หรือ hidden หรืออยู่ใน contest (`contest_id` ไม่เป็น NULL) สำหรับ non-staff** (PROBLEM-002: hidden = nonexistent, ไม่มี title oracle)
 
 ### 47. `GET /admin/problems/:id`
 - Auth: `staff|admin`
@@ -452,7 +454,7 @@
 - Auth: `staff|admin`
 - Body: `{ isVisible: boolean }`
 - Response 200: `{ message, problem: { id, title, is_visible } }`
-- Error 404
+- Errors: 404, 409 ถ้าโจทย์อยู่ใน contest (contest เป็นเจ้าของ visibility จนจบ contest)
 
 ### 54. `GET /admin/problems/:id/testcases`
 - Auth: `staff|admin`
@@ -486,9 +488,9 @@
 
 ### 59. `PUT /admin/collections/:id/visibility`
 - Auth: `staff|admin`
-- Purpose: toggle visibility ทั้ง collection — เขียน `is_visible` ของโจทย์ทุกตัวใน collection ใน transaction เดียว
+- Purpose: toggle visibility ทั้ง collection — เขียน `is_visible` ของโจทย์ทุกตัวใน collection ใน transaction เดียว (ข้ามโจทย์ที่อยู่ใน contest)
 - Body: `{ isVisible: boolean }`
-- Response 200: `{ message, updated }`
+- Response 200: `{ message, updated, skipped }` — `skipped` = จำนวนโจทย์ใน contest ที่ข้ามไป
 - Error 404
 
 ### 60. `POST /admin/problems/batch-upload`
@@ -540,7 +542,7 @@
 - Errors:
   - 400 language/problem invalid / โจทย์ไม่มี testcase เลย (DB-06)
   - 403 ไม่ได้ join contest
-  - 404 contest not found
+  - 404 contest not found หรือ hidden (non-staff; ตรวจก่อนเวลา/สถานะ)
 - Contest submission: ตรวจ wall-clock `start_time`/`end_time` ตรง ๆ (ไม่พึ่ง scheduler status เพียงอย่างเดียว)
 
 ### 65. `GET /submissions`
@@ -549,7 +551,7 @@
   - `filter`, `problemId`, `contestId`, `filterProblemId`, `filterUserId`
   - `page: number` (default 1, max 500; หน้าละ 200 แถว — SUB-004)
 - Response 200: submissions list
-- การ gate: feed สาธารณะไม่รวมโจทย์ hidden/contest สำหรับ non-staff; feed ต่อ contest (`?contestId=`) ต้องเป็น participant/staff และ contest ต้อง visible
+- การ gate: feed สาธารณะไม่รวมโจทย์ hidden/contest สำหรับ non-staff; feed ต่อ contest (`?contestId=`) ต้องเป็น participant/staff และ contest ต้อง visible; ก่อน contest finished non-staff เห็น `case_statuses` เฉพาะ submission ของตัวเอง (ของคนอื่นเป็น `[]`, verdict/score ยังเห็น)
 
 ### 66. `GET /search/problems`
 - Auth: required
