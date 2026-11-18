@@ -187,13 +187,6 @@ OJ/
 │   ├── localSessionSmoke.test.mjs
 │   └── authoring/          # Disposable authoring Compose suite + runtime matrices
 │
-├── content/header-problems/  # Problem CONTENT, not app code: the 50-problem
-│   ├── run.sh                #   starter set and the harness that builds it
-│   ├── build.py / verify.py  #   statements -> PDF, generators -> testcases,
-│   ├── lib/                  #   reference run -> expected output, then the
-│   ├── statement/            #   import ZIP; verify enforces "reference is
-│   ├── problems/<id>/        #   Accepted, naive solution times out"
-│   └── Dockerfile            #   throwaway image: judge's g++ + Thai PDF renderer
 └── docs/superpowers/       # Design specs and plans (historical, per-feature)
 ```
 
