@@ -157,6 +157,119 @@ describe('databaseDumpGuard (A2-06)', () => {
     });
   });
 
+  /**
+   * A2-06 follow-up: a backslash is a psql meta-command only at statement
+   * level. Inside a string literal, a quoted identifier, a dollar-quoted body
+   * or a comment it is data, and a pg_dump --inserts dump of LaTeX text has
+   * whole lines that start with one.
+   */
+  describe('inspectPlainDump: SQL lexical state outside COPY', () => {
+    const inspect = async (body: string) => inspectPlainDump(write(pgDump18(body)));
+    const metaCommandReason = (line: number, command: string): string =>
+      `The uploaded .sql file contains a psql meta-command on line ${line} (${command}). Only plain pg_dump output can be imported.`;
+    /** Line number of `needle` inside pgDump18(body). */
+    const lineOf = (body: string, needle: string): number =>
+      pgDump18(body).slice(0, pgDump18(body).indexOf(needle)).split('\n').length;
+
+    it.each([
+      ['a multi-line literal with LaTeX lines (pg_dump --inserts)',
+        "INSERT INTO public.statements VALUES (1, 'Statement\n\\begin{cases} x \\end{cases}\nend');"],
+      ['doubled quotes and a trailing backslash inside the literal',
+        "INSERT INTO public.statements VALUES (2, 'it''s\n\\frac{a}{b} ''quoted''\n\\');"],
+      ['an E string with escaped quotes and backslashes',
+        "INSERT INTO public.statements VALUES (3, E'a\\'b\n\\\\begin{x}\n\\'still inside\n\\\\');"],
+      ['a dollar-quoted function body',
+        "CREATE FUNCTION public.f() RETURNS text\n    LANGUAGE sql\n    AS $_$\nSELECT '\n\\begin{cases}'::text\n$_$;"],
+      ['dollar quotes with another tag inside',
+        'CREATE FUNCTION public.g() RETURNS text\n    LANGUAGE sql\n    AS $body$\nSELECT $x$\n\\x$x$ || $$\n\\$$\n$body$;'],
+      ['a quoted identifier spanning lines',
+        'CREATE TABLE public."odd\n\\name" (id integer);'],
+      ['nested block comments and line comments',
+        "/* outer\n\\one /* inner\n\\two */ still outer\n\\three */\nSELECT 1; -- \\! not a command\n-- \\! a comment line"],
+      ['lines that look like COPY and the footer inside a literal',
+        "INSERT INTO public.statements VALUES (4, 'COPY public.t (id) FROM stdin;\n\\N\n\\.\n-- PostgreSQL database dump complete\n');\nSELECT 2;"],
+      ['a literal right before real COPY data',
+        `INSERT INTO public.statements VALUES (5, 'a\n\\b');\n${TABLE_WITH_COPY}`],
+    ])('accepts %s', async (_name, body) => {
+      expect(await inspect(body)).toEqual({ ok: true, omitRanges: expect.any(Array) });
+    });
+
+    it.each([
+      ['the line after a multi-line literal closes',
+        "INSERT INTO public.statements VALUES (1, 'Statement\n\\begin{cases}\nend');\n\\! touch /tmp/x", '\\! touch', '\\!'],
+      ['the same line, after the literal',
+        "INSERT INTO public.statements VALUES (1, 'a\n\\b');  \\! touch /tmp/x", "\\b');", '\\!'],
+      ['an indented line',
+        'SELECT 1;\n   \\o | touch /tmp/x', '   \\o', '\\o'],
+      ['after a literal that ends in a backslash (standard strings)',
+        "SELECT 'a\\';\n\\! touch /tmp/x", '\\! touch', '\\!'],
+      ['after a doubled quote and the real closing quote',
+        "SELECT 'it''s\n';\n\\copy t TO PROGRAM 'x'", '\\copy', '\\copy'],
+      ['after an E string whose escaped quote did not close it',
+        "SELECT E'a\\'\n\\b';\n\\! touch /tmp/x", '\\! touch', '\\!'],
+      ['after a dollar-quoted body closes',
+        'SELECT $a$ $b$\n\\x $a$;\n\\! touch /tmp/x', '\\! touch', '\\!'],
+      ['after nested block comments close',
+        '/* /* */ still comment\n\\x */\n\\! touch /tmp/x', '\\! touch', '\\!'],
+      ['after a quoted identifier closes',
+        'SELECT 1 AS "a""\n\\b";\n\\! touch /tmp/x', '\\! touch', '\\!'],
+      ['after a COPY-looking line inside a literal (no COPY data follows)',
+        "SELECT '\nCOPY probe FROM stdin;\n';\n\\! touch /tmp/x\n\\.", '\\! touch', '\\!'],
+    ])('rejects a meta-command at statement level: %s', async (_name, body, needle, command) => {
+      expect(await inspect(body)).toEqual({ ok: false, reason: metaCommandReason(lineOf(body, needle), command) });
+    });
+
+    it('reports a dump that ends inside a literal as incomplete', async () => {
+      const result = await inspect("INSERT INTO public.statements VALUES (1, 'never closed\n\\begin{x}");
+
+      expect(result).toEqual({ ok: false, reason: expect.stringContaining('incomplete') });
+    });
+
+    it('follows a dollar-quote tag split across two read chunks', async () => {
+      // fs streams read 64 KiB at a time; put the closing tag on that boundary.
+      const prefix = 'CREATE FUNCTION public.h() RETURNS text\n    LANGUAGE sql\n    AS $tagname$\n\\body\n';
+      const framedPrefix = pgDump18(prefix + '@').split('@')[0];
+      const padding = 'x'.repeat(64 * 1024 - framedPrefix.length - 3);
+      const accepted = `${prefix}${padding}\n$tagname$;\nSELECT 1;`;
+      const rejected = `${prefix}${padding}\n$tagname$;\n\\! touch /tmp/x`;
+
+      const closingTag = pgDump18(accepted).lastIndexOf('$tagname$');
+      expect(closingTag).toBeLessThan(64 * 1024);
+      expect(closingTag + '$tagname$'.length).toBeGreaterThan(64 * 1024);
+      expect((await inspect(accepted)).ok).toBe(true);
+      expect(await inspect(rejected)).toEqual({ ok: false, reason: metaCommandReason(lineOf(rejected, '\\! touch'), '\\!') });
+    });
+
+    it('accepts a dump with CRLF line endings, literal and COPY data included', async () => {
+      const body = `INSERT INTO public.statements VALUES (1, 'a\n\\begin{x}\nb');\n${TABLE_WITH_COPY}`;
+      const contents = pgDump18(body).replace(/\n/g, '\r\n');
+
+      expect((await inspectPlainDump(write(contents))).ok).toBe(true);
+    });
+
+    it.each([
+      ['an indented \\restrict', pgDump18('SELECT 1;', null).replace('\n\n-- Dumped from', `\n  \\restrict ${DUMP_KEY}\n-- Dumped from`), '\\restrict'],
+      ['psql\'s \\; separator, which pg_dump never writes', pgDump18('SELECT 1 \\; SELECT 2;'), '\\;'],
+    ])('rejects %s', async (_name, contents, command) => {
+      const result = await inspectPlainDump(write(contents));
+
+      expect(result).toEqual({ ok: false, reason: expect.stringContaining(`psql meta-command on line`) });
+      if (!result.ok) expect(result.reason).toContain(`(${command})`);
+    });
+
+    it('rejects a dollar-quote tag it cannot follow', async () => {
+      const result = await inspect(`SELECT $${'a'.repeat(70 * 1024)}$ body $${'a'.repeat(70 * 1024)}$;`);
+
+      expect(result).toEqual({ ok: false, reason: expect.stringContaining('dollar-quote tag longer than 64 KiB') });
+    });
+
+    it('scans a literal longer than a read chunk', async () => {
+      const body = `INSERT INTO public.statements VALUES (1, '${'y'.repeat(200 * 1024)}\n\\begin{x}\n${'z'.repeat(200 * 1024)}');\n\\! touch /tmp/x`;
+
+      expect(await inspect(body)).toEqual({ ok: false, reason: metaCommandReason(lineOf(body, '\\! touch'), '\\!') });
+    });
+  });
+
   describe('openGuardedPlainDump', () => {
     it('prefixes its own \\restrict and drops only pg_dump\'s pair, byte for byte', async () => {
       // A raw CR inside a function body and a row longer than a read chunk

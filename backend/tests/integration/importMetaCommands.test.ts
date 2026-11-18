@@ -155,17 +155,39 @@ const pgDumpFrame = (body: string): string =>
     expect(await liveUsers()).toEqual(['live-admin']);
   });
 
-  // These pass the line scan; psql's restricted mode is what stops them.
-  const hiddenMetaCommands: Array<[string, (marker: string) => string]> = [
+  // A2-06 follow-up: the scan tracks SQL lexical state, so a meta-command
+  // after SQL on the same line, or behind a COPY line that is really inside a
+  // string literal, is rejected up front too.
+  const metaCommandsAtStatementLevel: Array<[string, (marker: string) => string]> = [
     ['a meta-command after SQL on the same line', (marker) => `CREATE TABLE probe (id int); \\! touch ${marker}\nSELECT 1;`],
     ['a meta-command after a fake COPY inside a string literal', (marker) => `SELECT '\nCOPY probe FROM stdin;\n';\n\\! touch ${marker}\n\\.`],
+  ];
+
+  it.each(metaCommandsAtStatementLevel)('%s is rejected up front', async (_name, body) => {
+    const marker = newMarker();
+
+    const started = await startDatabaseImport('backup.sql', upload(pgDumpFrame(body(marker))));
+
+    expect(started).toEqual({ kind: 'invalid_dump', message: expect.stringContaining('psql meta-command') });
+    expect(fs.existsSync(marker)).toBe(false);
+    expect(await liveUsers()).toEqual(['live-admin']);
+  });
+
+  // These pass the scan, which assumes standard_conforming_strings = on (as
+  // pg_dump writes) and does not model psql's BEGIN ATOMIC heuristic;
+  // psql's restricted mode is what stops them.
+  const hiddenMetaCommands: Array<[string, (marker: string) => string]> = [
+    ['a meta-command the scan reads as string content after the dump turned standard_conforming_strings off',
+      (marker) => `SET standard_conforming_strings = off;\nSELECT 'a\\';\nSELECT ';\n\\! touch ${marker}\n';`],
+    ['a meta-command after a COPY line inside a BEGIN ATOMIC function body',
+      (marker) => `CREATE FUNCTION probe_f() RETURNS int LANGUAGE sql BEGIN ATOMIC SELECT 1;\nCOPY probe FROM stdin;\n\\! touch ${marker}\n\\.\nEND;`],
   ];
 
   it.each(hiddenMetaCommands)('%s is refused by psql and the live database is kept', async (_name, body) => {
     const marker = newMarker();
 
     const started = await startDatabaseImport('backup.sql', upload(pgDumpFrame(body(marker))));
-    if (started.kind !== 'ok') throw new Error(`expected the line scan to accept this upload, got ${started.kind}`);
+    if (started.kind !== 'ok') throw new Error(`expected the scan to accept this upload, got ${started.kind}`);
     const outcome = await waitForImport(started.jobId, started.token);
 
     expect(fs.existsSync(marker)).toBe(false);
@@ -173,5 +195,69 @@ const pgDumpFrame = (body: string): string =>
     expect(outcome.message).toContain('backslash commands are restricted');
     expect(outcome.message).toContain('the previous database was restored');
     expect(await liveUsers()).toEqual(['live-admin']);
+  });
+
+  describe('a real pg_dump --inserts dump of text with lines that start with a backslash', () => {
+    // LaTeX in a statement: whole lines inside the literal start with "\".
+    const latexValues = [
+      'Statement\n\\begin{cases} x \\end{cases}\nend',
+      "\\frac{1}{2}\n\\\\ a doubled backslash, it's ''quoted''\n\\",
+      '\\! looks like a shell escape but is data\n\\o | not a pipe\n\\.',
+    ];
+
+    const dumpWithInserts = (): string => {
+      const url = new URL(integrationDatabaseUrl!);
+      const outFile = path.join(workDir, `inserts-${Date.now()}.sql`);
+      const result = spawnSync('pg_dump', [
+        '-h', url.hostname, '-p', url.port || '5432', '-U', decodeURIComponent(url.username), '-d', databaseName,
+        '--inserts', '-F', 'p', '-f', outFile,
+      ], { encoding: 'utf8', env: { ...process.env, PGPASSWORD: decodeURIComponent(url.password) } });
+      if (result.status !== 0) throw new Error(`pg_dump failed: ${result.stderr}`);
+      return fs.readFileSync(outFile, 'utf8');
+    };
+
+    const storedValues = async (): Promise<string[]> =>
+      (await db.query('SELECT body FROM latex_statements ORDER BY id')).rows.map((row) => row.body as string);
+
+    beforeEach(async () => {
+      await db.query('CREATE TABLE latex_statements (id int PRIMARY KEY, body text NOT NULL)');
+      for (const [index, value] of latexValues.entries()) {
+        await db.query('INSERT INTO latex_statements VALUES ($1, $2)', [index + 1, value]);
+      }
+    });
+
+    it('is accepted and restores every value byte for byte', async () => {
+      const dump = dumpWithInserts();
+      // The dump really has such lines outside any COPY block.
+      expect(dump).not.toContain('FROM stdin;');
+      expect(dump.split('\n').filter((line) => line.startsWith('\\begin{cases}') || line.startsWith('\\o | not a pipe'))).toHaveLength(2);
+      await db.query("UPDATE latex_statements SET body = 'changed after the dump'");
+
+      const started = await startDatabaseImport('backup.sql', upload(dump));
+      if (started.kind !== 'ok') throw new Error(`import did not start: ${JSON.stringify(started)}`);
+      const outcome = await waitForImport(started.jobId, started.token);
+
+      expect(outcome).toEqual({ status: 'completed', message: 'Database imported successfully.' });
+      expect(await storedValues()).toEqual(latexValues);
+      expect(await liveUsers()).toEqual(['live-admin']);
+    });
+
+    it.each([
+      ['on the line after the literal closes', (dump: string, command: string) =>
+        dump.replace(/(INSERT INTO public\.latex_statements VALUES \(1, [^;]*;\n)/, `$1${command}\n`)],
+      ['on the same line, right after the literal', (dump: string, command: string) =>
+        dump.replace(/(INSERT INTO public\.latex_statements VALUES \(1, [^;]*;)/, `$1 ${command}`)],
+    ])('still rejects a meta-command %s', async (_name, inject) => {
+      const marker = newMarker();
+      const dump = dumpWithInserts();
+      const tampered = inject(dump, `\\! touch ${marker}`);
+      expect(tampered).not.toBe(dump);
+
+      const started = await startDatabaseImport('backup.sql', upload(tampered));
+
+      expect(started).toEqual({ kind: 'invalid_dump', message: expect.stringMatching(/psql meta-command on line \d+ \(\\!\)/) });
+      expect(fs.existsSync(marker)).toBe(false);
+      expect(await storedValues()).toEqual(latexValues);
+    });
   });
 });
