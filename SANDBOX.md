@@ -88,6 +88,14 @@ flood memory with diagnostics. A timeout surfaces as a normal compile failure.
 - `mem_reservation: 512m`, `mem_limit: 1g`
 - `init: true` (zombie/orphan reaping below pid 1 — npm is not an init)
 
+CI checks the sandbox under exactly this cap set: after the full suite (which
+runs with Docker's default caps, so root there still has CAP_KILL,
+CAP_DAC_OVERRIDE and CAP_FOWNER), the `judge-tests` service of
+`tests/authoring/compose.yml` (profile `judge`) re-runs the judge, sandbox and
+header runtime suites with `cap_drop: ALL` + `SETUID`/`SETGID`,
+`no-new-privileges`, `init` and `pids_limit: 256`. `tests/composeConfig.test.mjs`
+keeps its caps equal to the backend service's.
+
 ## Phase 0 runner lockdown (security audit RUNNER findings)
 
 The audit pass added the following layers on top of the items above.
@@ -199,9 +207,9 @@ opens in `/tmp`: it returns NULL with `EACCES`), names from `tmpnam()`/
 `tempnam()`/`mkstemp("/tmp/...")` used in `/tmp`, and any hard-coded `/tmp/...`
 or `/var/tmp/...` path. Such programs were Accepted before. Writing in the
 current directory (the workspace) and Python's `tempfile` module still work.
-Submitters are not told yet (the UI does not show Runtime Error text for every
-case); a note in the problem statement template or a judge FAQ is an owner
-decision. `sandboxScratchIsolation.test.ts` pins the behaviour.
+Submitters are not told (owner decision 2026-11-18: competitive programs do
+not use it, so no statement or FAQ note). `sandboxScratchIsolation.test.ts`
+pins the behaviour.
 What a uid can still write outside its workspace (siblings in the 1733 root,
 `/dev/shm`, `/dev/mqueue`, which are runtime mounts) is removed after each
 submission: root lists those directories and a uid-dropped `rm -rf` deletes
@@ -413,9 +421,10 @@ an accepted limit:
   expression` or `no match for 'operator+=' in 'acc += solve(i, ...)'`. That
   is one expression per error and ten errors per submission, but repeatable,
   so a determined student can recover a grader's checks piece by piece.
-  Hiding or genericising diagnostics located in grader files is an open
-  owner decision; it would also cost students useful messages such as "no
-  member named push".
+  The owner chose (2026-11-18) to keep these diagnostics: hiding or
+  genericising the ones located in grader files would also cost students
+  useful messages such as "no member named push". Problems whose grader
+  checks must stay secret should not rely on that secrecy.
 - **Runtime Error output** for header problems is never the program's
   stderr, only a neutral crash description (see "Runtime Error output"
   above), because the program could otherwise print the compiled grader

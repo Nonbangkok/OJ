@@ -55,5 +55,38 @@ services:
         condition: service_started
     command: [npm, test, --, --runInBand, --verbose=false]
 
+  # The judge runtime suites again, under the backend's production cap set:
+  # root without CAP_KILL/CAP_DAC_OVERRIDE/CAP_FOWNER and an init that reaps
+  # orphans, which is what the sandbox sweep and the uid-dropped cleanup are
+  # built for. The default `tests` caps above would hide regressions there.
+  # Opt-in profile, run by CI with `--profile judge run --rm judge-tests`.
+  judge-tests:
+    profiles: [judge]
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    environment:
+      INTEGRATION_DATABASE_URL: postgres://oj_test:oj_test@database:5432/oj_test
+      JUDGE_RUNTIME_REQUIRED: "1"
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+    pids_limit: 256
+    mem_limit: 1g
+    depends_on:
+      database:
+        condition: service_healthy
+    command:
+      - npm
+      - test
+      - --
+      - --runInBand
+      - tests/integration/(judge|sandbox|headerGrader|headerProblemFiles|backendTempPrivacy)
+
 volumes:
   authoring-jobs:

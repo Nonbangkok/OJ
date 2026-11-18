@@ -229,6 +229,38 @@ test('integration stack uses Postgres 18', () => {
   assert.doesNotMatch(text, /\/var\/lib\/postgresql\/data/);
 });
 
+// The judge's own sandbox guarantees (no CAP_KILL, CAP_DAC_OVERRIDE or
+// CAP_FOWNER for root, an init that reaps orphans) only hold under the
+// production cap set, so CI runs the judge runtime suites once more with it.
+test('CI runs the judge runtime suites under the production capability set', () => {
+  const result = spawnSync('docker', ['compose', '-f', 'tests/authoring/compose.yml', '--profile', 'judge', 'config', '--format', 'json'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+    env: dockerEnvironment({}),
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const config = JSON.parse(result.stdout);
+  const judge = config.services['judge-tests'];
+  assert.ok(judge, 'tests/authoring/compose.yml must define a judge-tests service');
+  assert.deepEqual(judge.profiles, ['judge'], 'judge-tests must not start with the default `up`');
+  assert.deepEqual(judge.cap_drop, ['ALL']);
+  assert.deepEqual([...judge.cap_add].sort(), ['SETGID', 'SETUID']);
+  assert.ok(judge.security_opt.includes('no-new-privileges:true'));
+  assert.equal(judge.init, true);
+  assert.equal(judge.pids_limit, 256);
+  assert.equal(judge.environment.JUDGE_RUNTIME_REQUIRED, '1');
+  assert.match(judge.command.join(' '), /--runInBand/);
+  assert.match(judge.command.join(' '), /judge/);
+
+  const backend = renderComposeConfig(['docker-compose.yml']).services.backend;
+  assert.deepEqual(judge.cap_drop, backend.cap_drop);
+  assert.deepEqual([...judge.cap_add].sort(), [...backend.cap_add].sort());
+  assert.equal(judge.pids_limit, backend.pids_limit);
+
+  const workflow = readFileSync(path.join(repositoryRoot, '.github/workflows/ci.yml'), 'utf8');
+  assert.match(workflow, /docker compose -f tests\/authoring\/compose\.yml --profile judge run --rm judge-tests/);
+});
+
 test('backend image installs the Postgres 18 client and retries the pgdg key fetch', () => {
   const dockerfile = readFileSync(path.join(repositoryRoot, 'backend/Dockerfile'), 'utf8');
   assert.match(dockerfile, /postgresql-client-18\b/);
