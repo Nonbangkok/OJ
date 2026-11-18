@@ -54,43 +54,54 @@ export const moveProblemsToContest = async (contestId: number, problemIds: strin
     );
 
     if (contestResult.rows.length === 0) {
-      throw new Error('Contest not found');
+      throw new AppError('Contest not found', 404);
     }
 
     const contest = contestResult.rows[0];
     if (contest.status !== CONTEST_STATUS.SCHEDULED && contest.status !== CONTEST_STATUS.RUNNING) {
-      throw new Error('Can only move problems to scheduled or running contests');
+      throw new AppError('Can only move problems to scheduled or running contests', 409);
     }
 
-    // Check if all problems exist and are in main system (contest_id IS NULL)
+    // Check if all problems exist and are in main system (contest_id IS NULL).
+    // A5-10: FOR UPDATE, so a concurrent add of the same problem (to this or
+    // another contest) waits here until this one commits and then sees the
+    // problem already attached, instead of both passing the check and the
+    // later UPDATE re-homing it (and snapshotting the FALSE the first add
+    // wrote as its pre-contest visibility). Locked in id order so two
+    // overlapping adds cannot deadlock.
     const problemsCheck = await client.query<ProblemContestCheckRow>(
-      'SELECT id, title, contest_id FROM problems WHERE id = ANY($1)',
+      'SELECT id, title, contest_id FROM problems WHERE id = ANY($1) ORDER BY id FOR UPDATE',
       [problemIds]
     );
 
     if (problemsCheck.rows.length !== problemIds.length) {
-      throw new Error('Some problems not found');
+      throw new AppError('Some problems not found', 404);
     }
 
     const problemsInContest = problemsCheck.rows.filter((problem) => problem.contest_id !== null);
     if (problemsInContest.length > 0) {
-      throw new Error(`Problems already in contest: ${problemsInContest.map((problem) => problem.id).join(', ')}`);
+      throw new AppError(`Problems already in contest: ${problemsInContest.map((problem) => problem.id).join(', ')}`, 409);
     }
 
     // Move problems to contest. XSYS-004: snapshot each problem's current
     // visibility so every exit path can restore exactly what was there
     // before, instead of force-publishing hidden problems (bulk move-back)
     // or leaving them invisible forever (single move-back, contest delete).
+    // `contest_id IS NULL` keeps the UPDATE itself from moving an attached
+    // problem whatever happened since the check; all or nothing.
     const updateResult = await client.query<ProblemIdentityRow>(
       `UPDATE problems p
        SET contest_id = $1, is_visible = FALSE, is_visible_before_contest = p.is_visible,
            contest_position = base.last + o.ord
        FROM unnest($2::text[]) WITH ORDINALITY AS o(id, ord),
             (SELECT COALESCE(MAX(contest_position), 0) AS last FROM problems WHERE contest_id = $1) base
-       WHERE p.id = o.id
+       WHERE p.id = o.id AND p.contest_id IS NULL
        RETURNING p.id, p.title`,
       [contestId, problemIds]
     );
+    if (updateResult.rows.length !== problemIds.length) {
+      throw new AppError('Some problems were attached to a contest meanwhile; nothing was moved', 409);
+    }
 
     await client.query('COMMIT');
 
@@ -102,7 +113,10 @@ export const moveProblemsToContest = async (contestId: number, problemIds: strin
 
   } catch (error) {
     await client.query('ROLLBACK');
-    logger.error('failed to move problems to contest', { err: error });
+    // A refusal (404/409) is the caller's answer, not a server fault.
+    if (!(error instanceof AppError)) {
+      logger.error('failed to move problems to contest', { err: error });
+    }
     throw error;
   } finally {
     client.release();

@@ -335,6 +335,7 @@
   - `action: 'move_to_contest' | 'move_to_main'`
 - Response 200: migration result
 - ย้ายเข้า contest: snapshot `is_visible_before_contest` — ทุก exit path (bulk/single move-back, contest delete, post-contest migration) คืนค่าเดิม
+- Errors (`move_to_contest`): 404 ไม่พบ contest หรือบางโจทย์; 409 เมื่อ contest ไม่ได้ scheduled/running หรือโจทย์ใดอยู่ใน contest อื่นแล้ว — แถวโจทย์ถูก lock (`FOR UPDATE`) ระหว่างย้าย ดังนั้นการเพิ่มโจทย์เดียวกันพร้อมกันเข้าสอง contest สำเร็จได้แค่ครั้งเดียว อีกครั้งได้ 409 และไม่มีโจทย์ใดในคำขอนั้นถูกย้าย (A5-10)
 - Errors (`move_to_main`): 404 ไม่พบ contest; 409 เมื่อ contest จบแล้ว (`finishing`/`finished` หรือเลย `end_time` แล้วแต่ scheduler ยังไม่เปลี่ยนสถานะ) เพราะ standings และ final snapshot นับเฉพาะโจทย์ที่ยังอยู่ใน contest
 
 ### 38. `DELETE /admin/contests/:id/problems/:problemId`
