@@ -485,7 +485,9 @@ One cascade run per confirmed author-profile edit (migration 0009). The run row
 (`authoring_profile_syncs`) records status (`queued`/`running`/`succeeded`/`failed`),
 result summary, error message and timestamps; each item row
 (`authoring_profile_sync_items`) tracks one draft's PDF rebuild (status, attempts,
-error). Both cascade from `author_profiles`.
+error). Both cascade from `author_profiles`. Whether a draft's `sync_pdf` job
+republishes its live problem is decided when the item starts (draft status
+`published`) and stored on the job as `result_summary.republish`.
 
 ### Publication (Slice9)
 

@@ -99,9 +99,13 @@ export type SyncItemResolution =
 
 /**
  * Advances one pending sync item: atomically refreshes the draft's author
- * snapshot, bumps its revision, and queues a sync_pdf runner job. Published
- * drafts stay published — the legacy problem row is refreshed when the PDF
- * result is imported.
+ * snapshot, bumps its revision, and queues a sync_pdf runner job. Only a draft
+ * whose status is 'published' when the item starts is republished: it stays
+ * published and its legacy problem row is refreshed when the PDF result is
+ * imported. A draft in a revision cycle (published_at set, status not
+ * 'published') keeps its status and its live problem is left untouched until
+ * its next Verify + Publish. The decision is recorded on the job
+ * (result_summary.republish) so the import acts on what was decided here.
  */
 export async function startProfileSyncItem(
   itemId: string,
@@ -138,19 +142,23 @@ export async function startProfileSyncItem(
     }
 
     const avatar = profile.profile_image_png ?? await createFallbackAuthorAvatar(profile.aka_name);
+    // The row is locked, so this status is the one the sync acts on.
+    const republish = draft.status === 'published';
     // Snapshot update keeps the draft's statement source untouched; the revision
     // bump is the sync's own authority. A published draft stays 'published' so a
-    // later failed PDF rebuild cannot silently demote it and skip republish.
+    // later failed PDF rebuild cannot silently demote it and skip republish. A
+    // 'ready' draft loses its verified revision here, so it drops to 'generated'
+    // like every other revision bump; any other status is kept.
     const updated = (await client.query<ProblemDraftRow>(`
       UPDATE problem_drafts SET
         author_aka_name=$2, author_real_name=$3, language=$4, country_code=$5,
         author_profile_image_png=$6, revision=revision+1, verified_revision=NULL,
-        status=CASE WHEN published_at IS NOT NULL THEN 'published' ELSE status END,
+        status=CASE WHEN $7::boolean THEN 'published' WHEN status='ready' THEN 'generated' ELSE status END,
         updated_at=NOW()
       WHERE id=$1
       RETURNING *
     `, [item.draft_id, profile.aka_name, profile.real_name, profile.default_language,
-      profile.country_code, avatar])).rows[0];
+      profile.country_code, avatar, republish])).rows[0];
 
     let pdf: Awaited<ReturnType<typeof capturePdfSnapshot>>;
     try {
@@ -176,9 +184,9 @@ export async function startProfileSyncItem(
     if (!parsed.success) throw parsed.error;
     const snapshot = parsed.data;
     const job = (await client.query<{ id: string }>(`
-      INSERT INTO authoring_jobs (id, draft_id, job_type, draft_revision, request_snapshot)
-      VALUES ($1, $2, 'sync_pdf', $3, $4::jsonb) RETURNING id
-    `, [snapshot.jobId, updated.id, updated.revision, JSON.stringify(snapshot)])).rows[0];
+      INSERT INTO authoring_jobs (id, draft_id, job_type, draft_revision, request_snapshot, result_summary)
+      VALUES ($1, $2, 'sync_pdf', $3, $4::jsonb, $5::jsonb) RETURNING id
+    `, [snapshot.jobId, updated.id, updated.revision, JSON.stringify(snapshot), JSON.stringify({ republish })])).rows[0];
     await client.query("INSERT INTO authoring_job_files (job_id,name,content) VALUES ($1,'avatar',$2)", [snapshot.jobId, pdf.avatar]);
     await client.query(`INSERT INTO authoring_job_files (job_id,name,content)
       SELECT $1,'asset:'||filename,content FROM problem_draft_assets WHERE draft_id=$2`, [snapshot.jobId, updated.id]);

@@ -229,10 +229,11 @@ export async function applyJobResult(id: string, input: unknown, database: JobDa
     }
     if (buildingPdf && status === 'succeeded') {
       const content = await readPdf!(result.pdf!);
-      // A sync on a published draft keeps it published — published_at is the
-      // durable fact; the status lifecycle must not demote it, and the republish
-      // decision keys off published_at, not the (mutable) status value.
-      const syncKeepsPublished = syncing && draft.published_at !== null;
+      // A sync on a published draft keeps it published and republishes it. The
+      // decision was made when the sync started (only a draft whose status was
+      // 'published' then) and recorded on the job; a draft in a revision cycle
+      // keeps its live problem untouched until its next Verify + Publish.
+      const syncKeepsPublished = syncing && syncRepublishes(job, draft);
       await client.query(`UPDATE problem_drafts SET latest_pdf=$1,latest_pdf_revision=$2,
         status=${syncKeepsPublished ? "'published'" : "'generated'"},verified_revision=NULL,updated_at=NOW() WHERE id=$3`, [content, result.revision, job.draft_id]);
       if (verifying) await client.query("UPDATE problem_drafts SET status='ready',verified_revision=$1 WHERE id=$2", [result.revision, job.draft_id]);
@@ -268,6 +269,7 @@ export async function applyJobResult(id: string, input: unknown, database: JobDa
       ...(outputting ? { caseCount: result.outputs?.length ?? 0, outputs: result.outputs ?? [],
         ...(result.failedCase ? { failedCase: result.failedCase } : {}) } : {}),
       ...(buildingPdf ? { pdf: result.pdf ?? null } : {}),
+      ...(syncing ? { republish: syncRepublishes(job, draft) } : {}),
       ...(verifying ? { verification: result.verification ?? null,
         verifiedRevision: status === 'succeeded' ? result.revision : null,
         ...(result.failedCase ? { failedCase: result.failedCase } : {}),
@@ -292,6 +294,16 @@ export async function applyJobResult(id: string, input: unknown, database: JobDa
     return updated.rows.length === 1;
   } catch (error) { await client.query('ROLLBACK'); throw error; }
   finally { client.release(); }
+}
+
+/**
+ * Whether a sync_pdf job republishes its draft's live problem. Recorded on the
+ * job (result_summary.republish) when the sync started; a job queued before
+ * that flag existed falls back to the draft's current status.
+ */
+function syncRepublishes(job: DurableJob, draft: ProblemDraftRow): boolean {
+  const recorded = job.result_summary?.republish;
+  return typeof recorded === 'boolean' ? recorded : draft.status === 'published';
 }
 
 /** Fails abandoned or invalid jobs without allowing them to overwrite a terminal result. */

@@ -99,6 +99,13 @@ only exception: its statement-only Save begins a revision cycle and leaves the
 current legacy problem live until a new Verify and Publish succeed. Ready/Publish
 certifies mechanical artifact checks, not algorithm correctness.
 
+A confirmed author-profile edit (profile sync) republishes only drafts whose status
+is `published` when their sync item starts; the decision is recorded on the
+`sync_pdf` job as `result_summary.republish`. A draft in a revision cycle gets the
+new author snapshot and keeps its status, and its legacy problem keeps the old
+author until the next Verify and Publish. Because the sync clears the verified
+revision, a `ready` draft drops to `generated`.
+
 ## Verification
 
 `backend/tests/integration/authoringPublish.test.ts` runs against a unique disposable
