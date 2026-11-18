@@ -169,10 +169,21 @@ const BINARY_NAME = 'solution.out';
 type HeaderJudgeSpec = NonNullable<Awaited<ReturnType<typeof getHeaderJudgeSpec>>>;
 
 /**
+ * One step of the prepare phase: a bounded, unprivileged compiler run (a
+ * failure is the submitter's Compilation Error), or the removal of workspace
+ * files as their owner (a failure is a System Error: it must never let the
+ * next step or the run proceed next to files that should be gone).
+ */
+type PrepareStep =
+  | { kind: 'compile'; command: RunnableCommand }
+  | { kind: 'remove'; files: readonly string[] };
+
+/**
  * Everything that differs between a standard and a header submission, decided
- * ONCE before the workspace exists: which files go into it, how they are
- * compiled, what is scrubbed afterwards, and what the judge runs. The rest of
- * the pipeline stays a single straight-line flow over this plan.
+ * ONCE before the workspace exists: which files go into it, the ordered
+ * compile / scrub steps that turn them into a runnable, and what the judge
+ * runs. The rest of the pipeline stays a single straight-line flow over this
+ * plan.
  */
 interface PreparePlan {
   /**
@@ -186,14 +197,13 @@ interface PreparePlan {
   sourceName: string;
   /** Artifact the prepare step produces, or null for interpreted languages. */
   artifactName: string | null;
-  /** Compile / syntax-check invocation, with workspace-relative paths. */
-  check: RunnableCommand;
   /**
-   * Files removed from the workspace after a SUCCESSFUL prepare, before the
-   * binary runs: empty for standard problems, every grader source plus the
-   * submitted header for header problems.
+   * Compile / syntax-check invocations (workspace-relative paths) and file
+   * removals, run in order before anything executes: a single compile for a
+   * standard problem; compile, scrub, assemble + link, scrub for a header
+   * problem (see headerPreparePlan).
    */
-  scrub: readonly string[];
+  steps: readonly PrepareStep[];
   /** Keep the submitted file's real name in compile diagnostics. */
   keepSourceName: boolean;
   /** The judge's runnable, built from the artifact (or source) path. */
@@ -208,8 +218,7 @@ function standardPreparePlan(language: SubmissionLanguage, code: string): Prepar
     files: [{ name: sourceName, content: code }],
     sourceName,
     artifactName: prepare.compiledArtifactPath(BINARY_NAME),
-    check: prepare.checkCommand(sourceName, BINARY_NAME),
-    scrub: [],
+    steps: [{ kind: 'compile', command: prepare.checkCommand(sourceName, BINARY_NAME) }],
     keepSourceName: false,
     runCommand: prepare.runCommand,
   };
@@ -218,9 +227,15 @@ function standardPreparePlan(language: SubmissionLanguage, code: string): Prepar
 /**
  * Header problems: the grader files and the submitted header live side by side
  * in the workspace and compile as ONE translation unit (only the grader's
- * `.cpp` names are passed to g++ — headers arrive through `#include`).
- * Everything that was a source is then scrubbed, so the student's binary can
- * never read the grader's secret main.
+ * source names are passed to g++ — headers arrive through `#include`), in two
+ * steps so no grader file is readable by the time the assembler runs:
+ *
+ *  1. `g++ -S` (compile proper only) with every file present;
+ *  2. scrub every grader file and the submitted header — whatever the
+ *     submission smuggled into the assembly (`.incbin "main.cpp"`,
+ *     `.include`) now has nothing to read and fails as a Compilation Error;
+ *  3. assemble + link the `.s` files into the binary;
+ *  4. scrub the `.s` files, so the workspace holds no source at run time.
  */
 function headerPreparePlan(code: string, spec: HeaderJudgeSpec): PreparePlan {
   const sourceName = spec.submissionFilename ?? DEFAULT_SUBMISSION_FILENAME;
@@ -232,6 +247,12 @@ function headerPreparePlan(code: string, spec: HeaderJudgeSpec): PreparePlan {
     // as if the submission were at fault.
     throw new Error('header problem has no grader source to compile');
   }
+  const assemblies = cppSources.map(HEADER_CPP_PREPARE.assemblyName);
+  if (new Set(assemblies).size !== assemblies.length) {
+    // Upload validation rejects two sources with one stem (`a.cpp` + `a.cc`);
+    // g++ would write both to `a.s`.
+    throw new Error('header problem grader sources share an assembly file name');
+  }
   return {
     files: [
       // Buffers, not strings: byte-exact so a grader in a non-UTF-8 encoding
@@ -241,8 +262,12 @@ function headerPreparePlan(code: string, spec: HeaderJudgeSpec): PreparePlan {
     ],
     sourceName,
     artifactName: BINARY_NAME,
-    check: HEADER_CPP_PREPARE.checkCommand(cppSources, BINARY_NAME),
-    scrub: [...graderNames, sourceName],
+    steps: [
+      { kind: 'compile', command: HEADER_CPP_PREPARE.compileCommand(cppSources) },
+      { kind: 'remove', files: [...graderNames, sourceName] },
+      { kind: 'compile', command: HEADER_CPP_PREPARE.linkCommand(assemblies, BINARY_NAME) },
+      { kind: 'remove', files: assemblies },
+    ],
     keepSourceName: true,
     runCommand: HEADER_CPP_PREPARE.runCommand,
   };
@@ -415,7 +440,7 @@ async function runSubmissionPipeline(
     // identity-owned from creation (no chown — root cannot chown in the
     // lockdown container; see sandboxProcess.ts). For a header problem this
     // is also where the grader's secret files land; they are scrubbed again
-    // the moment the compile succeeds (below).
+    // right after the `-S` compile step, before the assembler runs (below).
     for (const file of plan.files) {
       if (privileged) {
         await writeSandboxFile(workspaceDir, file.name, file.content, { sandbox, context: uniqueId });
@@ -424,25 +449,45 @@ async function runSubmissionPipeline(
       }
     }
 
-    // Language-agnostic "prepare" phase: compile (C++) or syntax-check
-    // (Python via py_compile), as the submission's sandbox identity under
-    // prlimit caps and a hard wall-clock/output kill (RUNNER-001 / RUNNER-005).
-    // A failure maps to Compilation Error with the sanitized stderr shown to
-    // the submitter. Paths are relative to the workspace so diagnostics carry
-    // no server directories at all.
-    const compileCommand = prlimitWrap(plan.check.command, plan.check.args);
-    const compile = await runBoundedCompile(workspaceDir, compileCommand.command, compileCommand.args, sandbox);
-    if (!compile.ok) {
-      logger.warn('submission compile failed', { submissionId, table, language: submissionLanguage, stderr: compile.stderr });
-      await recordCompilationError(
-        table,
-        submissionId,
-        user_id,
-        sanitizeCompilerStderr(compile.stderr, plan.sourceName, submissionLanguage, {
-          keepSourceName: plan.keepSourceName,
-        })
-      );
-      return;
+    // Language-agnostic "prepare" phase, run step by step from the plan:
+    //  - compile steps (C++ compile, Python py_compile syntax check, the
+    //    header problem's `-S` and assemble+link) run as the submission's
+    //    sandbox identity under prlimit caps and a hard wall-clock/output
+    //    kill (RUNNER-001 / RUNNER-005). A failure maps to Compilation Error
+    //    with the sanitized stderr shown to the submitter. Paths are relative
+    //    to the workspace so diagnostics carry no server directories at all.
+    //  - remove steps are the HEADER PROBLEM scrubs: the grader sources and
+    //    the submitted header go before the assembler runs (so an injected
+    //    `.incbin "main.cpp"` has nothing to embed), the `.s` files before
+    //    the binary runs (so it cannot read any compiled grader code back
+    //    from the workspace). A failed scrub must never fall through to the
+    //    next step, so removeSandboxFiles throws and the submission becomes a
+    //    System Error (see utils/sandboxProcess.ts).
+    for (const step of plan.steps) {
+      if (step.kind === 'remove') {
+        if (privileged) {
+          await removeSandboxFiles(workspaceDir, step.files, { sandbox, context: uniqueId });
+        } else {
+          for (const fileName of step.files) {
+            await fs.promises.rm(path.join(workspaceDir, fileName), { force: true });
+          }
+        }
+        continue;
+      }
+      const compileCommand = prlimitWrap(step.command.command, step.command.args);
+      const compile = await runBoundedCompile(workspaceDir, compileCommand.command, compileCommand.args, sandbox);
+      if (!compile.ok) {
+        logger.warn('submission compile failed', { submissionId, table, language: submissionLanguage, stderr: compile.stderr });
+        await recordCompilationError(
+          table,
+          submissionId,
+          user_id,
+          sanitizeCompilerStderr(compile.stderr, plan.sourceName, submissionLanguage, {
+            keepSourceName: plan.keepSourceName,
+          })
+        );
+        return;
+      }
     }
 
     await db.query(
@@ -450,25 +495,6 @@ async function runSubmissionPipeline(
       [submissionId]
     );
     publishSubmissionStatus(submissionId, table, user_id, SUBMISSION_STATUS.RUNNING, 0);
-
-    // HEADER PROBLEMS — scrub before anything runs. The binary was linked
-    // against the problem's secret grader sources, which are still sitting in
-    // the workspace the program is about to run with (same uid, same
-    // directory): without this removal the student's code could simply
-    // fopen() main.cpp and print the solution it was graded against. The
-    // submitted header goes too — it is no longer needed and keeps the
-    // workspace free of ANY source. A failed scrub must never fall through to
-    // the run, so removeSandboxFiles throws and the submission becomes a
-    // System Error (see utils/sandboxProcess.ts).
-    if (plan.scrub.length > 0) {
-      if (privileged) {
-        await removeSandboxFiles(workspaceDir, plan.scrub, { sandbox, context: uniqueId });
-      } else {
-        for (const fileName of plan.scrub) {
-          await fs.promises.rm(path.join(workspaceDir, fileName), { force: true });
-        }
-      }
-    }
 
     // Compiled languages run the produced artifact; interpreted languages run
     // the source through their interpreter. The judge applies per-language

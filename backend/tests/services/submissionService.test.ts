@@ -988,25 +988,36 @@ describe('Submission Service', () => {
                 await processSubmission(1);
             };
 
-            it('compiles the grader .cpp sources (not the submitted header) with the header flag set', async () => {
+            /** The g++ argv of each compiler run, in order (prlimit-wrapped). */
+            const gppRuns = (): string[][] => spawnCalls
+                .filter(([cmd]) => cmd === JUDGE_CONFIG.PRLIMIT_PATH)
+                .map(([, args]) => {
+                    const gpp = args.indexOf('--') + 1;
+                    expect(args[gpp]).toBe('g++');
+                    return args.slice(gpp);
+                });
+
+            it('compiles the grader sources to assembly only (-S), with the header diagnostics flags', async () => {
                 await runHeaderPipeline();
 
-                const compile = spawnCalls.find(([cmd]) => cmd === JUDGE_CONFIG.PRLIMIT_PATH);
-                expect(compile).toBeDefined();
-                const compileArgs = compile![1];
-                const gpp = compileArgs.indexOf('--') + 1;
-                expect(compileArgs[gpp]).toBe('g++');
-                // Standard C++ flags are reused verbatim, plus the header flag
-                // that keeps the secret grader source OUT of diagnostics.
+                const runs = gppRuns();
+                expect(runs).toHaveLength(2);
+                const [compileArgs] = runs;
+                // Standard C++ flags are reused verbatim, plus the header flags
+                // that keep the secret grader source OUT of diagnostics and
+                // bound their length.
                 expect(compileArgs).toEqual(expect.arrayContaining([
                     '-std=c++20',
                     '-fsanitize=signed-integer-overflow',
                     '-fno-sanitize-recover=signed-integer-overflow',
                     '-fno-diagnostics-show-caret',
+                    '-fmax-errors=10',
+                    '-S',
                     'main.cpp',
-                    '-o',
-                    'solution.out',
                 ]));
+                // Compile proper only: no output binary, no assembler yet.
+                expect(compileArgs).not.toContain('-o');
+                expect(compileArgs).not.toContain('solution.out');
                 // The submitted header and the grader's .h are compiled only
                 // through #include — never named on the g++ command line.
                 expect(compileArgs).not.toContain('solution.cpp');
@@ -1014,6 +1025,22 @@ describe('Submission Service', () => {
                 expect(compileArgs).not.toContain('queue.h');
                 // No absolute server paths in argv.
                 expect(compileArgs.join(' ')).not.toContain('/tmp/oj-submissions');
+            });
+
+            it('assembles and links the .s files into a stripped binary in a second run', async () => {
+                await runHeaderPipeline();
+
+                const [, linkArgs] = gppRuns();
+                expect(linkArgs).toEqual([
+                    'g++',
+                    '-std=c++20',
+                    '-fsanitize=signed-integer-overflow',
+                    '-fno-sanitize-recover=signed-integer-overflow',
+                    '-s',
+                    'main.s',
+                    '-o',
+                    'solution.out',
+                ]);
             });
 
             it('writes every grader file and the submission into the workspace as the sandbox uid', async () => {
@@ -1054,34 +1081,97 @@ describe('Submission Service', () => {
                 expect(writtenBytes.get('student.h')).toBe(GOOD_HEADER);
             });
 
-            it('scrubs every source file from the workspace BEFORE the binary runs', async () => {
+            it('scrubs every source BEFORE the assembler runs and the .s files BEFORE the binary runs', async () => {
                 await runHeaderPipeline();
 
-                expect(removeFiles).toHaveBeenCalledTimes(1);
+                expect(removeFiles).toHaveBeenCalledTimes(2);
                 const [workspaceDir, fileNames, options] = removeFiles.mock.calls[0];
                 expect(String(workspaceDir)).toContain('oj-submissions');
                 expect(fileNames).toEqual(['main.cpp', 'queue.h', 'student.h']);
                 expect((options as { sandbox: { uid: number } }).sandbox.uid)
                     .toBeGreaterThanOrEqual(JUDGE_CONFIG.SANDBOX_UID_BASE);
-                // ...strictly before the judge runs the compiled binary.
-                expect(removeFiles.mock.invocationCallOrder[0])
-                    .toBeLessThan((judge as jest.Mock).mock.invocationCallOrder[0]);
+                expect(removeFiles.mock.calls[1][1]).toEqual(['main.s']);
+
+                // Order: -S compile < source scrub < assemble+link < .s scrub < run.
+                const spawnOrder = (cp.spawn as unknown as jest.Mock).mock.invocationCallOrder;
+                const compilerRuns = (cp.spawn as unknown as jest.Mock).mock.calls
+                    .map(([cmd]: [string], index: number) => ({ cmd, order: spawnOrder[index] }))
+                    .filter(({ cmd }) => cmd === JUDGE_CONFIG.PRLIMIT_PATH)
+                    .map(({ order }) => order);
+                const [sourceScrub, assemblyScrub] = removeFiles.mock.invocationCallOrder;
+                expect(compilerRuns[0]).toBeLessThan(sourceScrub);
+                expect(sourceScrub).toBeLessThan(compilerRuns[1]);
+                expect(compilerRuns[1]).toBeLessThan(assemblyScrub);
+                expect(assemblyScrub).toBeLessThan((judge as jest.Mock).mock.invocationCallOrder[0]);
                 expect(judge).toHaveBeenCalledWith('H1', { command: expect.stringContaining('.out'), args: [] }, 'cpp', expect.anything());
             });
 
-            it('fails the submission (System Error) and never runs the binary when the scrub fails', async () => {
+            it('fails the submission (System Error) and never assembles or runs when the scrub fails', async () => {
                 removeFiles.mockRejectedValue(new Error('rm: Permission denied'));
                 (db.query as jest.Mock)
                     .mockResolvedValueOnce(mockRow(GOOD_HEADER))
                     .mockResolvedValueOnce({}) // UPDATE Compiling
-                    .mockResolvedValueOnce({}) // UPDATE Running
                     .mockResolvedValueOnce({}); // UPDATE System Error
 
                 await processSubmission(1);
 
                 expect(judge).not.toHaveBeenCalled();
-                expect(db.query).toHaveBeenNthCalledWith(4,
+                // Only the -S run happened: the assembler never ran next to
+                // grader sources that were supposed to be gone.
+                expect(gppRuns()).toHaveLength(1);
+                expect(db.query).toHaveBeenNthCalledWith(3,
                     expect.stringContaining('UPDATE submissions SET overall_status = \'System Error\''), [1]);
+            });
+
+            it('fails the submission (System Error) and never runs the binary when the .s scrub fails', async () => {
+                removeFiles.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('rm: Permission denied'));
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce(mockRow(GOOD_HEADER))
+                    .mockResolvedValueOnce({}) // UPDATE Compiling
+                    .mockResolvedValueOnce({}); // UPDATE System Error
+
+                await processSubmission(1);
+
+                expect(judge).not.toHaveBeenCalled();
+                expect(db.query).toHaveBeenNthCalledWith(3,
+                    expect.stringContaining('UPDATE submissions SET overall_status = \'System Error\''), [1]);
+            });
+
+            it('reports an assembler failure (e.g. an injected .incbin with nothing to read) as a Compilation Error', async () => {
+                // The -S run succeeds; the assemble+link run fails the way as
+                // does when the file an injected `.incbin` names is gone.
+                let compilerRun = 0;
+                (cp.spawn as unknown as jest.Mock).mockImplementation(
+                    (command: string, args: string[], options: Record<string, unknown>) => {
+                        spawnCalls.push([command, args, options]);
+                        if (command === JUDGE_CONFIG.PRLIMIT_PATH) compilerRun += 1;
+                        if (command !== JUDGE_CONFIG.PRLIMIT_PATH || compilerRun === 1) return benignSpawn(command);
+                        const handlers: Record<string, (...a: unknown[]) => void> = {};
+                        const child = {
+                            pid: 1111,
+                            stdin: { on: jest.fn(), end: jest.fn() },
+                            stdout: { on: (_e: string, fn: (...a: unknown[]) => void) => { handlers.stdout = fn; } },
+                            stderr: { on: (_e: string, fn: (...a: unknown[]) => void) => { handlers.stderr = fn; } },
+                            on: (event: string, fn: (...a: unknown[]) => void) => { handlers[event] = fn; },
+                            kill: jest.fn(),
+                        };
+                        setImmediate(() => {
+                            handlers.stderr?.(Buffer.from('main.s: Assembler messages:\nmain.s:7: Error: file not found: main.cpp\n'));
+                            handlers.close?.(1, null);
+                        });
+                        return child;
+                    }
+                );
+                (db.query as jest.Mock)
+                    .mockResolvedValueOnce(mockRow(GOOD_HEADER))
+                    .mockResolvedValueOnce({}) // UPDATE Compiling
+                    .mockResolvedValueOnce({}); // UPDATE Compilation Error
+
+                await processSubmission(1);
+
+                expect(compilationErrorOutput(2)).toContain('file not found: main.cpp');
+                expect(removeFiles).toHaveBeenCalledTimes(1);
+                expect(judge).not.toHaveBeenCalled();
             });
 
             it('keeps the real student.h name in compile diagnostics but no server paths', async () => {
@@ -1152,7 +1242,7 @@ describe('Submission Service', () => {
 
                 const removed = (fs.promises.rm as jest.Mock).mock.calls
                     .map(([target]: [string]) => path.basename(String(target)));
-                expect(removed).toEqual(['main.cpp', 'queue.h', 'student.h']);
+                expect(removed).toEqual(['main.cpp', 'queue.h', 'student.h', 'main.s']);
                 expect(judge).toHaveBeenCalledTimes(1);
             });
 

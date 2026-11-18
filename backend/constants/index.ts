@@ -350,19 +350,42 @@ export const LANGUAGE_PREPARE: Record<SubmissionLanguage, {
 };
 
 /**
+ * Diagnostics flags of the header compile. `-fno-diagnostics-show-caret`
+ * stops g++ echoing the offending SOURCE LINE, which would quote the grader's
+ * secret code back to the submitter on any compile error; `-fmax-errors`
+ * bounds how much a single failing submission can make the compiler print.
+ */
+const HEADER_DIAGNOSTIC_FLAGS = ['-fno-diagnostics-show-caret', '-fmax-errors=10'] as const;
+
+/**
  * Prepare recipe for a HEADER problem: the student submits a single header
  * (e.g. `student.h`) and the judge compiles the problem's secret grader
- * sources — which `#include` it — into one binary. Same flags as a standard
- * C++ submission (header problems are C++ only) plus
- * `-fno-diagnostics-show-caret`: without it g++ echoes the offending SOURCE
- * LINE in diagnostics, which would quote the grader's secret code back to the
- * submitter on any compile error. Only the grader `.cpp` names are passed on
- * the command line; headers (the submission included) enter through #include.
+ * sources — which `#include` it — into one binary, in TWO steps:
+ *
+ *  1. `compileCommand`: compile proper (`-S`, no assembler) of the grader
+ *     sources with every file present, writing `<stem>.s` per source;
+ *  2. the pipeline then deletes every grader file and the submission;
+ *  3. `linkCommand`: assemble and link the `.s` files (same flags, so the
+ *     sanitizer runtime still links, plus `-s` to strip the symbol table);
+ *  4. the pipeline deletes the `.s` files before any testcase runs.
+ *
+ * The assembler therefore never runs while a grader source is readable, so a
+ * submission that smuggles `.incbin "main.cpp"` into the assembly gets a
+ * Compilation Error ("file not found") instead of the grader's bytes in its
+ * binary. Same flags as a standard C++ submission (header problems are C++
+ * only). Only the grader source names are passed on the command line; headers
+ * (the submission included) enter through #include.
  */
 export const HEADER_CPP_PREPARE = {
-    checkCommand: (cppSources: readonly string[], outputPath: string): RunnableCommand => ({
+    compileCommand: (cppSources: readonly string[]): RunnableCommand => ({
         command: 'g++',
-        args: [...CPP_COMPILE_FLAGS, '-fno-diagnostics-show-caret', ...cppSources, '-o', outputPath],
+        args: [...CPP_COMPILE_FLAGS, ...HEADER_DIAGNOSTIC_FLAGS, '-S', ...cppSources],
+    }),
+    /** The file `g++ -S` writes for a source: its stem plus `.s`, in the working directory. */
+    assemblyName: (cppSource: string): string => `${cppSource.slice(0, cppSource.lastIndexOf('.'))}.s`,
+    linkCommand: (assemblyFiles: readonly string[], outputPath: string): RunnableCommand => ({
+        command: 'g++',
+        args: [...CPP_COMPILE_FLAGS, '-s', ...assemblyFiles, '-o', outputPath],
     }),
     runCommand: (binaryPath: string): RunnableCommand => LANGUAGE_PREPARE.cpp.runCommand(binaryPath),
 } as const;
