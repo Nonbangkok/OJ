@@ -87,14 +87,29 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     await pool.query(`UPDATE problems SET collection_id=$1 WHERE id LIKE 'd%'`, [id]);
 
     const hidden = await setCollectionVisibility(id, false);
-    expect(hidden).toBe(3);
+    expect(hidden).toEqual({ updated: 3, skipped: 0 });
     let rows = await pool.query(`SELECT COUNT(*) FROM problems WHERE collection_id=$1 AND is_visible`, [id]);
     expect(Number(rows.rows[0].count)).toBe(0);
 
     const shown = await setCollectionVisibility(id, true);
-    expect(shown).toBe(3);
+    expect(shown).toEqual({ updated: 3, skipped: 0 });
     rows = await pool.query(`SELECT COUNT(*) FROM problems WHERE collection_id=$1 AND NOT is_visible`, [id]);
     expect(Number(rows.rows[0].count)).toBe(0);
+  });
+
+  it('skips and counts members attached to a contest (A6-01)', async () => {
+    const created = await createCollection('Contest week');
+    const id = (created as { collection: { id: number } }).collection.id;
+    await seedProblem('cw1', false); await seedProblem('cw2', false);
+    const contest = await pool.query(
+      `INSERT INTO contests (title, start_time, end_time, status) VALUES ('C', NOW() + INTERVAL '1 day', NOW() + INTERVAL '2 days', 'scheduled') RETURNING id`,
+    );
+    await pool.query(`UPDATE problems SET collection_id = $1 WHERE id LIKE 'cw%'`, [id]);
+    await pool.query(`UPDATE problems SET contest_id = $1 WHERE id = 'cw2'`, [contest.rows[0].id]);
+
+    expect(await setCollectionVisibility(id, true)).toEqual({ updated: 1, skipped: 1 });
+    const rows = await pool.query(`SELECT id, is_visible FROM problems WHERE collection_id = $1 ORDER BY id`, [id]);
+    expect(rows.rows).toEqual([{ id: 'cw1', is_visible: true }, { id: 'cw2', is_visible: false }]);
   });
 
   it('deleting a collection detaches its problems instead of deleting them', async () => {

@@ -1017,15 +1017,31 @@ export const updateAdminProblemsVisibility = async (
   return { updatedCount: result.rowCount ?? 0 };
 };
 
+export type UpdateProblemVisibilityResult =
+  | { kind: 'ok'; problem: Pick<ProblemRow, 'id' | 'title' | 'is_visible'> }
+  | { kind: 'not_found' }
+  | { kind: 'in_contest' };
+
+/**
+ * Single-problem visibility toggle. A6-01: a problem attached to a contest is
+ * refused (`in_contest`), like the filter-wide bulk path skips it — the
+ * contest keeps it hidden and restores its pre-contest visibility at the end,
+ * so a write here would either leak it or be silently undone.
+ */
 export const updateProblemVisibility = async (
   problemId: string,
   isVisible: boolean,
-): Promise<Pick<ProblemRow, 'id' | 'title' | 'is_visible'> | null> => {
+): Promise<UpdateProblemVisibilityResult> => {
   const result = await db.query<Pick<ProblemRow, 'id' | 'title' | 'is_visible'>>(
-    'UPDATE problems SET is_visible = $1 WHERE id = $2 RETURNING id, title, is_visible',
+    'UPDATE problems SET is_visible = $1 WHERE id = $2 AND contest_id IS NULL RETURNING id, title, is_visible',
     [isVisible, problemId]
   );
-  return result.rows[0] ?? null;
+  if (result.rows[0]) return { kind: 'ok', problem: result.rows[0] };
+  const existing = await db.query<Pick<ProblemRow, 'contest_id'>>(
+    'SELECT contest_id FROM problems WHERE id = $1',
+    [problemId],
+  );
+  return existing.rows[0] ? { kind: 'in_contest' } : { kind: 'not_found' };
 };
 
 export const updateProblemPdf = async (

@@ -635,7 +635,9 @@ describe('Problem Controller', () => {
         });
 
         it('should return 404 when updating visibility for missing problem', async () => {
-            (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [] }) // guarded UPDATE matched nothing
+                .mockResolvedValueOnce({ rows: [] }); // and no such problem
 
             const res = await request(app)
                 .put('/admin/problems/NOPE/visibility')
@@ -643,6 +645,20 @@ describe('Problem Controller', () => {
 
             expect(res.status).toBe(404);
             expect(res.body.message).toBe('Problem not found');
+        });
+
+        it('refuses a problem attached to a contest with 409 (A6-01)', async () => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [] }) // UPDATE ... AND contest_id IS NULL skipped it
+                .mockResolvedValueOnce({ rows: [{ contest_id: 4 }] });
+
+            const res = await request(app)
+                .put('/admin/problems/C1/visibility')
+                .send({ isVisible: true });
+
+            expect(res.status).toBe(409);
+            expect(res.body.message).toMatch(/in a contest/);
+            expect(db.query).toHaveBeenNthCalledWith(1, expect.stringContaining('AND contest_id IS NULL'), [true, 'C1']);
         });
     });
 
@@ -1008,6 +1024,7 @@ describe('Problem Controller', () => {
 
             expect(res.status).toBe(200);
             expect(res.body.updated).toBe(3);
+            expect(res.body.skipped).toBe(0);
             expect(res.body.message).toBe('3 problems hidden');
         });
     });
@@ -1078,7 +1095,7 @@ describe('Problem Controller', () => {
 
         it('includes header fields in the problem detail', async () => {
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{
-                id: 'H1', title: 'T', is_visible: true, problem_type: 'header',
+                id: 'H1', title: 'T', is_visible: true, contest_id: null, problem_type: 'header',
                 submission_filename: 'student.h', has_starter_files: true,
             }] });
             (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] }); // viewer context

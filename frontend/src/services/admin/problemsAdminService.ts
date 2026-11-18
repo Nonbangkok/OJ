@@ -255,8 +255,9 @@ const problemsAdminService = {
     await api.delete(`/admin/collections/${id}`);
   },
 
-  setCollectionVisibility: async (id: number, isVisible: boolean): Promise<{ message: string; updated: number }> => {
-    const response = await api.put<{ message: string; updated: number }>(`/admin/collections/${id}/visibility`, { isVisible });
+  /** `skipped`: members attached to a contest, which keep the visibility the contest gives them. */
+  setCollectionVisibility: async (id: number, isVisible: boolean): Promise<{ message: string; updated: number; skipped: number }> => {
+    const response = await api.put<{ message: string; updated: number; skipped: number }>(`/admin/collections/${id}/visibility`, { isVisible });
     return response.data;
   },
 };

@@ -57,6 +57,13 @@ export const healthIssues = (problem: AdminProblem): string[] => [
   ...(problem.problem_type === 'header' && problem.has_grader === false ? ['No grader'] : []),
 ];
 
+/** Attached to a contest that has not finished yet: its visibility belongs to the contest. */
+const isInContest = (problem: AdminProblem): boolean => problem.contest_id != null;
+
+const skippedNotice = (count: number): string => (count > 0
+  ? `${count} problem${count === 1 ? '' : 's'} in a contest ${count === 1 ? 'was' : 'were'} skipped.`
+  : '');
+
 const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: ProblemManagementProps) => {
   const navigate = useNavigate();
   // Rejudge is admin-only on the server (POST /admin/rejudge/problem/:id).
@@ -256,6 +263,9 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
   });
 
   const filteredCollection = collections.find(c => c.id === Number(collectionFilter));
+  // Visibility changes skip problems in a contest (the server refuses them):
+  // the contest keeps them hidden and restores their visibility at the end.
+  const [visibilityNotice, setVisibilityNotice] = useState('');
 
   // --- Bulk selection ------------------------------------------------------
   // `visibleProblems` (rows the table displays, after every filter) is the
@@ -364,7 +374,8 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
   const runCollectionVisibility = async () => {
     if (!collectionConfirm) return;
     try {
-      await adminService.setCollectionVisibility(collectionConfirm.id, collectionConfirm.isVisible);
+      const result = await adminService.setCollectionVisibility(collectionConfirm.id, collectionConfirm.isVisible);
+      setVisibilityNotice(skippedNotice(result?.skipped ?? 0));
       setCollectionConfirm(null);
       await refreshAfterCollectionChange();
     } catch {
@@ -399,6 +410,13 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
     }
   };
   const quickLookProblem = problems.find((p) => p.id === quickLookId) ?? null;
+
+  const runSelectionVisibility = (isVisible: boolean) => {
+    const inContestIds = new Set(problems.filter(isInContest).map((problem) => String(problem.id)));
+    const eligible = selectedProblemIds.filter((id) => !inContestIds.has(String(id)));
+    setVisibilityNotice(skippedNotice(selectedProblemIds.length - eligible.length));
+    if (eligible.length > 0) void setSelectionVisibility(eligible, isVisible);
+  };
 
   const runDeleteSelection = async () => {
     const succeeded = await deleteSelectedProblems(selectedProblemIds);
@@ -494,8 +512,8 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
           </span>
           <div className={styles['selection-actions']}>
             <Button size="compact" onClick={() => handleExportSelected(selectedProblemIds)} disabled={loading}>Export Selected ({selectedCount})</Button>
-            <Button size="compact" onClick={() => setSelectionVisibility(selectedProblemIds, true)} disabled={loading}>Show</Button>
-            <Button size="compact" variant="secondary" onClick={() => setSelectionVisibility(selectedProblemIds, false)} disabled={loading}>Hide</Button>
+            <Button size="compact" onClick={() => runSelectionVisibility(true)} disabled={loading}>Show</Button>
+            <Button size="compact" variant="secondary" onClick={() => runSelectionVisibility(false)} disabled={loading}>Hide</Button>
             <label className={styles['selection-move']}>
               <span className={styles['filter-label']}>Move to Collection</span>
               <select
@@ -613,6 +631,9 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
       {metadataError && (
         <div className={styles['scope-bar']}><span className="error-message" role="alert">{metadataError}</span></div>
       )}
+      {visibilityNotice && (
+        <div className={styles['scope-bar']}><span role="status">{visibilityNotice}</span></div>
+      )}
       {(loading || error) && !batchUploadProgress.visible && (
         <div className={styles['scope-bar']}>
           {loading && <span role="status">Loading Problems...</span>}
@@ -725,7 +746,7 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
                 <td className={`${styles['col-right']} ${styles.mono}`}>{acRateLabel(problem) ?? <span className={styles['health-ok']}>—</span>}</td>
                 <td className={`${styles['col-right']} ${styles.mono}`}>{(problem.submission_count ?? 0) > 0 ? (problem.solver_count ?? 0) : <span className={styles['health-ok']}>—</span>}</td>
                 <td className={styles['col-left']}>
-                  {problem.contest_id && (problem.contest_status === 'scheduled' || problem.contest_status === 'running')
+                  {isInContest(problem)
                     ? <StatusDot tone="neutral" label="In contest" />
                     : (
                       <label className={styles['visibility-switch']}>
@@ -755,7 +776,7 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
                           title: 'Re-run every submission for this problem against the current testcases and limits',
                           onClick: () => handleRejudgeClick({ kind: 'problem', id: problem.id, title: problem.title }),
                         }] : []),
-                        ...(problem.contest_id && (problem.contest_status === 'scheduled' || problem.contest_status === 'running') ? [] : [{
+                        ...(isInContest(problem) ? [] : [{
                           key: 'toggle-visibility',
                           label: problem.is_visible ? 'Hide' : 'Show',
                           onClick: () => handleToggleVisibility(problem.id, problem.is_visible),
@@ -829,7 +850,7 @@ const ProblemManagement = ({ currentUser = null, initialPageSpan = null }: Probl
           onClose={() => setCollectionConfirm(null)}
           onConfirm={runCollectionVisibility}
           title={collectionConfirm.isVisible ? 'Confirm Show Collection' : 'Confirm Hide Collection'}
-          message={`Are you sure you want to ${collectionConfirm.isVisible ? 'show' : 'hide'} all ${collectionConfirm.count} problem${collectionConfirm.count === 1 ? '' : 's'} in "${collectionConfirm.name}"?`}
+          message={`Are you sure you want to ${collectionConfirm.isVisible ? 'show' : 'hide'} all ${collectionConfirm.count} problem${collectionConfirm.count === 1 ? '' : 's'} in "${collectionConfirm.name}"? (Excluding those in contests)`}
         />
       )}
       {moveConfirm && (
