@@ -12,6 +12,13 @@ export const acRateLabel = (problem: Pick<AdminProblem, 'submission_count' | 'ac
   return `${Math.round((accepted / total) * 100)}%`;
 };
 
+/**
+ * Attached to a contest that has not finished yet (scheduled, running or
+ * finishing): its visibility belongs to the contest and the server refuses
+ * to change it. The Problems table and this quick look share the rule.
+ */
+export const isInContest = (problem: Pick<AdminProblem, 'contest_id'>): boolean => problem.contest_id != null;
+
 const formatBytes = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -33,7 +40,7 @@ interface ProblemQuickLookProps {
  * full editor stays one click away.
  */
 export default function ProblemQuickLook({ problem, issues, onClose, onSetDifficulty, busy = false }: ProblemQuickLookProps) {
-  const inContest = Boolean(problem?.contest_id) && (problem?.contest_status === 'scheduled' || problem?.contest_status === 'running');
+  const inContest = problem !== null && isInContest(problem);
   const rate = problem ? acRateLabel(problem) : null;
   return (
     <Drawer open={problem !== null} title={problem?.title ?? ''} onClose={onClose}>

@@ -221,6 +221,18 @@ describe('ProblemManagement Component', () => {
             expect(within(await row('P3')).getByText('In contest')).toBeInTheDocument();
         });
 
+        it.each(['scheduled', 'running', 'finishing'])('the quick look of a problem in a %s contest says In contest, like its row', async (contestStatus) => {
+            (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(makePage([
+                { ...rows[2], is_visible: false, contest_status: contestStatus },
+            ]));
+            renderProblemManagement();
+            expect(within(await row('P3')).getByText('In contest')).toBeInTheDocument();
+            fireEvent.click(within(await row('P3')).getByText('Problem 3'));
+            const look = await screen.findByRole('dialog', { name: 'Problem 3' });
+            expect(within(look).getByText('In contest')).toBeInTheDocument();
+            expect(within(look).queryByText('Hidden')).toBeNull();
+        });
+
         it('clicking a row opens a quick look with the facts, links and a difficulty quick edit', async () => {
             renderProblemManagement();
             fireEvent.click(within(await row('P1')).getByText('Problem 1'));

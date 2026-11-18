@@ -5,7 +5,7 @@ import useProblemSelection from '../../../hooks/admin/useProblemSelection';
 import useRejudge from '../../../hooks/admin/useRejudge';
 import CreateProblemDialog from './CreateProblemDialog';
 import CollectionsDialog from './CollectionsDialog';
-import ProblemQuickLook, { acRateLabel } from './ProblemQuickLook';
+import ProblemQuickLook, { acRateLabel, isInContest } from './ProblemQuickLook';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import RejudgeFeedbackBox from '../shared/RejudgeFeedbackBox';
 import adminService from '../../../services/adminService';
@@ -56,9 +56,6 @@ export const healthIssues = (problem: AdminProblem): string[] => [
   ...(problem.testcase_count === 0 ? ['No tests'] : []),
   ...(problem.problem_type === 'header' && problem.has_grader === false ? ['No grader'] : []),
 ];
-
-/** Attached to a contest that has not finished yet: its visibility belongs to the contest. */
-const isInContest = (problem: AdminProblem): boolean => problem.contest_id != null;
 
 const skippedNotice = (count: number): string => (count > 0
   ? `${count} problem${count === 1 ? '' : 's'} in a contest ${count === 1 ? 'was' : 'were'} skipped.`
