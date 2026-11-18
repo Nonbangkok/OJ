@@ -1,4 +1,4 @@
-import type { BatchUploadProgressState } from '../../types';
+import type { BatchUploadFeedback, BatchUploadProblemError, BatchUploadProgressState } from '../../types';
 import type { AdminProblem } from '../../types';
 import type { UploadProgress, UploadProgressState } from '../../types';
 
@@ -189,6 +189,31 @@ export const buildBatchUploadSuccessMessage = (
   }
 
   return 'Batch upload process finished.';
+};
+
+const formatBatchUploadErrors = (errors: BatchUploadProblemError[]): string =>
+  errors.map((item) => `${item.directory}: ${item.message}`).join('; ');
+
+/**
+ * Feedback for a finished batch upload. Any per-problem or archive-level error
+ * turns it into an error banner that names each `directory: message`; only a
+ * run with no errors reads as success.
+ */
+export const buildBatchUploadCompleteFeedback = (
+  result: Partial<Pick<BatchUploadProgressState, 'added' | 'skipped' | 'errors' | 'message'>>,
+): Pick<BatchUploadFeedback, 'message' | 'type'> => {
+  const errors = result.errors ?? [];
+  if (errors.length === 0) {
+    return { message: buildBatchUploadSuccessMessage(result.added, result.skipped, result.message), type: 'success' };
+  }
+  const added = result.added?.length ?? 0;
+  const skipped = result.skipped?.length ?? 0;
+  const errorCount = `${errors.length} ${errors.length === 1 ? 'error' : 'errors'}`;
+  return {
+    message: `Batch upload finished with ${errorCount}. Added ${added} problems, skipped ${skipped} problems. `
+      + `Errors: ${formatBatchUploadErrors(errors)}`,
+    type: 'error',
+  };
 };
 
 export const normalizeUploadProgress = (progress: UploadProgress): UploadProgressState => {

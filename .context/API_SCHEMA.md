@@ -194,7 +194,7 @@
   - 404 contest ไม่พบ
   - 409 rejudge ซ้ำ / contest จบแล้ว (scoreboard ถูก freeze — ให้ rejudge รายโจทย์แทน)
 
-หมายเหตุ rejudge: `queued` = จำนวนที่รับไป rejudge, `skipped` = แถวที่ไม่ judgeable, `busy` = แถวที่มี judge กำลังรันอยู่ (JUDGE-004 — ไม่ reset เพื่อกันสอง judge ชนกันในแถวเดียว)
+หมายเหตุ rejudge: `queued` = จำนวนที่รับไป rejudge, `skipped` = แถวที่ไม่ judgeable, `busy` = แถวที่มี judge อยู่ในคิวหรือกำลังรัน (JUDGE-004 — ไม่ enqueue ซ้ำ จึงไม่มีสอง judge ในแถวเดียว; แถวที่ busy อยู่ก่อน rejudge จะไม่ถูก reset ด้วย ส่วนแถวที่เพิ่งเข้าคิวระหว่าง reset จะถูก reset แต่ไม่เข้าคิวซ้ำ และ judge เดิมเขียน verdict ทับ)
 
 ---
 
@@ -441,7 +441,7 @@
 - Auth: `staff|admin`
 - Purpose: สร้างโจทย์ใหม่
 - Body:
-  - `id, title, author, time_limit_ms, memory_limit_mb`
+  - `id, title, author, time_limit_ms, memory_limit_mb` (`id` ≤ 50, `title` ≤ 255, `author` ≤ 100 ตัวอักษร ตามความกว้าง column — ยาวกว่านี้ได้ 400)
   - `categories?: string[]`, `difficulty?: number`, `collection_id?: number`
   - `problem_type?: 'standard'|'header'` (default `standard`), `submission_filename?: string` (header เท่านั้น, `.h`/`.hpp`, default `student.h`)
 - Response 201: created row
@@ -449,10 +449,10 @@
 
 ### 50. `PUT /admin/problems/:id`
 - Auth: `staff|admin`
-- Purpose: แก้โจทย์ (รวม rename id — rename cascade ไป `user_problem_rewards`/`authoring_published_problems`/`problem_drafts`)
+- Purpose: แก้โจทย์ (รวม rename id — rename cascade ไป `user_problem_rewards`/`authoring_published_problems`/`problem_drafts` และ key ของ `contest_scoreboards.detailed_scores` ของ contest ที่จบแล้ว)
 - Body: shape เดียวกับ create (field `id` คือใหม่)
 - Response 200: updated row
-- Errors: 404/409 — 409 ยังใช้เมื่อเปลี่ยน `problem_type`/`submission_filename` หลังมี submission แล้ว (type lock)
+- Errors: 404/409 — 409 ยังใช้เมื่อเปลี่ยน `problem_type`/`submission_filename` หลังมี submission แล้ว (type lock) และเมื่อ rename ไปยัง id ที่ยังมี `user_problem_rewards` ของโจทย์ที่ถูกลบไปแล้ว (XP ไม่ถูกลบตามโจทย์)
 
 ### 51. `DELETE /admin/problems/:id`
 - Auth: `staff|admin`
@@ -512,11 +512,12 @@
 - Auth: `staff|admin`
 - Multipart: `problemsZip`
 - Response 202: `{ message, progressId }`
+- Header problems ใน ZIP: `grader/` ที่ไม่ว่างต้องมี C++ source อย่างน้อยหนึ่งไฟล์; ไม่มี `grader/` เลยก็ import ได้ แต่ยัง submit ไม่ได้ (เหมือน admin create); มี `grader/`/`starter/` แต่ `config.json` ไม่ใช่ header = error ของโจทย์นั้น (ดู `errors` ใน `complete`)
 
 ### 61. `GET /admin/problems/batch-upload-progress/:progressId`
 - Auth: `staff|admin`
 - Purpose: subscribe progress ของ batch upload
-- Response: `text/event-stream` — Events: `initial`, `progress`, `complete`, `error`
+- Response: `text/event-stream` — Events: `initial`, `progress`, `complete`, `error` (`complete` มี `added`, `skipped`, `errors: [{ directory, message }]`; `errors` ไม่ว่าง = มีโจทย์หรือทั้ง archive ถูกปฏิเสธ)
 
 ### 62. `POST /admin/problems/:id/upload`
 - Auth: `staff|admin`

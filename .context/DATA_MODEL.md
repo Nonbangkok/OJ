@@ -265,7 +265,7 @@ Programming problems. The PDF is stored as `BYTEA` directly in the database.
 | `problem_type` | `TEXT` | NOT NULL, DEFAULT `'standard'`; CHECK IN (`'standard'`, `'header'`) (migration 0024) |
 | `submission_filename` | `TEXT` | NULLABLE; CHECK `(problem_type = 'header') = (submission_filename IS NOT NULL)` — header problems only, `.h`/`.hpp` (migration 0024) |
 
-Renaming a problem id cascades to the non-FK references in `user_problem_rewards`, `authoring_published_problems`, and `problem_drafts` (the service updates them explicitly).
+Renaming a problem id cascades to the non-FK references in `user_problem_rewards`, `authoring_published_problems`, and `problem_drafts`, and re-keys the problem's cells in finished contests' `contest_scoreboards.detailed_scores` (the service updates them explicitly). Because rewards outlive problem deletion, a rename onto an id that still has `user_problem_rewards` rows is refused with 409.
 
 ### `problem_files`
 Secret grader sources and public starter files of **header problems** (migration 0024). Files are flat (no paths), at most 20 per role and 1 MiB each (`HEADER_PROBLEM_LIMITS`).
@@ -490,7 +490,9 @@ One cascade run per confirmed author-profile edit (migration 0009). The run row
 (`authoring_profile_syncs`) records status (`queued`/`running`/`succeeded`/`failed`),
 result summary, error message and timestamps; each item row
 (`authoring_profile_sync_items`) tracks one draft's PDF rebuild (status, attempts,
-error). Both cascade from `author_profiles`.
+error). Both cascade from `author_profiles`. Whether a draft's `sync_pdf` job
+republishes its live problem is decided when the item starts (draft status
+`published`) and stored on the job as `result_summary.republish`.
 
 ### Publication (Slice9)
 

@@ -36,6 +36,30 @@ describe('useProblemCrud', () => {
         expect(result.current.problems).toEqual(mockProblems);
     });
 
+    it('moves a selection into a collection by sending only the collection, even for a problem without an author (A6-04)', async () => {
+        (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(mockPage);
+        (jest.mocked(adminService.getProblemDetail) as jest.Mock).mockResolvedValue({
+            id: 'PROB1', title: 'Problem 1', author: null, time_limit_ms: 1000, memory_limit_mb: 256,
+        });
+        (jest.mocked(adminService.updateProblem) as jest.Mock).mockResolvedValue({});
+
+        const { result } = renderHook(() => useProblemCrud({ query: {} }));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        await act(async () => {
+            await result.current.moveSelectionToCollection(['PROB1', 'PROB2'], 7);
+        });
+
+        // The server COALESCEs omitted fields, so the body carries only the
+        // id (rename target, unchanged) and the new collection: a NULL or
+        // empty author can never trip the update schema.
+        expect(adminService.updateProblem).toHaveBeenCalledTimes(2);
+        expect(adminService.updateProblem).toHaveBeenCalledWith('PROB1', { id: 'PROB1', collection_id: 7 });
+        expect(adminService.updateProblem).toHaveBeenCalledWith('PROB2', { id: 'PROB2', collection_id: 7 });
+        expect(adminService.getProblemDetail).not.toHaveBeenCalled();
+        expect(result.current.error).toBeFalsy();
+    });
+
     it('uses the update endpoint for an Edit Problem modal save', async () => {
         (jest.mocked(adminService.getProblems) as jest.Mock).mockResolvedValue(mockPage);
         (jest.mocked(adminService.getProblemDetail) as jest.Mock).mockResolvedValue({

@@ -10,8 +10,12 @@ import * as db from '../../db';
 import authorProfileRoutes from '../../controllers/authorProfileController';
 import { errorHandler } from '../../middleware/errorHandler';
 import { runMigrationsFromPool } from '../../scripts/migrate';
-import { createProblemDraft } from '../../services/authoringDraftQueryService';
-import { getAuthoringJob, queueCompileJob } from '../../services/authoringJobQueryService';
+import {
+  createProblemDraft,
+  startProblemDraftRevision,
+  updateProblemDraft,
+} from '../../services/authoringDraftQueryService';
+import { failAuthoringJob, getAuthoringJob, queueCompileJob } from '../../services/authoringJobQueryService';
 import { reconcileAuthoringJobs } from '../../services/authoringJobCoordinator';
 import {
   createProfileSync,
@@ -100,6 +104,22 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     await linkedDraft('IMP1', id);
     await linkedDraft('IMP2', id, { published: true });
     expect(await getProfileSyncImpact(id, database)).toEqual({ affectedDrafts: 2, affectedPublishedProblems: 1 });
+  });
+
+  it('does not count a draft reopened for revision as a published problem the sync will change', async () => {
+    const id = await createProfile();
+    await linkedDraft('IMPL1', id, { published: true });
+    const reopened = await linkedDraft('IMPR1', id, { published: true });
+    const generated = await linkedDraft('IMPR2', id, { published: true });
+    expect((await startProblemDraftRevision(reopened.id, database)).kind).toBe('updated');
+    expect((await startProblemDraftRevision(generated.id, database)).kind).toBe('updated');
+    await pool.query(`UPDATE problem_drafts SET status='generated' WHERE id=$1`, [generated.id]);
+
+    // All three keep published_at and a live problem, but only the draft that is
+    // still 'published' gets its live problem republished by the sync.
+    expect((await pool.query(`SELECT COUNT(*)::int AS n FROM problem_drafts
+      WHERE author_profile_id=$1 AND published_at IS NOT NULL`, [id])).rows[0].n).toBe(3);
+    expect(await getProfileSyncImpact(id, database)).toEqual({ affectedDrafts: 3, affectedPublishedProblems: 1 });
   });
 
   it('updates a draft snapshot, rebuilds the PDF, and republishes a published problem', async () => {
@@ -254,6 +274,125 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
       .send({ userId: 42 });
     expect(linked.status).toBe(200);
     expect((await pool.query('SELECT COUNT(*)::int AS count FROM authoring_profile_syncs')).rows[0].count).toBe(1);
+  });
+
+  describe('draft revision state at sync start', () => {
+    const syncJob = async (draftId: string) => (await pool.query(
+      `SELECT * FROM authoring_jobs WHERE draft_id=$1 AND job_type='sync_pdf' ORDER BY created_at DESC LIMIT 1`, [draftId])).rows[0];
+    const draftState = async (draftId: string) => (await pool.query(
+      'SELECT status,revision,verified_revision,title,statement_html,author_aka_name FROM problem_drafts WHERE id=$1', [draftId])).rows[0];
+    const liveProblem = async (problemId: string) => (await pool.query(
+      'SELECT title,author,categories,difficulty,problem_pdf FROM problems WHERE id=$1', [problemId])).rows[0];
+
+    /** Starts a sync for the profile and returns the sync_pdf job it queued for the draft. */
+    async function startSync(profile: string, draftId: string) {
+      const created = await createProfileSync(profile, database);
+      if (!('syncId' in created)) throw new Error(created.kind);
+      await reconcileAuthoringJobs(spool, database);
+      const job = await syncJob(draftId);
+      expect(job).toBeTruthy();
+      return { syncId: created.syncId, job };
+    }
+
+    async function failSyncPdf(job: { id: string; draft_id: string; draft_revision: number }) {
+      await reconcileAuthoringJobs(spool, database);
+      await spool.claim();
+      await spool.complete(job.id, { version: 1, jobId: job.id, draftId: job.draft_id, revision: job.draft_revision,
+        status: 'failed', errorCode: 'pdf_render_error', log: '', durationMs: 1, exitCode: 1 });
+      await reconcileAuthoringJobs(spool, database);
+    }
+
+    it('reopened with POST /new-revision: the live problem keeps its published fields and the draft stays in revision', async () => {
+      const id = await createProfile(profileId(), 'New Aka');
+      const d = await linkedDraft('REV1', id, { published: true });
+      const reopened = await startProblemDraftRevision(d.id, database);
+      if (reopened.kind !== 'updated') throw new Error(reopened.kind);
+      const edited = await updateProblemDraft(d.id, reopened.draft.revision,
+        { title: 'WIP unverified title', statement_html: '<p>half-written statement</p>' }, database);
+      if (edited.kind !== 'updated') throw new Error(edited.kind);
+      const before = await liveProblem('REV1');
+
+      const { syncId, job } = await startSync(id, d.id);
+      expect(job.result_summary).toEqual({ republish: false });
+      expect((await draftState(d.id)).status).toBe('draft');
+      await completeSyncPdf(job.id, d.id, job.draft_revision, pdfBytes('wip'));
+
+      expect(await liveProblem('REV1')).toEqual(before);
+      const row = await draftState(d.id);
+      expect(row).toEqual(expect.objectContaining({
+        title: 'WIP unverified title', statement_html: '<p>half-written statement</p>', author_aka_name: 'New Aka',
+      }));
+      expect(row.status).not.toBe('published');
+      expect((await getProfileSync(syncId, database))?.status).toBe('succeeded');
+      expect((await getAuthoringJob(job.id, database))?.result_summary).toEqual(expect.objectContaining({ republish: false }));
+    });
+
+    it('reopened by a statement-only PATCH: the live PDF is not replaced by the unverified statement', async () => {
+      const id = await createProfile(profileId(), 'New Aka');
+      const d = await linkedDraft('REV2', id, { published: true });
+      const edited = await updateProblemDraft(d.id, 1, { statement_html: '<p>wip correction</p>' }, database);
+      if (edited.kind !== 'updated') throw new Error(edited.kind);
+      expect(edited.draft.status).toBe('draft');
+      const before = await liveProblem('REV2');
+
+      const { job } = await startSync(id, d.id);
+      await completeSyncPdf(job.id, d.id, job.draft_revision, pdfBytes('wip'));
+
+      expect(await liveProblem('REV2')).toEqual(before);
+      expect((await draftState(d.id)).status).not.toBe('published');
+    });
+
+    it('a draft that is published when the sync starts records republish and is republished', async () => {
+      const id = await createProfile(profileId(), 'New Aka');
+      const d = await linkedDraft('REV3', id, { published: true });
+
+      const { job } = await startSync(id, d.id);
+      expect(job.result_summary).toEqual({ republish: true });
+      await completeSyncPdf(job.id, d.id, job.draft_revision, pdfBytes('wip'));
+
+      const problem = await liveProblem('REV3');
+      expect(problem.author).toBe('New Aka');
+      expect(problem.problem_pdf).toEqual(pdfBytes('wip'));
+      expect((await draftState(d.id)).status).toBe('published');
+      expect((await getAuthoringJob(job.id, database))?.result_summary).toEqual(expect.objectContaining({ republish: true }));
+    });
+
+    async function readyDraft(problemId: string, profile: string) {
+      const d = await linkedDraft(problemId, profile);
+      await pool.query(`UPDATE problem_drafts SET status='ready',verified_revision=revision WHERE id=$1`, [d.id]);
+      return d;
+    }
+
+    it('a ready draft drops to generated when the sync clears its verified revision', async () => {
+      const id = await createProfile(profileId(), 'New Aka');
+      const d = await readyDraft('REV4', id);
+
+      await startSync(id, d.id);
+
+      expect(await draftState(d.id)).toEqual(expect.objectContaining({ status: 'generated', revision: 2, verified_revision: null }));
+    });
+
+    it('a ready draft whose sync PDF fails to render is not left labelled ready', async () => {
+      const id = await createProfile(profileId(), 'New Aka');
+      const d = await readyDraft('REV5', id);
+
+      const { syncId, job } = await startSync(id, d.id);
+      await failSyncPdf(job);
+
+      expect((await getProfileSync(syncId, database))?.status).toBe('failed');
+      expect(await draftState(d.id)).toEqual(expect.objectContaining({ status: 'generated', verified_revision: null }));
+    });
+
+    it('a ready draft whose sync_pdf job expires is not left labelled ready', async () => {
+      const id = await createProfile(profileId(), 'New Aka');
+      const d = await readyDraft('REV6', id);
+
+      const { job } = await startSync(id, d.id);
+      await failAuthoringJob(job.id, 'job_expired', true, database);
+      await reconcileAuthoringJobs(spool, database);
+
+      expect(await draftState(d.id)).toEqual(expect.objectContaining({ status: 'generated', verified_revision: null }));
+    });
   });
 
   async function failJob(jobId: string) {

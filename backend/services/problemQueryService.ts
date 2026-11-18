@@ -542,12 +542,35 @@ export interface SubmissionFilenameConflict {
 export const updateProblem = async (
   oldId: string,
   payload: UpdateProblemRequestBody,
-): Promise<'duplicate_id' | 'not_found' | 'type_locked' | SubmissionFilenameConflict | ProblemRow> => {
+): Promise<'duplicate_id' | 'reward_conflict' | 'not_found' | 'type_locked' | SubmissionFilenameConflict | ProblemRow> => {
+  try {
+    return await updateProblemInTransaction(oldId, payload);
+  } catch (error) {
+    // Backstop for a rename racing another writer of the new id.
+    if (isUniqueViolation(error)) return 'duplicate_id';
+    throw error;
+  }
+};
+
+const updateProblemInTransaction = async (
+  oldId: string,
+  payload: UpdateProblemRequestBody,
+): Promise<'duplicate_id' | 'reward_conflict' | 'not_found' | 'type_locked' | SubmissionFilenameConflict | ProblemRow> => {
   return withTransaction(async (client) => {
     if (oldId !== payload.id) {
       const existingProblem = await client.query<Pick<ProblemRow, 'id'>>('SELECT id FROM problems WHERE id = $1', [payload.id]);
       if (existingProblem.rows.length > 0) {
         return 'duplicate_id';
+      }
+      // XP rewards outlive problem deletion, so a deleted problem's id can
+      // still carry them. Renaming onto it would either collide with
+      // UNIQUE (user_id, problem_id) or hand the old solves to this problem.
+      const leftoverRewards = await client.query(
+        'SELECT 1 FROM user_problem_rewards WHERE problem_id = $1 LIMIT 1',
+        [payload.id],
+      );
+      if (leftoverRewards.rows.length > 0) {
+        return 'reward_conflict';
       }
     }
 
@@ -615,6 +638,16 @@ export const updateProblem = async (
     if (oldId !== payload.id) {
       await client.query('UPDATE contest_problems SET problem_id = $1 WHERE problem_id = $2', [payload.id, oldId]);
       await client.query('UPDATE contest_submissions SET problem_id = $1 WHERE problem_id = $2', [payload.id, oldId]);
+      // A finished contest's frozen board keys each user's cells by problem id;
+      // re-key them so the renamed column (read from contest_problems) still
+      // finds its scores.
+      await client.query(
+        `UPDATE contest_scoreboards
+         SET detailed_scores = (detailed_scores - $2::text) || jsonb_build_object($1::text, detailed_scores -> $2::text)
+         WHERE detailed_scores ? $2::text
+           AND contest_id IN (SELECT contest_id FROM contest_problems WHERE problem_id = $1)`,
+        [payload.id, oldId],
+      );
       // XSYS-008: the remaining problem_id references have no foreign key
       // (rewards must survive problem deletion; provenance/drafts predate
       // FK-able schemas), so a rename must cascade to them explicitly —

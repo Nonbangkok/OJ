@@ -10,7 +10,7 @@ import type {
 import { getErrorMessage } from '../../utils/error';
 
 import {
-  buildBatchUploadSuccessMessage,
+  buildBatchUploadCompleteFeedback,
   EMPTY_BATCH_PROGRESS,
   parseProgressEventData,
 } from './problemManagement.helpers';
@@ -138,11 +138,7 @@ const useBatchUpload = ({ onCompleted, setLoading }: UseBatchUploadArgs) => {
             currentProblem: data.currentProblem ?? '',
           });
 
-          setBatchUploadFeedback({
-            visible: true,
-            message: buildBatchUploadSuccessMessage(data.added, data.skipped, data.message),
-            type: 'success',
-          });
+          setBatchUploadFeedback({ visible: true, ...buildBatchUploadCompleteFeedback(data) });
 
           eventSource.close();
           void onCompleted();
@@ -174,15 +170,7 @@ const useBatchUpload = ({ onCompleted, setLoading }: UseBatchUploadArgs) => {
         });
       } else {
         const { added = [], skipped = [], errors = [] } = response;
-        let feedbackMessage = `Batch upload complete. Added: ${added.length}. Skipped: ${skipped.length}.`;
-
-        if (errors.length > 0) {
-          const errorDetails = errors.map((item) => `${item.directory}: ${item.message}`).join('; ');
-          feedbackMessage += ` Errors: ${errors.length} (${errorDetails})`;
-          setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'error' });
-        } else {
-          setBatchUploadFeedback({ visible: true, message: feedbackMessage, type: 'success' });
-        }
+        setBatchUploadFeedback({ visible: true, ...buildBatchUploadCompleteFeedback({ added, skipped, errors }) });
 
         await onCompleted();
         setLoading(false);

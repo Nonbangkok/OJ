@@ -60,12 +60,12 @@ const problemsAdminService = {
     problemId: string,
     problemData: UpdateProblemRequest,
   ): Promise<ProblemMutationResponse> => {
-    const response = await api.put<ProblemMutationResponse>(`/admin/problems/${problemId}`, problemData);
+    const response = await api.put<ProblemMutationResponse>(`/admin/problems/${encodeURIComponent(problemId)}`, problemData);
     return response.data;
   },
 
   deleteProblem: async (problemId: string): Promise<ApiMessageResponse> => {
-    const response = await api.delete<ApiMessageResponse>(`/admin/problems/${problemId}`);
+    const response = await api.delete<ApiMessageResponse>(`/admin/problems/${encodeURIComponent(problemId)}`);
     return response.data;
   },
 
@@ -77,12 +77,12 @@ const problemsAdminService = {
   },
 
   rejudgeProblem: async (problemId: string | number): Promise<RejudgeResponse> => {
-    const response = await api.post<RejudgeResponse>(`/admin/rejudge/problem/${problemId}`);
+    const response = await api.post<RejudgeResponse>(`/admin/rejudge/problem/${encodeURIComponent(problemId)}`);
     return response.data;
   },
 
   getProblemDetail: async (problemId: string): Promise<AdminProblemDetailResponse> => {
-    const response = await api.get<AdminProblemDetailResponse>(`/admin/problems/${problemId}`);
+    const response = await api.get<AdminProblemDetailResponse>(`/admin/problems/${encodeURIComponent(problemId)}`);
     return response.data;
   },
 
@@ -90,12 +90,12 @@ const problemsAdminService = {
   // (case numbers + sizes) only; a caseNumber fetches one full case,
   // API-truncated past 1 MiB per side.
   getProblemTestcases: async (problemId: string): Promise<TestcaseListResponse> => {
-    const response = await api.get<TestcaseListResponse>(`/admin/problems/${problemId}/testcases`);
+    const response = await api.get<TestcaseListResponse>(`/admin/problems/${encodeURIComponent(problemId)}/testcases`);
     return response.data;
   },
 
   getProblemTestcase: async (problemId: string, caseNumber: number): Promise<TestcaseViewResponse> => {
-    const response = await api.get<TestcaseViewResponse>(`/admin/problems/${problemId}/testcases`, {
+    const response = await api.get<TestcaseViewResponse>(`/admin/problems/${encodeURIComponent(problemId)}/testcases`, {
       params: { caseNumber },
     });
     return response.data;
@@ -128,7 +128,7 @@ const problemsAdminService = {
   },
 
   updateProblemVisibility: async (problemId: string | number, isVisible: boolean): Promise<ApiMessageResponse> => {
-    const response = await api.put<ApiMessageResponse>(`/admin/problems/${problemId}/visibility`, { isVisible });
+    const response = await api.put<ApiMessageResponse>(`/admin/problems/${encodeURIComponent(problemId)}/visibility`, { isVisible });
     return response.data;
   },
 
@@ -217,7 +217,7 @@ const problemsAdminService = {
   },
 
   uploadFiles: async (problemId: string, formData: FormData): Promise<UploadFilesResponse> => {
-    const response = await api.post<UploadFilesResponse>(`/admin/problems/${problemId}/upload`, formData, {
+    const response = await api.post<UploadFilesResponse>(`/admin/problems/${encodeURIComponent(problemId)}/upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
