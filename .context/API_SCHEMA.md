@@ -136,6 +136,10 @@
 - ระหว่าง import: maintenance mode active — request อื่นตอบ 503, scheduler หยุด tick, judge queue หยุดรอ
 - Import ล้าง database ใน statement เดียว: ทุก schema ที่ไม่ใช่ของระบบ (พร้อมทุกอย่างข้างใน), publication และ large object ทั้งหมด แล้วสร้าง `public` ว่างใหม่ — ตรงกับสิ่งที่อยู่ใน safety copy (`pg_dump -Fc --no-subscriptions`) ที่ทำไว้ก่อน ถ้า restore หรือ migration ล้มเหลวจะ restore safety copy กลับอัตโนมัติ (progress `failed` พร้อมข้อความว่ากู้ database เดิมแล้ว)
 
+- ข้อจำกัดที่ยอมรับแล้ว (owner 2026-11-18):
+  - backup ที่ export จากระบบก่อน migration 0018 import ไม่ได้ (dump ไม่มีตาราง `user_sessions` แต่ 0018 แก้ตารางนั้น) — import จะล้มแล้วกู้ safety copy คืน ข้อมูลเดิมไม่หาย; ถ้าจำเป็นต้องกู้ backup เก่าแบบนั้น ให้ restore ลงฐานข้อมูลแยกด้วย `pg_restore`/`psql` เองก่อน แล้วค่อย export ใหม่จากระบบปัจจุบัน
+  - การ restore ยังเชื่อมต่อด้วย superuser ของฐานข้อมูล admin ที่ import dump ได้จึงยังสั่ง `COPY ... FROM PROGRAM` ใน container ของ DB ได้ — ถือว่า admin เป็นผู้ที่ไว้ใจได้ (เป็นเส้นแบ่งความเชื่อใจเดียวกับสิทธิ์ admin อื่น ๆ)
+
 ### 9. `GET /admin/database/import-progress/:jobId`
 - Auth: header `x-import-token` ที่ได้จาก endpoint 8 (session ใช้ไม่ได้ระหว่าง import เพราะ session table ถูก drop)
 - Response 200: progress object
