@@ -187,7 +187,7 @@
   - 404 contest ไม่พบ
   - 409 rejudge ซ้ำ / contest จบแล้ว (scoreboard ถูก freeze — ให้ rejudge รายโจทย์แทน)
 
-หมายเหตุ rejudge: `queued` = จำนวนที่รับไป rejudge, `skipped` = แถวที่ไม่ judgeable, `busy` = แถวที่มี judge กำลังรันอยู่ (JUDGE-004 — ไม่ reset เพื่อกันสอง judge ชนกันในแถวเดียว)
+หมายเหตุ rejudge: `queued` = จำนวนที่รับไป rejudge, `skipped` = แถวที่ไม่ judgeable, `busy` = แถวที่มี judge อยู่ในคิวหรือกำลังรัน (JUDGE-004 — ไม่ enqueue ซ้ำ จึงไม่มีสอง judge ในแถวเดียว; แถวที่ busy อยู่ก่อน rejudge จะไม่ถูก reset ด้วย ส่วนแถวที่เพิ่งเข้าคิวระหว่าง reset จะถูก reset แต่ไม่เข้าคิวซ้ำ และ judge เดิมเขียน verdict ทับ)
 
 ---
 

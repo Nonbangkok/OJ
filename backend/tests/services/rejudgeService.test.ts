@@ -149,6 +149,36 @@ describe('Rejudge Service', () => {
             expect(processSubmission).not.toHaveBeenCalledWith(1);
         });
 
+        it('JUDGE-004: never double-queues a row that goes in flight after the candidate check', async () => {
+            mockPools({ submissions: { candidates: [{ id: 1 }, { id: 2 }] } });
+            const inFlight = new Set<number>();
+            (isSubmissionInFlight as jest.Mock).mockImplementation(
+                (key: { table: string; submissionId: number }) =>
+                    key.table === 'submissions' && inFlight.has(key.submissionId)
+            );
+            // Both rows are idle when the candidates are checked. While the reset
+            // is on the wire, another dispatch (a fresh submit's controller, or a
+            // rejudge of an overlapping scope) enqueues row 1.
+            const answerPools = (db.query as jest.Mock).getMockImplementation()!;
+            (db.query as jest.Mock).mockImplementation(async (sql: string, values: unknown[]) => {
+                const result = await answerPools(sql, values);
+                if (kindOf(sql) === 'reset') inFlight.add(1);
+                return result;
+            });
+
+            const result = await rejudgeProblem('P1');
+
+            // Both were idle at the check, so both were reset ...
+            expect(callsOf('submissions', 'reset')[0][1]).toEqual(['Pending', [1, 2]]);
+            // ... but row 1 already has a judge by the time it would be queued.
+            expect(result).toEqual({ queued: 1, skipped: 0, busy: 1 });
+            expect(enqueueTrackedJudgeTask).toHaveBeenCalledTimes(1);
+            expect(enqueueTrackedJudgeTask).not.toHaveBeenCalledWith(expect.any(Function),
+                { table: 'submissions', submissionId: 1 }, undefined);
+            expect(enqueueTrackedJudgeTask).toHaveBeenCalledWith(expect.any(Function),
+                { table: 'submissions', submissionId: 2 }, undefined);
+        });
+
         it('sends no reset at all when every candidate is in flight', async () => {
             mockPools({ submissions: { candidates: [{ id: 1 }] } });
             (isSubmissionInFlight as jest.Mock).mockImplementation(() => true);
