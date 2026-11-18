@@ -153,10 +153,10 @@ export interface AdminProblemRow extends Pick<
     testcase_bytes: number;
     submission_count: number;
     type_locked: boolean;
-    /** Health: a statement PDF is stored; a header problem has a grader .cpp. */
+    /** Health: a statement PDF is stored; a header problem has a grader C++ source. */
     has_pdf: boolean;
     has_grader: boolean;
-    /** Practice submissions with a full score, and the distinct users behind them. */
+    /** Full-score submissions and their distinct users, over the same practice + contest rows as submission_count. */
     accepted_count: number;
     solver_count: number;
 }
@@ -186,8 +186,17 @@ export interface SubmissionRow {
 }
 
 
+/** Problem facts the submission page shows next to the code (LEFT JOIN, so null for a deleted problem). */
+export interface SubmissionDetailProblemFields {
+    time_limit_ms: number | null;
+    memory_limit_mb: number | null;
+    /** A header submission's code is the file named `submission_filename`. */
+    problem_type: ProblemType | null;
+    submission_filename: string | null;
+}
+
 /** `submissions` row augmented with username for display. */
-export interface SubmissionDetailRow extends SubmissionRow {
+export interface SubmissionDetailRow extends SubmissionRow, SubmissionDetailProblemFields {
     username: string;
     problem_name: string;
 }
@@ -233,7 +242,7 @@ export interface ContestSubmissionRow {
 
 
 /** `contest_submissions` row augmented with username for display. */
-export interface ContestSubmissionDetailRow extends ContestSubmissionRow {
+export interface ContestSubmissionDetailRow extends ContestSubmissionRow, SubmissionDetailProblemFields {
     username: string;
     problem_name: string;
 }

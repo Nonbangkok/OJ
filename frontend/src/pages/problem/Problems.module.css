@@ -30,6 +30,13 @@
 
 
 
+/* Header problems: a quiet type badge after the title, inside the row link.
+   StatusBadge is inline-flex, so the link's hover underline skips it. */
+.typeBadge {
+  margin-left: 2px;
+  vertical-align: 1px;
+}
+
 .best {
   display: inline-flex;
   align-items: center;

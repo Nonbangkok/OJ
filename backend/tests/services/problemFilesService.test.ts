@@ -106,30 +106,36 @@ describe('problemFilesService', () => {
     it('returns empty graderFiles for a standard problem without reading files', async () => {
       query.mockResolvedValueOnce({ rows: [{ problem_type: 'standard', submission_filename: null }] });
       expect(await getHeaderJudgeSpec('p1')).toEqual({
-        problemType: 'standard', submissionFilename: null, graderFiles: [],
+        problemType: 'standard', submissionFilename: null, graderFiles: [], starterFilenames: [],
       });
       expect(query).toHaveBeenCalledTimes(1);
     });
 
-    it('loads grader files for a header problem', async () => {
+    it('loads grader files and starter names for a header problem', async () => {
       query
         .mockResolvedValueOnce({ rows: [{ problem_type: 'header', submission_filename: 'student.h' }] })
-        .mockResolvedValueOnce({ rows: [{ filename: 'main.cpp', content: Buffer.from('x') }] });
+        .mockResolvedValueOnce({ rows: [{ filename: 'main.cpp', content: Buffer.from('x') }] })
+        .mockResolvedValueOnce({ rows: [{ filename: 'main.cpp' }, { filename: 'vector.h' }] });
       const spec = await getHeaderJudgeSpec('p1');
       expect(spec?.problemType).toBe('header');
       expect(spec?.submissionFilename).toBe('student.h');
       expect(spec?.graderFiles).toEqual([{ filename: 'main.cpp', content: Buffer.from('x') }]);
+      // Names only: the header source rules allow `#include "vector.h"`.
+      expect(spec?.starterFilenames).toEqual(['main.cpp', 'vector.h']);
+      expect(query.mock.calls[2][0]).toContain("role = 'starter'");
+      expect(query.mock.calls[2][0]).not.toContain('content');
     });
   });
 
-  it('hasGraderSource matches .cpp grader files case-insensitively', async () => {
+  it('hasGraderSource matches exactly the grader sources the judge compiles', async () => {
     query.mockResolvedValueOnce({ rows: [{ exists: true }] });
     expect(await hasGraderSource('p1')).toBe(true);
-    // validateProblemFileSet and headerPreparePlan both lower-case the
-    // extension, so a grader uploaded as `main.CPP` is accepted and compiled.
-    // A case-sensitive LIKE here would make such a problem permanently
-    // unsubmittable ("not ready for submissions yet").
-    expect(query.mock.calls[0][0]).toContain("LOWER(filename) LIKE '%.cpp'");
+    // Case-sensitive, like validateProblemFileSet and headerPreparePlan: a
+    // `main.Cpp` g++ would hand to the linker must not make the problem
+    // look submittable.
+    const sql = query.mock.calls[0][0] as string;
+    expect(sql).toContain("filename ~ '\\.(cpp|cc|cxx|cp|c\\+\\+|C|CPP)$'");
+    expect(sql).not.toMatch(/LOWER\(filename\)/i);
     query.mockResolvedValueOnce({ rows: [{ exists: false }] });
     expect(await hasGraderSource('p1')).toBe(false);
   });

@@ -56,6 +56,21 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     expect([list.a.type_locked, list.b.type_locked, list.c.type_locked, list.d.type_locked]).toEqual([true, false, true, false]);
   });
 
+  it('AC rate and solvers count the same practice + contest submissions as submission_count', async () => {
+    await pool.query(`INSERT INTO contest_submissions (contest_id, user_id, problem_id, code, language, overall_status, score, results)
+      VALUES (1, 2, 'c', 'x', 'cpp', 'Wrong Answer', 0, '[]'), (1, 1, 'c', 'x', 'cpp', 'Accepted', 100, '[]'),
+             (1, 2, 'c', 'x', 'cpp', 'Accepted', 100, '[]')`);
+    // A user who solved it both in practice and in the contest is one solver.
+    await pool.query(`INSERT INTO submissions (user_id, problem_id, code, language, overall_status, score, results)
+      VALUES (2, 'c', 'x', 'cpp', 'Accepted', 100, '[]')`);
+    const list = await rows();
+    expect(list.c).toMatchObject({ submission_count: 5, accepted_count: 4, solver_count: 2 });
+    expect(list.a).toMatchObject({ submission_count: 2, accepted_count: 1, solver_count: 1 });
+    expect(list.d).toMatchObject({ submission_count: 0, accepted_count: 0, solver_count: 0 });
+    const res = await request(app).get('/admin/problems').expect(200);
+    expect(res.body.problems.find((p: { id: string }) => p.id === 'c')).toMatchObject({ accepted_count: 4, solver_count: 2 });
+  });
+
   it('admin detail carries the collection id the editor needs', async () => {
     await pool.query("INSERT INTO collections (id, name) VALUES (7, 'Sorting')");
     await pool.query("UPDATE problems SET collection_id = 7 WHERE id = 'a'");

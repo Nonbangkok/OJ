@@ -79,6 +79,25 @@
   color: var(--text-muted);
 }
 
+/* Phones: a header submission's "student.h · C++ · N lines" does not fit
+   beside the toggle and Copy, so the meta takes its own line underneath. */
+@media (max-width: 767px) {
+  .codeHead {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .copy {
+    margin-left: auto;
+  }
+
+  .codeMeta {
+    order: 1;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}
+
 .codeBody {
   display: flex;
   overflow-x: auto;

@@ -129,6 +129,9 @@ jobs:
           docker compose -f tests/authoring/compose.yml up
           --abort-on-container-exit --exit-code-from tests
 
+      - name: Judge sandbox suites under the production capability set
+        run: docker compose -f tests/authoring/compose.yml --profile judge run --rm judge-tests
+
       - name: Logs on failure
         if: failure()
         run: docker compose -f tests/authoring/compose.yml logs --no-color --tail=300

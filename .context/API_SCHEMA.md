@@ -382,6 +382,7 @@
   - `cursor: string` (opaque token จากหน้าก่อน)
 - Response 200:
   - `{ problems: [...], nextCursor: string | null, hasMore: boolean }`
+  - แต่ละ row: `id, title, author, categories, difficulty, problem_type` (`'standard'|'header'` — หน้า Problems แสดง badge "Header") + personal stats ของ viewer (`best_score`, `submission_count`, `latest_submission_*`, `best_submission_*`; null สำหรับ guest)
 - ลำดับ default: by id; sort by difficulty ใช้ id เป็น tiebreaker
 
 ### 44. `GET /problems/categories`
@@ -447,6 +448,7 @@
 - Auth: `staff|admin`
 - Purpose: list problems สำหรับ admin table
 - Response 200: list with visibility/contest status/collection/categories/difficulty
+  - B6 facts ต่อ row: `testcase_count`, `testcase_bytes`, `submission_count`, `type_locked`, `accepted_count`, `solver_count`, `has_pdf`, `has_grader` — `submission_count`, `accepted_count` (score เต็ม) และ `solver_count` (distinct user) นับบน practice + contest submissions ชุดเดียวกัน (AC rate ของโจทย์ที่อยู่ใน contest จึงไม่เป็น 0)
 
 ### 53. `PUT /admin/problems/:id/visibility`
 - Auth: `staff|admin`
@@ -515,7 +517,7 @@
 - Body: `{ problemIds: string[] }`
 - Response 200: ZIP binary
 - Error 400: ไม่มี problemIds
-- Header problems: `config.json` มี `problem_type`/`submission_filename` และ ZIP มี `<id>/grader/*`, `<id>/starter/*` (batch upload รับรูปแบบเดียวกัน; ต้องมี grader `.cpp` อย่างน้อยหนึ่งไฟล์, id ที่มีอยู่แล้วถูก SKIPPED)
+- Header problems: `config.json` มี `problem_type`/`submission_filename` และ ZIP มี `<id>/grader/*`, `<id>/starter/*` (batch upload รับรูปแบบเดียวกัน; ต้องมี grader C++ source (`.cpp`/`.cc`/`.cxx`/`.cp`/`.c++`/`.C`/`.CPP`) อย่างน้อยหนึ่งไฟล์, id ที่มีอยู่แล้วถูก SKIPPED)
 
 ### 63a. Header problem files (admin)
 - Auth: `staff|admin`
@@ -567,7 +569,7 @@
 ### 68. `GET /submissions/:id`
 - Auth: required (guest ไม่ได้รับสิทธิ์นี้แม้ใน PUBLIC mode)
 - Query optional: `contestId`
-- Response 200: submission detail
+- Response 200: submission detail — row ของ `submissions`/`contest_submissions` + `username`, `problem_name`, `time_limit_ms`, `memory_limit_mb`, `problem_type`, `submission_filename` (จาก `problems`; header submission แสดงชื่อไฟล์ในหัว code panel)
 - Errors:
   - 404 not found (id ต้องเป็นตัวเลข — ไม่ใช่ตอบ 500)
   - 403 ไม่มีสิทธิ์ดู

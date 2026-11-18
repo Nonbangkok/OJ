@@ -18,7 +18,7 @@ import {
     SubmissionListRow,
 } from '../types/service';
 
-/** Header problems are C++-only and need at least one grader .cpp to be judgeable. */
+/** Header problems are C++-only and need at least one grader C++ source (see isGraderSourceFilename) to be judgeable. */
 const assertHeaderSubmitAllowed = async (
     problemType: string | undefined,
     problemId: string,
@@ -375,7 +375,8 @@ export const getSubmissionDetail = async (
     }
 
     const result = await db.query<SubmissionDetailRow>(
-        `SELECT s.*, u.username, p.title AS problem_name, p.time_limit_ms, p.memory_limit_mb
+        `SELECT s.*, u.username, p.title AS problem_name, p.time_limit_ms, p.memory_limit_mb,
+                p.problem_type, p.submission_filename
          FROM submissions s
          LEFT JOIN users u ON s.user_id = u.id
          LEFT JOIN problems p ON s.problem_id = p.id

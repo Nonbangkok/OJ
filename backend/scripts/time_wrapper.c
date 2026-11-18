@@ -9,6 +9,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <grp.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <signal.h>
 #include <sys/wait.h>
 #include <sys/resource.h>
 #include <sys/types.h>
@@ -23,6 +26,9 @@
 #include <linux/filter.h>
 #include <linux/seccomp.h>
 #include <sys/syscall.h>
+#ifndef CLONE_THREAD
+#define CLONE_THREAD 0x00010000 /* <linux/sched.h>; not pulled in without _GNU_SOURCE */
+#endif
 #endif
 
 /*
@@ -30,26 +36,55 @@
  *
  * Usage:
  *   time_wrapper <executable> [mem_mb] [cpu_seconds] [uid] [exec_args...]
+ *   time_wrapper --kill-uid <uid> <sweeper-uid>
  *
  * Backwards compatible: if mem_mb / cpu_seconds are omitted (legacy 1-arg
  * invocation), no resource limits are applied and the program runs as before.
- * judgeService.ts now always passes mem_mb, cpu_seconds and uid.
+ * judgeService.ts always passes mem_mb, cpu_seconds and uid.
  *
  * In the child (after fork, before execv) this wrapper:
+ *   - closes the telemetry fd (below), so the program can never write to it;
  *   - applies setrlimit() for RLIMIT_AS, RLIMIT_CPU, RLIMIT_NPROC,
  *     RLIMIT_FSIZE and RLIMIT_NOFILE to bound memory, CPU, fork-bombs,
  *     disk writes and file descriptors of untrusted user code;
  *   - installs a seccomp filter denying socket/socketpair (and other
- *     namespace/escape syscalls) so the submission cannot reach the network
- *     (see restrict_network below); and
+ *     namespace/escape syscalls) so the submission cannot reach the network,
+ *     shmget/semget/msgget so it cannot leave SysV IPC objects behind, and
+ *     every process-creating clone so the program is thread-only (see
+ *     restrict_sandbox_syscalls below); and
  *   - if currently running as root, drops to an unprivileged identity (the
  *     per-submission sandbox uid/gid passed as argv[4], default nobody) via
  *     setgid() then setuid() so the submitted binary cannot act with root
  *     privileges.
  *
- * The parent still measures CPU time / peak RSS via wait4() and emits the
- * exact same stderr line the judge parser expects:
+ * The parent measures CPU time / peak RSS via wait4() and reports
  *     TIME_USED:<user>+<sys> MEM_USED:<maxrss_kb>
+ * on fd 3 (TELEMETRY_FD) when the caller opened it (the judge always does),
+ * otherwise on stderr for manual runs. The judge reads the figures ONLY from
+ * fd 3: the program shares stderr with the wrapper, so anything on stderr is
+ * attacker-controlled (a program printing a fake MEM_USED:1 line first used
+ * to dodge Memory Limit Exceeded, audit A4-04). A missing report means the
+ * wrapper itself was killed, which the judge treats as timeout evidence.
+ *
+ * --kill-uid <uid> <sweeper-uid> (audit A4-02): SIGKILL every process of a
+ * sandbox uid X and wait until none is left. Root in the production
+ * container has no CAP_KILL, so it cannot signal sandbox processes. This
+ * mode instead takes real = saved uid S (the identity's dedicated sweeper
+ * uid, which nothing else ever runs as) and effective uid X, then calls
+ * kill(-1, SIGKILL). The kernel lets a signal through when the sender's real
+ * or effective uid equals the target's real or saved uid, so:
+ *   - the helper reaches every process of X (effective X = their real uid);
+ *   - it reaches nothing else: not root (the backend), not another
+ *     identity, and nothing runs as S (checked before the drop);
+ *   - X's processes cannot signal the helper (its real and saved uid are S),
+ *     so a judged daemon spinning kill(-1, SIGKILL) cannot stop the sweep.
+ *     When the helper had all three uids = X, such a daemon killed it.
+ * Real uid 0 is never kept: kill(-1) would then reach root's processes.
+ * It repeats until /proc shows no live (non-zombie) process with uid X, for
+ * a bounded number of rounds.
+ * Exit status: 0 = none left, 3 = processes survived, 2 = usage/setup error
+ * (including "not started as root", so a dev run can never turn this into a
+ * kill of the developer's own processes, and "sweeper uid in use").
  */
 
 /* Default unprivileged identity to drop to when started as root. 65534 is the
@@ -58,6 +93,14 @@
  * submissions do not share an RLIMIT_NPROC budget. */
 #define SANDBOX_UID 65534
 #define SANDBOX_GID 65534
+
+/* The judge passes a fourth pipe for the wrapper's telemetry line. */
+#define TELEMETRY_FD 3
+
+/* --kill-uid bounds: about a second in all, which a SIGKILLed process tree
+ * (even one freeing a large heap) needs far less than. */
+#define SWEEP_MAX_ROUNDS 400
+#define SWEEP_ROUND_SLEEP_US 2500
 
 #ifdef __linux__
 #if defined(__x86_64__)
@@ -77,7 +120,11 @@
 /* Deny networking and namespace/escape syscalls for the untrusted program
  * (RUNNER-002). Mirrors the authoring sandbox (`backend/authoring/sandbox.c`):
  * a submission must not be able to open sockets to the database or other
- * in-stack services, nor escape its identity via namespaces/ptrace. Failures
+ * in-stack services, nor escape its identity via namespaces/ptrace. It must
+ * not create SysV IPC objects either: they live in the kernel, not in a
+ * directory, so they outlive the submission (and a shm segment stays charged
+ * to the backend's memory cgroup) where the per-uid cleanup cannot see them.
+ * POSIX shm/semaphores (/dev/shm) are files the cleanup removes. Failures
  * installing the filter abort the child — never run unfiltered by accident. */
 static int restrict_sandbox_syscalls(void) {
     struct sock_filter rules[] = {
@@ -93,6 +140,29 @@ static int restrict_sandbox_syscalls(void) {
         DENY(__NR_socket), DENY(__NR_socketpair),
         DENY(__NR_unshare), DENY(__NR_setns),
         DENY(__NR_ptrace), DENY(__NR_mount),
+        DENY(__NR_shmget), DENY(__NR_semget), DENY(__NR_msgget),
+        /* Thread-only (A9-06): RLIMIT_AS and the wait4() peak are per
+         * process, so forked workers could each take a fresh memory (and
+         * CPU) allowance. fork/vfork and clone without CLONE_THREAD get
+         * EPERM; clone3 answers ENOSYS so glibc falls back to the clone
+         * syscall whose flags this filter can inspect. Threads share the
+         * one limited address space and keep working. Mirrors the
+         * authoring sandbox's solution filter. */
+#ifdef __NR_clone3
+        BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, __NR_clone3, 0, 1),
+        BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_ERRNO|(ENOSYS & SECCOMP_RET_DATA)),
+#endif
+#ifdef __NR_fork
+        DENY(__NR_fork),
+#endif
+#ifdef __NR_vfork
+        DENY(__NR_vfork),
+#endif
+        /* Last check: it replaces the syscall number with clone's flags. */
+        BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, __NR_clone, 0, 3),
+        BPF_STMT(BPF_LD|BPF_W|BPF_ABS, offsetof(struct seccomp_data, args[0])),
+        BPF_JUMP(BPF_JMP|BPF_JSET|BPF_K, CLONE_THREAD, 1, 0),
+        BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_ERRNO|(EPERM & SECCOMP_RET_DATA)),
         BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_ALLOW),
     };
     struct sock_fprog program = { .len = sizeof(rules)/sizeof(rules[0]), .filter = rules };
@@ -119,7 +189,149 @@ static void set_limit(int resource, rlim_t value, const char *name) {
     }
 }
 
+#ifdef __linux__
+/* Live processes (other than `self`) any of whose real/effective/saved/fs
+ * uids is `uid`; zombies and dead tasks do not count. Reads the Uid: line of
+ * /proc/<pid>/status rather than the owner of /proc/<pid>, which a process
+ * can turn into root by making itself non-dumpable. A zombie whose Threads:
+ * count is above 1 is a process whose main thread exited while other threads
+ * still run, so it counts as live. A status file that exists but cannot be
+ * read counts as a live process (fail closed). Returns -1 when /proc itself
+ * cannot be read. */
+static int count_uid_processes(uid_t uid, pid_t self) {
+    DIR *proc = opendir("/proc");
+    if (proc == NULL) return -1;
+    int count = 0;
+    struct dirent *entry;
+    while ((entry = readdir(proc)) != NULL) {
+        char *end = NULL;
+        long pid = strtol(entry->d_name, &end, 10);
+        if (end == entry->d_name || *end != '\0' || pid <= 0 || (pid_t)pid == self) continue;
+
+        char path[64];
+        snprintf(path, sizeof(path), "/proc/%ld/status", pid);
+        FILE *status = fopen(path, "re");
+        if (status == NULL) {
+            if (errno != ENOENT && errno != ESRCH) count++;
+            continue;
+        }
+        char line[256];
+        char state = '?';
+        int owned = 0;
+        long threads = 0;
+        while (fgets(line, sizeof(line), status) != NULL) {
+            if (strncmp(line, "State:", 6) == 0) {
+                sscanf(line + 6, " %c", &state);
+            } else if (strncmp(line, "Uid:", 4) == 0) {
+                unsigned long ids[4];
+                if (sscanf(line + 4, "%lu %lu %lu %lu", &ids[0], &ids[1], &ids[2], &ids[3]) == 4) {
+                    for (int i = 0; i < 4; i++) {
+                        if (ids[i] == (unsigned long)uid) owned = 1;
+                    }
+                }
+            } else if (strncmp(line, "Threads:", 8) == 0) {
+                sscanf(line + 8, " %ld", &threads);
+                break; /* State: and Uid: precede Threads: */
+            }
+        }
+        fclose(status);
+        int dead = (state == 'Z' || state == 'X') && threads <= 1;
+        if (owned && !dead) count++;
+    }
+    closedir(proc);
+    return count;
+}
+#endif /* __linux__ */
+
+/* A positive uid that is neither root nor nobody (the default drop identity,
+ * also used by other sandboxes in the image). 0 on success. */
+static int parse_sweep_uid(const char *arg, long *out) {
+    char *end = NULL;
+    errno = 0;
+    long value = strtol(arg, &end, 10);
+    if (errno != 0 || end == arg || *end != '\0' || value <= 0 || value > 2147483647L
+        || value == SANDBOX_UID) {
+        return -1;
+    }
+    *out = value;
+    return 0;
+}
+
+static int kill_uid_mode(const char *uid_arg, const char *sweeper_arg) {
+    long uid = 0;
+    long sweeper = 0;
+    if (parse_sweep_uid(uid_arg, &uid) != 0 || parse_sweep_uid(sweeper_arg, &sweeper) != 0
+        || sweeper == uid) {
+        fprintf(stderr, "error: --kill-uid needs two distinct positive uids: the identity, then its sweeper uid\n");
+        return 2;
+    }
+    if (getuid() != 0 || geteuid() != 0) {
+        fprintf(stderr, "error: --kill-uid must be started as root\n");
+        return 2;
+    }
+#ifndef __linux__
+    /* Needs setresuid() and /proc: the sweep exists for the Linux image. */
+    fprintf(stderr, "error: --kill-uid is only supported on Linux\n");
+    return 2;
+#else
+    pid_t self = getpid();
+    /* Anything running as S could signal the helper, and the helper's
+     * kill(-1) would reach it (real uid S): a sweeper uid that is not the
+     * helper's alone is a setup error, and then nothing is signalled. Only
+     * root can start a process as S, so this cannot change after the check. */
+    int sweeper_users = count_uid_processes((uid_t)sweeper, self);
+    if (sweeper_users != 0) {
+        if (sweeper_users < 0) {
+            fprintf(stderr, "error: cannot read /proc: %s\n", strerror(errno));
+        } else {
+            fprintf(stderr, "error: sweeper uid %ld is in use by %d process(es)\n", sweeper, sweeper_users);
+        }
+        return 2;
+    }
+
+    /* Real = saved = S, effective = X (gids all S; they play no part in
+     * signal permission). Dropping every uid away from 0 also drops every
+     * capability, so the helper holds no privilege while X's processes live. */
+    uid_t real = 0, effective = 0, saved = 0;
+    if (setgroups(0, NULL) != 0
+        || setresgid((gid_t)sweeper, (gid_t)sweeper, (gid_t)sweeper) != 0
+        || setresuid((uid_t)sweeper, (uid_t)uid, (uid_t)sweeper) != 0
+        || getresuid(&real, &effective, &saved) != 0
+        || real != (uid_t)sweeper || effective != (uid_t)uid || saved != (uid_t)sweeper) {
+        fprintf(stderr, "error: cannot take sweeper uid %ld with effective uid %ld: %s\n",
+                sweeper, uid, strerror(errno));
+        return 2;
+    }
+
+    for (int round = 0; round < SWEEP_MAX_ROUNDS; round++) {
+        /* ESRCH = nothing of X left to signal. kill(-1) never signals the
+         * caller itself or pid 1. */
+        if (kill(-1, SIGKILL) != 0 && errno != ESRCH) {
+            fprintf(stderr, "error: kill(-1) as uid %ld failed: %s\n", uid, strerror(errno));
+            return 2;
+        }
+        int remaining = count_uid_processes((uid_t)uid, self);
+        if (remaining < 0) {
+            fprintf(stderr, "error: cannot read /proc: %s\n", strerror(errno));
+            return 2;
+        }
+        if (remaining == 0) return 0;
+        usleep(SWEEP_ROUND_SLEEP_US);
+    }
+    fprintf(stderr, "error: processes of uid %ld survived the sweep\n", uid);
+    return 3;
+#endif /* __linux__ */
+}
+
 int main(int argc, char *argv[]) {
+    if (argc >= 2 && strcmp(argv[1], "--kill-uid") == 0) {
+        if (argc != 4) {
+            fprintf(stderr, "Usage: %s --kill-uid <uid> <sweeper-uid>\n", argv[0]);
+            return 2;
+        }
+        return kill_uid_mode(argv[2], argv[3]);
+    }
+
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <executable> [mem_mb] [cpu_seconds] [args...]\n", argv[0]);
         return 1;
@@ -134,6 +346,18 @@ int main(int argc, char *argv[]) {
     long cpu_seconds = (argc >= 4) ? strtol(argv[3], NULL, 10) : 0;
     long drop_uid = (argc >= 5) ? strtol(argv[4], NULL, 10) : 0;
 
+    /* Telemetry channel: fd 3 when the caller opened it, stderr otherwise.
+     * Close-on-exec as well as the explicit close in the child below, so no
+     * exec'd program can ever hold it. */
+    int report_fd = STDERR_FILENO;
+    if (fcntl(TELEMETRY_FD, F_GETFD) != -1) {
+        report_fd = TELEMETRY_FD;
+        if (fcntl(TELEMETRY_FD, F_SETFD, FD_CLOEXEC) != 0) {
+            perror("fcntl(telemetry fd)");
+            return 1;
+        }
+    }
+
     pid_t pid = fork();
 
     if (pid < 0) {
@@ -143,6 +367,12 @@ int main(int argc, char *argv[]) {
 
     if (pid == 0) {
         /* ---- Child: lock down, then exec the untrusted program. ---- */
+
+        /* The program must not be able to write (forge) the telemetry. */
+        if (report_fd == TELEMETRY_FD && close(TELEMETRY_FD) != 0) {
+            fprintf(stderr, "error: cannot close the telemetry fd: %s\n", strerror(errno));
+            _exit(127);
+        }
 
         /* Address space (virtual memory). This is the primary memory cap; the
          * judge reports MLE from peak RSS, but RLIMIT_AS prevents a runaway
@@ -230,7 +460,7 @@ int main(int argc, char *argv[]) {
         perror("execv");
         _exit(127);
     } else {
-        /* ---- Parent: wait and collect stats (unchanged output format). ---- */
+        /* ---- Parent: wait and collect stats. ---- */
         int status;
         struct rusage usage;
 
@@ -244,7 +474,7 @@ int main(int argc, char *argv[]) {
 
         long max_rss = usage.ru_maxrss; /* KB on Linux */
 
-        fprintf(stderr, "TIME_USED:%.3f+%.3f MEM_USED:%ld\n", user_time, sys_time, max_rss);
+        dprintf(report_fd, "TIME_USED:%.3f+%.3f MEM_USED:%ld\n", user_time, sys_time, max_rss);
 
         if (WIFEXITED(status)) {
             return WEXITSTATUS(status);

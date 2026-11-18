@@ -250,7 +250,9 @@ function ProblemEditor() {
         {tab === 'testcases' && (
           <ProblemTestcasesTab problemId={detail.id} submissionCount={submissionCount} canRejudge={user?.role === 'admin'} />
         )}
-        {tab === 'grader' && <ProblemGraderTab problemId={detail.id} />}
+        {tab === 'grader' && (
+          <ProblemGraderTab problemId={detail.id} submissionCount={submissionCount} canRejudge={user?.role === 'admin'} />
+        )}
         {tab === 'danger' && (
           <ProblemDangerTab
             problemId={detail.id}

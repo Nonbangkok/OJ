@@ -92,6 +92,14 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     expect(await getSubmissionDetail(String(id))).toMatchObject({ time_limit_ms: 1500, memory_limit_mb: 128 });
   });
 
+  it('detail carries the problem type and the header file name the code was submitted as', async () => {
+    await pool.query("UPDATE problems SET problem_type = 'header', submission_filename = 'queue.hpp' WHERE id = 'vis'");
+    const header = await submit(1, 'vis', 'Accepted', 100, '[]');
+    expect(await getSubmissionDetail(String(header))).toMatchObject({ problem_type: 'header', submission_filename: 'queue.hpp' });
+    const standard = await submit(1, 'hid', 'Accepted', 100, '[]');
+    expect(await getSubmissionDetail(String(standard))).toMatchObject({ problem_type: 'standard', submission_filename: null });
+  });
+
   it('problem detail carries collection, viewer best and submission count', async () => {
     await submit(1, 'vis', 'Wrong Answer', 40, '[{"status":"Accepted"},{"status":"Wrong Answer"}]');
     await submit(1, 'vis', 'Wrong Answer', 20, '[{"status":"Wrong Answer"}]');

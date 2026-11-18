@@ -261,6 +261,13 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
       expect(counts.body.all).toBe(1);
     });
 
+    it('every row says its problem type, so the list can mark header problems', async () => {
+      const res = await request(app).get('/problems-with-stats');
+      expect(res.status).toBe(200);
+      expect(Object.fromEntries(res.body.problems.map((p: { id: string; problem_type: string }) => [p.id, p.problem_type])))
+        .toEqual({ 'head-a': 'header', 'plain-a': 'standard', 'plain-b': 'standard' });
+    });
+
     it('rejects an unknown type', async () => {
       expect((await request(app).get('/problems-with-stats?type=interactive')).status).toBe(400);
       expect((await request(app).get('/problem-status-counts?type=interactive')).status).toBe(400);

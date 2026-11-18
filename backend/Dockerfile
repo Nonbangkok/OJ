@@ -34,6 +34,14 @@ RUN npm ci --no-audit --install-links
 # Copy the rest of your app's source code from the 'backend' directory
 COPY backend/. .
 
+# Judged programs run as sandbox uids and may write only inside their own
+# workspace (TMPDIR points there): no world write on /tmp, /var/tmp or
+# /run/lock, so they can neither fill the disk outside it nor claim a path
+# the backend (root, the owner) creates later. Workspaces live in the
+# root-owned 1733 submissions root, created here so nobody can claim it.
+RUN chmod 1755 /tmp /var/tmp /run/lock \
+    && install -d -o root -g root -m 1733 /tmp/oj-submissions
+
 # Compile the high-precision time wrapper
 RUN gcc scripts/time_wrapper.c -o scripts/time_wrapper
 RUN gcc -Wall -Wextra -Werror authoring/sandbox.c -o /usr/local/bin/oj-authoring-sandbox

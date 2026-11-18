@@ -189,7 +189,7 @@ export const ANALYTICS_TIMEZONE = 'Asia/Bangkok';
 export const RANKING_PAGE_SIZE = 50;
 
 export const JUDGE_CONFIG = {
-    EXEC_MAX_BUFFER: 50 * 1024 * 1024, // 50MB
+    EXEC_MAX_BUFFER: 50 * 1024 * 1024, // 50MB cap on one testcase run's stdout
     TIMEOUT_BUFFER_MS: 500,
     // Grace period after the wall-clock limit before a judge execution is
     // SIGKILLed outright (RUNNER-004). GNU `timeout` runs with `-k` using this
@@ -204,14 +204,29 @@ export const JUDGE_CONFIG = {
     SIGNAL_EXIT_BASE: 128,
     SIGKILL: 9,
     SIGXCPU: 24,
-    // time_wrapper telemetry tokens (see scripts/time_wrapper.c). Parsed for
-    // time/memory figures; WRAPPER_TELEMETRY_STRIP removes them from any
-    // stderr shown to submitters (JUDGE-001). Token-based (not line-based):
-    // when a program's own output lacks a trailing newline the tokens
-    // concatenate onto that line, so whole-line filtering misses them.
+    // time_wrapper telemetry tokens (see scripts/time_wrapper.c). The wrapper
+    // writes them to its own fd (WRAPPER_TELEMETRY_FD), which the program
+    // never inherits, and the judge parses time/memory from that fd ONLY:
+    // stderr is shared with the program, so a token there is forgeable
+    // (A4-04). WRAPPER_TELEMETRY_STRIP still removes look-alike tokens from
+    // any stderr shown to submitters (JUDGE-001).
     WRAPPER_TIME_REPORT: /TIME_USED:([0-9.+]+)/,
     WRAPPER_MEM_REPORT: /MEM_USED:(\d+)/,
     WRAPPER_TELEMETRY_STRIP: /\s*TIME_USED:[0-9.+]+\s*MEM_USED:\d+\s*|\s*(?:TIME_USED:[0-9.+]+|MEM_USED:\d+)\s*/g,
+    // The judge's run spawn: `timeout` + the wrapper, no shell, stdio
+    // [stdin, stdout, stderr, telemetry]. The wrapper is also the per-uid
+    // sweep helper (`--kill-uid`).
+    TIME_WRAPPER_PATH: './scripts/time_wrapper',
+    WRAPPER_TELEMETRY_FD: 3,
+    WRAPPER_TELEMETRY_MAX_BYTES: 4 * 1024,
+    // Program stderr kept in memory per run (the rest is drained, never
+    // buffered), and the Runtime Error text stored from it, truncation
+    // marker included (A9-04).
+    RUN_STDERR_MAX_BYTES: 64 * 1024,
+    RUNTIME_ERROR_OUTPUT_MAX_BYTES: 4 * 1024,
+    // After the run's `timeout` process exits, how long to wait for its
+    // stdio pipes to close before abandoning them.
+    RUN_STDIO_DRAIN_GRACE_MS: 1000,
     // CPU-time slack (seconds) added on top of the wall-clock limit before the
     // in-process RLIMIT_CPU hard-kills the program. The `timeout` command still
     // owns wall-clock TLE detection; this is a defence-in-depth backstop against
@@ -262,6 +277,35 @@ export const JUDGE_CONFIG = {
     // Wall-clock/output caps for the uid-dropped workspace helper spawns.
     WORKSPACE_OP_TIMEOUT_MS: 5000,
     WORKSPACE_OP_MAX_BUFFER: 64 * 1024,
+    // Per-uid process sweep (`time_wrapper --kill-uid`, A4-02): SIGKILLs
+    // every process of a sandbox identity. Runs before an identity is handed
+    // out, after the compile, after every testcase and at the end of the
+    // pipeline; a sweep that still fails after SANDBOX_SWEEP_ATTEMPTS runs
+    // quarantines the uid.
+    SANDBOX_SWEEP_TIMEOUT_MS: 5000,
+    SANDBOX_SWEEP_ATTEMPTS: 3,
+    // Each pool identity X has its own sweeper uid
+    // SANDBOX_SWEEPER_UID_BASE + (X - SANDBOX_UID_BASE), i.e. 61000..61015,
+    // that nothing else ever runs as (it must not overlap the pool, nobody
+    // 65534 or any other uid in use). The helper takes real = saved uid =
+    // the sweeper uid and effective uid = X, so its kill(-1) reaches exactly
+    // X's processes, and they cannot signal it back.
+    SANDBOX_SWEEPER_UID_BASE: 61000,
+    // How many identities one acquisition tries (each swept) before the
+    // submission becomes a System Error.
+    SANDBOX_ACQUIRE_CANDIDATES: 3,
+    // A quarantined identity is swept again by the first acquisition at
+    // least this long after its last failed sweep; once a sweep passes and
+    // its leftovers are removed it rejoins the pool. When no clean identity
+    // is free, a quarantined one is tried at once instead.
+    SANDBOX_QUARANTINE_RETRY_MS: 60_000,
+    // World-writable places outside the workspace a sandbox uid can still
+    // reach (the image makes /tmp, /var/tmp and /run/lock 1755; /dev/shm
+    // and /dev/mqueue are runtime mounts). After each submission every
+    // top-level entry the uid owns here, or in the submissions root, is
+    // removed as the uid (A9-05).
+    SANDBOX_SHARED_SCRATCH_DIRS: ['/tmp', '/var/tmp', '/run/lock', '/dev/shm', '/dev/mqueue'],
+    SANDBOX_STRAY_REMOVE_BATCH: 256,
     // --- Compile-step resource caps (RUNNER-005), mirroring the authoring
     // compiler's prlimit recipe ---
     PRLIMIT_PATH: '/usr/bin/prlimit',
@@ -350,19 +394,42 @@ export const LANGUAGE_PREPARE: Record<SubmissionLanguage, {
 };
 
 /**
+ * Diagnostics flags of the header compile. `-fno-diagnostics-show-caret`
+ * stops g++ echoing the offending SOURCE LINE, which would quote the grader's
+ * secret code back to the submitter on any compile error; `-fmax-errors`
+ * bounds how much a single failing submission can make the compiler print.
+ */
+const HEADER_DIAGNOSTIC_FLAGS = ['-fno-diagnostics-show-caret', '-fmax-errors=10'] as const;
+
+/**
  * Prepare recipe for a HEADER problem: the student submits a single header
  * (e.g. `student.h`) and the judge compiles the problem's secret grader
- * sources — which `#include` it — into one binary. Same flags as a standard
- * C++ submission (header problems are C++ only) plus
- * `-fno-diagnostics-show-caret`: without it g++ echoes the offending SOURCE
- * LINE in diagnostics, which would quote the grader's secret code back to the
- * submitter on any compile error. Only the grader `.cpp` names are passed on
- * the command line; headers (the submission included) enter through #include.
+ * sources — which `#include` it — into one binary, in TWO steps:
+ *
+ *  1. `compileCommand`: compile proper (`-S`, no assembler) of the grader
+ *     sources with every file present, writing `<stem>.s` per source;
+ *  2. the pipeline then deletes every grader file and the submission;
+ *  3. `linkCommand`: assemble and link the `.s` files (same flags, so the
+ *     sanitizer runtime still links, plus `-s` to strip the symbol table);
+ *  4. the pipeline deletes the `.s` files before any testcase runs.
+ *
+ * The assembler therefore never runs while a grader source is readable, so a
+ * submission that smuggles `.incbin "main.cpp"` into the assembly gets a
+ * Compilation Error ("file not found") instead of the grader's bytes in its
+ * binary. Same flags as a standard C++ submission (header problems are C++
+ * only). Only the grader source names are passed on the command line; headers
+ * (the submission included) enter through #include.
  */
 export const HEADER_CPP_PREPARE = {
-    checkCommand: (cppSources: readonly string[], outputPath: string): RunnableCommand => ({
+    compileCommand: (cppSources: readonly string[]): RunnableCommand => ({
         command: 'g++',
-        args: [...CPP_COMPILE_FLAGS, '-fno-diagnostics-show-caret', ...cppSources, '-o', outputPath],
+        args: [...CPP_COMPILE_FLAGS, ...HEADER_DIAGNOSTIC_FLAGS, '-S', ...cppSources],
+    }),
+    /** The file `g++ -S` writes for a source: its stem plus `.s`, in the working directory. */
+    assemblyName: (cppSource: string): string => `${cppSource.slice(0, cppSource.lastIndexOf('.'))}.s`,
+    linkCommand: (assemblyFiles: readonly string[], outputPath: string): RunnableCommand => ({
+        command: 'g++',
+        args: [...CPP_COMPILE_FLAGS, '-s', ...assemblyFiles, '-o', outputPath],
     }),
     runCommand: (binaryPath: string): RunnableCommand => LANGUAGE_PREPARE.cpp.runCommand(binaryPath),
 } as const;
@@ -576,6 +643,15 @@ export const PROBLEM_FILE_ROLES = ['grader', 'starter'] as const;
 export type ProblemFileRole = (typeof PROBLEM_FILE_ROLES)[number];
 
 export const DEFAULT_SUBMISSION_FILENAME = 'student.h';
+
+/**
+ * Grader file extensions, matched EXACTLY (case-sensitive). Sources are the
+ * suffixes g++ itself compiles as C++ (gcc/cp/lang-specs.h: `.CPP` and `.C`
+ * included); it hands any other casing, e.g. `main.Cpp` or `main.CXX`, to the
+ * linker as a linker script. Headers only ever arrive through #include.
+ */
+export const GRADER_SOURCE_EXTENSIONS = ['.cpp', '.cc', '.cxx', '.cp', '.c++', '.C', '.CPP'] as const;
+export const GRADER_HEADER_EXTENSIONS = ['.h', '.hpp'] as const;
 
 export const HEADER_PROBLEM_LIMITS = {
     MAX_FILE_BYTES: 1024 * 1024, // 1 MiB per file

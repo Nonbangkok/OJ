@@ -11,6 +11,7 @@ import { DifficultyBadge,
   PageHeader,
   ScoreCell,
   SegmentedControl,
+  StatusBadge,
   StatusMark,
   TestcaseStrip,
   verdictTone,
@@ -274,7 +275,10 @@ const Problems = ({ initialPageSpan = null }: { initialPageSpan?: PublicProblemL
       key: 'title',
       header: 'Title',
       mobile: 'primary',
-      cell: (p) => p.title,
+      // The badge sits inside the row link, so the link reads "<title> Header".
+      cell: (p) => (p.problem_type === 'header'
+        ? <>{p.title}{' '}<StatusBadge soft className={styles.typeBadge}>Header</StatusBadge></>
+        : p.title),
     },
     {
       // Each row reveals its own categories (filtered ones show by default); outside the title link.

@@ -145,7 +145,7 @@ describe('ProblemGraderTab', () => {
       .mockResolvedValueOnce(filesInfo())
       .mockResolvedValueOnce(filesInfo({ files: [{ role: 'grader', filename: 'new.cpp', bytes: 5 }] }));
     jest.mocked(adminService.replaceProblemFiles).mockResolvedValue({ message: 'ok' } as never);
-    render(<ProblemGraderTab problemId="P1" />);
+    render(<ProblemGraderTab problemId="P1" submissionCount={0} canRejudge />);
     expect(await screen.findByText('grader.cpp')).toBeInTheDocument();
     expect(screen.getByText('2.0 KB')).toBeInTheDocument();
     const file = new File(['zip'], 'grader.zip', { type: 'application/zip' });
@@ -160,15 +160,107 @@ describe('ProblemGraderTab', () => {
     jest.mocked(adminService.replaceProblemFiles).mockRejectedValue({
       response: { status: 400, data: { message: 'Grader files need at least one .cpp file.' } },
     });
-    render(<ProblemGraderTab problemId="P1" />);
+    render(<ProblemGraderTab problemId="P1" submissionCount={0} canRejudge />);
     await screen.findByText('grader.cpp');
     await userEvent.upload(screen.getByLabelText('Replace all starter files'), new File(['z'], 's.zip'));
     expect(await screen.findByText('Grader files need at least one .cpp file.')).toBeInTheDocument();
   });
 
+  describe('replacing the grader of a problem with earlier submissions', () => {
+    const graderZip = () => new File(['zip'], 'fixed-grader.zip', { type: 'application/zip' });
+    beforeEach(() => {
+      jest.mocked(adminService.getProblemFiles).mockResolvedValue(filesInfo());
+      jest.mocked(adminService.replaceProblemFiles).mockResolvedValue({ message: 'ok' } as never);
+      jest.mocked(adminService.rejudgeProblem).mockResolvedValue({ message: 'ok' } as never);
+    });
+
+    it('asks first, names the submissions, rejudge is on, and the primary replaces then rejudges', async () => {
+      render(<ProblemGraderTab problemId="P1" submissionCount={214} canRejudge />);
+      await screen.findByText('grader.cpp');
+      const zip = graderZip();
+      await userEvent.upload(screen.getByLabelText('Replace all grader files'), zip);
+      const dialog = await screen.findByRole('dialog', { name: 'Replace all grader files?' });
+      expect(adminService.replaceProblemFiles).not.toHaveBeenCalled();
+      expect(dialog).toHaveTextContent('Every current grader file is deleted and replaced by the ones in fixed-grader.zip.');
+      expect(dialog).toHaveTextContent('214 earlier submissions were judged with the current grader files.');
+      expect(within(dialog).getByRole('switch', { name: 'Rejudge after replacing' })).toBeChecked();
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Replace and rejudge' }));
+      await waitFor(() => expect(adminService.rejudgeProblem).toHaveBeenCalledWith('P1'));
+      expect(adminService.replaceProblemFiles).toHaveBeenCalledWith('P1', 'grader', zip);
+      expect(jest.mocked(adminService.replaceProblemFiles).mock.invocationCallOrder[0])
+        .toBeLessThan(jest.mocked(adminService.rejudgeProblem).mock.invocationCallOrder[0]);
+      expect(await screen.findByRole('status')).toHaveTextContent('Grader files replaced. Rejudging 214 submissions.');
+    });
+
+    it('turning rejudge off replaces only', async () => {
+      render(<ProblemGraderTab problemId="P1" submissionCount={214} canRejudge />);
+      await screen.findByText('grader.cpp');
+      await userEvent.upload(screen.getByLabelText('Replace all grader files'), graderZip());
+      const dialog = await screen.findByRole('dialog', { name: 'Replace all grader files?' });
+      fireEvent.click(within(dialog).getByRole('switch', { name: 'Rejudge after replacing' }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Replace grader files' }));
+      expect(await screen.findByRole('status')).toHaveTextContent('Grader files replaced.');
+      expect(adminService.replaceProblemFiles).toHaveBeenCalledTimes(1);
+      expect(adminService.rejudgeProblem).not.toHaveBeenCalled();
+    });
+
+    it('cancel leaves the grader alone', async () => {
+      render(<ProblemGraderTab problemId="P1" submissionCount={214} canRejudge />);
+      await screen.findByText('grader.cpp');
+      await userEvent.upload(screen.getByLabelText('Replace all grader files'), graderZip());
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(adminService.replaceProblemFiles).not.toHaveBeenCalled();
+      expect(adminService.rejudgeProblem).not.toHaveBeenCalled();
+    });
+
+    it('staff cannot rejudge, so the confirm says who can', async () => {
+      render(<ProblemGraderTab problemId="P1" submissionCount={214} canRejudge={false} />);
+      await screen.findByText('grader.cpp');
+      await userEvent.upload(screen.getByLabelText('Replace all grader files'), graderZip());
+      const dialog = await screen.findByRole('dialog', { name: 'Replace all grader files?' });
+      expect(within(dialog).queryByRole('switch')).toBeNull();
+      expect(dialog).toHaveTextContent('An admin can rejudge them afterwards.');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Replace grader files' }));
+      await waitFor(() => expect(adminService.replaceProblemFiles).toHaveBeenCalled());
+      expect(adminService.rejudgeProblem).not.toHaveBeenCalled();
+    });
+
+    it('starter files decide no verdict, so they replace at once and never rejudge', async () => {
+      render(<ProblemGraderTab problemId="P1" submissionCount={214} canRejudge />);
+      await screen.findByText('grader.cpp');
+      await userEvent.upload(screen.getByLabelText('Replace all starter files'), new File(['z'], 's.zip'));
+      await waitFor(() => expect(adminService.replaceProblemFiles).toHaveBeenCalledWith('P1', 'starter', expect.any(File)));
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(adminService.rejudgeProblem).not.toHaveBeenCalled();
+    });
+
+    it('a rejudge that fails after a good replace keeps the success and says only the rejudge failed', async () => {
+      jest.mocked(adminService.rejudgeProblem).mockRejectedValue({ response: { status: 500, data: { message: 'Judge queue unavailable' } } });
+      render(<ProblemGraderTab problemId="P1" submissionCount={214} canRejudge />);
+      await screen.findByText('grader.cpp');
+      await userEvent.upload(screen.getByLabelText('Replace all grader files'), graderZip());
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Replace and rejudge' }));
+      expect(await screen.findByRole('status')).toHaveTextContent('Grader files replaced.');
+      expect(screen.getByRole('alert')).toHaveTextContent("The rejudge didn't start: Judge queue unavailable");
+    });
+
+    it('a rejected replace shows its message and skips the rejudge', async () => {
+      jest.mocked(adminService.replaceProblemFiles).mockRejectedValue({
+        response: { status: 400, data: { message: 'Grader files need at least one .cpp file.' } },
+      });
+      render(<ProblemGraderTab problemId="P1" submissionCount={214} canRejudge />);
+      await screen.findByText('grader.cpp');
+      await userEvent.upload(screen.getByLabelText('Replace all grader files'), graderZip());
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Replace and rejudge' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Grader files need at least one .cpp file.');
+      expect(adminService.rejudgeProblem).not.toHaveBeenCalled();
+    });
+  });
+
   it('says so when the files cannot be loaded', async () => {
     jest.mocked(adminService.getProblemFiles).mockRejectedValue(new Error('down'));
-    render(<ProblemGraderTab problemId="P1" />);
+    render(<ProblemGraderTab problemId="P1" submissionCount={0} canRejudge />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load the grader files.');
   });
 });

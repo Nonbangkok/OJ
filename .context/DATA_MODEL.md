@@ -276,7 +276,7 @@ Secret grader sources and public starter files of **header problems** (migration
 | `content` | `BYTEA` | NOT NULL |
 | | | PK(`problem_id`, `role`, `filename`) |
 
-`grader` files (at least one `.cpp`) are compiled with the student's header and never served to non-staff; `starter` files are what students download. Rows are kept if a problem's type is later switched back to standard (only possible before the first submission).
+`grader` files (at least one C++ source: exactly `.cpp`/`.cc`/`.cxx`/`.cp`/`.c++`/`.C`/`.CPP`; headers `.h`/`.hpp`) are compiled with the student's header and never served to non-staff; `starter` files are what students download. Rows are kept if a problem's type is later switched back to standard (only possible before the first submission).
 
 ### `testcases`
 Input/output pairs for judging.
@@ -542,6 +542,8 @@ three-table write. See `AUTHORING_PUBLISH.md`.
 ```
 
 Possible `status` values: `Accepted`, `Wrong Answer`, `Time Limit Exceeded`, `Memory Limit Exceeded`, `Runtime Error`, `System Error`, `Skipped`.
+
+A failed case other than Wrong Answer may carry `output`: for a Runtime Error the program's stderr without server paths, capped at 4 KiB with a `[truncated N bytes]` marker (on header problems only a neutral crash description such as `Program terminated by signal SIGABRT`).
 
 ### `contest_scoreboards.detailed_scores`
 

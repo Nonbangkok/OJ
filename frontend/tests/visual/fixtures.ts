@@ -231,7 +231,7 @@ export async function expectVisibleFocus(target: Locator): Promise<void> {
 }
 
 const studentProblems = [
-  { id: 'hp_vec04_erase', title: 'vector::erase', author: 'Ada', categories: ['Data Structures'], difficulty: 1200,
+  { id: 'hp_vec04_erase', title: 'vector::erase', author: 'Ada', categories: ['Data Structures'], difficulty: 1200, problem_type: 'header',
     best_score: 60, submission_count: '3', latest_submission_at: '2026-09-16T00:00:00.000Z',
     latest_submission_status: 'Wrong Answer', best_submission_status: 'Wrong Answer',
     best_submission_results: [...Array(6).fill({ status: 'Accepted' }), { status: 'Wrong Answer' }, ...Array(3).fill({ status: 'Skipped' })] },
@@ -283,6 +283,7 @@ const submissionDetail = {
   overall_status: 'Wrong Answer', score: 60, language: 'cpp', submitted_at: '2026-09-16T01:58:00.000Z',
   code: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    int n; cin >> n;\n    vector<int> a(n);\n    for (auto &x : a) cin >> x;\n    a.erase(a.begin() + n / 2);\n    for (int x : a) cout << x << " ";\n}\n',
   max_time_ms: 410, max_memory_kb: 12595, time_limit_ms: 1000, memory_limit_mb: 256,
+  problem_type: 'header', submission_filename: 'student.h',
   results: [
     ...[30, 40, 110, 190, 270, 330].map((timeMs, i) => ({ testCase: i + 1, status: 'Accepted', timeMs, memoryKb: 3900 + i * 1500 })),
     { testCase: 7, status: 'Wrong Answer', timeMs: 410, memoryKb: 12595 },
