@@ -174,8 +174,9 @@ const settlesWithin = async (work: Promise<unknown>, timeoutMs: number): Promise
 /**
  * A2-03: nothing else in the process may touch the database between the
  * drop and the end of the restore. Maintenance mode already 503s new
- * requests and makes the authoring coordinator skip its ticks; this waits
- * for the work that was already running. Throws (nothing dropped yet) when
+ * requests and makes the authoring coordinator skip its ticks and a batch
+ * upload stop between problems (startDatabaseImport refuses to begin while
+ * a batch is running); this waits for the work that was already running. Throws (nothing dropped yet) when
  * a step does not settle within DATABASE_IMPORT.QUIESCE_TIMEOUT_MS.
  */
 const quiesceBackgroundWork = async (schedulerSettled: Promise<unknown>): Promise<void> => {

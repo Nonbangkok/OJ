@@ -129,10 +129,11 @@
   - `{ message, jobId, token }` — ใช้ token ตรวจ progress
 - Errors:
   - 400 ไม่มีไฟล์ / extension ไม่รองรับ
-  - 400 ไฟล์ไม่ผ่านการตรวจ (`{ message }` บอกเหตุผล): `.dump`/`.tar` ที่ `pg_restore --list` อ่านไม่ได้, `.sql` ที่ไม่ใช่ pg_dump plain output (ไม่มี header/footer หรือมีบรรทัด psql meta-command) — ตรวจก่อนเริ่ม maintenance mode จึงไม่มีอะไรถูกแตะ
+  - 400 ไฟล์ไม่ผ่านการตรวจ (`{ message }` บอกเหตุผล): `.dump`/`.tar` ที่ `pg_restore --list` อ่านไม่ได้, `.sql` ที่ไม่ใช่ pg_dump plain output (ไม่มี header/footer หรือมี psql meta-command ที่ระดับ statement — backslash ใน string literal / identifier / dollar-quoted body / comment เป็นข้อมูล ไม่นับ) — ตรวจก่อนเริ่ม maintenance mode จึงไม่มีอะไรถูกแตะ
   - 409 มี import กำลังรันอยู่ (single-flight)
+  - 409 batch problem upload ยังประมวลผลอยู่ (`A batch problem upload is still being processed. Wait for it to finish, then start the import again.`)
 - ระหว่าง import: maintenance mode active — request อื่นตอบ 503, scheduler หยุด tick, judge queue หยุดรอ
-- Import ใช้ `DROP SCHEMA public CASCADE` (ครบทุกตาราง) หลังทำ safety copy (`pg_dump -Fc`) ไว้ก่อน ถ้า restore หรือ migration ล้มเหลวจะ restore safety copy กลับอัตโนมัติ (progress `failed` พร้อมข้อความว่ากู้ database เดิมแล้ว)
+- Import ล้าง database ใน statement เดียว: ทุก schema ที่ไม่ใช่ของระบบ (พร้อมทุกอย่างข้างใน), publication และ large object ทั้งหมด แล้วสร้าง `public` ว่างใหม่ — ตรงกับสิ่งที่อยู่ใน safety copy (`pg_dump -Fc --no-subscriptions`) ที่ทำไว้ก่อน ถ้า restore หรือ migration ล้มเหลวจะ restore safety copy กลับอัตโนมัติ (progress `failed` พร้อมข้อความว่ากู้ database เดิมแล้ว)
 
 ### 9. `GET /admin/database/import-progress/:jobId`
 - Auth: header `x-import-token` ที่ได้จาก endpoint 8 (session ใช้ไม่ได้ระหว่าง import เพราะ session table ถูก drop)

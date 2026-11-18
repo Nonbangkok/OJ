@@ -3,8 +3,8 @@ import { Request, Response, NextFunction } from 'express';
 /**
  * DB-05: in-process maintenance mode for the database import window.
  *
- * The import drops and recreates the whole public schema before restoring the
- * dump, so any API request that touches the database during that window fails
+ * The import empties the whole database (every non-system schema) before
+ * restoring the dump, so any API request that touches the database during that window fails
  * with a 500. This module is a simple process-wide flag:
  *
  *  - `beginMaintenanceMode()` claims the window (returns false when another
@@ -17,8 +17,10 @@ import { Request, Response, NextFunction } from 'express';
  * Deliberately simple: single-process state, no DB reads (the DB is being
  * dropped). Background work is quiesced by the import itself (A2-03, see
  * adminDatabaseService): the contest scheduler is paused and its running tick
- * awaited, the judge queue is paused and its running tasks awaited, and the
- * authoring coordinator skips its ticks while `isMaintenanceActive()`.
+ * awaited, the judge queue is paused and its running tasks awaited, the
+ * authoring coordinator skips its ticks while `isMaintenanceActive()`, an
+ * import is refused while a batch problem upload is running, and a batch
+ * stops between problems while `isMaintenanceActive()`.
  */
 
 let maintenanceActive = false;
