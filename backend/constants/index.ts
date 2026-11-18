@@ -239,10 +239,10 @@ export const JUDGE_CONFIG = {
     // to the next tick (contestScheduler caps the deferrals).
     CONTEST_MIGRATION_DRAIN_TIMEOUT_MS: 30_000,
     // The same wait on every later attempt (a retry of a deferred or failed
-    // migration). Kept short so contests still waiting on their judges
-    // cannot stretch the one-minute scheduler tick for everyone else: a tick
-    // that overruns makes the next cron fire skip, which delays other
-    // contests' start and end. The deferral budget is counted in ticks
+    // migration). Kept short so a contest still waiting on its judges adds
+    // only a few seconds to each one-minute scheduler tick: a tick that
+    // overruns makes the next cron fire skip, which delays other contests'
+    // start and end. The deferral budget is counted in ticks
     // (contestScheduler), so this does not shorten how long a contest may
     // wait for its judges.
     CONTEST_MIGRATION_RETRY_DRAIN_TIMEOUT_MS: 5_000,

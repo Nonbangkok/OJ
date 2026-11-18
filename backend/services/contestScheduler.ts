@@ -184,9 +184,12 @@ class ContestScheduler {
   // migration, because a migration may wait for its contest's judges to
   // drain. The attempt on the tick a contest ends may wait the full
   // CONTEST_MIGRATION_DRAIN_TIMEOUT_MS; every later attempt waits only
-  // CONTEST_MIGRATION_RETRY_DRAIN_TIMEOUT_MS, so contests that keep deferring
-  // cannot stretch the tick past a minute (an overrunning tick makes the next
-  // cron fire skip, delaying other contests' start and end).
+  // CONTEST_MIGRATION_RETRY_DRAIN_TIMEOUT_MS, so a contest that keeps
+  // deferring adds a few seconds to each tick instead of 30 s (an overrunning
+  // tick makes the next cron fire skip, delaying other contests' start and
+  // end). Not a hard bound: contests ending on the same tick still drain one
+  // after another, each up to the full wait, and many deferring contests add
+  // up.
   async endRunningContests(now: Date): Promise<void> {
     try {
       const result = await db.query<ContestTimingRow & { status: string }>(`
