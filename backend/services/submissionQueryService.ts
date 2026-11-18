@@ -363,8 +363,7 @@ export const getSubmissionDetail = async (
     if (contestId) {
         // For contest submissions, we join with contest_problems (the snapshot)
         const result = await db.query<ContestSubmissionDetailRow>(
-            `SELECT cs.*, u.username, cp.title AS problem_name, p.time_limit_ms, p.memory_limit_mb,
-                    p.problem_type, p.submission_filename
+            `SELECT cs.*, u.username, cp.title AS problem_name, p.time_limit_ms, p.memory_limit_mb
              FROM contest_submissions cs
              LEFT JOIN users u ON cs.user_id = u.id
              LEFT JOIN contest_problems cp ON cs.problem_id = cp.problem_id AND cs.contest_id = cp.contest_id
