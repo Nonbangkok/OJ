@@ -33,7 +33,7 @@
  *
  * Usage:
  *   time_wrapper <executable> [mem_mb] [cpu_seconds] [uid] [exec_args...]
- *   time_wrapper --kill-uid <uid>
+ *   time_wrapper --kill-uid <uid> <sweeper-uid>
  *
  * Backwards compatible: if mem_mb / cpu_seconds are omitted (legacy 1-arg
  * invocation), no resource limits are applied and the program runs as before.
@@ -61,15 +61,25 @@
  * to dodge Memory Limit Exceeded, audit A4-04). A missing report means the
  * wrapper itself was killed, which the judge treats as timeout evidence.
  *
- * --kill-uid <uid> (audit A4-02): SIGKILL every process of a sandbox uid and
- * wait until none is left. Root in the production container has no CAP_KILL,
- * so it cannot signal sandbox processes; instead this mode drops to the uid
- * and calls kill(-1, SIGKILL), which from uid X reaches exactly X's
- * processes and needs no capability. It repeats until /proc shows no live
- * (non-zombie) process with that uid, for a bounded number of rounds.
+ * --kill-uid <uid> <sweeper-uid> (audit A4-02): SIGKILL every process of a
+ * sandbox uid X and wait until none is left. Root in the production
+ * container has no CAP_KILL, so it cannot signal sandbox processes. This
+ * mode instead takes real = saved uid S (the identity's dedicated sweeper
+ * uid, which nothing else ever runs as) and effective uid X, then calls
+ * kill(-1, SIGKILL). The kernel lets a signal through when the sender's real
+ * or effective uid equals the target's real or saved uid, so:
+ *   - the helper reaches every process of X (effective X = their real uid);
+ *   - it reaches nothing else: not root (the backend), not another
+ *     identity, and nothing runs as S (checked before the drop);
+ *   - X's processes cannot signal the helper (its real and saved uid are S),
+ *     so a judged daemon spinning kill(-1, SIGKILL) cannot stop the sweep.
+ *     When the helper had all three uids = X, such a daemon killed it.
+ * Real uid 0 is never kept: kill(-1) would then reach root's processes.
+ * It repeats until /proc shows no live (non-zombie) process with uid X, for
+ * a bounded number of rounds.
  * Exit status: 0 = none left, 3 = processes survived, 2 = usage/setup error
  * (including "not started as root", so a dev run can never turn this into a
- * kill of the developer's own processes).
+ * kill of the developer's own processes, and "sweeper uid in use").
  */
 
 /* Default unprivileged identity to drop to when started as root. 65534 is the
@@ -147,6 +157,7 @@ static void set_limit(int resource, rlim_t value, const char *name) {
     }
 }
 
+#ifdef __linux__
 /* Live processes (other than `self`) any of whose real/effective/saved/fs
  * uids is `uid`; zombies and dead tasks do not count. Reads the Uid: line of
  * /proc/<pid>/status rather than the owner of /proc/<pid>, which a process
@@ -198,28 +209,70 @@ static int count_uid_processes(uid_t uid, pid_t self) {
     closedir(proc);
     return count;
 }
+#endif /* __linux__ */
 
-static int kill_uid_mode(const char *arg) {
+/* A positive uid that is neither root nor nobody (the default drop identity,
+ * also used by other sandboxes in the image). 0 on success. */
+static int parse_sweep_uid(const char *arg, long *out) {
     char *end = NULL;
     errno = 0;
-    long uid = strtol(arg, &end, 10);
-    if (errno != 0 || end == arg || *end != '\0' || uid <= 0 || uid > 2147483647L) {
-        fprintf(stderr, "error: --kill-uid needs a positive uid\n");
+    long value = strtol(arg, &end, 10);
+    if (errno != 0 || end == arg || *end != '\0' || value <= 0 || value > 2147483647L
+        || value == SANDBOX_UID) {
+        return -1;
+    }
+    *out = value;
+    return 0;
+}
+
+static int kill_uid_mode(const char *uid_arg, const char *sweeper_arg) {
+    long uid = 0;
+    long sweeper = 0;
+    if (parse_sweep_uid(uid_arg, &uid) != 0 || parse_sweep_uid(sweeper_arg, &sweeper) != 0
+        || sweeper == uid) {
+        fprintf(stderr, "error: --kill-uid needs two distinct positive uids: the identity, then its sweeper uid\n");
         return 2;
     }
     if (getuid() != 0 || geteuid() != 0) {
         fprintf(stderr, "error: --kill-uid must be started as root\n");
         return 2;
     }
-    if (setgroups(0, NULL) != 0 || setgid((gid_t)uid) != 0 || setuid((uid_t)uid) != 0
-        || getuid() != (uid_t)uid || geteuid() != (uid_t)uid) {
-        fprintf(stderr, "error: cannot become uid %ld: %s\n", uid, strerror(errno));
+#ifndef __linux__
+    /* Needs setresuid() and /proc: the sweep exists for the Linux image. */
+    fprintf(stderr, "error: --kill-uid is only supported on Linux\n");
+    return 2;
+#else
+    pid_t self = getpid();
+    /* Anything running as S could signal the helper, and the helper's
+     * kill(-1) would reach it (real uid S): a sweeper uid that is not the
+     * helper's alone is a setup error, and then nothing is signalled. Only
+     * root can start a process as S, so this cannot change after the check. */
+    int sweeper_users = count_uid_processes((uid_t)sweeper, self);
+    if (sweeper_users != 0) {
+        if (sweeper_users < 0) {
+            fprintf(stderr, "error: cannot read /proc: %s\n", strerror(errno));
+        } else {
+            fprintf(stderr, "error: sweeper uid %ld is in use by %d process(es)\n", sweeper, sweeper_users);
+        }
         return 2;
     }
 
-    pid_t self = getpid();
+    /* Real = saved = S, effective = X (gids all S; they play no part in
+     * signal permission). Dropping every uid away from 0 also drops every
+     * capability, so the helper holds no privilege while X's processes live. */
+    uid_t real = 0, effective = 0, saved = 0;
+    if (setgroups(0, NULL) != 0
+        || setresgid((gid_t)sweeper, (gid_t)sweeper, (gid_t)sweeper) != 0
+        || setresuid((uid_t)sweeper, (uid_t)uid, (uid_t)sweeper) != 0
+        || getresuid(&real, &effective, &saved) != 0
+        || real != (uid_t)sweeper || effective != (uid_t)uid || saved != (uid_t)sweeper) {
+        fprintf(stderr, "error: cannot take sweeper uid %ld with effective uid %ld: %s\n",
+                sweeper, uid, strerror(errno));
+        return 2;
+    }
+
     for (int round = 0; round < SWEEP_MAX_ROUNDS; round++) {
-        /* ESRCH = nothing of ours left to signal. kill(-1) never signals the
+        /* ESRCH = nothing of X left to signal. kill(-1) never signals the
          * caller itself or pid 1. */
         if (kill(-1, SIGKILL) != 0 && errno != ESRCH) {
             fprintf(stderr, "error: kill(-1) as uid %ld failed: %s\n", uid, strerror(errno));
@@ -235,15 +288,16 @@ static int kill_uid_mode(const char *arg) {
     }
     fprintf(stderr, "error: processes of uid %ld survived the sweep\n", uid);
     return 3;
+#endif /* __linux__ */
 }
 
 int main(int argc, char *argv[]) {
     if (argc >= 2 && strcmp(argv[1], "--kill-uid") == 0) {
-        if (argc != 3) {
-            fprintf(stderr, "Usage: %s --kill-uid <uid>\n", argv[0]);
+        if (argc != 4) {
+            fprintf(stderr, "Usage: %s --kill-uid <uid> <sweeper-uid>\n", argv[0]);
             return 2;
         }
-        return kill_uid_mode(argv[2]);
+        return kill_uid_mode(argv[2], argv[3]);
     }
 
     if (argc < 2) {

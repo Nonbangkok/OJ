@@ -278,10 +278,27 @@ export const JUDGE_CONFIG = {
     WORKSPACE_OP_TIMEOUT_MS: 5000,
     WORKSPACE_OP_MAX_BUFFER: 64 * 1024,
     // Per-uid process sweep (`time_wrapper --kill-uid`, A4-02): SIGKILLs
-    // every process of a sandbox identity as that identity. Runs before an
-    // identity is handed out, after the compile, after every testcase and
-    // at the end of the pipeline; a sweep that fails quarantines the uid.
+    // every process of a sandbox identity. Runs before an identity is handed
+    // out, after the compile, after every testcase and at the end of the
+    // pipeline; a sweep that still fails after SANDBOX_SWEEP_ATTEMPTS runs
+    // quarantines the uid.
     SANDBOX_SWEEP_TIMEOUT_MS: 5000,
+    SANDBOX_SWEEP_ATTEMPTS: 3,
+    // Each pool identity X has its own sweeper uid
+    // SANDBOX_SWEEPER_UID_BASE + (X - SANDBOX_UID_BASE), i.e. 61000..61015,
+    // that nothing else ever runs as (it must not overlap the pool, nobody
+    // 65534 or any other uid in use). The helper takes real = saved uid =
+    // the sweeper uid and effective uid = X, so its kill(-1) reaches exactly
+    // X's processes, and they cannot signal it back.
+    SANDBOX_SWEEPER_UID_BASE: 61000,
+    // How many identities one acquisition tries (each swept) before the
+    // submission becomes a System Error.
+    SANDBOX_ACQUIRE_CANDIDATES: 3,
+    // A quarantined identity is swept again by the first acquisition at
+    // least this long after its last failed sweep; once a sweep passes and
+    // its leftovers are removed it rejoins the pool. When no clean identity
+    // is free, a quarantined one is tried at once instead.
+    SANDBOX_QUARANTINE_RETRY_MS: 60_000,
     // World-writable places outside the workspace a sandbox uid can still
     // reach (the image makes /tmp, /var/tmp and /run/lock 1755; /dev/shm
     // and /dev/mqueue are runtime mounts). After each submission every

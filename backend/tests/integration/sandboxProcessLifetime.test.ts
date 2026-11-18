@@ -65,11 +65,17 @@ function livePoolProcesses(): PoolProcess[] {
 
 /**
  * Test hygiene only: SIGKILL every process of every pool uid. Root in the
- * production container has no CAP_KILL, so the kill is sent AS the uid —
- * kill(-1) from uid X reaches exactly X's processes and needs no capability.
+ * production container has no CAP_KILL, so the kill is sent from the uid's
+ * side: the judge's own sweep helper (`time_wrapper --kill-uid`, which a
+ * spinning kill(-1) cannot stop), then a plain kill(-1) AS the uid as a
+ * fallback for a wrapper that lacks the sweep mode.
  */
 function killPoolProcesses(): void {
   for (const uid of POOL_UIDS) {
+    const sweeper = JUDGE_CONFIG.SANDBOX_SWEEPER_UID_BASE + (uid - JUDGE_CONFIG.SANDBOX_UID_BASE);
+    spawnSync(path.resolve('scripts/time_wrapper'), ['--kill-uid', String(uid), String(sweeper)], {
+      stdio: 'ignore', timeout: 10_000,
+    });
     spawnSync('/usr/bin/python3', ['-c', 'import os\ntry:\n    os.kill(-1, 9)\nexcept ProcessLookupError:\n    pass\n'], {
       uid, gid: uid, stdio: 'ignore', timeout: 5000,
     });
@@ -152,6 +158,47 @@ int main() {
 }
 `;
 }
+
+/**
+ * Prints the right answer and exits. Its setsid'd, stdio-closed grandchild
+ * waits until the program has been reaped, then spins kill(-1, SIGKILL) in
+ * several threads for about 3 s, re-forking every 0.15 s so the per-process
+ * RLIMIT_CPU never fires, and then sleeps. While it spins, any other process
+ * of its uid dies the moment it exists: a sweep helper that had become the
+ * uid was killed every time, so the sweep failed (System Error, uid
+ * quarantined) and the daemon stayed (review of the A4-02 fix).
+ */
+const SWEEP_SPINNER = `#include <cstdio>
+#include <fcntl.h>
+#include <iostream>
+#include <pthread.h>
+#include <signal.h>
+#include <time.h>
+#include <unistd.h>
+static double until_t;
+static double now() { timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec + t.tv_nsec / 1e9; }
+static void* spin(void*) { while (now() < until_t) kill(-1, SIGKILL); return nullptr; }
+int main() {
+  long long n; std::cin >> n; std::cout << n * 2 << std::endl;
+  pid_t program = getpid();
+  pid_t child = fork();
+  if (child != 0) return 0;
+  setsid();
+  if (fork() > 0) _exit(0);
+  int fd = open("/dev/null", O_RDWR); dup2(fd, 0); dup2(fd, 1); dup2(fd, 2);
+  while (kill(program, 0) == 0) usleep(200);
+  for (int generation = 0; generation < 20; generation++) {
+    until_t = now() + 0.15;
+    pthread_t threads[5];
+    for (pthread_t& t : threads) pthread_create(&t, nullptr, spin, nullptr);
+    spin(nullptr);
+    for (pthread_t& t : threads) pthread_join(t, nullptr);
+    if (fork() > 0) _exit(0);
+  }
+  for (;;) sleep(1);
+}
+`;
+const SWEEP_SPINNER_SUBMISSIONS = 6;
 
 /** Dumps the stolen sources in `loot` to stderr and fails: the Runtime Error output. */
 function exfilSource(loot: string): string {
@@ -263,6 +310,22 @@ int main() {
   it('a backgrounded (setsid, stdio-closed) process is gone once its submission is judged', async () => {
     await judgeOnce('double', daemonSource(null));
     expect(livePoolProcesses()).toEqual([]);
+  });
+
+  it('a daemon spinning kill(-1, SIGKILL) cannot stop the sweep: every verdict lands and nothing survives', async () => {
+    const outcomes: Array<{ status: string; survivors: PoolProcess[] }> = [];
+    for (let i = 0; i < SWEEP_SPINNER_SUBMISSIONS; i++) {
+      const row = await judgeOnce('double', SWEEP_SPINNER);
+      outcomes.push({ status: row.overall_status, survivors: livePoolProcesses() });
+    }
+    // The program's answer is right, so each verdict is Accepted, not System
+    // Error from a sweep the daemon killed, and no daemon outlives its submission.
+    expect(outcomes).toEqual(Array.from({ length: SWEEP_SPINNER_SUBMISSIONS }, () => ({
+      status: SUBMISSION_STATUS.ACCEPTED, survivors: [],
+    })));
+    // The pool still serves everyone afterwards.
+    const after = await judgeOnce('double', '#include <iostream>\nint main(){ long long n; std::cin >> n; std::cout << n * 2 << "\\n"; }');
+    expect(after.overall_status).toBe(SUBMISSION_STATUS.ACCEPTED);
   });
 
   it('a later submission that draws the same sandbox uid cannot have its sources or grader read', async () => {

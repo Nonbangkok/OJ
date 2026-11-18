@@ -3,13 +3,18 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-// `time_wrapper --kill-uid <uid>` (A4-02), the per-uid process sweep the judge
-// runs before handing out a sandbox identity, after the compile, after every
-// testcase and at the end of the pipeline. Root in the production container
-// has no CAP_KILL, so the helper drops to the uid and kills from there; these
-// cases pin what it promises: everything of that uid dies, nothing else does,
-// and anything it cannot prove dead makes it fail (the judge then fails
-// closed).
+// `time_wrapper --kill-uid <uid> <sweeper-uid>` (A4-02), the per-uid process
+// sweep the judge runs before handing out a sandbox identity, after the
+// compile, after every testcase and at the end of the pipeline. Root in the
+// production container has no CAP_KILL, so the helper kills from the uid's
+// side: real and saved uid = the identity's dedicated sweeper uid, effective
+// uid = the identity. kill() lets a sender whose real or effective uid equals
+// the target's real or saved uid through, so kill(-1) reaches exactly the
+// identity's processes, while they cannot signal the helper (its real and
+// saved uids are not theirs). These cases pin what it promises: everything of
+// that uid dies, even a process spinning kill(-1, SIGKILL) to stop the sweep;
+// nothing else does (root, other identities); and anything it cannot prove
+// dead makes it fail (the judge then fails closed).
 //
 // Needs the backend image (linux, root, the compiled wrapper in cwd, gcc for
 // the helper programs). Run it with the production capability set
@@ -30,6 +35,11 @@ const enabled = unmet.length === 0;
 
 const UID_A = 61230;
 const UID_B = 61231;
+/** Dedicated sweeper uids for A and B: nothing else ever runs as them. */
+const SWEEPER_A = 62230;
+const SWEEPER_B = 62231;
+/** Only used to clean up a process the "sweeper uid in use" case starts as SWEEPER_A. */
+const HYGIENE_SWEEPER = 63230;
 
 /**
  * Started as root: takes real/saved uid `argv[1]` and effective uid `argv[2]`,
@@ -56,6 +66,33 @@ int main(int argc, char **argv) {
   for (;;) sleep(1);
 }
 `;
+
+/**
+ * The judged daemon of the review probe: forks away from its starter, setsid,
+ * forks again, closes its stdio, then spins kill(-1, SIGKILL) in argv[1]
+ * threads forever. Every other process of its uid dies the moment it exists,
+ * which used to include the sweep helper once it had become the uid.
+ */
+const SPINNER = `#define _GNU_SOURCE
+#include <fcntl.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <unistd.h>
+static void *spin(void *arg) { (void)arg; for (;;) kill(-1, SIGKILL); return NULL; }
+int main(int argc, char **argv) {
+  int threads = argc > 1 ? atoi(argv[1]) : 4;
+  if (fork() > 0) return 0;
+  setsid();
+  if (fork() > 0) _exit(0);
+  int fd = open("/dev/null", O_RDWR); dup2(fd, 0); dup2(fd, 1); dup2(fd, 2);
+  for (int i = 0; i < threads - 1; i++) { pthread_t t; pthread_create(&t, NULL, spin, NULL); }
+  spin(NULL);
+  return 0;
+}
+`;
+const SPINNER_THREADS = 6;
+const SPINNER_ROUNDS = 40;
 
 interface UidProcess { pid: number; state: string; threads: number }
 
@@ -87,17 +124,34 @@ async function waitFor(check: () => boolean, timeoutMs = 3000): Promise<void> {
   }
 }
 
-const sweep = (uid: number, asUid?: number) => spawnSync(WRAPPER, ['--kill-uid', String(uid)], {
-  encoding: 'utf8',
-  timeout: 10_000,
-  ...(asUid !== undefined ? { uid: asUid, gid: asUid } : {}),
-});
+/** Whether `pid` is a live (non-zombie) process. */
+function isLive(pid: number): boolean {
+  try {
+    const state = /^State:\s+(\S)/m.exec(fs.readFileSync(`/proc/${pid}/status`, 'utf8'))?.[1];
+    return state !== undefined && state !== 'Z' && state !== 'X';
+  } catch {
+    return false;
+  }
+}
+
+const sweep = (uid: number, sweeper: number, asUid?: number) => spawnSync(
+  WRAPPER,
+  ['--kill-uid', String(uid), String(sweeper)],
+  {
+    encoding: 'utf8',
+    timeout: 10_000,
+    ...(asUid !== undefined ? { uid: asUid, gid: asUid } : {}),
+  },
+);
 
 (enabled ? describe : describe.skip)('time_wrapper --kill-uid (per-uid process sweep)', () => {
   jest.setTimeout(30_000);
   let workDir = '';
   let helper = '';
+  let spinner = '';
   const children: ChildProcess[] = [];
+  /** Processes the tests start as root; only these are killed by pid (root may signal its own). */
+  let rootChildren: ChildProcess[] = [];
 
   const start = (command: string, args: string[], options: { uid?: number } = {}): void => {
     const child = spawn(command, args, {
@@ -114,12 +168,25 @@ const sweep = (uid: number, asUid?: number) => spawnSync(WRAPPER, ['--kill-uid',
     fs.writeFileSync(path.join(workDir, 'helper.c'), HELPER);
     helper = path.join(workDir, 'helper');
     execFileSync('/usr/bin/gcc', ['-pthread', '-o', helper, path.join(workDir, 'helper.c')]);
+    fs.writeFileSync(path.join(workDir, 'spinner.c'), SPINNER);
+    spinner = path.join(workDir, 'spinner');
+    execFileSync('/usr/bin/gcc', ['-pthread', '-o', spinner, path.join(workDir, 'spinner.c')]);
+    // The workspace is root's 0700 mkdtemp: let the test uids execute the programs.
+    fs.chmodSync(workDir, 0o755);
   });
 
   afterEach(() => {
-    // Hygiene: every test uid ends with nothing running. Sweeping B first
-    // kills the helpers (real uid B), so the A sweep then passes at once.
-    for (const uid of [UID_B, UID_A]) sweep(uid);
+    // Hygiene: every test uid ends with nothing running. A process started
+    // as SWEEPER_A goes first (it would block A's sweep), then B (which
+    // kills the helpers, real uid B), so the A sweep then passes at once.
+    sweep(SWEEPER_A, HYGIENE_SWEEPER);
+    for (const [uid, sweeper] of [[UID_B, SWEEPER_B], [UID_A, SWEEPER_A]]) sweep(uid, sweeper);
+    for (const child of rootChildren) {
+      if (child.pid !== undefined && child.exitCode === null && child.signalCode === null) {
+        try { process.kill(child.pid, 'SIGKILL'); } catch { /* gone */ }
+      }
+    }
+    rootChildren = [];
   });
 
   afterAll(() => {
@@ -131,21 +198,62 @@ const sweep = (uid: number, asUid?: number) => spawnSync(WRAPPER, ['--kill-uid',
     start('/bin/sh', ['-c', 'setsid sh -c "sleep 1000 & sleep 1000" </dev/null >/dev/null 2>&1 &'], { uid: UID_A });
     await waitFor(() => liveProcesses(UID_A).length >= 2);
 
-    const result = sweep(UID_A);
+    const result = sweep(UID_A, SWEEPER_A);
 
     expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
     expect(liveProcesses(UID_A)).toEqual([]);
   });
 
-  it('leaves the processes of every other uid alone', async () => {
+  it('a process of the uid spinning kill(-1, SIGKILL) in several threads cannot stop the sweep', async () => {
+    const failures: Array<{ round: number; status: number | null; signal: string | null; survivors: number }> = [];
+    for (let round = 0; round < SPINNER_ROUNDS; round++) {
+      start(spinner, [String(SPINNER_THREADS)], { uid: UID_A });
+      await waitFor(() => liveProcesses(UID_A).some((p) => p.threads >= SPINNER_THREADS));
+
+      const result = sweep(UID_A, SWEEPER_A);
+
+      const survivors = liveProcesses(UID_A).length;
+      if (result.status !== 0 || survivors > 0) {
+        failures.push({ round, status: result.status, signal: result.signal, survivors });
+        break; // a surviving spinner would only pile up (pids_limit)
+      }
+    }
+    // Every sweep succeeds and leaves nothing: the spinner can never signal the helper.
+    expect(failures).toEqual([]);
+  });
+
+  it('signals nothing but the uid\'s own processes: root and other identities keep running', async () => {
+    // Root's own process: a sweeper with real uid 0 would kill it (and the backend).
+    const rootSleeper = spawn('/bin/sleep', ['1000'], { detached: true, stdio: 'ignore' });
+    rootSleeper.unref();
+    children.push(rootSleeper);
+    rootChildren.push(rootSleeper);
     start('/bin/sleep', ['1000'], { uid: UID_A });
     start('/bin/sleep', ['1000'], { uid: UID_B });
-    await waitFor(() => liveProcesses(UID_A).length === 1 && liveProcesses(UID_B).length === 1);
+    await waitFor(() => liveProcesses(UID_A).length === 1 && liveProcesses(UID_B).length === 1
+      && rootSleeper.pid !== undefined && isLive(rootSleeper.pid));
 
-    expect(sweep(UID_A).status).toBe(0);
+    expect(sweep(UID_A, SWEEPER_A).status).toBe(0);
 
     expect(liveProcesses(UID_A)).toEqual([]);
     expect(liveProcesses(UID_B)).toHaveLength(1);
+    expect(isLive(rootSleeper.pid!)).toBe(true);
+    expect(isLive(process.pid)).toBe(true);
+  });
+
+  it('refuses to sweep while anything runs as its sweeper uid, and then kills nothing', async () => {
+    // The sweep could signal such a process (its real uid matches), so a
+    // sweeper uid that is not exclusively the helper's is a setup error.
+    start('/bin/sleep', ['1000'], { uid: SWEEPER_A });
+    start('/bin/sleep', ['1000'], { uid: UID_A });
+    await waitFor(() => liveProcesses(SWEEPER_A).length === 1 && liveProcesses(UID_A).length === 1);
+
+    const result = sweep(UID_A, SWEEPER_A);
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('in use');
+    expect(liveProcesses(SWEEPER_A)).toHaveLength(1);
+    expect(liveProcesses(UID_A)).toHaveLength(1);
   });
 
   it('fails (exit 3) when a process of the uid survives the kill', async () => {
@@ -153,7 +261,7 @@ const sweep = (uid: number, asUid?: number) => spawnSync(WRAPPER, ['--kill-uid',
     start(helper, [String(UID_B), String(UID_A)]);
     await waitFor(() => liveProcesses(UID_A).length === 1);
 
-    const result = sweep(UID_A);
+    const result = sweep(UID_A, SWEEPER_A);
 
     expect(result.status).toBe(3);
     expect(result.stderr).toContain('survived');
@@ -164,21 +272,37 @@ const sweep = (uid: number, asUid?: number) => spawnSync(WRAPPER, ['--kill-uid',
     await waitFor(() => liveProcesses(UID_A).some((p) => p.state === 'Z' && p.threads > 1));
 
     // Its /proc entry says "zombie", but it is alive and was not killed.
-    expect(sweep(UID_A).status).toBe(3);
+    expect(sweep(UID_A, SWEEPER_A).status).toBe(3);
   });
 
   it('refuses to run unless started as root, and then kills nothing', async () => {
     start('/bin/sleep', ['1000'], { uid: UID_A });
     await waitFor(() => liveProcesses(UID_A).length === 1);
 
-    const result = sweep(UID_A, UID_A);
+    const result = sweep(UID_A, SWEEPER_A, UID_A);
 
     expect(result.status).toBe(2);
     expect(liveProcesses(UID_A)).toHaveLength(1);
   });
 
-  it.each([['0'], ['-1'], ['abc'], ['']])('refuses the uid argument %p (a root sweep would kill everything)', (arg) => {
-    const result = spawnSync(WRAPPER, ['--kill-uid', arg], { encoding: 'utf8', timeout: 10_000 });
+  it.each([
+    [['0', String(SWEEPER_A)]],
+    [['-1', String(SWEEPER_A)]],
+    [['abc', String(SWEEPER_A)]],
+    [['', String(SWEEPER_A)]],
+    [[String(UID_A), '0']],
+    [[String(UID_A), String(UID_A)]],
+    [[String(UID_A), '65534']],
+    [['65534', String(SWEEPER_A)]],
+    [[String(UID_A)]],
+    [[String(UID_A), String(SWEEPER_A), 'extra']],
+  ])('refuses the arguments %p (no root or nobody, no sweeper equal to the uid) and kills nothing', async (args) => {
+    start('/bin/sleep', ['1000'], { uid: UID_A });
+    await waitFor(() => liveProcesses(UID_A).length === 1);
+
+    const result = spawnSync(WRAPPER, ['--kill-uid', ...args], { encoding: 'utf8', timeout: 10_000 });
+
     expect(result.status).toBe(2);
+    expect(liveProcesses(UID_A)).toHaveLength(1);
   });
 });

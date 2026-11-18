@@ -884,9 +884,11 @@ describe('Submission Service', () => {
             // Run as root (the helper drops to the uid itself), for the uid the pipeline used.
             const uid = Number(sweeps[0][1][1]);
             expect(uid).toBeGreaterThanOrEqual(JUDGE_CONFIG.SANDBOX_UID_BASE);
+            // Each identity has its own sweeper uid (real/saved uid of the helper).
+            const sweeper = JUDGE_CONFIG.SANDBOX_SWEEPER_UID_BASE + (uid - JUDGE_CONFIG.SANDBOX_UID_BASE);
             for (const [command, args, options] of sweeps) {
                 expect(path.basename(command)).toBe('time_wrapper');
-                expect(args).toEqual(['--kill-uid', String(uid)]);
+                expect(args).toEqual(['--kill-uid', String(uid), String(sweeper)]);
                 expect(options.uid).toBeUndefined();
             }
             expect(order.indexOf('sweep')).toBeLessThan(order.indexOf('mktemp'));
@@ -921,8 +923,12 @@ describe('Submission Service', () => {
             expect(spawnCalls.some(([, args]) => args.includes('/dev/shm/someone-elses'))).toBe(false);
         });
 
-        it('fails closed (System Error, nothing compiled) when the uid cannot be swept before use', async () => {
-            sweepExitCodes = [3];
+        it('fails closed (System Error, nothing compiled) when no identity can be swept before use', async () => {
+            // Every attempt on every candidate identity fails.
+            sweepExitCodes = Array.from(
+                { length: JUDGE_CONFIG.SANDBOX_SWEEP_ATTEMPTS * JUDGE_CONFIG.SANDBOX_ACQUIRE_CANDIDATES },
+                () => 3,
+            );
             (db.query as jest.Mock)
                 .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
                 .mockResolvedValueOnce({}) // UPDATE Compiling
@@ -939,7 +945,8 @@ describe('Submission Service', () => {
         });
 
         it('fails closed (System Error, nothing runs) when the compile leaves processes that cannot be killed', async () => {
-            sweepExitCodes = [0, 3];
+            // Hand-out sweep passes; every attempt of the post-compile sweep fails.
+            sweepExitCodes = [0, ...Array.from({ length: JUDGE_CONFIG.SANDBOX_SWEEP_ATTEMPTS }, () => 3)];
             (db.query as jest.Mock)
                 .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', user_id: 42, code: 'int main(){}', language: 'cpp' }] })
                 .mockResolvedValueOnce({}) // UPDATE Compiling
