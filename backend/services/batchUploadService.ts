@@ -24,6 +24,7 @@ import { replaceProblemFiles } from './problemFilesService';
 import type { ProblemFileInput } from '../utils/headerProblemFiles';
 import { pairFlatDirTestcaseFiles, pairZippedTestcaseFiles } from './testcaseZipPairing';
 import { assertSafeArchive, MAX_ARCHIVE_ENTRIES, type ArchiveEntryLike } from '../utils/archiveSafety';
+import { isMaintenanceActive } from './maintenanceMode';
 
 // Re-exported for the callers that have always imported the archive guard from
 // this service; the implementation now lives in `utils/archiveSafety`.
@@ -391,12 +392,23 @@ async function processProblemDirectory(problemPath: string): Promise<ProblemProc
   });
 }
 
+/**
+ * A2-03: batch uploads being processed right now. Each one runs after its
+ * request has been answered 202, one transaction per problem, so the
+ * database import cannot rely on the maintenance gate to keep it out.
+ */
+let runningBatchUploads = 0;
+
+/** A2-03: whether a batch upload may still write problems; a database import refuses to start while one does. */
+export const isBatchUploadRunning = (): boolean => runningBatchUploads > 0;
+
 export async function processBatchUpload(
   zipFilePath: string,
   onProgress?: (progress: BatchUploadProgressData) => void,
 ): Promise<BatchUploadResult> {
   const results: BatchUploadResult = { added: [], skipped: [], errors: [] };
   const tempDir = path.join(os.tmpdir(), `oj_batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  runningBatchUploads += 1;
 
   try {
     await fsPromises.mkdir(tempDir, { recursive: true });
@@ -435,7 +447,17 @@ export async function processBatchUpload(
     let processedCount = 0;
     const totalProblems = problemPathsToProcess.length;
 
-    for (const problemPath of problemPathsToProcess) {
+    for (const [index, problemPath] of problemPathsToProcess.entries()) {
+      // A2-03: an import is dropping and restoring the database (this batch
+      // reached its first problem after the import began). Write nothing more.
+      if (isMaintenanceActive()) {
+        const notProcessed = totalProblems - index;
+        results.errors.push({
+          directory: 'Batch Process',
+          message: `Stopped because a database import started: ${notProcessed} of ${totalProblems} problems were not processed. Upload them again after the import has finished.`,
+        });
+        break;
+      }
       try {
         const result = await processProblemDirectory(problemPath);
         if (result.status === UPLOAD_STATUS.ADDED) {
@@ -463,6 +485,8 @@ export async function processBatchUpload(
     console.error('An unexpected error occurred during the batch upload process:', error);
     results.errors.push({ directory: 'Batch Process', message: getErrorMessage(error) || 'A critical error occurred.' });
   } finally {
+    // Only temporary files are touched from here on.
+    runningBatchUploads -= 1;
     const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
     try {
       await delay(FILE_CONFIG.CLEANUP_DELAY_MS);

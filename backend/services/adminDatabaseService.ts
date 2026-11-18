@@ -24,6 +24,7 @@ import {
   PgConnection,
 } from './adminSystemService';
 import { waitForAuthoringCoordinatorIdle } from './authoringJobCoordinator';
+import { isBatchUploadRunning } from './batchUploadService';
 import { ByteRange, createRestrictKey, inspectPlainDump, openGuardedPlainDump } from './databaseDumpGuard';
 import { discardQueuedJudgeTasks, pauseJudgeQueue, resumeJudgeQueue, waitForRunningJudgesToSettle } from './judgeQueue';
 import { sweepOrphanedSubmissions } from './submissionService';
@@ -98,6 +99,8 @@ export type DatabaseImportStartResult =
   | StartedDatabaseImport
   | { kind: 'unsupported_extension' }
   | { kind: 'import_in_progress' }
+  /** A2-03: a background batch problem upload is still writing problems. */
+  | { kind: 'batch_upload_in_progress' }
   /** A2-02/A2-06: rejected before anything was touched; `message` is for the admin. */
   | { kind: 'invalid_dump'; message: string };
 
@@ -352,11 +355,24 @@ export const startDatabaseImport = async (
     await unlinkIfExists(dumpFilePath);
     return { kind: 'import_in_progress' };
   }
+  if (isBatchUploadRunning()) {
+    await unlinkIfExists(dumpFilePath);
+    return { kind: 'batch_upload_in_progress' };
+  }
 
   const validation = await validateUpload(importCommandResult, dumpFilePath);
   if (!validation.ok) {
     await unlinkIfExists(dumpFilePath);
     return { kind: 'invalid_dump', message: validation.message };
+  }
+
+  // A2-03: checked again right before the claim, with no await in between:
+  // a batch upload running now would keep writing problems into the
+  // database the import drops and restores, while one that reaches its
+  // first problem after the claim sees maintenance mode and stops.
+  if (isBatchUploadRunning()) {
+    await unlinkIfExists(dumpFilePath);
+    return { kind: 'batch_upload_in_progress' };
   }
 
   // DB-05: exactly one import may run at a time. The maintenance-mode flag is

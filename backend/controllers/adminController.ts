@@ -224,6 +224,11 @@ router.post('/admin/database/import', requireAuth, requireAdmin, diskUpload.sing
     // running concurrently would interleave destructively.
     return res.status(409).json({ message: 'A database import is already in progress. Wait for it to finish before starting another.' });
   }
+  if (startResult.kind === 'batch_upload_in_progress') {
+    // A2-03: the batch writes problems in the background after its 202; the
+    // import would drop and restore the database under it.
+    return res.status(409).json({ message: 'A batch problem upload is still being processed. Wait for it to finish, then start the import again.' });
+  }
   if (startResult.kind === 'invalid_dump') {
     // A2-02/A2-06: rejected before maintenance mode; nothing was touched.
     return res.status(400).json({ message: startResult.message });

@@ -75,6 +75,12 @@ jest.mock('../middleware/upload', () => ({
         }
     }
 }));
+// A2-03: whether a background batch problem upload is still writing problems.
+const mockBatchUploadRunning = jest.fn(() => false);
+jest.mock('../services/batchUploadService', () => ({
+    ...jest.requireActual('../services/batchUploadService'),
+    isBatchUploadRunning: () => mockBatchUploadRunning(),
+}));
 jest.mock('child_process', () => ({
     exec: jest.fn(),
     spawn: jest.fn(() => {
@@ -453,6 +459,18 @@ describe('Admin Controller', () => {
             expect(res.status).toBe(400);
             expect(res.body.message).toContain('not a pg_dump plain-text dump');
             expect(res.body.jobId).toBeUndefined();
+            expect(isMaintenanceActive()).toBe(false);
+        });
+
+        it('answers 409 while a batch problem upload is still being processed, before maintenance starts (A2-03)', async () => {
+            mockBatchUploadRunning.mockReturnValueOnce(true);
+
+            const res = await startImport();
+
+            expect(res.status).toBe(409);
+            expect(res.body).toEqual({
+                message: 'A batch problem upload is still being processed. Wait for it to finish, then start the import again.',
+            });
             expect(isMaintenanceActive()).toBe(false);
         });
 
