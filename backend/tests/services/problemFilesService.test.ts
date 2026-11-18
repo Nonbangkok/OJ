@@ -122,14 +122,15 @@ describe('problemFilesService', () => {
     });
   });
 
-  it('hasGraderSource matches .cpp grader files case-insensitively', async () => {
+  it('hasGraderSource matches exactly the grader sources the judge compiles', async () => {
     query.mockResolvedValueOnce({ rows: [{ exists: true }] });
     expect(await hasGraderSource('p1')).toBe(true);
-    // validateProblemFileSet and headerPreparePlan both lower-case the
-    // extension, so a grader uploaded as `main.CPP` is accepted and compiled.
-    // A case-sensitive LIKE here would make such a problem permanently
-    // unsubmittable ("not ready for submissions yet").
-    expect(query.mock.calls[0][0]).toContain("LOWER(filename) LIKE '%.cpp'");
+    // Case-sensitive, like validateProblemFileSet and headerPreparePlan: a
+    // `main.Cpp` g++ would hand to the linker must not make the problem
+    // look submittable.
+    const sql = query.mock.calls[0][0] as string;
+    expect(sql).toContain("filename ~ '\\.(cpp|cc|cxx)$'");
+    expect(sql).not.toMatch(/LOWER\(filename\)/i);
     query.mockResolvedValueOnce({ rows: [{ exists: false }] });
     expect(await hasGraderSource('p1')).toBe(false);
   });

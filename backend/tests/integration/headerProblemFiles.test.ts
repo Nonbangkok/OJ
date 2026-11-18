@@ -108,12 +108,15 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   });
 
   describe('hasGraderSource', () => {
-    it('accepts an upper-case .CPP grader extension', async () => {
+    it('matches exactly the lowercase source extensions the judge compiles', async () => {
+      // Upload validation and headerPreparePlan accept only exact lowercase
+      // .cpp / .cc / .cxx (g++ hands `main.Cpp` to the linker), so a stored
+      // row with any other casing must not make the problem look ready.
       await seedHeaderProblem('h3');
-      // validateProblemFileSet lower-cases the extension, so `main.CPP`
-      // uploads fine and headerPreparePlan compiles it; a case-sensitive
-      // check here would leave the problem permanently unsubmittable.
       await addFile('h3', 'grader', 'main.CPP', 'int main(){}');
+      await addFile('h3', 'grader', 'Main.Cpp', 'int main(){}');
+      expect(await hasGraderSource('h3')).toBe(false);
+      await addFile('h3', 'grader', 'main.cc', 'int main(){}');
       expect(await hasGraderSource('h3')).toBe(true);
     });
 

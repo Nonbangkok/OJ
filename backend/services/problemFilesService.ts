@@ -6,6 +6,7 @@ import * as db from '../db';
 import { AppError } from '../middleware/errorHandler';
 import type { ProblemFileRole, ProblemType } from '../constants';
 import { validateProblemFileSet, type ProblemFileInput } from '../utils/headerProblemFiles';
+import { GRADER_SOURCE_FILENAME_SQL_REGEX } from '../utils/problemFilename';
 
 export async function listProblemFiles(
   problemId: string,
@@ -87,11 +88,12 @@ export async function getHeaderJudgeSpec(problemId: string): Promise<{
   return { problemType, submissionFilename: row.submission_filename ?? null, graderFiles };
 }
 
+/** True when the problem has a grader file the judge would compile (exact-case .cpp/.cc/.cxx). */
 export async function hasGraderSource(problemId: string): Promise<boolean> {
   const result = await db.query(
     `SELECT EXISTS (
        SELECT 1 FROM problem_files
-        WHERE problem_id = $1 AND role = 'grader' AND LOWER(filename) LIKE '%.cpp'
+        WHERE problem_id = $1 AND role = 'grader' AND filename ~ '${GRADER_SOURCE_FILENAME_SQL_REGEX}'
      ) AS exists`,
     [problemId],
   );

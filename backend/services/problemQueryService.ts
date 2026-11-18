@@ -21,6 +21,7 @@ import { isUniqueViolation } from '../utils/dbErrors';
 import { AppError } from '../middleware/errorHandler';
 import { getProblemFiles } from './problemFilesService';
 import { validateProblemFileSet } from '../utils/headerProblemFiles';
+import { GRADER_SOURCE_FILENAME_SQL_REGEX } from '../utils/problemFilename';
 
 /**
  * Run `body` inside a single transaction. BEGIN/COMMIT/ROLLBACK on a dedicated
@@ -747,7 +748,7 @@ const decodeAdminCursor = (raw: string): string => {
  * no statement PDF, or a header problem without a grader .cpp.
  */
 const HAS_TESTCASES_SQL = 'EXISTS (SELECT 1 FROM testcases t WHERE t.problem_id = p.id)';
-const HAS_GRADER_SQL = "EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = p.id AND f.role = 'grader' AND lower(f.filename) LIKE '%.cpp')";
+const HAS_GRADER_SQL = `EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = p.id AND f.role = 'grader' AND f.filename ~ '${GRADER_SOURCE_FILENAME_SQL_REGEX}')`;
 const ADMIN_VIEW_SQL: Record<AdminProblemView, string> = {
   attention: `(NOT ${HAS_TESTCASES_SQL} OR p.problem_pdf IS NULL OR (p.problem_type = 'header' AND NOT ${HAS_GRADER_SQL}))`,
   hidden: '(p.is_visible = false AND p.contest_id IS NULL)',
@@ -824,7 +825,7 @@ const ADMIN_PROBLEM_FACTS_SQL = `
            COALESCE(subs.n, 0) AS submission_count, COALESCE(subs.n, 0) > 0 AS type_locked,
            COALESCE(acc.accepted, 0) AS accepted_count, COALESCE(acc.solvers, 0) AS solver_count,
            EXISTS (SELECT 1 FROM problem_files f WHERE f.problem_id = page.id AND f.role = 'grader'
-                   AND lower(f.filename) LIKE '%.cpp') AS has_grader
+                   AND f.filename ~ '${GRADER_SOURCE_FILENAME_SQL_REGEX}') AS has_grader
     FROM page
     LEFT JOIN tc ON tc.problem_id = page.id
     LEFT JOIN subs ON subs.problem_id = page.id

@@ -16,6 +16,7 @@ import {
   SubmissionLanguage,
 } from '../constants';
 import { findForbiddenAsm, findForbiddenInclude } from '../utils/compileGuard';
+import { isGraderSourceFilename } from '../utils/problemFilename';
 import { logger } from '../utils/logger';
 import { publishRealtime } from './realtimeHub';
 import { awardSolveReward } from './progressionService';
@@ -218,12 +219,12 @@ function standardPreparePlan(language: SubmissionLanguage, code: string): Prepar
 function headerPreparePlan(code: string, spec: HeaderJudgeSpec): PreparePlan {
   const sourceName = spec.submissionFilename ?? DEFAULT_SUBMISSION_FILENAME;
   const graderNames = spec.graderFiles.map((file) => file.filename);
-  const cppSources = graderNames.filter((name) => name.toLowerCase().endsWith('.cpp')).sort();
+  const cppSources = graderNames.filter(isGraderSourceFilename).sort();
   if (cppSources.length === 0) {
-    // Authoring validation guarantees at least one grader .cpp; a problem that
-    // lost its grader files must fail loudly (System Error), never judge as if
-    // the submission were at fault.
-    throw new Error('header problem has no grader .cpp source to compile');
+    // Authoring validation guarantees at least one grader source; a problem
+    // that lost its grader files must fail loudly (System Error), never judge
+    // as if the submission were at fault.
+    throw new Error('header problem has no grader source to compile');
   }
   return {
     files: [
