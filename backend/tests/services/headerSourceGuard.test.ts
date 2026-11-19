@@ -272,13 +272,17 @@ describe('findHeaderSourceRejection', () => {
  * Every bundled header problem's own headers (reference solution, naive
  * solution, starter template) must pass the include guard and the header
  * rules against that problem's real grader and starter file sets, as the
- * pipeline runs them. The sets are rebuilt the way
- * content/header-problems/build.py ships them: grader = main.cpp
+ * pipeline runs them. The sets are rebuilt the way CP-Author's
+ * header-problems harness ships them: grader = main.cpp
  * (grader_main.cpp) + <ds>.h, starter = main.cpp (starter_main.cpp) + <ds>.h +
  * student.h, where <ds>.h is lib/<topic>.h with meta.json's declarations
  * injected at the marker.
+ *
+ * HEADER_PROBLEMS_CONTENT  the header-problems folder of a CP-Author checkout
+ *                          (default: a sibling checkout next to this repo,
+ *                          ../CP-Author/header-problems); skipped when absent.
  */
-const contentDir = path.resolve(process.env.HEADER_PROBLEMS_CONTENT ?? path.join(__dirname, '../../../content/header-problems'));
+const contentDir = path.resolve(process.env.HEADER_PROBLEMS_CONTENT ?? path.join(__dirname, '../../../../CP-Author/header-problems'));
 const problemsDir = path.join(contentDir, 'problems');
 const contentPresent = fs.existsSync(problemsDir);
 const TOPIC_HEADERS: Record<string, string> = {

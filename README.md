@@ -373,16 +373,14 @@ Thai/Latin coverage. The font-registry check runs on Linux and is skipped on mac
 ### Header-problem content tests
 
 Two backend suites use the bundled header problems from the public
-[CP-Author](https://github.com/Nonbangkok/CP-Author) repository. Both are skipped
-when the content is missing.
+[CP-Author](https://github.com/Nonbangkok/CP-Author) repository. By default both
+read a sibling checkout at `../CP-Author/header-problems`, and both are skipped
+when it is absent.
 
-- **`tests/integration/headerProblemsImport.test.ts`** reads a sibling checkout
-  at `../CP-Author/header-problems` by default. It also needs
-  `INTEGRATION_DATABASE_URL`.
+- **`tests/integration/headerProblemsImport.test.ts`** imports the built ZIP, so
+  it needs `./run.sh build` first, and it also needs `INTEGRATION_DATABASE_URL`.
 - **The bundled-problem case of `tests/services/headerSourceGuard.test.ts`**
-  still defaults to the old in-repo path `content/header-problems`. That path no
-  longer exists, so this case only runs when `HEADER_PROBLEMS_CONTENT` points at
-  a checkout, e.g. `HEADER_PROBLEMS_CONTENT=../CP-Author/header-problems`.
+  reads the problem sources directly, so a plain clone is enough.
 
 To run them, clone CP-Author next to this repository and build it:
 
