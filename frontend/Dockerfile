@@ -27,7 +27,7 @@ ENV REACT_APP_LARGE_UPLOAD_API_URL=$REACT_APP_LARGE_UPLOAD_API_URL
 RUN npm run build && chmod -R a+rX build
 
 # Stage 2: Serve the application with Nginx
-FROM nginx:1.30-alpine
+FROM nginx:1.30.7-alpine
 
 # Copy the build output from the build stage
 COPY --from=build /app/frontend/build /usr/share/nginx/html

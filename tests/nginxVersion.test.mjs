@@ -31,6 +31,18 @@ test('nginx is on the 1.30 stable line', () => {
   assert.match(proxyImage(), /^nginx:1\.30(\.\d+)?-alpine$/);
 });
 
+// deploy.sh never pulls (`compose build` has no --pull and `up -d` keeps an
+// image it already has), so a floating tag such as nginx:1.30-alpine stays on
+// whatever the server pulled first. Pin the exact patch release; bumping it is
+// what makes the next deploy fetch the new image.
+const MIN_PATCH = 7; // 1.30.7 fixes the 2026-11-18 advisories (CVE-2026-123007, CVE-2026-118899, ...)
+
+test('nginx image pins an exact, patched 1.30 release', () => {
+  const pinned = proxyImage().match(/^nginx:1\.30\.(\d+)-alpine$/);
+  assert.ok(pinned, `expected nginx:1.30.<patch>-alpine, got ${proxyImage()}`);
+  assert.ok(Number(pinned[1]) >= MIN_PATCH, `nginx 1.30.${pinned[1]} predates 1.30.${MIN_PATCH}`);
+});
+
 test('production overlay does not override the nginx-proxy image', () => {
   const overlay = readText('docker-compose.production.yml');
   if (!/^ {2}nginx-proxy:/m.test(overlay)) return;
