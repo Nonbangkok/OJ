@@ -3,7 +3,7 @@ import { spawn } from 'child_process';
 import { constants as osConstants } from 'os';
 import path from 'path';
 import type { Readable } from 'stream';
-import { SUBMISSION_STATUS, JUDGE_CONFIG, LANGUAGE_LIMITS, SubmissionLanguage } from '../constants';
+import { SUBMISSION_STATUS, JUDGE_CONFIG, LANGUAGE_LIMITS, SubmissionLanguage, EffectiveLimits, effectiveLimits } from '../constants';
 import { RunnableCommand } from '../constants';
 import { logger } from '../utils/logger';
 import {
@@ -109,6 +109,8 @@ interface CaseRunContext {
   hideProgramStderr: boolean;
   /** Kill the identity's processes after the run (production only). */
   sweep: boolean;
+  /** Exit status that is out-of-memory evidence for this language (Java). */
+  oomExitCode?: number;
 }
 
 /** A testcase run, plus why the sandbox could not be proven clean afterwards. */
@@ -128,17 +130,19 @@ type CaseRunResult = RunResult & { sandboxError?: unknown };
 async function runSingleCase(
   runnable: RunnableCommand,
   input: string,
-  timeLimitMs: number,
-  memoryLimitMb: number,
+  limits: EffectiveLimits,
   ctx: CaseRunContext
 ): Promise<CaseRunResult> {
+  const timeLimitMs = limits.timeMs;
+  const memoryLimitMb = limits.rssLimitMb;
   return new Promise((resolve) => {
-    // Resource limits handed to the sandbox wrapper. RLIMIT_AS gets a little
-    // headroom over the problem's memory limit (runtime/loader/UBSan overhead);
-    // RLIMIT_CPU gets the wall-clock limit plus slack as a hard backstop.
-    // `timeLimitMs` / `memoryLimitMb` are the EFFECTIVE limits for the
-    // submission's language (already multiplied by LANGUAGE_LIMITS).
-    const asLimitMb = memoryLimitMb + JUDGE_CONFIG.MEMORY_LIMIT_SLACK_MB;
+    // Resource limits handed to the sandbox wrapper, all EFFECTIVE for the
+    // submission's language (effectiveLimits): RLIMIT_AS is the program's
+    // memory plus the language's slack (32 MB of loader/UBSan headroom for
+    // C++/Python, the JVM's address-space grace for Java); RLIMIT_CPU gets
+    // the wall-clock limit plus slack as a hard backstop. `memoryLimitMb` is
+    // the peak-RSS MLE threshold (the heap plus the JVM overhead for Java).
+    const asLimitMb = limits.asLimitMb;
     const cpuLimitS = Math.ceil(timeLimitMs / 1000) + JUDGE_CONFIG.CPU_LIMIT_SLACK_S;
     // `timeout -k` grace: after the wall-clock limit, GNU timeout sends
     // SIGTERM then — if the wrapper is still alive after this many seconds —
@@ -160,7 +164,10 @@ async function runSingleCase(
     // at the submission's own workspace, the only place it may write (A9-05).
     // The project augments NodeJS.ProcessEnv to mark the secret keys as
     // required, so this intentionally-sparse env is asserted to that type.
+    // A runnable may add language variables (Java: MALLOC_ARENA_MAX), never
+    // replace PATH or TMPDIR.
     const sandboxEnv = {
+      ...(runnable.env ?? {}),
       PATH: JUDGE_CONFIG.SANDBOX_PATH,
       ...(ctx.workspaceDir ? { TMPDIR: ctx.workspaceDir } : {}),
     } as unknown as NodeJS.ProcessEnv;
@@ -272,7 +279,24 @@ async function runSingleCase(
       //    outcome, clean exit included, so the RLIMIT_AS slack cannot let
       //    an over-limit run pass — or the program died from a hard SIGKILL
       //    (OOM / over-limit kill). The REAL measured MEM_USED is reported.
-      if (memoryKb > memoryLimitMb * 1024 || programSignalExitCode === JUDGE_CONFIG.SIGKILL) {
+      //    The RLIMIT_CPU backstop also ends in SIGKILL (soft = hard), so a
+      //    SIGKILL with the CPU cap measured and the memory within the limit
+      //    is a TLE, not an OOM kill.
+      const cpuCapReached = timeMs >= cpuLimitS * 1000 - JUDGE_CONFIG.CPU_LIMIT_EVIDENCE_TOLERANCE_MS;
+      if (
+        programSignalExitCode === JUDGE_CONFIG.SIGKILL
+        && cpuCapReached
+        && memoryKb >= 0
+        && memoryKb <= memoryLimitMb * 1024
+      ) {
+        finish({ status: SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED, timeMs: timeLimitMs, memoryKb });
+        return;
+      }
+      //    Java: -XX:+ExitOnOutOfMemoryError exits with the language's OOM
+      //    status (JAVA_CONFIG.OOM_EXIT_CODE). A program can exit with it on
+      //    purpose, but that only forges a WORSE verdict (SANDBOX.md, Java).
+      const oomExit = ctx.oomExitCode !== undefined && exitCode === ctx.oomExitCode;
+      if (memoryKb > memoryLimitMb * 1024 || programSignalExitCode === JUDGE_CONFIG.SIGKILL || oomExit) {
         finish({
           status: SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED,
           timeMs,
@@ -411,7 +435,7 @@ async function runSingleCase(
 
 export async function judge(
   problemId: string,
-  runnable: RunnableCommand,
+  runnable: RunnableCommand | ((limits: EffectiveLimits) => RunnableCommand),
   language: SubmissionLanguage,
   options: JudgeRunOptions = {}
 ): Promise<JudgeResult> {
@@ -426,11 +450,13 @@ export async function judge(
     const { time_limit_ms, memory_limit_mb } = problemRes.rows[0];
 
     // Effective limits for this language: one problem serves every language,
-    // the multipliers (in LANGUAGE_LIMITS) scale the raw limits at execution
-    // time (C++ is the identity, so C++ behavior is unchanged).
-    const { timeMultiplier, memoryMultiplier } = LANGUAGE_LIMITS[language];
-    const effectiveTimeMs = time_limit_ms * timeMultiplier;
-    const effectiveMemoryMb = memory_limit_mb * memoryMultiplier;
+    // LANGUAGE_LIMITS scales the raw limits at execution time (C++ is the
+    // identity, so C++ behavior is unchanged). A run-command factory (Java)
+    // derives its own flags (the heap) from them.
+    const limits = effectiveLimits(language, time_limit_ms, memory_limit_mb);
+    const effectiveTimeMs = limits.timeMs;
+    const effectiveMemoryMb = limits.memoryMb;
+    const runCommand = typeof runnable === 'function' ? runnable(limits) : runnable;
 
     const testcasesRes = await db.query<JudgeTestcaseRow>(
       'SELECT case_number, input_data, output_data FROM testcases WHERE problem_id = $1 ORDER BY case_number ASC',
@@ -454,11 +480,12 @@ export async function judge(
       hideProgramStderr: options.hideProgramStderr === true,
       // Only a root backend can drop to (and sweep) a sandbox uid.
       sweep: canDropPrivileges(),
+      oomExitCode: LANGUAGE_LIMITS[language].oomExitCode,
     };
     for (let i = 0; i < testcases.length; i++) {
       const { case_number, input_data, output_data } = testcases[i];
 
-      const runResult = await runSingleCase(runnable, input_data, effectiveTimeMs, effectiveMemoryMb, context);
+      const runResult = await runSingleCase(runCommand, input_data, limits, context);
 
       // Fail closed (A4-02): a run whose leftovers could not be killed, or
       // that could not start, ends the submission as a System Error.

@@ -6,8 +6,11 @@ import { judge } from './judgeService';
 import { ContestSubmissionRow, SubmissionRow } from '../types/models';
 import { CompileCommandError } from '../types/service';
 import {
+  CompileLimits,
   DEFAULT_SUBMISSION_FILENAME,
+  EffectiveLimits,
   HEADER_CPP_PREPARE,
+  JAVA_MAIN_CLASS_HINT,
   JUDGE_CONFIG,
   LANGUAGE_PREPARE,
   RunnableCommand,
@@ -60,7 +63,8 @@ async function runBoundedCompile(
   cwd: string,
   command: string,
   args: readonly string[],
-  sandbox: SandboxIdentity
+  sandbox: SandboxIdentity,
+  timeoutMs: number = JUDGE_CONFIG.COMPILE_TIMEOUT_MS,
 ): Promise<{ ok: boolean; stderr: string }> {
   const sandboxEnv = {
     PATH: JUDGE_CONFIG.SANDBOX_PATH,
@@ -71,7 +75,7 @@ async function runBoundedCompile(
     cwd,
     env: sandboxEnv,
     ...(canDropPrivileges() ? { uid: sandbox.uid, gid: sandbox.gid } : {}),
-    timeoutMs: JUDGE_CONFIG.COMPILE_TIMEOUT_MS,
+    timeoutMs,
     maxBufferBytes: JUDGE_CONFIG.COMPILE_MAX_BUFFER,
   });
   return { ok: result.exitCode === 0, stderr: result.stderr || result.stdout };
@@ -82,7 +86,23 @@ async function runBoundedCompile(
 const SANITIZED_SOURCE_NAME: Record<SubmissionLanguage, string> = {
   cpp: 'solution.cpp',
   python: 'solution.py',
+  java: 'Main.java',
 };
+
+/** javac's error when the public class is not named after the file. */
+const JAVAC_FILE_NAME_MISMATCH = /is public, should be declared in a file named/;
+
+/**
+ * The Compilation Error text a submitter sees: the sanitized compiler output,
+ * plus the `Main` hint when javac rejected a public class named otherwise
+ * (a classroom `public class Solution` is the common case).
+ */
+function compileErrorMessage(stderr: string, language: SubmissionLanguage): string {
+  if (language === 'java' && JAVAC_FILE_NAME_MISMATCH.test(stderr)) {
+    return `${stderr.trimEnd()}\n\n${JAVA_MAIN_CLASS_HINT}`;
+  }
+  return stderr;
+}
 
 export interface SanitizeStderrOptions {
   /**
@@ -175,8 +195,9 @@ type HeaderJudgeSpec = NonNullable<Awaited<ReturnType<typeof getHeaderJudgeSpec>
  * next step or the run proceed next to files that should be gone).
  */
 type PrepareStep =
-  | { kind: 'compile'; command: RunnableCommand }
-  | { kind: 'remove'; files: readonly string[] };
+  | { kind: 'compile'; command: RunnableCommand; limits?: CompileLimits }
+  | { kind: 'remove'; files: readonly string[] }
+  | { kind: 'require'; file: string; message: string };
 
 /**
  * Everything that differs between a standard and a header submission, decided
@@ -207,18 +228,25 @@ interface PreparePlan {
   /** Keep the submitted file's real name in compile diagnostics. */
   keepSourceName: boolean;
   /** The judge's runnable, built from the artifact (or source) path. */
-  runCommand: (targetPath: string) => RunnableCommand;
+  runCommand: (targetPath: string, limits: EffectiveLimits) => RunnableCommand;
 }
 
 /** The unchanged single-source flow: one file, one compile, nothing scrubbed. */
 function standardPreparePlan(language: SubmissionLanguage, code: string): PreparePlan {
   const prepare = LANGUAGE_PREPARE[language];
-  const sourceName = `solution${prepare.sourceExtension}`;
+  const sourceName = prepare.sourceName ?? `solution${prepare.sourceExtension}`;
+  const outputName = prepare.outputName ?? BINARY_NAME;
+  const steps: PrepareStep[] = [
+    { kind: 'compile', command: prepare.checkCommand(sourceName, outputName), limits: prepare.compileLimits },
+  ];
+  if (prepare.requiredArtifact) {
+    steps.push({ kind: 'require', file: prepare.requiredArtifact.path, message: prepare.requiredArtifact.message });
+  }
   return {
     files: [{ name: sourceName, content: code }],
     sourceName,
-    artifactName: prepare.compiledArtifactPath(BINARY_NAME),
-    steps: [{ kind: 'compile', command: prepare.checkCommand(sourceName, BINARY_NAME) }],
+    artifactName: prepare.compiledArtifactPath(outputName),
+    steps,
     keepSourceName: false,
     runCommand: prepare.runCommand,
   };
@@ -476,8 +504,29 @@ async function runSubmissionPipeline(
         }
         continue;
       }
-      const compileCommand = prlimitWrap(step.command.command, step.command.args);
-      const compile = await runBoundedCompile(workspaceDir, compileCommand.command, compileCommand.args, sandbox);
+      if (step.kind === 'require') {
+        // The compile succeeded but did not produce what the run needs
+        // (Java: no classes/Main.class — a package line or no class Main).
+        // Checked as the sandbox identity: root cannot look inside the
+        // identity's workspace in the lockdown container.
+        const present = privileged
+          ? (await runBoundedCompile(workspaceDir, '/usr/bin/test', ['-f', step.file], sandbox)).ok
+          : fs.existsSync(path.join(workspaceDir, step.file));
+        if (privileged) await killSandboxProcesses(sandbox);
+        if (!present) {
+          await recordCompilationError(table, submissionId, user_id, step.message);
+          return;
+        }
+        continue;
+      }
+      const compileCommand = prlimitWrap(step.command.command, step.command.args, step.limits);
+      const compile = await runBoundedCompile(
+        workspaceDir,
+        compileCommand.command,
+        compileCommand.args,
+        sandbox,
+        step.limits?.timeoutMs,
+      );
       // Nothing a compile step started may outlive it (A4-02): root cannot
       // kill a timed-out compile in production (no CAP_KILL), the sweep can.
       // Throws (System Error) if the uid cannot be proven clean.
@@ -488,9 +537,12 @@ async function runSubmissionPipeline(
           table,
           submissionId,
           user_id,
-          sanitizeCompilerStderr(compile.stderr, plan.sourceName, submissionLanguage, {
-            keepSourceName: plan.keepSourceName,
-          })
+          compileErrorMessage(
+            sanitizeCompilerStderr(compile.stderr, plan.sourceName, submissionLanguage, {
+              keepSourceName: plan.keepSourceName,
+            }),
+            submissionLanguage,
+          )
         );
         return;
       }
@@ -520,7 +572,9 @@ async function runSubmissionPipeline(
     }
     const judgeResult = await judge(
       problem_id,
-      plan.runCommand(artifactPath ?? sourcePath),
+      // The judge resolves the effective limits first: a language whose run
+      // flags depend on them (Java's heap) builds its command from them.
+      (limits: EffectiveLimits) => plan.runCommand(artifactPath ?? sourcePath, limits),
       submissionLanguage,
       // Header problems keep only a neutral crash description: the grader is
       // linked into the program, which could print it from its own memory.

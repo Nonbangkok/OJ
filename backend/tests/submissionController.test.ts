@@ -85,7 +85,7 @@ describe('Submission Controller', () => {
         it('should return 400 if language is not supported', async () => {
             const res = await request(app)
                 .post('/submit')
-                .send({ problemId: 'P1', language: 'java', code: 'System.out.println(1);' });
+                .send({ problemId: 'P1', language: 'kotlin', code: 'println(1)' });
 
             expect(res.status).toBe(400);
             expect(res.body.message).toBe('Validation failed');

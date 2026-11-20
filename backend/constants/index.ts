@@ -242,6 +242,10 @@ export const JUDGE_CONFIG = {
     // owns wall-clock TLE detection; this is a defence-in-depth backstop against
     // busy-loops that the wall-clock timeout might race with.
     CPU_LIMIT_SLACK_S: 1,
+    // RLIMIT_CPU is set with soft = hard, so reaching it SIGKILLs the program
+    // (no SIGXCPU). A SIGKILL whose wrapper-measured CPU time is within this
+    // many ms of the cap is that backstop, a TLE, not an OOM kill (MLE).
+    CPU_LIMIT_EVIDENCE_TOLERANCE_MS: 100,
     // Address-space (RLIMIT_AS) headroom (MB) added to the problem's memory limit
     // so the runtime/loader/UBSan overhead does not trip the limit before the
     // program's own allocations do. Tune conservatively.
@@ -335,26 +339,126 @@ export const JUDGE_CONFIG = {
 // --- Submission languages ---
 
 /** The closed set of languages a submission may be written in. */
-export const SUPPORTED_LANGUAGES = ['cpp', 'python'] as const;
+export const SUPPORTED_LANGUAGES = ['cpp', 'python', 'java'] as const;
 export type SubmissionLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 /**
- * Per-language judge multipliers applied to a problem's raw limits. One
- * problem serves every language: an interpreter is slower and heavier than
- * compiled C++, so Python gets time x4 / memory x2. C++ is the identity.
+ * Java runtime constants (spec 2026-11-20-java-language-support-design.md).
+ * The JVM reserves far more address space than it touches (heap reservation,
+ * class space, code cache, the lib/modules mmap, CDS archive, thread stacks),
+ * so it cannot run under the C++ `limit + 32 MB` RLIMIT_AS; it gets the heap
+ * plus AS_GRACE_MB instead, and its resident memory is bounded by the run
+ * flags (LANGUAGE_PREPARE.java) and judged by the usual peak-RSS check
+ * against heap + RSS_OVERHEAD_MB.
  */
-export const LANGUAGE_LIMITS: Record<SubmissionLanguage, {
-    timeMultiplier: number;   // C++ = 1, Python = 4
-    memoryMultiplier: number; // C++ = 1, Python = 2
-}> = {
-    cpp: { timeMultiplier: 1, memoryMultiplier: 1 },
-    python: { timeMultiplier: 4, memoryMultiplier: 2 },
+export const JAVA_CONFIG = {
+    /** Absolute JVM paths (time_wrapper execv()s without a PATH lookup). The
+     *  Dockerfile asserts both resolve into the JDK 25 install. */
+    JAVA_PATH: '/usr/bin/java',
+    JAVAC_COMMAND: 'javac',
+    /** Root-owned, read-only directory holding the compiled OjJavaLauncher
+     *  (backend/scripts/java), first on the run classpath. */
+    LAUNCHER_DIR: '/opt/oj/java-launcher',
+    LAUNCHER_CLASS: 'OjJavaLauncher',
+    SOURCE_NAME: 'Main.java',
+    OUTPUT_DIR: 'classes',
+    MAIN_CLASS_FILE: 'classes/Main.class',
+    /** RLIMIT_AS headroom over the heap. Measured on the backend image
+     *  (JDK 25, run flags below): see the measurement note in
+     *  tests/integration/judgeJava.test.ts. */
+    AS_GRACE_MB: 1024,
+    /** Peak-RSS allowance over the heap for the MLE check (JVM code, class
+     *  metadata, code cache, thread stacks). Measured, see above. */
+    RSS_OVERHEAD_MB: 64,
+    /** Heap clamp: the floor lets the JVM start under a tiny limit; the
+     *  ceiling keeps heap + overhead + the idle backend inside the backend
+     *  container's 1 GiB (owner decision 2026-11-20). */
+    MIN_HEAP_MB: 16,
+    MAX_HEAP_MB: 512,
+    /** Exit status of `-XX:+ExitOnOutOfMemoryError` (HotSpot): MLE evidence
+     *  for Java only. A program can exit 3 itself and get MLE; forging a
+     *  WORSE verdict gains nothing (SANDBOX.md, Java). */
+    OOM_EXIT_CODE: 3,
+    /** javac is itself a JVM: its own address-space and wall-clock caps. */
+    COMPILE_AS_LIMIT_BYTES: 2048 * 1024 * 1024,
+    COMPILE_TIMEOUT_MS: 20_000,
+} as const;
+
+/** Shown (as a Compilation Error) when a Java submission has no top-level
+ *  class `Main`, declares a package, or names its public class otherwise. */
+export const JAVA_MAIN_CLASS_HINT =
+    'Java submissions must contain a top-level class named `Main` and no `package` declaration.';
+
+/**
+ * Per-language rules turning a problem's single time/memory limits into the
+ * limits a submission is judged against. One problem serves every language:
+ *  - time   = limit × timeMultiplier + timeOffsetMs
+ *  - memory = clamp(limit × memoryMultiplier, memoryFloorMb, memoryCeilingMb)
+ *             (for Java this is the heap, `-Xmx`)
+ *  - the peak-RSS MLE threshold is memory + rssOverheadMb
+ *  - RLIMIT_AS (the kernel backstop) is memory + asSlackMb
+ * C++ (1x/1x) and Python (4x time, 2x memory) keep the values they always
+ * had; Java gets 2x + 500 ms (JVM start-up and JIT warm-up) and a heap equal
+ * to the limit with a fixed JVM overhead allowance.
+ */
+export interface LanguageLimitRule {
+    timeMultiplier: number;
+    timeOffsetMs: number;
+    memoryMultiplier: number;
+    rssOverheadMb: number;
+    asSlackMb: number;
+    memoryFloorMb?: number;
+    memoryCeilingMb?: number;
+    /** Exit status that is evidence of running out of memory (Java only). */
+    oomExitCode?: number;
+}
+
+export const LANGUAGE_LIMITS: Record<SubmissionLanguage, LanguageLimitRule> = {
+    cpp: { timeMultiplier: 1, timeOffsetMs: 0, memoryMultiplier: 1, rssOverheadMb: 0, asSlackMb: JUDGE_CONFIG.MEMORY_LIMIT_SLACK_MB },
+    python: { timeMultiplier: 4, timeOffsetMs: 0, memoryMultiplier: 2, rssOverheadMb: 0, asSlackMb: JUDGE_CONFIG.MEMORY_LIMIT_SLACK_MB },
+    java: {
+        timeMultiplier: 2,
+        timeOffsetMs: 500,
+        memoryMultiplier: 1,
+        rssOverheadMb: JAVA_CONFIG.RSS_OVERHEAD_MB,
+        asSlackMb: JAVA_CONFIG.AS_GRACE_MB,
+        memoryFloorMb: JAVA_CONFIG.MIN_HEAP_MB,
+        memoryCeilingMb: JAVA_CONFIG.MAX_HEAP_MB,
+        oomExitCode: JAVA_CONFIG.OOM_EXIT_CODE,
+    },
 };
+
+/** The limits one submission is judged against (see LANGUAGE_LIMITS). */
+export interface EffectiveLimits {
+    /** Wall-clock limit per testcase. */
+    timeMs: number;
+    /** The program's memory limit (the heap for Java); shown to the user. */
+    memoryMb: number;
+    /** Peak RSS above this is Memory Limit Exceeded. */
+    rssLimitMb: number;
+    /** RLIMIT_AS handed to the sandbox wrapper. */
+    asLimitMb: number;
+}
+
+export function effectiveLimits(language: SubmissionLanguage, timeLimitMs: number, memoryLimitMb: number): EffectiveLimits {
+    const rule = LANGUAGE_LIMITS[language];
+    let memoryMb = memoryLimitMb * rule.memoryMultiplier;
+    if (rule.memoryFloorMb !== undefined) memoryMb = Math.max(memoryMb, rule.memoryFloorMb);
+    if (rule.memoryCeilingMb !== undefined) memoryMb = Math.min(memoryMb, rule.memoryCeilingMb);
+    return {
+        timeMs: timeLimitMs * rule.timeMultiplier + rule.timeOffsetMs,
+        memoryMb,
+        rssLimitMb: memoryMb + rule.rssOverheadMb,
+        asLimitMb: memoryMb + rule.asSlackMb,
+    };
+}
 
 /** The runnable command the judge executes for a submission. */
 export interface RunnableCommand {
     command: string;
     args: string[];
+    /** Extra variables for the run's otherwise minimal env (PATH, TMPDIR). */
+    env?: Record<string, string>;
 }
 
 /**
@@ -372,23 +476,76 @@ const CPP_COMPILE_FLAGS = [
 ] as const;
 
 /**
+ * JVM flags shared by every Java run (spec decision 6). Serial GC, one
+ * active processor and two JIT compiler threads keep the JVM at ~15 threads
+ * (RLIMIT_NPROC = 64 per uid counts threads); no perf data file (/tmp is
+ * 1755) and no attach listener (never a socket); OOM exits with
+ * JAVA_CONFIG.OOM_EXIT_CODE. The class/code/direct-memory caps bound the
+ * non-heap resident memory. No -Xss: the launcher gives only the student's
+ * main thread a big stack (OjJavaLauncher), so extra threads stay cheap in
+ * address space.
+ */
+const JAVA_RUN_FLAGS = [
+    '-XX:+UseSerialGC',
+    '-XX:ActiveProcessorCount=1',
+    '-XX:CICompilerCount=2',
+    '-XX:-UsePerfData',
+    '-XX:+DisableAttachMechanism',
+    '-XX:+ExitOnOutOfMemoryError',
+    '-XX:MaxMetaspaceSize=64m',
+    '-XX:CompressedClassSpaceSize=32m',
+    '-XX:ReservedCodeCacheSize=48m',
+    '-XX:MaxDirectMemorySize=16m',
+] as const;
+
+/** javac's own JVM: small heap, fast start-up (C1 only), no perf data. */
+const JAVAC_JVM_FLAGS = [
+    '-J-Xmx256m',
+    '-J-XX:+UseSerialGC',
+    '-J-XX:ActiveProcessorCount=1',
+    '-J-XX:TieredStopAtLevel=1',
+    '-J-XX:-UsePerfData',
+    '-J-XX:+DisableAttachMechanism',
+] as const;
+
+/** Caps that replace the shared g++ prlimit/wall-clock caps for one language. */
+export interface CompileLimits {
+    asBytes: number;
+    timeoutMs: number;
+}
+
+/**
  * Per-language "prepare" recipe: how a submission's source is turned into a
  * runnable command. Every language defines
  *  - `sourceExtension`  — file suffix for the written source,
+ *  - `sourceName` / `outputName` — fixed workspace names when the language
+ *    needs them (Java: `Main.java` compiled into `classes/`); otherwise the
+ *    pipeline uses `solution<ext>` / `solution.out`,
  *  - `checkCommand(src, out)` — the compile/verification phase invocation
  *    (g++ for C++, `python3 -m py_compile` for Python — a fast syntax check
- *    whose failure maps to Compilation Error), as an argv array: the compile
- *    is executed WITHOUT a shell (see submissionService's bounded compile),
- *  - `runCommand(src | out)` — what the judge executes,
- *  - `compiledArtifactPath(out)` — the produced artifact to chmod/unlink, or
- *    null for interpreted languages that produce none.
+ *    whose failure maps to Compilation Error, javac for Java), as an argv
+ *    array: the compile is executed WITHOUT a shell (see submissionService's
+ *    bounded compile),
+ *  - `compileLimits` — the language's own compile caps (javac is a JVM),
+ *  - `requiredArtifact` — a file the compile must have produced, else a
+ *    Compilation Error with `message` (Java: `classes/Main.class`),
+ *  - `runCommand(src | out, limits)` — what the judge executes, given the
+ *    submission's effective limits (Java derives its heap flag from them),
+ *  - `compiledArtifactPath(out)` — the produced artifact to chmod, or null
+ *    for interpreted languages that produce none.
  */
-export const LANGUAGE_PREPARE: Record<SubmissionLanguage, {
+export interface LanguagePrepareRecipe {
     sourceExtension: string;
+    sourceName?: string;
+    outputName?: string;
     checkCommand: (sourcePath: string, outputPath: string) => RunnableCommand;
-    runCommand: (path: string) => RunnableCommand;
+    compileLimits?: CompileLimits;
+    requiredArtifact?: { path: string; message: string };
+    runCommand: (path: string, limits: EffectiveLimits) => RunnableCommand;
     compiledArtifactPath: (outputPath: string) => string | null;
-}> = {
+}
+
+export const LANGUAGE_PREPARE: Record<SubmissionLanguage, LanguagePrepareRecipe> = {
     cpp: {
         sourceExtension: '.cpp',
         checkCommand: (sourcePath, outputPath) => ({
@@ -408,6 +565,42 @@ export const LANGUAGE_PREPARE: Record<SubmissionLanguage, {
         // /usr/bin/python3 (inside SANDBOX_PATH).
         runCommand: (sourcePath) => ({ command: '/usr/bin/python3', args: [sourcePath] }),
         compiledArtifactPath: () => null,
+    },
+    java: {
+        sourceExtension: '.java',
+        // javac requires a public class to live in a file of its name, so
+        // the source is always Main.java (spec decision 7).
+        sourceName: JAVA_CONFIG.SOURCE_NAME,
+        outputName: JAVA_CONFIG.OUTPUT_DIR,
+        checkCommand: (sourcePath, outputPath) => ({
+            command: JAVA_CONFIG.JAVAC_COMMAND,
+            // -proc:none: never run annotation processors found on the
+            // classpath (the workspace).
+            args: [...JAVAC_JVM_FLAGS, '-proc:none', '-encoding', 'UTF-8', '-d', outputPath, sourcePath],
+        }),
+        compileLimits: { asBytes: JAVA_CONFIG.COMPILE_AS_LIMIT_BYTES, timeoutMs: JAVA_CONFIG.COMPILE_TIMEOUT_MS },
+        requiredArtifact: { path: JAVA_CONFIG.MAIN_CLASS_FILE, message: JAVA_MAIN_CLASS_HINT },
+        runCommand: (classesDir, limits) => {
+            const workspaceDir = classesDir.replace(/\/[^/]+\/?$/, '');
+            return {
+                command: JAVA_CONFIG.JAVA_PATH,
+                args: [
+                    ...JAVA_RUN_FLAGS,
+                    `-Xmx${limits.memoryMb}m`,
+                    `-Xms${Math.min(limits.memoryMb, 32)}m`,
+                    // Java ignores TMPDIR; keep its temp files and crash log
+                    // in the workspace, the only place the program may write.
+                    `-Djava.io.tmpdir=${workspaceDir}`,
+                    `-XX:ErrorFile=${workspaceDir}/hs_err.log`,
+                    '-cp', `${JAVA_CONFIG.LAUNCHER_DIR}:${classesDir}`,
+                    JAVA_CONFIG.LAUNCHER_CLASS,
+                ],
+                // glibc would reserve a 64 MB malloc arena per thread, all of
+                // it address space under RLIMIT_AS.
+                env: { MALLOC_ARENA_MAX: '2' },
+            };
+        },
+        compiledArtifactPath: (outputPath) => outputPath,
     },
 };
 
@@ -449,7 +642,7 @@ export const HEADER_CPP_PREPARE = {
         command: 'g++',
         args: [...CPP_COMPILE_FLAGS, '-s', ...assemblyFiles, '-o', outputPath],
     }),
-    runCommand: (binaryPath: string): RunnableCommand => LANGUAGE_PREPARE.cpp.runCommand(binaryPath),
+    runCommand: (binaryPath: string): RunnableCommand => ({ command: binaryPath, args: [] }),
 } as const;
 
 export const SUBMISSION_VALIDATION = {

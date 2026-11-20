@@ -273,17 +273,25 @@ export function prlimitAvailable(): boolean {
 /**
  * Wrap a command with `prlimit` resource caps, mirroring the authoring
  * compiler recipe (RUNNER-005). Falls back to the bare command when prlimit
- * is unavailable (local dev).
+ * is unavailable (local dev). `caps` replaces the shared g++ address-space
+ * and CPU caps for a language whose compiler needs more (javac is a JVM).
  */
-export function prlimitWrap(command: string, args: readonly string[]): { command: string; args: string[] } {
+export function prlimitWrap(
+  command: string,
+  args: readonly string[],
+  caps: { asBytes: number; timeoutMs: number } = {
+    asBytes: JUDGE_CONFIG.COMPILE_AS_LIMIT_BYTES,
+    timeoutMs: JUDGE_CONFIG.COMPILE_TIMEOUT_MS,
+  },
+): { command: string; args: string[] } {
   if (!prlimitAvailable()) {
     return { command, args: [...args] };
   }
   return {
     command: JUDGE_CONFIG.PRLIMIT_PATH,
     args: [
-      `--as=${JUDGE_CONFIG.COMPILE_AS_LIMIT_BYTES}`,
-      `--cpu=${Math.ceil(JUDGE_CONFIG.COMPILE_TIMEOUT_MS / 1000) + 1}`,
+      `--as=${caps.asBytes}`,
+      `--cpu=${Math.ceil(caps.timeoutMs / 1000) + 1}`,
       `--nproc=${JUDGE_CONFIG.COMPILE_NPROC_LIMIT}`,
       `--fsize=${JUDGE_CONFIG.COMPILE_FSIZE_LIMIT_BYTES}`,
       '--core=0',
