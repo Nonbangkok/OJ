@@ -226,6 +226,28 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
     expect(lesson.problems.map((p) => p.id)).toEqual(['P0002-renamed']);
   });
 
+  it('restores the problem links of an unchanged lesson once a deleted problem is back', async () => {
+    await importSample();
+    await pool.query(`DELETE FROM problems WHERE id = 'P0003'`);
+    await pool.query(`INSERT INTO problems (id, title, is_visible, difficulty) VALUES ('P0003', 'Subarray Sum K', true, 1300)`);
+    const again = await importSample();
+    expect(again.kind).toBe('imported');
+    expect(again.plan.lessons.changed).toEqual([]);
+    const lesson = (await getLearnLesson('prefix-sums', staff))!;
+    expect(lesson.problems.map((p) => p.id)).toEqual(['P0002', 'P0003']);
+  });
+
+  it('blanks the ids of unavailable problems in the lesson HTML for non-staff', async () => {
+    await importSample();
+    await pool.query(`UPDATE problems SET is_visible = false WHERE id = 'P0002'`);
+    const asLearner = (await getLearnLesson('prefix-sums', learner))!;
+    expect(asLearner.lesson.html).not.toContain('P0002');
+    expect(asLearner.lesson.html).toContain('data-lesson="problem" data-problem=""');
+    expect(asLearner.lesson.html).toContain('data-lesson="solution" data-problem=""');
+    const asStaff = (await getLearnLesson('prefix-sums', staff))!;
+    expect(asStaff.lesson.html).toContain('data-lesson="problem" data-problem="P0002"');
+  });
+
   it('hides a hidden track and everything in it from non-staff', async () => {
     await importSample();
     const trackId = (await pool.query<{ id: number }>(`SELECT id FROM lesson_tracks WHERE slug = 'graphs'`)).rows[0].id;
