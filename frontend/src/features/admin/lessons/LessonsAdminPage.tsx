@@ -6,10 +6,10 @@ import {
 import lessonsAdminService from '../../../services/admin/lessonsAdminService';
 import { getErrorMessage } from '../../../utils/error';
 import { trackPath } from '../../learn/paths';
+import { LESSON_BUNDLE_MAX_BYTES } from '../../../config/upload';
 import type { AdminLessonOverview, LessonImportPlan } from '../../../types';
 import styles from './LessonsAdmin.module.css';
 
-const BUNDLE_MAX_BYTES = 25 * 1024 * 1024;
 const WHEN = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 interface Overview { attempt: number; data: AdminLessonOverview | null; error: string | null }
@@ -107,9 +107,9 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
       <h2 id="lesson-import" className={styles.panelTitle}>Import bundle</h2>
       <FileDrop
         label="Drop lessons-bundle.zip here or choose a file"
-        hint="Built with ./run.sh build-lessons in CP-Author · up to 25 MB"
+        hint="Built with lessons/run.sh build in CP-Author · up to 25 MB"
         accept={['.zip']}
-        maxBytes={BUNDLE_MAX_BYTES}
+        maxBytes={LESSON_BUNDLE_MAX_BYTES}
         disabled={state.step === 'checking' || state.step === 'importing'}
         onFiles={([picked]) => { void check(picked); }}
       />

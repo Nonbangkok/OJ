@@ -80,6 +80,19 @@ describe('prepareLessonHtml', () => {
     expect(cards[0].querySelector('a')).toBeNull();
   });
 
+  it('shows staff the real card of a hidden or contest problem, with why learners cannot see it', () => {
+    const root = mount(prepareLessonHtml(
+      '<div data-lesson="problem" data-problem="P0003"></div>',
+      [problem({ id: 'P0003', title: 'Subarray Sum K', available: false, unavailableReason: 'in_contest', status: 'not_tried' })],
+    ));
+    const card = root.querySelector('[data-lesson="problem"]')!;
+    expect(card.getAttribute('data-state')).toBe('not_tried');
+    expect(card.hasAttribute('data-staff-only')).toBe(true);
+    expect(card.querySelector('[data-part="title"]')!.textContent).toBe('Subarray Sum K');
+    expect(card.querySelector('[data-part="staff-note"]')!.textContent).toBe('In a contest: learners see "Problem unavailable"');
+    expect(card.querySelector('a')!.getAttribute('href')).toBe('/problems/P0003');
+  });
+
   it('marks a guest card without status', () => {
     const root = mount(prepareLessonHtml('<div data-lesson="problem" data-problem="P0002"></div>', [problem({ status: null, bestScore: null })]));
     const card = root.querySelector('[data-lesson="problem"]')!;

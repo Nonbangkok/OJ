@@ -113,7 +113,8 @@ function span(doc: Document, attribute: string, text: string): HTMLSpanElement {
 
 function buildProblemCard(doc: Document, slot: Element, problem: LearnLessonProblem | undefined): void {
   slot.replaceChildren();
-  if (!problem || !problem.available || !problem.id) {
+  // Learners get no id for a problem they may not see; staff do, and see the real card plus why.
+  if (!problem || !problem.id) {
     slot.setAttribute('data-state', 'unavailable');
     slot.append(span(doc, 'mark', ''), span(doc, 'title', 'Problem unavailable'));
     slot.append(span(doc, 'note', 'It is hidden or part of a running contest right now.'));
@@ -133,6 +134,12 @@ function buildProblemCard(doc: Document, slot: Element, problem: LearnLessonProb
   line.setAttribute('data-part', 'line');
   line.append(span(doc, 'id', problem.id), span(doc, 'title', problem.title ?? problem.id));
   text.append(line);
+  if (!problem.available) {
+    slot.setAttribute('data-staff-only', '');
+    text.append(span(doc, 'staff-note', problem.unavailableReason === 'in_contest'
+      ? 'In a contest: learners see "Problem unavailable"'
+      : 'Hidden: learners see "Problem unavailable"'));
+  }
   slot.append(text);
 
   if (problem.difficulty !== null) slot.append(span(doc, 'difficulty', String(problem.difficulty)));
