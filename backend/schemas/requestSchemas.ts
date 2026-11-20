@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { seedSchema } from '../authoring/protocol';
 import { validateProblemFilename, validateSubmissionFilename } from '../utils/problemFilename';
+import { LESSON_ASSET_NAME_PATTERN, LESSON_SLUG_MAX_LENGTH, LESSON_SLUG_PATTERN } from '../constants/lessons';
 import {
   ADMIN_USER_LIST_CONFIG,
   AUTHORING_VALIDATION,
@@ -707,3 +708,27 @@ export const analyticsExportQuerySchema = z.object({
   sortBy: z.string().trim().max(30).optional(),
   sortDir: z.enum(['asc', 'desc']).optional(),
 });
+
+// ---------- Lessons (Learn) ----------
+
+const lessonSlug = z.string().max(LESSON_SLUG_MAX_LENGTH).regex(LESSON_SLUG_PATTERN);
+
+export const learnTrackParamsSchema = z.object({ trackSlug: lessonSlug });
+export const learnLessonParamsSchema = z.object({ lessonSlug });
+export const learnLessonAssetParamsSchema = z.object({
+  lessonSlug,
+  name: z.string().regex(LESSON_ASSET_NAME_PATTERN),
+});
+
+export const lessonProgressBodySchema = z.object({ completed: z.boolean() }).strict();
+
+/** `?dryRun=1` previews; `?confirmRemovals=1` allows deleting completed lessons. */
+const queryFlag = z.enum(['0', '1', 'true', 'false']).optional()
+  .transform((value) => value === '1' || value === 'true');
+export const lessonImportQuerySchema = z.object({
+  dryRun: queryFlag,
+  confirmRemovals: queryFlag,
+}).strict();
+
+export const lessonTrackIdParamsSchema = z.object({ id: z.coerce.number().int().positive() });
+export const lessonTrackVisibilityBodySchema = z.object({ isVisible: z.boolean() }).strict();

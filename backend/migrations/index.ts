@@ -6,6 +6,7 @@ import { contestProblemPositionSql } from './0026ContestProblemPosition';
 import { userLastLoginSql } from './0027UserLastLogin';
 import { authoringJobsDraftTypeIndexSql } from './0028AuthoringJobsDraftTypeIndex';
 import { submissionsContestIdStatements } from './0029SubmissionsContestId';
+import { lessonsSchemaSql } from './0030LessonsSchema';
 import { Migration } from './migrationRunner';
 import { authoringJobDeliverySql } from './0003AuthoringJobDelivery';
 import { authoringJobInputsSql } from './0004AuthoringJobInputs';
@@ -69,4 +70,5 @@ export const migrations: readonly Migration[] = Object.freeze([
   { version: '0027_user_last_login', sql: userLastLoginSql },
   { version: '0028_authoring_jobs_draft_type_index', sql: authoringJobsDraftTypeIndexSql },
   { version: '0029_submissions_contest_id', concurrentStatements: submissionsContestIdStatements },
+  { version: '0030_lessons_schema', sql: lessonsSchemaSql },
 ]);
