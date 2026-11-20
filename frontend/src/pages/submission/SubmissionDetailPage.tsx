@@ -21,7 +21,7 @@ hljs.registerLanguage('java', java);
 
 const highlight = (code: string, language: string): string => {
   try {
-    return hljs.highlight(code, { language: language === 'python' || language === 'java' ? language : 'cpp' }).value;
+    return hljs.highlight(code, { language: hljs.getLanguage(language) ? language : 'cpp' }).value;
   } catch {
     return code.replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch] as string));
   }

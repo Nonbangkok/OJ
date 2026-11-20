@@ -514,7 +514,7 @@ async function runSubmissionPipeline(
         // Checked as the sandbox identity: root cannot look inside the
         // identity's workspace in the lockdown container.
         const present = privileged
-          ? (await runBoundedCompile(workspaceDir, '/usr/bin/test', ['-f', step.file], sandbox)).ok
+          ? (await runBoundedCompile(workspaceDir, JUDGE_CONFIG.FILE_TEST_PATH, ['-f', step.file], sandbox)).ok
           : fs.existsSync(path.join(workspaceDir, step.file));
         if (privileged) await killSandboxProcesses(sandbox);
         if (!present) {

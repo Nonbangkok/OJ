@@ -246,6 +246,9 @@ export const JUDGE_CONFIG = {
     // (no SIGXCPU). A SIGKILL whose wrapper-measured CPU time is within this
     // many ms of the cap is that backstop, a TLE, not an OOM kill (MLE).
     CPU_LIMIT_EVIDENCE_TOLERANCE_MS: 100,
+    // Absolute path of test(1), run as the sandbox identity to check that a
+    // compile produced a required file (Java: classes/Main.class).
+    FILE_TEST_PATH: '/usr/bin/test',
     // Address-space (RLIMIT_AS) headroom (MB) added to the problem's memory limit
     // so the runtime/loader/UBSan overhead does not trip the limit before the
     // program's own allocations do. Tune conservatively.
@@ -489,7 +492,8 @@ const CPP_COMPILE_FLAGS = [
 /**
  * JVM flags shared by every Java run (spec decision 6). Serial GC, one
  * active processor and two JIT compiler threads keep the JVM at ~15 threads
- * (RLIMIT_NPROC = 64 per uid counts threads); no perf data file (/tmp is
+ * (RLIMIT_NPROC = 64 per uid counts threads); JVM messages go to stderr,
+ * never into the judged stdout; no perf data file (/tmp is
  * 1755) and no attach listener (never a socket); OOM exits with
  * JAVA_CONFIG.OOM_EXIT_CODE. The class/code/direct-memory caps bound the
  * non-heap resident memory. No -Xss: the launcher gives only the student's
@@ -497,6 +501,12 @@ const CPP_COMPILE_FLAGS = [
  * address space.
  */
 const JAVA_RUN_FLAGS = [
+    // HotSpot's own output (warnings such as "CodeCache is full") and unified
+    // logging default to STDOUT, where they would corrupt the program's
+    // answer: send them to stderr.
+    '-XX:+DisplayVMOutputToStderr',
+    '-Xlog:disable',
+    '-Xlog:all=warning:stderr',
     '-XX:+UseSerialGC',
     '-XX:ActiveProcessorCount=1',
     '-XX:CICompilerCount=2',

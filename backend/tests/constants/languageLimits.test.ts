@@ -156,6 +156,9 @@ describe('language constants', () => {
                 const run = java.runCommand(`${ws}/classes`, effectiveLimits('java', 1000, 256));
                 expect(run.command).toBe('/usr/bin/java');
                 expect(run.args).toEqual(expect.arrayContaining([
+                    // JVM warnings must never reach the judged stdout.
+                    '-XX:+DisplayVMOutputToStderr',
+                    '-Xlog:all=warning:stderr',
                     '-Xmx256m',
                     '-XX:+UseSerialGC',
                     '-XX:ActiveProcessorCount=1',
