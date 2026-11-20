@@ -45,6 +45,15 @@ describe('readLessonBundle', () => {
     ]));
   });
 
+  it('requires problems named in the body to be listed in module.json', async () => {
+    const tracks = sampleTracks();
+    tracks[1].modules[0].lessons[0].body += '\n\n:::problem P0042';
+    const bundle = await readLessonBundle(await buildLessonBundle(tracks));
+    expect(messages(bundle.issues)).toEqual([
+      'graphs/01-traversal/bfs.md: problem "P0042" is used in the lesson but missing from its "problems" list in module.json',
+    ]);
+  });
+
   it('checks JSON shape, folder names and missing files', async () => {
     const entries = lessonBundleEntries(sampleTracks());
     entries['graphs/track.json'] = JSON.stringify({ slug: 'graph', title: 'Graphs', modules: ['01-traversal'] });

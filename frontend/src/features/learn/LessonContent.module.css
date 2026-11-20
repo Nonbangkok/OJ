@@ -1,0 +1,285 @@
+/* Lesson body (spec §7). Thai prose reads best a little larger and looser
+   than UI text; everything else follows the neutral visual system. */
+
+.content {
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.content > :first-child { margin-top: 0; }
+.content > :last-child { margin-bottom: 0; }
+
+.content :global(p),
+.content :global(ul),
+.content :global(ol),
+.content :global(blockquote),
+.content :global(table) {
+  margin: 0 0 16px;
+}
+
+.content :global(h2),
+.content :global(h3),
+.content :global(h4) {
+  margin: 32px 0 12px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: var(--text-primary);
+  scroll-margin-top: 24px;
+}
+
+.content :global(h2) { font-size: 19px; }
+.content :global(h3) { font-size: 16px; }
+.content :global(h4) { font-size: 15px; }
+
+.content :global(a) {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.content :global(strong) { color: var(--text-primary); font-weight: 600; }
+
+.content :global(ul),
+.content :global(ol) { padding-left: 1.4em; }
+
+.content :global(li + li) { margin-top: 4px; }
+
+.content :global(blockquote) {
+  padding: 2px 0 2px 14px;
+  border-left: 2px solid var(--border-strong);
+  color: var(--text-muted);
+}
+
+.content :global(img) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 8px 0 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.content :global(table) {
+  border-collapse: collapse;
+  font-size: 14px;
+  display: block;
+  overflow-x: auto;
+}
+
+.content :global(th),
+.content :global(td) {
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.content :global(th) { background: var(--background-secondary); color: var(--text-primary); font-weight: 500; }
+
+/* Inline code */
+.content :global(:not(pre) > code) {
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background: var(--background-tertiary);
+  font-family: var(--font-family-mono);
+  font-size: 0.86em;
+  color: var(--text-primary);
+}
+
+/* Display math scrolls instead of overflowing the column on phones. */
+.content :global(.katex-display) {
+  margin: 4px 0 16px;
+  padding: 14px 12px;
+  border-radius: var(--radius-md);
+  background: var(--background-secondary);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.content :global(.katex) { color: var(--text-primary); font-size: 1.05em; }
+
+/* ---------- Code blocks and tabs ---------- */
+
+.content :global([data-lesson='code']),
+.content :global([data-lesson='code-tabs']) {
+  position: relative;
+  margin: 0 0 16px;
+  border: 1px solid var(--editor-border);
+  border-radius: var(--radius-md);
+  background: var(--editor-bg);
+  overflow: hidden;
+}
+
+.content :global(pre) {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--code-text);
+  background: var(--editor-bg);
+}
+
+.content :global(pre code) { font-family: inherit; }
+
+.content :global([data-lesson='tab-list']) {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--editor-border);
+  background: var(--editor-surface);
+}
+
+.content :global([role='tab']) {
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.content :global([role='tab'][aria-selected='true']) {
+  border-bottom-color: var(--text-primary);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.content :global([role='tab']:focus-visible),
+.content :global([data-lesson='copy']:focus-visible) {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: -2px;
+}
+
+.content :global([data-lesson='copy']) {
+  margin-left: auto;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.content :global([data-lesson='copy']:hover) { color: var(--text-primary); background: var(--background-tertiary); }
+
+.content :global([data-lesson='code'] > [data-lesson='copy']) {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
+/* ---------- Hints, solutions, callouts ---------- */
+
+.content :global(details[data-lesson]) {
+  margin: 0 0 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+}
+
+.content :global(details[data-lesson] > summary) {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  list-style-position: inside;
+}
+
+.content :global(details[data-lesson][open] > summary) { border-bottom: 1px solid var(--border-color); }
+
+.content :global(details[data-lesson] > [data-lesson='body']) { padding: 12px 14px 4px; }
+
+.content :global(aside[data-lesson='callout']) {
+  margin: 0 0 16px;
+  padding: 12px 14px 2px;
+  border: 1px solid var(--tint-neutral-border);
+  border-radius: var(--radius-md);
+  background: var(--tint-neutral-bg);
+}
+
+.content :global(aside[data-tone='warning']) {
+  border-color: var(--tint-warning-border);
+  background: var(--tint-warning-bg);
+}
+
+.content :global([data-lesson='callout-title']) {
+  margin-bottom: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tint-neutral-fg);
+}
+
+.content :global(aside[data-tone='warning'] [data-lesson='callout-title']) { color: var(--tint-warning-fg); }
+
+/* ---------- Problem card (:::problem) ---------- */
+
+.content :global([data-lesson='problem']) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+  line-height: 1.4;
+}
+
+.content :global([data-lesson='problem'] [data-part='mark']) {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+}
+
+.content :global([data-lesson='problem'][data-state='solved'] [data-part='mark']) {
+  border-color: var(--status-success);
+  background: var(--status-success);
+}
+
+.content :global([data-lesson='problem'][data-state='attempted'] [data-part='mark']) { border-color: var(--status-danger); }
+
+.content :global([data-part='text']) { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.content :global([data-part='eyebrow']) { font-size: 12px; color: var(--text-muted); }
+.content :global([data-part='line']) { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.content :global([data-part='id']) { font-family: var(--font-family-mono); font-size: 12.5px; color: var(--text-muted); }
+.content :global([data-lesson='problem'] [data-part='title']) { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+.content :global([data-part='difficulty']),
+.content :global([data-part='score']) { font-family: var(--font-family-mono); font-size: 12.5px; color: var(--text-secondary); }
+.content :global([data-part='note']) { flex: 1; font-size: 13px; color: var(--text-muted); }
+
+.content :global([data-lesson-link]) {
+  flex: none;
+  padding: 5px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--text-primary);
+  background: var(--background-primary);
+}
+
+.content :global([data-lesson-link]:hover) { background: var(--background-tertiary); }
+
+.content :global([data-lesson='problem'][data-state='unavailable']) { background: var(--background-secondary); }
+.content :global([data-lesson='problem'][data-state='unavailable'] [data-part='title']) { color: var(--text-muted); }
+
+@media (max-width: 480px) {
+  .content :global([data-lesson='problem']) { flex-wrap: wrap; }
+  .content :global([data-part='difficulty']),
+  .content :global([data-part='score']) { display: none; }
+  .content :global([data-part='note']) { flex-basis: 100%; padding-left: 26px; }
+}

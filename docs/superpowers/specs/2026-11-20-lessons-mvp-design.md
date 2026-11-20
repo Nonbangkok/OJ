@@ -63,7 +63,7 @@ Markdown body: GFM + `$…$` / `$$…$$` math (KaTeX at import), images as `![al
 | `:::tabs` with fenced `cpp` / `python` blocks … `:::` | `<div data-lesson="code-tabs">` |
 | `:::problem P0150` (one line) | `<div data-lesson="problem" data-problem="P0150"></div>` — hydrated into a problem card |
 
-Directive lines become placeholder paragraphs before the statement compiler/sanitizer runs and are swapped for the fixed markup above afterwards, so author text never reaches an attribute except a pattern-checked problem id or an escaped title. `h2`/`h3` get `id="section-N"` and form the stored TOC. Images keep the `{{ASSET_BASE}}` placeholder; the client replaces it with `/api/learn/lessons/<slug>/assets`. Problem ids named in `problems` or in directives must exist in the target grader (checked at import).
+Directive lines become placeholder paragraphs before the statement compiler/sanitizer runs and are swapped for the fixed markup above afterwards, so author text never reaches an attribute except a pattern-checked problem id or an escaped title. `h2`/`h3` get `id="section-N"` and form the stored TOC. Images keep the `{{ASSET_BASE}}` placeholder; the client replaces it with `/api/learn/lessons/<slug>/assets`. Every problem id named by a directive must also be listed in the lesson's `problems` (so the page can build its card from the problem list), and every listed id must exist in the target grader (checked at import).
 
 ## 5. Database (migration `0030LessonsSchema.ts`)
 
@@ -206,7 +206,7 @@ Reused: PageHeader, ProgressBar, StatusMark, TestcaseStrip, DataTable, FileDrop,
 ## 9. Phases
 
 1. Schema + import + read API + seed bundle with 3 lessons. **Status (2026-11-20): built on `feat/lessons-phase1`** — migration 0030, bundle reader, import (dry run / confirm removals), `/learn/*` and `/admin/lessons*` routes; the 3-lesson bundle exists as the test fixture `backend/tests/fixtures/lessonBundle.ts` (the real content and `run.sh build-lessons` belong to CP-Author, phase 3).
-2. `/learn` pages + sidebar entry + admin import panel.
+2. `/learn` pages + sidebar entry + admin import panel. **Status (2026-11-20): built on `feat/lessons-phase2`** (stacked on phase 1) — `pages/learn/{LearnHome,TrackPage,LessonPage}.tsx`, `features/learn/` (`lessonHtml.ts` turns the stored HTML into tabs / highlighted code / problem cards with DOM APIs, `LessonContent` handles clicks by delegation — no effects or portals, so the React Compiler rules hold), `features/admin/lessons/LessonsAdminPage.tsx` (drop → dry run → confirm → import), `services/learnService.ts`, `services/admin/lessonsAdminService.ts`; KaTeX CSS loaded with the lesson page (`katex` 0.16.21 now a direct frontend dependency). Checked in a local stack (Postgres 18 + backend + Vite) on desktop and phone widths.
 3. First real track in CP-Author (5–8 lessons on existing problems), then owner review.
 
 ## 10. Owner decisions (2026-11-20)

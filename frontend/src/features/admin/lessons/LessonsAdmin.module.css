@@ -1,0 +1,72 @@
+/* Manage › Lessons (spec §7). */
+
+.page { display: flex; flex-direction: column; gap: 24px; width: 100%; padding-bottom: 40px; }
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+}
+
+.panelTitle { margin: 0; font-size: 16px; font-weight: 600; color: var(--text-primary); }
+
+.section { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+.sectionLabel {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.muted { color: var(--text-muted); }
+.danger { color: var(--tint-danger-fg); }
+.strong { font-weight: 500; color: var(--text-primary); }
+.mono { font-family: var(--font-family-mono); font-size: 12.5px; color: var(--text-secondary); }
+
+.headerLink { font-size: 13px; color: var(--text-primary); }
+
+.fileLine { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; font-size: 13px; }
+
+.summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: 13px; }
+
+.issues {
+  padding: 12px 14px;
+  border: 1px solid var(--tint-danger-border);
+  border-radius: var(--radius-md);
+  background: var(--tint-danger-bg);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.issuesTitle { margin: 0 0 6px; font-weight: 600; color: var(--tint-danger-fg); }
+.issues ul { margin: 0; padding-left: 1.2em; }
+.issues li + li { margin-top: 4px; }
+
+.tableWrap { border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.table th { padding: 8px 12px; border-bottom: 1px solid var(--border-color); background: var(--background-secondary); text-align: left; font-size: 12px; font-weight: 500; color: var(--text-muted); white-space: nowrap; }
+.table td { padding: 9px 12px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); }
+.table tr:last-child td { border-bottom: 0; }
+.removedRow td { background: var(--tint-danger-bg); }
+
+.confirmRow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+.checkbox { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary); }
+.spacer { flex: 1; }
+
+.columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+
+.rows { margin: 0; padding: 0; list-style: none; border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden; }
+.row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; font-size: 13.5px; background: var(--background-primary); }
+.row + .row { border-top: 1px solid var(--border-color); }
+.rowText { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; }
+
+@media (max-width: 900px) {
+  .columns { grid-template-columns: minmax(0, 1fr); }
+}

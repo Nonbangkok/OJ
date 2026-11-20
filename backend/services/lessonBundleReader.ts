@@ -316,6 +316,13 @@ export async function readLessonBundle(zip: Buffer): Promise<LessonBundle> {
           throw error;
         }
 
+        const listed = new Set(meta.problems.map((p) => p.id));
+        const unlisted = [...new Set(rendered.problemRefs.filter((id) => !listed.has(id)))];
+        if (unlisted.length > 0) {
+          issue(lessonPath, `problem ${unlisted.map((id) => `"${id}"`).join(', ')} is used in the lesson but missing from its "problems" list in module.json`);
+          continue;
+        }
+
         const lesson = {
           slug: meta.slug,
           title: meta.title,

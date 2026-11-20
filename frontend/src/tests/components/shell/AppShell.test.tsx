@@ -123,8 +123,11 @@ describe('AppShell', () => {
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
     const tabs = screen.getByRole('navigation', { name: 'Primary' });
     expect(within(tabs).getAllByRole('link')).toHaveLength(4);
+    expect(within(tabs).queryByRole('link', { name: /learn/i })).toBeNull();
     fireEvent.click(within(tabs).getByRole('button', { name: 'More' }));
     const sheet = screen.getByRole('dialog');
+    // Learn sits under More on phones (owner decision 2026-11-20).
+    expect(within(sheet).getByRole('link', { name: /^learn$/i })).toBeInTheDocument();
     expect(within(sheet).getByRole('link', { name: /ranking/i })).toBeInTheDocument();
     expect(within(sheet).getByRole('link', { name: /authoring/i })).toBeInTheDocument();
   });

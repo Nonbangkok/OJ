@@ -97,6 +97,7 @@ const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
   it('refuses a bundle that names a problem this grader does not have', async () => {
     const tracks = sampleTracks();
     tracks[1].modules[0].lessons[0].body += '\n\n:::problem P9999';
+    tracks[1].modules[0].lessons[0].problems = [{ id: 'P9999', role: 'practice' }];
     const result = await importSample(tracks);
     expect(result.kind).toBe('invalid');
     expect(result.plan.issues).toEqual([{ path: 'graphs/01-traversal/bfs.md', message: 'problem "P9999" does not exist in this grader' }]);
