@@ -125,6 +125,10 @@
 
 .content :global(pre code) { font-family: inherit; }
 
+/* Learners copy these by eye too: show `<=`, `++`, `!=` as typed, not as JetBrains Mono ligatures. */
+.content :global(pre),
+.content :global(code) { font-variant-ligatures: none; }
+
 .content :global([data-lesson='tab-list']) {
   display: flex;
   align-items: center;
