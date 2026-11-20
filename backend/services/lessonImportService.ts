@@ -135,7 +135,12 @@ class ImportStopped extends Error {
   }
 }
 
-async function replaceLessonChildren(client: PoolClient, lessonId: number, lesson: BundleLesson): Promise<void> {
+/**
+ * Problem links are rewritten for every lesson on every import, changed or not:
+ * deleting a problem drops its links by FK cascade, so an unchanged lesson must
+ * get them back once the problem exists again.
+ */
+async function replaceLessonProblems(client: PoolClient, lessonId: number, lesson: BundleLesson): Promise<void> {
   await client.query('DELETE FROM lesson_problems WHERE lesson_id = $1', [lessonId]);
   if (lesson.problems.length > 0) {
     await client.query(
@@ -145,6 +150,9 @@ async function replaceLessonChildren(client: PoolClient, lessonId: number, lesso
       [lessonId, lesson.problems.map((p) => p.id), lesson.problems.map((p) => p.role)],
     );
   }
+}
+
+async function replaceLessonAssets(client: PoolClient, lessonId: number, lesson: BundleLesson): Promise<void> {
   await client.query('DELETE FROM lesson_assets WHERE lesson_id = $1', [lessonId]);
   for (const asset of lesson.assets) {
     await client.query(
@@ -194,7 +202,8 @@ async function writeBundle(client: PoolClient, bundle: LessonBundle, plan: Lesso
           [moduleId, lesson.slug, lesson.title, lesson.summary, lesson.position, lesson.minutes,
             lesson.source, lesson.html, JSON.stringify(lesson.toc), lesson.contentHash],
         );
-        if (touched.has(lesson.slug)) await replaceLessonChildren(client, lessonRow.rows[0].id, lesson);
+        await replaceLessonProblems(client, lessonRow.rows[0].id, lesson);
+        if (touched.has(lesson.slug)) await replaceLessonAssets(client, lessonRow.rows[0].id, lesson);
       }
     }
   }

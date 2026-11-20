@@ -18,7 +18,7 @@ import { createInflateBudget, readZipEntryBounded, ZipEntryLimitError, type Arch
 import { LessonContentError, renderLessonMarkdown, type LessonTocEntry } from './lessonMarkdown';
 
 /**
- * Reads a lessons bundle (spec §4) built by CP-Author's `run.sh build-lessons`:
+ * Reads a lessons bundle (spec §4) built by CP-Author's `lessons/run.sh build`:
  *
  *   manifest.json                     { format: 1, sourceCommit?, tracks: [<trackDir>…] }
  *   <trackDir>/track.json             { slug (= trackDir), title, description?, modules: [<moduleDir>…] }

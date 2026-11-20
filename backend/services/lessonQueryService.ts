@@ -106,6 +106,15 @@ export interface LearnLessonResponse {
 
 const userParam = (viewer: LearnViewer): number | null => viewer.userId;
 
+/**
+ * Blank the `data-problem` id of every problem card / solution block whose
+ * problem the viewer may not see, so the stored HTML does not leak what the
+ * problem list withholds. lessonMarkdown writes the attribute as `data-problem="<id>"`
+ * with an id matching LESSON_PROBLEM_ID_PATTERN (no quotes to escape).
+ */
+const withoutProblemIds = (html: string, hiddenIds: ReadonlySet<string>): string => (hiddenIds.size === 0 ? html
+  : html.replace(/ data-problem="([^"]*)"/g, (whole, id: string) => (hiddenIds.has(id) ? ' data-problem=""' : whole)));
+
 export async function getLearnTracks(viewer: LearnViewer): Promise<LearnTracksResponse> {
   const tracks = await db.query<{
     slug: string; title: string; description: string | null; is_visible: boolean;
@@ -312,13 +321,16 @@ export async function getLearnLesson(lessonSlug: string, viewer: LearnViewer): P
   );
 
   const signedIn = viewer.userId !== null;
+  const hiddenIds = viewer.isStaff ? new Set<string>() : new Set(problems.rows
+    .filter((row) => !(row.is_visible && row.contest_id === null))
+    .map((row) => row.id));
   return {
     lesson: {
       slug: lesson.slug,
       title: lesson.title,
       summary: lesson.summary,
       minutes: lesson.reading_minutes,
-      html: lesson.content_html,
+      html: withoutProblemIds(lesson.content_html, hiddenIds),
       toc: lesson.toc,
       updatedAt: lesson.updated_at,
       completed: signedIn ? order.rows[index]?.completed ?? false : null,
