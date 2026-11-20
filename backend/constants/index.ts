@@ -363,12 +363,20 @@ export const JAVA_CONFIG = {
     SOURCE_NAME: 'Main.java',
     OUTPUT_DIR: 'classes',
     MAIN_CLASS_FILE: 'classes/Main.class',
-    /** RLIMIT_AS headroom over the heap. Measured on the backend image
-     *  (JDK 25, run flags below): see the measurement note in
-     *  tests/integration/judgeJava.test.ts. */
+    /** RLIMIT_AS headroom over the heap. Measured 2026-11-20 on the backend
+     *  image (JDK 25.0.5, run flags below, MALLOC_ARENA_MAX=2): an idle
+     *  hello-world peaks at heap + 691..703 MB of address space (VmPeak, heaps
+     *  64/256/512 MB, measured with a 256 MB launcher main-thread stack; with
+     *  the 64 MB stack it measured heap + ~500 MB, and the launcher now
+     *  reserves 32 MB); the JVM fails to start
+     *  at a grace of 512 MB and starts at 768 MB. 1024 leaves room for
+     *  student threads (1 MB stack each) and mappings. */
     AS_GRACE_MB: 1024,
     /** Peak-RSS allowance over the heap for the MLE check (JVM code, class
-     *  metadata, code cache, thread stacks). Measured, see above. */
+     *  metadata, code cache, thread stacks). Measured 2026-11-20: an idle JVM
+     *  peaks at ~45 MB RSS; holding as much live data as SerialGC allows
+     *  (~70-80% of -Xmx, beyond that the heap itself is out of memory)
+     *  peaked at heap + 32 MB (64 MB heap), below the heap at 256/512 MB. */
     RSS_OVERHEAD_MB: 64,
     /** Heap clamp: the floor lets the JVM start under a tiny limit; the
      *  ceiling keeps heap + overhead + the idle backend inside the backend
@@ -379,8 +387,11 @@ export const JAVA_CONFIG = {
      *  for Java only. A program can exit 3 itself and get MLE; forging a
      *  WORSE verdict gains nothing (SANDBOX.md, Java). */
     OOM_EXIT_CODE: 3,
-    /** javac is itself a JVM: its own address-space and wall-clock caps. */
-    COMPILE_AS_LIMIT_BYTES: 2048 * 1024 * 1024,
+    /** javac is itself a JVM: its own address-space and wall-clock caps.
+     *  Measured 2026-11-20: javac with JAVAC_JVM_FLAGS and MALLOC_ARENA_MAX=2
+     *  compiles under 768 MB (fails without the arena cap even at 2 GB);
+     *  ~0.2 s wall and ~75 MB RSS for a small class on a warm cache. */
+    COMPILE_AS_LIMIT_BYTES: 1024 * 1024 * 1024,
     COMPILE_TIMEOUT_MS: 20_000,
 } as const;
 
@@ -498,7 +509,8 @@ const JAVA_RUN_FLAGS = [
     '-XX:MaxDirectMemorySize=16m',
 ] as const;
 
-/** javac's own JVM: small heap, fast start-up (C1 only), no perf data. */
+/** javac's own JVM: small heap, fast start-up (C1 only), no perf data, and
+ *  bounded class space / code cache so it starts under COMPILE_AS_LIMIT_BYTES. */
 const JAVAC_JVM_FLAGS = [
     '-J-Xmx256m',
     '-J-XX:+UseSerialGC',
@@ -506,7 +518,14 @@ const JAVAC_JVM_FLAGS = [
     '-J-XX:TieredStopAtLevel=1',
     '-J-XX:-UsePerfData',
     '-J-XX:+DisableAttachMechanism',
+    '-J-XX:MaxMetaspaceSize=128m',
+    '-J-XX:CompressedClassSpaceSize=64m',
+    '-J-XX:ReservedCodeCacheSize=32m',
 ] as const;
+
+/** glibc would reserve a 64 MB malloc arena per thread, all of it address
+ *  space under RLIMIT_AS (javac and the run both need the cap). */
+const JVM_ENV = { MALLOC_ARENA_MAX: '2' } as const;
 
 /** Caps that replace the shared g++ prlimit/wall-clock caps for one language. */
 export interface CompileLimits {
@@ -577,6 +596,7 @@ export const LANGUAGE_PREPARE: Record<SubmissionLanguage, LanguagePrepareRecipe>
             // -proc:none: never run annotation processors found on the
             // classpath (the workspace).
             args: [...JAVAC_JVM_FLAGS, '-proc:none', '-encoding', 'UTF-8', '-d', outputPath, sourcePath],
+            env: { ...JVM_ENV },
         }),
         compileLimits: { asBytes: JAVA_CONFIG.COMPILE_AS_LIMIT_BYTES, timeoutMs: JAVA_CONFIG.COMPILE_TIMEOUT_MS },
         requiredArtifact: { path: JAVA_CONFIG.MAIN_CLASS_FILE, message: JAVA_MAIN_CLASS_HINT },
@@ -595,9 +615,7 @@ export const LANGUAGE_PREPARE: Record<SubmissionLanguage, LanguagePrepareRecipe>
                     '-cp', `${JAVA_CONFIG.LAUNCHER_DIR}:${classesDir}`,
                     JAVA_CONFIG.LAUNCHER_CLASS,
                 ],
-                // glibc would reserve a 64 MB malloc arena per thread, all of
-                // it address space under RLIMIT_AS.
-                env: { MALLOC_ARENA_MAX: '2' },
+                env: { ...JVM_ENV },
             };
         },
         compiledArtifactPath: (outputPath) => outputPath,

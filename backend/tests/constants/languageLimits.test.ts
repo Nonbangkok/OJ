@@ -136,7 +136,8 @@ describe('language constants', () => {
                 const { command, args } = java.checkCommand('Main.java', 'classes');
                 expect(command).toBe('javac');
                 expect(args).toEqual(expect.arrayContaining(['-proc:none', '-encoding', 'UTF-8', '-d', 'classes', 'Main.java']));
-                expect(args).toEqual(expect.arrayContaining(['-J-Xmx256m', '-J-XX:+UseSerialGC', '-J-XX:-UsePerfData']));
+                expect(args).toEqual(expect.arrayContaining(['-J-Xmx256m', '-J-XX:+UseSerialGC', '-J-XX:-UsePerfData', '-J-XX:CompressedClassSpaceSize=64m']));
+                expect(java.checkCommand('Main.java', 'classes').env).toEqual({ MALLOC_ARENA_MAX: '2' });
                 expect(args[args.length - 1]).toBe('Main.java');
             });
 

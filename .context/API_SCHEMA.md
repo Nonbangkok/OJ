@@ -551,7 +551,7 @@
 - Purpose: ส่งโค้ดทั้ง global และ contest mode — ผ่าน judge queue (max 3 concurrent)
 - Body:
   - `problemId: string`
-  - `language: 'cpp' | 'python'` (Python ได้ time ×4 / memory ×2)
+  - `language: 'cpp' | 'python' | 'java'` (Python ได้ time ×4 / memory ×2; Java ได้ time ×2 + 500 ms และ heap = memory limit ที่ clamp 16..512 MB; header problem รับแค่ `cpp`)
   - `code: string` (max 64 KiB)
   - `contestId?: string`
 - Body เป็น JSON หรือ `multipart/form-data` ก็ได้; multipart รับเฉพาะ text fields ข้างบน (สูงสุด 4 fields, field ละไม่เกิน 3 × 65536 bytes, ห้ามมีไฟล์)

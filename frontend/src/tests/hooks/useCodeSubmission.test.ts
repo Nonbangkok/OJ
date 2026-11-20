@@ -1,5 +1,6 @@
 import { renderHook, waitFor, act } from '@testing-library/react';
 import useCodeSubmission from '../../hooks/useCodeSubmission';
+import { JAVA_STARTER_TEMPLATE } from '../../utils/constants';
 import submissionService from '../../services/submissionService';
 import { useNavigate } from 'react-router-dom';
 
@@ -146,6 +147,38 @@ describe('useCodeSubmission', () => {
 
         // No python draft: the editor is blank, not the C++ code.
         expect(result.current.code).toBe('');
+    });
+
+    it('starts a Java editor with no draft from the class Main template', () => {
+        const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined));
+
+        act(() => {
+            result.current.setLanguage('java');
+        });
+
+        expect(result.current.language).toBe('java');
+        expect(result.current.code).toBe(JAVA_STARTER_TEMPLATE);
+    });
+
+    it('restores a saved Java draft instead of the template', () => {
+        localStorage.setItem('oj-submission-cache', JSON.stringify({
+            [`${mockProblemId}:java`]: { code: 'public class Main {}', timestamp: new Date().getTime() - 1000 },
+        }));
+
+        const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined));
+
+        expect(result.current.language).toBe('java');
+        expect(result.current.code).toBe('public class Main {}');
+    });
+
+    it('a dropped .java file switches a standard problem to Java', async () => {
+        const { result } = renderHook(() => useCodeSubmission(mockProblemId, undefined));
+        const file = new File(['public class Main { }'], 'Main.java', { type: 'text/x-java' });
+
+        await act(async () => { await result.current.loadFile(file); });
+
+        await waitFor(() => expect(result.current.language).toBe('java'));
+        expect(result.current.code).toBe('public class Main { }');
     });
 
     it('ignores expired cache items', () => {

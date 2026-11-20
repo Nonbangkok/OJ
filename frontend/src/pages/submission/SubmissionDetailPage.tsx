@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import hljs from 'highlight.js/lib/core';
 import cpp from 'highlight.js/lib/languages/cpp';
 import python from 'highlight.js/lib/languages/python';
+import java from 'highlight.js/lib/languages/java';
 import { CaretDown, CaretRight, Copy } from '@phosphor-icons/react';
 import { InlineError, PageHeader } from '../../components/ui';
 import SubmissionResult from '../../features/submission/SubmissionResult';
@@ -16,10 +17,11 @@ const isSubmissionLanguage = (value: string): value is SubmissionLanguage => (SU
 
 hljs.registerLanguage('cpp', cpp);
 hljs.registerLanguage('python', python);
+hljs.registerLanguage('java', java);
 
 const highlight = (code: string, language: string): string => {
   try {
-    return hljs.highlight(code, { language: language === 'python' ? 'python' : 'cpp' }).value;
+    return hljs.highlight(code, { language: language === 'python' || language === 'java' ? language : 'cpp' }).value;
   } catch {
     return code.replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch] as string));
   }

@@ -28,7 +28,7 @@
 | Testing (FE) | Jest + React Testing Library 16 | — |
 | Testing (visual) | Playwright | 1.63 |
 | Language | TypeScript (backend + frontend) | — |
-| Judged Languages | C++ (compiled) and Python (stdlib-only interpreter), executed in an isolated per-submission sandbox | — |
+| Judged Languages | C++ (compiled), Python (stdlib-only interpreter) and Java 25 (javac + JVM via a trusted launcher), executed in an isolated per-submission sandbox | — |
 
 ## System Hierarchy
 
@@ -62,7 +62,7 @@ OJ/
 │   │   ├── authorProfileController.ts  # Author identity API
 │   │   └── authoring*.ts               # Draft/job/testcase/workspace authoring API
 │   ├── services/           # Business logic & external processes
-│   │   ├── judgeService.ts       # Judge C++/Python in per-submission sandbox
+│   │   ├── judgeService.ts       # Judge C++/Python/Java in per-submission sandbox
 │   │   ├── judgeQueue.ts         # Concurrency gate + in-flight registry + contest drain
 │   │   ├── submissionService.ts  # Submission pipeline + startup orphan sweep
 │   │   ├── submissionQueryService.ts # Submission read/queue/query orchestration
@@ -332,7 +332,7 @@ sequenceDiagram
     participant Sandbox
     participant DB
 
-    User->>Frontend: Write C++/Python code, click Submit
+    User->>Frontend: Write C++/Python/Java code, click Submit
     Frontend->>API: POST /submit { code, problemId, language }
     API->>API: requireAuth + wall-clock contest window + testcase-exists check
     API->>DB: INSERT submission (status: Pending)
@@ -364,7 +364,7 @@ sequenceDiagram
 
 Key judging properties:
 - **Sandbox identity model** — each submission draws a uid/gid pair from a pool (60000–60015) that never hands one identity to two live pipelines; its compile and every testcase run share that identity, distinct from any concurrent submission (per-uid RLIMIT_NPROC budgets stay independent). Because root has no CAP_KILL, `time_wrapper --kill-uid` kills every process of the identity before hand-out, after the compile, after each testcase and at the end, with real = saved uid = the identity's own sweeper uid (61000–61015) and effective uid = the identity, so the identity's processes cannot kill the sweep and it reaches nothing else; a failed sweep is a System Error and the uid is quarantined until a later acquisition re-sweeps it and removes its leftovers (retried at most every 60 s, or at once when no clean uid is free). Workspaces under `/tmp/oj-submissions/` are owned by the sandbox identity by construction (uid-dropped create/write/chmod/remove — no `chown`, since the container runs with `cap_drop: ALL` + only SETUID/SETGID). `time_wrapper.c` applies setrlimits, drops to the per-submission uid, and installs a seccomp filter denying socket/socketpair/unshare/setns/ptrace/mount and SysV IPC creation (shmget/semget/msgget). Judged code cannot write `/tmp` (1755), so glibc `tmpfile()` and hard-coded `/tmp` paths fail there. See `SANDBOX.md`.
-- **Languages** — C++ compiles with `g++ -std=c++20 -fsanitize=signed-integer-overflow -fno-sanitize-recover=signed-integer-overflow` (UBSan aborts on signed overflow with exit 1, so it is a Runtime Error even when the output is correct; the UBSan report, which names `solution.cpp` rather than a server path, is shown as the Runtime Error output); Python is syntax-checked with `py_compile` and executed via `/usr/bin/python3` (stdlib only) with time ×4 / memory ×2 limit multipliers. The judge image is Debian trixie (g++ 14, Python 3.13).
+- **Languages** — C++ compiles with `g++ -std=c++20 -fsanitize=signed-integer-overflow -fno-sanitize-recover=signed-integer-overflow` (UBSan aborts on signed overflow with exit 1, so it is a Runtime Error even when the output is correct; the UBSan report, which names `solution.cpp` rather than a server path, is shown as the Runtime Error output); Python is syntax-checked with `py_compile` and executed via `/usr/bin/python3` (stdlib only) with time ×4 / memory ×2 limit multipliers; Java (standard problems only) compiles `Main.java` with `javac` into `classes/` and runs `/usr/bin/java` through the trusted `OjJavaLauncher` with time ×2 + 500 ms and a heap (`-Xmx`) equal to the limit clamped to 16..512 MB (RSS allowance + address-space grace in `JAVA_CONFIG`; OOM exit 3 = MLE). The judge image is Debian trixie (g++ 14, Python 3.13, OpenJDK 25). See SANDBOX.md § Java submissions.
 - **Verdicts are evidence-based** (JUDGE-001/002/008): exit code 124 = TLE; SIGKILL with measured memory over the limit = MLE; SIGSEGV and other signals = Runtime Error. No stderr-keyword heuristics. Time and memory come only from the wrapper's own fd 3, never from stderr (A4-04). Runtime Error output is sanitized — server paths and telemetry look-alikes never reach the submitter — and capped at 4 KiB; on header problems it is only a neutral crash description, because the grader runs in the student's process.
 - **Crash-safety** — the judge queue keeps an in-flight registry; the final verdict UPDATE only lands while the row is still in a non-terminal judgeable state (a stale judge from a rejudge or contest-end migration cannot overwrite a newer verdict). On boot, `sweepOrphanedSubmissions` re-enqueues `Pending` rows and marks `Compiling`/`Running` rows as System Error ("interrupted by server restart").
 - **Rejudge** (`/admin/rejudge/*`) resets and re-enqueues judgeable submissions; rows with a judge already in flight are reported as `busy` (never double-judged), and a second identical rejudge gets 409.

@@ -633,6 +633,9 @@ describe('Submission Service', () => {
             expect(compileArgs[javacAt]).toBe('javac');
             expect(compileArgs.slice(-3)).toEqual(['-d', 'classes', 'Main.java']);
             expect(compileOpts.shell).toBeUndefined();
+            // javac gets the arena cap on top of the minimal compile env.
+            expect(compileOpts.env).toEqual(expect.objectContaining({ PATH: JUDGE_CONFIG.SANDBOX_PATH, MALLOC_ARENA_MAX: '2' }));
+            expect(compileOpts.env.DATABASE_URL).toBeUndefined();
         });
 
         it('judges through the launcher with the heap taken from the effective limits', async () => {

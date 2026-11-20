@@ -65,8 +65,12 @@ async function runBoundedCompile(
   args: readonly string[],
   sandbox: SandboxIdentity,
   timeoutMs: number = JUDGE_CONFIG.COMPILE_TIMEOUT_MS,
+  extraEnv: Readonly<Record<string, string>> = {},
 ): Promise<{ ok: boolean; stderr: string }> {
+  // A language may add variables (javac: MALLOC_ARENA_MAX), never replace
+  // the minimal PATH / LANG / TMPDIR.
   const sandboxEnv = {
+    ...extraEnv,
     PATH: JUDGE_CONFIG.SANDBOX_PATH,
     LANG: 'C.UTF-8',
     TMPDIR: cwd,
@@ -526,6 +530,7 @@ async function runSubmissionPipeline(
         compileCommand.args,
         sandbox,
         step.limits?.timeoutMs,
+        step.command.env,
       );
       // Nothing a compile step started may outlive it (A4-02): root cannot
       // kill a timed-out compile in production (no CAP_KILL), the sweep can.

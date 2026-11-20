@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from 'react';
 import hljs from 'highlight.js/lib/core';
 import cpp from 'highlight.js/lib/languages/cpp';
 import python from 'highlight.js/lib/languages/python';
+import java from 'highlight.js/lib/languages/java';
 import submissionService from '../services/submissionService';
-import { APP_CONSTANTS } from '../utils/constants';
+import { APP_CONSTANTS, JAVA_STARTER_TEMPLATE, SUPPORTED_LANGUAGES } from '../utils/constants';
 import type { SubmissionLanguage } from '../utils/constants';
 import type { SubmitRequest } from '../types';
 import type { FormEvent, MutableRefObject } from 'react';
@@ -12,6 +13,7 @@ import { readSubmissionCache, writeSubmissionCache } from '../utils/submissionDr
 // Register the highlight.js grammar for every supported language.
 hljs.registerLanguage('cpp', cpp);
 hljs.registerLanguage('python', python);
+hljs.registerLanguage('java', java);
 
 /** Reads a dropped file as text (FileReader works in every browser and jsdom). */
 const readFileText = (file: File): Promise<string> =>
@@ -22,7 +24,7 @@ const readFileText = (file: File): Promise<string> =>
     reader.readAsText(file);
   });
 
-const LANGUAGES: SubmissionLanguage[] = ['cpp', 'python'];
+const LANGUAGES: readonly SubmissionLanguage[] = SUPPORTED_LANGUAGES;
 /** The language of this problem's most recent unexpired draft, if any. */
 const draftLanguage = (problemId: string): SubmissionLanguage | null => {
   const cache = readSubmissionCache();
@@ -88,9 +90,10 @@ const useCodeSubmission = (
         writeSubmissionCache(cachedSubmission);
       }
     } else {
-      // No cached draft for this language — start from a blank editor rather
-      // than keeping the other language's code around.
-      setCode('');
+      // No cached draft for this language — start from a blank editor (Java:
+      // the class Main starter the judge expects) rather than keeping the
+      // other language's code around.
+      setCode(cacheKey.endsWith(':java') ? JAVA_STARTER_TEMPLATE : '');
     }
   }, [cacheKey]);
 
@@ -181,11 +184,12 @@ const useCodeSubmission = (
     editorWrapperRef.current?.querySelector('textarea')?.focus();
   };
 
-  /** Loads a dropped/picked file into the editor; a .py file switches a standard problem to Python. */
+  /** Loads a dropped/picked file into the editor; a .py / .java file switches a standard problem to Python / Java. */
   const loadFile = async (file: File) => {
     const text = await readFileText(file);
     if (!submissionFilename) {
-      const next: SubmissionLanguage = file.name.toLowerCase().endsWith('.py') ? 'python' : 'cpp';
+      const name = file.name.toLowerCase();
+      const next: SubmissionLanguage = name.endsWith('.py') ? 'python' : name.endsWith('.java') ? 'java' : 'cpp';
       if (next !== language) {
         // Switching language re-runs the draft-restore effect for the new key;
         // store the file as that language's draft so the restore loads it.

@@ -90,6 +90,7 @@ This drives decision 7 (keep `Main`, friendly hints) and decision 3: a generous 
 - **Accepted consequences.** Document both in `SANDBOX.md`:
   - A program that calls `System.exit(3)` is reported as MLE. The evidence-based policy exists so that nobody can forge a **better** verdict. Forging a worse one only hurts the submitter.
   - "unable to create native thread" is also an `OutOfMemoryError`. It too becomes MLE, which is a fair description of exhausting the thread budget.
+  - **Measured when built:** `Thread.start` throws that error into the program as an ordinary exception, and `ExitOnOutOfMemoryError` does not fire for it. Thread exhaustion is therefore a Runtime Error whose output names it. It is deterministic and documented, which the Testing table allows.
 - **Rejected: classify OOM as RE.** It confuses beginners.
 - **Rejected: match `OutOfMemoryError` in stderr.** It violates the no-stderr-heuristics rule and stderr is forgeable.
 
@@ -141,6 +142,10 @@ Full tiered compilation (C1 + C2) with a bounded thread count:
   - It picks the entry point the way the JDK 25 launcher does (JEP 512). That is `static void main(String[])` first, then the other `main` forms, including instance `main()` for compact source files, via reflection.
   - Stack traces gain one or two launcher frames at the bottom, which is acceptable.
   - The exact size (256 MB) is the builder's call. It must make the deep-recursion row in Testing pass.
+  - **Built: 32 MB** (measured 2026-11-20). With the JIT on, overflowing a stack costs far more than the stack: the thread's resource arena grows while the JVM unwinds, by up to about 6× the stack depending on JIT timing.
+    - 256 MB peaked near 1 GB, which breaks anti-goal 1. 64 MB peaked at 188 or 464 MB.
+    - 32 MB peaks at about 116 MB and holds 200,000 frames every time (often 10⁶). It keeps a full 512 MB heap plus an overflow inside the container.
+    - **Open question for the owner:** a larger stack requires raising the backend `mem_limit`.
 - **Result.** Address space per extra thread drops to about 1 MB. Threads are then bounded by `RLIMIT_NPROC = 64` (about 15 for the JVM, the rest for the student). A program that starts a 16-thread executor works.
 
 - **`-XX:-UsePerfData`**: `/tmp` is mode 1755, so `hsperfdata` cannot be written there.
@@ -278,5 +283,5 @@ Full tiered compilation (C1 + C2) with a bounded thread count:
 5. **A `Scanner`-based default template.**
 6. **Learn highlight.js registration** for `java` is moved to a follow-up after the lessons PR merges.
 7. **No queue weighting**, because concurrency is 1.
-8. **A trusted `OjJavaLauncher`** with a 256 MB main-thread stack instead of `-Xss64m`.
+8. **A trusted `OjJavaLauncher`** with a main-thread stack instead of `-Xss64m` (built with 32 MB, see decision 6).
 9. **The CPU-backstop SIGKILL fix** (TLE instead of MLE) is part of this change.
