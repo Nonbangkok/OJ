@@ -1,0 +1,245 @@
+/* Learn pages (spec §7): /learn, /learn/:track, /learn/:track/:lesson. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  padding-bottom: 40px;
+}
+
+.sectionLabel {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.muted { color: var(--text-muted); }
+.mono { font-family: var(--font-family-mono); font-size: 12.5px; }
+
+.progressBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  width: 220px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+/* ---------- Continue ---------- */
+
+.continue {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+}
+
+.continueText { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
+.continueTitle { margin: 0; font-size: 16px; font-weight: 600; color: var(--text-primary); }
+.continueMeta { margin: 0; font-size: 13px; color: var(--text-muted); }
+
+/* ---------- Track list ---------- */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.list > li + li { border-top: 1px solid var(--border-color); }
+
+.trackRow {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 20px;
+  color: inherit;
+  text-decoration: none;
+  background: var(--background-primary);
+}
+
+.trackRow:hover { background: var(--background-secondary); }
+
+.trackRow:focus-visible,
+.lessonRow:focus-visible {
+  outline: 2px solid var(--action-focus-ring);
+  outline-offset: -2px;
+}
+
+.index { flex: none; width: 22px; font-family: var(--font-family-mono); font-size: 13px; color: var(--text-faint); }
+
+.trackText { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
+.trackTitle { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; font-weight: 600; color: var(--text-primary); }
+.trackDescription { margin: 0; font-size: 13.5px; color: var(--text-secondary); }
+.trackMeta { margin: 0; font-size: 12.5px; color: var(--text-muted); }
+
+.trackProgress { display: flex; flex: none; flex-direction: column; align-items: flex-end; gap: 6px; width: 200px; font-size: 12.5px; color: var(--text-secondary); }
+
+.caret { flex: none; color: var(--text-faint); }
+
+/* ---------- Modules ---------- */
+
+.module { display: flex; flex-direction: column; gap: 10px; }
+
+.moduleHead { display: flex; align-items: baseline; gap: 10px; }
+.moduleTitle { margin: 0; font-size: 16px; font-weight: 600; color: var(--text-primary); }
+.moduleCount { margin-left: auto; font-size: 12.5px; color: var(--text-muted); }
+.moduleSummary { margin: 0; font-size: 13.5px; color: var(--text-muted); }
+
+.lessonRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  color: inherit;
+  text-decoration: none;
+  background: var(--background-primary);
+}
+
+.lessonRow:hover { background: var(--background-secondary); }
+
+.lessonTitle { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; color: var(--text-primary); }
+.lessonSummary { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 400; color: var(--text-muted); }
+.lessonFact { flex: none; width: 92px; text-align: right; font-size: 12.5px; color: var(--text-muted); }
+
+/* ---------- Lesson page ---------- */
+
+.lessonLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 720px) 220px;
+  gap: 48px;
+  align-items: start;
+}
+
+.lessonMain { display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+
+.rail {
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: 13px;
+}
+
+.toc { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+
+.tocLink {
+  display: block;
+  padding: 4px 10px;
+  border-left: 1px solid var(--border-color);
+  color: var(--text-muted);
+  text-decoration: none;
+  line-height: 1.45;
+}
+
+.tocLink:hover { color: var(--text-primary); }
+.tocNested { padding-left: 22px; }
+
+.tocActive {
+  border-left: 2px solid var(--text-primary);
+  padding-left: 9px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.tocNested.tocActive { padding-left: 21px; }
+
+.divider { height: 1px; border: 0; margin: 2px 0; background: var(--border-color); }
+
+.railLessons { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.railLesson { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); text-decoration: none; }
+.railLesson:hover { color: var(--text-primary); }
+.railCurrent { font-weight: 500; color: var(--text-primary); }
+
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-muted); }
+
+/* Practice problems */
+.practiceHead { display: flex; align-items: baseline; gap: 12px; }
+.practiceTitle { margin: 0; font-size: 19px; font-weight: 600; color: var(--text-primary); }
+.practiceCount { margin-left: auto; font-size: 12.5px; color: var(--text-muted); }
+
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tableWrap { border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow-x: auto; }
+.table th { padding: 8px 12px; background: var(--background-secondary); border-bottom: 1px solid var(--border-color); text-align: left; font-size: 12px; font-weight: 500; color: var(--text-muted); white-space: nowrap; }
+.table td { padding: 10px 12px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+.table tr:last-child td { border-bottom: 0; }
+.markCell { width: 16px; padding-right: 0 !important; }
+.idCell { width: 64px; font-family: var(--font-family-mono); font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+.problemLink { font-weight: 500; color: var(--text-primary); text-decoration: none; }
+.problemLink:hover { text-decoration: underline; text-underline-offset: 2px; }
+.bestCell { white-space: nowrap; }
+.best { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-family-mono); font-size: 12.5px; color: var(--text-secondary); }
+.unavailableRow td { background: var(--background-secondary); color: var(--text-muted); }
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.footerSpacer { flex: 1; }
+
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 34%;
+  padding: 7px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-decoration: none;
+  background: var(--background-primary);
+}
+
+.navLink:hover { background: var(--background-tertiary); }
+.navLink span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.done { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--tint-success-fg); }
+
+@media (max-width: 1100px) {
+  .lessonLayout { grid-template-columns: minmax(0, 1fr); }
+  .rail { position: static; order: -1; }
+  .railModule { display: none; }
+}
+
+@media (max-width: 768px) {
+  .trackRow { flex-wrap: wrap; gap: 12px; padding: 14px 16px; }
+  .trackProgress { width: 100%; align-items: stretch; }
+  .caret, .index { display: none; }
+  .lessonFact:last-of-type { display: none; }
+  .progressBlock { width: 100%; align-items: stretch; }
+  .continue { flex-direction: column; align-items: stretch; }
+  .footer { flex-wrap: wrap; }
+  .footer > :global(button) { order: -1; width: 100%; justify-content: center; }
+  .footerSpacer { display: none; }
+  .navLink { max-width: none; flex: 1; }
+  .hideOnPhone { display: none; }
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

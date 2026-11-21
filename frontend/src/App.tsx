@@ -29,6 +29,9 @@ import Submissions from './pages/submission/Submissions';
 import SubmissionDetailPage from './pages/submission/SubmissionDetailPage';
 import UserProfile from './pages/user/UserProfile';
 import NotFound from './pages/notfound/NotFound';
+import LearnHome from './pages/learn/LearnHome';
+import TrackPage from './pages/learn/TrackPage';
+import LessonPage from './pages/learn/LessonPage';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import Admin from './pages/admin/Admin';
@@ -56,6 +59,7 @@ import AnalysisPage from './features/admin/analysis/AnalysisPage';
 import ProblemEditPage from './features/admin/problems/ProblemEditPage';
 import ContestEditPage from './features/admin/contests/ContestEditPage';
 import ProblemAuthoring from './features/admin/authoring/ProblemAuthoring';
+import LessonsAdminPage from './features/admin/lessons/LessonsAdminPage';
 import {
   DraftMetadata,
   DraftStatement,
@@ -127,6 +131,9 @@ export const appRoutes = createRoutesFromElements(
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/contests" element={<PrivateRoute><Contests /></PrivateRoute>} />
+      <Route path="/learn" element={<PrivateRoute><LearnHome /></PrivateRoute>} />
+      <Route path="/learn/:trackSlug" element={<PrivateRoute><TrackPage /></PrivateRoute>} />
+      <Route path="/learn/:trackSlug/:lessonSlug" element={<PrivateRoute><LessonPage /></PrivateRoute>} />
       {/* Anything no other route matches (including unknown /admin and
           /contests/:id sub-paths) gets a real 404 page, not the router's
           developer error screen. */}
@@ -155,6 +162,7 @@ export const appRoutes = createRoutesFromElements(
       <Route path="authoring/:draftId/editor" element={<ProblemAuthoring editorMode />} />
       <Route path="contests" element={<ContestManagement />} />
       <Route path="contests/:contestId/:tab?" element={<ContestEditPage />} />
+      <Route path="lessons" element={<LessonsAdminPage />} />
       <Route path="settings" element={<Settings />} />
       <Route path="analysis" element={<AnalysisPage />} />
       <Route path="analysis/:tab" element={<AnalysisPage />} />

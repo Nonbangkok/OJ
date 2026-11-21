@@ -63,7 +63,7 @@ Markdown body: GFM + `$…$` / `$$…$$` math (KaTeX at import), images as `![al
 | `:::tabs` with fenced `cpp` / `python` blocks … `:::` | `<div data-lesson="code-tabs">` |
 | `:::problem P0150` (one line) | `<div data-lesson="problem" data-problem="P0150"></div>` — hydrated into a problem card |
 
-Directive lines become placeholder paragraphs before the statement compiler/sanitizer runs and are swapped for the fixed markup above afterwards, so author text never reaches an attribute except a pattern-checked problem id or an escaped title. `h2`/`h3` get `id="section-N"` and form the stored TOC. Images keep the `{{ASSET_BASE}}` placeholder; the client replaces it with `/api/learn/lessons/<slug>/assets`. Problem ids named in `problems` or in directives must exist in the target grader (checked at import).
+Directive lines become placeholder paragraphs before the statement compiler/sanitizer runs and are swapped for the fixed markup above afterwards, so author text never reaches an attribute except a pattern-checked problem id or an escaped title. `h2`/`h3` get `id="section-N"` and form the stored TOC. Images keep the `{{ASSET_BASE}}` placeholder; the client replaces it with `/api/learn/lessons/<slug>/assets`. Every problem id named by a directive must also be listed in the lesson's `problems` (so the page can build its card from the problem list), and every listed id must exist in the target grader (checked at import).
 
 ## 5. Database (migration `0030LessonsSchema.ts`)
 
@@ -205,9 +205,21 @@ Reused: PageHeader, ProgressBar, StatusMark, TestcaseStrip, DataTable, FileDrop,
 
 ## 9. Phases
 
-1. Schema + import + read API + seed bundle with 3 lessons. **Status (2026-11-20): built on `feat/lessons-phase1`** — migration 0030, bundle reader, import (dry run / confirm removals), `/learn/*` and `/admin/lessons*` routes; the 3-lesson bundle exists as the test fixture `backend/tests/fixtures/lessonBundle.ts` (the real content and `run.sh build-lessons` belong to CP-Author, phase 3).
-2. `/learn` pages + sidebar entry + admin import panel.
-3. First real track in CP-Author (5–8 lessons on existing problems), then owner review.
+1. Schema + import + read API + seed bundle with 3 lessons. **Status (2026-11-20): built on `feat/lessons-phase1`** — migration 0030, bundle reader, import (dry run / confirm removals), `/learn/*` and `/admin/lessons*` routes; the 3-lesson bundle exists as the test fixture `backend/tests/fixtures/lessonBundle.ts` (the real content and its build script belong to CP-Author, phase 3).
+2. `/learn` pages + sidebar entry + admin import panel. **Status (2026-11-20): built on `feat/lessons-phase2`** (stacked on phase 1) — `pages/learn/{LearnHome,TrackPage,LessonPage}.tsx`, `features/learn/` (`lessonHtml.ts` turns the stored HTML into tabs / highlighted code / problem cards with DOM APIs, `LessonContent` handles clicks by delegation — no effects or portals, so the React Compiler rules hold), `features/admin/lessons/LessonsAdminPage.tsx` (drop → dry run → confirm → import), `services/learnService.ts`, `services/admin/lessonsAdminService.ts`; KaTeX CSS loaded with the lesson page (`katex` 0.16.21 now a direct frontend dependency). Checked in a local stack (Postgres 18 + backend + Vite) on desktop and phone widths.
+3. First real track in CP-Author (5–8 lessons on existing problems), then owner review. **Status (2026-11-20): built on CP-Author branch `add-lessons-data-structures`** — `lessons/` with `build.py` / `run.sh {check|build}` (stdlib Python, mirrors the backend rules; replaces the `run.sh build-lessons` name used above) and the 7-lesson track *Data Structures (CP::)* over the 50 header problems; the bundle passes the backend reader and imports cleanly on a local stack. Next tracks (29 lessons over the owner's 25-topic list, new problems for each) are planned in CP-Author `lessons/CURRICULUM.md`.
+
+4. Full curriculum (CP-Author `lessons/CURRICULUM.md`). **Status (2026-11-20): written** — Foundations (11 lessons), Intermediate (13), Advanced (5) next to Data Structures (7): 36 lessons, 82 new `lp_*` problems in `standard-problems/` (Nonbangkok's red-gate-v1 statements; every problem verified: reference AC, Python AC at x4, `slow.cpp` TLE at the promised subtask). CP-Author PRs #2 → #3 → #4.
+5. Review and end-to-end check. **Status (2026-11-20): done.** Code review of both OJ PRs fixed: problem links lost by FK cascade are restored on re-import; non-staff lesson HTML no longer carries the ids of hidden / contest problems; staff see the real card of an unavailable problem with the reason; lesson code renders without font ligatures; the bundle cap moved to `config/upload.ts`. E2E on a throwaway Postgres 18 + backend + Vite: 82-problem ZIP via the batch importer, 36-lesson bundle through Manage › Lessons (dry run, then import), bulk publish, then every lesson checked in the browser (KaTeX without errors, code tabs, problem cards, practice tables, no horizontal overflow at 375 px), plus the guest / learner / staff views of hidden, contest-attached and hidden-track states.
+
+### Shipping (owner)
+
+1. Merge OJ #58, then #59 (retarget it to `main` once #58 is in), and approve the `production` deploy; migration 0030 runs on start.
+2. Merge CP-Author #2 → #3 → #4. In a CP-Author checkout of `main`: `cd standard-problems && ./run.sh build --all` (then `./run.sh verify --all` if you want the proof again) and `cd ../lessons && ./run.sh build`.
+3. Production, Manage › Problems → Import ZIP: `standard-problems/dist/standard-problems.zip` (~124 MiB, goes chunked). The 82 `lp_*` problems arrive **hidden** in the collections "Learn — Foundations / Intermediate / Advanced"; spot-check a few (PDF, 10 testcases).
+4. Publish them: Hidden tab → select all → Show, repeated until the tab reads 0 (the page shows 25 rows at a time).
+5. Manage › Lessons → drop `lessons/dist/lessons-bundle.zip`. The dry run must say **+36 added, 0 issues, new tracks: foundations, intermediate, advanced, data-structures**; then Import. Tracks are visible as soon as they are imported; to review first, Hide them on the same page, read them as staff, then Show.
+6. Check `/learn` as a guest or student: 4 tracks, 36 lessons, problem cards resolve.
 
 ## 10. Owner decisions (2026-11-20)
 
