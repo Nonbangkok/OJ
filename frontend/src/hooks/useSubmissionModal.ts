@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import hljs from 'highlight.js/lib/core';
 import cpp from 'highlight.js/lib/languages/cpp';
 import python from 'highlight.js/lib/languages/python';
+import java from 'highlight.js/lib/languages/java';
 import { UI_TIMEOUTS } from '../config/constants';
 import { getStatusClass } from '../utils/formatters';
 import { SUBMISSION_STATUS } from '../utils/constants';
@@ -11,6 +12,7 @@ import type { SubmissionDetail, TestCaseResult } from '../types';
 // submissions are highlighted with their own language.
 hljs.registerLanguage('cpp', cpp);
 hljs.registerLanguage('python', python);
+hljs.registerLanguage('java', java);
 
 type ParsedResults = TestCaseResult[] | 'error' | null;
 

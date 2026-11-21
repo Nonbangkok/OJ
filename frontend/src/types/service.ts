@@ -24,7 +24,7 @@ export interface AdminResetPasswordRequest {
 
 export interface SubmitRequest {
   problemId: string;
-  language: 'cpp' | 'python';
+  language: 'cpp' | 'python' | 'java';
   code: string;
   contestId?: string | number;
 }

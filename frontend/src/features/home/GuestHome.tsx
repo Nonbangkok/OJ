@@ -39,7 +39,7 @@ export default function GuestHome() {
     <div className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.title}>Grader</h1>
-        <p className={styles.lead}>Practice problems in C++ and Python, judged in seconds. Browse freely; log in to submit.</p>
+        <p className={styles.lead}>Practice problems in C++, Python and Java, judged in seconds. Browse freely; log in to submit.</p>
       </header>
 
       {contests.length > 0 && (

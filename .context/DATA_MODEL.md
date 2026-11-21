@@ -121,7 +121,7 @@ erDiagram
         INT user_id FK "ON DELETE SET NULL"
         VARCHAR50 problem_id FK "ON DELETE CASCADE"
         TEXT code
-        VARCHAR20 language "cpp | python"
+        VARCHAR20 language "cpp | python | java"
         VARCHAR50 overall_status
         INT score
         JSONB results
@@ -303,7 +303,7 @@ Global (practice-pool) code submissions, including the submissions of finished c
 | `user_id` | `INT` | FK → `users(id)` ON DELETE SET NULL |
 | `problem_id` | `VARCHAR(50)` | FK → `problems(id)` ON DELETE CASCADE ON UPDATE CASCADE |
 | `code` | `TEXT` | NOT NULL |
-| `language` | `VARCHAR(20)` | NOT NULL (`"cpp"` or `"python"`) |
+| `language` | `VARCHAR(20)` | NOT NULL (`"cpp"`, `"python"` or `"java"`) |
 | `overall_status` | `VARCHAR(50)` | NOT NULL |
 | `score` | `INT` | NOT NULL (0–100) |
 | `results` | `JSONB` | Per-test-case results array |

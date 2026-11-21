@@ -482,6 +482,80 @@ an accepted limit:
   from its own memory or `/proc/self/exe`. Covert channels (verdict, time,
   exit code) still leak slowly; graders must not embed answers or secrets.
 
+## Java submissions
+
+Java (`language = 'java'`, OpenJDK 25 from Debian trixie, standard problems
+only — header problems stay C++) runs through the same pipeline, uid drop,
+seccomp filter, sweeps and evidence-based verdicts as C++ and Python. The
+spec is `docs/superpowers/specs/2026-11-20-java-language-support-design.md`;
+what differs, and why:
+
+- **Compile.** The source is always `Main.java`; `javac -proc:none -encoding
+  UTF-8 -d classes Main.java` runs as the sandbox identity under prlimit,
+  with its own caps (`JAVA_CONFIG.COMPILE_AS_LIMIT_BYTES` /
+  `COMPILE_TIMEOUT_MS`): javac is a JVM and cannot start under the g++
+  768 MB address-space cap. `-proc:none` keeps it from running annotation
+  processors found on the classpath. A compile that leaves no
+  `classes/Main.class` (a `package` line, no class `Main`) is a Compilation
+  Error with a fixed hint; the check runs as the identity, since root cannot
+  look inside its workspace.
+- **Address space.** The JVM reserves far more address space than it touches
+  (heap reservation, class space, code cache, the `lib/modules` mmap, CDS
+  archive, thread stacks), so `RLIMIT_AS` is the heap plus
+  `JAVA_CONFIG.AS_GRACE_MB` rather than the heap plus 32 MB. Resident memory
+  is bounded by the run flags instead — `-Xmx` = the problem's limit clamped
+  to 16..512 MB, `MaxMetaspaceSize`, `CompressedClassSpaceSize`,
+  `ReservedCodeCacheSize`, `MaxDirectMemorySize`, `MALLOC_ARENA_MAX=2` — and
+  judged by the usual peak-RSS check against the heap plus
+  `JAVA_CONFIG.RSS_OVERHEAD_MB`. The 512 MB heap ceiling keeps a Java run
+  plus the idle backend inside the backend container's 1 GiB
+  (`MAX_CONCURRENT_JUDGES` is 1; revisit both together if that changes).
+- **Out of memory is MLE by exit status.** `-XX:+ExitOnOutOfMemoryError`
+  makes the JVM exit with status 3 when the heap (or metaspace) runs out;
+  for Java only, that status is MLE evidence. (Running out of threads is
+  different: `Thread.start` throws "unable to create native thread" into the
+  program as an ordinary exception, so it ends as a Runtime Error naming it.) A program can `System.exit(3)`
+  and be reported MLE: the evidence-based rule exists so nobody can forge a
+  *better* verdict, and forging a worse one only hurts the submitter. Exit 3
+  stays a Runtime Error for C++ and Python. Stderr is never read for it.
+- **Threads.** Judged programs are thread-only (seccomp, §8); the JVM's own
+  threads are bounded by `-XX:+UseSerialGC -XX:ActiveProcessorCount=1
+  -XX:CICompilerCount=2` (about 15), well inside `RLIMIT_NPROC = 64`, which
+  counts threads. `ProcessBuilder`/`Runtime.exec` fail (EPERM on the non-thread
+  `clone`), sockets fail (EPERM on `socket`; the JDK's socket class then
+  fails to initialize, a Runtime Error), and `-XX:+DisableAttachMechanism`
+  means the JVM never opens its attach socket.
+- **Stack.** No JVM-wide `-Xss`: it would give every thread, the JVM's own
+  Java threads included, a large stack that counts against `RLIMIT_AS`. The
+  trusted launcher `OjJavaLauncher` (`backend/scripts/java`, compiled into
+  the image at `/opt/oj/java-launcher`, root-owned and read-only, first on
+  the classpath) runs the student's `Main` on a thread named `main` with a
+  32 MB stack and keeps the `java` launcher's semantics (JEP 512 entry-point
+  order, so compact source files work; uncaught exception → stack trace and
+  exit 1; non-daemon threads keep the JVM alive). It holds nothing to
+  protect: the student's code shares its JVM, and the process sandbox is the
+  boundary. Why 32 MB: a stack overflow costs far more than the stack, since
+  the thread's resource arena grows while the JVM unwinds, by up to ~6x the
+  stack size depending on JIT timing (measured: 64 MB peaked at 188 or
+  464 MB RSS, 256 MB near 1 GB). 32 MB always holds 200,000 frames of a
+  simple recursion (often 10^6) and its overflow peaked at ~116 MB, so a full
+  512 MB heap plus an overflow plus the JVM stays inside what the 1 GiB
+  backend container leaves next to Node. A bigger stack needs a bigger
+  `mem_limit`. The Security Manager is gone (JDK 24+) and is not relied on; JNI
+  `System.load` of a file the program wrote is native code under the same uid
+  and filter.
+- **Files and env.** `/tmp` is 1755, so `-XX:-UsePerfData` (no
+  `hsperfdata`), `-Djava.io.tmpdir=<workspace>` (Java ignores `TMPDIR`) and
+  `-XX:ErrorFile=<workspace>/hs_err.log` keep every write in the workspace.
+  The run env is `PATH`, `TMPDIR` and `MALLOC_ARENA_MAX` only; a runnable's
+  extra variables can never replace `PATH` or `TMPDIR`, and no
+  `JAVA_TOOL_OPTIONS`-style variable reaches the JVM.
+- **CPU backstop.** `RLIMIT_CPU` is set with soft = hard, so reaching it
+  SIGKILLs the program; JIT/GC threads on a second CPU make that likelier for
+  Java. A SIGKILL whose wrapper-measured CPU time reached the cap, with the
+  peak RSS within the limit, is a TLE (all languages); any other SIGKILL is
+  still MLE.
+
 ## Stretch / recommended next step: a dedicated `judge` container
 
 Move all compilation and execution out of the API backend into a separate,

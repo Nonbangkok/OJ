@@ -294,6 +294,17 @@ describe('submissionQueryService visibility (PROBLEM-001 / SUB-001 / SUB-002)', 
             });
         });
 
+        it('rejects Java submissions to a header problem', async () => {
+            query
+                .mockResolvedValueOnce({ rows: [{ exists: 1 }] })
+                .mockResolvedValueOnce({ rows: [{ exists: 1, problem_type: 'header' }] });
+
+            await expect(validateAndQueueSubmission({ ...base, language: 'java' }, 5)).rejects.toMatchObject({
+                statusCode: 400,
+                message: 'This problem accepts C++ only.',
+            });
+        });
+
         it('rejects submissions when the header problem has no grader .cpp', async () => {
             query
                 .mockResolvedValueOnce({ rows: [{ exists: 1 }] })

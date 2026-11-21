@@ -104,8 +104,13 @@ describe('requestSchemas size & validation caps', () => {
       expect(submitSchema.safeParse({ ...base, language: 'python', code: 'print(1)' }).success).toBe(true);
     });
 
+    it('accepts java', () => {
+      expect(submitSchema.safeParse({ ...base, language: 'java', code: 'public class Main {}' }).success).toBe(true);
+    });
+
     it('rejects unknown languages', () => {
-      expect(submitSchema.safeParse({ ...base, language: 'java' }).success).toBe(false);
+      expect(submitSchema.safeParse({ ...base, language: 'kotlin' }).success).toBe(false);
+      expect(submitSchema.safeParse({ ...base, language: 'Java' }).success).toBe(false); // case-sensitive
       expect(submitSchema.safeParse({ ...base, language: 'C++' }).success).toBe(false); // case-sensitive
       expect(submitSchema.safeParse({ ...base, language: '' }).success).toBe(false);
     });

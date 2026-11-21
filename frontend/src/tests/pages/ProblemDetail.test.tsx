@@ -52,7 +52,7 @@ describe('ProblemDetail page', () => {
         renderPage();
         expect(await screen.findByRole('heading', { level: 1, name: 'Test Problem' })).toBeInTheDocument();
         expect(screen.getByText('1000 ms · 256 MB')).toBeInTheDocument();
-        expect(screen.getByText('C++ · Python')).toBeInTheDocument();
+        expect(screen.getByText('C++ · Python · Java 25')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Ada' })).toHaveAttribute('href', '/problems?author=Ada');
         const crumbs = screen.getByRole('navigation', { name: /breadcrumb/i });
         expect(within(crumbs).getByRole('link', { name: 'Basics' })).toHaveAttribute('href', '/problems?collection=2');

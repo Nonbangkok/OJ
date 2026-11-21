@@ -11,6 +11,7 @@ import type { ProblemDetail as ProblemDetailModel } from '../../types';
 import { useContest } from '../../features/contest/ContestContext';
 import { problemLetter } from '../../features/contest/letters';
 import { useCountdown } from '../../components/shell/useCountdown';
+import { SUPPORTED_LANGUAGES, getLanguageDisplayName } from '../../utils/constants';
 
 type Tab = 'statement' | 'submit' | 'submissions';
 const TABS: Tab[] = ['statement', 'submit', 'submissions'];
@@ -18,7 +19,7 @@ const TABS: Tab[] = ['statement', 'submit', 'submissions'];
 const languagesLine = (problem: ProblemDetailModel) =>
   problem.problem_type === 'header' && problem.submission_filename
     ? `C++ · submit ${problem.submission_filename}`
-    : 'C++ · Python';
+    : SUPPORTED_LANGUAGES.map(getLanguageDisplayName).join(' · ');
 
 /** Statement tab: the PDF in a centred frame (at most 960px wide) with a loading line. */
 function Statement({ problem, pdfUrl }: { problem: ProblemDetailModel; pdfUrl: string }) {

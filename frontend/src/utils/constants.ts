@@ -45,7 +45,7 @@ export const SUBMISSION_STATUS = {
 } as const;
 
 /** Closed set of submission languages, mirroring backend SUPPORTED_LANGUAGES. */
-export const SUPPORTED_LANGUAGES = ['cpp', 'python'] as const;
+export const SUPPORTED_LANGUAGES = ['cpp', 'python', 'java'] as const;
 export type SubmissionLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 /** Display names for the submission languages. Unknown keys fall back to the
@@ -53,6 +53,7 @@ export type SubmissionLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 export const LANGUAGE_DISPLAY_NAMES: Record<SubmissionLanguage, string> = {
   cpp: 'C++',
   python: 'Python',
+  java: 'Java 25',
 };
 
 /** Map a submission language key to its display name; unknown keys (e.g. a
@@ -114,16 +115,40 @@ export function difficultyBand(difficulty: number | null | undefined): number | 
 }
 
 /**
- * The judge's per-language multipliers on a problem's limits (mirrors backend LANGUAGE_LIMITS):
- * Python gets time x4 and memory x2, C++ runs at the problem's own limits.
+ * The judge's per-language rules on a problem's limits (mirrors backend LANGUAGE_LIMITS /
+ * effectiveLimits): time = limit x timeMultiplier + timeOffsetMs, memory = limit x memoryMultiplier
+ * clamped to [memoryFloorMb, memoryCeilingMb]. C++ runs at the problem's own limits, Python gets
+ * time x4 and memory x2, Java gets time x2 + 500 ms and a heap equal to the limit (16..512 MB).
  */
-export const LANGUAGE_LIMITS: Record<SubmissionLanguage, { timeMultiplier: number; memoryMultiplier: number }> = {
-  cpp: { timeMultiplier: 1, memoryMultiplier: 1 },
-  python: { timeMultiplier: 4, memoryMultiplier: 2 },
+export const LANGUAGE_LIMITS: Record<SubmissionLanguage, {
+  timeMultiplier: number;
+  timeOffsetMs: number;
+  memoryMultiplier: number;
+  memoryFloorMb?: number;
+  memoryCeilingMb?: number;
+}> = {
+  cpp: { timeMultiplier: 1, timeOffsetMs: 0, memoryMultiplier: 1 },
+  python: { timeMultiplier: 4, timeOffsetMs: 0, memoryMultiplier: 2 },
+  java: { timeMultiplier: 2, timeOffsetMs: 500, memoryMultiplier: 1, memoryFloorMb: 16, memoryCeilingMb: 512 },
 };
 
-/** The limits a run in `language` was actually judged against. */
+/** The limits a run in `language` was actually judged against (for Java the memory is the heap). */
 export const judgedLimits = (language: string, timeMs: number, memoryMb: number): { timeMs: number; memoryMb: number } => {
-  const multipliers = LANGUAGE_LIMITS[language as SubmissionLanguage] ?? LANGUAGE_LIMITS.cpp;
-  return { timeMs: timeMs * multipliers.timeMultiplier, memoryMb: memoryMb * multipliers.memoryMultiplier };
+  const rule = LANGUAGE_LIMITS[language as SubmissionLanguage] ?? LANGUAGE_LIMITS.cpp;
+  let memory = memoryMb * rule.memoryMultiplier;
+  if (rule.memoryFloorMb !== undefined) memory = Math.max(memory, rule.memoryFloorMb);
+  if (rule.memoryCeilingMb !== undefined) memory = Math.min(memory, rule.memoryCeilingMb);
+  return { timeMs: timeMs * rule.timeMultiplier + rule.timeOffsetMs, memoryMb: memory };
 };
+
+/** What a Java editor starts with: the judge runs class `Main` (no package). */
+export const JAVA_STARTER_TEMPLATE = `import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner in = new Scanner(System.in);
+        // For large inputs, BufferedReader is much faster than Scanner.
+
+    }
+}
+`;

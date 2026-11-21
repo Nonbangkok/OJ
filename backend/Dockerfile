@@ -14,6 +14,19 @@ RUN apt-get update \
     && apt-get install -y build-essential time python3 postgresql-client-18 \
     && test "$(command -v python3)" = "/usr/bin/python3"
 
+# Java submissions: OpenJDK 25 (LTS) from Debian trixie, headless JDK
+# (javac + java). Its own layer, so the layers above stay cached. The judge
+# runs /usr/bin/java by absolute path (time_wrapper execv()s with no PATH
+# lookup), so both commands must resolve into the JDK 25 install.
+# The man directory works around openjdk's postinst on slim images.
+RUN mkdir -p /usr/share/man/man1 \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends openjdk-25-jdk-headless \
+    && rm -rf /var/lib/apt/lists/* \
+    && readlink -f /usr/bin/java | grep -q '/java-25-openjdk-' \
+    && readlink -f /usr/bin/javac | grep -q '/java-25-openjdk-' \
+    && java -version
+
 # sharp's SVG fallback avatars need actual glyphs in the deployed runtime.
 # DejaVu covers Latin; Garuda supplies Thai initials instead of missing-glyph boxes.
 RUN apt-get update \
@@ -41,6 +54,13 @@ COPY backend/. .
 # root-owned 1733 submissions root, created here so nobody can claim it.
 RUN chmod 1755 /tmp /var/tmp /run/lock \
     && install -d -o root -g root -m 1733 /tmp/oj-submissions
+
+# The trusted Java launcher (scripts/java/OjJavaLauncher.java): root-owned
+# and read-only, first on every Java run's classpath.
+RUN install -d -o root -g root -m 0755 /opt/oj/java-launcher \
+    && javac -proc:none -encoding UTF-8 -d /opt/oj/java-launcher scripts/java/OjJavaLauncher.java \
+    && chmod 0644 /opt/oj/java-launcher/*.class \
+    && test -f /opt/oj/java-launcher/OjJavaLauncher.class
 
 # Compile the high-precision time wrapper
 RUN gcc scripts/time_wrapper.c -o scripts/time_wrapper

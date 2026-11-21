@@ -8,7 +8,7 @@ import { publishRealtime } from '../../services/realtimeHub';
 import { awardSolveReward } from '../../services/progressionService';
 import { enqueueTrackedJudgeTask } from '../../services/judgeQueue';
 import { getHeaderJudgeSpec } from '../../services/problemFilesService';
-import { JUDGE_CONFIG } from '../../constants';
+import { JAVA_CONFIG, JAVA_MAIN_CLASS_HINT, JUDGE_CONFIG, effectiveLimits } from '../../constants';
 
 jest.mock('../../db');
 // The header-problem spec is read through its own service (own db.query
@@ -96,6 +96,15 @@ const benignSpawn = (command: string) => {
     return child;
 };
 
+/**
+ * The runnable judge() was handed in call `callIndex`: the pipeline passes a
+ * factory of the effective limits (Java derives its heap flag from them).
+ */
+const judgedRunnable = (callIndex = 0, language: 'cpp' | 'python' | 'java' = 'cpp') => {
+    const runnable = (judge as jest.Mock).mock.calls[callIndex][1];
+    return typeof runnable === 'function' ? runnable(effectiveLimits(language, 1000, 256)) : runnable;
+};
+
 /** The Compilation Error output the pipeline persisted (results JSON). */
 const compilationErrorOutput = (callIndex: number): string =>
     JSON.parse((db.query as jest.Mock).mock.calls[callIndex][1][0])[0].output;
@@ -180,7 +189,8 @@ describe('Submission Service', () => {
             expect(db.query).toHaveBeenNthCalledWith(3, expect.stringContaining('UPDATE submissions SET overall_status = \'Running\''), [1]);
 
             // Verify judge was called with the compiled binary runnable and language
-            expect(judge).toHaveBeenCalledWith('P1', { command: expect.stringContaining('.out'), args: [] }, 'cpp', expect.anything());
+            expect(judge).toHaveBeenCalledWith('P1', expect.any(Function), 'cpp', expect.anything());
+            expect(judgedRunnable()).toEqual({ command: expect.stringContaining('.out'), args: [] });
 
             // Verify final results saved
             expect(db.query).toHaveBeenNthCalledWith(4, expect.stringContaining('UPDATE submissions\n       SET overall_status'), ['Accepted', 100, JSON.stringify([{ testCase: 1, status: 'Accepted' }]), 10, 2048, 1]);
@@ -493,12 +503,8 @@ describe('Submission Service', () => {
 
             // Judge receives the python interpreter runnable, the language,
             // and the submission's sandbox identity.
-            expect(judge).toHaveBeenCalledWith(
-                'P1',
-                { command: '/usr/bin/python3', args: [expect.stringContaining('.py')] },
-                'python',
-                expect.anything()
-            );
+            expect(judge).toHaveBeenCalledWith('P1', expect.any(Function), 'python', expect.anything());
+            expect(judgedRunnable(0, 'python')).toEqual({ command: '/usr/bin/python3', args: [expect.stringContaining('.py')] });
         });
 
         it('maps a py_compile syntax error to Compilation Error with sanitized stderr', async () => {
@@ -578,6 +584,124 @@ describe('Submission Service', () => {
             for (const [target] of chmodCalls) {
                 expect(String(target)).not.toContain('.out');
             }
+        });
+    });
+
+    describe('java submissions', () => {
+        /** A compile child that writes `stderr` and exits `code`. */
+        const compileExits = (code: number, stderr = '') => {
+            (cp.spawn as unknown as jest.Mock).mockImplementationOnce(() => {
+                const handlers: Record<string, (...a: unknown[]) => void> = {};
+                const child = {
+                    pid: 1111,
+                    stdout: { on: (_e: string, fn: (...a: unknown[]) => void) => { handlers.stdout = fn; } },
+                    stderr: { on: (_e: string, fn: (...a: unknown[]) => void) => { handlers.stderr = fn; } },
+                    on: (event: string, fn: (...a: unknown[]) => void) => { handlers[event] = fn; },
+                    kill: jest.fn(),
+                };
+                setImmediate(() => {
+                    handlers.stderr?.(Buffer.from(stderr));
+                    handlers.close?.(code, null);
+                });
+                return child;
+            });
+        };
+        const accepted = { results: [], score: 100, overallStatus: 'Accepted', maxTimeMs: 0, maxMemoryKb: 0 };
+        /** Queue exactly the db calls the run makes (a leftover queued value
+         *  would leak into the next test). */
+        const javaSubmission = (code = 'public class Main { public static void main(String[] a) {} }', compiles = true) => {
+            (db.query as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ problem_id: 'P1', code, language: 'java' }] }) // SELECT
+                .mockResolvedValueOnce({}) // UPDATE Compiling
+                .mockResolvedValueOnce({}); // UPDATE Running / Compilation Error
+            if (compiles) (db.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 }); // UPDATE final results
+        };
+
+        it('writes Main.java and compiles it with javac into classes/ under the Java compile caps', async () => {
+            javaSubmission();
+            (judge as jest.Mock).mockResolvedValueOnce(accepted);
+
+            await processSubmission(1);
+
+            const written = (fs.promises.writeFile as jest.Mock).mock.calls.map(([file]) => String(file));
+            expect(written.some((file) => file.endsWith('/Main.java'))).toBe(true);
+            const [compileCmd, compileArgs, compileOpts] = (cp.spawn as unknown as jest.Mock).mock.calls[0];
+            expect(compileCmd).toBe(JUDGE_CONFIG.PRLIMIT_PATH);
+            expect(compileArgs).toContain(`--as=${JAVA_CONFIG.COMPILE_AS_LIMIT_BYTES}`);
+            expect(compileArgs).toContain(`--cpu=${Math.ceil(JAVA_CONFIG.COMPILE_TIMEOUT_MS / 1000) + 1}`);
+            const javacAt = compileArgs.indexOf('--') + 1;
+            expect(compileArgs[javacAt]).toBe('javac');
+            expect(compileArgs.slice(-3)).toEqual(['-d', 'classes', 'Main.java']);
+            expect(compileOpts.shell).toBeUndefined();
+            // javac gets the arena cap on top of the minimal compile env.
+            expect(compileOpts.env).toEqual(expect.objectContaining({ PATH: JUDGE_CONFIG.SANDBOX_PATH, MALLOC_ARENA_MAX: '2' }));
+            expect(compileOpts.env.DATABASE_URL).toBeUndefined();
+        });
+
+        it('judges through the launcher with the heap taken from the effective limits', async () => {
+            javaSubmission();
+            (judge as jest.Mock).mockResolvedValueOnce(accepted);
+
+            await processSubmission(1);
+
+            expect(judge).toHaveBeenCalledWith('P1', expect.any(Function), 'java', expect.anything());
+            const run = judgedRunnable(0, 'java');
+            expect(run.command).toBe(JAVA_CONFIG.JAVA_PATH);
+            expect(run.args).toContain('-Xmx256m');
+            expect(run.args[run.args.length - 1]).toBe(JAVA_CONFIG.LAUNCHER_CLASS);
+            expect(run.args[run.args.length - 2]).toMatch(/oj-submissions\/.*\/classes$/);
+            expect(run.env).toEqual({ MALLOC_ARENA_MAX: '2' });
+        });
+
+        it('is a Compilation Error with the Main hint when javac produced no Main.class', async () => {
+            javaSubmission('package foo; public class Main { public static void main(String[] a) {} }', false);
+            (fs.existsSync as jest.Mock).mockImplementation((file: string) => !String(file).endsWith('Main.class'));
+
+            try {
+                await processSubmission(1);
+            } finally {
+                (fs.existsSync as jest.Mock).mockImplementation(() => true);
+            }
+
+            expect(db.query).toHaveBeenNthCalledWith(3,
+                expect.stringContaining('UPDATE submissions SET overall_status = \'Compilation Error\''),
+                [expect.any(String), 1]);
+            expect(compilationErrorOutput(2)).toBe(JAVA_MAIN_CLASS_HINT);
+            expect(judge).not.toHaveBeenCalled();
+        });
+
+        it('appends the Main hint to javac\'s public-class file-name error, with no server paths', async () => {
+            javaSubmission('public class Solution { public static void main(String[] a) {} }', false);
+            compileExits(1, '/tmp/oj-submissions/sub_1_x/Main.java:1: error: class Solution is public, should be declared in a file named Solution.java\npublic class Solution {\n       ^\n1 error\n');
+
+            await processSubmission(1);
+
+            const output = compilationErrorOutput(2);
+            expect(output).toContain('class Solution is public, should be declared in a file named Solution.java');
+            expect(output).toContain('Main.java:1: error');
+            expect(output).not.toContain('oj-submissions');
+            expect(output.endsWith(JAVA_MAIN_CLASS_HINT)).toBe(true);
+            expect(judge).not.toHaveBeenCalled();
+        });
+
+        it('leaves other javac errors without the hint', async () => {
+            javaSubmission('public class Main { int x = ; }', false);
+            compileExits(1, 'Main.java:1: error: illegal start of expression\n1 error\n');
+
+            await processSubmission(1);
+
+            const output = compilationErrorOutput(2);
+            expect(output).toContain('illegal start of expression');
+            expect(output).not.toContain(JAVA_MAIN_CLASS_HINT);
+        });
+
+        it('does not run the C++ include guard over Java sources', async () => {
+            javaSubmission('// #include "/etc/passwd"\npublic class Main { public static void main(String[] a) {} }');
+            (judge as jest.Mock).mockResolvedValueOnce(accepted);
+
+            await processSubmission(1);
+
+            expect(judge).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -1306,7 +1430,8 @@ describe('Submission Service', () => {
                 expect(sourceScrub).toBeLessThan(compilerRuns[1]);
                 expect(compilerRuns[1]).toBeLessThan(assemblyScrub);
                 expect(assemblyScrub).toBeLessThan((judge as jest.Mock).mock.invocationCallOrder[0]);
-                expect(judge).toHaveBeenCalledWith('H1', { command: expect.stringContaining('.out'), args: [] }, 'cpp', expect.anything());
+                expect(judge).toHaveBeenCalledWith('H1', expect.any(Function), 'cpp', expect.anything());
+                expect(judgedRunnable()).toEqual({ command: expect.stringContaining('.out'), args: [] });
             });
 
             it('fails the submission (System Error) and never assembles or runs when the scrub fails', async () => {

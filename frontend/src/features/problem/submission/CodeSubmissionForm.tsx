@@ -44,7 +44,7 @@ const CodeSubmissionForm = ({ problemId, contestId = null, submissionFilename = 
     }
   };
 
-  const accept = submissionFilename ? ['.h', '.hpp'] : ['.cpp', '.cc', '.py'];
+  const accept = submissionFilename ? ['.h', '.hpp'] : ['.cpp', '.cc', '.py', '.java'];
 
   return (
     <div className={styles['submission-form-container']}>

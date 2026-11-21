@@ -3,7 +3,7 @@ import { PassThrough } from 'stream';
 import { judge, formatRuntimeErrorOutput } from '../../services/judgeService';
 import * as db from '../../db';
 import cp from 'child_process';
-import { SUBMISSION_STATUS, JUDGE_CONFIG, LANGUAGE_LIMITS } from '../../constants';
+import { SUBMISSION_STATUS, JUDGE_CONFIG, JAVA_CONFIG, LANGUAGE_LIMITS, EffectiveLimits, RunnableCommand } from '../../constants';
 import { normalizeOutput, outputsMatch } from '../../utils/outputComparison';
 import { canDropPrivileges, killSandboxProcesses } from '../../utils/sandboxProcess';
 
@@ -455,6 +455,122 @@ describe('Judge Service', () => {
             const result = await judge('P1', cpp, 'cpp');
 
             expect(result.overallStatus).toBe(SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED);
+        });
+    });
+
+    describe('Java (spec 2026-11-20)', () => {
+        const java = (limits: EffectiveLimits): RunnableCommand => ({
+            command: JAVA_CONFIG.JAVA_PATH,
+            args: [`-Xmx${limits.memoryMb}m`, 'OjJavaLauncher'],
+            env: { MALLOC_ARENA_MAX: '2' },
+        });
+
+        it('builds the run command from the effective limits and hands the wrapper heap + AS grace', async () => {
+            mockProblem();
+            mockRunOnce();
+            const factory = jest.fn(java);
+
+            const result = await judge('P1', factory, 'java');
+
+            expect(factory).toHaveBeenCalledWith({
+                timeMs: 2500,
+                memoryMb: 256,
+                rssLimitMb: 256 + JAVA_CONFIG.RSS_OVERHEAD_MB,
+                asLimitMb: 256 + JAVA_CONFIG.AS_GRACE_MB,
+            });
+            const [, args] = spawnMock.mock.calls[0];
+            expect(args.slice(0, 3)).toEqual(['-k', `${Math.max(1, Math.ceil(JUDGE_CONFIG.KILL_GRACE_MS / 1000))}s`, '2.5s']);
+            const wrapperAt = args.indexOf(JUDGE_CONFIG.TIME_WRAPPER_PATH);
+            expect(args.slice(wrapperAt + 1, wrapperAt + 4)).toEqual([
+                JAVA_CONFIG.JAVA_PATH,
+                String(256 + JAVA_CONFIG.AS_GRACE_MB),
+                String(3 + JUDGE_CONFIG.CPU_LIMIT_SLACK_S),
+            ]);
+            expect(args.slice(-2)).toEqual(['-Xmx256m', 'OjJavaLauncher']);
+            expect(result.timeLimitMs).toBe(2500);
+            expect(result.memoryLimitMb).toBe(256);
+        });
+
+        it('adds the runnable\'s extra env to the minimal run env', async () => {
+            mockProblem();
+            mockRunOnce();
+
+            await judge('P1', java, 'java', { workspaceDir: '/tmp/oj-submissions/sub_9_ws' });
+
+            const [, , opts] = spawnMock.mock.calls[0];
+            expect(opts.env).toEqual({ PATH: JUDGE_CONFIG.SANDBOX_PATH, TMPDIR: '/tmp/oj-submissions/sub_9_ws', MALLOC_ARENA_MAX: '2' });
+        });
+
+        it('does not let a runnable env override PATH or TMPDIR', async () => {
+            mockProblem();
+            mockRunOnce();
+            const hostile = (): RunnableCommand => ({ command: '/x', args: [], env: { PATH: '/evil', TMPDIR: '/tmp' } });
+
+            await judge('P1', hostile, 'java', { workspaceDir: '/tmp/oj-submissions/sub_9_ws' });
+
+            const [, , opts] = spawnMock.mock.calls[0];
+            expect(opts.env.PATH).toBe(JUDGE_CONFIG.SANDBOX_PATH);
+            expect(opts.env.TMPDIR).toBe('/tmp/oj-submissions/sub_9_ws');
+        });
+
+        it('treats the JVM out-of-memory exit status as Memory Limit Exceeded', async () => {
+            mockProblem();
+            mockRunOnce({ code: JAVA_CONFIG.OOM_EXIT_CODE, telemetry: telemetryLine(150000, '0.300+0.050'), stderr: 'Terminating due to java.lang.OutOfMemoryError: Java heap space\n' });
+
+            const result = await judge('P1', java, 'java');
+
+            expect(result.overallStatus).toBe(SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED);
+            expect(result.results[0].memoryKb).toBe(150000);
+        });
+
+        it('keeps exit 3 a Runtime Error for C++ and Python', async () => {
+            for (const [runnable, language] of [[cpp, 'cpp'], [python, 'python']] as const) {
+                mockProblem();
+                mockRunOnce({ code: 3, telemetry: telemetryLine(1200) });
+                const result = await judge('P1', runnable, language);
+                expect(result.overallStatus).toBe(SUBMISSION_STATUS.RUNTIME_ERROR);
+            }
+        });
+
+        it('judges Java MLE against heap + overhead, not the bare heap', async () => {
+            const heapKb = 256 * 1024;
+            mockProblem();
+            mockRunOnce({ code: 0, telemetry: telemetryLine(heapKb + 30 * 1024) });
+            expect((await judge('P1', java, 'java')).overallStatus).toBe(SUBMISSION_STATUS.ACCEPTED);
+
+            mockProblem();
+            mockRunOnce({ code: 0, telemetry: telemetryLine(heapKb + (JAVA_CONFIG.RSS_OVERHEAD_MB + 1) * 1024) });
+            expect((await judge('P1', java, 'java')).overallStatus).toBe(SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED);
+        });
+    });
+
+    describe('CPU backstop (RLIMIT_CPU hard limit SIGKILLs the program)', () => {
+        it('is a TLE when the wrapper measured the CPU cap being reached', async () => {
+            // cpp, 1000 ms: CPU cap = ceil(1 s) + slack = 2 s.
+            mockProblem();
+            mockRunOnce({ code: 128 + 9, telemetry: telemetryLine(5000, '1.960+0.045') });
+
+            const result = await judge('P1', cpp, 'cpp');
+
+            expect(result.overallStatus).toBe(SUBMISSION_STATUS.TIME_LIMIT_EXCEEDED);
+        });
+
+        it('stays MLE when the peak RSS is over the limit even at the CPU cap', async () => {
+            mockProblem();
+            mockRunOnce({ code: 128 + 9, telemetry: telemetryLine(300 * 1024, '1.990+0.020') });
+
+            const result = await judge('P1', cpp, 'cpp');
+
+            expect(result.overallStatus).toBe(SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED);
+        });
+
+        it('stays MLE for a SIGKILL well below the CPU cap', async () => {
+            mockProblem();
+            mockRunOnce({ code: 128 + 9, telemetry: telemetryLine(5000, '1.200+0.050') });
+
+            const result = await judge('P1', cpp, 'cpp');
+
+            expect(result.overallStatus).toBe(SUBMISSION_STATUS.MEMORY_LIMIT_EXCEEDED);
         });
     });
 
