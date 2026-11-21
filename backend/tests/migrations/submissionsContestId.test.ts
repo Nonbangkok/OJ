@@ -5,9 +5,10 @@ describe('submissions.contest_id migration (A5-04)', () => {
   const statements = () => (migration as { concurrentStatements: readonly string[] }).concurrentStatements
     .map((s) => s.replace(/\s+/g, ' ').trim());
 
-  it('is registered last, as separate statements (submissions is the largest table)', () => {
+  it('is registered after 0028, as separate statements (submissions is the largest table)', () => {
     expect(migration).toBeDefined();
-    expect(migrations[migrations.length - 1]).toBe(migration);
+    const index = migrations.indexOf(migration!);
+    expect(migrations[index - 1]?.version).toBe('0028_authoring_jobs_draft_type_index');
     expect('concurrentStatements' in migration!).toBe(true);
   });
 

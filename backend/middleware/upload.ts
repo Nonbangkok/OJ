@@ -11,6 +11,7 @@ import {
     USER_AVATAR,
 } from '../constants';
 import { AppError } from './errorHandler';
+import { LESSON_LIMITS } from '../constants/lessons';
 import { CHUNKED_BATCH_UPLOAD_MULTER_FILE_SIZE_BYTES } from '../services/chunkedBatchUploadService';
 import { privateTempDir } from '../utils/privateTemp';
 
@@ -166,3 +167,27 @@ export const chunkDiskUpload = multer({
     storage: diskStorage,
     limits: { fileSize: CHUNKED_BATCH_UPLOAD_MULTER_FILE_SIZE_BYTES },
 });
+
+// Staff lesson bundle import (POST /admin/lessons/import): one ZIP held in
+// memory, no text fields (flags travel in the query string).
+const lessonBundleUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: LESSON_LIMITS.BUNDLE_MAX_BYTES, files: 1, fields: 0, parts: 1 },
+});
+const lessonBundleOnly = (): AppError => new AppError(
+    `The import takes only the "${LESSON_LIMITS.BUNDLE_FIELD_NAME}" ZIP file`,
+    400,
+);
+export const parseLessonBundleUpload: RequestHandler = withMulterMessages(
+    lessonBundleUpload.single(LESSON_LIMITS.BUNDLE_FIELD_NAME),
+    {
+        LIMIT_FILE_SIZE: () => new AppError(
+            `The lessons bundle must not exceed ${LESSON_LIMITS.BUNDLE_MAX_BYTES / (1024 * 1024)} MiB`,
+            413,
+        ),
+        LIMIT_FIELD_COUNT: lessonBundleOnly,
+        LIMIT_PART_COUNT: lessonBundleOnly,
+        LIMIT_FILE_COUNT: lessonBundleOnly,
+        LIMIT_UNEXPECTED_FILE: lessonBundleOnly,
+    },
+);

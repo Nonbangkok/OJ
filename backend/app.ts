@@ -28,6 +28,8 @@ import analyticsRoutes from './controllers/analyticsController';
 import { createAuthoringJobRouter } from './controllers/authoringJobController';
 import authoringTestcaseRoutes from './controllers/authoringTestcaseController';
 import authoringWorkspaceRoutes from './controllers/authoringWorkspaceController';
+import lessonRoutes from './controllers/lessonController';
+import adminLessonRoutes from './controllers/adminLessonController';
 
 type RuntimeEnv = ReturnType<typeof parseRuntimeEnv>;
 
@@ -130,6 +132,8 @@ export const createApp = (options: CreateAppOptions = {}): Express => {
   app.use('/', userProfileRoutes);
   app.use('/', homeRoutes);
   app.use('/', analyticsRoutes);
+  app.use('/', lessonRoutes);
+  app.use('/', adminLessonRoutes);
 
   app.get('/', (_req: Request, res: Response) => {
     res.send('Grader System API is running!');
